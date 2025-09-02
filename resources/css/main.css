@@ -1,0 +1,124 @@
+
+
+#printMe {
+  position: absolute;
+  z-index: -40;
+  left: 0;
+  top: 0;
+  width: 100%;
+}
+
+
+.apexcharts-toolbar {
+  display: none !important;
+}
+
+.table-without-padding .ant-pagination {
+  @apply px-6;
+}
+
+
+.ant-table-thead th {
+  background: #009EFB !important;
+  @apply text-white border-none !important;
+}
+
+.ant-table-thead th::before {
+  background-color: transparent !important;
+}
+
+/* modals */
+.ant-modal-header {
+  background: #009EFB !important;
+}
+
+.ant-modal-header .ant-modal-title,
+.ant-modal-close {
+  @apply text-white !important;
+}
+
+.ant-modal .ant-modal-content {
+  @apply rounded-lg !important;
+}
+
+.ant-modal .ant-modal-header {
+  @apply rounded-t-lg !important;
+}
+
+.ant-table-row:hover td {
+  @apply bg-gray-100 border-transparent !important;
+}
+
+.ant-modal>.ant-modal-content>.ant-modal-header {
+  @apply pr-[46px]
+}
+
+.transfer-dropdown-overlay > .ant-dropdown-content > .ant-dropdown-menu-root > [tabindex='-1'].ant-dropdown-menu-item:hover,
+.ant-dropdown-menu-submenu-title:hover {
+  /* @apply text-[#1F9BF4] bg-[#1f9bf41a] !important; */
+}
+
+.account-settings-input {
+  @apply text-black !important;
+}
+
+.contact-filter-popover > .ant-popover-content > .ant-popover-arrow {
+  display: none !important;
+}
+
+.contact-filter-popover > .ant-popover-content > .ant-popover-inner > .ant-popover-inner-content {
+  padding: 0 !important;
+}
+
+.contact-filter-popover > .ant-popover-content > .ant-popover-inner {
+  border-radius: 4px !important;
+}
+
+.contact-filter-popover > .ant-popover-content > .ant-popover-inner > .ant-popover-inner-content > .ant-menu-inline {
+  border-right: 0 !important;
+  border-radius: 4px !important;
+}
+
+.contact-filter-popover > .ant-popover-content > .ant-popover-inner > .ant-popover-inner-content > .ant-menu-inline > li {
+  padding: 0 16px !important;
+  line-height: 20px !important;
+  margin-bottom: 0 !important;
+}
+
+.contact-filter-popover > .ant-popover-content > .ant-popover-inner > .ant-popover-inner-content > .ant-menu-inline > li > .ant-menu-submenu-title {
+  padding: 0 38px 0 0 !important;
+  line-height: 20px !important;
+  margin-bottom: 0 !important;
+  height: 30px !important;
+}
+
+.contact-filter-popover > .ant-popover-content > .ant-popover-inner > .ant-popover-inner-content > .ant-menu-inline > li > ul > li {
+  padding-left: 18px !important;
+  line-height: 20px !important;
+  margin-bottom: 0 !important;
+  height: 30px !important;
+}
+
+.contact-filter-popover > .ant-popover-content > .ant-popover-inner > .ant-popover-inner-content > .ant-menu-inline > li > ul > li {
+  background-color: transparent !important;
+}
+
+.contact-filter-popover > .ant-popover-content > .ant-popover-inner > .ant-popover-inner-content > .ant-menu-inline > li > ul > li::after {
+  border-right: 0 !important;
+}
+
+.contact-filter-popover > .ant-popover-content > .ant-popover-inner > .ant-popover-inner-content > .ant-menu-inline > .ant-menu-item-selected {
+  background-color: transparent !important;
+}
+
+.contact-filter-popover > .ant-popover-content > .ant-popover-inner > .ant-popover-inner-content > .ant-menu-inline > .ant-menu-item-selected::after {
+  border-right: 0 !important;
+}
+
+@media (max-width: 700px) {
+
+  .ant-pagination.ant-table-pagination.ant-table-pagination-right,
+  .ant-table-content table {
+      @apply w-[700px] !important;
+  }
+}
