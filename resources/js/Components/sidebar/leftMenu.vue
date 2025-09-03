@@ -93,6 +93,7 @@ const menuSelectedKeys = ref([])
                         >
                             <component
                                 class="flex-shrink-0"
+                            
                                 v-if="menu.icon"
                                 :is="menu.icon"
                             />
