@@ -10,9 +10,7 @@ import LeftMenu from "@/Components/sidebar/leftMenu.vue";
 import LeftSidebarWrapper from "@/Components/sidebar/leftWrapper.vue";
 import LeftAccountSettings from "@/Components/sidebar/leftAccountSettings.vue";
 import { useAuth } from "@/composables/useAuth";
-import { useSidebar } from "@/composables/useSidebar"
-
-
+import { useSidebar } from "@/composables/useSidebar";
 
 const { user } = useAuth();
 const { isCollapsed } = useSidebar();
@@ -22,19 +20,25 @@ const collapsed = ref(false);
 </script>
 
 <template>
-  <a-layout>
-    <left-sidebar-wrapper >
+  <a-layout
+    class="relative bg-dots-darker bg-center bg-gray-100 dark:bg-dots-lighter dark:bg-gray-900 selection:bg-red-500 selection:text-white"
+  >
+    <left-sidebar-wrapper>
       <!-- menu -->
       <left-menu />
 
       <!-- account-settings -->
-      <left-account-settings :user="user" :leftSidebatdCollapsed="isCollapsed" />
+      <left-account-settings
+        :user="user"
+        :leftSidebatdCollapsed="isCollapsed"
+      />
     </left-sidebar-wrapper>
-    <a-layout>
-      <main>
-        <slot />
-      </main>
-    </a-layout>
+
+    <a-layout-content
+      class="p-6 lg:overflow-auto md:overflow-auto sm:overflow-scroll"
+    >
+      <slot />
+    </a-layout-content>
   </a-layout>
 </template>
 
@@ -43,8 +47,7 @@ const collapsed = ref(false);
   @apply bg-green-500/20 text-green-500 !important;
 }
 
-
 .ant-menu-item.ant-menu-item-selected::after {
   border-right: 4px solid #014945 !important;
 }
-</style>
+</style>-200

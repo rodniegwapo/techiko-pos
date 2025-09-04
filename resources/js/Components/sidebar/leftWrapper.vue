@@ -1,21 +1,20 @@
 <script setup>
-import TechikoLogo from '@/Components/TechikoLogo.vue'
-import TLogo from '@/Components/TLogo.vue'
-import { IconLayoutSidebarLeftCollapse } from '@tabler/icons-vue'
-import { useSidebar } from '@/composables/useSidebar'
-
+import TechikoLogo from "@/Components/TechikoLogo.vue";
+import TLogo from "@/Components/TLogo.vue";
+import { IconLayoutSidebarLeftCollapse } from "@tabler/icons-vue";
+import { useSidebar } from "@/composables/useSidebar";
 
 const props = defineProps({
-  impersonator: Boolean
-})
+  impersonator: Boolean,
+});
 
-const { isCollapsed, toggle, setCollapsed } = useSidebar()
+const { isCollapsed, toggle, setCollapsed } = useSidebar();
 </script>
 
 <template>
   <div class="lg:block md:block sm:hidden">
     <a-layout-sider
-      :width="264"
+      :width="250"
       v-model:collapsed="isCollapsed"
       :trigger="null"
       theme="light"
@@ -26,17 +25,24 @@ const { isCollapsed, toggle, setCollapsed } = useSidebar()
         <div
           class="px-6 text-white flex items-center py-4"
           :class="isCollapsed ? 'flex-col-reverse items-center' : 'space-x-2'"
-          :style="impersonator ? 'margin-top:45px' : ''"
+   
         >
-           <TLogo  v-if="isCollapsed" style="margin-top: 28px !important" />
-          <a role="button" @click="() => { toggle() }">
+          <TLogo v-if="isCollapsed" style="margin-top: 28px !important" />
+          <TechikoLogo v-if="!isCollapsed" :height="30" />
+          <a
+            role="button"
+            @click="
+              () => {
+                toggle();
+              }
+            "
+          >
             <IconLayoutSidebarLeftCollapse
               size="26"
-              class="trigger flex-shrink-0 text-gray-600 transition-all hover:text-sky-400"
-              :class="{ 'rotate-180': isCollapsed }"
+              class="trigger  flex-shrink-0 text-gray-600 mt-[12px] transition-all hover:text-sky-400"
+              :class="{ 'rotate-180': isCollapsed , 'ml-6': !isCollapsed }"
             />
           </a>
-          <TechikoLogo v-if="!isCollapsed" :height="30" />
         </div>
 
         <slot />

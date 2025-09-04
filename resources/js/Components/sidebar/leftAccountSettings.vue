@@ -7,7 +7,7 @@ import UserProfileMini from "./UserProfileMini.vue";
 const props = defineProps({
   user: { type: Object, default: {} },
   leftSidebatdCollapsed: Boolean,
-  showSettings: { type: Boolean, default: true }
+  showSettings: { type: Boolean, default: true },
 });
 
 let selectedKeys = ref(null);
@@ -20,13 +20,20 @@ const truncate = (str, length = 100, ending = "...") => {
 </script>
 
 <template>
-  <div class="left-0 w-full border-t sticky top-[100vh]">
+  <div class="left-0 w-full border-t sticky top-[100vh] ">
     <div
       class="py-4 px-6 lg-block xl-block"
       :class="{ 'px-0': leftSidebatdCollapsed }"
     >
       <!-- Popover Settings -->
-      <a-popover v-if="showSettings" :trigger="['click']" placement="rightBottom">
+    <div class="relative ">
+       <a-popover
+        v-if="showSettings"
+        :trigger="['click']"
+        placement="rightBottom"
+        overlayClassName="account-settings-pop-custom-css"
+     
+      >
         <template #content>
           <div class="flex flex-col gap-4 py-2">
             <Link class="flex items-center text-gray-800 hover:text-green-500">
@@ -63,8 +70,17 @@ const truncate = (str, length = 100, ending = "...") => {
           />
         </div>
       </a-popover>
-
-   
+    </div> 
     </div>
   </div>
 </template>
+
+<style>
+.account-settings-pop-custom-css .ant-popover-content {
+  border-radius: 10px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+}
+
+
+</style>
