@@ -1,21 +1,21 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { IconDashboard,IconCategory,IconUsers ,IconBrandProducthunt} from '@tabler/icons-vue'
+import { router ,usePage} from '@inertiajs/vue3'
 
-
-const emit = defineEmits(['handleClick'])
-
+const page = usePage()
 const menus = computed(() => {  
     return [
         {
             title: 'Dashboard',
-            path: '/dashboard',
+            path: route('dashboard'),
             icon: IconDashboard,
+            pathName: 'dashboard'
            
         },
         {
             title: 'Categories',
-            path: '/orders',
+            path: route('categories.index'),
             icon: IconCategory,
           
         },
@@ -52,6 +52,14 @@ let openKeys = ref([])
 
 const menuSelectedKeys = ref([])
 
+const handleClick = (menu) => {
+    router.visit(menu.path)    
+}
+
+onMounted(() => {
+    menuSelectedKeys.value = [window.location.href]
+})
+
 </script>
 
 <template>
@@ -61,12 +69,13 @@ const menuSelectedKeys = ref([])
             v-model:selectedKeys="menuSelectedKeys"
            
             mode="inline"
+            theme="light"
         >
             <template v-for="menu in menus">
                 <a-menu-item
                     v-if="!menu.children"
                     :key="menu.path"
-                    @click="emit('handleClick', menu)"
+                    @click="handleClick(menu)"
                     class="font-semibold text-gray-800 items-center"
                 >
                     <template #icon>
