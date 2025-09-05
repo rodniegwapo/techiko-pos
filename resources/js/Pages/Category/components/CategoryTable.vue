@@ -1,6 +1,7 @@
 <script setup>
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { IconTrash, IconEdit } from "@tabler/icons-vue";
+import { useHelpers } from "@/Composables/useHelpers";
 
 const props = defineProps({
   categories: { type: Object, required: true },
@@ -8,6 +9,7 @@ const props = defineProps({
 });
 
 const emit = defineEmits(["handleTableChange"]);
+const { confirmDelete } = useHelpers();
 
 const columns = [
   { title: "Category", dataIndex: "name", key: "name", align: "left" },
@@ -22,6 +24,10 @@ const columns = [
 
 const handleTableChange = (event) => {
   emit("handleTableChange", event);
+};
+
+const handleDeleteCategory = (record) => {
+  confirmDelete('categories.destroy', {id: record.id}, 'Do you want to delete this item ?');
 };
 </script>
 
@@ -39,11 +45,18 @@ const handleTableChange = (event) => {
     <template #bodyCell="{ index, column, record }">
       <template v-if="column.key == 'action'">
         <div class="flex items-center gap-2">
-          <icon-tooltip-button hover="group-hover:bg-blue-500" name="Edit Category">
+          <icon-tooltip-button
+            hover="group-hover:bg-blue-500"
+            name="Edit Category"
+          >
             <IconEdit size="20" class="mx-auto" />
           </icon-tooltip-button>
 
-          <icon-tooltip-button hover="group-hover:bg-red-500" name="Delete Category">
+          <icon-tooltip-button
+            hover="group-hover:bg-red-500"
+            name="Delete Category"
+            @click="handleDeleteCategory(record)"
+          >
             <IconTrash size="20" class="mx-auto" />
           </icon-tooltip-button>
         </div>

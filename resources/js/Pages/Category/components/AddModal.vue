@@ -1,6 +1,14 @@
 <script setup>
 import { ref, toRefs } from "vue";
 import VerticalForm from "@/components/Forms/VerticalForm.vue";
+import PrimaryButton from "@/Components/PrimaryButton.vue";
+import { useEmits } from "@/Composables/useEmits";
+import { router } from "@inertiajs/vue3";
+import { useTable } from "@/Composables/useTable";
+import { usePage } from "@inertiajs/vue3";
+
+const { spinning } = useTable();
+const page = usePage();
 
 const props = defineProps({
   visible: {
@@ -9,76 +17,46 @@ const props = defineProps({
   },
 });
 
+const { emitClose, emitEvent } = useEmits();
+
 const { visible } = toRefs(props);
 
 const formData = ref({});
 
 const formFields = [
   { key: "name", label: "Name", type: "text" },
-  {
-    key: "gender",
-    label: "Gender",
-    type: "radio",
-    options: ["Male", "Female"],
-  },
-  { key: "birthday", label: "Birthday", type: "date", open: false },
-  { key: "age", label: "Age", type: "number" },
-  { key: "bio", label: "Bio", type: "textarea" },
-  { key: "appointment", label: "Appointment", type: "datetime" },
-  { key: "alarm", label: "Alarm Time", type: "time" },
-  {
-    key: "role_id",
-    label: "Role",
-    type: "select",
-    multiple: "multiple",
-    options: [
-      { id: 1, name: "Admin" },
-      { id: 2, name: "User" },
-      { id: 3, name: "Guest" },
-    ],
-  },
-  {
-    key: "agree",
-    label: "Agreement",
-    type: "checkbox-single",
-    text: "I agree to the terms and conditions",
-  },
-  {
-    key: "fruits",
-    label: "Select Fruits",
-    type: "checkbox-group",
-    checkAll: true,
-    options: [
-      { label: "Apple", value: "Apple" },
-      { label: "Pear", value: "Pear" },
-      { label: "Orange", value: "Orange", disabled: true },
-    ],
-  },
+  { key: "description", label: "Description", type: "textarea", rows: 4 },
 ];
-const plainOptions = [
-  {
-    label: "Apple",
-    value: "Apple",
-  },
-  {
-    label: "Pear",
-    value: "Pear",
-  },
-  {
-    label: "Orange",
-    value: "Orange",
-  },
-];
+
+const errors = ref({});
+const handleSave = () => {
+  router.post(route("categories.index"), formData.value, {
+    onSuccess: () => {
+      emitClose();
+      formData.value = {};
+    },
+    onStart: () => {
+      spinning.value = true;
+    },
+    onError: (error) => {
+      errors.value = error;
+    },
+    onFinish: () => {
+      spinning.value = false;
+    },
+  });
+};
 </script>
 
 <template>
-  <!-- <a-checkbox-group
-    v-model:value="value1"
-    name="checkboxgroup"
-    :options="plainOptions"
-  /> -->
-  {{ formData }}
-  <a-modal v-model:visible="visible" title="Basic Modal" @ok="handleOk">
-    <vertical-form v-model="formData" :fields="formFields" />
+  <a-modal v-model:visible="visible" title="Add Category" @cancel="emitClose">
+    <vertical-form v-model="formData" :fields="formFields" :errors="errors" />
+    <template #footer>
+      <a-button @click="emitClose">Cancel</a-button>
+
+      <primary-button :loading="spinning" @click="handleSave"
+        >Submit</primary-button
+      >
+    </template>
   </a-modal>
 </template>

@@ -22,18 +22,16 @@ const { spinning, pagination, handleTableChange, getItems } = useTable(
 );
 
 const search = ref("");
-const showCreateModal = () => {
-  // Logic to show the create category modal
-};
 
 const handleRefresh = () => {
   getItems(pagination.value.pageSize, pagination.value.current, ["items"]);
 };
+
+const visible = ref(false);
 </script>
 
 <template>
   <AuthenticatedLayout>
-    <add-modal :visible="true" />
     <Head title="Categories" />
     <ContentHeader class="mb-8" title="Categories" />
     <ContentLayout title="Categories">
@@ -46,7 +44,7 @@ const handleRefresh = () => {
           class="min-w-[100px] max-w-[300px]"
         />
         <a-button
-          @click="showCreateModal"
+          @click="visible = true"
           type="primary"
           class="bg-white border flex items-center border-green-500 text-green-500"
         >
@@ -66,4 +64,10 @@ const handleRefresh = () => {
       </template>
     </ContentLayout>
   </AuthenticatedLayout>
+
+  <!-- add modal -->
+  <add-modal :visible="visible" @close="visible = false" />
 </template>
+
+
+    
