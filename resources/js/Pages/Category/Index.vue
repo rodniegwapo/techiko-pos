@@ -9,8 +9,7 @@ import { PlusSquareOutlined } from "@ant-design/icons-vue";
 import RefreshButton from "@/Components/buttons/Refresh.vue";
 import { ref } from "vue";
 import { IconPlus } from "@tabler/icons-vue";
-
-
+import AddModal from "./components/AddModal.vue";
 
 const props = defineProps({
   items: Object,
@@ -25,16 +24,21 @@ const { spinning, pagination, handleTableChange, getItems } = useTable(
 const search = ref("");
 const showCreateModal = () => {
   // Logic to show the create category modal
-};  
+};
+
+const handleRefresh = () => {
+  getItems(pagination.value.pageSize, pagination.value.current, ["items"]);
+};
 </script>
 
 <template>
   <AuthenticatedLayout>
+    <add-modal :visible="true" />
     <Head title="Categories" />
     <ContentHeader class="mb-8" title="Categories" />
     <ContentLayout title="Categories">
       <template #filters>
-        <refresh-button :loading="spinning" @click="getItems()" />
+        <refresh-button :loading="spinning" @click="handleRefresh" />
         <a-input-search
           v-model:value="search"
           placeholder="Input search text"
@@ -44,7 +48,7 @@ const showCreateModal = () => {
         <a-button
           @click="showCreateModal"
           type="primary"
-          class="bg-white border flex items-center border-green-500 text-green-500 "
+          class="bg-white border flex items-center border-green-500 text-green-500"
         >
           <template #icon>
             <PlusSquareOutlined />
