@@ -10,8 +10,14 @@ class CategoryController extends Controller
 {
     public function index(Request $request)
     {
+        $category = Category::query()->when($request->input('search'), function ($query, $search) {
+
+            logger('search sssfd');
+            return $query->search($search);
+        })->paginate($request?->data['per_page'] ?? 10);
+
         return inertia('Category/Index', [
-            'items' => CategoryResource::collection(Category::paginate($request?->data['per_page'] ?? 10)),
+            'items' => CategoryResource::collection($category),
         ]);
     }
 

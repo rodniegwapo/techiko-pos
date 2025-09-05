@@ -1,6 +1,6 @@
 <script setup>
 import { Head } from "@inertiajs/vue3";
-import { useTable } from "@/Composables/useTable"; 
+import { useTable } from "@/Composables/useTable";
 import ContentHeader from "@/Components/ContentHeader.vue";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentLayout from "@/Components/ContentLayout.vue";
@@ -11,6 +11,8 @@ import { ref } from "vue";
 import { IconPlus } from "@tabler/icons-vue";
 import AddModal from "./components/AddModal.vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
+import { watchDebounced } from "@vueuse/core";
+import { router } from "@inertiajs/vue3";
 
 const { openModal, isEdit } = useGlobalVariables();
 
@@ -19,16 +21,27 @@ const props = defineProps({
 });
 
 // use composable
-const { spinning, pagination, handleTableChange, getItems } = useTable(
+const { spinning, pagination, handleTableChange } = useTable(
   props,
-  "categories.index"
+
 );
 
 const search = ref("");
 
-const handleRefresh = () => {
-  getItems(pagination.value.pageSize, pagination.value.current, ["items"]);
+const getItems = () => {
+  router.reload({
+    only: ["items"],
+    preserveScroll: true,
+    data: {
+      page: 1,
+      search: search.value || undefined,
+    },
+    onStart: () => (spinning.value = true),
+    onFinish: () => (spinning.value = false),
+  });
 };
+
+watchDebounced(search, getItems, { debounce: 300 });
 </script>
 
 <template>
@@ -37,7 +50,7 @@ const handleRefresh = () => {
     <ContentHeader class="mb-8" title="Categories" />
     <ContentLayout title="Categories">
       <template #filters>
-        <refresh-button :loading="spinning" @click="handleRefresh" />
+        <refresh-button :loading="spinning" @click="getItems" />
         <a-input-search
           v-model:value="search"
           placeholder="Input search text"
