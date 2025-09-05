@@ -1,5 +1,3 @@
-
-
 #printMe {
   position: absolute;
   z-index: -40;
@@ -29,7 +27,7 @@
 
 /* modals */
 .ant-modal-header {
-  background: #009EFB !important;
+  @apply bg-green-700 !important;
 }
 
 .ant-modal-header .ant-modal-title,
@@ -53,7 +51,15 @@
   @apply pr-[46px]
 }
 
-.transfer-dropdown-overlay > .ant-dropdown-content > .ant-dropdown-menu-root > [tabindex='-1'].ant-dropdown-menu-item:hover,
+/* ant button */
+
+.ant-modal-confirm-btns .ant-btn-primary {
+  border: #287e47 !important;
+  background-color: #287e47ed !important;
+}
+
+
+.transfer-dropdown-overlay>.ant-dropdown-content>.ant-dropdown-menu-root>[tabindex='-1'].ant-dropdown-menu-item:hover,
 .ant-dropdown-menu-submenu-title:hover {
   /* @apply text-[#1F9BF4] bg-[#1f9bf41a] !important; */
 }
@@ -62,56 +68,56 @@
   @apply text-black !important;
 }
 
-.contact-filter-popover > .ant-popover-content > .ant-popover-arrow {
+.contact-filter-popover>.ant-popover-content>.ant-popover-arrow {
   display: none !important;
 }
 
-.contact-filter-popover > .ant-popover-content > .ant-popover-inner > .ant-popover-inner-content {
+.contact-filter-popover>.ant-popover-content>.ant-popover-inner>.ant-popover-inner-content {
   padding: 0 !important;
 }
 
-.contact-filter-popover > .ant-popover-content > .ant-popover-inner {
+.contact-filter-popover>.ant-popover-content>.ant-popover-inner {
   border-radius: 4px !important;
 }
 
-.contact-filter-popover > .ant-popover-content > .ant-popover-inner > .ant-popover-inner-content > .ant-menu-inline {
+.contact-filter-popover>.ant-popover-content>.ant-popover-inner>.ant-popover-inner-content>.ant-menu-inline {
   border-right: 0 !important;
   border-radius: 4px !important;
 }
 
-.contact-filter-popover > .ant-popover-content > .ant-popover-inner > .ant-popover-inner-content > .ant-menu-inline > li {
+.contact-filter-popover>.ant-popover-content>.ant-popover-inner>.ant-popover-inner-content>.ant-menu-inline>li {
   padding: 0 16px !important;
   line-height: 20px !important;
   margin-bottom: 0 !important;
 }
 
-.contact-filter-popover > .ant-popover-content > .ant-popover-inner > .ant-popover-inner-content > .ant-menu-inline > li > .ant-menu-submenu-title {
+.contact-filter-popover>.ant-popover-content>.ant-popover-inner>.ant-popover-inner-content>.ant-menu-inline>li>.ant-menu-submenu-title {
   padding: 0 38px 0 0 !important;
   line-height: 20px !important;
   margin-bottom: 0 !important;
   height: 30px !important;
 }
 
-.contact-filter-popover > .ant-popover-content > .ant-popover-inner > .ant-popover-inner-content > .ant-menu-inline > li > ul > li {
+.contact-filter-popover>.ant-popover-content>.ant-popover-inner>.ant-popover-inner-content>.ant-menu-inline>li>ul>li {
   padding-left: 18px !important;
   line-height: 20px !important;
   margin-bottom: 0 !important;
   height: 30px !important;
 }
 
-.contact-filter-popover > .ant-popover-content > .ant-popover-inner > .ant-popover-inner-content > .ant-menu-inline > li > ul > li {
+.contact-filter-popover>.ant-popover-content>.ant-popover-inner>.ant-popover-inner-content>.ant-menu-inline>li>ul>li {
   background-color: transparent !important;
 }
 
-.contact-filter-popover > .ant-popover-content > .ant-popover-inner > .ant-popover-inner-content > .ant-menu-inline > li > ul > li::after {
+.contact-filter-popover>.ant-popover-content>.ant-popover-inner>.ant-popover-inner-content>.ant-menu-inline>li>ul>li::after {
   border-right: 0 !important;
 }
 
-.contact-filter-popover > .ant-popover-content > .ant-popover-inner > .ant-popover-inner-content > .ant-menu-inline > .ant-menu-item-selected {
+.contact-filter-popover>.ant-popover-content>.ant-popover-inner>.ant-popover-inner-content>.ant-menu-inline>.ant-menu-item-selected {
   background-color: transparent !important;
 }
 
-.contact-filter-popover > .ant-popover-content > .ant-popover-inner > .ant-popover-inner-content > .ant-menu-inline > .ant-menu-item-selected::after {
+.contact-filter-popover>.ant-popover-content>.ant-popover-inner>.ant-popover-inner-content>.ant-menu-inline>.ant-menu-item-selected::after {
   border-right: 0 !important;
 }
 
@@ -119,6 +125,6 @@
 
   .ant-pagination.ant-table-pagination.ant-table-pagination-right,
   .ant-table-content table {
-      @apply w-[700px] !important;
+    @apply w-[700px] !important;
   }
 }

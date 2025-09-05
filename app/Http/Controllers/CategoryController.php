@@ -15,15 +15,32 @@ class CategoryController extends Controller
         ]);
     }
 
-    public function store(Request $request) {}
+    public function store(Request $request)
+    {
+        $data = $this->validatedData($request);
+
+        Category::create($data);
+
+        return redirect()->back();
+    }
 
     public function update(Request $request, $id)
     {
         // Validate and update category logic here
     }
 
-    public function destroy($id)
+    public function destroy(Request $request, Category $category)
     {
-        // Delete category logic here
+        $category->delete();
+
+        return redirect()->back();
+    }
+
+    private function validatedData(Request $request)
+    {
+        return $request->validate([
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
+        ]);
     }
 }

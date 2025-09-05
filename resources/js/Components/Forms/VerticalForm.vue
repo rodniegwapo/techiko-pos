@@ -10,6 +10,43 @@ const props = defineProps({
   fields: {
     type: Array,
     required: true,
+    /**
+     * Reusable Dynamic Form Component
+     *
+     * Example fields config:
+     * [
+     *   { key: "name", label: "Name", type: "text" },
+     *   { key: "email", label: "Email", type: "text", placeholder: "Enter your email" },
+     *   { key: "role", label: "Role", type: "select", options: ["Admin", "User"] },
+     *   { key: "dob", label: "Date of Birth", type: "date" },
+     *   { key: "bio", label: "Biography", type: "textarea", rows: 4 },
+     *   { key: "active", label: "Active", type: "checkbox-single", text: "Is Active?" },
+     *   {
+     *     key: "permissions",
+     *     label: "Permissions",
+     *     type: "checkbox-group",
+     *     checkAll: true,
+     *     options: ["Read", "Write", "Delete"],
+     *   },
+     * ]
+     *
+     * Usage:
+     * <DynamicForm v-model="formData" :fields="fields" :errors="errors" />
+     *
+     * // In parent:
+     * const formData = ref({})
+     * const errors = ref({})
+     *
+     * // After submit (Laravel backend example):
+     * errors.value = {
+     *   name: "The name field is required.",
+     *   email: "The email must be a valid email address."
+     * }
+     */
+  },
+  errors: {
+    type: Object,
+    default: () => ({}), // 🔹 backend error messages from parent
   },
 });
 
@@ -20,7 +57,14 @@ const formState = reactive({ ...props.modelValue });
 // keep formState in sync with parent
 watch(
   () => props.modelValue,
-  (val) => Object.assign(formState, val)
+  (val) => {
+    if (!val || Object.keys(val).length === 0) {
+      Object.keys(formState).forEach((k) => (formState[k] = undefined));
+    } else {
+      Object.assign(formState, val);
+    }
+  },
+  { deep: true }
 );
 
 function updateValue(key, val) {
@@ -54,7 +98,6 @@ function isCheckAllIndeterminate(field) {
 // controls for open/close
 const dateOpen = ref(false);
 const timeOpen = ref(false);
-const datetimeOpen = ref(false);
 </script>
 
 <template>
@@ -63,7 +106,11 @@ const datetimeOpen = ref(false);
     class="max-h-[400px] overflow-scroll overflow-x-hidden"
   >
     <template v-for="field in fields" :key="field.key">
-      <a-form-item :label="field.label">
+      <a-form-item
+        :label="field.label"
+        :validate-status="errors[field.key] ? 'error' : ''"
+        :help="errors[field.key] || ''"
+      >
         <!-- text -->
         <a-input
           v-if="field.type === 'text'"
@@ -96,25 +143,41 @@ const datetimeOpen = ref(false);
           v-else-if="field.type === 'select'"
           :value="
             field.multiple
-              ? Array.isArray(formState[field.key])
-                ? formState[field.key]
-                : []
-              : formState[field.key]
+              ? (formState[field.key] || []).map((v) => v.id ?? v.value ?? v)
+              : formState[field.key]?.id ??
+                formState[field.key]?.value ??
+                formState[field.key]
           "
           :options="
             field.options.map((o) =>
               typeof o === 'object'
                 ? {
                     label: o.label ?? o.name ?? o.value,
-                    value: o.id ?? o.value,
+                    value: o.id ?? o.value ?? o,
                   }
                 : { label: o, value: o }
             )
           "
           :mode="field.multiple ? 'multiple' : undefined"
-          @change="(val) => updateValue(field.key, val)"
           allowClear
           class="w-full"
+          @change="
+            (val) => {
+              if (field.multiple) {
+                updateValue(
+                  field.key,
+                  val.map((v) =>
+                    field.options.find((o) => (o.id ?? o.value ?? o) === v)
+                  )
+                );
+              } else {
+                updateValue(
+                  field.key,
+                  field.options.find((o) => (o.id ?? o.value ?? o) === val)
+                );
+              }
+            }
+          "
         />
 
         <!-- date -->
@@ -130,7 +193,6 @@ const datetimeOpen = ref(false);
           @openChange="(status) => (dateOpen = status)"
           @change="(val) => updateValue(field.key, val)"
         >
-          >
           <template #renderExtraFooter>
             <div class="flex justify-between mt-2">
               <span
@@ -148,6 +210,7 @@ const datetimeOpen = ref(false);
           </template>
         </a-date-picker>
 
+        <!-- datetime -->
         <a-date-picker
           v-else-if="field.type === 'datetime'"
           v-model:value="formState[field.key]"
@@ -170,8 +233,7 @@ const datetimeOpen = ref(false);
           class="w-full"
           :open="timeOpen"
           @openChange="(status) => (timeOpen = status)"
-        >
-        </a-time-picker>
+        />
 
         <!-- radio -->
         <a-radio-group
