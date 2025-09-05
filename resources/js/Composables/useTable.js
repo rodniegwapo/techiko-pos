@@ -29,27 +29,10 @@ export function useTable(props, routeName) {
         });
     };
 
-    const getItems = (pageSize = null, current = 1, items = []) => {
-        router.get(
-            route(routeName),
-            {
-                page: current,
-                per_page: pageSize,
-            },
-            {
-                preserveState: true,
-                replace: true,
-                only: items,
-                onStart: () => (spinning.value = true),
-                onFinish: () => (spinning.value = false),
-            }
-        );
-    };
-
     return {
         spinning,
         pagination,
         handleTableChange,
-        getItems,
+     
     };
 }
