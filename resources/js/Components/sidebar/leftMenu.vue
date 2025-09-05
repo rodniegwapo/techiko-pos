@@ -1,129 +1,129 @@
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
-import { IconDashboard,IconCategory,IconUsers ,IconBrandProducthunt} from '@tabler/icons-vue'
-import { router ,usePage} from '@inertiajs/vue3'
+import { ref, computed, watch, onMounted } from "vue";
+import {
+  IconDashboard,
+  IconCategory,
+  IconUsers,
+  IconBrandProducthunt,
+} from "@tabler/icons-vue";
+import { router, usePage } from "@inertiajs/vue3";
 
-const page = usePage()
-const menus = computed(() => {  
-    return [
-        {
-            title: 'Dashboard',
-            path: route('dashboard'),
-            icon: IconDashboard,
-            pathName: 'dashboard'
-           
-        },
-        {
-            title: 'Categories',
-            path: route('categories.index'),
-            icon: IconCategory,
-          
-        },
-        {
-            title: 'Customers',
-            path: '/customers',
-            icon: IconUsers,
-      
-        },
-        {
-            title: 'Products',
-            path: '/products',
-            icon: IconBrandProducthunt,
-            // children: [
-            //     {
-            //         title: 'products.products',
-            //         path: '/products/products',
-            //     },
-            //     {
-            //         title: 'products.orders',
-            //         path: '/products/orders',
-            //     },
-            //     {
-            //         title: 'products.customers',
-            //         path: '/products/customers',
-            //     },
-            // ],
-        },
-    ]
-})  
+const page = usePage();
+const menus = computed(() => {
+  return [
+    {
+      title: "Dashboard",
+      path: route("dashboard"),
+      icon: IconDashboard,
+      pathName: "dashboard",
+    },
+    {
+      title: "Categories",
+      path: route("categories.index"),
+      icon: IconCategory,
+    },
+    {
+      title: "Customers",
+      path: "/customers",
+      icon: IconUsers,
+    },
+    {
+      title: "Products",
+      path: "/products",
+      icon: IconBrandProducthunt,
+      // children: [
+      //     {
+      //         title: 'products.products',
+      //         path: '/products/products',
+      //     },
+      //     {
+      //         title: 'products.orders',
+      //         path: '/products/orders',
+      //     },
+      //     {
+      //         title: 'products.customers',
+      //         path: '/products/customers',
+      //     },
+      // ],
+    },
+  ];
+});
 
+let openKeys = ref([]);
 
-let openKeys = ref([])
-
-const menuSelectedKeys = ref([])
+const menuSelectedKeys = ref([]);
 
 const handleClick = (menu) => {
-    router.visit(menu.path)    
-}
+  router.visit(menu.path);
+};
 
 onMounted(() => {
-    menuSelectedKeys.value = [window.location.href]
-})
+  const url = new URL(window.location.href);
+  menuSelectedKeys.value = [url.origin + url.pathname]; // only path, no params
 
+});
 </script>
 
 <template>
-    <div class="overflow-auto ">
-        <a-menu
-            v-model:openKeys="openKeys"
-            v-model:selectedKeys="menuSelectedKeys"
-           
-            mode="inline"
-            theme="light"
+  <div class="overflow-auto">
+    <a-menu
+      v-model:openKeys="openKeys"
+      v-model:selectedKeys="menuSelectedKeys"
+      mode="inline"
+      theme="light"
+    >
+      <template v-for="menu in menus">
+        <a-menu-item
+          v-if="!menu.children"
+          :key="menu.path"
+          @click="handleClick(menu)"
+          class="font-semibold text-gray-800 items-center"
         >
-            <template v-for="menu in menus">
-                <a-menu-item
-                    v-if="!menu.children"
-                    :key="menu.path"
-                    @click="handleClick(menu)"
-                    class="font-semibold text-gray-800 items-center"
-                >
-                    <template #icon>
-                        <span
-                            class="leading-[40px] h-full items-center flex justify-center"
-                        >
-                            <component
-                                class="flex-shrink-0"
-                                v-if="menu.icon"
-                                :is="menu.icon"
-                            />
-                        </span>
-                    </template>
-                    {{ menu.title }}
-                </a-menu-item>
-                <a-sub-menu
-                    v-else
-                    :key="'sub' + menu.path"
-                    class="font-semibold text-gray-800 items-center"
-                >
-                    <template #icon>
-                        <span
-                            class="leading-[40px] h-full items-center flex justify-center"
-                        >
-                            <component
-                                class="flex-shrink-0"
-                            
-                                v-if="menu.icon"
-                                :is="menu.icon"
-                            />
-                        </span>
-                    </template>
-                    <template #title>{{ menu.title}}</template>
-                    <a-menu-item
-                        v-for="child in menu.children"
-                        :key="child.path"
-                        @click="emit('handleClick', child, menu)"
-                    >
-                        <component
-                            v-if="child.icon"
-                            :is="child.icon"
-                            style="font-size: 20px"
-                        >
-                        </component>
-                        <span>{{ child.title}}</span>
-                    </a-menu-item>
-                </a-sub-menu>
-            </template>
-        </a-menu>
-    </div>
+          <template #icon>
+            <span
+              class="leading-[40px] h-full items-center flex justify-center"
+            >
+              <component
+                class="flex-shrink-0"
+                v-if="menu.icon"
+                :is="menu.icon"
+              />
+            </span>
+          </template>
+          {{ menu.title }}
+        </a-menu-item>
+        <a-sub-menu
+          v-else
+          :key="'sub' + menu.path"
+          class="font-semibold text-gray-800 items-center"
+        >
+          <template #icon>
+            <span
+              class="leading-[40px] h-full items-center flex justify-center"
+            >
+              <component
+                class="flex-shrink-0"
+                v-if="menu.icon"
+                :is="menu.icon"
+              />
+            </span>
+          </template>
+          <template #title>{{ menu.title }}</template>
+          <a-menu-item
+            v-for="child in menu.children"
+            :key="child.path"
+            @click="emit('handleClick', child, menu)"
+          >
+            <component
+              v-if="child.icon"
+              :is="child.icon"
+              style="font-size: 20px"
+            >
+            </component>
+            <span>{{ child.title }}</span>
+          </a-menu-item>
+        </a-sub-menu>
+      </template>
+    </a-menu>
+  </div>
 </template>
