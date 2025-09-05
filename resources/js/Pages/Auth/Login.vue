@@ -6,6 +6,7 @@ import InputLabel from "@/Components/InputLabel.vue";
 import PrimaryButton from "@/Components/PrimaryButton.vue";
 import TextInput from "@/Components/TextInput.vue";
 import { Head, Link, useForm } from "@inertiajs/vue3";
+import { ref } from "vue";
 
 defineProps({
   canResetPassword: {
@@ -22,9 +23,14 @@ const form = useForm({
   remember: false,
 });
 
+const spinning = ref(false);
 const submit = () => {
   form.post(route("login"), {
-    onFinish: () => form.reset("password"),
+    onFinish: () => {
+      spinning.value = false
+      form.reset("password");
+    },
+    onStart: () => (spinning.value = true),
   });
 };
 </script>
@@ -46,7 +52,7 @@ const submit = () => {
       </div>
     </div>
 
-    <form @submit.prevent="submit">
+    <form>
       <div>
         <InputLabel for="email" value="Email" />
 
@@ -94,11 +100,7 @@ const submit = () => {
           Forgot your password?
         </Link>
 
-        <PrimaryButton
-          class="ms-4"
-          :class="{ 'opacity-25': form.processing }"
-          :disabled="form.processing"
-        >
+        <PrimaryButton :loading="spinning" @click="submit">
           Log in
         </PrimaryButton>
       </div>

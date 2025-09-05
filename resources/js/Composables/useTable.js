@@ -1,10 +1,12 @@
 // composables/useTable.js
 import { ref, computed } from "vue";
 import { router } from "@inertiajs/vue3";
+import { useGlobalVariables } from "./useGlobalVariable";
+
+
+const { spinning } = useGlobalVariables();
 
 export function useTable(props, routeName) {
-    const spinning = ref(false);
-
     const pagination = computed(() => {
         return {
             total: props.items?.meta?.total ?? 0,

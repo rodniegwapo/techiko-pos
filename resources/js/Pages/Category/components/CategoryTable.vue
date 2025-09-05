@@ -2,14 +2,16 @@
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { IconTrash, IconEdit } from "@tabler/icons-vue";
 import { useHelpers } from "@/Composables/useHelpers";
+import { useGlobalVariables } from "@/Composables/useGlobalVariable";
+
+const emit = defineEmits(["handleTableChange"]);
+const { confirmDelete } = useHelpers();
+const { formData, openModal, isEdit } = useGlobalVariables();
 
 const props = defineProps({
   categories: { type: Object, required: true },
   pagination: { type: Object, required: false, default: () => ({}) },
 });
-
-const emit = defineEmits(["handleTableChange"]);
-const { confirmDelete } = useHelpers();
 
 const columns = [
   { title: "Category", dataIndex: "name", key: "name", align: "left" },
@@ -27,7 +29,17 @@ const handleTableChange = (event) => {
 };
 
 const handleDeleteCategory = (record) => {
-  confirmDelete('categories.destroy', {id: record.id}, 'Do you want to delete this item ?');
+  confirmDelete(
+    "categories.destroy",
+    { id: record.id },
+    "Do you want to delete this item ?"
+  );
+};
+
+const handleClickEdit = (record) => {
+  openModal.value = true;
+  formData.value = record;
+  isEdit.value = true
 };
 </script>
 
@@ -48,6 +60,7 @@ const handleDeleteCategory = (record) => {
           <icon-tooltip-button
             hover="group-hover:bg-blue-500"
             name="Edit Category"
+            @click="handleClickEdit(record)"
           >
             <IconEdit size="20" class="mx-auto" />
           </icon-tooltip-button>

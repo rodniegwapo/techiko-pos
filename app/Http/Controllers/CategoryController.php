@@ -24,9 +24,13 @@ class CategoryController extends Controller
         return redirect()->back();
     }
 
-    public function update(Request $request, $id)
+    public function update(Request $request, Category $category)
     {
-        // Validate and update category logic here
+        $data = $this->validatedData($request);
+
+        $category->update($data);
+
+        return back();
     }
 
     public function destroy(Request $request, Category $category)
