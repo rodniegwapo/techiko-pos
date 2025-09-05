@@ -3,7 +3,6 @@ import { ref, computed } from "vue";
 import { router } from "@inertiajs/vue3";
 import { useGlobalVariables } from "./useGlobalVariable";
 
-
 const { spinning } = useGlobalVariables();
 
 export function useTable(props, routeName) {
@@ -20,7 +19,7 @@ export function useTable(props, routeName) {
 
     const handleTableChange = (event) => {
         router.reload({
-            onProgress: () => (spinning.value = true),
+            onStart: () => (spinning.value = true),
             onFinish: () => (spinning.value = false),
             data: {
                 per_page: event.pageSize,
@@ -33,6 +32,5 @@ export function useTable(props, routeName) {
         spinning,
         pagination,
         handleTableChange,
-     
     };
 }

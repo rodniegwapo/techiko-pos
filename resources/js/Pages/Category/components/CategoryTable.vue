@@ -6,7 +6,7 @@ import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 
 const emit = defineEmits(["handleTableChange"]);
 const { confirmDelete } = useHelpers();
-const { formData, openModal, isEdit } = useGlobalVariables();
+const { formData, openModal, isEdit,spinning } = useGlobalVariables();
 
 const props = defineProps({
   categories: { type: Object, required: true },
@@ -53,6 +53,7 @@ const handleClickEdit = (record) => {
     "
     @change="handleTableChange"
     :pagination="pagination"
+    :loading="spinning"
   >
     <template #bodyCell="{ index, column, record }">
       <template v-if="column.key == 'action'">
