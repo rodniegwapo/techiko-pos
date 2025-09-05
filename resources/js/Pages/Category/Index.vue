@@ -1,6 +1,6 @@
 <script setup>
 import { Head } from "@inertiajs/vue3";
-import { useTable } from "@/Composables/useTable"; // 👈 import
+import { useTable } from "@/Composables/useTable"; 
 import ContentHeader from "@/Components/ContentHeader.vue";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentLayout from "@/Components/ContentLayout.vue";
@@ -10,6 +10,9 @@ import RefreshButton from "@/Components/buttons/Refresh.vue";
 import { ref } from "vue";
 import { IconPlus } from "@tabler/icons-vue";
 import AddModal from "./components/AddModal.vue";
+import { useGlobalVariables } from "@/Composables/useGlobalVariable";
+
+const { openModal, isEdit } = useGlobalVariables();
 
 const props = defineProps({
   items: Object,
@@ -26,8 +29,6 @@ const search = ref("");
 const handleRefresh = () => {
   getItems(pagination.value.pageSize, pagination.value.current, ["items"]);
 };
-
-const visible = ref(false);
 </script>
 
 <template>
@@ -44,7 +45,7 @@ const visible = ref(false);
           class="min-w-[100px] max-w-[300px]"
         />
         <a-button
-          @click="visible = true"
+          @click="(openModal = true), (isEdit = false)"
           type="primary"
           class="bg-white border flex items-center border-green-500 text-green-500"
         >
@@ -66,7 +67,7 @@ const visible = ref(false);
   </AuthenticatedLayout>
 
   <!-- add modal -->
-  <add-modal :visible="visible" @close="visible = false" />
+  <add-modal />
 </template>
 
 

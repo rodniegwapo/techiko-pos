@@ -6,9 +6,13 @@ import { useEmits } from "@/Composables/useEmits";
 import { router } from "@inertiajs/vue3";
 import { useTable } from "@/Composables/useTable";
 import { usePage } from "@inertiajs/vue3";
+import { useGlobalVariables } from "@/Composables/useGlobalVariable";
+import { useHelpers } from "@/Composables/useHelpers";
 
 const { spinning } = useTable();
 const page = usePage();
+const { formData, openModal, isEdit } = useGlobalVariables();
+const {inertiaProgressLifecyle} = useHelpers()
 
 const props = defineProps({
   visible: {
@@ -19,10 +23,6 @@ const props = defineProps({
 
 const { emitClose, emitEvent } = useEmits();
 
-const { visible } = toRefs(props);
-
-const formData = ref({});
-
 const formFields = [
   { key: "name", label: "Name", type: "text" },
   { key: "description", label: "Description", type: "textarea", rows: 4 },
@@ -30,33 +30,40 @@ const formFields = [
 
 const errors = ref({});
 const handleSave = () => {
-  router.post(route("categories.index"), formData.value, {
-    onSuccess: () => {
-      emitClose();
-      formData.value = {};
-    },
-    onStart: () => {
-      spinning.value = true;
-    },
-    onError: (error) => {
-      errors.value = error;
-    },
-    onFinish: () => {
-      spinning.value = false;
-    },
-  });
+  router.post(
+    route("categories.index"),
+    formData.value,
+    inertiaProgressLifecyle
+  );
+};
+
+const handleUpdate = () => {
+  router.put(
+    route("categories.update", {
+      id: formData.value.id,
+    }),
+    formData.value,
+    inertiaProgressLifecyle
+  );
 };
 </script>
 
 <template>
-  <a-modal v-model:visible="visible" title="Add Category" @cancel="emitClose">
+  <a-modal
+    v-model:visible="openModal"
+    title="Add Category"
+    @cancel="openModal = false"
+  >
     <vertical-form v-model="formData" :fields="formFields" :errors="errors" />
     <template #footer>
-      <a-button @click="emitClose">Cancel</a-button>
+      <a-button @click="openModal = false">Cancel</a-button>
 
-      <primary-button :loading="spinning" @click="handleSave"
-        >Submit</primary-button
-      >
+      <primary-button v-if="isEdit" :loading="spinning" @click="handleUpdate"
+        >Update
+      </primary-button>
+      <primary-button v-else :loading="spinning" @click="handleSave"
+        >Submit
+      </primary-button>
     </template>
   </a-modal>
 </template>
