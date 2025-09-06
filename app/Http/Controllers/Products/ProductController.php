@@ -25,7 +25,30 @@ class ProductController extends Controller
     }
 
 
-    public function store() {}
+    public function store(Request $request)
+    {
+        $data = $this->validatedData($request);
+
+        Product::create($data);
+
+        return redirect()->back();
+    }
+
+    public function update(Request $request, Product $product)
+    {
+        $data = $this->validatedData($request);
+
+        $product->update($data);
+
+        return redirect()->back();
+    }
+
+    public function destroy(Request $request, Product $product)
+    {
+        $product->delete();
+
+        redirect()->back();
+    }
 
     private function validatedData(Request $request)
     {

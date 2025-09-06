@@ -13,10 +13,16 @@ import { useEmits } from "./useEmits";
  * confirmDelete("categories.destroy", { id: record.id }, "Do you want to delete this item?");
  */
 
-const { formData, spinning, errors, openModal } = useGlobalVariables();
+const { formData, spinning, errors, openModal,isEdit } = useGlobalVariables();
 const { emitClose } = useEmits();
 
 export function useHelpers() {
+    const showModal = () => {
+        formData.value = {};
+        openModal.value = true;
+        isEdit.value = false;
+    };
+
     const inertiaProgressLifecyle = {
         onSuccess: () => {
             openModal.value = false;
@@ -67,5 +73,6 @@ export function useHelpers() {
     return {
         confirmDelete,
         inertiaProgressLifecyle,
+        showModal
     };
 }

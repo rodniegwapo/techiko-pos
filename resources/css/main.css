@@ -57,6 +57,10 @@
   border: #287e47 !important;
   background-color: #287e47ed !important;
 }
+.ant-tag {
+  display: flex !important;
+  align-items: center !important;
+}
 
 
 .transfer-dropdown-overlay>.ant-dropdown-content>.ant-dropdown-menu-root>[tabindex='-1'].ant-dropdown-menu-item:hover,

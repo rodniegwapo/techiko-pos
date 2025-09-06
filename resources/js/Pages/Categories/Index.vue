@@ -13,8 +13,10 @@ import AddModal from "./components/AddModal.vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { watchDebounced } from "@vueuse/core";
 import { router } from "@inertiajs/vue3";
+import { useHelpers } from "@/Composables/useHelpers";
 
 const { openModal, isEdit } = useGlobalVariables();
+const {showModal} = useHelpers();
 
 const props = defineProps({
   items: Object,
@@ -55,7 +57,7 @@ watchDebounced(search, getItems, { debounce: 300 });
           class="min-w-[100px] max-w-[300px]"
         />
         <a-button
-          @click="(openModal = true), (isEdit = false)"
+          @click="showModal"
           type="primary"
           class="bg-white border flex items-center border-green-500 text-green-500"
         >

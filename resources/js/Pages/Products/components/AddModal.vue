@@ -41,8 +41,8 @@ const formFields = [
     type: "select",
     options: categoriesOption.value,
   },
-  { key: "cost", label: "Cost", type: "text" },
-  { key: "price", label: "Price", type: "text" },
+  { key: "cost", label: "Cost", type: "number" },
+  { key: "price", label: "Price", type: "number" },
   { key: "SKU", label: "SKU", type: "text" },
   { key: "barcode", label: "Barcode", type: "text" },
   {
@@ -66,6 +66,7 @@ const formFields = [
 
 const errors = ref({});
 const handleSave = () => {
+  formData.value.category_id = formData.value?.category_id?.value;
   router.post(route("products.store"), formData.value, inertiaProgressLifecyle);
 };
 
@@ -87,6 +88,7 @@ const handleUpdate = () => {
     @cancel="openModal = false"
     :maskClosable="false"
   >
+
     <vertical-form v-model="formData" :fields="formFields" :errors="errors" />
     <!-- <a-upload
       v-model:file-list="fileList"
