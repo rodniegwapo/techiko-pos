@@ -23,13 +23,8 @@ const menus = computed(() => {
       icon: IconCategory,
     },
     {
-      title: "Customers",
-      path: "/customers",
-      icon: IconUsers,
-    },
-    {
       title: "Products",
-      path: "/products",
+      path: route('products.index'),
       icon: IconBrandProducthunt,
       // children: [
       //     {
@@ -46,6 +41,12 @@ const menus = computed(() => {
       //     },
       // ],
     },
+    {
+      title: "Customers",
+      path: "/customers",
+      icon: IconUsers,
+    },
+    
   ];
 });
 

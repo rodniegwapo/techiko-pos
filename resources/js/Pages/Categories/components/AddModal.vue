@@ -12,7 +12,7 @@ import { useHelpers } from "@/Composables/useHelpers";
 const { spinning } = useTable();
 const page = usePage();
 const { formData, openModal, isEdit } = useGlobalVariables();
-const {inertiaProgressLifecyle} = useHelpers()
+const { inertiaProgressLifecyle } = useHelpers();
 
 const props = defineProps({
   visible: {
@@ -31,7 +31,7 @@ const formFields = [
 const errors = ref({});
 const handleSave = () => {
   router.post(
-    route("categories.index"),
+    route("categories.store"),
     formData.value,
     inertiaProgressLifecyle
   );
@@ -51,7 +51,7 @@ const handleUpdate = () => {
 <template>
   <a-modal
     v-model:visible="openModal"
-    title="Add Category"
+    :title=" isEdit ? 'Edit Category' : 'Add Category'"
     @cancel="openModal = false"
   >
     <vertical-form v-model="formData" :fields="formFields" :errors="errors" />
