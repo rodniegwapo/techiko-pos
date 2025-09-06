@@ -15,8 +15,8 @@ const props = defineProps({
 
 const columns = [
   { title: "Avatar", dataIndex: "avatar", key: "avatar", align: "left" },
-  { title: "Category", dataIndex: "category", key: "category", align: "left" },
   { title: "Product", dataIndex: "name", key: "name", align: "left" },
+  { title: "Category", dataIndex: "category", key: "category", align: "left" },
   {
     title: "Price",
     dataIndex: "price",
@@ -40,7 +40,7 @@ const handleTableChange = (event) => {
 
 const handleDeleteCategory = (record) => {
   confirmDelete(
-    "categories.destroy",
+    "products.destroy",
     { id: record.id },
     "Do you want to delete this item ?"
   );

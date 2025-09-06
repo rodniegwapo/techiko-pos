@@ -7,14 +7,21 @@ import ContentLayout from "@/Components/ContentLayout.vue";
 import ProductTable from "./components/ProductTable.vue";
 import { PlusSquareOutlined } from "@ant-design/icons-vue";
 import RefreshButton from "@/Components/buttons/Refresh.vue";
-import { ref } from "vue";
+import FilterDropdown from "@/Components/filters/FilterDropdown.vue";
+import ActiveFilters from "@/Components/filters/ActiveFilters.vue";
+import { ref, computed, reactive, toRef } from "vue";
 import { IconPlus } from "@tabler/icons-vue";
 import AddModal from "./components/AddModal.vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { watchDebounced } from "@vueuse/core";
 import { router } from "@inertiajs/vue3";
+import { useHelpers } from "@/Composables/useHelpers";
+import { useFilters, toLabel } from "@/Composables/useFilters";
+import { usePage } from "@inertiajs/vue3";
 
-const { openModal, isEdit } = useGlobalVariables();
+const { openModal, isEdit, formData, formFilters } = useGlobalVariables();
+const { showModal } = useHelpers();
+const page = usePage();
 
 const props = defineProps({
   items: Object,
@@ -38,7 +45,34 @@ const getItems = () => {
   });
 };
 
+const soldTypeOptions = computed(() => {
+  return page?.props.sold_by_types.map((item) => {
+    return { label: item.name, value: item.name };
+  });
+});
+
 watchDebounced(search, getItems, { debounce: 300 });
+
+const { filters, activeFilters, handleClearSelectedFilter, handleClearFilter } =
+  useFilters({
+    getItems,
+    configs: [
+      {
+        key: "sold_type",
+        ref: toRef(formFilters, "sold_type"),
+        getLabel: toLabel(soldTypeOptions),
+      },
+    ],
+  });
+
+const filtersConfig = [
+  {
+    key: "sold_type",
+    label: "Sold Type",
+    type: "select",
+    options: page?.props.sold_by_types.map((item) => item.name),
+  },
+];
 </script>
 
 <template>
@@ -55,7 +89,7 @@ watchDebounced(search, getItems, { debounce: 300 });
           class="min-w-[100px] max-w-[300px]"
         />
         <a-button
-          @click="(openModal = true), (isEdit = false)"
+          @click="showModal"
           type="primary"
           class="bg-white border flex items-center border-green-500 text-green-500"
         >
@@ -64,8 +98,16 @@ watchDebounced(search, getItems, { debounce: 300 });
           </template>
           Create Product
         </a-button>
+        <FilterDropdown v-model="filters" :filters="filtersConfig" />
       </template>
 
+      <template #activeFilters>
+        <!-- Active Filters -->
+        <ActiveFilters
+          :filters="activeFilters"
+          @remove-filter="handleClearSelectedFilter"
+        />
+      </template>
       <template #table>
         <ProductTable
           :products="items.data"

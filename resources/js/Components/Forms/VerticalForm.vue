@@ -1,6 +1,10 @@
 <script setup>
 import { reactive, ref, watch } from "vue";
 import dayjs from "dayjs";
+import { useGlobalVariables } from "@/Composables/useGlobalVariable";
+
+
+const {errors} = useGlobalVariables()
 
 const props = defineProps({
   modelValue: {
@@ -44,10 +48,7 @@ const props = defineProps({
      * }
      */
   },
-  errors: {
-    type: Object,
-    default: () => ({}), // 🔹 backend error messages from parent
-  },
+
 });
 
 const emit = defineEmits(["update:modelValue"]);
@@ -117,6 +118,7 @@ const timeOpen = ref(false);
           :value="formState[field.key]"
           :placeholder="field.placeholder"
           @input="updateValue(field.key, $event.target.value)"
+          size="large"
         />
 
         <!-- number -->
@@ -127,6 +129,7 @@ const timeOpen = ref(false);
           @change="(val) => updateValue(field.key, val)"
           style="width: 100%"
           type="number"
+          size="large"
         />
 
         <!-- textarea -->
@@ -136,6 +139,7 @@ const timeOpen = ref(false);
           :placeholder="field.placeholder"
           @input="updateValue(field.key, $event.target.value)"
           :rows="field.rows || 3"
+          size="large"
         />
 
         <!-- select -->
@@ -179,9 +183,11 @@ const timeOpen = ref(false);
               }
             }
           "
-          :filterOption="(input, option) =>
-  option.label.toLowerCase().includes(input.toLowerCase())
-"
+          :filterOption="
+            (input, option) =>
+              option.label.toLowerCase().includes(input.toLowerCase())
+          "
+          size="large"
         />
 
         <!-- date -->
@@ -196,6 +202,7 @@ const timeOpen = ref(false);
           :open="dateOpen"
           @openChange="(status) => (dateOpen = status)"
           @change="(val) => updateValue(field.key, val)"
+          size="large"
         >
           <template #renderExtraFooter>
             <div class="flex justify-between mt-2">
@@ -224,6 +231,7 @@ const timeOpen = ref(false);
           show-time
           :format="field.format || 'ddd, MMM DD, YYYY hh:mm a'"
           @change="(val) => updateValue(field.key, val)"
+          size="large"
         />
 
         <!-- time -->
@@ -237,18 +245,29 @@ const timeOpen = ref(false);
           class="w-full"
           :open="timeOpen"
           @openChange="(status) => (timeOpen = status)"
+          size="large"
         />
 
         <!-- radio -->
         <a-radio-group
           v-else-if="field.type === 'radio'"
-          :value="formState[field.key]"
-          @change="(e) => updateValue(field.key, e.target.value)"
+          :value="formState[field.key]?.value ?? formState[field.key]"
+          @change="
+            (e) => {
+              updateValue(
+                field.key,
+                field.options.find(
+                  (o) => (o.value ?? o.id ?? o) === e.target.value
+                )
+              );
+            }
+          "
+          size="large"
         >
           <a-radio
             v-for="opt in field.options"
-            :key="typeof opt === 'object' ? opt.id ?? opt.value : opt"
-            :value="typeof opt === 'object' ? opt.id ?? opt.value : opt"
+            :key="typeof opt === 'object' ? opt.value ?? opt.id : opt"
+            :value="typeof opt === 'object' ? opt.value ?? opt.id : opt"
           >
             {{
               typeof opt === "object" ? opt.label ?? opt.name ?? opt.value : opt
@@ -263,6 +282,7 @@ const timeOpen = ref(false);
               :checked="isCheckAllChecked(field)"
               :indeterminate="isCheckAllIndeterminate(field)"
               @change="(e) => handleCheckAll(field, e)"
+              size="large"
             >
               {{ field.checkAllLabel || "Check all" }}
             </a-checkbox>
@@ -270,16 +290,28 @@ const timeOpen = ref(false);
           </div>
 
           <a-checkbox-group
-            :value="formState[field.key]"
-            @change="(val) => updateValue(field.key, val)"
+            :value="
+              (formState[field.key] || []).map((v) => v.value ?? v.id ?? v)
+            "
+            @change="
+              (val) =>
+                updateValue(
+                  field.key,
+                  val.map((v) =>
+                    field.options.find((o) => (o.value ?? o.id ?? o) === v)
+                  )
+                )
+            "
+            size="large"
           >
             <a-checkbox
               v-for="opt in field.options"
-              :key="typeof opt === 'object' ? opt.id ?? opt.value : opt"
-              :value="typeof opt === 'object' ? opt.id ?? opt.value : opt"
+              :key="typeof opt === 'object' ? opt.value ?? opt.id : opt"
+              :value="typeof opt === 'object' ? opt.value ?? opt.id : opt"
               :disabled="
                 typeof opt === 'object' ? opt.disabled ?? false : false
               "
+              size="large"
             >
               {{
                 typeof opt === "object"
@@ -291,11 +323,21 @@ const timeOpen = ref(false);
         </template>
 
         <!-- single checkbox -->
+
         <a-checkbox
           v-else-if="field.type === 'checkbox-single'"
-          :checked="!!formState[field.key]"
-          @change="(e) => updateValue(field.key, e.target.checked)"
+          :checked="formState[field.key] === (field.value ?? true)"
+          @change="
+            (e) =>
+              updateValue(
+                field.key,
+                e.target.checked
+                  ? field.value ?? true
+                  : field.uncheckedValue ?? null
+              )
+          "
           :disabled="field.disabled ?? false"
+          size="large"
         >
           {{ field.text || field.label }}
         </a-checkbox>
