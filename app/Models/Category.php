@@ -13,4 +13,8 @@ class Category extends Model
     protected $guarded = [];
 
     protected $searchable = ['name', 'description'];
+
+    public function products (){
+        return $this->hasMany(Product::class);
+    }
 }

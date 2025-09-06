@@ -21,10 +21,7 @@ const props = defineProps({
 });
 
 // use composable
-const { spinning, pagination, handleTableChange } = useTable(
-  props,
-
-);
+const { spinning, pagination, handleTableChange } = useTable(props);
 
 const search = ref("");
 

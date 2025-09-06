@@ -27,7 +27,7 @@ const spinning = ref(false);
 const submit = () => {
   form.post(route("login"), {
     onFinish: () => {
-      spinning.value = false
+      spinning.value = false;
       form.reset("password");
     },
     onStart: () => (spinning.value = true),

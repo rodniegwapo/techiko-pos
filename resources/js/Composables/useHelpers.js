@@ -13,7 +13,7 @@ import { useEmits } from "./useEmits";
  * confirmDelete("categories.destroy", { id: record.id }, "Do you want to delete this item?");
  */
 
-const { formData, spinning, errors,openModal } = useGlobalVariables();
+const { formData, spinning, errors, openModal } = useGlobalVariables();
 const { emitClose } = useEmits();
 
 export function useHelpers() {
@@ -38,16 +38,29 @@ export function useHelpers() {
         params = {},
         message = "Do you want to delete this item?"
     ) => {
-        Modal.confirm({
-            title: "Confirm Delete",
-            icon: createVNode(ExclamationCircleOutlined),
-            content: message,
-            onOk() {
-                router.delete(route(routeName, params));
-            },
-            onCancel() {
-                // optional: handle cancel if needed
-            },
+        return new Promise((resolve, reject) => {
+            Modal.confirm({
+                title: "Confirm Delete",
+                icon: createVNode(ExclamationCircleOutlined),
+                content: message,
+                okText: "Delete",
+                cancelText: "Cancel",
+                onOk: () => {
+                    return new Promise((innerResolve, innerReject) => {
+                        router.delete(route(routeName, params), {
+                            onSuccess: (page) => {
+                                resolve(page);
+                                innerResolve();
+                            },
+                            onError: (errors) => {
+                                reject(errors);
+                                innerReject();
+                            },
+                        });
+                    });
+                },
+                onCancel: () => reject(new Error("User canceled")),
+            });
         });
     };
 

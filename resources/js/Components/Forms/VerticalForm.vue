@@ -141,6 +141,7 @@ const timeOpen = ref(false);
         <!-- select -->
         <a-select
           v-else-if="field.type === 'select'"
+          show-search
           :value="
             field.multiple
               ? (formState[field.key] || []).map((v) => v.id ?? v.value ?? v)
@@ -178,6 +179,9 @@ const timeOpen = ref(false);
               }
             }
           "
+          :filterOption="(input, option) =>
+  option.label.toLowerCase().includes(input.toLowerCase())
+"
         />
 
         <!-- date -->
