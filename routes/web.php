@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Product\ProductDiscountController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
@@ -37,6 +38,10 @@ Route::middleware('auth')->group(function () {
 Route::middleware(['auth'])->group(function () {
     Route::resource('categories', \App\Http\Controllers\CategoryController::class)->names('categories');
     Route::resource('products', \App\Http\Controllers\Products\ProductController::class)->names('products');
+    Route::name('products.')->group(function () {
+        Route::resource('discounts', \App\Http\Controllers\Products\DiscountController::class)
+            ->names('discounts');
+    });
 });
 
 require __DIR__ . '/auth.php';
