@@ -7,7 +7,7 @@ const openModal = ref(false);
 const isEdit = ref(false);
 const spinning = ref(false);
 const errors = ref({});
-const   formFilters = ref({})
+const formFilters = ref({});
 
 export function useGlobalVariables() {
     return {
