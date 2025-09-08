@@ -1,11 +1,12 @@
 <script setup>
 import { computed } from "vue";
 import { CloseOutlined } from "@ant-design/icons-vue";
-import { useGlobalVariables } from "@/Composables/useGlobalVariable";
-
-const { formFilters } = useGlobalVariables();
 
 const props = defineProps({
+  filters: {
+    type: Array,
+    default: () => [],
+  },
   title: {
     type: String,
     default: "Active Filters:",
@@ -16,29 +17,7 @@ const props = defineProps({
   },
 });
 
-// 🔹 Build active filters list from global formFilters
-const activeFilters = computed(() => {
-  return Object.entries(formFilters.value)
-    .filter(([_, v]) => v && (Array.isArray(v) ? v.length > 0 : v !== ""))
-    .map(([key, value]) => ({
-      key,
-      value: Array.isArray(value) ? value.join(", ") : value,
-    }));
-});
-
-const hasActiveFilters = computed(() => activeFilters.value.length > 0);
-
-// remove a single filter
-const removeFilter = (key) => {
-  const newFilters = { ...formFilters.value };
-  delete newFilters[key];
-  formFilters.value = newFilters;
-};
-
-// clear all filters
-const clearAll = () => {
-  formFilters.value = {};
-};
+const hasActiveFilters = computed(() => props.filters.some((f) => f.value));
 </script>
 
 <template>
@@ -48,9 +27,14 @@ const clearAll = () => {
       <!-- Active Filters List -->
       <div class="flex items-start space-x-2 flex-wrap">
         <h3 class="text-sm">{{ title }}</h3>
-        <template v-for="(item, index) in activeFilters" :key="index">
-          <a-tag closable color="blue" @close="removeFilter(item.key)">
-            {{ item.value }}
+        <template v-for="(item, index) in filters" :key="index">
+          <a-tag
+            v-if="item.value"
+            closable
+            color="blue"
+            @close="$emit('remove-filter', item.key)"
+          >
+            <span v-if="item.label">{{ item.label }} : </span> {{ item.value }}
           </a-tag>
         </template>
       </div>
@@ -63,7 +47,7 @@ const clearAll = () => {
         <a-button
           type="link"
           class="-mt-[7px] text-gray-400"
-          @click.prevent="clearAll"
+          @click.prevent="$emit('clear-all')"
         >
           <template #icon>
             <CloseOutlined />
