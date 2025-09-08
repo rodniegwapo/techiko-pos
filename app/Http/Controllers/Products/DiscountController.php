@@ -1,0 +1,59 @@
+<?php
+
+namespace App\Http\Controllers\Products;
+
+use App\Http\Controllers\Controller;
+use App\Http\Resources\DiscountResource;
+use App\Models\Product\Discount;
+use Illuminate\Http\Request;
+use Inertia\Inertia;
+
+class DiscountController extends Controller
+{
+    public function index(Request $request)
+    {
+        $data = Discount::query()->when($request->input('search'), function ($query, $search) {
+            return $query->search($search);
+        })->paginate();
+
+        return Inertia::render('Discounts/Index', [
+            'items' => DiscountResource::collection($data)
+        ]);
+    }
+
+    public function store(Request $request)
+    {
+        $data = $this->validatedData($request);
+
+        Discount::create($data);
+
+        return redirect()->back();
+    }
+
+    public function update(Request $request, Discount $discount)
+    {
+        $data = $this->validatedData($request);
+
+        $discount->update($data);
+
+        redirect()->back();
+    }
+
+    public function destroy(Request $request, Discount $discount)
+    {
+        $discount->delete();
+
+        return  redirect()->back();
+    }
+
+    private function validatedData(Request $request)
+    {
+        return $request->validate([
+            'name' => 'string|max:200|required',
+            'type' => 'string|in:Amount,Percentage|required',
+            'value' => 'integer|required',
+            'start_date' => 'date|required',
+            'end_date' => 'date|required|after:start_date'
+        ]);
+    }
+}

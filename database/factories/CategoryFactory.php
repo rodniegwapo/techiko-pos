@@ -16,9 +16,27 @@ class CategoryFactory extends Factory
      */
     public function definition(): array
     {
+        // Custom product category names
+        $categories = [
+            'Electronics',
+            'Clothing',
+            'Groceries',
+            'Furniture',
+            'Books',
+            'Toys',
+            'Sports',
+            'Beauty & Health',
+            'Automotive',
+            'Office Supplies',
+            'Jewelry',
+            'Home Appliances',
+            'Shoes',
+            'Garden',
+        ];
+
         return [
-            'name' => $this->faker->unique()->word(),  // e.g. "Electronics"
-            'description' => $this->faker->sentence(), // e.g. "This category contains tech gadgets."
+            'name' => $this->faker->unique()->randomElement($categories),
+            'description' => $this->faker->sentence(), // still generates English
         ];
     }
 }

@@ -5,7 +5,6 @@ import {
   IconCategory,
   IconUsers,
   IconBrandProducthunt,
-  
 } from "@tabler/icons-vue";
 import { router, usePage } from "@inertiajs/vue3";
 
@@ -23,13 +22,8 @@ const menus = computed(() => {
       pathName: "dashboard",
     },
     {
-      title: "Categories",
-      icon: IconCategory,
-      path: "/categories", // add path so it has unique key
-    },
-    {
       title: "Products",
-      icon: IconBrandProducthunt,
+      icon: IconCategory,
       path: "/products", // important: give parent submenu a path (for key)
       children: [
         {
@@ -39,6 +33,10 @@ const menus = computed(() => {
         {
           title: "Categories",
           path: route("categories.index"),
+        },
+        {
+          title: "Discounts",
+          path: route("products.discounts.index"),
         },
       ],
     },
