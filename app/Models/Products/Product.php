@@ -2,6 +2,7 @@
 
 namespace App\Models\Products;
 
+use App\Models\Category;
 use App\Traits\Searchable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;

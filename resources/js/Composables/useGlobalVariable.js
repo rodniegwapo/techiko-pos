@@ -8,6 +8,8 @@ const isEdit = ref(false);
 const spinning = ref(false);
 const errors = ref({});
 const formFilters = ref({});
+const openKeys = ref([]); // for menus
+const selectedKeys = ref([]);// for menus
 
 export function useGlobalVariables() {
     return {
@@ -19,5 +21,7 @@ export function useGlobalVariables() {
         isEdit,
         spinning,
         errors,
+        selectedKeys,
+        openKeys
     };
 }

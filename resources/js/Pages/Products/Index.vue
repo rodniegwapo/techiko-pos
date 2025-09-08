@@ -1,8 +1,10 @@
 <script setup>
 import { ref, computed, onMounted } from "vue";
 import { usePage, router, Head } from "@inertiajs/vue3";
+import {PlusSquareOutlined} from '@ant-design/icons-vue'
 import { watchDebounced } from "@vueuse/core";
 import { useFilters, toLabel } from "@/Composables/useFilters";
+import { useHelpers } from "@/Composables/useHelpers";
 
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
@@ -12,6 +14,9 @@ import FilterDropdown from "@/Components/filters/FilterDropdown.vue";
 import ActiveFilters from "@/Components/filters/ActiveFilters.vue";
 import ProductTable from "./components/ProductTable.vue";
 import AddModal from "./components/AddModal.vue";
+
+
+const { showModal } = useHelpers();
 
 // Page props
 const page = usePage();
@@ -25,8 +30,8 @@ const search = ref("");
 
 const sold_type = ref(null);
 const price = ref(null);
-const category = ref(null)
-const cost = ref(null)
+const category = ref(null);
+const cost = ref(null);
 
 // Fetch items
 const getItems = () => {
@@ -37,8 +42,8 @@ const getItems = () => {
       search: search.value || undefined,
       sold_type: sold_type.value || undefined,
       price: price.value || undefined,
-      category: category.value || undefined, 
-      cost: cost.value || undefined, 
+      category: category.value || undefined,
+      cost: cost.value || undefined,
       page: pagination.value.current_page || 1,
     },
     onStart: () => (spinning.value = true),
@@ -128,6 +133,16 @@ const handleTableChange = (newPagination) => {
           placeholder="Search products"
           class="min-w-[100px] max-w-[300px]"
         />
+        <a-button
+          @click="showModal"
+          type="primary"
+          class="bg-white border flex items-center border-green-500 text-green-500"
+        >
+          <template #icon>
+            <PlusSquareOutlined />
+          </template>
+          Create Product
+        </a-button>
         <FilterDropdown v-model="filters" :filters="filtersConfig" />
       </template>
 
