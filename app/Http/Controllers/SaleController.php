@@ -55,8 +55,8 @@ class SaleController extends Controller
                 return $query->whereHas('category', function ($query) use ($category) {
                     return $query->where('name', $category);
                 });
-            })->get();
-            
+            })->with('category')->get();
+
 
         return ProductResource::collection($product);
     }

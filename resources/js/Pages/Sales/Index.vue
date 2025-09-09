@@ -8,6 +8,8 @@ import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import RefreshButton from "@/Components/buttons/Refresh.vue";
 import FilterDropdown from "@/Components/filters/FilterDropdown.vue";
 import ActiveFilters from "@/Components/filters/ActiveFilters.vue";
+import ProductTable from "./components/ProductTable.vue";
+
 import { PlusSquareOutlined } from "@ant-design/icons-vue";
 
 import { usePage, router, Head } from "@inertiajs/vue3";
@@ -91,36 +93,7 @@ const getProducts = async () => {
       </template>
 
       <template #table>
-        <div
-          class="grid grid-cols-[repeat(auto-fit,minmax(250px,1fr))] gap-4 mt-8 overflow-scroll"
-        >
-          <div
-            v-for="(product, index) in products"
-            :key="index"
-            class="flex justify-between items-start border px-4 py-3 rounded-lg shadow bg-white"
-          >
-            <div>
-              <div class="text-sm font-medium">{{ product.name }}</div>
-              <div
-                class="text-[10px] text-white bg-green-600 w-fit px-2 py-[1px] rounded-full mt-1"
-              >
-                Bakery
-              </div>
-            </div>
-            <div class="text-right">
-              <div class="text-md text-gray-700 font-semibold">
-                ₱ {{ product.price }}
-              </div>
-              <a-button
-                type="primary"
-                class="text-xs flex items-center p-0 mt-1 bg-transparent text-green-600 border-none shadow-none"
-                size="small"
-              >
-                <PlusSquareOutlined class="mr-1" /> Add to Cart
-              </a-button>
-            </div>
-          </div>
-        </div>
+        <ProductTable :products="products" />
       </template>
       <div>dsdsss</div>
     </ContentLayoutV2>
