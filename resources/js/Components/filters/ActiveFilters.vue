@@ -31,7 +31,7 @@ const hasActiveFilters = computed(() => props.filters.some((f) => f.value));
           <a-tag
             v-if="item.value"
             closable
-            color="blue"
+            color="green"
             @close="$emit('remove-filter', item.key)"
           >
             <span v-if="item.label">{{ item.label }} : </span> {{ item.value }}

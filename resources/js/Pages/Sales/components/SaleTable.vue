@@ -4,20 +4,13 @@ import { IconTrash, IconEdit, IconCurrencyPeso } from "@tabler/icons-vue";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 
-import { usePage } from "@inertiajs/vue3";
-
-const page = usePage();
-
+const emit = defineEmits(["handleTableChange"]);
 const { confirmDelete } = useHelpers();
 const { formData, openModal, isEdit, spinning } = useGlobalVariables();
 
-defineEmits(["handleTableChange"]);
-
 const props = defineProps({
-  pagination: {
-    type: Object,
-    default: {},
-  },
+  products: { type: Object, required: true },
+  pagination: { type: Object, required: false, default: () => ({}) },
 });
 
 const columns = [
@@ -41,6 +34,10 @@ const columns = [
   { title: "Action", key: "action", align: "center", width: "1%" },
 ];
 
+const handleTableChange = (event) => {
+  emit("handleTableChange", event);
+};
+
 const handleDeleteCategory = (record) => {
   confirmDelete(
     "products.destroy",
@@ -60,11 +57,11 @@ const handleClickEdit = (record) => {
   <a-table
     class="ant-table-striped"
     :columns="columns"
-    :data-source="page.props?.items?.data ?? []"
+    :data-source="products"
     :row-class-name="
       (_, index) => (index % 2 === 1 ? 'bg-gray-50 group' : 'group')
     "
-    @change="$emit('handleTableChange', $event)"
+    @change="handleTableChange"
     :pagination="pagination"
     :loading="spinning"
   >
@@ -76,7 +73,8 @@ const handleClickEdit = (record) => {
           size="large"
           :src="`https://ui-avatars.com/api/?name=${record.name}&background=${record.representation}&color=ffff`"
         >
-        </a-avatar>
+        </a-avatar
+        >
         <a-avatar
           v-else
           shape="circle"

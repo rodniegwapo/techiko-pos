@@ -16,14 +16,11 @@ import { router } from "@inertiajs/vue3";
 import { useHelpers } from "@/Composables/useHelpers";
 
 const { openModal, isEdit } = useGlobalVariables();
-const {showModal} = useHelpers();
+const { showModal } = useHelpers();
 
 const props = defineProps({
   items: Object,
 });
-
-// use composable
-const { spinning, pagination, handleTableChange } = useTable(props);
 
 const search = ref("");
 
@@ -41,6 +38,11 @@ const getItems = () => {
 };
 
 watchDebounced(search, getItems, { debounce: 300 });
+
+// use composable
+// group all filters in one object
+const tableFilters = { search };
+const { pagination, handleTableChange ,spinning} = useTable("items", tableFilters);
 </script>
 
 <template>
