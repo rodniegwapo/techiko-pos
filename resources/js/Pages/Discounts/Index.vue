@@ -12,23 +12,16 @@ import ContentLayout from "@/Components/ContentLayout.vue";
 import RefreshButton from "@/Components/buttons/Refresh.vue";
 import DiscountTable from "./components/DiscountTable.vue";
 import AddModal from "./components/AddModal.vue";
+import { useTable } from "@/Composables/useTable";
 
 const { showModal } = useHelpers();
 
 // Page props
 const page = usePage();
 
-// Table state (pagination/spinning)
-const spinning = ref(false);
-const pagination = ref(page.props.items.meta || {});
 
 // Search input
 const search = ref("");
-
-const sold_type = ref(null);
-const price = ref(null);
-const category = ref(null);
-const cost = ref(null);
 
 // Fetch items
 const getItems = () => {
@@ -47,10 +40,8 @@ const getItems = () => {
 watchDebounced(search, getItems, { debounce: 300 });
 
 // Table change handler
-const handleTableChange = (newPagination) => {
-  pagination.value = newPagination;
-  getItems();
-};
+const tableFilters = { search };
+const { pagination, handleTableChange ,spinning} = useTable("items", tableFilters);
 </script>
 
 <template>

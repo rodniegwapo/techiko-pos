@@ -42,6 +42,8 @@ Route::middleware(['auth'])->group(function () {
         Route::resource('discounts', \App\Http\Controllers\Products\DiscountController::class)
             ->names('discounts');
     });
+
+    Route::get('/sales',[\App\Http\Controllers\SaleController::class, 'index'])->name('sales.index');
 });
 
 require __DIR__ . '/auth.php';

@@ -142,7 +142,7 @@ const countActiveFilters = computed(
             </div>
         </template>
 
-        <a-badge :count="countActiveFilters" color="blue">
+        <a-badge :count="countActiveFilters" color="green">
             <a-button>
                 <template #icon>
                     <FilterOutlined />

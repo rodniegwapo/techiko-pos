@@ -1,10 +1,12 @@
 <script setup>
 import { ref, computed, onMounted } from "vue";
 import { usePage, router, Head } from "@inertiajs/vue3";
-import {PlusSquareOutlined} from '@ant-design/icons-vue'
+import { PlusSquareOutlined } from "@ant-design/icons-vue";
 import { watchDebounced } from "@vueuse/core";
 import { useFilters, toLabel } from "@/Composables/useFilters";
 import { useHelpers } from "@/Composables/useHelpers";
+import { useGlobalVariables } from "@/Composables/useGlobalVariable";
+import { useTable } from "@/Composables/useTable";
 
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
@@ -15,19 +17,11 @@ import ActiveFilters from "@/Components/filters/ActiveFilters.vue";
 import ProductTable from "./components/ProductTable.vue";
 import AddModal from "./components/AddModal.vue";
 
-
-const { showModal } = useHelpers();
-
-// Page props
 const page = usePage();
+const { showModal } = useHelpers();
+const { spinning } = useGlobalVariables();
 
-// Table state (pagination/spinning)
-const spinning = ref(false);
-const pagination = ref(page.props.items.meta || {});
-
-// Search input
 const search = ref("");
-
 const sold_type = ref(null);
 const price = ref(null);
 const category = ref(null);
@@ -44,7 +38,7 @@ const getItems = () => {
       price: price.value || undefined,
       category: category.value || undefined,
       cost: cost.value || undefined,
-      page: pagination.value.current_page || 1,
+      // page: pagination.value.current_page || 1,
     },
     onStart: () => (spinning.value = true),
     onFinish: () => (spinning.value = false),
@@ -113,11 +107,9 @@ const filtersConfig = [
   { key: "price", label: "Price", type: "number" },
 ];
 
-// Table change handler
-const handleTableChange = (newPagination) => {
-  pagination.value = newPagination;
-  getItems();
-};
+// group all filters in one object
+const tableFilters = { search, sold_type, price, category, cost };
+const { pagination, handleTableChange } = useTable("items", tableFilters);
 </script>
 
 <template>
@@ -160,9 +152,8 @@ const handleTableChange = (newPagination) => {
       <!-- Table -->
       <template #table>
         <ProductTable
-          :products="page.props.items.data"
-          :pagination="pagination"
           @handle-table-change="handleTableChange"
+          :pagination="pagination"
         />
       </template>
     </ContentLayout>
