@@ -28,8 +28,6 @@ const props = defineProps({
       </div>
       <div>
         <slot name="activeFilters" />
-      </div>
-      <div>
         <slot name="table" />
       </div>
     </div>

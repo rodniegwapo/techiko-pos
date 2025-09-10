@@ -15,13 +15,17 @@ const props = defineProps({
     type: String,
     default: "Remove all filters",
   },
+  alwaysShow: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const hasActiveFilters = computed(() => props.filters.some((f) => f.value));
 </script>
 
 <template>
-  <div v-if="hasActiveFilters">
+  <div v-if="hasActiveFilters || alwaysShow">
     <hr class="-mx-6 border-t-[3px] mt-[20px] m-[20px]" />
     <div class="flex justify-between items-start mb-3">
       <!-- Active Filters List -->
@@ -48,6 +52,7 @@ const hasActiveFilters = computed(() => props.filters.some((f) => f.value));
           type="link"
           class="-mt-[7px] text-gray-400"
           @click.prevent="$emit('clear-all')"
+          v-if="hasActiveFilters"
         >
           <template #icon>
             <CloseOutlined />
