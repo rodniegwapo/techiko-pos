@@ -10,6 +10,7 @@ const errors = ref({});
 const formFilters = ref({});
 const openKeys = ref([]); // for menus
 const selectedKeys = ref([]);// for menus
+const orders = ref([])
 
 export function useGlobalVariables() {
     return {
@@ -22,6 +23,7 @@ export function useGlobalVariables() {
         spinning,
         errors,
         selectedKeys,
-        openKeys
+        openKeys,
+        orders
     };
 }

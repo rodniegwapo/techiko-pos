@@ -35,7 +35,7 @@ const collapsed = ref(false);
     </left-sidebar-wrapper>
 
     <a-layout-content
-      class="p-6 lg:overflow-auto md:overflow-auto sm:overflow-scroll"
+      class="max-w-7xl mx-auto p-6 lg:overflow-auto md:overflow-auto sm:overflow-scroll"
     >
       <slot />
     </a-layout-content>

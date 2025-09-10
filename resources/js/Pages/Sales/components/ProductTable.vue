@@ -1,20 +1,36 @@
 <script setup>
 import { PlusSquareOutlined } from "@ant-design/icons-vue";
+import { ref, inject } from "vue";
+import { useOrders } from "@/Composables/useOrder";
+
 const props = defineProps({
   products: {
     type: Array,
     default: [],
   },
 });
+
+const { orders, handleAddOrder } = useOrders();
+
+//  Formatted total with commas (Philippine Peso example)
+const formattedTotal = (price) => {
+  return new Intl.NumberFormat("en-PH", {
+    style: "currency",
+    currency: "PHP",
+  }).format(price);
+};
 </script>
 
 <template>
-  <div class="overflow-y-auto overflow-x-hidden h-[calc(100vh-250px)]">
-    <div class="grid [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))] gap-4 mt-2">
+  <div class="overflow-y-auto overflow-x-hidden h-[calc(100vh-300px)] ">
+    <div
+      class="grid [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))] gap-4 mt-2"
+    >
       <div
         v-for="(product, index) in products"
         :key="index"
         class="flex justify-between items-start border px-4 py-3 rounded-lg bg-white hover:shadow cursor-pointer"
+        @click="handleAddOrder(product)"
       >
         <div>
           <div class="text-sm font-semibold">{{ product.name }}</div>
@@ -26,7 +42,7 @@ const props = defineProps({
         </div>
         <div class="text-right">
           <div class="text-md text-green-700 font-bold">
-            ₱ {{ parseFloat(product.price) }}
+           {{ formattedTotal(product.price) }}
           </div>
           <a-button
             type="primary"
