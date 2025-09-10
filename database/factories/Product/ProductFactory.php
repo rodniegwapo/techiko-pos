@@ -12,7 +12,7 @@ use App\Models\Product\Product; // important
  */
 class ProductFactory extends Factory
 {
-    
+
     protected $model = Product::class;
 
     public function definition(): array

@@ -15,8 +15,8 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('sold_type');
-            $table->integer('price');
-            $table->integer('cost');
+            $table->float('price');
+            $table->float('cost');
             $table->string('SKU');
             $table->string('barcode');
             $table->string('representation_type')->nullable();
