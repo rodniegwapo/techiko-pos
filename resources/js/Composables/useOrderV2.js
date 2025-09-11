@@ -7,7 +7,8 @@ export function useOrders() {
     const { user } = useAuth();
 
     // local state
-    const orders = ref([]);
+    const orders = ref(JSON.parse(localStorage.getItem("orders")) || []);
+
     const orderId = ref(localStorage.getItem("current_order") || null);
 
     // ✅ Step 1: Create a draft in DB when new order starts
@@ -22,7 +23,7 @@ export function useOrders() {
     const syncDraft = useDebounceFn(async () => {
         if (!orderId.value) return;
 
-        await axios.post(`/api/orders/${orderId.value}/sync`, {
+        await axios.post(`/api/sales/${orderId.value}/sync`, {
             items: orders.value,
         });
     }, 1000); // sync after 1s idle
@@ -40,7 +41,7 @@ export function useOrders() {
     // ✅ Step 3: Finalize order
     const finalizeOrder = async () => {
         if (!orderId.value) return;
-        await axios.post(`/api/orders/${orderId.value}/finalize`);
+        await axios.post(`/api/sales/${orderId.value}/finalize`);
         localStorage.removeItem("orders");
         localStorage.removeItem("current_order");
         orderId.value = null;
@@ -52,7 +53,7 @@ export function useOrders() {
         if (!orderId.value) {
             await createDraft();
         }
-        
+
         const index = orders.value.findIndex((p) => p.id === product.id);
         if (index >= 0) {
             orders.value[index].quantity += 1;

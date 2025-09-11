@@ -8,7 +8,14 @@ import {
 
 import { useOrders } from "@/Composables/useOrderV2";
 
-const { orders,handleAddOrder,handleSubtractOrder,totalAmount,formattedTotal, removeOrder } = useOrders();
+const {
+  orders,
+  handleAddOrder,
+  handleSubtractOrder,
+  totalAmount,
+  formattedTotal,
+  removeOrder,
+} = useOrders();
 </script>
 
 <template>
@@ -17,13 +24,14 @@ const { orders,handleAddOrder,handleSubtractOrder,totalAmount,formattedTotal, re
     <a-input value="Walk-in Customer" disabled />
   </div>
   <div
-     class="flex flex-col gap-2 mt-2 h-[calc(100vh-380px)] overflow-auto overflow-x-hidden"
+    class="flex flex-col gap-2 mt-2 h-[calc(100vh-380px)] overflow-auto overflow-x-hidden"
   >
     <div
       v-for="(order, index) in orders"
       :key="index"
       class="flex justify-between items-center border px-4 rounded-lg bg-white hover:shadow cursor-pointer"
     >
+    <!-- {{ order }} -->
       <div>
         <div class="text-sm font-semibold">{{ order.name }}</div>
 
@@ -32,11 +40,14 @@ const { orders,handleAddOrder,handleSubtractOrder,totalAmount,formattedTotal, re
         >
           <PlusSquareOutlined @click="handleAddOrder(order)" />
           <span>{{ order.quantity }}</span>
-          <MinusSquareOutlined  @click="handleSubtractOrder(order)"/>
+          <MinusSquareOutlined @click="handleSubtractOrder(order)" />
         </div>
       </div>
       <div class="text-right">
-        <div class="text-red-600 mt-1 cursor-pointer" @click="removeOrder(order)">
+        <div
+          class="text-red-600 mt-1 cursor-pointer"
+          @click="removeOrder(order)"
+        >
           <CloseOutlined />
         </div>
         <div class="text-xs text-green-700 mt-1">{{ order.price }}</div>

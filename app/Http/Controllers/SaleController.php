@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\Product\Product;
 use App\Models\Sale;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Illuminate\Support\Str;
 
@@ -72,5 +73,27 @@ class SaleController extends Controller
         ]);
 
         return response()->json(['order' => $order]);
+    }
+
+    public function syncDraft(Request $request, Sale $sale)
+    {
+        DB::transaction(function () use ($request, $sale) {
+            $sale->items()->delete(); // overwrite draft
+
+            foreach ($request->items as $item) {
+                $sale->items()->create([
+                    'product_id' => $item['id'],
+                    'quantity'   => $item['quantity'],
+                    'unit_price'      => $item['price'],
+                    'subtotal' => $item['price'] * $item['quantity']
+                ]);
+            }
+
+            $sale->total_amount = collect($request->items)
+                ->sum(fn($i) => $i['quantity'] * $i['price']);
+            $sale->save();
+        });
+
+        return response()->json(['order' => $sale->fresh('items')]);
     }
 }
