@@ -6,7 +6,7 @@ import {
   MinusSquareOutlined,
 } from "@ant-design/icons-vue";
 
-import { useOrders } from "@/Composables/useOrderV2";
+import { useOrders } from "@/Composables/useOrder";
 
 const { orders,handleAddOrder,handleSubtractOrder,totalAmount,formattedTotal, removeOrder } = useOrders();
 </script>
@@ -36,7 +36,7 @@ const { orders,handleAddOrder,handleSubtractOrder,totalAmount,formattedTotal, re
         </div>
       </div>
       <div class="text-right">
-        <div class="text-red-600 mt-1 cursor-pointer" @click="removeOrder(order)">
+        <div class="text-red-600 mt-1 cursor-pointer" @click="removeOrder(order.id)">
           <CloseOutlined />
         </div>
         <div class="text-xs text-green-700 mt-1">{{ order.price }}</div>

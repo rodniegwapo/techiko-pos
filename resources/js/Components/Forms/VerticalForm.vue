@@ -3,8 +3,7 @@ import { reactive, ref, watch } from "vue";
 import dayjs from "dayjs";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 
-
-const {errors} = useGlobalVariables()
+const { errors } = useGlobalVariables();
 
 const props = defineProps({
   modelValue: {
@@ -48,7 +47,6 @@ const props = defineProps({
      * }
      */
   },
-
 });
 
 const emit = defineEmits(["update:modelValue"]);
@@ -119,6 +117,15 @@ const timeOpen = ref(false);
           :placeholder="field.placeholder"
           @input="updateValue(field.key, $event.target.value)"
           size="large"
+        />
+
+        <a-input
+          v-else-if="field.type === 'password'"
+          :value="formState[field.key]"
+          :placeholder="field.placeholder"
+          @input="updateValue(field.key, $event.target.value)"
+          size="large"
+          type="password"
         />
 
         <!-- number -->

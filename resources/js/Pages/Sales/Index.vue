@@ -1,5 +1,5 @@
 <script setup >
-import { ref, computed, onMounted,provide } from "vue";
+import { ref, computed, onMounted, provide } from "vue";
 import axios from "axios";
 
 import ContentHeader from "@/Components/ContentHeader.vue";
@@ -71,13 +71,10 @@ const getProducts = async () => {
   products.value = items.data.data;
   loading.value = false;
 };
-
-
 </script>
 
 <template>
   <AuthenticatedLayout>
-    
     <Head title="Sales" />
     <ContentHeader class="mb-8" title="Sales" />
     <ContentLayoutV2 title="Create Transaction">

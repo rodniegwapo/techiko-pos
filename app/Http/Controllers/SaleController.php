@@ -8,6 +8,7 @@ use App\Models\Product\Product;
 use App\Models\Sale;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Support\Str;
 
 class SaleController extends Controller
 {
@@ -59,5 +60,17 @@ class SaleController extends Controller
 
 
         return ProductResource::collection($product);
+    }
+
+    public function storeDraft(Request $request)
+    {
+        $order = Sale::create([
+            'user_id' => $request->user()->id,
+            'payment_status' => 'pending',
+            'invoice_number' => Str::random(10),
+            'transaction_date' => now()
+        ]);
+
+        return response()->json(['order' => $order]);
     }
 }

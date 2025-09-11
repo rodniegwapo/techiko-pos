@@ -1,14 +1,16 @@
 <script setup>
-import { ref } from "vue";
+import LeftMenu from "@/Components/sidebar/leftMenu.vue";
+import LeftSidebarWrapper from "@/Components/sidebar/leftWrapper.vue";
+import LeftAccountSettings from "@/Components/sidebar/leftAccountSettings.vue";
+import Terminal from "@/Components/Terminal.vue";
+
+import { onMounted, ref } from "vue";
 import {
   UserOutlined,
   VideoCameraOutlined,
   UploadOutlined,
 } from "@ant-design/icons-vue";
 import { IconMenu2 } from "@tabler/icons-vue";
-import LeftMenu from "@/Components/sidebar/leftMenu.vue";
-import LeftSidebarWrapper from "@/Components/sidebar/leftWrapper.vue";
-import LeftAccountSettings from "@/Components/sidebar/leftAccountSettings.vue";
 import { useAuth } from "@/composables/useAuth";
 import { useSidebar } from "@/composables/useSidebar";
 
@@ -17,12 +19,23 @@ const { isCollapsed } = useSidebar();
 
 const selectedKeys = ref(["1"]);
 const collapsed = ref(false);
+
+const terminalModal = ref(false);
+onMounted(() => {
+  let deviceId = localStorage.getItem("device_id");
+  if (deviceId) {
+    return (terminalModal.value = false);
+  }
+
+  return (terminalModal.value = true);
+});
 </script>
 
 <template>
   <a-layout
     class="relative bg-dots-darker bg-center bg-gray-100 dark:bg-dots-lighter dark:bg-gray-900 selection:bg-red-500 selection:text-white"
   >
+    <terminal />
     <left-sidebar-wrapper>
       <!-- menu -->
       <left-menu />

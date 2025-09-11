@@ -20,4 +20,5 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/sales/products', [\App\Http\Controllers\SaleController::class, 'products'])->name('sales.products');
+    Route::post('/sales/draft', [\App\Http\Controllers\SaleController::class, 'storeDraft'])->name('sales.draft');
 });
