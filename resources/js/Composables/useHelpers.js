@@ -1,5 +1,5 @@
 // composables/useConfirmDelete.js
-import { createVNode } from "vue";
+import { computed, createVNode } from "vue";
 import { Modal } from "ant-design-vue";
 import { ExclamationCircleOutlined } from "@ant-design/icons-vue";
 import { router } from "@inertiajs/vue3";
@@ -13,7 +13,7 @@ import { useEmits } from "./useEmits";
  * confirmDelete("categories.destroy", { id: record.id }, "Do you want to delete this item?");
  */
 
-const { formData, spinning, errors, openModal,isEdit } = useGlobalVariables();
+const { formData, spinning, errors, openModal, isEdit } = useGlobalVariables();
 const { emitClose } = useEmits();
 
 export function useHelpers() {
@@ -70,9 +70,16 @@ export function useHelpers() {
         });
     };
 
+    const getDeviceId = computed(() => {
+        let deviceId = localStorage.getItem("device_id");
+
+        return deviceId;
+    });
+
     return {
         confirmDelete,
         inertiaProgressLifecyle,
-        showModal
+        showModal,
+        getDeviceId,
     };
 }

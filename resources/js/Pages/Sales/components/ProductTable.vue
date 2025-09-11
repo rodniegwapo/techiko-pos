@@ -1,7 +1,7 @@
 <script setup>
 import { PlusSquareOutlined } from "@ant-design/icons-vue";
 import { ref, inject } from "vue";
-import { useOrders } from "@/Composables/useOrder";
+import { useOrders } from "@/Composables/useOrderV2";
 
 const props = defineProps({
   products: {
@@ -22,7 +22,7 @@ const formattedTotal = (price) => {
 </script>
 
 <template>
-  <div class="overflow-y-auto overflow-x-hidden h-[calc(100vh-300px)] ">
+  <div class="overflow-y-auto overflow-x-hidden h-[calc(100vh-300px)]">
     <div
       class="grid [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))] gap-4 mt-2"
     >
@@ -30,7 +30,6 @@ const formattedTotal = (price) => {
         v-for="(product, index) in products"
         :key="index"
         class="flex justify-between items-start border px-4 py-3 rounded-lg bg-white hover:shadow cursor-pointer"
-        @click="handleAddOrder(product)"
       >
         <div>
           <div class="text-sm font-semibold">{{ product.name }}</div>
@@ -42,12 +41,13 @@ const formattedTotal = (price) => {
         </div>
         <div class="text-right">
           <div class="text-md text-green-700 font-bold">
-           {{ formattedTotal(product.price) }}
+            {{ formattedTotal(product.price) }}
           </div>
           <a-button
             type="primary"
             class="text-xs flex items-center p-0 mt-1 bg-transparent text-gray-800 border-none shadow-none"
             size="small"
+            @click="handleAddOrder(prod)"
           >
             <PlusSquareOutlined /> Add to Cart
           </a-button>

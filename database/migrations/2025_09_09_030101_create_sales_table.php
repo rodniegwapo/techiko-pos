@@ -17,10 +17,10 @@ return new class extends Migration
             // $table->foreignId('customer_id')->nullable()->constrained('customers')->nullOnDelete();
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
 
-            $table->decimal('total_amount', 12, 2);
+            $table->decimal('total_amount', 12, 2)->default(0);
             $table->decimal('discount_amount', 12, 2)->default(0);
             $table->decimal('tax_amount', 12, 2)->default(0);
-            $table->decimal('grand_total', 12, 2);
+            $table->decimal('grand_total', 12, 2)->default(0);
 
             $table->enum('payment_method', ['cash', 'card', 'e-wallet'])->default('cash');
             $table->enum('payment_status', ['paid', 'pending', 'refunded', 'partial'])->default('pending');
