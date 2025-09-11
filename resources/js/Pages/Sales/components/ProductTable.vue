@@ -47,7 +47,7 @@ const formattedTotal = (price) => {
             type="primary"
             class="text-xs flex items-center p-0 mt-1 bg-transparent text-gray-800 border-none shadow-none"
             size="small"
-            @click="handleAddOrder(prod)"
+            @click="handleAddOrder(product)"
           >
             <PlusSquareOutlined /> Add to Cart
           </a-button>
