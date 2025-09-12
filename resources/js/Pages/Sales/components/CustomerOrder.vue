@@ -1,13 +1,17 @@
 <script setup>
+import VerticalForm from "@/Components/Forms/VerticalForm.vue";
+import PrimaryButton from "@/Components/PrimaryButton.vue";
 import { ref, inject } from "vue";
 import {
   CloseOutlined,
   PlusSquareOutlined,
   MinusSquareOutlined,
 } from "@ant-design/icons-vue";
-
+import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useOrders } from "@/Composables/useOrderV2";
+import axios from "axios";
 
+const { formData, errors } = useGlobalVariables();
 const {
   orders,
   handleAddOrder,
@@ -15,7 +19,42 @@ const {
   totalAmount,
   formattedTotal,
   removeOrder,
+  orderId,
 } = useOrders();
+
+const formFields = [
+  { key: "amount", label: "Amount", type: "text", disabled: true },
+  { key: "sale_item", label: "Sale item", type: "text", disabled: true },
+  { key: "pin_code", label: "Enter Pin", type: "text" },
+  {
+    key: "reason",
+    label: "Reason",
+    type: "textarea",
+  },
+];
+
+const openvoidModal = ref(false);
+const showVoidItem = async (product) => {
+  openvoidModal.value = true;
+  formData.value = {
+    ...product,
+    sale_item: product.name,
+    amount: product.price,
+    product_id: product.id,
+  };
+
+  return;
+  removeOrder(product);
+};
+
+const handleSubmitVoid = async () => {
+  await axios.post(
+    route("sales.item.void", {
+      sale: orderId.value,
+    }),
+    formData.value
+  );
+};
 </script>
 
 <template>
@@ -26,12 +65,13 @@ const {
   <div
     class="flex flex-col gap-2 mt-2 h-[calc(100vh-380px)] overflow-auto overflow-x-hidden"
   >
+    <!-- {{orders}} -->
     <div
       v-for="(order, index) in orders"
       :key="index"
       class="flex justify-between items-center border px-4 rounded-lg bg-white hover:shadow cursor-pointer"
     >
-    <!-- {{ order }} -->
+      <!-- {{ order }} -->
       <div>
         <div class="text-sm font-semibold">{{ order.name }}</div>
 
@@ -46,7 +86,7 @@ const {
       <div class="text-right">
         <div
           class="text-red-600 mt-1 cursor-pointer"
-          @click="removeOrder(order)"
+          @click="showVoidItem(order)"
         >
           <CloseOutlined />
         </div>
@@ -69,4 +109,21 @@ const {
       >Proceed Payment</a-button
     >
   </div>
+
+  <a-modal
+    v-model:visible="openvoidModal"
+    title="Void Product"
+    @cancel="openvoidModal = false"
+    :maskClosable="false"
+    width="450px"
+  >
+    <vertical-form v-model="formData" :fields="formFields" :errors="errors" />
+    <template #footer>
+      <a-button @click="openvoidModal = false">Cancel</a-button>
+
+      <primary-button :loading="spinning" @click="handleSubmitVoid"
+        >Submit
+      </primary-button>
+    </template>
+  </a-modal>
 </template>

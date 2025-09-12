@@ -117,6 +117,7 @@ const timeOpen = ref(false);
           :placeholder="field.placeholder"
           @input="updateValue(field.key, $event.target.value)"
           size="large"
+            :disabled="field.disabled ?? false"
         />
 
         <a-input
@@ -137,6 +138,7 @@ const timeOpen = ref(false);
           style="width: 100%"
           type="number"
           size="large"
+          :disabled="field.disabled ?? false"
         />
 
         <!-- textarea -->
