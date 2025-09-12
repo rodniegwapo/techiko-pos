@@ -21,5 +21,9 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/sales/products', [\App\Http\Controllers\SaleController::class, 'products'])->name('sales.products');
     Route::post('/sales/draft', [\App\Http\Controllers\SaleController::class, 'storeDraft'])->name('sales.draft');
-    Route::post('/sales/{sale}/sync', [\App\Http\Controllers\SaleController::class, 'syncDraft'])->name('sales.syncDraft');  
+    Route::post('/sales/{sale}/sync', [\App\Http\Controllers\SaleController::class, 'syncDraft'])->name('sales.syncDraft');
+    Route::post('/sales/{sale}/sale-items/void', [\App\Http\Controllers\SaleController::class, 'voidItem'])
+        ->scopeBindings()
+        ->name('sales.item.void');
+
 });

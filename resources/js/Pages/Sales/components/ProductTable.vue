@@ -26,6 +26,7 @@ const formattedTotal = (price) => {
     <div
       class="grid [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))] gap-4 mt-2"
     >
+    
       <div
         v-for="(product, index) in products"
         :key="index"

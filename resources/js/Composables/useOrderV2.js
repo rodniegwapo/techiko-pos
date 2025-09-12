@@ -1,34 +1,43 @@
+// useOrders.js
 import { ref, computed } from "vue";
-import { useAuth } from "./useAuth";
 import { useDebounceFn, watchDebounced } from "@vueuse/core";
 import axios from "axios";
 
+const orders = ref(JSON.parse(localStorage.getItem("orders")) || []);
+const orderId = ref(localStorage.getItem("current_order") || null);
+const isCreatingDraft = ref(false);
+let draftPromise = null; // ✅ shared across all components
+
 export function useOrders() {
-    const { user } = useAuth();
-
-    // local state
-    const orders = ref(JSON.parse(localStorage.getItem("orders")) || []);
-
-    const orderId = ref(localStorage.getItem("current_order") || null);
-
-    // ✅ Step 1: Create a draft in DB when new order starts
+    // ✅ Step 1: Create draft
     const createDraft = async () => {
-        if (orderId.value) return; // already have one
-        const { data } = await axios.post("/api/sales/draft");
-        orderId.value = data.order.id;
-        localStorage.setItem("current_order", orderId.value);
+        if (orderId.value) return orderId.value;
+        if (isCreatingDraft.value && draftPromise) return draftPromise;
+
+        isCreatingDraft.value = true;
+        draftPromise = axios
+            .post("/api/sales/draft")
+            .then(({ data }) => {
+                orderId.value = data.order.id;
+                localStorage.setItem("current_order", orderId.value);
+                return orderId.value;
+            })
+            .finally(() => {
+                isCreatingDraft.value = false;
+                draftPromise = null;
+            });
+
+        return draftPromise;
     };
 
-    // ✅ Step 2: Sync to DB (debounced)
+    // ✅ Step 2: Sync to DB
     const syncDraft = useDebounceFn(async () => {
         if (!orderId.value) return;
-
         await axios.post(`/api/sales/${orderId.value}/sync`, {
             items: orders.value,
         });
-    }, 1000); // sync after 1s idle
+    }, 1000);
 
-    // watch local orders → sync to DB
     watchDebounced(
         orders,
         () => {
@@ -38,7 +47,7 @@ export function useOrders() {
         { deep: true, debounce: 1000 }
     );
 
-    // ✅ Step 3: Finalize order
+    // ✅ Step 3: Finalize
     const finalizeOrder = async () => {
         if (!orderId.value) return;
         await axios.post(`/api/sales/${orderId.value}/finalize`);
@@ -51,7 +60,7 @@ export function useOrders() {
     // Actions
     const handleAddOrder = async (product) => {
         if (!orderId.value) {
-            await createDraft();
+            await createDraft(); // ✅ safe across all components
         }
 
         const index = orders.value.findIndex((p) => p.id === product.id);
@@ -73,9 +82,15 @@ export function useOrders() {
         orders.value = orders.value.filter((p) => p.id !== product.id);
     };
 
-    // Computed
     const totalAmount = computed(() =>
         orders.value.reduce((sum, i) => sum + i.quantity * i.price, 0)
+    );
+
+    const formattedTotal = computed(() =>
+        new Intl.NumberFormat("en-PH", {
+            style: "currency",
+            currency: "PHP",
+        }).format(totalAmount.value)
     );
 
     return {
@@ -87,5 +102,6 @@ export function useOrders() {
         createDraft,
         finalizeOrder,
         totalAmount,
+        formattedTotal
     };
 }
