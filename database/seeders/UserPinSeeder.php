@@ -25,5 +25,15 @@ class UserPinSeeder extends Seeder
                 ]
             );
         }
+        $manager = User::role('admin')->first();
+        if ($manager) {
+            UserPin::updateOrCreate(
+                ['user_id' => $manager->id],
+                [
+                    'pin_code'  => Hash::make('4567'), // 🔑 default PIN (change in production)
+                    'active'    => true,
+                ]
+            );
+        }
     }
 }

@@ -30,7 +30,7 @@ export function useOrders() {
         return draftPromise;
     };
 
-    // ✅ Step 2: Sync to DB
+    //  Step 2: Sync to DB
     const syncDraft = useDebounceFn(async () => {
         if (!orderId.value) return;
         await axios.post(`/api/sales/${orderId.value}/sync`, {
@@ -49,8 +49,6 @@ export function useOrders() {
 
     // ✅ Step 3: Finalize
     const finalizeOrder = async () => {
-        if (!orderId.value) return;
-        await axios.post(`/api/sales/${orderId.value}/finalize`);
         localStorage.removeItem("orders");
         localStorage.removeItem("current_order");
         orderId.value = null;
@@ -80,18 +78,24 @@ export function useOrders() {
 
     const removeOrder = (product) => {
         orders.value = orders.value.filter((p) => p.id !== product.id);
+        if (orders.value.length == 0) {
+            localStorage.removeItem("orders");
+            localStorage.removeItem("current_order");
+        }
     };
 
-    const totalAmount = computed(() =>
-        orders.value.reduce((sum, i) => sum + i.quantity * i.price, 0)
-    );
+    const totalAmount = computed(() => {
+        return orders.value.reduce((sum, i) => sum + i.quantity * i.price, 0);
+    });
 
-    const formattedTotal = computed(() =>
-        new Intl.NumberFormat("en-PH", {
+    const formattedTotal = (total) => {
+        const formattedTotal = new Intl.NumberFormat("en-PH", {
             style: "currency",
             currency: "PHP",
-        }).format(totalAmount.value)
-    );
+        }).format(total);
+
+        return formattedTotal;
+    };
 
     return {
         orders,
@@ -102,6 +106,6 @@ export function useOrders() {
         createDraft,
         finalizeOrder,
         totalAmount,
-        formattedTotal
+        formattedTotal,
     };
 }

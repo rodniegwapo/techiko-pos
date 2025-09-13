@@ -15,9 +15,9 @@ return new class extends Migration
             $table->id();
             $table->foreignId('sale_item_id')->constrained('sale_items')->cascadeOnDelete();
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
-            $table->foreignId('manager_id')->constrained('users')->cascadeOnDelete();
+            $table->foreignId('approver_id')->constrained('users')->cascadeOnDelete();
             $table->string('reason')->nullable();
-            $table->decimal('amount', 12, 0)->default(0);
+            $table->decimal('amount', 12, 0)->default(0);   
             $table->timestamps();
         });
     }

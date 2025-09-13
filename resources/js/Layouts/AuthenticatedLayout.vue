@@ -33,7 +33,7 @@ onMounted(() => {
 
 <template>
   <a-layout
-    class="relative bg-dots-darker bg-center bg-gray-100 dark:bg-dots-lighter dark:bg-gray-900 selection:bg-red-500 selection:text-white"
+    class="relative bg-dots-darker bg-center bg-gray-200 dark:bg-dots-lighter dark:bg-gray-900 selection:bg-red-500 selection:text-white"
   >
     <terminal />
     <left-sidebar-wrapper>
@@ -48,7 +48,7 @@ onMounted(() => {
     </left-sidebar-wrapper>
 
     <a-layout-content
-      class="max-w-7xl mx-auto p-6 lg:overflow-auto md:overflow-auto sm:overflow-scroll"
+      class="max-w-7xl mx-auto p-6 lg:overflow-auto md:overflow-auto sm:overflow-scroll bg-gray-200 dark:bg-dots-lighter dark:bg-gray-900 selection:bg-red-500 selection:text-white"
     >
       <slot />
     </a-layout-content>
