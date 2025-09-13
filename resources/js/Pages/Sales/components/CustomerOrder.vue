@@ -1,7 +1,7 @@
 <script setup>
 import VerticalForm from "@/Components/Forms/VerticalForm.vue";
 import PrimaryButton from "@/Components/PrimaryButton.vue";
-import { ref, inject } from "vue";
+import { ref, inject, computed } from "vue";
 import {
   CloseOutlined,
   PlusSquareOutlined,
@@ -10,6 +10,7 @@ import {
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useOrders } from "@/Composables/useOrderV2";
 import axios from "axios";
+import { notification } from "ant-design-vue";
 
 const { formData, errors } = useGlobalVariables();
 const {
@@ -20,12 +21,13 @@ const {
   formattedTotal,
   removeOrder,
   orderId,
+  finalizeOrder,
 } = useOrders();
 
 const formFields = [
   { key: "amount", label: "Amount", type: "text", disabled: true },
-  { key: "sale_item", label: "Sale item", type: "text", disabled: true },
-  { key: "pin_code", label: "Enter Pin", type: "text" },
+  { key: "sale_item", label: "Item", type: "text", disabled: true },
+  { key: "pin_code", label: "Enter Pin", type: "password" },
   {
     key: "reason",
     label: "Reason",
@@ -34,7 +36,9 @@ const formFields = [
 ];
 
 const openvoidModal = ref(false);
+
 const showVoidItem = async (product) => {
+  errors.value = {};
   openvoidModal.value = true;
   formData.value = {
     ...product,
@@ -42,18 +46,72 @@ const showVoidItem = async (product) => {
     amount: product.price,
     product_id: product.id,
   };
-
-  return;
-  removeOrder(product);
 };
 
+const loading = ref(false);
 const handleSubmitVoid = async () => {
-  await axios.post(
-    route("sales.item.void", {
-      sale: orderId.value,
-    }),
-    formData.value
-  );
+  try {
+    loading.value = true;
+    await axios.post(
+      route("sales.items.void", {
+        sale: orderId.value,
+      }),
+      formData.value
+    );
+    removeOrder(formData.value);
+    openvoidModal.value = false;
+    clearForm();
+    notification["success"]({
+      message: "Success",
+      description: "The item was successfully voided.",
+    });
+  } catch ({ response }) {
+    errors.value = response?.data?.errors;
+  } finally {
+    loading.value = false;
+  }
+};
+
+let amountReceived = ref(0);
+
+const customerChange = computed(() => {
+  const received = Number(amountReceived.value) || 0;
+  const total = Number(totalAmount.value) || 0;
+
+  if (received < 1) return 0;
+  return received - total;
+});
+
+const proceedPaymentLoading = ref(false);
+const handleProceedPayment = async () => {
+  try {
+    proceedPaymentLoading.value = true;
+    await axios.post(
+      route("sales.payment.store", {
+        sale: orderId.value,
+      })
+    );
+    amountReceived.value = 0;
+    finalizeOrder();
+  } catch (error) {
+  } finally {
+    proceedPaymentLoading.value = false;
+  }
+};
+
+const disabledPaymentButtonColor = computed(() => {
+  if (amountReceived.value < totalAmount.value) return "";
+  return "bg-green-700 border-green-700 hover:bg-green-600";
+});
+
+const clearForm = () => {
+  formData.value = {
+    amount: "",
+    sale_item: "",
+    pin_code: "",
+    reason: "",
+    product_id: null,
+  };
 };
 </script>
 
@@ -63,49 +121,75 @@ const handleSubmitVoid = async () => {
     <a-input value="Walk-in Customer" disabled />
   </div>
   <div
-    class="flex flex-col gap-2 mt-2 h-[calc(100vh-380px)] overflow-auto overflow-x-hidden"
+    class="relative flex flex-col gap-2 mt-2 h-[calc(100vh-480px)] overflow-auto overflow-x-hidden"
   >
-    <!-- {{orders}} -->
-    <div
-      v-for="(order, index) in orders"
-      :key="index"
-      class="flex justify-between items-center border px-4 rounded-lg bg-white hover:shadow cursor-pointer"
+    <div v-if="orders.length ==  0"
+      class="text-[40px] text-nowrap uppercase font-bold text-gray-200 -rotate-45 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
     >
-      <!-- {{ order }} -->
-      <div>
-        <div class="text-sm font-semibold">{{ order.name }}</div>
+      No Order
+    </div>
+    <!-- {{orders}} -->
+    <div v-else class="flex flex-col gap-2">
+      <div
+        v-for="(order, index) in orders"
+        :key="index"
+        class="flex justify-between items-center border px-4 rounded-lg bg-white hover:shadow cursor-pointer"
+      >
+        <!-- {{ order }} -->
+        <div>
+          <div class="text-sm font-semibold">{{ order.name }}</div>
 
-        <div
-          class="text-xs flex items-center bg-transparent text-gray-800 border-none shadow-none gap-1 mt-1"
-        >
-          <PlusSquareOutlined @click="handleAddOrder(order)" />
-          <span>{{ order.quantity }}</span>
-          <MinusSquareOutlined @click="handleSubtractOrder(order)" />
+          <div
+            class="text-xs flex items-center bg-transparent text-gray-800 border-none shadow-none gap-1 mt-1"
+          >
+            <PlusSquareOutlined @click="handleAddOrder(order)" />
+            <span>{{ order.quantity }}</span>
+            <MinusSquareOutlined @click="handleSubtractOrder(order)" />
+          </div>
         </div>
-      </div>
-      <div class="text-right">
-        <div
-          class="text-red-600 mt-1 cursor-pointer"
-          @click="showVoidItem(order)"
-        >
-          <CloseOutlined />
+        <div class="text-right">
+          <div
+            class="text-red-600 mt-1 cursor-pointer"
+            @click="showVoidItem(order)"
+          >
+            <CloseOutlined />
+          </div>
+          <div class="text-xs text-green-700 mt-1">{{ order.price }}</div>
         </div>
-        <div class="text-xs text-green-700 mt-1">{{ order.price }}</div>
       </div>
     </div>
   </div>
   <hr class="-mx-6 border-t-[3px] pt-2 mt-2" />
   <div class="font-bold text-lg">
-    Total: <span class="text-green-700">{{ formattedTotal }}</span>
+    Total: <span class="text-green-700">{{ formattedTotal(totalAmount) }}</span>
   </div>
   <div class="mt-2">
     <div>Payment Method</div>
     <a-input value="Pay in Cash " disabled></a-input>
   </div>
+  <div class="flex gap-2 items-center mt-2">
+    <div class="flex-grow text-nowrap">Amount Received :</div>
+    <a-input
+      :class="{
+        'border-red-400 shadow-none':
+          amountReceived < totalAmount && orders.length > 0,
+      }"
+      v-model:value="amountReceived"
+      type="number"
+    />
+  </div>
+  <div class="font-bold text-lg mt-2">
+    Change:
+    <span class="text-green-700">{{ formattedTotal(customerChange) }}</span>
+  </div>
   <div>
     <a-button
-      class="w-full mt-2 bg-green-700 border-green-700 hover:bg-green-600"
+      class="w-full mt-2"
+      :class="disabledPaymentButtonColor"
       type="primary"
+      @click="handleProceedPayment"
+      :disabled="proceedPaymentLoading || amountReceived < totalAmount"
+      :loading="proceedPaymentLoading"
       >Proceed Payment</a-button
     >
   </div>
@@ -121,7 +205,7 @@ const handleSubmitVoid = async () => {
     <template #footer>
       <a-button @click="openvoidModal = false">Cancel</a-button>
 
-      <primary-button :loading="spinning" @click="handleSubmitVoid"
+      <primary-button :loading="loading" @click="handleSubmitVoid"
         >Submit
       </primary-button>
     </template>
