@@ -8,6 +8,10 @@ const props = defineProps({
     type: Array,
     default: [],
   },
+  loading: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const { orders, handleAddOrder } = useOrders();
@@ -22,11 +26,14 @@ const formattedTotal = (price) => {
 </script>
 
 <template>
-  <div class="overflow-y-auto overflow-x-hidden h-[calc(100vh-300px)]">
-    <div
+  <div class="overflow-y-auto overflow-x-hidden h-[calc(100vh-300px)] relative">
+    <a-spin v-if="loading"
+      class="-rotate-45 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+      size="large"
+    />
+    <div v-else
       class="grid [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))] gap-4 mt-2"
     >
-    
       <div
         v-for="(product, index) in products"
         :key="index"

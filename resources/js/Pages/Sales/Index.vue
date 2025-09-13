@@ -19,32 +19,15 @@ import {
 
 import { usePage, router, Head } from "@inertiajs/vue3";
 import { useFilters, toLabel } from "@/Composables/useFilters";
+import { watchDebounced } from "@vueuse/core";
 
 const page = usePage();
 
 const search = ref("");
 const category = ref();
 const spinning = ref(false);
-const getItems = () => {};
 
 // Filters setup
-const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
-  getItems,
-  configs: [
-    {
-      key: "category",
-      ref: category,
-      getLabel: toLabel(
-        computed(() =>
-          page.props.categories.map((item) => ({
-            label: item.name,
-            value: item.name,
-          }))
-        )
-      ),
-    },
-  ],
-});
 
 // FilterDropdown configuration
 const filtersConfig = [
@@ -67,10 +50,34 @@ onMounted(async () => {
 
 const getProducts = async () => {
   loading.value = true;
-  const items = await axios.get(route("sales.products"));
+  const items = await axios.get(
+    route("sales.products", {
+      category: category.value,
+      search: search.value,
+    })
+  );
   products.value = items.data.data;
   loading.value = false;
 };
+const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
+  getItems: getProducts,
+  configs: [
+    {
+      key: "category",
+      ref: category,
+      getLabel: toLabel(
+        computed(() =>
+          page.props.categories.map((item) => ({
+            label: item.name,
+            value: item.name,
+          }))
+        )
+      ),
+    },
+  ],
+});
+
+watchDebounced(search, getProducts, { debounce: 300 });
 </script>
 
 <template>
@@ -84,7 +91,7 @@ const getProducts = async () => {
           placeholder="Search Product"
           class="min-w-[100px] max-w-[300px]"
         />
-        <RefreshButton :loading="spinning" @click="getItems" />
+        <RefreshButton :loading="loading" @click="getProducts" />
         <FilterDropdown v-model="filters" :filters="filtersConfig" />
       </template>
       <template #activeFilters>
@@ -99,7 +106,7 @@ const getProducts = async () => {
       </template>
 
       <template #table>
-        <ProductTable :products="products" />
+        <ProductTable :products="products" :loading="loading" />
       </template>
       <template #right-side-content>
         <customer-order />
