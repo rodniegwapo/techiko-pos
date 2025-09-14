@@ -62,5 +62,10 @@ const formattedTotal = (price) => {
         </div>
       </div>
     </div>
+      <div v-if="products.length ==  0"
+      class="text-[40px] text-nowrap uppercase font-bold text-gray-200 -rotate-45 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+    >
+      No Item Found
+    </div>
   </div>
 </template>

@@ -28,7 +28,7 @@ class SaleService
         SyncSaleDraft::dispatch($sale, $items);
     }
 
-   public function voidItem(Sale $sale, array $validated, $currentUser)
+    public function voidItem(Sale $sale, array $validated, $currentUser)
     {
         $saleItem = $sale->saleItems()
             ->where('product_id', $validated['product_id'])
@@ -83,9 +83,9 @@ class SaleService
     private function validateCashierPin(string $pinCode): int
     {
         $managerPin = UserPin::whereHas('user.roles', function ($q) {
-            $q->where('name', 'manager');
+            $q->whereIn('name', ['manager', 'admin']);
         })->get()
-          ->first(fn($pin) => Hash::check($pinCode, $pin->pin_code));
+            ->first(fn($pin) => Hash::check($pinCode, $pin->pin_code));
 
         if (! $managerPin) {
             throw ValidationException::withMessages([

@@ -5,7 +5,8 @@ import {
   IconCategory,
   IconUsers,
   IconBrandProducthunt,
-  IconHeartHandshake
+  IconHeartHandshake,
+  IconHistory,
 } from "@tabler/icons-vue";
 import { router, usePage } from "@inertiajs/vue3";
 
@@ -46,6 +47,11 @@ const menus = computed(() => {
           path: route("products.discounts.index"),
         },
       ],
+    },
+    {
+      title: "Void logs",
+      path: route("voids.index"),
+      icon: IconHistory,
     },
     {
       title: "Customers",

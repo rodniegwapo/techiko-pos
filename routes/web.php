@@ -44,8 +44,11 @@ Route::middleware(['auth'])->group(function () {
     });
 
     Route::get('/sales', [\App\Http\Controllers\SaleController::class, 'index'])->name('sales.index');
+    // terminal
+    Route::post('/setup-terminal', [\App\Http\Controllers\TerminalController::class, 'setupTerminal'])->name('setup.terminal');
 
-    Route::post('/setup-terminal', [\App\Http\Controllers\TerminalController::class,'setupTerminal'])->name('setup.terminal');
+    // Void logs
+    Route::get('/void-logs', [\App\Http\Controllers\VoidLogController::class, 'index'])->name('voids.index');
 });
 
 require __DIR__ . '/auth.php';
