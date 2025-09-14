@@ -1,10 +1,16 @@
 // composables/useConfirmDelete.js
 import { computed, createVNode } from "vue";
-import { Modal } from "ant-design-vue";
 import { ExclamationCircleOutlined } from "@ant-design/icons-vue";
 import { router } from "@inertiajs/vue3";
 import { useGlobalVariables } from "./useGlobalVariable";
 import { useEmits } from "./useEmits";
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
+import isocalendar from "dayjs/plugin/isoWeek";
+dayjs.extend(utc);
+dayjs.extend(timezone);
+dayjs.extend(isocalendar);
 /**
  * Composable for showing delete confirmation modals
  *
@@ -76,10 +82,34 @@ export function useHelpers() {
         return deviceId;
     });
 
+    const startDateFormat = (date) => {
+        return dayjs(`${date.format("YYYY-MM-DD")}T00:00:00`).format(
+            "YYYY-MM-DD HH:mm:ss"
+        );
+    };
+
+    const endDateFormat = (date) => {
+        return dayjs(`${date.format("YYYY-MM-DD")}T23:59:59`).format(
+            "YYYY-MM-DD HH:mm:ss"
+        );
+    };
+
+    const formattedTotal = (total) => {
+        const formattedTotal = new Intl.NumberFormat("en-PH", {
+            style: "currency",
+            currency: "PHP",
+        }).format(total);
+
+        return formattedTotal;
+    };
+
     return {
         confirmDelete,
         inertiaProgressLifecyle,
         showModal,
         getDeviceId,
+        startDateFormat,
+        endDateFormat,
+        formattedTotal
     };
 }

@@ -8,22 +8,23 @@ use Illuminate\Support\Str;
 trait Searchable
 {
     public function scopeSearch($query, $search)
-    {
-        $search = trim($search); // Clean up white space
-        // $fields = $searchable ?: $this->searchable ?: [];
-        $fields = $this->searchable ?: [];
+{
+    $search = trim($search);
+    $fields = $this->searchable ?: [];
 
-        return $query->where(function (Builder $query) use ($search, $fields) {
-            foreach ($fields as $key => $field) {
-                if (Str::contains($field, '.')) {
-                    [$relationship, $relationshipField] = explode('.', $field);
-                    $query->orWhereHas($relationship, function ($query) use ($relationshipField, $search) {
-                        $query->where($relationshipField, 'like', "%$search%");
-                    });
-                } else {
-                    $query->orWhere($field, 'like', "%$search%");
-                }
+    return $query->where(function (Builder $query) use ($search, $fields) {
+        foreach ($fields as $field) {
+            if (Str::contains($field, '.')) {
+                $parts = explode('.', $field);
+                $last = array_pop($parts); // last part is the actual column
+                $query->orWhereHas(implode('.', $parts), function ($q) use ($last, $search) {
+                    $q->where($last, 'like', "%$search%");
+                });
+            } else {
+                $query->orWhere($field, 'like', "%$search%");
             }
-        });
-    }
+        }
+    });
+}
+
 }
