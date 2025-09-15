@@ -11,10 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('discount_product', function (Blueprint $table) {
+        Schema::create('sale_discounts', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('sale_id')->constrained()->cascadeOnDelete();
             $table->foreignId('discount_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('product_id')->constrained()->cascadeOnDelete();
+            $table->decimal('discount_amount', 10, 2);
             $table->timestamps();
         });
     }
@@ -24,6 +25,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('discount_product');
+        Schema::dropIfExists('sale_discounts');
     }
 };

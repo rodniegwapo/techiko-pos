@@ -37,7 +37,21 @@ const formFields = [
   {
     key: "value",
     label: "Discount Value",
-    type: "text",
+    type: "number",
+  },
+  {
+    key: "min_order_amount",
+    label: "Minimum Order Amount",
+    type: "number",
+  },
+  {
+    key: "scope",
+    label: "Scope",
+    type: "select",
+    options: [
+      { label: "Order", value: "order" },
+      { label: "Product", value: "product" },
+    ],
   },
   {
     key: "start_date",
@@ -55,6 +69,7 @@ const errors = ref({});
 const handleSave = () => {
   const payload = {
     ...formData.value,
+    scope: formData.value?.scope?.value,
     start_date: dayjs(formData.value.start_date).format("YYYY-MM-DD hh:mm:ss"),
     end_date: dayjs(formData.value?.end_date).format("YYYY-MM-DD hh:mm:ss"),
   };

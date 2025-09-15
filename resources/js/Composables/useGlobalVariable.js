@@ -11,6 +11,7 @@ let formFilters = ref({});
 const openKeys = ref([]); // for menus
 const selectedKeys = ref([]);// for menus
 const orders = ref([])
+const openViewModal = ref(false)
 
 export function useGlobalVariables() {
     return {
@@ -24,6 +25,7 @@ export function useGlobalVariables() {
         errors,
         selectedKeys,
         openKeys,
-        orders
+        orders,
+        openViewModal
     };
 }
