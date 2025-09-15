@@ -1,13 +1,19 @@
 <script setup>
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
-import { IconTrash, IconEdit, IconCurrencyPeso } from "@tabler/icons-vue";
+import {
+  IconTrash,
+  IconEdit,
+  IconCurrencyPeso,
+  IconEye,
+} from "@tabler/icons-vue";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import dayjs from "dayjs";
 
-const emit = defineEmits(["handleTableChange"]);
+const emit = defineEmits(["handleTableChange", "selectedDiscount"]);
 const { confirmDelete } = useHelpers();
-const { formData, openModal, isEdit, spinning } = useGlobalVariables();
+const { formData, openModal, isEdit, spinning, openViewModal } =
+  useGlobalVariables();
 
 const props = defineProps({
   products: { type: Object, required: true },
@@ -70,6 +76,11 @@ const handleClickEdit = (record) => {
   isEdit.value = true;
   openModal.value = true;
 };
+
+const handleViewDetail = (record) => {
+  openViewModal.value = true;
+  emit("selectedDiscount", record);
+};
 </script>
 
 <template>
@@ -86,14 +97,16 @@ const handleClickEdit = (record) => {
   >
     <template #bodyCell="{ index, column, record }">
       <template v-if="column.key == 'start_date'">
-        {{ dayjs(record.start_date).format("MMMM DD YYYY hh:mm:ss a") }}
+        {{ dayjs(record.start_date).format("MMM DD YYYY hh:mm:ss a") }}
       </template>
       <template v-if="column.key == 'end_date'">
-        {{ dayjs(record.end_date).format("MMMM DD YYYY hh:mm:ss a") }}
+        {{ dayjs(record.end_date).format("MMM DD YYYY hh:mm:ss a") }}
       </template>
 
       <template v-if="column.key == 'action'">
         <div class="flex items-center gap-2">
+      
+
           <icon-tooltip-button
             hover="group-hover:bg-blue-500"
             name="Edit Category"
@@ -108,6 +121,14 @@ const handleClickEdit = (record) => {
             @click="handleDelete(record)"
           >
             <IconTrash size="20" class="mx-auto" />
+          </icon-tooltip-button>
+
+              <icon-tooltip-button
+            hover="group-hover:bg-[#3379B4]"
+            name="View Discount"
+            @click="handleViewDetail(record)"
+          >
+            <IconEye size="20" class="mx-auto" />
           </icon-tooltip-button>
         </div>
       </template>

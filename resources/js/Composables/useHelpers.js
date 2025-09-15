@@ -33,6 +33,7 @@ export function useHelpers() {
         onSuccess: () => {
             openModal.value = false;
             formData.value = {};
+            errors.value = {}
         },
         onStart: () => {
             spinning.value = true;

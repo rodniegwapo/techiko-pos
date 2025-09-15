@@ -12,13 +12,14 @@ import ContentLayout from "@/Components/ContentLayout.vue";
 import RefreshButton from "@/Components/buttons/Refresh.vue";
 import DiscountTable from "./components/DiscountTable.vue";
 import AddModal from "./components/AddModal.vue";
+import ViewDetailModal from "./components/ViewDetailModal.vue";
+
 import { useTable } from "@/Composables/useTable";
 
 const { showModal } = useHelpers();
 
 // Page props
 const page = usePage();
-
 
 // Search input
 const search = ref("");
@@ -41,7 +42,12 @@ watchDebounced(search, getItems, { debounce: 300 });
 
 // Table change handler
 const tableFilters = { search };
-const { pagination, handleTableChange ,spinning} = useTable("items", tableFilters);
+const { pagination, handleTableChange, spinning } = useTable(
+  "items",
+  tableFilters
+);
+
+const discountDetail = ref({});
 </script>
 
 <template>
@@ -75,10 +81,17 @@ const { pagination, handleTableChange ,spinning} = useTable("items", tableFilter
           :products="page.props.items.data"
           :pagination="pagination"
           @handle-table-change="handleTableChange"
+          @selectedDiscount="(data) => (discountDetail = data)"
         />
       </template>
     </ContentLayout>
 
+    <!-- add modal  -->
     <AddModal />
+
+    <!-- view modal -->
+    <ViewDetailModal :selectedDiscount="discountDetail" />
+
+    
   </AuthenticatedLayout>
 </template>
