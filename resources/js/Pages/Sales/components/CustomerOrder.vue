@@ -97,6 +97,9 @@ const handleProceedPayment = async () => {
     );
     amountReceived.value = 0;
     finalizeOrder();
+    notification["success"]({
+      message: "Success",
+    });
   } catch (error) {
   } finally {
     proceedPaymentLoading.value = false;
@@ -122,7 +125,7 @@ const currentProduct = ref({});
 const openApplyDiscountModal = ref(false);
 const handleShowDiscountModal = (order) => {
   formData.value = {
-    discount: order?.discount_id
+    discount: order?.discount_id,
   };
   currentProduct.value = order;
   openApplyDiscountModal.value = true;
@@ -165,16 +168,19 @@ const handleShowDiscountModal = (order) => {
             {{ order.price }} x {{ order.quantity }}
           </div>
         </div>
-        <div class="text-right flex flex-col py-1 items-end gap-1">
+        <div class="text-right flex flex-col text-red-700 py-1 items-end gap-1">
           <div class="cursor-pointer" @click.stop="showVoidItem(order)">
             <CloseOutlined />
           </div>
-          <div class="text-xs">
+          <div class="text-xs" v-if="order.discount">
             <div class="text-gray-300 bg-gray-600 w px-2 rounded-full">
               {{ formattedPercent(order?.discount) }}
             </div>
           </div>
-          <div class="text-xs text-green-700">
+          <div class="text-xs text-green-700" v-if="order.discount">
+            {{ formattedTotal(order.subtotal) }}
+          </div>
+          <div v-else class="text-xs text-green-700">
             {{ formattedTotal(order.price * order.quantity) }}
           </div>
         </div>

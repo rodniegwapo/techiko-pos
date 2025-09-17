@@ -20,7 +20,8 @@ class DatabaseSeeder extends Seeder
             CategorySeeder::class,
             ProductSeeder::class,
             ProductSoldTypeSeeder::class,
-            UserPinSeeder::class
+            UserPinSeeder::class,
+            DiscountSeeder::class
         ]);
     }
 }

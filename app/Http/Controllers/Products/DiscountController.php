@@ -50,7 +50,7 @@ class DiscountController extends Controller
     {
         return $request->validate([
             'name' => 'string|max:200|required',
-            'type' => 'string|in:Amount,Percentage|required',
+            'type' => 'string|in:amount,percentage|required',
             'value' => 'numeric|required',
             'min_order_amount' => 'numeric|nullable',
             'scope' => 'string|in:order,product|required',

@@ -32,7 +32,7 @@ const formFields = [
     key: "type",
     label: "Discount Type",
     type: "radio",
-    options: ["Percentage", "Amount"],
+    options: [ {label: 'Percentage', value: 'percentage',lable: 'Amount', value: 'amount'}],
   },
   {
     key: "value",
