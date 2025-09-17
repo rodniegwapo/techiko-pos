@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\ProductResource;
 use App\Models\Category;
+use App\Models\Product\Discount;
 use App\Models\Product\Product;
 use App\Models\Sale;
 use App\Services\SaleService;
@@ -22,34 +23,34 @@ class SaleController extends Controller
     public function index()
     {
         return Inertia::render('Sales/Index', [
-            'categories' => Category::all()
+            'categories' => Category::all(),
+            'discounts' => Discount::all(),
         ]);
     }
 
     public function products(Request $request)
     {
         $query = Product::query()
-            ->when($request->input('search'), fn($q, $search) => $q->search($search))
+            ->when($request->input('search'), fn ($q, $search) => $q->search($search))
             ->when($request->input('category'), function ($q, $category) {
-                $q->whereHas('category', fn($q) => $q->where('name', $category));
+                $q->whereHas('category', fn ($q) => $q->where('name', $category));
             })
             ->with('category');
 
         $products = $query->when(
             ! $request->input('search') && ! $request->input('category'),
-            fn($q) => $q->limit(30)
+            fn ($q) => $q->limit(30)
         )->get();
 
         return ProductResource::collection($products);
     }
-
 
     public function proceedPayment(Request $request, Sale $sale)
     {
         $sale->update([
             'payment_status' => 'paid',
             'transaction_date' => now(),
-            'grand_total' => $sale->total_amount
+            'grand_total' => $sale->total_amount,
         ]);
 
         return response()->noContent(200);
@@ -72,8 +73,8 @@ class SaleController extends Controller
     public function voidItem(Request $request, Sale $sale)
     {
         $validated = $request->validate([
-            'pin_code'   => 'required|string',
-            'reason'     => 'nullable|string',
+            'pin_code' => 'required|string',
+            'reason' => 'nullable|string',
             'product_id' => 'required|integer',
         ]);
 
@@ -81,7 +82,14 @@ class SaleController extends Controller
 
         return response()->json([
             'message' => 'Sale item voided successfully.',
-            'item'    => $saleItem,
+            'item' => $saleItem,
         ]);
+    }
+
+    public function findSaleItem(Request $request, Sale $sale)
+    {
+        return $sale->saleitems()
+            ->where('product_id', $request->product_id)
+            ->first();
     }
 }

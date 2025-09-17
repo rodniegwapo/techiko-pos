@@ -11,7 +11,7 @@ import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import dayjs from "dayjs";
 
 const emit = defineEmits(["handleTableChange", "selectedDiscount"]);
-const { confirmDelete } = useHelpers();
+const { confirmDelete, formattedTotal, formattedPercent } = useHelpers();
 const { formData, openModal, isEdit, spinning, openViewModal } =
   useGlobalVariables();
 
@@ -96,6 +96,13 @@ const handleViewDetail = (record) => {
     :loading="spinning"
   >
     <template #bodyCell="{ index, column, record }">
+      <template v-if="column.key == 'value'">
+        <span v-if="record.type == 'Amount'">
+          {{ formattedTotal(record.value) }}
+        </span>
+        <span v-else>{{ formattedPercent(record.value) }}</span>
+      </template>
+
       <template v-if="column.key == 'start_date'">
         {{ dayjs(record.start_date).format("MMM DD YYYY hh:mm:ss a") }}
       </template>
@@ -105,8 +112,6 @@ const handleViewDetail = (record) => {
 
       <template v-if="column.key == 'action'">
         <div class="flex items-center gap-2">
-      
-
           <icon-tooltip-button
             hover="group-hover:bg-blue-500"
             name="Edit Category"
@@ -123,7 +128,7 @@ const handleViewDetail = (record) => {
             <IconTrash size="20" class="mx-auto" />
           </icon-tooltip-button>
 
-              <icon-tooltip-button
+          <icon-tooltip-button
             hover="group-hover:bg-[#3379B4]"
             name="View Discount"
             @click="handleViewDetail(record)"

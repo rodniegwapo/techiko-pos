@@ -11,11 +11,12 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
 
-class SyncSaleDraft implements ShouldQueue, ShouldBeUnique
+class SyncSaleDraft implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     protected Sale $sale;
+
     protected array $items;
 
     // Prevent multiple jobs for the same sale at once
@@ -40,23 +41,32 @@ class SyncSaleDraft implements ShouldQueue, ShouldBeUnique
      */
     public function handle(): void
     {
-        // Retry up to 5 times if deadlock happens
         DB::transaction(function () {
             foreach ($this->items as $item) {
-                $this->sale->saleItems()->updateOrCreate(
+                $saleItem = $this->sale->saleItems()->updateOrCreate(
                     ['product_id' => $item['id']],
                     [
-                        'quantity'   => $item['quantity'],
+                        'quantity' => $item['quantity'],
                         'unit_price' => $item['price'],
-                        'subtotal'   => $item['price'] * $item['quantity'],
+                        // no need to set subtotal or discount, handled in model
                     ]
                 );
+
+                // Handle discounts if provided
+                if (! empty($item['discount_id'])) {
+                    $discount = \App\Models\Product\Discount::find($item['discount_id']);
+                    if ($discount) {
+                        $saleItem->setDiscountAmount($discount->type, (float) $discount->value);
+                        $saleItem->discounts()->syncWithoutDetaching([$discount->id]);
+                    }
+                } else {
+                    $saleItem->discount = 0;
+                    $saleItem->save();
+                }
             }
 
-            // recalc total
-            $this->sale->total_amount = collect($this->items)
-                ->sum(fn($i) => $i['quantity'] * $i['price']);
-            $this->sale->save();
+            // Recalculate sale totals
+            $this->sale->recalcTotals();
         }, 5); // retry 5 times if deadlock
     }
 }

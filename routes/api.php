@@ -26,7 +26,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/sales/draft', [\App\Http\Controllers\SaleController::class, 'storeDraft'])
         ->name('drafts.store');
 
-
     // Routes that need scoped bindings
     Route::prefix('sales')
         ->name('sales.')
@@ -42,5 +41,16 @@ Route::middleware('auth:sanctum')->group(function () {
 
             Route::post('/{sale}/sync', [\App\Http\Controllers\SaleController::class, 'syncDraft'])
                 ->name('sales.syncDraft');
+
+            // discounts
+            Route::post('/{sale}/discounts/order', [\App\Http\Controllers\SaleDiscountController::class, 'applyOrderDiscount'])
+                ->name('discounts.order.apply');
+            Route::delete('/{sale}/discounts/{saleDiscount}', [\App\Http\Controllers\SaleDiscountController::class, 'removeOrderDiscount'])
+                ->name('discounts.order.remove');
+            Route::post('/{sale}/saleItems/{saleItem}/discount', [\App\Http\Controllers\SaleDiscountController::class, 'applyItemDiscount'])
+                ->name('items.discount.apply');
+
+            Route::get('/{sale}/find-sale-item', [\App\Http\Controllers\SaleController::class, 'findSaleItem'])->name('find-sale-item');
         });
+
 });
