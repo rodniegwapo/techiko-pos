@@ -33,7 +33,7 @@ export function useHelpers() {
         onSuccess: () => {
             openModal.value = false;
             formData.value = {};
-            errors.value = {}
+            errors.value = {};
         },
         onStart: () => {
             spinning.value = true;
@@ -104,6 +104,14 @@ export function useHelpers() {
         return formattedTotal;
     };
 
+    const formattedPercent = (value) => {
+        return new Intl.NumberFormat("en-PH", {
+            style: "percent",
+            minimumFractionDigits: 0, // optional, to control decimals
+            maximumFractionDigits: 2,
+        }).format(value / 100);
+    };
+
     return {
         confirmDelete,
         inertiaProgressLifecyle,
@@ -111,6 +119,7 @@ export function useHelpers() {
         getDeviceId,
         startDateFormat,
         endDateFormat,
-        formattedTotal
+        formattedTotal,
+        formattedPercent
     };
 }

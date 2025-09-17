@@ -1,6 +1,7 @@
 <script setup>
 import VerticalForm from "@/Components/Forms/VerticalForm.vue";
 import PrimaryButton from "@/Components/PrimaryButton.vue";
+import ApplyDiscountModal from "./ApplyDiscountModal.vue";
 import { ref, inject, computed } from "vue";
 import {
   CloseOutlined,
@@ -9,6 +10,7 @@ import {
 } from "@ant-design/icons-vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useOrders } from "@/Composables/useOrderV2";
+import { useHelpers } from "@/Composables/useHelpers";
 import axios from "axios";
 import { notification } from "ant-design-vue";
 
@@ -23,6 +25,8 @@ const {
   orderId,
   finalizeOrder,
 } = useOrders();
+
+const { formattedPercent } = useHelpers();
 
 const formFields = [
   { key: "amount", label: "Amount", type: "text", disabled: true },
@@ -113,6 +117,16 @@ const clearForm = () => {
     product_id: null,
   };
 };
+
+const currentProduct = ref({});
+const openApplyDiscountModal = ref(false);
+const handleShowDiscountModal = (order) => {
+  formData.value = {
+    discount: order?.discount_id
+  };
+  currentProduct.value = order;
+  openApplyDiscountModal.value = true;
+};
 </script>
 
 <template>
@@ -121,9 +135,10 @@ const clearForm = () => {
     <a-input value="Walk-in Customer" disabled />
   </div>
   <div
-    class="relative flex flex-col gap-2 mt-2 h-[calc(100vh-480px)] overflow-auto overflow-x-hidden"
+    class="relative flex flex-col gap-2 mt-2 h-[calc(100vh-400px)] overflow-auto overflow-x-hidden"
   >
-    <div v-if="orders.length ==  0"
+    <div
+      v-if="orders.length == 0"
       class="text-[40px] text-nowrap uppercase font-bold text-gray-200 -rotate-45 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
     >
       No Order
@@ -134,27 +149,34 @@ const clearForm = () => {
         v-for="(order, index) in orders"
         :key="index"
         class="flex justify-between items-center border px-4 rounded-lg bg-white hover:shadow cursor-pointer"
+        @click="handleShowDiscountModal(order)"
       >
-        <!-- {{ order }} -->
-        <div>
+        <div class="flex flex-col gap-1 py-1">
           <div class="text-sm font-semibold">{{ order.name }}</div>
 
           <div
-            class="text-xs flex items-center bg-transparent text-gray-800 border-none shadow-none gap-1 mt-1"
+            class="text-xs flex items-center bg-transparent text-gray-800 border-none shadow-none gap-1"
           >
-            <PlusSquareOutlined @click="handleAddOrder(order)" />
+            <PlusSquareOutlined @click.stop="handleAddOrder(order)" />
             <span>{{ order.quantity }}</span>
-            <MinusSquareOutlined @click="handleSubtractOrder(order)" />
+            <MinusSquareOutlined @click.stop="handleSubtractOrder(order)" />
+          </div>
+          <div class="text-[11px]">
+            {{ order.price }} x {{ order.quantity }}
           </div>
         </div>
-        <div class="text-right">
-          <div
-            class="text-red-600 mt-1 cursor-pointer"
-            @click="showVoidItem(order)"
-          >
+        <div class="text-right flex flex-col py-1 items-end gap-1">
+          <div class="cursor-pointer" @click.stop="showVoidItem(order)">
             <CloseOutlined />
           </div>
-          <div class="text-xs text-green-700 mt-1">{{ order.price }}</div>
+          <div class="text-xs">
+            <div class="text-gray-300 bg-gray-600 w px-2 rounded-full">
+              {{ formattedPercent(order?.discount) }}
+            </div>
+          </div>
+          <div class="text-xs text-green-700">
+            {{ formattedTotal(order.price * order.quantity) }}
+          </div>
         </div>
       </div>
     </div>
@@ -210,4 +232,10 @@ const clearForm = () => {
       </primary-button>
     </template>
   </a-modal>
+
+  <apply-discount-modal
+    :openModal="openApplyDiscountModal"
+    :product="currentProduct"
+    @close="openApplyDiscountModal = false"
+  />
 </template>

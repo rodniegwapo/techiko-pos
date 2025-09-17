@@ -3,6 +3,7 @@
 namespace App\Models\Product;
 
 use App\Models\Category;
+use App\Models\SaleItem;
 use App\Traits\Searchable;
 use Database\Factories\Product\ProductFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -31,4 +32,9 @@ class Product extends Model
     {
         return $this->belongsTo(Category::class);
     }
+
+   public function saleitems()
+   {
+       return $this->hasMany(SaleItem::class);
+   }
 }
