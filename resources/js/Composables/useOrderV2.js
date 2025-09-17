@@ -63,42 +63,97 @@ const finalizeOrder = async () => {
 };
 
 // Add item
-const handleAddOrder = async (product) => {
+const handleAddOrder = async (product, selectedDiscount = null) => {
     if (!orderId.value) {
         await createDraft();
     }
 
     const index = orders.value.findIndex((p) => p.id === product.id);
+
     if (index >= 0) {
+        // Increase quantity
         orders.value[index].quantity += 1;
 
-        // recalc subtotal
         const lineSubtotal =
             orders.value[index].price * orders.value[index].quantity;
-        orders.value[index].subtotal =
-            lineSubtotal - (orders.value[index].discount_amount || 0);
+
+        let discountAmount = orders.value[index].discount_amount || 0;
+
+        // ✅ Recalculate discount if exists or passed in
+        const discount = selectedDiscount || orders.value[index];
+        if (discount?.discount_type === "percentage") {
+            const percentage = Math.min(Math.max(discount.discount, 0), 100);
+            discountAmount = lineSubtotal * (percentage / 100);
+        } else if (discount?.discount_type === "amount") {
+            discountAmount = Math.min(
+                Math.max(discount.discount, 0),
+                lineSubtotal
+            );
+        }
+
+        orders.value[index] = {
+            ...orders.value[index],
+            discount_id: discount?.id || null,
+            discount_type: discount?.discount_type || null,
+            discount: discount?.discount || 0,
+            discount_amount: discountAmount,
+            subtotal: lineSubtotal - discountAmount,
+        };
     } else {
+        // New order line
         orders.value.push({
             ...product,
             quantity: 1,
-            discount_id: null,
-            discount_amount: 0,
-            subtotal: product.price,
+            discount_id: selectedDiscount?.id || null,
+            discount_type: selectedDiscount?.type || null,
+            discount: selectedDiscount?.value || 0,
+            discount_amount: selectedDiscount
+                ? selectedDiscount.type === "percentage"
+                    ? product.price * (selectedDiscount.value / 100)
+                    : Math.min(selectedDiscount.value, product.price)
+                : 0,
+            subtotal: selectedDiscount
+                ? product.price -
+                  (selectedDiscount.type === "percentage"
+                      ? product.price * (selectedDiscount.value / 100)
+                      : Math.min(selectedDiscount.value, product.price))
+                : product.price,
         });
     }
 };
 
 // Subtract item
-const handleSubtractOrder = (product) => {
+const handleSubtractOrder = (product, selectedDiscount = null) => {
     const index = orders.value.findIndex((p) => p.id === product.id);
     if (index >= 0 && orders.value[index].quantity > 1) {
+        // Decrease quantity
         orders.value[index].quantity -= 1;
 
-        // recalc subtotal
         const lineSubtotal =
             orders.value[index].price * orders.value[index].quantity;
-        orders.value[index].subtotal =
-            lineSubtotal - (orders.value[index].discount_amount || 0);
+
+        let discountAmount = 0;
+
+        // ✅ Recalculate discount if exists or passed in
+        const discount = selectedDiscount || orders.value[index];
+        if (discount?.discount_type === "percentage") {
+            const percentage = Math.min(Math.max(discount.discount, 0), 100);
+            discountAmount = lineSubtotal * (percentage / 100);
+        } else if (discount?.discount_type === "amount") {
+            discountAmount = Math.min(
+                Math.max(discount.discount, 0),
+                lineSubtotal
+            );
+        }
+
+        orders.value[index] = {
+            ...orders.value[index],
+            discount_id: discount?.id || null,
+            discount_type: discount?.discount_type || null,
+            discount: discount?.discount || 0,
+            discount_amount: discountAmount,
+            subtotal: lineSubtotal - discountAmount,
+        };
     }
 };
 
