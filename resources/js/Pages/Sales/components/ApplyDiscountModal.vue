@@ -22,8 +22,6 @@ const loading = ref(false);
 
 const handleSave = async () => {
   try {
-    console.log("formData before save:", formData.value);
-
     // ✅ Ensure formData is a valid object
     if (!formData.value || typeof formData.value !== "object") {
       emit("close");
@@ -43,12 +41,13 @@ const handleSave = async () => {
       (d) => d.id === formData.value?.discount?.value
     );
 
+    console.log('sale items',saleItem)
+
     if (!selectedDiscount) {
       emit("close");
       return;
     }
 
-    console.log('sale item',saleItem)
 
     // prepare payload for backend
     const payload = { discount_id: selectedDiscount.id };
@@ -56,21 +55,20 @@ const handleSave = async () => {
     await axios.post(
       route("sales.items.discount.apply", {
         sale: orderId.value,
-        saleItem: saleItem.id
+        saleItem: saleItem.data?.id
       }),
       payload
     );
 
-    // update local orders reactively
     const idx = orders.value.findIndex((item) => item.id == product.value.id);
     if (idx !== -1) {
       const lineSubtotal = orders.value[idx].price * orders.value[idx].quantity;
 
       let discountAmount = 0;
-      if (selectedDiscount.type === "Percentage") {
+      if (selectedDiscount.type == "percentage") {
         const percentage = Math.min(Math.max(selectedDiscount.value, 0), 100);
         discountAmount = lineSubtotal * (percentage / 100);
-      } else if (selectedDiscount.type === "Amount") {
+      } else if (selectedDiscount.type === "amount") {
         discountAmount = Math.min(
           Math.max(selectedDiscount.value, 0),
           lineSubtotal
