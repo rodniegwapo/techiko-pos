@@ -151,14 +151,14 @@ const handleShowDiscountModal = (order) => {
       <div
         v-for="(order, index) in orders"
         :key="index"
-        class="flex justify-between items-center border px-4 rounded-lg bg-white hover:shadow cursor-pointer"
+        class="flex justify-between items-center border relative px-4 rounded-lg bg-white hover:shadow cursor-pointer"
         @click="handleShowDiscountModal(order)"
       >
         <div class="flex flex-col gap-1 py-1">
           <div class="text-sm font-semibold">{{ order.name }}</div>
 
           <div
-            class="text-xs flex items-center bg-transparent text-gray-800 border-none shadow-none gap-1"
+            class="text-md flex items-center bg-transparent text-gray-800 border-none shadow-none gap-1"
           >
             <PlusSquareOutlined @click.stop="handleAddOrder(order)" />
             <span>{{ order.quantity }}</span>
@@ -168,19 +168,31 @@ const handleShowDiscountModal = (order) => {
             {{ order.price }} x {{ order.quantity }}
           </div>
         </div>
-        <div class="text-right flex flex-col text-red-700 py-1 items-end gap-1">
-          <div class="cursor-pointer" @click.stop="showVoidItem(order)">
+        <div class="text-right flex flex-col  py-1 items-end gap-1">
+          <div class="cursor-pointer text-red-700" @click.stop="showVoidItem(order)">
             <CloseOutlined />
           </div>
           <div class="text-xs" v-if="order.discount">
-            <div class="text-gray-300 bg-gray-600 w px-2 rounded-full">
-              {{ formattedPercent(order?.discount) }}
+            <div
+              class="text-gray-600 border-b px-2"
+              v-if="order.discount_type == 'amount'"
+            >
+              Disc : {{ formattedTotal(order?.discount) }} -
+              {{ formattedTotal(order.discount_amount) }}
+            </div>
+            <div class="text-gray-600 border-b px-2" v-else>
+              Disc: {{ formattedPercent(order?.discount) }} -
+              {{ formattedTotal(order?.discount_amount) }}
             </div>
           </div>
-          <div class="text-xs text-green-700" v-if="order.discount">
+          <div class="text-xs text-gray-600 line-through invisible" v-else>Discount</div>
+          <div
+            class="text-md font-semibold text-green-700"
+            v-if="order.discount"
+          >
             {{ formattedTotal(order.subtotal) }}
           </div>
-          <div v-else class="text-xs text-green-700">
+          <div v-else class="text-md font-semibold text-green-700">
             {{ formattedTotal(order.price * order.quantity) }}
           </div>
         </div>
