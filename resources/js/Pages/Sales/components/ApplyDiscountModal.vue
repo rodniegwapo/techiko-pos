@@ -10,90 +10,58 @@ import axios from "axios";
 const emit = defineEmits(["close"]);
 const { formData, errors } = useGlobalVariables();
 const page = usePage();
-const { orderId, orders } = useOrders();
+const { orderId, orders, applyDiscountToLine } = useOrders();
 
 const props = defineProps({
-  openModal: { type: Boolean, default: false },
-  product: { type: Object, default: {} },
+  openModal: Boolean,
+  product: { type: Object, default: () => ({}) },
 });
-
 const { openModal, product } = toRefs(props);
+
 const loading = ref(false);
 
 const handleSave = async () => {
   try {
-    // ✅ Ensure formData is a valid object
-    if (!formData.value || typeof formData.value !== "object") {
-      emit("close");
-      return;
-    }
-
+    if (!formData.value?.discount?.value) return emit("close");
     loading.value = true;
 
     // fetch sale item
-    const saleItem = await axios.get(
+    const { data: saleItem } = await axios.get(
       route("sales.find-sale-item", { sale: orderId.value }),
       { params: { product_id: product.value.id } }
     );
 
-    // get selected discount
+    // selected discount
     const selectedDiscount = page.props.discounts.find(
-      (d) => d.id === formData.value?.discount?.value
+      (d) => d.id === formData.value.discount.value
     );
+    if (!selectedDiscount) return emit("close");
 
-    console.log('sale items',saleItem)
-
-    if (!selectedDiscount) {
-      emit("close");
-      return;
-    }
-
-
-    // prepare payload for backend
-    const payload = { discount_id: selectedDiscount.id };
-
+    // backend apply
     await axios.post(
       route("sales.items.discount.apply", {
         sale: orderId.value,
-        saleItem: saleItem.data?.id
+        saleItem: saleItem?.id,
       }),
-      payload
+      { discount_id: selectedDiscount.id }
     );
 
+    // update local state
     const idx = orders.value.findIndex((item) => item.id == product.value.id);
     if (idx !== -1) {
-      const lineSubtotal = orders.value[idx].price * orders.value[idx].quantity;
-
-      let discountAmount = 0;
-      if (selectedDiscount.type == "percentage") {
-        const percentage = Math.min(Math.max(selectedDiscount.value, 0), 100);
-        discountAmount = lineSubtotal * (percentage / 100);
-      } else if (selectedDiscount.type === "amount") {
-        discountAmount = Math.min(
-          Math.max(selectedDiscount.value, 0),
-          lineSubtotal
-        );
-      }
-
-      orders.value[idx] = {
-        ...orders.value[idx],
-        discount_id: selectedDiscount.id,
-        discount_amount: discountAmount,
-        discount_type: selectedDiscount.type,
-        discount: selectedDiscount.value,
-        subtotal: lineSubtotal - discountAmount,
-      };
+      orders.value[idx] = applyDiscountToLine(
+        orders.value[idx],
+        selectedDiscount
+      );
     }
 
-    console.log("orders after save:", orders.value);
     emit("close");
-  } catch (error) {
-    console.error("Error applying discount:", error);
+  } catch (e) {
+    console.error("Error applying discount:", e);
   } finally {
     loading.value = false;
   }
 };
-
 
 const formFields = [
   {
@@ -112,20 +80,18 @@ const formFields = [
 </script>
 
 <template>
-  <div>
-    <a-modal
-      v-model:visible="openModal"
-      :title="`Apply Discount to`"
-      @cancel="$emit('close')"
-      width="400px"
-    >
-      <vertical-form v-model="formData" :fields="formFields" :errors="errors" />
-      <template #footer>
-        <a-button @click="$emit('close')">Cancel</a-button>
-        <primary-button :loading="loading" @click="handleSave">
-          Submit
-        </primary-button>
-      </template>
-    </a-modal>
-  </div>
+  <a-modal
+    v-model:visible="openModal"
+    :title="`Apply Discount`"
+    @cancel="$emit('close')"
+    width="400px"
+  >
+    <vertical-form v-model="formData" :fields="formFields" :errors="errors" />
+    <template #footer>
+      <a-button @click="$emit('close')">Cancel</a-button>
+      <primary-button :loading="loading" @click="handleSave">
+        Submit
+      </primary-button>
+    </template>
+  </a-modal>
 </template>
