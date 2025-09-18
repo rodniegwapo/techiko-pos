@@ -20,6 +20,7 @@ const { openModal, product } = toRefs(props);
 
 const loading = ref(false);
 
+/** 🔹 Apply discount */
 const handleSave = async () => {
   try {
     if (!formData.value?.discount?.value) return emit("close");
@@ -63,6 +64,41 @@ const handleSave = async () => {
   }
 };
 
+/**  Clear discount */
+const discountLoading = ref(false)
+const handleClearDiscount = async () => {
+  try {
+    discountLoading.value = true;
+
+    // fetch sale item
+    const { data: saleItem } = await axios.get(
+      route("sales.find-sale-item", { sale: orderId.value }),
+      { params: { product_id: product.value.id } }
+    );
+
+    // backend remove
+    await axios.delete(
+      route("sales.items.discount.remove", {
+        sale: orderId.value,
+        saleItem: saleItem?.id,
+        discount: product.value.discount_id
+      })
+    );
+
+    // update local state (reset)
+    const idx = orders.value.findIndex((item) => item.id == product.value.id);
+    if (idx !== -1) {
+      orders.value[idx] = applyDiscountToLine(orders.value[idx], null);
+    }
+
+    emit("close");
+  } catch (e) {
+    console.error("Error clearing discount:", e);
+  } finally {
+    discountLoading.value = false;
+  }
+};
+
 const formFields = [
   {
     key: "discount",
@@ -78,7 +114,6 @@ const formFields = [
   },
 ];
 </script>
-
 <template>
   <a-modal
     v-model:visible="openModal"
@@ -88,7 +123,15 @@ const formFields = [
   >
     <vertical-form v-model="formData" :fields="formFields" :errors="errors" />
     <template #footer>
-      <a-button @click="$emit('close')">Cancel</a-button>
+      <!-- Clear button only visible if product already has discount -->
+      <a-button
+        type="danger"
+        :loading="discountLoading"
+        v-if="product.discount"
+        @click="handleClearDiscount"
+      >
+        Clear Discount
+      </a-button>
       <primary-button :loading="loading" @click="handleSave">
         Submit
       </primary-button>
