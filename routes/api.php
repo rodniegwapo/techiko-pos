@@ -50,6 +50,11 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/{sale}/saleItems/{saleItem}/discount', [\App\Http\Controllers\SaleDiscountController::class, 'applyItemDiscount'])
                 ->name('items.discount.apply');
 
+            Route::delete(
+                '/{sale}/saleItems/{saleItem}/discounts/{discount}',
+                [\App\Http\Controllers\SaleDiscountController::class, 'removeItemDiscount']
+            )->name('items.discount.remove');
+
             Route::get('/{sale}/find-sale-item', [\App\Http\Controllers\SaleController::class, 'findSaleItem'])->name('find-sale-item');
         });
 

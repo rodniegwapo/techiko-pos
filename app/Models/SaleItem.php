@@ -27,20 +27,26 @@ class SaleItem extends Model
         return $this->belongsToMany(\App\Models\Product\Discount::class);
     }
 
-    public function setDiscountAmount(string $type, float $discountAmount): void
+    public function setDiscountAmount(?string $type, ?float $discountAmount): void
     {
         $lineSubtotal = $this->unit_price * $this->quantity;
 
-        if ($type === 'amount') {
+        if ($type === null || $discountAmount === null) {
+            // 🔹 No discount (reset)
+            $this->discount = 0;
+            $this->subtotal = $lineSubtotal;
+        } elseif ($type === 'amount') {
             // Apply discount per item * quantity
             $discount = min(max($discountAmount * $this->quantity, 0), $lineSubtotal);
+            $this->discount = $discount;
+            $this->subtotal = $lineSubtotal - $discount;
         } else {
             // Treat as percentage
             $discount = $lineSubtotal * max(min($discountAmount, 100), 0) / 100;
+            $this->discount = $discount;
+            $this->subtotal = $lineSubtotal - $discount;
         }
 
-        $this->discount = $discount;
-        $this->subtotal = $lineSubtotal - $discount;
         $this->save();
     }
 }

@@ -61,4 +61,22 @@ class SaleDiscountController extends Controller
             'item' => $saleItem->fresh(),
         ]);
     }
+
+    public function removeItemDiscount(Request $request, Sale $sale, SaleItem $saleItem, Discount $discount)
+    {
+        if ($saleItem->sale_id !== $sale->id) {
+            abort(404);
+        }
+
+        // detach the discount
+        $saleItem->discounts()->detach($discount->id);
+
+        // reset discount amount on the item
+        $saleItem->setDiscountAmount(null, 0);
+
+        return response()->json([
+            'message' => 'Item discount removed',
+            'item' => $saleItem->fresh(),
+        ]);
+    }
 }

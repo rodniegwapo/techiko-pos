@@ -8,7 +8,7 @@ const orderId = ref(localStorage.getItem("current_order") || null);
 const isCreatingDraft = ref(false);
 let draftPromise = null;
 
-/**  Utility: calculate discount + subtotal */
+/** 🔹 Utility: calculate discount + subtotal */
 function applyDiscountToLine(product, discount) {
     const lineSubtotal = product.price * product.quantity;
 
