@@ -8,7 +8,7 @@ const orderId = ref(localStorage.getItem("current_order") || null);
 const isCreatingDraft = ref(false);
 let draftPromise = null;
 
-/** 🔹 Utility: calculate discount + subtotal */
+/**  Utility: calculate discount + subtotal */
 function applyDiscountToLine(product, discount) {
     const lineSubtotal = product.price * product.quantity;
 
@@ -28,7 +28,9 @@ function applyDiscountToLine(product, discount) {
         const percentage = Math.min(Math.max(discount.value, 0), 100);
         discountAmount = lineSubtotal * (percentage / 100);
     } else if (discount.type === "amount") {
-        discountAmount = Math.min(Math.max(discount.value, 0), lineSubtotal);
+        // 🔹 Multiply by quantity so discount applies per item
+        const totalDiscount = discount.value * product.quantity;
+        discountAmount = Math.min(Math.max(totalDiscount, 0), lineSubtotal);
     }
 
     return {
@@ -40,6 +42,7 @@ function applyDiscountToLine(product, discount) {
         subtotal: lineSubtotal - discountAmount,
     };
 }
+
 
 /**  Step 1: Create draft */
 const createDraft = async () => {
@@ -77,7 +80,7 @@ const syncDraft = useDebounceFn(async () => {
     });
 }, 1000);
 
-// ✅ Global watcher (sync + localStorage)
+//  Global watcher (sync + localStorage)
 watchDebounced(
     orders,
     () => {
@@ -104,7 +107,7 @@ const handleAddOrder = async (product, discount = null) => {
     if (idx >= 0) {
         orders.value[idx].quantity += 1;
 
-        // ✅ Keep existing discount if no new one is passed
+        // Keep existing discount if no new one is passed
         const activeDiscount = discount || {
             id: orders.value[idx].discount_id,
             type: orders.value[idx].discount_type,
@@ -128,7 +131,7 @@ const handleSubtractOrder = (product, discount = null) => {
     if (idx >= 0 && orders.value[idx].quantity > 1) {
         orders.value[idx].quantity -= 1;
 
-        // ✅ Keep existing discount if no new one is passed
+        //  Keep existing discount if no new one is passed
         const activeDiscount = discount || {
             id: orders.value[idx].discount_id,
             type: orders.value[idx].discount_type,
@@ -142,13 +145,13 @@ const handleSubtractOrder = (product, discount = null) => {
     }
 };
 
-/** 🔹 Remove item */
+/**  Remove item */
 const removeOrder = (product) => {
     orders.value = orders.value.filter((p) => p.id !== product.id);
     if (orders.value.length === 0) finalizeOrder();
 };
 
-/** 🔹 Totals */
+/** Totals */
 const totalAmount = computed(() =>
     orders.value.reduce(
         (sum, i) => sum + (i.subtotal ?? i.quantity * i.price),

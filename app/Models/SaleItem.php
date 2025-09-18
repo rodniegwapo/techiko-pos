@@ -32,8 +32,8 @@ class SaleItem extends Model
         $lineSubtotal = $this->unit_price * $this->quantity;
 
         if ($type === 'amount') {
-            // Clamp between 0 and subtotal
-            $discount = min(max($discountAmount, 0), $lineSubtotal);
+            // Apply discount per item * quantity
+            $discount = min(max($discountAmount * $this->quantity, 0), $lineSubtotal);
         } else {
             // Treat as percentage
             $discount = $lineSubtotal * max(min($discountAmount, 100), 0) / 100;
