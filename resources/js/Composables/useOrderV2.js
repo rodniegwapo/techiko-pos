@@ -1,5 +1,5 @@
 // composables/useOrderV2.js
-import { ref, computed, watch } from "vue";
+import { ref, computed } from "vue";
 import { useDebounceFn, watchDebounced } from "@vueuse/core";
 import axios from "axios";
 
@@ -8,7 +8,40 @@ const orderId = ref(localStorage.getItem("current_order") || null);
 const isCreatingDraft = ref(false);
 let draftPromise = null;
 
-// ✅ Step 1: Create draft
+/** 🔹 Utility: calculate discount + subtotal */
+function applyDiscountToLine(product, discount) {
+    const lineSubtotal = product.price * product.quantity;
+
+    if (!discount) {
+        return {
+            ...product,
+            discount_id: null,
+            discount_type: null,
+            discount: 0,
+            discount_amount: 0,
+            subtotal: lineSubtotal,
+        };
+    }
+
+    let discountAmount = 0;
+    if (discount.type === "percentage") {
+        const percentage = Math.min(Math.max(discount.value, 0), 100);
+        discountAmount = lineSubtotal * (percentage / 100);
+    } else if (discount.type === "amount") {
+        discountAmount = Math.min(Math.max(discount.value, 0), lineSubtotal);
+    }
+
+    return {
+        ...product,
+        discount_id: discount.id,
+        discount_type: discount.type,
+        discount: discount.value,
+        discount_amount: discountAmount,
+        subtotal: lineSubtotal - discountAmount,
+    };
+}
+
+/**  Step 1: Create draft */
 const createDraft = async () => {
     if (orderId.value) return orderId.value;
     if (isCreatingDraft.value && draftPromise) return draftPromise;
@@ -29,7 +62,7 @@ const createDraft = async () => {
     return draftPromise;
 };
 
-// ✅ Step 2: Sync to DB (debounced once globally)
+/** 🔹 Step 2: Sync draft to DB */
 const syncDraft = useDebounceFn(async () => {
     if (!orderId.value) return;
     await axios.post(`/api/sales/${orderId.value}/sync`, {
@@ -39,12 +72,12 @@ const syncDraft = useDebounceFn(async () => {
             price: item.price,
             discount_id: item.discount_id || null,
             discount_amount: item.discount_amount || 0,
-            subtotal: item.subtotal ?? item.quantity * item.price,
+            subtotal: item.subtotal,
         })),
     });
 }, 1000);
 
-// ✅ Global watcher (runs only once)
+// ✅ Global watcher (sync + localStorage)
 watchDebounced(
     orders,
     () => {
@@ -54,134 +87,80 @@ watchDebounced(
     { debounce: 1000, deep: true }
 );
 
-// ✅ Step 3: Finalize order
-const finalizeOrder = async () => {
+/** 🔹 Step 3: Finalize */
+const finalizeOrder = () => {
     localStorage.removeItem("orders");
     localStorage.removeItem("current_order");
     orderId.value = null;
     orders.value = [];
 };
 
-// Add item
-const handleAddOrder = async (product, selectedDiscount = null) => {
-    if (!orderId.value) {
-        await createDraft();
-    }
+/** 🔹 Add item */
+const handleAddOrder = async (product, discount = null) => {
+    if (!orderId.value) await createDraft();
 
-    const index = orders.value.findIndex((p) => p.id === product.id);
+    const idx = orders.value.findIndex((p) => p.id === product.id);
 
-    if (index >= 0) {
-        // Increase quantity
-        orders.value[index].quantity += 1;
+    if (idx >= 0) {
+        orders.value[idx].quantity += 1;
 
-        const lineSubtotal =
-            orders.value[index].price * orders.value[index].quantity;
-
-        let discountAmount = orders.value[index].discount_amount || 0;
-
-        // ✅ Recalculate discount if exists or passed in
-        const discount = selectedDiscount || orders.value[index];
-        if (discount?.discount_type === "percentage") {
-            const percentage = Math.min(Math.max(discount.discount, 0), 100);
-            discountAmount = lineSubtotal * (percentage / 100);
-        } else if (discount?.discount_type === "amount") {
-            discountAmount = Math.min(
-                Math.max(discount.discount, 0),
-                lineSubtotal
-            );
-        }
-
-        orders.value[index] = {
-            ...orders.value[index],
-            discount_id: discount?.id || null,
-            discount_type: discount?.discount_type || null,
-            discount: discount?.discount || 0,
-            discount_amount: discountAmount,
-            subtotal: lineSubtotal - discountAmount,
+        // ✅ Keep existing discount if no new one is passed
+        const activeDiscount = discount || {
+            id: orders.value[idx].discount_id,
+            type: orders.value[idx].discount_type,
+            value: orders.value[idx].discount,
         };
+
+        orders.value[idx] = applyDiscountToLine(
+            orders.value[idx],
+            activeDiscount
+        );
     } else {
-        // New order line
-        orders.value.push({
-            ...product,
-            quantity: 1,
-            discount_id: selectedDiscount?.id || null,
-            discount_type: selectedDiscount?.type || null,
-            discount: selectedDiscount?.value || 0,
-            discount_amount: selectedDiscount
-                ? selectedDiscount.type === "percentage"
-                    ? product.price * (selectedDiscount.value / 100)
-                    : Math.min(selectedDiscount.value, product.price)
-                : 0,
-            subtotal: selectedDiscount
-                ? product.price -
-                  (selectedDiscount.type === "percentage"
-                      ? product.price * (selectedDiscount.value / 100)
-                      : Math.min(selectedDiscount.value, product.price))
-                : product.price,
-        });
+        orders.value.push(
+            applyDiscountToLine({ ...product, quantity: 1 }, discount)
+        );
     }
 };
 
-// Subtract item
-const handleSubtractOrder = (product, selectedDiscount = null) => {
-    const index = orders.value.findIndex((p) => p.id === product.id);
-    if (index >= 0 && orders.value[index].quantity > 1) {
-        // Decrease quantity
-        orders.value[index].quantity -= 1;
+/** 🔹 Subtract item */
+const handleSubtractOrder = (product, discount = null) => {
+    const idx = orders.value.findIndex((p) => p.id === product.id);
+    if (idx >= 0 && orders.value[idx].quantity > 1) {
+        orders.value[idx].quantity -= 1;
 
-        const lineSubtotal =
-            orders.value[index].price * orders.value[index].quantity;
-
-        let discountAmount = 0;
-
-        // ✅ Recalculate discount if exists or passed in
-        const discount = selectedDiscount || orders.value[index];
-        if (discount?.discount_type === "percentage") {
-            const percentage = Math.min(Math.max(discount.discount, 0), 100);
-            discountAmount = lineSubtotal * (percentage / 100);
-        } else if (discount?.discount_type === "amount") {
-            discountAmount = Math.min(
-                Math.max(discount.discount, 0),
-                lineSubtotal
-            );
-        }
-
-        orders.value[index] = {
-            ...orders.value[index],
-            discount_id: discount?.id || null,
-            discount_type: discount?.discount_type || null,
-            discount: discount?.discount || 0,
-            discount_amount: discountAmount,
-            subtotal: lineSubtotal - discountAmount,
+        // ✅ Keep existing discount if no new one is passed
+        const activeDiscount = discount || {
+            id: orders.value[idx].discount_id,
+            type: orders.value[idx].discount_type,
+            value: orders.value[idx].discount,
         };
+
+        orders.value[idx] = applyDiscountToLine(
+            orders.value[idx],
+            activeDiscount
+        );
     }
 };
 
-// Remove item
+/** 🔹 Remove item */
 const removeOrder = (product) => {
     orders.value = orders.value.filter((p) => p.id !== product.id);
-    if (orders.value.length == 0) {
-        localStorage.removeItem("orders");
-        localStorage.removeItem("current_order");
-    }
+    if (orders.value.length === 0) finalizeOrder();
 };
 
-// ✅ Total including discounts
-const totalAmount = computed(() => {
-    return orders.value.reduce((sum, i) => {
-        if (i.subtotal !== undefined) {
-            return sum + i.subtotal;
-        }
-        return sum + i.quantity * i.price;
-    }, 0);
-});
+/** 🔹 Totals */
+const totalAmount = computed(() =>
+    orders.value.reduce(
+        (sum, i) => sum + (i.subtotal ?? i.quantity * i.price),
+        0
+    )
+);
 
-const formattedTotal = (total) => {
-    return new Intl.NumberFormat("en-PH", {
+const formattedTotal = (total) =>
+    new Intl.NumberFormat("en-PH", {
         style: "currency",
         currency: "PHP",
     }).format(total);
-};
 
 export function useOrders() {
     return {
@@ -194,5 +173,6 @@ export function useOrders() {
         finalizeOrder,
         totalAmount,
         formattedTotal,
+        applyDiscountToLine,
     };
 }
