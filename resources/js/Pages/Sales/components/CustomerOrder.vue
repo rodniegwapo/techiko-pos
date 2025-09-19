@@ -130,12 +130,26 @@ const handleShowDiscountModal = (order) => {
   currentProduct.value = order;
   openApplyDiscountModal.value = true;
 };
+
+const isLoyalCustomer = ref(false);
+
+const customer = ref('')
 </script>
 
 <template>
-  <div class="space-y-2">
+ 
+  <div class="flex items-center justify-between">
     <div class="font-semibold text-lg">Current Order</div>
-    <a-input value="Walk-in Customer" disabled />
+    <a-switch
+      v-model:checked="isLoyalCustomer"
+      checked-children="Loyal"
+      un-checked-children="Walk-in"
+    />
+  </div>
+  <div class="mt-1">
+     <a-input-search  v-if="isLoyalCustomer" v-model:value="customer" placeholder="Search Customer" />
+    <a-input  v-else value="Walk-in Customer" disabled />
+   
   </div>
   <div
     class="relative flex flex-col gap-2 mt-2 h-[calc(100vh-400px)] overflow-auto overflow-x-hidden"
@@ -168,8 +182,11 @@ const handleShowDiscountModal = (order) => {
             {{ order.price }} x {{ order.quantity }}
           </div>
         </div>
-        <div class="text-right flex flex-col  py-1 items-end gap-1">
-          <div class="cursor-pointer text-red-700" @click.stop="showVoidItem(order)">
+        <div class="text-right flex flex-col py-1 items-end gap-1">
+          <div
+            class="cursor-pointer text-red-700"
+            @click.stop="showVoidItem(order)"
+          >
             <CloseOutlined />
           </div>
           <div class="text-xs" v-if="order.discount">
@@ -185,7 +202,9 @@ const handleShowDiscountModal = (order) => {
               {{ formattedTotal(order?.discount_amount) }}
             </div>
           </div>
-          <div class="text-xs text-gray-600 line-through invisible" v-else>Discount</div>
+          <div class="text-xs text-gray-600 line-through invisible" v-else>
+            Discount
+          </div>
           <div
             class="text-md font-semibold text-green-700"
             v-if="order.discount"
