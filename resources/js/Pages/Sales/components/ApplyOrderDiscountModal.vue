@@ -30,6 +30,7 @@ const loading = ref(false);
 /** 🔹 Apply discount */
 const handleSave = async () => {
   try {
+    if (!formData.value?.discount?.value) return emit("close");
     const payload = { discount_id: formData.value?.discount.value };
     loading.value = true;
     const { data: sale } = await axios.post(
@@ -43,10 +44,11 @@ const handleSave = async () => {
       "order_discount_amount",
       sale?.sale?.discount_amount ?? 0
     );
-    localStorage.setItem("order_discount_id", sale.sale.discount_id);
-    
+    localStorage.setItem("order_discount_id", sale.sale.discount_id ?? '');
+
     orderDiscountAmount.value = sale?.sale?.discount_amount ?? 0;
     orderDiscountId.value = sale.sale.discount_id;
+    formData.value = {}
 
     emit("close");
   } catch (e) {
@@ -118,6 +120,7 @@ const formFields = [
     @cancel="$emit('close')"
     width="400px"
   >
+
     <vertical-form v-model="formData" :fields="formFields" :errors="errors" />
     <template #footer>
       <!-- Clear button only visible if product already has discount -->
