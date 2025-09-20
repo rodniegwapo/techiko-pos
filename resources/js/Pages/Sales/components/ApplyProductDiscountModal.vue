@@ -117,7 +117,7 @@ const formFields = [
 <template>
   <a-modal
     v-model:visible="openModal"
-    :title="`Apply Discount`"
+    :title="`Apply Discount - ${product.name}` "
     @cancel="$emit('close')"
     width="400px"
   >

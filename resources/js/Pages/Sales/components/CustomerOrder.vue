@@ -1,8 +1,11 @@
 <script setup>
 import VerticalForm from "@/Components/Forms/VerticalForm.vue";
 import PrimaryButton from "@/Components/PrimaryButton.vue";
-import ApplyDiscountModal from "./ApplyDiscountModal.vue";
+import ApplyProductDiscountModal from "./ApplyProductDiscountModal.vue";
+import ApplyOrderDiscountModal from "./ApplyOrderDiscountModal.vue";
+import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { ref, inject, computed } from "vue";
+import { IconDiscount } from "@tabler/icons-vue";
 import {
   CloseOutlined,
   PlusSquareOutlined,
@@ -132,12 +135,13 @@ const handleShowDiscountModal = (order) => {
 };
 
 const isLoyalCustomer = ref(false);
+const customer = ref("");
 
-const customer = ref('')
+
+const openOrderDicountModal = ref(false)
 </script>
 
 <template>
- 
   <div class="flex items-center justify-between">
     <div class="font-semibold text-lg">Current Order</div>
     <a-switch
@@ -147,9 +151,12 @@ const customer = ref('')
     />
   </div>
   <div class="mt-1">
-     <a-input-search  v-if="isLoyalCustomer" v-model:value="customer" placeholder="Search Customer" />
-    <a-input  v-else value="Walk-in Customer" disabled />
-   
+    <a-input-search
+      v-if="isLoyalCustomer"
+      v-model:value="customer"
+      placeholder="Search Customer"
+    />
+    <a-input v-else value="Walk-in Customer" disabled />
   </div>
   <div
     class="relative flex flex-col gap-2 mt-2 h-[calc(100vh-400px)] overflow-auto overflow-x-hidden"
@@ -219,8 +226,20 @@ const customer = ref('')
     </div>
   </div>
   <hr class="-mx-6 border-t-[3px] pt-2 mt-2" />
-  <div class="font-bold text-lg">
-    Total: <span class="text-green-700">{{ formattedTotal(totalAmount) }}</span>
+  <div class="font-bold text-lg flex items-center justify-between">
+    <div>
+      Total:
+      <span class="text-green-700">{{ formattedTotal(totalAmount) }}</span>
+    </div>
+    <div>
+      <icon-tooltip-button
+        name="Apply Order Discount"
+        class="hover:bg-green-700"
+        @click="openOrderDicountModal = true"
+      >
+        <IconDiscount size="20" class="mx-auto" />
+      </icon-tooltip-button>
+    </div>
   </div>
   <div class="mt-2">
     <div>Payment Method</div>
@@ -270,9 +289,15 @@ const customer = ref('')
     </template>
   </a-modal>
 
-  <apply-discount-modal
+  <apply-product-discount-modal
     :openModal="openApplyDiscountModal"
     :product="currentProduct"
     @close="openApplyDiscountModal = false"
+  />
+
+  <apply-order-discount-modal
+    :openModal="openOrderDicountModal"
+    :product="currentProduct"
+    @close="openOrderDicountModal = false"
   />
 </template>
