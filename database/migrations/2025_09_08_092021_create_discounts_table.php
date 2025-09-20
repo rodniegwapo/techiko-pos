@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('name');
             $table->string('type');
             $table->enum('scope', ['order', 'product', 'category']);
-            $table->decimal('value', 10, 2);
+            $table->decimal('value', 10, 2)->nullable();
             $table->decimal('min_order_amount', 10, 2)->nullable();
             $table->dateTime('start_date')->nullable();
             $table->dateTime('end_date')->nullable();
