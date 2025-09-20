@@ -92,7 +92,7 @@ const customerChange = computed(() => {
   return received - (total - orderDiscountAmount.value);
 });
 const handleProceedPaymentConfirmation = () => {
-  Modal.info({
+  Modal.confirm({
     title: "Are you sure you would like to proceed?",
     icon: createVNode(ExclamationCircleOutlined),
     okText: "Submit",
@@ -110,9 +110,9 @@ const handleProceedPaymentConfirmation = () => {
     onCancel() {
       console.log("Cancel");
     },
-    class: "test",
   });
 };
+
 
 const proceedPaymentLoading = ref(false);
 
@@ -145,6 +145,7 @@ const handleProceedPayment = async () => {
 
 const disabledPaymentButtonColor = computed(() => {
   if (amountReceived.value < totalAmount.value) return "";
+  if (orders.value.length == 0) return "";
   return "bg-green-700 border-green-700 hover:bg-green-600";
 });
 
@@ -172,6 +173,11 @@ const isLoyalCustomer = ref(false);
 const customer = ref("");
 
 const openOrderDicountModal = ref(false);
+
+const showDiscountOrder = () => {
+  if(orders.value.length == 0) return
+  openOrderDicountModal.value = true
+}
 </script>
 
 <template>
@@ -192,7 +198,7 @@ const openOrderDicountModal = ref(false);
     <a-input v-else value="Walk-in Customer" disabled />
   </div>
   <div
-    class="relative flex flex-col gap-2 mt-2 h-[calc(100vh-400px)] overflow-auto overflow-x-hidden"
+    class="relative flex flex-col gap-2 mt-2 h-[calc(100vh-450px)] overflow-auto overflow-x-hidden"
   >
     <div
       v-if="orders.length == 0"
@@ -262,7 +268,7 @@ const openOrderDicountModal = ref(false);
   <div class="relative">
     <div class="flex justify-between items-center">
       <div class="text-xs">
-        <span class="font-semibold">Discounted Amount: </span>
+        <span class="font-semibold">Order Discount: </span>
         <span class="text-gray-700">{{
           formattedTotal(orderDiscountAmount)
         }}</span>
@@ -271,7 +277,8 @@ const openOrderDicountModal = ref(false);
         <icon-tooltip-button
           name="Apply Order Discount"
           class="hover:bg-green-700"
-          @click="openOrderDicountModal = true"
+          :disabled="orders.length == 0"
+          @click="showDiscountOrder"
         >
           <IconDiscount size="20" class="mx-auto" />
         </icon-tooltip-button>
@@ -317,8 +324,8 @@ const openOrderDicountModal = ref(false);
         @click="handleProceedPaymentConfirmation"
         :disabled="
           proceedPaymentLoading ||
-          (amountReceived < totalAmount - orderDiscountAmount &&
-            orders.length > 0)
+          amountReceived < totalAmount - orderDiscountAmount ||
+          orders.length == 0
         "
         :loading="proceedPaymentLoading"
         >Proceed Payment</a-button
