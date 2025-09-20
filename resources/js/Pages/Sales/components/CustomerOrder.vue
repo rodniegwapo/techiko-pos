@@ -161,11 +161,12 @@ const clearForm = () => {
 
 const currentProduct = ref({});
 const openApplyDiscountModal = ref(false);
-const handleShowDiscountModal = (order) => {
+const handleShowProductDiscountModal = (product) => {
+  console.log('order discount',product)
   formData.value = {
-    discount: orderDiscountId.value ?? '',
+    discount: product.discount_id
   };
-  currentProduct.value = order;
+  currentProduct.value = product;
   openApplyDiscountModal.value = true;
 };
 
@@ -176,6 +177,9 @@ const openOrderDicountModal = ref(false);
 
 const showDiscountOrder = () => {
   if(orders.value.length == 0) return
+   formData.value = {
+    orderDiscount: Number(orderDiscountId.value)
+  };
   openOrderDicountModal.value = true
 }
 </script>
@@ -212,7 +216,7 @@ const showDiscountOrder = () => {
         v-for="(order, index) in orders"
         :key="index"
         class="flex justify-between items-center border relative px-4 rounded-lg bg-white hover:shadow cursor-pointer"
-        @click="handleShowDiscountModal(order)"
+        @click="handleShowProductDiscountModal(order)"
       >
         <div class="flex flex-col gap-1 py-1">
           <div class="text-sm font-semibold">{{ order.name }}</div>

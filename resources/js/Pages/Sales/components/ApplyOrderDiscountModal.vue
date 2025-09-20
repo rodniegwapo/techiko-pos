@@ -30,8 +30,8 @@ const loading = ref(false);
 /** 🔹 Apply discount */
 const handleSave = async () => {
   try {
-    if (!formData.value?.discount?.value) return emit("close");
-    const payload = { discount_id: formData.value?.discount.value };
+    if (!formData.value?.orderDiscount?.value) return emit("close");
+    const payload = { discount_id: formData.value?.orderDiscount.value };
     loading.value = true;
     const { data: sale } = await axios.post(
       route("sales.discounts.order.apply", {
@@ -95,7 +95,7 @@ const handleClearDiscount = async () => {
 
 const formFields = [
   {
-    key: "discount",
+    key: "orderDiscount",
     label: "Select Discount",
     type: "select",
     options: page.props.discounts
