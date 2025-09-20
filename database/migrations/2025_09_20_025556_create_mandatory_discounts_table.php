@@ -11,11 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('sale_discounts', function (Blueprint $table) {
+        Schema::create('mandatory_discounts', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('sale_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('discount_id')->constrained()->cascadeOnDelete();
-            $table->decimal('discount_amount', 10, 2);
+            $table->string('name'); // e.g., "Senior Citizen", "PWD"
+            $table->enum('type', ['percentage', 'amount']);
+            $table->decimal('value', 10, 2); // e.g., 20.00 (% or fixed)
+            $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
     }
@@ -25,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('sale_discounts');
+        Schema::dropIfExists('mandatory_discounts');
     }
 };

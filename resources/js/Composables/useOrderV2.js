@@ -5,6 +5,8 @@ import axios from "axios";
 
 const orders = ref(JSON.parse(localStorage.getItem("orders")) || []);
 const orderId = ref(localStorage.getItem("current_order") || null);
+const orderDiscountAmount = ref(localStorage.getItem("order_discount_amount"))
+const orderDiscountId = ref(localStorage.getItem("order_discount_id"))
 const isCreatingDraft = ref(false);
 let draftPromise = null;
 
@@ -42,7 +44,6 @@ function applyDiscountToLine(product, discount) {
         subtotal: lineSubtotal - discountAmount,
     };
 }
-
 
 /**  Step 1: Create draft */
 const createDraft = async () => {
@@ -169,6 +170,8 @@ export function useOrders() {
     return {
         orders,
         orderId,
+        orderDiscountAmount,
+        orderDiscountId,
         handleAddOrder,
         handleSubtractOrder,
         removeOrder,

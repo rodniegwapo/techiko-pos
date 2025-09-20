@@ -2,10 +2,9 @@
 
 namespace App\Models;
 
+use App\Models\Product\Discount;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Carbon; 
-use App\Models\Product\Discount;
 
 class Sale extends Model
 {
@@ -18,11 +17,6 @@ class Sale extends Model
         return $this->hasMany(SaleItem::class);
     }
 
-    public function saleDiscounts()
-    {
-        return $this->hasMany(SaleDiscount::class);
-    }
-
     public function recalcTotals(): void
     {
         $itemsTotal = $this->saleItems()
@@ -31,21 +25,23 @@ class Sale extends Model
             ->sum(function (SaleItem $item) {
                 $lineSubtotal = $item->unit_price * $item->quantity;
                 $lineDiscount = $item->discount ?? 0;
+
                 return max(0, $lineSubtotal - $lineDiscount);
             });
 
         $this->total_amount = $itemsTotal;
 
-        $orderDiscountTotal = $this->saleDiscounts()->sum('discount_amount');
-        $this->discount_amount = $orderDiscountTotal;
+        // discount_amount is already a column in sales
+        $discount = $this->discount_amount ?? 0;
 
         $tax = $this->tax_amount ?? 0;
-        $this->grand_total = max(0, $this->total_amount - $this->discount_amount + $tax);
+
+        $this->grand_total = max(0, $this->total_amount - $discount + $tax);
 
         $this->save();
     }
 
-    public function applyOrderDiscount(Discount $discount): SaleDiscount
+    public function applyOrderDiscount(Discount $discount): void
     {
         if ($discount->scope !== 'order') {
             throw new \InvalidArgumentException('Discount scope must be order.');
@@ -69,23 +65,18 @@ class Sale extends Model
             throw new \InvalidArgumentException('Order amount does not meet minimum requirement.');
         }
 
-        $amount = 0;
-        if ($discount->type === 'percentage') {
-            $amount = round(($discount->value / 100) * $this->total_amount, 2);
-        } else {
-            $amount = (float) $discount->value;
-        }
+        // calculate discount
+        $amount = $discount->type === 'percentage'
+            ? round(($discount->value / 100) * $this->total_amount, 2)
+            : (float) $discount->value;
 
         $amount = min(max($amount, 0), $this->total_amount);
 
-        $saleDiscount = $this->saleDiscounts()->create([
-            'discount_id' => $discount->id,
-            'discount_amount' => $amount,
-        ]);
+        // update sale record directly
+        $this->discount_id = $discount->id;
+        $this->discount_amount = $amount;
+        $this->save();
 
         $this->recalcTotals();
-
-        return $saleDiscount;
     }
-
 }

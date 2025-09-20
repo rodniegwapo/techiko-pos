@@ -18,6 +18,7 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
 
             $table->decimal('total_amount', 12, 2)->default(0);
+            $table->foreignId('discount_id')->nullable()->constrained('discounts')->nullOnDelete();
             $table->decimal('discount_amount', 12, 2)->default(0);
             $table->decimal('tax_amount', 12, 2)->default(0);
             $table->decimal('grand_total', 12, 2)->default(0);
@@ -27,6 +28,7 @@ return new class extends Migration
 
             $table->dateTime('transaction_date');
             $table->text('notes')->nullable();
+
             $table->timestamps();
         });
     }

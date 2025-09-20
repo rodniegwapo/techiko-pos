@@ -4,22 +4,25 @@ import PrimaryButton from "@/Components/PrimaryButton.vue";
 import ApplyProductDiscountModal from "./ApplyProductDiscountModal.vue";
 import ApplyOrderDiscountModal from "./ApplyOrderDiscountModal.vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
-import { ref, inject, computed } from "vue";
+import { ref, inject, computed, createVNode } from "vue";
 import { IconDiscount } from "@tabler/icons-vue";
 import {
   CloseOutlined,
   PlusSquareOutlined,
   MinusSquareOutlined,
+  ExclamationCircleOutlined,
 } from "@ant-design/icons-vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useOrders } from "@/Composables/useOrderV2";
 import { useHelpers } from "@/Composables/useHelpers";
 import axios from "axios";
-import { notification } from "ant-design-vue";
+import { Modal, notification } from "ant-design-vue";
 
 const { formData, errors } = useGlobalVariables();
 const {
   orders,
+  orderDiscountAmount,
+  orderDiscountId,
   handleAddOrder,
   handleSubtractOrder,
   totalAmount,
@@ -86,10 +89,33 @@ const customerChange = computed(() => {
   const total = Number(totalAmount.value) || 0;
 
   if (received < 1) return 0;
-  return received - total;
+  return received - (total - orderDiscountAmount.value);
 });
+const handleProceedPaymentConfirmation = () => {
+  Modal.info({
+    title: "Are you sure you would like to proceed?",
+    icon: createVNode(ExclamationCircleOutlined),
+    okText: "Submit",
+    cancelText: "Cancel",
+    onOk() {
+      return new Promise(async (innerResolve, innerReject) => {
+        try {
+          await handleProceedPayment(); // wait until payment success
+          innerResolve(); // close modal
+        } catch (error) {
+          innerReject(error); // keep modal open if failed
+        }
+      });
+    },
+    onCancel() {
+      console.log("Cancel");
+    },
+    class: "test",
+  });
+};
 
 const proceedPaymentLoading = ref(false);
+
 const handleProceedPayment = async () => {
   try {
     proceedPaymentLoading.value = true;
@@ -103,7 +129,15 @@ const handleProceedPayment = async () => {
     notification["success"]({
       message: "Success",
     });
+    localStorage.setItem("order_discount_amount", 0);
+    localStorage.setItem("order_discount_id", null);
+    orderDiscountAmount.value = 0;
+    orderDiscountId.value = "";
   } catch (error) {
+    notification["error"]({
+      message: "Payment failed",
+    });
+    throw error; // bubble up to keep modal open
   } finally {
     proceedPaymentLoading.value = false;
   }
@@ -137,8 +171,7 @@ const handleShowDiscountModal = (order) => {
 const isLoyalCustomer = ref(false);
 const customer = ref("");
 
-
-const openOrderDicountModal = ref(false)
+const openOrderDicountModal = ref(false);
 </script>
 
 <template>
@@ -226,50 +259,71 @@ const openOrderDicountModal = ref(false)
     </div>
   </div>
   <hr class="-mx-6 border-t-[3px] pt-2 mt-2" />
-  <div class="font-bold text-lg flex items-center justify-between">
-    <div>
-      Total:
-      <span class="text-green-700">{{ formattedTotal(totalAmount) }}</span>
+  <div class="relative">
+    <div class="flex justify-between items-center">
+      <div class="text-xs">
+        <span class="font-semibold">Discounted Amount: </span>
+        <span class="text-gray-700">{{
+          formattedTotal(orderDiscountAmount)
+        }}</span>
+      </div>
+      <div>
+        <icon-tooltip-button
+          name="Apply Order Discount"
+          class="hover:bg-green-700"
+          @click="openOrderDicountModal = true"
+        >
+          <IconDiscount size="20" class="mx-auto" />
+        </icon-tooltip-button>
+      </div>
+    </div>
+    <div class="text-xs">
+      <span class="font-semibold">Subtotal:</span>
+      {{ formattedTotal(totalAmount) }}
+    </div>
+    <div class="font-bold text-lg flex items-center justify-between mt-2">
+      <div>
+        Total:
+        <span class="text-green-700"
+          >{{ formattedTotal(totalAmount - Number(orderDiscountAmount)) }}
+        </span>
+      </div>
+    </div>
+    <div class="mt-2">
+      <div>Payment Method</div>
+      <a-input value="Pay in Cash " disabled></a-input>
+    </div>
+    <div class="flex gap-2 items-center mt-2">
+      <div class="flex-grow text-nowrap">Amount Received :</div>
+      <a-input
+        :class="{
+          'border-red-400 shadow-none':
+            amountReceived < totalAmount - orderDiscountAmount &&
+            orders.length > 0,
+        }"
+        v-model:value="amountReceived"
+        type="number"
+      />
+    </div>
+    <div class="font-bold text-lg mt-2">
+      Change:
+      <span class="text-green-700">{{ formattedTotal(customerChange) }}</span>
     </div>
     <div>
-      <icon-tooltip-button
-        name="Apply Order Discount"
-        class="hover:bg-green-700"
-        @click="openOrderDicountModal = true"
+      <a-button
+        class="w-full mt-2"
+        :class="disabledPaymentButtonColor"
+        type="primary"
+        @click="handleProceedPaymentConfirmation"
+        :disabled="
+          proceedPaymentLoading ||
+          (amountReceived < totalAmount - orderDiscountAmount &&
+            orders.length > 0)
+        "
+        :loading="proceedPaymentLoading"
+        >Proceed Payment</a-button
       >
-        <IconDiscount size="20" class="mx-auto" />
-      </icon-tooltip-button>
     </div>
-  </div>
-  <div class="mt-2">
-    <div>Payment Method</div>
-    <a-input value="Pay in Cash " disabled></a-input>
-  </div>
-  <div class="flex gap-2 items-center mt-2">
-    <div class="flex-grow text-nowrap">Amount Received :</div>
-    <a-input
-      :class="{
-        'border-red-400 shadow-none':
-          amountReceived < totalAmount && orders.length > 0,
-      }"
-      v-model:value="amountReceived"
-      type="number"
-    />
-  </div>
-  <div class="font-bold text-lg mt-2">
-    Change:
-    <span class="text-green-700">{{ formattedTotal(customerChange) }}</span>
-  </div>
-  <div>
-    <a-button
-      class="w-full mt-2"
-      :class="disabledPaymentButtonColor"
-      type="primary"
-      @click="handleProceedPayment"
-      :disabled="proceedPaymentLoading || amountReceived < totalAmount"
-      :loading="proceedPaymentLoading"
-      >Proceed Payment</a-button
-    >
   </div>
 
   <a-modal
