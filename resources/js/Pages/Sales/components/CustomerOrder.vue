@@ -163,7 +163,7 @@ const currentProduct = ref({});
 const openApplyDiscountModal = ref(false);
 const handleShowDiscountModal = (order) => {
   formData.value = {
-    discount: order?.discount_id,
+    discount: orderDiscountId.value ?? '',
   };
   currentProduct.value = order;
   openApplyDiscountModal.value = true;
