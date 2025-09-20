@@ -30,6 +30,7 @@ defineProps({
       :class="['bg-gray-400', hover]"
       :loading="loading"
       :disabled="disabled"
+      type="primary"
     >
       <template #icon>
         <slot />
