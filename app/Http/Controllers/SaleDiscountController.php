@@ -21,8 +21,7 @@ class SaleDiscountController extends Controller
 
         return response()->json([
             'message' => 'Discount applied',
-            'sale_discount' => $saleDiscount,
-            'sale' => $sale->fresh(['saleItems', 'saleDiscounts']),
+            'sale' => $sale->fresh(['saleItems']),
         ]);
     }
 

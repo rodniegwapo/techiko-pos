@@ -1,16 +1,23 @@
 <script setup>
 import VerticalForm from "@/Components/Forms/VerticalForm.vue";
 import PrimaryButton from "@/Components/PrimaryButton.vue";
-import { ref, toRefs } from "vue";
+import { onMounted, ref, toRefs } from "vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { usePage } from "@inertiajs/vue3";
 import { useOrders } from "@/Composables/useOrderV2";
 import axios from "axios";
+import dayjs from "dayjs";
 
 const emit = defineEmits(["close"]);
 const { formData, errors } = useGlobalVariables();
 const page = usePage();
-const { orderId, orders, applyDiscountToLine } = useOrders();
+const {
+  orderId,
+  orders,
+  orderDiscountAmount,
+  orderDiscountId,
+  applyDiscountToLine,
+} = useOrders();
 
 const props = defineProps({
   openModal: Boolean,
@@ -23,38 +30,23 @@ const loading = ref(false);
 /** 🔹 Apply discount */
 const handleSave = async () => {
   try {
-    if (!formData.value?.discount?.value) return emit("close");
+    const payload = { discount_id: formData.value?.discount.value };
     loading.value = true;
-
-    // fetch sale item
-    const { data: saleItem } = await axios.get(
-      route("sales.find-sale-item", { sale: orderId.value }),
-      { params: { product_id: product.value.id } }
-    );
-
-    // selected discount
-    const selectedDiscount = page.props.discounts.find(
-      (d) => d.id === formData.value.discount.value
-    );
-    if (!selectedDiscount) return emit("close");
-
-    // backend apply
-    await axios.post(
-      route("sales.items.discount.apply", {
+    const { data: sale } = await axios.post(
+      route("sales.discounts.order.apply", {
         sale: orderId.value,
-        saleItem: saleItem?.id,
       }),
-      { discount_id: selectedDiscount.id }
+      payload
     );
 
-    // update local state
-    const idx = orders.value.findIndex((item) => item.id == product.value.id);
-    if (idx !== -1) {
-      orders.value[idx] = applyDiscountToLine(
-        orders.value[idx],
-        selectedDiscount
-      );
-    }
+    localStorage.setItem(
+      "order_discount_amount",
+      sale?.sale?.discount_amount ?? 0
+    );
+    localStorage.setItem("order_discount_id", sale.sale.discount_id);
+    
+    orderDiscountAmount.value = sale?.sale?.discount_amount ?? 0;
+    orderDiscountId.value = sale.sale.discount_id;
 
     emit("close");
   } catch (e) {
@@ -65,7 +57,7 @@ const handleSave = async () => {
 };
 
 /**  Clear discount */
-const discountLoading = ref(false)
+const discountLoading = ref(false);
 const handleClearDiscount = async () => {
   try {
     discountLoading.value = true;
@@ -81,7 +73,7 @@ const handleClearDiscount = async () => {
       route("sales.items.discount.remove", {
         sale: orderId.value,
         saleItem: saleItem?.id,
-        discount: product.value.discount_id
+        discount: product.value.discount_id,
       })
     );
 
@@ -105,7 +97,12 @@ const formFields = [
     label: "Select Discount",
     type: "select",
     options: page.props.discounts
-      .filter((item) => item.scope == "order")
+      .filter(
+        (item) =>
+          item.scope == "order" &&
+          dayjs(item.start_date).isBefore(dayjs()) &&
+          item.is_active
+      )
       .map((item) => ({
         label: item.name,
         value: item.id,
@@ -117,7 +114,7 @@ const formFields = [
 <template>
   <a-modal
     v-model:visible="openModal"
-    :title="`Apply Order Discount` "
+    :title="`Apply Order Discount`"
     @cancel="$emit('close')"
     width="400px"
   >

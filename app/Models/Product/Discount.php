@@ -15,6 +15,10 @@ class Discount extends Model
 
     protected $searchable = ['name'];
 
+    protected $casts = [
+        'is_active' => 'boolean',
+    ];
+
     public function saleItem()
     {
         return $this->belongsToMany(SaleItem::class);

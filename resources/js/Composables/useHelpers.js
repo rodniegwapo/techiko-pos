@@ -8,6 +8,7 @@ import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import isocalendar from "dayjs/plugin/isoWeek";
+import { Modal } from 'ant-design-vue';
 dayjs.extend(utc);
 dayjs.extend(timezone);
 dayjs.extend(isocalendar);

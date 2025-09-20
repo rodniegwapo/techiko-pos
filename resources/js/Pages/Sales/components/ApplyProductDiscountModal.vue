@@ -6,6 +6,7 @@ import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { usePage } from "@inertiajs/vue3";
 import { useOrders } from "@/Composables/useOrderV2";
 import axios from "axios";
+import dayjs from "dayjs";
 
 const emit = defineEmits(["close"]);
 const { formData, errors } = useGlobalVariables();
@@ -65,7 +66,7 @@ const handleSave = async () => {
 };
 
 /**  Clear discount */
-const discountLoading = ref(false)
+const discountLoading = ref(false);
 const handleClearDiscount = async () => {
   try {
     discountLoading.value = true;
@@ -81,7 +82,7 @@ const handleClearDiscount = async () => {
       route("sales.items.discount.remove", {
         sale: orderId.value,
         saleItem: saleItem?.id,
-        discount: product.value.discount_id
+        discount: product.value.discount_id,
       })
     );
 
@@ -105,7 +106,12 @@ const formFields = [
     label: "Select Discount",
     type: "select",
     options: page.props.discounts
-      .filter((item) => item.scope == "product")
+      .filter(
+        (item) =>
+          item.scope == "product" &&
+          dayjs(item.start_date).isBefore(dayjs()) &&
+          item.is_active
+      )
       .map((item) => ({
         label: item.name,
         value: item.id,
@@ -117,7 +123,7 @@ const formFields = [
 <template>
   <a-modal
     v-model:visible="openModal"
-    :title="`Apply Discount - ${product.name}` "
+    :title="`Apply Discount - ${product.name}`"
     @cancel="$emit('close')"
     width="400px"
   >

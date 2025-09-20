@@ -21,7 +21,8 @@ class DatabaseSeeder extends Seeder
             ProductSeeder::class,
             ProductSoldTypeSeeder::class,
             UserPinSeeder::class,
-            DiscountSeeder::class
+            DiscountSeeder::class,
+            MandatoryDiscountSeeder::class
         ]);
     }
 }
