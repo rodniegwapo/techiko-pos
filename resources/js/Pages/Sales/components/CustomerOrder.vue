@@ -130,7 +130,7 @@ const handleProceedPayment = async () => {
       message: "Success",
     });
     localStorage.setItem("order_discount_amount", 0);
-    localStorage.setItem("order_discount_id", null);
+    localStorage.setItem("order_discount_id", '');
     orderDiscountAmount.value = 0;
     orderDiscountId.value = "";
   } catch (error) {
@@ -176,9 +176,10 @@ const customer = ref("");
 const openOrderDicountModal = ref(false);
 
 const showDiscountOrder = () => {
+  console.log('discoutn amount',orderDiscountId.value)
   if(orders.value.length == 0) return
    formData.value = {
-    orderDiscount: Number(orderDiscountId.value)
+    orderDiscount: orderDiscountId.value ? Number(orderDiscountId.value) : ''
   };
   openOrderDicountModal.value = true
 }
