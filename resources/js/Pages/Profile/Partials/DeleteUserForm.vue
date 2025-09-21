@@ -1,3 +1,6 @@
+<template>
+    <div></div>
+</template>
 <!-- <script setup>
 import DangerButton from '@/Components/unused/DangerButton.vue';
 import InputError from '@/Components/InputError.vue';

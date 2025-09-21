@@ -2,25 +2,29 @@
 
 namespace App\Services;
 
+use App\Events\OrderUpdated;
 use App\Jobs\SyncSaleDraft;
 use App\Models\Sale;
-use App\Models\SaleItem;
 use App\Models\UserPin;
 use App\Models\VoidLog;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class SaleService
 {
     public function storeDraft($user)
     {
-        return Sale::create([
+        $sale = Sale::create([
             'user_id' => $user->id,
             'payment_status' => 'pending',
             'invoice_number' => Str::random(10),
-            'transaction_date' => now()
+            'transaction_date' => now(),
         ]);
+
+
+
+        return $sale;
     }
 
     public function syncDraft(Sale $sale, array $items)
@@ -40,10 +44,10 @@ class SaleService
         // Create log
         VoidLog::create([
             'sale_item_id' => $saleItem->id,
-            'user_id'      => $currentUser->id,
-            'approver_id'  => $approvedBy,
-            'reason'       => $validated['reason'] ?? null,
-            'amount'       => $saleItem->unit_price,
+            'user_id' => $currentUser->id,
+            'approver_id' => $approvedBy,
+            'reason' => $validated['reason'] ?? null,
+            'amount' => $saleItem->unit_price,
         ]);
 
         // Soft delete
@@ -85,7 +89,7 @@ class SaleService
         $managerPin = UserPin::whereHas('user.roles', function ($q) {
             $q->whereIn('name', ['manager', 'admin']);
         })->get()
-            ->first(fn($pin) => Hash::check($pinCode, $pin->pin_code));
+            ->first(fn ($pin) => Hash::check($pinCode, $pin->pin_code));
 
         if (! $managerPin) {
             throw ValidationException::withMessages([

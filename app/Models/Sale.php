@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Events\OrderUpdated;
 use App\Models\Product\Discount;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -45,6 +46,14 @@ class Sale extends Model
         $this->grand_total = max(0, $this->total_amount - $this->discount_amount + $tax);
 
         $this->save();
+
+        // 🔹 Fire event here with fresh relationships
+        event(new OrderUpdated($this->fresh([
+            'saleItems',
+            'saleDiscounts',
+            'saleItems.discounts'
+        ])));
+
     }
 
     public function applyOrderDiscount(Discount $discount): SaleDiscount
