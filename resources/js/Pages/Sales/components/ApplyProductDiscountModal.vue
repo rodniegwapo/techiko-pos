@@ -105,6 +105,7 @@ const formFields = [
     key: "discount",
     label: "Select Discount",
     type: "select",
+    isAllowClear: false,
     options: page.props.discounts
       .filter(
         (item) =>

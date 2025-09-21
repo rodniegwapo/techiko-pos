@@ -117,7 +117,7 @@ const timeOpen = ref(false);
           :placeholder="field.placeholder"
           @input="updateValue(field.key, $event.target.value)"
           size="large"
-            :disabled="field.disabled ?? false"
+          :disabled="field.disabled ?? false"
         />
 
         <a-input
@@ -173,7 +173,7 @@ const timeOpen = ref(false);
             )
           "
           :mode="field.multiple ? 'multiple' : undefined"
-          allowClear
+          :allowClear="field.isAllowClear ?? true"
           class="w-full"
           @change="
             (val) => {
