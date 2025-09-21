@@ -7,6 +7,7 @@ import { usePage } from "@inertiajs/vue3";
 import { useOrders } from "@/Composables/useOrderV2";
 import axios from "axios";
 import dayjs from "dayjs";
+import { data } from "autoprefixer";
 
 const emit = defineEmits(["close"]);
 const { formData, errors } = useGlobalVariables();
@@ -28,11 +29,14 @@ const { openModal, product } = toRefs(props);
 const loading = ref(false);
 
 /** 🔹 Apply discount */
+
 const handleSave = async () => {
-  console.log("form data".formData.value);
   try {
-    if (!formData.value?.orderDiscount?.value) return emit("close");
-    const payload = { discount_id: formData.value?.orderDiscount.value };
+    if (!checkedForm(formData.value)) return emit("close");
+
+    const payload = {
+      discount_ids: formData.value?.orderDiscount.map((item) => item.value),
+    };
     loading.value = true;
     const { data: sale } = await axios.post(
       route("sales.discounts.order.apply", {
@@ -41,14 +45,22 @@ const handleSave = async () => {
       payload
     );
 
+    const { sale_discounts } = sale;
+    const joinDiscountsIds = sale_discounts
+      .map((item) => item.discount_id)
+      .join(",");
+
     localStorage.setItem(
       "order_discount_amount",
       sale?.sale?.discount_amount ?? 0
     );
-    localStorage.setItem("order_discount_id", sale.sale.discount_id ?? "");
+    localStorage.setItem(
+      "order_discount_ids",
+      sale_discounts ? joinDiscountsIds : ""
+    );
 
     orderDiscountAmount.value = sale?.sale?.discount_amount ?? 0;
-    orderDiscountId.value = sale.sale.discount_id;
+    orderDiscountId.value = joinDiscountsIds;
     formData.value = {};
 
     emit("close");
@@ -59,32 +71,34 @@ const handleSave = async () => {
   }
 };
 
+const checkedForm = (dataForm) => {
+  if (!dataForm.orderDiscount) return false;
+  const values = dataForm.orderDiscount.filter((item) =>
+    item.hasOwnProperty("value")
+  );
+
+  if (values.length == 0) return false;
+
+  return true;
+};
+
 /**  Clear discount */
 const discountLoading = ref(false);
 const handleClearDiscount = async () => {
   try {
     discountLoading.value = true;
 
-    // fetch sale item
-    const { data: saleItem } = await axios.get(
-      route("sales.find-sale-item", { sale: orderId.value }),
-      { params: { product_id: product.value.id } }
-    );
-
     // backend remove
     await axios.delete(
-      route("sales.items.discount.remove", {
+      route("sales.discounts.order.remove", {
         sale: orderId.value,
-        saleItem: saleItem?.id,
-        discount: product.value.discount_id,
       })
     );
 
-    // update local state (reset)
-    const idx = orders.value.findIndex((item) => item.id == product.value.id);
-    if (idx !== -1) {
-      orders.value[idx] = applyDiscountToLine(orders.value[idx], null);
-    }
+    localStorage.removeItem("order_discount_amount");
+    localStorage.removeItem("order_discount_ids");
+    orderDiscountAmount.value = 0;
+    orderDiscountId.value = '';
 
     emit("close");
   } catch (e) {
@@ -129,7 +143,6 @@ const formFields = [
       <a-button
         type="danger"
         :loading="discountLoading"
-        v-if="product.discount"
         @click="handleClearDiscount"
       >
         Clear Discount

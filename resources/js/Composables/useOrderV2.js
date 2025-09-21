@@ -6,7 +6,7 @@ import axios from "axios";
 const orders = ref(JSON.parse(localStorage.getItem("orders")) || []);
 const orderId = ref(localStorage.getItem("current_order") || null);
 const orderDiscountAmount = ref(localStorage.getItem("order_discount_amount"))
-const orderDiscountId = ref(localStorage.getItem("order_discount_id") ?? '')
+const orderDiscountId = ref(localStorage.getItem("order_discount_ids") ?? '')
 const isCreatingDraft = ref(false);
 let draftPromise = null;
 
