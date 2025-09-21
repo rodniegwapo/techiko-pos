@@ -59,7 +59,7 @@ class SaleController extends Controller
     public function storeDraft(Request $request)
     {
         $order = $this->saleService->storeDraft($request->user());
-
+        
         return response()->json(['order' => $order]);
     }
 

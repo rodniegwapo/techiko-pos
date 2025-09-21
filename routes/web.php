@@ -1,7 +1,8 @@
 <?php
 
-use App\Http\Controllers\Product\ProductDiscountController;
+use App\Events\OrderUpdated;
 use App\Http\Controllers\ProfileController;
+use App\Models\Sale;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -31,10 +32,6 @@ Route::get('/dashboard', function () {
 //     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 // });
 
-
-
-
-
 Route::middleware(['auth'])->group(function () {
     Route::resource('categories', \App\Http\Controllers\CategoryController::class)->names('categories');
     Route::resource('products', \App\Http\Controllers\Products\ProductController::class)->names('products');
@@ -51,4 +48,18 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/void-logs', [\App\Http\Controllers\VoidLogController::class, 'index'])->name('voids.index');
 });
 
-require __DIR__ . '/auth.php';
+Route::get('/test-order', function () {
+    $sales = Sale::all();
+
+    if ($sales->isNotEmpty()) {
+        // Trigger broadcast for each sale (if you want all sales individually)
+        foreach ($sales as $sale) {
+            event(new OrderUpdated($sale));
+        }
+
+        return Inertia::render('Sales/components/CustomerOrderView');
+    }
+
+    return "No orders found";
+});
+require __DIR__.'/auth.php';
