@@ -29,6 +29,7 @@ const loading = ref(false);
 
 /** 🔹 Apply discount */
 const handleSave = async () => {
+  console.log("form data".formData.value);
   try {
     if (!formData.value?.orderDiscount?.value) return emit("close");
     const payload = { discount_id: formData.value?.orderDiscount.value };
@@ -44,11 +45,11 @@ const handleSave = async () => {
       "order_discount_amount",
       sale?.sale?.discount_amount ?? 0
     );
-    localStorage.setItem("order_discount_id", sale.sale.discount_id ?? '');
+    localStorage.setItem("order_discount_id", sale.sale.discount_id ?? "");
 
     orderDiscountAmount.value = sale?.sale?.discount_amount ?? 0;
     orderDiscountId.value = sale.sale.discount_id;
-    formData.value = {}
+    formData.value = {};
 
     emit("close");
   } catch (e) {
@@ -98,6 +99,8 @@ const formFields = [
     key: "orderDiscount",
     label: "Select Discount",
     type: "select",
+    isAllowClear: false,
+    multiple: true,
     options: page.props.discounts
       .filter(
         (item) =>
@@ -120,7 +123,6 @@ const formFields = [
     @cancel="$emit('close')"
     width="400px"
   >
-
     <vertical-form v-model="formData" :fields="formFields" :errors="errors" />
     <template #footer>
       <!-- Clear button only visible if product already has discount -->

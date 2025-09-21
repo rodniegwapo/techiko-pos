@@ -176,7 +176,6 @@ const customer = ref("");
 const openOrderDicountModal = ref(false);
 
 const showDiscountOrder = () => {
-  console.log('discoutn amount',orderDiscountId.value)
   if(orders.value.length == 0) return
    formData.value = {
     orderDiscount: orderDiscountId.value ? Number(orderDiscountId.value) : ''

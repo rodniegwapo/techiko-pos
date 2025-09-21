@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Product\Discount;
 use App\Models\Sale;
-use App\Models\SaleDiscount;
 use App\Models\SaleItem;
 use Illuminate\Http\Request;
 
@@ -21,22 +20,21 @@ class SaleDiscountController extends Controller
 
         return response()->json([
             'message' => 'Discount applied',
-            'sale' => $sale->fresh(['saleItems']),
+            'sale_discount' => $saleDiscount,
+            'sale' => $sale->fresh(['saleItems', 'saleDiscounts']),
         ]);
     }
 
-    public function removeOrderDiscount(Request $request, Sale $sale, SaleDiscount $saleDiscount)
+    public function removeOrderDiscount(Request $request, Sale $sale)
     {
-        if ($saleDiscount->sale_id !== $sale->id) {
-            abort(404);
-        }
-
-        $saleDiscount->delete();
-        $sale->recalcTotals();
+        $sale->update([
+            'discount_id' => null,
+            'discount_amount' => null,
+        ]);
 
         return response()->json([
             'message' => 'Discount removed',
-            'sale' => $sale->fresh(['saleItems', 'saleDiscounts']),
+            'sale' => $sale->fresh(['sale']),
         ]);
     }
 
