@@ -49,42 +49,24 @@ class Sale extends Model
 
     public function applyOrderDiscount(Discount $discount): SaleDiscount
     {
-        if ($discount->scope !== 'order') {
-            throw new \InvalidArgumentException('Discount scope must be order.');
-        }
+        // validate
+        throw_if($discount->scope !== 'order', \InvalidArgumentException::class, 'Discount scope must be order.');
+        throw_if(! $discount->is_active, \InvalidArgumentException::class, 'Discount is not active.');
+        throw_if($discount->start_date && now()->lt($discount->start_date), \InvalidArgumentException::class, 'Discount has not started yet.');
+        throw_if($discount->end_date && now()->gt($discount->end_date), \InvalidArgumentException::class, 'Discount has expired.');
+        throw_if($discount->min_order_amount && $this->total_amount < $discount->min_order_amount, \InvalidArgumentException::class, 'Order amount does not meet minimum requirement.');
 
-        if (! $discount->is_active) {
-            throw new \InvalidArgumentException('Discount is not active.');
-        }
-
-        if ($discount->start_date && now()->lt($discount->start_date)) {
-            throw new \InvalidArgumentException('Discount is not started yet.');
-        }
-
-        if ($discount->end_date && now()->gt($discount->end_date)) {
-            throw new \InvalidArgumentException('Discount has expired.');
-        }
-
-        if ($discount->min_order_amount && $this->total_amount < $discount->min_order_amount) {
-            throw new \InvalidArgumentException('Order amount does not meet minimum requirement.');
-        }
-
-        // calculate discount
+        // calculate amount
         $amount = $discount->type === 'percentage'
             ? round(($discount->value / 100) * $this->total_amount, 2)
             : (float) $discount->value;
 
         $amount = min(max($amount, 0), $this->total_amount);
 
-        // update sale record directly
-
-        $saleDiscount = $this->saleDiscounts()->create([
-            'discount_id' => $discount->id,
-            'discount_amount' => $amount,
-        ]);
-
-        $this->recalcTotals();
-
-        return $saleDiscount;
+        // upsert record
+        return $this->saleDiscounts()->updateOrCreate(
+            ['discount_id' => $discount->id],
+            ['discount_amount' => $amount]
+        );
     }
 }

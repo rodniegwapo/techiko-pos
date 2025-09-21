@@ -113,7 +113,6 @@ const handleProceedPaymentConfirmation = () => {
   });
 };
 
-
 const proceedPaymentLoading = ref(false);
 
 const handleProceedPayment = async () => {
@@ -130,7 +129,7 @@ const handleProceedPayment = async () => {
       message: "Success",
     });
     localStorage.setItem("order_discount_amount", 0);
-    localStorage.setItem("order_discount_id", '');
+    localStorage.setItem("order_discount_ids", "");
     orderDiscountAmount.value = 0;
     orderDiscountId.value = "";
   } catch (error) {
@@ -162,9 +161,8 @@ const clearForm = () => {
 const currentProduct = ref({});
 const openApplyDiscountModal = ref(false);
 const handleShowProductDiscountModal = (product) => {
-  console.log('order discount',product)
   formData.value = {
-    discount: product.discount_id
+    discount: product.discount_id,
   };
   currentProduct.value = product;
   openApplyDiscountModal.value = true;
@@ -176,12 +174,14 @@ const customer = ref("");
 const openOrderDicountModal = ref(false);
 
 const showDiscountOrder = () => {
-  if(orders.value.length == 0) return
-   formData.value = {
-    orderDiscount: orderDiscountId.value ? Number(orderDiscountId.value) : ''
+  if (orders.value.length == 0) return;
+  formData.value = {
+    orderDiscount: orderDiscountId.value
+      ? orderDiscountId.value.split(',').map(item => Number(item))
+      : [],
   };
-  openOrderDicountModal.value = true
-}
+  openOrderDicountModal.value = true;
+};
 </script>
 
 <template>

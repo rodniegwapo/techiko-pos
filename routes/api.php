@@ -45,7 +45,7 @@ Route::middleware('auth:sanctum')->group(function () {
             // discounts
             Route::post('/{sale}/discounts/order', [\App\Http\Controllers\SaleDiscountController::class, 'applyOrderDiscount'])
                 ->name('discounts.order.apply');
-            Route::delete('/{sale}/discounts/{saleDiscount}', [\App\Http\Controllers\SaleDiscountController::class, 'removeOrderDiscount'])
+            Route::delete('/{sale}/discounts', [\App\Http\Controllers\SaleDiscountController::class, 'removeOrderDiscount'])
                 ->name('discounts.order.remove');
             Route::post('/{sale}/saleItems/{saleItem}/discount', [\App\Http\Controllers\SaleDiscountController::class, 'applyItemDiscount'])
                 ->name('items.discount.apply');
