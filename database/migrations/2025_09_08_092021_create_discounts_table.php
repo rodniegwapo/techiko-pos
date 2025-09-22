@@ -20,6 +20,7 @@ return new class extends Migration
             $table->decimal('min_order_amount', 10, 2)->nullable();
             $table->dateTime('start_date')->nullable();
             $table->dateTime('end_date')->nullable();
+            $table->boolean('is_mandatory')->default(false);
             $table->boolean('is_active')->default(true);
             $table->timestamps();
         });
