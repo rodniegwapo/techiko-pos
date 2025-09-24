@@ -10,6 +10,7 @@ import FilterDropdown from "@/Components/filters/FilterDropdown.vue";
 import ActiveFilters from "@/Components/filters/ActiveFilters.vue";
 import ProductTable from "./components/ProductTable.vue";
 import CustomerOrder from "./components/CustomerOrder.vue";
+import TotalAmountSection from "./components/TotalAmountSection.vue";
 
 import {
   CloseOutlined,
@@ -110,7 +111,12 @@ watchDebounced(search, getProducts, { debounce: 300 });
       </template>
       <template #right-side-content>
         <customer-order />
+     
       </template>
+
     </ContentLayoutV2>
+    <template #content-footer>
+        <total-amount-section />
+      </template>
   </AuthenticatedLayout>
 </template>

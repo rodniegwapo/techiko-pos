@@ -48,11 +48,18 @@ onMounted(() => {
     </left-sidebar-wrapper>
 
     <a-layout-content
-      class="max-w-7xl mx-auto p-6 lg:overflow-auto md:overflow-auto sm:overflow-scroll bg-gray-200 dark:bg-dots-lighter dark:bg-gray-900 selection:bg-red-500 selection:text-white"
+      
     >
+    <div class="max-w-7xl mx-auto p-6 lg:overflow-auto md:overflow-auto sm:overflow-scroll bg-gray-200 dark:bg-dots-lighter dark:bg-gray-900 selection:bg-red-500 selection:text-white">
       <slot />
+    </div>
+    <div > 
+      <slot name="content-footer" />
+    </div>
     </a-layout-content>
+
   </a-layout>
+
 </template>
 
 <style>

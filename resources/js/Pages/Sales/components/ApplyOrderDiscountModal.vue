@@ -1,13 +1,13 @@
 <script setup>
 import VerticalForm from "@/Components/Forms/VerticalForm.vue";
 import PrimaryButton from "@/Components/PrimaryButton.vue";
-import { onMounted, ref, toRefs } from "vue";
+import { computed, onMounted, ref, toRefs, watch } from "vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { usePage } from "@inertiajs/vue3";
 import { useOrders } from "@/Composables/useOrderV2";
 import axios from "axios";
 import dayjs from "dayjs";
-import { data } from "autoprefixer";
+import { notification } from "ant-design-vue";
 
 const emit = defineEmits(["close"]);
 const { formData, errors } = useGlobalVariables();
@@ -25,6 +25,13 @@ const props = defineProps({
   product: { type: Object, default: () => ({}) },
 });
 const { openModal, product } = toRefs(props);
+
+// Watch for modal opening to clear previous errors
+watch(openModal, (newValue) => {
+  if (newValue) {
+    errors.value = {};
+  }
+});
 
 const loading = ref(false);
 
@@ -63,21 +70,68 @@ const handleSave = async () => {
     orderDiscountId.value = joinDiscountsIds;
     formData.value = {};
 
+    // Clear any previous errors on success
+    errors.value = {};
+    
+    notification["success"]({
+      message: "Success",
+      description: "Discount(s) applied successfully",
+    });
+    
     emit("close");
-  } catch (e) {
-    console.error("Error applying discount:", e);
+  } catch (error) {
+    console.error("Error applying discount:", error);
+    
+    // Handle validation errors from backend
+    if (error.response?.status === 422) {
+      errors.value = error.response.data.errors || {};
+    } else if (error.response?.status === 400) {
+      // Handle InvalidArgumentException from Sale model
+      const errorMessage = error.response.data.message || "Invalid discount application";
+      
+      notification["error"]({
+        message: "Discount Error",
+        description: errorMessage,
+        duration: 5,
+      });
+      
+      // Set form-level error
+      errors.value = {
+        orderDiscount: [errorMessage]
+      };
+    } else {
+      // Handle other errors
+      notification["error"]({
+        message: "Error",
+        description: "Failed to apply discount. Please try again.",
+      });
+    }
   } finally {
     loading.value = false;
   }
 };
 
 const checkedForm = (dataForm) => {
-  if (!dataForm.orderDiscount) return false;
+  // Clear previous errors
+  errors.value = {};
+  
+  if (!dataForm.orderDiscount) {
+    errors.value = {
+      orderDiscount: ["Please select at least one discount"]
+    };
+    return false;
+  }
+  
   const values = dataForm.orderDiscount.filter((item) =>
     item.hasOwnProperty("value")
   );
 
-  if (values.length == 0) return false;
+  if (values.length == 0) {
+    errors.value = {
+      orderDiscount: ["Please select at least one discount"]
+    };
+    return false;
+  }
 
   return true;
 };
@@ -100,35 +154,58 @@ const handleClearDiscount = async () => {
     orderDiscountAmount.value = 0;
     orderDiscountId.value = '';
 
+    // Clear any previous errors on success
+    errors.value = {};
+    
+    notification["success"]({
+      message: "Success",
+      description: "Discount(s) cleared successfully",
+    });
+
     emit("close");
-  } catch (e) {
-    console.error("Error clearing discount:", e);
+  } catch (error) {
+    console.error("Error clearing discount:", error);
+    
+    notification["error"]({
+      message: "Error",
+      description: error.response?.data?.message || "Failed to clear discount. Please try again.",
+    });
   } finally {
     discountLoading.value = false;
   }
 };
 
-const formFields = [
+const availableDiscounts = computed(() => {
+  return page.props.discounts
+    .filter(
+      (item) =>
+        item.scope == "order" &&
+        item.is_active &&
+        (!item.start_date || dayjs(item.start_date).isBefore(dayjs())) &&
+        (!item.end_date || dayjs(item.end_date).isAfter(dayjs()))
+    )
+    .map((item) => ({
+      label: `${item.name} (${item.type === 'percentage' ? item.value + '%' : '₱' + item.value})`,
+      value: item.id,
+      amount: item.value,
+      type: item.type,
+      min_order_amount: item.min_order_amount,
+    }));
+});
+
+const formFields = computed(() => [
   {
     key: "orderDiscount",
     label: "Select Discount",
     type: "select",
     isAllowClear: false,
     multiple: true,
-    options: page.props.discounts
-      .filter(
-        (item) =>
-          item.scope == "order" &&
-          dayjs(item.start_date).isBefore(dayjs()) &&
-          item.is_active
-      )
-      .map((item) => ({
-        label: item.name,
-        value: item.id,
-        amount: item.value,
-      })),
+    options: availableDiscounts.value,
+    placeholder: availableDiscounts.value.length > 0 
+      ? "Choose discount(s) to apply" 
+      : "No active discounts available",
   },
-];
+]);
 </script>
 <template>
   <a-modal
@@ -137,6 +214,12 @@ const formFields = [
     @cancel="$emit('close')"
     width="400px"
   >
+    <div v-if="availableDiscounts.length === 0" class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
+      <p class="text-yellow-800 text-sm">
+        <strong>No discounts available:</strong> There are currently no active order-level discounts that can be applied.
+      </p>
+    </div>
+    
     <vertical-form v-model="formData" :fields="formFields" :errors="errors" />
     <template #footer>
       <!-- Clear button only visible if product already has discount -->
@@ -147,7 +230,11 @@ const formFields = [
       >
         Clear Discount
       </a-button>
-      <primary-button :loading="loading" @click="handleSave">
+      <primary-button 
+        :loading="loading" 
+        :disabled="availableDiscounts.length === 0"
+        @click="handleSave"
+      >
         Submit
       </primary-button>
     </template>

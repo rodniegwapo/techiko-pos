@@ -6,11 +6,8 @@ import ApplyOrderDiscountModal from "./ApplyOrderDiscountModal.vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { ref, inject, computed, createVNode } from "vue";
 import {
-  IconDiscount,
   IconArmchair,
   IconUsers,
-  IconArrowRight,
-  IconArrowRightToArc,
 } from "@tabler/icons-vue";
 import {
   CloseOutlined,
@@ -88,71 +85,6 @@ const handleSubmitVoid = async () => {
   }
 };
 
-let amountReceived = ref(0);
-
-const customerChange = computed(() => {
-  const received = Number(amountReceived.value) || 0;
-  const total = Number(totalAmount.value) || 0;
-
-  if (received < 1) return 0;
-  return received - (total - orderDiscountAmount.value);
-});
-const handleProceedPaymentConfirmation = () => {
-  Modal.confirm({
-    title: "Are you sure you would like to proceed?",
-    icon: createVNode(ExclamationCircleOutlined),
-    okText: "Submit",
-    cancelText: "Cancel",
-    onOk() {
-      return new Promise(async (innerResolve, innerReject) => {
-        try {
-          await handleProceedPayment(); // wait until payment success
-          innerResolve(); // close modal
-        } catch (error) {
-          innerReject(error); // keep modal open if failed
-        }
-      });
-    },
-    onCancel() {
-      console.log("Cancel");
-    },
-  });
-};
-
-const proceedPaymentLoading = ref(false);
-
-const handleProceedPayment = async () => {
-  try {
-    proceedPaymentLoading.value = true;
-    await axios.post(
-      route("sales.payment.store", {
-        sale: orderId.value,
-      })
-    );
-    amountReceived.value = 0;
-    finalizeOrder();
-    notification["success"]({
-      message: "Success",
-    });
-    localStorage.setItem("order_discount_amount", 0);
-    localStorage.setItem("order_discount_ids", "");
-    orderDiscountAmount.value = 0;
-    orderDiscountId.value = "";
-  } catch (error) {
-    notification["error"]({
-      message: "Payment failed",
-    });
-    throw error; // bubble up to keep modal open
-  } finally {
-    proceedPaymentLoading.value = false;
-  }
-};
-
-const disabledPaymentButtonColor = computed(() => {
-  if (amountReceived.value < totalAmount.value) return "";
-  if (orders.value.length == 0) return "";
-  return "bg-green-700 border-green-700 hover:bg-green-600";
-});
 
 const clearForm = () => {
   formData.value = {
@@ -239,7 +171,7 @@ const showPayment = ref(false);
       <!-- 🟥 ORDER SUMMARY PAGE -->
       <div v-if="!showPayment" key="order" >
         <div
-          class="relative flex flex-col gap-2 mt-4 h-[calc(100vh-375px)] overflow-auto overflow-x-hidden"
+          class="relative flex flex-col gap-2 mt-4 h-[calc(100vh-420px)] overflow-auto overflow-x-hidden"
         >
           <div
             v-if="orders.length == 0"
@@ -311,105 +243,8 @@ const showPayment = ref(false);
             </div>
           </div>
         </div>
-
-        <hr class="-mx-6 border-t-[3px] pt-2 mt-2" />
-
-        <div class="relative">
-          <div class="flex justify-between items-center">
-            <div class="text-xs">
-              <span class="font-semibold">Order Discount: </span>
-              <span class="text-gray-700">
-                {{ formattedTotal(orderDiscountAmount) }}
-              </span>
-            </div>
-            <div>
-              <icon-tooltip-button
-                name="Apply Order Discount"
-                class="hover:bg-green-700"
-                :disabled="orders.length == 0"
-                @click="showDiscountOrder"
-              >
-                <IconDiscount size="20" class="mx-auto" />
-              </icon-tooltip-button>
-            </div>
-          </div>
-
-          <div class="text-xs">
-            <span class="font-semibold">Subtotal:</span>
-            {{ formattedTotal(totalAmount) }}
-          </div>
-
-          <div class="font-bold text-lg flex items-center justify-between mt-2">
-            <div>
-              Total:
-              <span class="text-green-700">
-                {{ formattedTotal(totalAmount - Number(orderDiscountAmount)) }}
-              </span>
-            </div>
-          </div>
-
-          <div class="mt-2">
-            <a-button
-              type="primary"
-              class="bg-green-700 border-green-700 w-full flex items-center justify-center gap-2"
-              @click="showPayment = true"
-            >
-              Continue <IconArrowRightToArc size="20" />
-            </a-button>
-          </div>
-        </div>
       </div>
 
-      <!-- 🟦 PAYMENT PAGE -->
-      <div v-else key="payment" class="next page  p-4 text-white">
-        <div class="mt-2">
-          <div>Payment Method</div>
-          <a-input value="Pay in Cash " disabled />
-        </div>
-
-        <div class="flex gap-2 items-center mt-2">
-          <div class="flex-grow text-nowrap">Amount Received :</div>
-          <a-input
-            :class="{
-              'border-red-400 shadow-none':
-                amountReceived < totalAmount - orderDiscountAmount &&
-                orders.length > 0,
-            }"
-            v-model:value="amountReceived"
-            type="number"
-          />
-        </div>
-
-        <div class="font-bold text-lg mt-2">
-          Change:
-          <span class="text-green-300">{{
-            formattedTotal(customerChange)
-          }}</span>
-        </div>
-
-        <div>
-          <a-button
-            class="w-full mt-2"
-            :class="disabledPaymentButtonColor"
-            type="primary"
-            @click="handleProceedPaymentConfirmation"
-            :disabled="
-              proceedPaymentLoading ||
-              amountReceived < totalAmount - orderDiscountAmount ||
-              orders.length == 0
-            "
-            :loading="proceedPaymentLoading"
-          >
-            Proceed Payment
-          </a-button>
-        </div>
-
-        <div class="mt-4">
-          <a-button class="w-full" @click="showPayment = false">
-            ← Back
-          </a-button>
-        </div>
-      </div>
     </Transition>
   </div>
 
@@ -442,7 +277,6 @@ const showPayment = ref(false);
     @close="openOrderDicountModal = false"
   />
 </template>
-
 <style>
 /* Slide horizontal animation */
 .slide-x-enter-active,
