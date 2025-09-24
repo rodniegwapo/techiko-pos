@@ -26,7 +26,7 @@ const formattedTotal = (price) => {
 </script>
 
 <template>
-  <div class="overflow-y-auto overflow-x-hidden h-[calc(100vh-200px)] relative">
+  <div class="overflow-y-auto overflow-x-hidden h-[calc(100vh-420px)] relative">
     <a-spin v-if="loading"
       class="-rotate-45 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
       size="large"

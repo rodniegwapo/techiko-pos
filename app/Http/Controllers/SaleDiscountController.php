@@ -17,31 +17,40 @@ class SaleDiscountController extends Controller
             'discount_ids.*' => 'exists:discounts,id',
         ]);
 
-        return DB::transaction(function () use ($validated, $sale) {
-            $discountIds = $validated['discount_ids'];
+        try {
+            return DB::transaction(function () use ($validated, $sale) {
+                $discountIds = $validated['discount_ids'];
 
-            // delete all discounts if array empty,
-            // or delete only those not in the submitted list
-            $sale->saleDiscounts()
-                ->when(! empty($discountIds), fn ($q) => $q->whereNotIn('discount_id', $discountIds))
-                ->delete();
+                // delete all discounts if array empty,
+                // or delete only those not in the submitted list
+                $sale->saleDiscounts()
+                    ->when(! empty($discountIds), fn ($q) => $q->whereNotIn('discount_id', $discountIds))
+                    ->delete();
 
-            $saleDiscounts = [];
+                $saleDiscounts = [];
 
-            foreach ($discountIds as $discountId) {
-                $discount = Discount::findOrFail($discountId);
-                $saleDiscounts[] = $sale->applyOrderDiscount($discount);
-            }
+                foreach ($discountIds as $discountId) {
+                    $discount = Discount::findOrFail($discountId);
+                    $saleDiscounts[] = $sale->applyOrderDiscount($discount);
+                }
 
-            // recalc once after all changes
-            $sale->recalcTotals();
+                // recalc once after all changes
+                $sale->recalcTotals();
 
+                return response()->json([
+                    'message' => 'Discount(s) applied',
+                    'sale_discounts' => $saleDiscounts,
+                    'sale' => $sale->fresh(['saleItems', 'saleDiscounts']),
+                ]);
+            });
+        } catch (\InvalidArgumentException $e) {
             return response()->json([
-                'message' => 'Discount(s) applied',
-                'sale_discounts' => $saleDiscounts,
-                'sale' => $sale->fresh(['saleItems', 'saleDiscounts']),
-            ]);
-        });
+                'message' => $e->getMessage(),
+                'errors' => [
+                    'discount' => [$e->getMessage()]
+                ]
+            ], 400);
+        }
     }
 
     public function removeOrderDiscount(Request $request, Sale $sale)

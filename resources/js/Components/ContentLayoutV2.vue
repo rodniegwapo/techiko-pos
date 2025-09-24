@@ -18,21 +18,26 @@ const props = defineProps({
 </script>
 
 <template>
-  <div class="rounded-lg w-full flex gap-4">
-    <div class="w-[70%] p-6 bg-white rounded-lg shadow">
-      <div :class="filterMainClass">
-        <h1 class="text-lg font-semibold text-nowrap">{{ title }}</h1>
-        <div :class="filterClass">
-          <slot name="filters" />
+  <div>
+    <div class="rounded-lg w-full flex gap-4">
+      <div class="w-[70%] p-6 bg-white rounded-lg shadow">
+        <div :class="filterMainClass">
+          <h1 class="text-lg font-semibold text-nowrap">{{ title }}</h1>
+          <div :class="filterClass">
+            <slot name="filters" />
+          </div>
+        </div>
+        <div>
+          <slot name="activeFilters" />
+          <slot name="table" />
         </div>
       </div>
-      <div>
-        <slot name="activeFilters" />
-        <slot name="table" />
+      <div class="w-[30%] bg-white p-6 rounded-lg shadow">
+        <slot name="right-side-content" />
       </div>
     </div>
-    <div class="w-[30%] bg-white p-6 rounded-lg shadow">
-      <slot name="right-side-content" />
+    <div>
+      <slot name="footer" />
     </div>
   </div>
 </template>
