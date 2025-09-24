@@ -103,7 +103,7 @@ const paymentMethod = ref("cash");
 </script>
 
 <template>
-  <div class="bg-white p-4 shadow-sm">
+  <div class="bg-white px-8 py-4 shadow-sm">
     <!-- Horizontal Layout - Single Row -->
     <div class="flex items-center justify-between gap-6">
       <!-- Order Discount -->
