@@ -52,6 +52,7 @@ const handleCancel = () => {
     @ok="handleOk"
     @cancel="handleCancel"
     :footer="null"
+    :maskClosable="false"
   >
     <!-- Default slot for modal content -->
     <slot />

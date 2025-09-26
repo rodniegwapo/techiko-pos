@@ -53,6 +53,7 @@ const handleUpdate = () => {
     v-model:visible="openModal"
     :title=" isEdit ? 'Edit Category' : 'Add Category'"
     @cancel="openModal = false"
+    :maskClosable="false"
   >
     <vertical-form v-model="formData" :fields="formFields" :errors="errors" />
     <template #footer>

@@ -60,10 +60,11 @@ const handleSave = () => {
   const payload = {
     ...formData.value,
     type: formData.value?.type?.value || formData.value?.type,
-    is_active: formData.value?.is_active?.value !== undefined 
-      ? formData.value?.is_active?.value 
-      : formData.value?.is_active !== undefined 
-        ? formData.value?.is_active 
+    is_active:
+      formData.value?.is_active?.value !== undefined
+        ? formData.value?.is_active?.value
+        : formData.value?.is_active !== undefined
+        ? formData.value?.is_active
         : true,
   };
 
@@ -78,15 +79,18 @@ const handleUpdate = () => {
   const payload = {
     ...formData.value,
     type: formData.value?.type?.value || formData.value?.type,
-    is_active: formData.value?.is_active?.value !== undefined 
-      ? formData.value?.is_active?.value 
-      : formData.value?.is_active !== undefined 
-        ? formData.value?.is_active 
+    is_active:
+      formData.value?.is_active?.value !== undefined
+        ? formData.value?.is_active?.value
+        : formData.value?.is_active !== undefined
+        ? formData.value?.is_active
         : true,
   };
 
   router.put(
-    route("mandatory-discounts.update", { mandatory_discount: formData.value.id }),
+    route("mandatory-discounts.update", {
+      mandatory_discount: formData.value.id,
+    }),
     payload,
     inertiaProgressLifecyle
   );
@@ -109,7 +113,7 @@ const modalTitle = computed(() => {
 
     <template #footer>
       <a-button @click="openModal = false">Cancel</a-button>
-      
+
       <primary-button v-if="isEdit" :loading="spinning" @click="handleUpdate">
         Update
       </primary-button>

@@ -54,6 +54,7 @@ const formatDate = (dateStr) => {
     title="Mandatory Discount Details"
     @cancel="openViewModal = false"
     width="700px"
+    :maskClosable="false"
   >
     <div>
       <!-- Body -->
