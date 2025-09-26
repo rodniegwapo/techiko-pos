@@ -213,6 +213,7 @@ const formFields = computed(() => [
     :title="`Apply Order Discount`"
     @cancel="$emit('close')"
     width="400px"
+    :maskClosable="false"
   >
     <div v-if="availableDiscounts.length === 0" class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
       <p class="text-yellow-800 text-sm">

@@ -150,6 +150,7 @@ const formFields = [
     :title="`Apply Discount - ${product.name}`"
     @cancel="$emit('close')"
     width="400px"
+    :maskClosable="false"
   >
     <vertical-form v-model="formData" :fields="formFields" :errors="errors" />
     <template #footer>
