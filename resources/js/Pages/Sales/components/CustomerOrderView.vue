@@ -27,7 +27,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div>
-    <h2>Order Updates</h2>
+    <h2>Your Order</h2>
     <p>Listening to Orders channel...</p>
     <pre>{{ order }}</pre>
   </div>

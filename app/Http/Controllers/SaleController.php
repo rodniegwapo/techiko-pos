@@ -88,7 +88,7 @@ class SaleController extends Controller
 
     public function findSaleItem(Request $request, Sale $sale)
     {
-        return $sale->saleitems()
+        return $sale->saleItems()
             ->where('product_id', $request->product_id)
             ->first();
     }

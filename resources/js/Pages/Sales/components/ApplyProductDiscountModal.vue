@@ -33,6 +33,13 @@ const handleSave = async () => {
       { params: { product_id: product.value.id } }
     );
 
+    // Check if sale item exists
+    if (!saleItem || !saleItem.id) {
+      console.error("Sale item not found for product:", product.value.id);
+      alert("Sale item not found. Please add the product to the sale first.");
+      return emit("close");
+    }
+
     // selected discount
     const selectedDiscount = page.props.discounts.find(
       (d) => d.id === formData.value.discount.value
@@ -43,7 +50,7 @@ const handleSave = async () => {
     await axios.post(
       route("sales.items.discount.apply", {
         sale: orderId.value,
-        saleItem: saleItem?.id,
+        saleItem: saleItem.id,
       }),
       { discount_id: selectedDiscount.id }
     );
@@ -60,6 +67,7 @@ const handleSave = async () => {
     emit("close");
   } catch (e) {
     console.error("Error applying discount:", e);
+    alert("Failed to apply discount. Please try again.");
   } finally {
     loading.value = false;
   }
@@ -77,11 +85,25 @@ const handleClearDiscount = async () => {
       { params: { product_id: product.value.id } }
     );
 
+    // Check if sale item exists
+    if (!saleItem || !saleItem.id) {
+      console.error("Sale item not found for product:", product.value.id);
+      alert("Sale item not found. Cannot clear discount.");
+      return emit("close");
+    }
+
+    // Check if discount_id exists
+    if (!product.value.discount_id) {
+      console.error("No discount ID found for product:", product.value.id);
+      alert("No discount found to clear.");
+      return emit("close");
+    }
+
     // backend remove
     await axios.delete(
       route("sales.items.discount.remove", {
         sale: orderId.value,
-        saleItem: saleItem?.id,
+        saleItem: saleItem.id,
         discount: product.value.discount_id,
       })
     );
@@ -95,6 +117,7 @@ const handleClearDiscount = async () => {
     emit("close");
   } catch (e) {
     console.error("Error clearing discount:", e);
+    alert("Failed to clear discount. Please try again.");
   } finally {
     discountLoading.value = false;
   }
