@@ -21,11 +21,34 @@ const { openModal, product } = toRefs(props);
 
 const loading = ref(false);
 
+/** 🔹 Ensure sale item exists in database before applying discount */
+const ensureSaleItemExists = async () => {
+  try {
+    // Force sync the current draft immediately to ensure sale items exist in database
+    await axios.post(`/api/sales/${orderId.value}/sync-immediate`, {
+      items: orders.value.map((item) => ({
+        id: item.id,
+        quantity: item.quantity,
+        price: item.price,
+        discount_id: item.discount_id || null,
+        discount_amount: item.discount_amount || 0,
+        subtotal: item.subtotal,
+      })),
+    });
+  } catch (error) {
+    console.error("Error syncing draft:", error);
+    throw new Error("Failed to sync draft. Please try again.");
+  }
+};
+
 /** 🔹 Apply discount */
 const handleSave = async () => {
   try {
     if (!formData.value?.discount?.value) return emit("close");
     loading.value = true;
+
+    // First, ensure the draft is synced to database
+    await ensureSaleItemExists();
 
     // fetch sale item
     const { data: saleItem } = await axios.get(
@@ -36,7 +59,14 @@ const handleSave = async () => {
     // Check if sale item exists
     if (!saleItem || !saleItem.id) {
       console.error("Sale item not found for product:", product.value.id);
-      alert("Sale item not found. Please add the product to the sale first.");
+      
+      // Show user-friendly notification instead of alert
+      const { notification } = await import("ant-design-vue");
+      notification.error({
+        message: "Sale Item Not Found",
+        description: "The product needs to be added to the sale before applying a discount. Please try again.",
+        duration: 5,
+      });
       return emit("close");
     }
 
@@ -67,7 +97,14 @@ const handleSave = async () => {
     emit("close");
   } catch (e) {
     console.error("Error applying discount:", e);
-    alert("Failed to apply discount. Please try again.");
+    
+    // Show user-friendly notification
+    const { notification } = await import("ant-design-vue");
+    notification.error({
+      message: "Discount Application Failed",
+      description: e.message || "Failed to apply discount. Please try again.",
+      duration: 5,
+    });
   } finally {
     loading.value = false;
   }

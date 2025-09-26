@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class SaleItem extends Model
 {
+    use SoftDeletes;
+    
     protected $guarded = [];
 
     protected static function booted()
@@ -20,6 +23,11 @@ class SaleItem extends Model
     public function sale()
     {
         return $this->belongsTo(Sale::class);
+    }
+
+    public function product()
+    {
+        return $this->belongsTo(\App\Models\Product\Product::class);
     }
 
     public function discounts()

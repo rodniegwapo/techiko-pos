@@ -2,6 +2,9 @@
 import { ref, computed } from "vue";
 import { useDebounceFn, watchDebounced } from "@vueuse/core";
 import axios from "axios";
+import { useTransactionTimeout } from "./useTransactionTimeout";
+import { useOfflineMode } from "./useOfflineMode";
+import { useHoldTransaction } from "./useHoldTransaction";
 
 const orders = ref(JSON.parse(localStorage.getItem("orders")) || []);
 const orderId = ref(localStorage.getItem("current_order") || null);
@@ -66,18 +69,25 @@ const createDraft = async () => {
     return draftPromise;
 };
 
-/** 🔹 Step 2: Sync draft to DB */
+/** 🔹 Step 2: Sync draft to DB with offline support */
 const syncDraft = useDebounceFn(async () => {
     if (!orderId.value) return;
-    await axios.post(`/api/sales/${orderId.value}/sync`, {
-        items: orders.value.map((item) => ({
-            id: item.id,
-            quantity: item.quantity,
-            price: item.price,
-            discount_id: item.discount_id || null,
-            discount_amount: item.discount_amount || 0,
-            subtotal: item.subtotal,
-        })),
+    
+    const { makeRequest } = useOfflineMode();
+    
+    await makeRequest({
+        method: 'POST',
+        url: `/api/sales/${orderId.value}/sync`,
+        data: {
+            items: orders.value.map((item) => ({
+                id: item.id,
+                quantity: item.quantity,
+                price: item.price,
+                discount_id: item.discount_id || null,
+                discount_amount: item.discount_amount || 0,
+                subtotal: item.subtotal,
+            })),
+        }
     });
 }, 1000);
 
@@ -167,18 +177,115 @@ const formattedTotal = (total) =>
     }).format(total);
 
 export function useOrders() {
+    // Initialize enhanced features
+    const timeout = useTransactionTimeout();
+    const offline = useOfflineMode();
+    const hold = useHoldTransaction();
+    
+    // Set up timeout callback
+    timeout.setClearTransactionCallback(() => {
+        finalizeOrder();
+    });
+    
+    // Enhanced finalize with timeout management
+    const enhancedFinalizeOrder = () => {
+        timeout.stopTimeout();
+        finalizeOrder();
+    };
+    
+    // Enhanced add order with activity tracking
+    const enhancedHandleAddOrder = async (product, discount = null) => {
+        await handleAddOrder(product, discount);
+        timeout.updateActivity();
+        if (orders.value.length === 1) {
+            timeout.startTimeout(); // Start timeout on first item
+        }
+    };
+    
+    // Enhanced subtract order with activity tracking
+    const enhancedHandleSubtractOrder = (product, discount = null) => {
+        handleSubtractOrder(product, discount);
+        timeout.updateActivity();
+    };
+    
+    // Enhanced remove order with activity tracking
+    const enhancedRemoveOrder = (product) => {
+        removeOrder(product);
+        timeout.updateActivity();
+        if (orders.value.length === 0) {
+            timeout.stopTimeout();
+        }
+    };
+    
+    // Hold current transaction
+    const holdCurrentTransaction = () => {
+        const transactionData = {
+            orderId: orderId.value,
+            orders: orders.value,
+            orderDiscountAmount: orderDiscountAmount.value,
+            orderDiscountId: orderDiscountId.value,
+        };
+        
+        const heldId = hold.holdTransaction(transactionData);
+        if (heldId) {
+            enhancedFinalizeOrder();
+        }
+        return heldId;
+    };
+    
+    // Recall held transaction
+    const recallHeldTransaction = (transactionId) => {
+        const transaction = hold.recallTransaction(transactionId);
+        if (transaction) {
+            // Clear current transaction if any
+            if (orders.value.length > 0) {
+                enhancedFinalizeOrder();
+            }
+            
+            // Restore transaction
+            orders.value = [...transaction.orders];
+            orderId.value = transaction.orderId;
+            orderDiscountAmount.value = transaction.orderDiscountAmount;
+            orderDiscountId.value = transaction.orderDiscountId;
+            
+            // Update localStorage
+            localStorage.setItem("orders", JSON.stringify(orders.value));
+            localStorage.setItem("current_order", orderId.value);
+            localStorage.setItem("order_discount_amount", orderDiscountAmount.value);
+            localStorage.setItem("order_discount_ids", orderDiscountId.value);
+            
+            // Start timeout for recalled transaction
+            timeout.startTimeout();
+        }
+        return transaction;
+    };
+
     return {
+        // Original exports
         orders,
         orderId,
         orderDiscountAmount,
         orderDiscountId,
-        handleAddOrder,
-        handleSubtractOrder,
-        removeOrder,
+        handleAddOrder: enhancedHandleAddOrder,
+        handleSubtractOrder: enhancedHandleSubtractOrder,
+        removeOrder: enhancedRemoveOrder,
         createDraft,
-        finalizeOrder,
+        finalizeOrder: enhancedFinalizeOrder,
         totalAmount,
         formattedTotal,
         applyDiscountToLine,
+        
+        // Enhanced features
+        timeout,
+        offline,
+        hold,
+        holdCurrentTransaction,
+        recallHeldTransaction,
+        
+        // Convenience exports
+        isOffline: offline.isOffline,
+        offlineQueue: offline.offlineQueue,
+        heldTransactions: hold.heldTransactions,
+        lastActivity: timeout.lastActivity,
     };
 }

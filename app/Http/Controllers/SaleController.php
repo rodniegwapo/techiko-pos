@@ -71,6 +71,13 @@ class SaleController extends Controller
         return response()->json(['message' => 'Sale draft is syncing...']);
     }
 
+    public function syncDraftImmediate(Request $request, Sale $sale)
+    {
+        $this->saleService->syncDraftImmediate($sale, $request->items);
+
+        return response()->json(['message' => 'Sale draft synced successfully']);
+    }
+
     public function voidItem(Request $request, Sale $sale)
     {
         $validated = $request->validate([
