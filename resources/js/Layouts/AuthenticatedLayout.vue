@@ -35,7 +35,7 @@ onMounted(() => {
   <a-layout
     class="relative bg-dots-darker bg-center bg-gray-200 dark:bg-dots-lighter dark:bg-gray-900 selection:bg-red-500 selection:text-white"
   >
-    <terminal />
+    <!-- <terminal /> -->
     <left-sidebar-wrapper>
       <!-- menu -->
       <left-menu />

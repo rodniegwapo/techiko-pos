@@ -46,6 +46,10 @@ const menus = computed(() => {
           title: "Discounts",
           path: route("products.discounts.index"),
         },
+        {
+          title: "Mandatory Discounts",
+          path: route("mandatory-discounts.index"),
+        },
       ],
     },
     {

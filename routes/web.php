@@ -40,6 +40,9 @@ Route::middleware(['auth'])->group(function () {
             ->names('discounts');
     });
 
+    // Mandatory Discounts
+    Route::resource('mandatory-discounts', \App\Http\Controllers\MandatoryDiscountController::class)->names('mandatory-discounts');
+
     Route::get('/sales', [\App\Http\Controllers\SaleController::class, 'index'])->name('sales.index');
     // terminal
     Route::post('/setup-terminal', [\App\Http\Controllers\TerminalController::class, 'setupTerminal'])->name('setup.terminal');
