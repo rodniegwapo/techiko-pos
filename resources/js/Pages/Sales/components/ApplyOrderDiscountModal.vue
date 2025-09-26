@@ -35,14 +35,31 @@ watch(openModal, (newValue) => {
 
 const loading = ref(false);
 
+
 /** 🔹 Apply discount */
 
 const handleSave = async () => {
   try {
     if (!checkedForm(formData.value)) return emit("close");
 
+    // Separate regular and mandatory discount IDs
+    const selectedRegularIds = formData.value?.orderDiscount ? 
+      formData.value.orderDiscount
+        .map((item) => item.value || item.id || item)
+        .filter(id => id !== null && id !== undefined && id !== '' && !isNaN(id)) : [];
+    
+    const selectedMandatoryIds = formData.value?.mandatoryDiscount ? 
+      [formData.value.mandatoryDiscount.value || formData.value.mandatoryDiscount.id || formData.value.mandatoryDiscount]
+        .filter(id => id !== null && id !== undefined && id !== '' && !isNaN(id)) : [];
+
+    // Debug logging
+    console.log('Form data:', formData.value);
+    console.log('Selected regular IDs:', selectedRegularIds);
+    console.log('Selected mandatory IDs:', selectedMandatoryIds);
+
     const payload = {
-      discount_ids: formData.value?.orderDiscount.map((item) => item.value),
+      discount_ids: selectedRegularIds,
+      mandatory_discount_ids: selectedMandatoryIds,
     };
     loading.value = true;
     const { data: sale } = await axios.post(
@@ -53,21 +70,25 @@ const handleSave = async () => {
     );
 
     const { sale_discounts } = sale;
-    const joinDiscountsIds = sale_discounts
-      .map((item) => item.discount_id)
-      .join(",");
-
-    localStorage.setItem(
-      "order_discount_amount",
-      sale?.sale?.discount_amount ?? 0
-    );
-    localStorage.setItem(
-      "order_discount_ids",
-      sale_discounts ? joinDiscountsIds : ""
-    );
+    
+    // Separate regular and mandatory discount IDs
+    const regularDiscounts = sale_discounts.filter(item => item.discount_type === 'regular');
+    const mandatoryDiscounts = sale_discounts.filter(item => item.discount_type === 'mandatory');
+    
+    const regularDiscountIds = regularDiscounts.map(item => item.discount_id).join(",");
+    const mandatoryDiscountIds = mandatoryDiscounts.map(item => item.discount_id).join(",");
+    
+    // Store separately for proper retrieval
+    localStorage.setItem("order_discount_amount", sale?.sale?.discount_amount ?? 0);
+    localStorage.setItem("regular_discount_ids", regularDiscountIds);
+    localStorage.setItem("mandatory_discount_ids", mandatoryDiscountIds);
+    
+    // Keep the old format for backward compatibility
+    const allDiscountIds = sale_discounts.map(item => item.discount_id).join(",");
+    localStorage.setItem("order_discount_ids", allDiscountIds);
 
     orderDiscountAmount.value = sale?.sale?.discount_amount ?? 0;
-    orderDiscountId.value = joinDiscountsIds;
+    orderDiscountId.value = allDiscountIds;
     formData.value = {};
 
     // Clear any previous errors on success
@@ -115,20 +136,23 @@ const checkedForm = (dataForm) => {
   // Clear previous errors
   errors.value = {};
   
-  if (!dataForm.orderDiscount) {
-    errors.value = {
-      orderDiscount: ["Please select at least one discount"]
-    };
-    return false;
-  }
+  // More robust checking for regular discounts
+  const hasRegularDiscount = dataForm.orderDiscount && 
+    Array.isArray(dataForm.orderDiscount) &&
+    dataForm.orderDiscount.filter((item) => 
+      item && (item.value || item.id) && 
+      item.value !== null && item.value !== undefined && item.value !== ''
+    ).length > 0;
   
-  const values = dataForm.orderDiscount.filter((item) =>
-    item.hasOwnProperty("value")
-  );
+  // More robust checking for mandatory discounts
+  const hasMandatoryDiscount = dataForm.mandatoryDiscount && 
+    (dataForm.mandatoryDiscount.value || dataForm.mandatoryDiscount.id || typeof dataForm.mandatoryDiscount === 'number') &&
+    dataForm.mandatoryDiscount.value !== null && dataForm.mandatoryDiscount.value !== undefined && dataForm.mandatoryDiscount.value !== '';
 
-  if (values.length == 0) {
+  if (!hasRegularDiscount && !hasMandatoryDiscount) {
     errors.value = {
-      orderDiscount: ["Please select at least one discount"]
+      orderDiscount: ["Please select at least one discount (promotional or mandatory)"],
+      mandatoryDiscount: ["Please select at least one discount (promotional or mandatory)"]
     };
     return false;
   }
@@ -151,6 +175,8 @@ const handleClearDiscount = async () => {
 
     localStorage.removeItem("order_discount_amount");
     localStorage.removeItem("order_discount_ids");
+    localStorage.removeItem("regular_discount_ids");
+    localStorage.removeItem("mandatory_discount_ids");
     orderDiscountAmount.value = 0;
     orderDiscountId.value = '';
 
@@ -193,17 +219,65 @@ const availableDiscounts = computed(() => {
     }));
 });
 
+const availableMandatoryDiscounts = computed(() => {
+  return (page.props.mandatoryDiscounts || [])
+    .map((item) => ({
+      label: `${item.name} (${item.type === 'percentage' ? item.value + '%' : '₱' + item.value})`,
+      value: item.id,
+      amount: item.value,
+      type: item.type,
+      isMandatory: true,
+    }));
+});
+
+// Helper function to get the best mandatory discount
+const getBestMandatoryDiscount = computed(() => {
+  if (availableMandatoryDiscounts.value.length === 0) return null;
+  
+  // For now, return the one with highest percentage/amount
+  return availableMandatoryDiscounts.value.reduce((best, current) => {
+    if (current.type === 'percentage' && best.type === 'percentage') {
+      return current.amount > best.amount ? current : best;
+    } else if (current.type === 'amount' && best.type === 'amount') {
+      return current.amount > best.amount ? current : best;
+    } else if (current.type === 'percentage' && best.type === 'amount') {
+      // Assume percentage is usually better for larger orders
+      return current;
+    }
+    return best;
+  });
+});
+
+// Check if multiple mandatory discounts are available (PWD + Senior scenario)
+const hasMultipleMandatoryOptions = computed(() => {
+  return availableMandatoryDiscounts.value.length > 1;
+});
+
 const formFields = computed(() => [
   {
     key: "orderDiscount",
-    label: "Select Discount",
+    label: "Promotional Discounts",
     type: "select",
     isAllowClear: false,
     multiple: true,
     options: availableDiscounts.value,
     placeholder: availableDiscounts.value.length > 0 
-      ? "Choose discount(s) to apply" 
-      : "No active discounts available",
+      ? "Choose promotional discount(s)" 
+      : "No promotional discounts available",
+  },
+  {
+    key: "mandatoryDiscount",
+    label: "Mandatory Discounts (Choose ONE Only)",
+    type: "select",
+    isAllowClear: false,
+    multiple: false, // Regulatory requirement: only one mandatory discount
+    options: availableMandatoryDiscounts.value,
+    placeholder: availableMandatoryDiscounts.value.length > 0 
+      ? "Select PWD, Senior, Student, etc." 
+      : "No mandatory discounts available",
+    helpText: hasMultipleMandatoryOptions.value 
+      ? "⚠️ Customer with multiple eligibilities (PWD + Senior) can only use ONE discount"
+      : null,
   },
 ]);
 </script>
@@ -212,31 +286,72 @@ const formFields = computed(() => [
     v-model:visible="openModal"
     :title="`Apply Order Discount`"
     @cancel="$emit('close')"
-    width="400px"
+    width="500px"
     :maskClosable="false"
   >
-    <div v-if="availableDiscounts.length === 0" class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
+    <div v-if="availableDiscounts.length === 0 && availableMandatoryDiscounts.length === 0" class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
       <p class="text-yellow-800 text-sm">
-        <strong>No discounts available:</strong> There are currently no active order-level discounts that can be applied.
+        <strong>No discounts available:</strong> There are currently no active discounts that can be applied.
       </p>
     </div>
     
+    <!-- Enhanced Info Section -->
+    <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+      <details class="text-sm text-blue-800">
+        <summary class="cursor-pointer font-medium text-blue-700">📋 Discount Types</summary>
+        <div class="mt-2 space-y-1">
+          <p><strong>Promotional:</strong> Regular sales discounts (can select multiple)</p>
+          <p><strong>Mandatory:</strong> PWD, Senior Citizen, Student discounts</p>
+          <p class="text-xs italic text-blue-600">⚠️ Regulatory Requirement: Only ONE mandatory discount per transaction</p>
+        </div>
+      </details>
+    </div>
+    
+    <!-- PWD + Senior Guidance -->
+    <div v-if="hasMultipleMandatoryOptions" class="mb-4 p-3 bg-orange-50 border border-orange-200 rounded">
+      <details class="text-sm text-orange-800">
+        <summary class="cursor-pointer font-medium text-orange-700">⚠️ Multiple Mandatory Discounts Available</summary>
+        <div class="mt-2 space-y-1">
+          <p class="text-orange-700">If customer qualifies for multiple discounts (PWD + Senior), they must choose ONE.</p>
+          <p class="text-orange-700">Help them select the most beneficial option or their preferred discount.</p>
+          <div v-if="getBestMandatoryDiscount" class="text-orange-600">
+            <strong>Suggestion:</strong> {{ getBestMandatoryDiscount.label }} might be the best value
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <!-- Business Rules Reference -->
+    <div class="mb-4 p-3 bg-gray-50 border border-gray-200 rounded">
+      <details class="text-xs text-gray-600">
+        <summary class="cursor-pointer font-medium text-gray-700">📋 Cashier Guidelines</summary>
+        <div class="mt-2 space-y-1">
+          <p><strong>ID Verification:</strong> Always verify customer ID for mandatory discounts</p>
+          <p><strong>Multiple Eligibility:</strong> Customer chooses ONE mandatory discount only</p>
+          <p><strong>Combining:</strong> Promotional + Mandatory discounts can be combined</p>
+          <p><strong>Documentation:</strong> Ensure proper receipt notation for audit compliance</p>
+        </div>
+      </details>
+    </div>
+    
     <vertical-form v-model="formData" :fields="formFields" :errors="errors" />
+    
     <template #footer>
-      <!-- Clear button only visible if product already has discount -->
+      <!-- Clear button -->
       <a-button
         type="danger"
         :loading="discountLoading"
         @click="handleClearDiscount"
       >
-        Clear Discount
+        Clear All Discounts
       </a-button>
+      
       <primary-button 
         :loading="loading" 
-        :disabled="availableDiscounts.length === 0"
+        :disabled="availableDiscounts.length === 0 && availableMandatoryDiscounts.length === 0"
         @click="handleSave"
       >
-        Submit
+        Apply Discount(s)
       </primary-button>
     </template>
   </a-modal>

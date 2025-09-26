@@ -25,6 +25,7 @@ class SaleController extends Controller
         return Inertia::render('Sales/Index', [
             'categories' => Category::all(),
             'discounts' => Discount::all(),
+            'mandatoryDiscounts' => \App\Models\MandatoryDiscount::where('is_active', true)->get(),
         ]);
     }
 
