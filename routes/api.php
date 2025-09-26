@@ -42,6 +42,9 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/{sale}/sync', [\App\Http\Controllers\SaleController::class, 'syncDraft'])
                 ->name('sales.syncDraft');
 
+            Route::post('/{sale}/sync-immediate', [\App\Http\Controllers\SaleController::class, 'syncDraftImmediate'])
+                ->name('sales.syncDraftImmediate');
+
             // discounts
             Route::post('/{sale}/discounts/order', [\App\Http\Controllers\SaleDiscountController::class, 'applyOrderDiscount'])
                 ->name('discounts.order.apply');
