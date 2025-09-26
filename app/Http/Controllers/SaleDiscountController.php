@@ -13,25 +13,56 @@ class SaleDiscountController extends Controller
     public function applyOrderDiscount(Request $request, Sale $sale)
     {
         $validated = $request->validate([
-            'discount_ids' => 'required|array',
-            'discount_ids.*' => 'exists:discounts,id',
+            'discount_ids' => 'sometimes|array',
+            'discount_ids.*' => 'integer|exists:discounts,id',
+            'mandatory_discount_ids' => 'sometimes|array',
+            'mandatory_discount_ids.*' => 'integer|exists:mandatory_discounts,id',
         ]);
+
+        // Ensure at least one discount type is provided
+        if (empty($validated['discount_ids']) && empty($validated['mandatory_discount_ids'])) {
+            throw new \InvalidArgumentException('At least one discount must be provided.');
+        }
 
         try {
             return DB::transaction(function () use ($validated, $sale) {
-                $discountIds = $validated['discount_ids'];
+                $regularDiscountIds = $validated['discount_ids'] ?? [];
+                $mandatoryDiscountIds = $validated['mandatory_discount_ids'] ?? [];
 
-                // delete all discounts if array empty,
-                // or delete only those not in the submitted list
-                $sale->saleDiscounts()
-                    ->when(! empty($discountIds), fn ($q) => $q->whereNotIn('discount_id', $discountIds))
-                    ->delete();
+                // Clean up regular discounts not in the submitted list
+                if (!empty($regularDiscountIds)) {
+                    $sale->saleDiscounts()
+                        ->where('discount_type', 'regular')
+                        ->whereNotIn('discount_id', $regularDiscountIds)
+                        ->delete();
+                } else {
+                    // Remove all regular discounts if none submitted
+                    $sale->saleDiscounts()->where('discount_type', 'regular')->delete();
+                }
+
+                // Clean up mandatory discounts not in the submitted list
+                if (!empty($mandatoryDiscountIds)) {
+                    $sale->saleDiscounts()
+                        ->where('discount_type', 'mandatory')
+                        ->whereNotIn('discount_id', $mandatoryDiscountIds)
+                        ->delete();
+                } else {
+                    // Remove all mandatory discounts if none submitted
+                    $sale->saleDiscounts()->where('discount_type', 'mandatory')->delete();
+                }
 
                 $saleDiscounts = [];
 
-                foreach ($discountIds as $discountId) {
+                // Process regular discounts
+                foreach ($regularDiscountIds as $discountId) {
                     $discount = Discount::findOrFail($discountId);
                     $saleDiscounts[] = $sale->applyOrderDiscount($discount);
+                }
+
+                // Process mandatory discounts
+                foreach ($mandatoryDiscountIds as $mandatoryDiscountId) {
+                    $mandatoryDiscount = \App\Models\MandatoryDiscount::findOrFail($mandatoryDiscountId);
+                    $saleDiscounts[] = $sale->applyMandatoryDiscount($mandatoryDiscount);
                 }
 
                 // recalc once after all changes
@@ -115,4 +146,5 @@ class SaleDiscountController extends Controller
             ]);
         });
     }
+
 }

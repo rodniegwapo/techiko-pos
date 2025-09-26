@@ -20,8 +20,10 @@ import { useOrders } from "@/Composables/useOrderV2";
 import { useHelpers } from "@/Composables/useHelpers";
 import axios from "axios";
 import { Modal, notification } from "ant-design-vue";
+import { usePage } from "@inertiajs/vue3";
 
 const { formData, errors } = useGlobalVariables();
+const page = usePage();
 const {
   orders,
   orderDiscountAmount,
@@ -113,10 +115,48 @@ const openOrderDicountModal = ref(false);
 
 const showDiscountOrder = () => {
   if (orders.value.length == 0) return;
+  
+  // Get stored regular and mandatory discount IDs
+  const regularDiscountIds = localStorage.getItem("regular_discount_ids") || "";
+  const mandatoryDiscountIds = localStorage.getItem("mandatory_discount_ids") || "";
+  
+  // Convert stored IDs back to option objects for the select components
+  const regularDiscountOptions = regularDiscountIds 
+    ? regularDiscountIds.split(",")
+        .map(id => Number(id))
+        .filter(id => id)
+        .map(id => {
+          // Find the matching option from available discounts
+          const discount = (page.props.discounts || []).find(d => d.id === id);
+          return discount ? {
+            label: `${discount.name} (${discount.type === 'percentage' ? discount.value + '%' : '₱' + discount.value})`,
+            value: discount.id,
+            amount: discount.value,
+            type: discount.type,
+          } : null;
+        })
+        .filter(Boolean)
+    : [];
+  
+  const mandatoryDiscountId = mandatoryDiscountIds 
+    ? Number(mandatoryDiscountIds.split(",")[0])
+    : null;
+    
+  const mandatoryDiscountOption = mandatoryDiscountId 
+    ? (() => {
+        const discount = (page.props.mandatoryDiscounts || []).find(d => d.id === mandatoryDiscountId);
+        return discount ? {
+          label: `${discount.name} (${discount.type === 'percentage' ? discount.value + '%' : '₱' + discount.value})`,
+          value: discount.id,
+          amount: discount.value,
+          type: discount.type,
+        } : null;
+      })()
+    : null;
+  
   formData.value = {
-    orderDiscount: orderDiscountId.value
-      ? orderDiscountId.value.split(",").map((item) => Number(item))
-      : [],
+    orderDiscount: regularDiscountOptions,
+    mandatoryDiscount: mandatoryDiscountOption,
   };
   openOrderDicountModal.value = true;
 };
@@ -145,7 +185,7 @@ const showPayment = ref(false);
     />
     <a-input v-else value="Walk-in Customer" disabled />
   </div>
-  <div class="mt-2">
+  <!-- <div class="mt-2">
     <div class="font-semibold">Quick Discounts</div>
     <div class="flex items-center gap-2 mt-1">
       <div :class="cardClass">
@@ -163,7 +203,7 @@ const showPayment = ref(false);
         </div>
       </div>
     </div>
-  </div>
+  </div> -->
 
   <div class="relative">
     <!-- Transition wrapper -->

@@ -74,7 +74,26 @@ class Sale extends Model
 
         // upsert record
         return $this->saleDiscounts()->updateOrCreate(
-            ['discount_id' => $discount->id],
+            ['discount_id' => $discount->id, 'discount_type' => 'regular'],
+            ['discount_amount' => $amount]
+        );
+    }
+
+    public function applyMandatoryDiscount(\App\Models\MandatoryDiscount $mandatoryDiscount): SaleDiscount
+    {
+        // validate
+        throw_if(! $mandatoryDiscount->is_active, \InvalidArgumentException::class, 'Mandatory discount is not active.');
+
+        // calculate amount
+        $amount = $mandatoryDiscount->type === 'percentage'
+            ? round(($mandatoryDiscount->value / 100) * $this->total_amount, 2)
+            : (float) $mandatoryDiscount->value;
+
+        $amount = min(max($amount, 0), $this->total_amount);
+
+        // upsert record - using the same table but with mandatory discount ID
+        return $this->saleDiscounts()->updateOrCreate(
+            ['discount_id' => $mandatoryDiscount->id, 'discount_type' => 'mandatory'],
             ['discount_amount' => $amount]
         );
     }
