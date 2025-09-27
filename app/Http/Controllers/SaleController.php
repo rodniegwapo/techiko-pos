@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\ProductResource;
 use App\Models\Category;
+use App\Models\Customer;
 use App\Models\Product\Discount;
 use App\Models\Product\Product;
 use App\Models\Sale;
@@ -99,5 +100,34 @@ class SaleController extends Controller
         return $sale->saleItems()
             ->where('product_id', $request->product_id)
             ->first();
+    }
+
+    public function processLoyalty(Request $request, Sale $sale)
+    {
+        $validated = $request->validate([
+            'customer_id' => 'required|exists:customers,id',
+            'sale_amount' => 'required|numeric|min:0'
+        ]);
+        
+        $customer = Customer::findOrFail($validated['customer_id']);
+        
+        // Update sale with customer
+        $sale->update(['customer_id' => $customer->id]);
+        
+        // Process loyalty rewards
+        $results = $customer->processLoyaltyForSale($validated['sale_amount']);
+        
+        return response()->json([
+            'success' => true,
+            'results' => $results,
+            'customer' => [
+                'id' => $customer->id,
+                'name' => $customer->name,
+                'loyalty_points' => $customer->loyalty_points,
+                'tier' => $customer->tier,
+                'lifetime_spent' => $customer->lifetime_spent,
+                'total_purchases' => $customer->total_purchases,
+            ]
+        ]);
     }
 }

@@ -23,6 +23,11 @@ class Sale extends Model
         return $this->hasMany(SaleDiscount::class);
     }
 
+    public function customer()
+    {
+        return $this->belongsTo(Customer::class);
+    }
+
     public function recalcTotals(): void
     {
         $itemsTotal = $this->saleItems()
