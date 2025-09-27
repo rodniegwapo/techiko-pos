@@ -77,7 +77,7 @@ const handleSave = async () => {
     if (!selectedDiscount) return emit("close");
 
     // backend apply
-    await axios.post(
+    const { data: response } = await axios.post(
       route("sales.items.discount.apply", {
         sale: orderId.value,
         saleItem: saleItem.id,
@@ -85,14 +85,30 @@ const handleSave = async () => {
       { discount_id: selectedDiscount.id }
     );
 
-    // update local state
+    // update local state with backend response data
     const idx = orders.value.findIndex((item) => item.id == product.value.id);
     if (idx !== -1) {
-      orders.value[idx] = applyDiscountToLine(
-        orders.value[idx],
-        selectedDiscount
-      );
+      // Update with actual backend calculated values
+      const updatedItem = {
+        ...orders.value[idx],
+        discount_id: selectedDiscount.id,
+        discount_type: selectedDiscount.type,
+        discount: selectedDiscount.value,
+        discount_amount: response.item.discount,
+        subtotal: response.item.subtotal,
+      };
+      
+      console.log('Updating item with discount:', updatedItem);
+      orders.value[idx] = updatedItem;
     }
+
+    // Show success notification
+    const { notification } = await import("ant-design-vue");
+    notification.success({
+      message: "Discount Applied",
+      description: `${selectedDiscount.name} has been applied to ${product.value.name}`,
+      duration: 3,
+    });
 
     emit("close");
   } catch (e) {
@@ -129,32 +145,64 @@ const handleClearDiscount = async () => {
       return emit("close");
     }
 
-    // Check if discount_id exists
-    if (!product.value.discount_id) {
-      console.error("No discount ID found for product:", product.value.id);
-      alert("No discount found to clear.");
+    // Check if there are any discounts to clear
+    if (!saleItem.discounts || saleItem.discounts.length === 0) {
+      console.log("No discounts found to clear for product:", product.value.id);
+      
+      // Show user-friendly notification
+      const { notification } = await import("ant-design-vue");
+      notification.info({
+        message: "No Discount Found",
+        description: "This product doesn't have any discounts to clear.",
+        duration: 3,
+      });
       return emit("close");
     }
 
+    // Get the first discount (assuming one discount per item for now)
+    const discountToRemove = saleItem.discounts[0];
+
     // backend remove
-    await axios.delete(
+    const { data: response } = await axios.delete(
       route("sales.items.discount.remove", {
         sale: orderId.value,
         saleItem: saleItem.id,
-        discount: product.value.discount_id,
+        discount: discountToRemove.id,
       })
     );
 
-    // update local state (reset)
+    // update local state with backend response data (reset)
     const idx = orders.value.findIndex((item) => item.id == product.value.id);
     if (idx !== -1) {
-      orders.value[idx] = applyDiscountToLine(orders.value[idx], null);
+      orders.value[idx] = {
+        ...orders.value[idx],
+        discount_id: null,
+        discount_type: null,
+        discount: 0,
+        discount_amount: 0,
+        subtotal: response.item.subtotal,
+      };
     }
+
+    // Show success notification
+    const { notification } = await import("ant-design-vue");
+    notification.success({
+      message: "Discount Cleared",
+      description: "Product discount has been successfully removed.",
+      duration: 3,
+    });
 
     emit("close");
   } catch (e) {
     console.error("Error clearing discount:", e);
-    alert("Failed to clear discount. Please try again.");
+    
+    // Show user-friendly notification instead of alert
+    const { notification } = await import("ant-design-vue");
+    notification.error({
+      message: "Clear Discount Failed",
+      description: e.response?.data?.message || "Failed to clear discount. Please try again.",
+      duration: 5,
+    });
   } finally {
     discountLoading.value = false;
   }
@@ -195,7 +243,7 @@ const formFields = [
       <a-button
         type="danger"
         :loading="discountLoading"
-        v-if="product.discount"
+        v-if="product.discount_id || (product.discount_amount && product.discount_amount > 0)"
         @click="handleClearDiscount"
       >
         Clear Discount

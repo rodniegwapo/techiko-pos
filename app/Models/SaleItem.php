@@ -45,12 +45,14 @@ class SaleItem extends Model
             $this->subtotal = $lineSubtotal;
         } elseif ($type === 'amount') {
             // Apply discount per item * quantity
-            $discount = min(max($discountAmount * $this->quantity, 0), $lineSubtotal);
+            $totalDiscount = round($discountAmount * $this->quantity, 2);
+            $discount = min(max($totalDiscount, 0), $lineSubtotal);
             $this->discount = $discount;
             $this->subtotal = $lineSubtotal - $discount;
         } else {
             // Treat as percentage
-            $discount = $lineSubtotal * max(min($discountAmount, 100), 0) / 100;
+            $percentage = max(min($discountAmount, 100), 0);
+            $discount = round($lineSubtotal * ($percentage / 100), 2);
             $this->discount = $discount;
             $this->subtotal = $lineSubtotal - $discount;
         }
