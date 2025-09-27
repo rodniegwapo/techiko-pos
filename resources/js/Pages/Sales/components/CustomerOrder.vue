@@ -4,6 +4,7 @@ import PrimaryButton from "@/Components/PrimaryButton.vue";
 import ApplyProductDiscountModal from "./ApplyProductDiscountModal.vue";
 import ApplyOrderDiscountModal from "./ApplyOrderDiscountModal.vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
+import CustomerLoyaltyCard from "@/Components/Loyalty/CustomerLoyaltyCard.vue";
 import { ref, inject, computed, createVNode } from "vue";
 import {
   IconArmchair,
@@ -14,6 +15,7 @@ import {
   PlusSquareOutlined,
   MinusSquareOutlined,
   ExclamationCircleOutlined,
+  PlusOutlined
 } from "@ant-design/icons-vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useOrders } from "@/Composables/useOrderV2";
@@ -21,6 +23,7 @@ import { useHelpers } from "@/Composables/useHelpers";
 import axios from "axios";
 import { Modal, notification } from "ant-design-vue";
 import { usePage } from "@inertiajs/vue3";
+import { useDebounceFn } from "@vueuse/core";
 
 const { formData, errors } = useGlobalVariables();
 const page = usePage();
@@ -111,6 +114,23 @@ const handleShowProductDiscountModal = (product) => {
 const isLoyalCustomer = ref(false);
 const customer = ref("");
 
+// Customer loyalty state
+const selectedCustomer = ref(null);
+const customerSearchQuery = ref('');
+const customerOptions = ref([]);
+const searchingCustomers = ref(false);
+const showAddCustomerModal = ref(false);
+const showCustomerDetailsModal = ref(false);
+const addingCustomer = ref(false);
+
+// New customer form
+const newCustomerForm = ref({
+  name: '',
+  phone: '',
+  email: '',
+  date_of_birth: null,
+});
+
 const openOrderDicountModal = ref(false);
 
 const showDiscountOrder = () => {
@@ -166,6 +186,118 @@ const cardClass =
 
 
 const showPayment = ref(false);
+
+// Customer search with debounce
+const handleCustomerSearch = useDebounceFn(async (query) => {
+  if (!query || query.length < 2) {
+    customerOptions.value = [];
+    return;
+  }
+
+  searchingCustomers.value = true;
+  
+  try {
+    const response = await axios.get('/api/customers/search', {
+      params: { q: query }
+    });
+    
+    customerOptions.value = response.data.map(customer => ({
+      value: customer.id,
+      label: customer.display_text,
+      customer: customer,
+    }));
+  } catch (error) {
+    console.error('Customer search error:', error);
+    notification.error({
+      message: 'Search Error',
+      description: 'Failed to search customers',
+    });
+  } finally {
+    searchingCustomers.value = false;
+  }
+}, 300);
+
+// Handle customer selection
+const handleCustomerSelect = (customerId) => {
+  const option = customerOptions.value.find(opt => opt.value === customerId);
+  if (option) {
+    selectedCustomer.value = option.customer;
+    customerSearchQuery.value = '';
+    customerOptions.value = [];
+    
+    notification.success({
+      message: 'Customer Selected',
+      description: `${option.customer.name} selected for this order`,
+    });
+  }
+};
+
+// Handle customer type change
+const handleCustomerTypeChange = (isLoyal) => {
+  if (!isLoyal) {
+    clearCustomer();
+  }
+};
+
+// Clear selected customer
+const clearCustomer = () => {
+  selectedCustomer.value = null;
+  customerSearchQuery.value = '';
+  customerOptions.value = [];
+};
+
+// Show customer details
+const showCustomerDetails = () => {
+  showCustomerDetailsModal.value = true;
+};
+
+
+// Add new customer
+const handleAddCustomer = async () => {
+  if (!newCustomerForm.value.name) {
+    notification.error({
+      message: 'Validation Error',
+      description: 'Customer name is required',
+    });
+    return;
+  }
+
+  addingCustomer.value = true;
+  
+  try {
+    const response = await axios.post('/api/customers', newCustomerForm.value);
+    
+    selectedCustomer.value = response.data.customer;
+    showAddCustomerModal.value = false;
+    
+    // Reset form
+    newCustomerForm.value = {
+      name: '',
+      phone: '',
+      email: '',
+      date_of_birth: null,
+    };
+    
+    notification.success({
+      message: 'Customer Added',
+      description: `${response.data.customer.name} has been added and selected`,
+    });
+  } catch (error) {
+    notification.error({
+      message: 'Error',
+      description: error.response?.data?.message || 'Failed to add customer',
+    });
+  } finally {
+    addingCustomer.value = false;
+  }
+};
+
+
+// Export customer data for parent component
+defineExpose({
+  selectedCustomer,
+  isLoyalCustomer,
+});
 </script>
 
 <template>
@@ -175,14 +307,64 @@ const showPayment = ref(false);
       v-model:checked="isLoyalCustomer"
       checked-children="Loyal"
       un-checked-children="Walk-in"
+      @change="handleCustomerTypeChange"
     />
   </div>
+  
+  <!-- Customer Search/Display -->
   <div class="mt-1">
-    <a-input-search
-      v-if="isLoyalCustomer"
-      v-model:value="customer"
-      placeholder="Search Customer"
-    />
+    <div v-if="isLoyalCustomer" class="space-y-2 max-h-52 overflow-y-auto">
+      <!-- Customer Search -->
+      <a-auto-complete
+        v-if="!selectedCustomer"
+        v-model:value="customerSearchQuery"
+        :options="customerOptions"
+        placeholder="Search customer by name, phone, or email"
+        :loading="searchingCustomers"
+        @search="handleCustomerSearch"
+        @select="handleCustomerSelect"
+        class="w-full"
+      >
+        <template #option="{ value, label, customer }">
+          <div class="flex justify-between items-center py-2 px-1 hover:bg-gray-50 rounded">
+            <div class="flex-1">
+              <div class="font-medium text-sm">{{ customer.name }}</div>
+              <div class="text-xs text-gray-500">
+                {{ customer.phone || customer.email }}
+              </div>
+            </div>
+            <div class="text-right ml-2">
+              <div class="text-xs font-medium px-2 py-0.5 rounded-full text-white" :style="{ backgroundColor: customer.tier_info.color }">
+                {{ customer.tier_info.name }}
+              </div>
+              <div class="text-xs text-purple-600 mt-0.5">
+                {{ customer.loyalty_points?.toLocaleString() }} pts
+              </div>
+            </div>
+          </div>
+        </template>
+      </a-auto-complete>
+
+      <!-- Selected Customer Card -->
+      <CustomerLoyaltyCard
+        v-if="selectedCustomer"
+        :customer="selectedCustomer"
+        :total-amount="totalAmount"
+        :show-points-preview="true"
+        @view-details="showCustomerDetails"
+        @clear-customer="clearCustomer"
+      />
+
+      <!-- Quick Add Customer -->
+      <div class="flex gap-2">
+        <a-button size="small" @click="showAddCustomerModal = true">
+          <plus-outlined />
+          Add New Customer
+        </a-button>
+      </div>
+    </div>
+
+    <!-- Walk-in Customer Display -->
     <a-input v-else value="Walk-in Customer" disabled />
   </div>
   <!-- <div class="mt-2">
@@ -211,7 +393,15 @@ const showPayment = ref(false);
       <!-- 🟥 ORDER SUMMARY PAGE -->
       <div v-if="!showPayment" key="order" >
         <div
-          class="relative flex flex-col gap-2 mt-4 h-[calc(100vh-430px)] overflow-auto overflow-x-hidden"
+          :class="[
+            'scrollable-orders relative flex flex-col gap-2 mt-4 overflow-auto overflow-x-hidden transition-all duration-300',
+            {
+              'h-[calc(100vh-430px)]': !isLoyalCustomer,
+              'h-[calc(100vh-440px)]': isLoyalCustomer && !selectedCustomer,
+              'h-[calc(100vh-570px)]': isLoyalCustomer && selectedCustomer && totalAmount <= 0,
+              'h-[calc(100vh-600px)]': isLoyalCustomer && selectedCustomer && totalAmount > 0
+            }
+          ]"
         >
           <div
             v-if="orders.length == 0"
@@ -231,11 +421,31 @@ const showPayment = ref(false);
                 <div class="text-sm font-semibold">{{ order.name }}</div>
 
                 <div class="text-md flex items-center gap-1 text-gray-800">
-                  <PlusSquareOutlined @click.stop="handleAddOrder(order)" />
-                  <span>{{ order.quantity }}</span>
-                  <MinusSquareOutlined
-                    @click.stop="handleSubtractOrder(order)"
-                  />
+                  <a-tooltip title="Add item">
+                    <a-button 
+                      type="text" 
+                      size="small" 
+                      @click.stop="handleAddOrder(order)"
+                      class="p-0 h-auto border-0 text-green-600 hover:text-green-700"
+                    >
+                      <template #icon>
+                        <PlusSquareOutlined />
+                      </template>
+                    </a-button>
+                  </a-tooltip>
+                  <span class="mx-2 font-medium">{{ order.quantity }}</span>
+                  <a-tooltip title="Remove item">
+                    <a-button 
+                      type="text" 
+                      size="small" 
+                      @click.stop="handleSubtractOrder(order)"
+                      class="p-0 h-auto border-0 text-red-600 hover:text-red-700"
+                    >
+                      <template #icon>
+                        <MinusSquareOutlined />
+                      </template>
+                    </a-button>
+                  </a-tooltip>
                 </div>
                 <div class="text-[11px]">
                   {{ order.price }} x {{ order.quantity }}
@@ -243,12 +453,18 @@ const showPayment = ref(false);
               </div>
 
               <div class="text-right flex flex-col py-1 items-end gap-1">
-                <div
-                  class="cursor-pointer text-red-700"
-                  @click.stop="showVoidItem(order)"
-                >
-                  <CloseOutlined />
-                </div>
+                <a-tooltip title="Remove item from order">
+                  <a-button 
+                    type="text" 
+                    size="small" 
+                    @click.stop="showVoidItem(order)"
+                    class="p-1 h-auto border-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                  >
+                    <template #icon>
+                      <CloseOutlined />
+                    </template>
+                  </a-button>
+                </a-tooltip>
 
                 <div class="text-xs" v-if="order.discount">
                   <div
@@ -316,6 +532,56 @@ const showPayment = ref(false);
     :product="currentProduct"
     @close="openOrderDicountModal = false"
   />
+
+  <!-- Add Customer Modal -->
+  <a-modal
+    v-model:visible="showAddCustomerModal"
+    title="Add New Customer"
+    @ok="handleAddCustomer"
+    @cancel="showAddCustomerModal = false"
+    :confirm-loading="addingCustomer"
+  >
+    <a-form :model="newCustomerForm" layout="vertical">
+      <a-form-item label="Name" required>
+        <a-input v-model:value="newCustomerForm.name" placeholder="Customer name" />
+      </a-form-item>
+      <a-form-item label="Phone">
+        <a-input v-model:value="newCustomerForm.phone" placeholder="Phone number" />
+      </a-form-item>
+      <a-form-item label="Email">
+        <a-input v-model:value="newCustomerForm.email" placeholder="Email address" />
+      </a-form-item>
+      <a-form-item label="Date of Birth">
+        <a-date-picker v-model:value="newCustomerForm.date_of_birth" class="w-full" />
+      </a-form-item>
+    </a-form>
+  </a-modal>
+
+  <!-- Customer Details Modal -->
+  <a-modal
+    v-model:visible="showCustomerDetailsModal"
+    title="Customer Details"
+    :footer="null"
+    width="600px"
+  >
+    <div v-if="selectedCustomer" class="space-y-4">
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <h4 class="font-medium text-gray-700">Contact Information</h4>
+          <p><strong>Name:</strong> {{ selectedCustomer.name }}</p>
+          <p><strong>Phone:</strong> {{ selectedCustomer.phone || 'N/A' }}</p>
+          <p><strong>Email:</strong> {{ selectedCustomer.email || 'N/A' }}</p>
+        </div>
+        <div>
+          <h4 class="font-medium text-gray-700">Loyalty Status</h4>
+          <p><strong>Tier:</strong> {{ selectedCustomer.tier_info.name }}</p>
+          <p><strong>Points:</strong> {{ selectedCustomer.loyalty_points?.toLocaleString() || 0 }}</p>
+          <p><strong>Lifetime Spent:</strong> ₱{{ selectedCustomer.lifetime_spent?.toLocaleString() || 0 }}</p>
+          <p><strong>Total Purchases:</strong> {{ selectedCustomer.total_purchases || 0 }}</p>
+        </div>
+      </div>
+    </div>
+  </a-modal>
 </template>
 <style>
 /* Slide horizontal animation */
@@ -333,4 +599,5 @@ const showPayment = ref(false);
   opacity: 0;
   transform: translateX(-100%);
 }
+
 </style>

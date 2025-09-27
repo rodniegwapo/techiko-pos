@@ -59,6 +59,17 @@ Route::middleware('auth:sanctum')->group(function () {
             )->name('items.discount.remove');
 
             Route::get('/{sale}/find-sale-item', [\App\Http\Controllers\SaleController::class, 'findSaleItem'])->name('find-sale-item');
+            
+            // Loyalty processing
+            Route::post('/{sale}/process-loyalty', [\App\Http\Controllers\SaleController::class, 'processLoyalty'])
+                ->name('sales.processLoyalty');
         });
+
+    // Customer routes
+    Route::prefix('customers')->group(function () {
+        Route::get('/search', [\App\Http\Controllers\CustomerController::class, 'search']);
+        Route::post('/', [\App\Http\Controllers\CustomerController::class, 'store']);
+        Route::get('/{customer}', [\App\Http\Controllers\CustomerController::class, 'show']);
+    });
 
 });
