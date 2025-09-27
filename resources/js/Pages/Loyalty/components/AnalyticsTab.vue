@@ -20,10 +20,17 @@
               <span class="font-medium capitalize">{{ tier.tier }}</span>
             </div>
             <div class="text-right">
-              <div class="font-medium">{{ tier.count }}</div>
-              <div class="text-xs text-gray-500">
-                {{ ((tier.count / totalCustomers) * 100).toFixed(1) }}%
-              </div>
+                <div class="font-medium">{{ tier.count || 0 }}</div>
+                <div class="text-xs text-gray-500">
+                  {{ 
+                    (() => {
+                      const count = Number(tier.count) || 0;
+                      const total = Number(totalCustomers) || 0;
+                      if (total === 0) return '0.0';
+                      return ((count / total) * 100).toFixed(1);
+                    })()
+                  }}%
+                </div>
             </div>
           </div>
         </div>
