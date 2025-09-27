@@ -59,12 +59,13 @@ const handleSave = async () => {
     // Check if sale item exists
     if (!saleItem || !saleItem.id) {
       console.error("Sale item not found for product:", product.value.id);
-      
+
       // Show user-friendly notification instead of alert
       const { notification } = await import("ant-design-vue");
       notification.error({
         message: "Sale Item Not Found",
-        description: "The product needs to be added to the sale before applying a discount. Please try again.",
+        description:
+          "The product needs to be added to the sale before applying a discount. Please try again.",
         duration: 5,
       });
       return emit("close");
@@ -97,8 +98,8 @@ const handleSave = async () => {
         discount_amount: response.item.discount,
         subtotal: response.item.subtotal,
       };
-      
-      console.log('Updating item with discount:', updatedItem);
+
+      console.log("Updating item with discount:", updatedItem);
       orders.value[idx] = updatedItem;
     }
 
@@ -113,7 +114,7 @@ const handleSave = async () => {
     emit("close");
   } catch (e) {
     console.error("Error applying discount:", e);
-    
+
     // Show user-friendly notification
     const { notification } = await import("ant-design-vue");
     notification.error({
@@ -138,6 +139,7 @@ const handleClearDiscount = async () => {
       { params: { product_id: product.value.id } }
     );
 
+    console.log("slea item", saleItem);
     // Check if sale item exists
     if (!saleItem || !saleItem.id) {
       console.error("Sale item not found for product:", product.value.id);
@@ -146,8 +148,14 @@ const handleClearDiscount = async () => {
     }
 
     // Check if there are any discounts to clear
-    if (!saleItem.discounts || saleItem.discounts.length === 0) {
+    // Check both discount amount and discounts relationship
+    const hasDiscountAmount = saleItem.discount && parseFloat(saleItem.discount) > 0;
+    const hasDiscountRelationship = saleItem.discounts && saleItem.discounts.length > 0;
+    
+    if (!hasDiscountAmount && !hasDiscountRelationship) {
       console.log("No discounts found to clear for product:", product.value.id);
+      console.log("saleItem.discount:", saleItem.discount);
+      console.log("saleItem.discounts:", saleItem.discounts);
       
       // Show user-friendly notification
       const { notification } = await import("ant-design-vue");
@@ -159,8 +167,25 @@ const handleClearDiscount = async () => {
       return emit("close");
     }
 
-    // Get the first discount (assuming one discount per item for now)
-    const discountToRemove = saleItem.discounts[0];
+    // Get the discount to remove
+    let discountToRemove = null;
+    
+    if (hasDiscountRelationship) {
+      // Use the first discount from the relationship
+      discountToRemove = saleItem.discounts[0];
+    } else {
+      // If no relationship but has discount amount, we need to find the discount
+      // This might happen if the relationship wasn't loaded properly
+      console.error("Item has discount amount but no discount relationship loaded");
+      
+      const { notification } = await import("ant-design-vue");
+      notification.error({
+        message: "Clear Discount Failed",
+        description: "Unable to identify the discount to remove. Please refresh and try again.",
+        duration: 5,
+      });
+      return emit("close");
+    }
 
     // backend remove
     const { data: response } = await axios.delete(
@@ -195,12 +220,14 @@ const handleClearDiscount = async () => {
     emit("close");
   } catch (e) {
     console.error("Error clearing discount:", e);
-    
+
     // Show user-friendly notification instead of alert
     const { notification } = await import("ant-design-vue");
     notification.error({
       message: "Clear Discount Failed",
-      description: e.response?.data?.message || "Failed to clear discount. Please try again.",
+      description:
+        e.response?.data?.message ||
+        "Failed to clear discount. Please try again.",
       duration: 5,
     });
   } finally {
@@ -243,7 +270,10 @@ const formFields = [
       <a-button
         type="danger"
         :loading="discountLoading"
-        v-if="product.discount_id || (product.discount_amount && product.discount_amount > 0)"
+        v-if="
+          product.discount_id ||
+          (product.discount_amount && product.discount_amount > 0)
+        "
         @click="handleClearDiscount"
       >
         Clear Discount
