@@ -14,13 +14,18 @@ class AuthUserResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-    
-        $profileUrl = "https://ui-avatars.com/api/?name={$request->user()->name}&background=287e47&color=ffff";
+        $profileUrl = "https://ui-avatars.com/api/?name={$this->name}&background=287e47&color=ffff";
 
         return array_merge(parent::toArray($request), [
             'email' => $this->email,
             'profileUrl' => $profileUrl,
             'name' => $this->name,
+            'roles' => $this->roles->map(function ($role) {
+                return [
+                    'id' => $role->id,
+                    'name' => $role->name,
+                ];
+            }),
         ]);
     }
 }

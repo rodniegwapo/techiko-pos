@@ -8,6 +8,7 @@ import {
   IconHeartHandshake,
   IconHistory,
   IconGift,
+  IconUserCog,
 } from "@tabler/icons-vue";
 import { router, usePage } from "@inertiajs/vue3";
 
@@ -16,8 +17,19 @@ import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 const { selectedKeys, openKeys } = useGlobalVariables();
 
 const page = usePage();
+
+// Check if user has admin or super admin role (managers can also manage limited users)
+const canManageUsers = computed(() => {
+  const user = page.props.auth?.user?.data;
+  if (!user || !user.roles) return false;
+  return user.roles.some(role => {
+    const roleName = role.name.toLowerCase();
+    return ['super admin', 'admin', 'manager'].includes(roleName);
+  });
+});
+
 const menus = computed(() => {
-  return [
+  const baseMenus = [
     {
       title: "Dashboard",
       path: route("dashboard"),
@@ -70,6 +82,19 @@ const menus = computed(() => {
       icon: IconUsers,
     },
   ];
+
+  // Add User Management menu item only for Super Admin and Admin
+  if (canManageUsers.value) {
+   
+    baseMenus.push({
+      title: "Users",
+      path: route("users.index"),
+      icon: IconUserCog,
+      pathName: "users",
+    });
+  }
+
+  return baseMenus;
 });
 
 const handleClick = (menu, parentMenu = null) => {

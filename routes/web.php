@@ -48,6 +48,14 @@ Route::middleware(['auth'])->group(function () {
     // Loyalty Program
     Route::get('/loyalty', [\App\Http\Controllers\LoyaltyController::class, 'index'])->name('loyalty.index');
     
+    // Customers
+    Route::get('/customers', [\App\Http\Controllers\CustomerController::class, 'webIndex'])->name('customers.index');
+    
+    // User Management (Only for super admin, admin, and manager)
+    Route::middleware(['role:super admin|admin|manager'])->group(function () {
+        Route::get('/users', [\App\Http\Controllers\UserController::class, 'index'])->name('users.index');
+    });
+    
     // terminal
     Route::post('/setup-terminal', [\App\Http\Controllers\TerminalController::class, 'setupTerminal'])->name('setup.terminal');
 
