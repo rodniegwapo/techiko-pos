@@ -189,6 +189,8 @@ const showPayment = ref(false);
 
 // Customer search with debounce
 const handleCustomerSearch = useDebounceFn(async (query) => {
+  console.log('Searching for:', query); // Debug log
+  
   if (!query || query.length < 2) {
     customerOptions.value = [];
     return;
@@ -201,6 +203,8 @@ const handleCustomerSearch = useDebounceFn(async (query) => {
       params: { q: query }
     });
     
+    console.log('Search results:', response.data); // Debug log
+    
     customerOptions.value = response.data.map(customer => ({
       value: customer.id,
       label: customer.display_text,
@@ -210,7 +214,7 @@ const handleCustomerSearch = useDebounceFn(async (query) => {
     console.error('Customer search error:', error);
     notification.error({
       message: 'Search Error',
-      description: 'Failed to search customers',
+      description: 'Failed to search customers. Please try again.',
     });
   } finally {
     searchingCustomers.value = false;
@@ -219,16 +223,23 @@ const handleCustomerSearch = useDebounceFn(async (query) => {
 
 // Handle customer selection
 const handleCustomerSelect = (customerId) => {
+  console.log('Customer selected:', customerId); // Debug log
+  
   const option = customerOptions.value.find(opt => opt.value === customerId);
   if (option) {
     selectedCustomer.value = option.customer;
     customerSearchQuery.value = '';
     customerOptions.value = [];
     
+    console.log('Selected customer:', option.customer); // Debug log
+    
     notification.success({
       message: 'Customer Selected',
-      description: `${option.customer.name} selected for this order`,
+      description: `${option.customer.name} (${option.customer.tier_info.name} tier) selected`,
+      duration: 2,
     });
+  } else {
+    console.error('Customer option not found for ID:', customerId);
   }
 };
 
@@ -314,23 +325,31 @@ defineExpose({
   <!-- Customer Search/Display -->
   <div class="mt-1">
     <div v-if="isLoyalCustomer" class="space-y-2 max-h-52 overflow-y-auto">
+      <!-- Search Instructions -->
+      <div v-if="!selectedCustomer && customerSearchQuery.length < 2" class="text-xs text-gray-500 mb-1">
+        💡 Type at least 2 characters to search for existing customers
+      </div>
+      
       <!-- Customer Search -->
       <a-auto-complete
         v-if="!selectedCustomer"
         v-model:value="customerSearchQuery"
         :options="customerOptions"
-        placeholder="Search customer by name, phone, or email"
+        placeholder="Search customer by name, phone, or email (min 2 chars)"
         :loading="searchingCustomers"
         @search="handleCustomerSearch"
         @select="handleCustomerSelect"
+        @clear="() => { customerOptions = []; }"
+        allow-clear
         class="w-full"
+        :filter-option="false"
       >
         <template #option="{ value, label, customer }">
-          <div class="flex justify-between items-center py-2 px-1 hover:bg-gray-50 rounded">
+          <div class="flex justify-between items-center py-2 px-1 hover:bg-gray-50 rounded transition-colors">
             <div class="flex-1">
               <div class="font-medium text-sm">{{ customer.name }}</div>
               <div class="text-xs text-gray-500">
-                {{ customer.phone || customer.email }}
+                {{ customer.phone || customer.email || 'No contact info' }}
               </div>
             </div>
             <div class="text-right ml-2">
@@ -338,9 +357,26 @@ defineExpose({
                 {{ customer.tier_info.name }}
               </div>
               <div class="text-xs text-purple-600 mt-0.5">
-                {{ customer.loyalty_points?.toLocaleString() }} pts
+                {{ customer.loyalty_points?.toLocaleString() || 0 }} pts
               </div>
             </div>
+          </div>
+        </template>
+        
+        <!-- Loading state -->
+        <template #notFoundContent v-if="searchingCustomers">
+          <div class="text-center py-2 text-gray-500">
+            <a-spin size="small" /> Searching...
+          </div>
+        </template>
+        
+        <!-- Empty state -->
+        <template #notFoundContent v-else-if="customerSearchQuery && customerSearchQuery.length >= 2 && customerOptions.length === 0">
+          <div class="text-center py-2 text-gray-500">
+            No customers found. 
+            <a-button type="link" size="small" @click="showAddCustomerModal = true">
+              Add new customer
+            </a-button>
           </div>
         </template>
       </a-auto-complete>
@@ -397,9 +433,9 @@ defineExpose({
             'scrollable-orders relative flex flex-col gap-2 mt-4 overflow-auto overflow-x-hidden transition-all duration-300',
             {
               'h-[calc(100vh-430px)]': !isLoyalCustomer,
-              'h-[calc(100vh-440px)]': isLoyalCustomer && !selectedCustomer,
+              'h-[calc(100vh-480px)]': isLoyalCustomer && !selectedCustomer,
               'h-[calc(100vh-570px)]': isLoyalCustomer && selectedCustomer && totalAmount <= 0,
-              'h-[calc(100vh-600px)]': isLoyalCustomer && selectedCustomer && totalAmount > 0
+              'h-[calc(100vh-540px)]': isLoyalCustomer && selectedCustomer && totalAmount > 0
             }
           ]"
         >
@@ -601,3 +637,4 @@ defineExpose({
 }
 
 </style>
+
