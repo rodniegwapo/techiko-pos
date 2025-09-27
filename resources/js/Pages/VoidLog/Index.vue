@@ -107,7 +107,7 @@ const { pagination, handleTableChange } = useTable("items", tableFilters);
           @clear-all="
             () => Object.keys(filters).forEach((k) => (filters[k] = null))
           "
-          :always-show="true"
+          :always-show="false"
         />
       </template>
 

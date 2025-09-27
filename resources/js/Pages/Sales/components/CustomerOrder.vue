@@ -211,7 +211,7 @@ const showPayment = ref(false);
       <!-- 🟥 ORDER SUMMARY PAGE -->
       <div v-if="!showPayment" key="order" >
         <div
-          class="relative flex flex-col gap-2 mt-4 h-[calc(100vh-420px)] overflow-auto overflow-x-hidden"
+          class="relative flex flex-col gap-2 mt-4 h-[calc(100vh-430px)] overflow-auto overflow-x-hidden"
         >
           <div
             v-if="orders.length == 0"

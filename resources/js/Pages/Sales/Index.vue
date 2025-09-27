@@ -84,7 +84,7 @@ watchDebounced(search, getProducts, { debounce: 300 });
 <template>
   <AuthenticatedLayout>
     <Head title="Sales" />
-    <!-- <ContentHeader class="mb-8" title="Sales" /> -->
+    <ContentHeader  title="Sales" />
     <ContentLayoutV2 title="Create Transaction">
       <template #filters>
         <a-input-search
