@@ -130,8 +130,9 @@ const newCustomerForm = ref({
 const openOrderDicountModal = ref(false);
 
 const showDiscountOrder = () => {
-  // Check if there's an active order/draft instead of checking cart items
-  if (!orderId.value) return;
+  // Check if there's an active order/draft OR if there are items in the cart
+  // (orderId might be null briefly while draft is being created)
+  if (!orderId.value && orders.value.length === 0) return;
 
   // Get stored regular and mandatory discount IDs
   const regularDiscountIds = localStorage.getItem("regular_discount_ids") || "";
@@ -557,12 +558,12 @@ defineExpose({
                     class="text-gray-600 border-b px-2"
                     v-if="order.discount_type == 'amount'"
                   >
-                    Disc : {{ formattedTotal(order?.discount) }} -
-                    {{ formattedTotal(order.discount_amount) }}
+                    Disc : {{ formattedTotal(parseFloat(order?.discount) || 0) }} -
+                    {{ formattedTotal(parseFloat(order.discount_amount) || 0) }}
                   </div>
                   <div class="text-gray-600 border-b px-2" v-else>
-                    Disc: {{ formattedPercent(order?.discount) }} -
-                    {{ formattedTotal(order?.discount_amount) }}
+                    Disc: {{ formattedPercent(parseFloat(order?.discount) || 0) }} -
+                    {{ formattedTotal(parseFloat(order?.discount_amount) || 0) }}
                   </div>
                 </div>
                 <div
@@ -576,10 +577,10 @@ defineExpose({
                   class="text-md font-semibold text-green-700"
                   v-if="order.discount"
                 >
-                  {{ formattedTotal(order.subtotal) }}
+                  {{ formattedTotal(parseFloat(order.subtotal) || 0) }}
                 </div>
                 <div v-else class="text-md font-semibold text-green-700">
-                  {{ formattedTotal(order.price * order.quantity) }}
+                  {{ formattedTotal((parseFloat(order.price) || 0) * (parseFloat(order.quantity) || 0)) }}
                 </div>
               </div>
             </div>

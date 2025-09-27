@@ -5,12 +5,13 @@ namespace App\Http\Controllers;
 use App\Models\Product\Discount;
 use App\Models\Sale;
 use App\Models\SaleItem;
+use App\Services\SaleDiscountService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class SaleDiscountController extends Controller
 {
-    public function applyOrderDiscount(Request $request, Sale $sale)
+    public function applyOrderDiscount(Request $request, Sale $sale, SaleDiscountService $discountService)
     {
         $validated = $request->validate([
             'discount_ids' => 'sometimes|array',
@@ -25,58 +26,16 @@ class SaleDiscountController extends Controller
         }
 
         try {
-            return DB::transaction(function () use ($validated, $sale) {
-                $regularDiscountIds = $validated['discount_ids'] ?? [];
-                $mandatoryDiscountIds = $validated['mandatory_discount_ids'] ?? [];
+            $regularDiscountIds = $validated['discount_ids'] ?? [];
+            $mandatoryDiscountIds = $validated['mandatory_discount_ids'] ?? [];
+            
+            $result = $discountService->applyOrderDiscounts($sale, $regularDiscountIds, $mandatoryDiscountIds);
 
-                // First, recalculate totals to ensure we have accurate base amounts
-                $sale->recalcTotals();
-
-                // Clean up regular discounts not in the submitted list
-                if (!empty($regularDiscountIds)) {
-                    $sale->saleDiscounts()
-                        ->where('discount_type', 'regular')
-                        ->whereNotIn('discount_id', $regularDiscountIds)
-                        ->delete();
-                } else {
-                    // Remove all regular discounts if none submitted
-                    $sale->saleDiscounts()->where('discount_type', 'regular')->delete();
-                }
-
-                // Clean up mandatory discounts not in the submitted list
-                if (!empty($mandatoryDiscountIds)) {
-                    $sale->saleDiscounts()
-                        ->where('discount_type', 'mandatory')
-                        ->whereNotIn('discount_id', $mandatoryDiscountIds)
-                        ->delete();
-                } else {
-                    // Remove all mandatory discounts if none submitted
-                    $sale->saleDiscounts()->where('discount_type', 'mandatory')->delete();
-                }
-
-                $saleDiscounts = [];
-
-                // Process regular discounts
-                foreach ($regularDiscountIds as $discountId) {
-                    $discount = Discount::findOrFail($discountId);
-                    $saleDiscounts[] = $sale->applyOrderDiscount($discount);
-                }
-
-                // Process mandatory discounts
-                foreach ($mandatoryDiscountIds as $mandatoryDiscountId) {
-                    $mandatoryDiscount = \App\Models\MandatoryDiscount::findOrFail($mandatoryDiscountId);
-                    $saleDiscounts[] = $sale->applyMandatoryDiscount($mandatoryDiscount);
-                }
-
-                // recalc once after all changes
-                $sale->recalcTotals();
-
-                return response()->json([
-                    'message' => 'Discount(s) applied',
-                    'sale_discounts' => $saleDiscounts,
-                    'sale' => $sale->fresh(['saleItems', 'saleDiscounts']),
-                ]);
-            });
+            return response()->json([
+                'message' => 'Discount(s) applied',
+                'sale_discounts' => $result['sale_discounts'],
+                'sale' => $result['sale'],
+            ]);
         } catch (\InvalidArgumentException $e) {
             return response()->json([
                 'message' => $e->getMessage(),
@@ -84,30 +43,36 @@ class SaleDiscountController extends Controller
                     'discount' => [$e->getMessage()]
                 ]
             ], 400);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'An error occurred while applying discounts: ' . $e->getMessage(),
+                'errors' => [
+                    'discount' => [$e->getMessage()]
+                ]
+            ], 500);
         }
     }
 
-    public function removeOrderDiscount(Request $request, Sale $sale)
+    public function removeOrderDiscount(Request $request, Sale $sale, SaleDiscountService $discountService)
     {
-        return DB::transaction(function () use ($sale) {
-            // remove all sale-level discounts
-            $sale->saleDiscounts()->delete();
-
-            $sale->update([
-                'discount_id' => null,
-                'discount_amount' => 0,
-            ]);
-
-            $sale->recalcTotals();
+        try {
+            $sale = $discountService->removeOrderDiscounts($sale);
 
             return response()->json([
                 'message' => 'Discount(s) removed',
-                'sale' => $sale->fresh(['saleItems', 'saleDiscounts']),
+                'sale' => $sale,
             ]);
-        });
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'An error occurred while removing discounts: ' . $e->getMessage(),
+                'errors' => [
+                    'discount' => [$e->getMessage()]
+                ]
+            ], 500);
+        }
     }
 
-    public function applyItemDiscount(Request $request, Sale $sale, SaleItem $saleItem)
+    public function applyItemDiscount(Request $request, Sale $sale, SaleItem $saleItem, SaleDiscountService $discountService)
     {
         if ($saleItem->sale_id !== $sale->id) {
             abort(404);
@@ -117,45 +82,46 @@ class SaleDiscountController extends Controller
             'discount_id' => 'required|integer|exists:discounts,id',
         ]);
 
-        return DB::transaction(function () use ($validated, $saleItem, $sale) {
-            $discount = Discount::findOrFail($validated['discount_id']);
-            $saleItem->setDiscountAmount($discount->type, (float) $discount->value);
-
-            $saleItem->discounts()->sync([$discount->id]);
-
-            // Recalculate sale totals after applying item discount
-            $sale->recalcTotals();
+        try {
+            $result = $discountService->applyItemDiscount($sale, $saleItem, $validated['discount_id']);
 
             return response()->json([
                 'message' => 'Item discount applied',
-                'item' => $saleItem->fresh(),
-                'sale' => $sale->fresh(['saleItems', 'saleDiscounts']),
+                'item' => $result['item'],
+                'sale' => $result['sale'],
             ]);
-        });
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'An error occurred while applying item discount: ' . $e->getMessage(),
+                'errors' => [
+                    'discount' => [$e->getMessage()]
+                ]
+            ], 500);
+        }
     }
 
-    public function removeItemDiscount(Request $request, Sale $sale, SaleItem $saleItem, Discount $discount)
+    public function removeItemDiscount(Request $request, Sale $sale, SaleItem $saleItem, Discount $discount, SaleDiscountService $discountService)
     {
         if ($saleItem->sale_id !== $sale->id) {
             abort(404);
         }
 
-        return DB::transaction(function () use ($saleItem, $discount, $sale) {
-            // detach the discount
-            $saleItem->discounts()->detach($discount->id);
-
-            // reset discount amount on the item
-            $saleItem->setDiscountAmount(null, 0);
-
-            // Recalculate sale totals after removing item discount
-            $sale->recalcTotals();
+        try {
+            $result = $discountService->removeItemDiscount($sale, $saleItem, $discount->id);
 
             return response()->json([
                 'message' => 'Item discount removed',
-                'item' => $saleItem->fresh(),
-                'sale' => $sale->fresh(['saleItems', 'saleDiscounts']),
+                'item' => $result['item'],
+                'sale' => $result['sale'],
             ]);
-        });
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'An error occurred while removing item discount: ' . $e->getMessage(),
+                'errors' => [
+                    'discount' => [$e->getMessage()]
+                ]
+            ], 500);
+        }
     }
 
 }

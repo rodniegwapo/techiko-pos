@@ -42,6 +42,12 @@ const handleSave = async () => {
   try {
     if (!checkedForm(formData.value)) return emit("close");
 
+    // Ensure we have an orderId (create draft if needed)
+    if (!orderId.value) {
+      const { createDraft } = useOrders();
+      await createDraft();
+    }
+
     // Separate regular and mandatory discount IDs
     const selectedRegularIds = formData.value?.orderDiscount ? 
       formData.value.orderDiscount

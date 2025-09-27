@@ -146,6 +146,7 @@ class SaleController extends Controller
     public function findSaleItem(Request $request, Sale $sale)
     {
         return $sale->saleItems()
+            ->with('discounts') // Load the discounts relationship
             ->where('product_id', $request->product_id)
             ->first();
     }

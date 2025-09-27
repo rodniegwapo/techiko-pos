@@ -8,14 +8,16 @@ import { useHoldTransaction } from "./useHoldTransaction";
 
 const orders = ref(JSON.parse(localStorage.getItem("orders")) || []);
 const orderId = ref(localStorage.getItem("current_order") || null);
-const orderDiscountAmount = ref(localStorage.getItem("order_discount_amount"))
+const orderDiscountAmount = ref(parseFloat(localStorage.getItem("order_discount_amount")) || 0)
 const orderDiscountId = ref(localStorage.getItem("order_discount_ids") ?? '')
 const isCreatingDraft = ref(false);
 let draftPromise = null;
 
 /** 🔹 Utility: calculate discount + subtotal */
 function applyDiscountToLine(product, discount) {
-    const lineSubtotal = product.price * product.quantity;
+    const price = parseFloat(product.price) || 0;
+    const quantity = parseFloat(product.quantity) || 0;
+    const lineSubtotal = price * quantity;
 
     if (!discount) {
         return {
@@ -29,20 +31,25 @@ function applyDiscountToLine(product, discount) {
     }
 
     let discountAmount = 0;
+    const discountValue = parseFloat(discount.value) || 0;
+    
     if (discount.type === "percentage") {
-        const percentage = Math.min(Math.max(discount.value, 0), 100);
+        const percentage = Math.min(Math.max(discountValue, 0), 100);
         discountAmount = lineSubtotal * (percentage / 100);
     } else if (discount.type === "amount") {
         // 🔹 Multiply by quantity so discount applies per item
-        const totalDiscount = discount.value * product.quantity;
+        const totalDiscount = discountValue * quantity;
         discountAmount = Math.min(Math.max(totalDiscount, 0), lineSubtotal);
     }
+
+    // Ensure discountAmount is a valid number
+    discountAmount = isNaN(discountAmount) ? 0 : discountAmount;
 
     return {
         ...product,
         discount_id: discount.id,
         discount_type: discount.type,
-        discount: discount.value,
+        discount: discountValue,
         discount_amount: discountAmount,
         subtotal: lineSubtotal - discountAmount,
     };
@@ -165,7 +172,16 @@ const removeOrder = (product) => {
 /** Totals */
 const totalAmount = computed(() =>
     orders.value.reduce(
-        (sum, i) => sum + (i.subtotal ?? i.quantity * i.price),
+        (sum, i) => {
+            const quantity = parseFloat(i.quantity) || 0;
+            const price = parseFloat(i.price) || 0;
+            const subtotal = parseFloat(i.subtotal);
+            
+            // Use subtotal if it's a valid number, otherwise calculate from price * quantity
+            const itemTotal = !isNaN(subtotal) ? subtotal : quantity * price;
+            
+            return sum + itemTotal;
+        },
         0
     )
 );

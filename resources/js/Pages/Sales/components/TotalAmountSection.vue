@@ -35,8 +35,9 @@ const amountReceived = ref(0);
 const openOrderDicountModal = ref(false);
 
 const showDiscountOrder = () => {
-  // Check if there's an active order/draft instead of checking cart items
-  if (!orderId.value) return;
+  // Check if there's an active order/draft OR if there are items in the cart
+  // (orderId might be null briefly while draft is being created)
+  if (!orderId.value && orders.value.length === 0) return;
   
   // Get stored regular and mandatory discount IDs
   const regularDiscountIds = localStorage.getItem("regular_discount_ids") || "";
@@ -219,7 +220,7 @@ const paymentMethod = ref("cash");
             >Total:</span
           >
           <span class="font-bold text-green-600 text-lg">
-            {{ formattedTotal(totalAmount - Number(orderDiscountAmount)) }}
+            {{ formattedTotal(totalAmount - (parseFloat(orderDiscountAmount) || 0)) }}
           </span>
         </div>
       </div>
