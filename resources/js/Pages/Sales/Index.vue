@@ -28,6 +28,15 @@ const search = ref("");
 const category = ref();
 const spinning = ref(false);
 
+// Customer state management
+const selectedCustomer = ref(null);
+
+// Handle customer changes from CustomerOrder component
+const handleCustomerChanged = (customer) => {
+  selectedCustomer.value = customer;
+  console.log('Customer changed:', customer);
+};
+
 // Filters setup
 
 // FilterDropdown configuration
@@ -110,13 +119,13 @@ watchDebounced(search, getProducts, { debounce: 300 });
         <ProductTable :products="products" :loading="loading" />
       </template>
       <template #right-side-content>
-        <customer-order />
+        <customer-order @customer-changed="handleCustomerChanged" />
      
       </template>
 
     </ContentLayoutV2>
     <template #content-footer>
-        <total-amount-section />
+        <total-amount-section :selected-customer="selectedCustomer" />
       </template>
   </AuthenticatedLayout>
 </template>
