@@ -59,22 +59,33 @@ class Customer extends Model
 
     public function getTierInfo(): array
     {
-        $tier = $this->tier ?? 'bronze';
+        // Get tier from database instead of hardcoded values
+        $tierModel = \App\Models\LoyaltyTier::where('name', $this->tier ?? 'bronze')->first();
+        
+        if (!$tierModel) {
+            // Fallback to bronze if tier not found
+            $tierModel = \App\Models\LoyaltyTier::where('name', 'bronze')->first();
+        }
+        
+        if (!$tierModel) {
+            // Ultimate fallback if no tiers exist
+            return [
+                'id' => null,
+                'name' => 'Bronze',
+                'multiplier' => 1.0,
+                'color' => '#CD7F32',
+                'description' => 'Default tier',
+                'spending_threshold' => 0,
+            ];
+        }
         
         return [
-            'name' => ucfirst($tier),
-            'multiplier' => match($tier) {
-                'silver' => 1.25,
-                'gold' => 1.5,
-                'platinum' => 2.0,
-                default => 1.0
-            },
-            'color' => match($tier) {
-                'silver' => '#C0C0C0',
-                'gold' => '#FFD700',
-                'platinum' => '#E5E4E2',
-                default => '#CD7F32'
-            }
+            'id' => $tierModel->id,
+            'name' => $tierModel->display_name,
+            'multiplier' => $tierModel->multiplier,
+            'color' => $tierModel->color,
+            'description' => $tierModel->description,
+            'spending_threshold' => $tierModel->spending_threshold,
         ];
     }
 
@@ -90,20 +101,12 @@ class Customer extends Model
     {
         $previousTier = $this->tier;
         
-        // Tier thresholds
-        if ($this->lifetime_spent >= 100000) {
-            $newTier = 'platinum';
-        } elseif ($this->lifetime_spent >= 50000) {
-            $newTier = 'gold';
-        } elseif ($this->lifetime_spent >= 20000) {
-            $newTier = 'silver';
-        } else {
-            $newTier = 'bronze';
-        }
-
-        if ($previousTier !== $newTier) {
+        // Get appropriate tier based on spending from database
+        $newTierModel = \App\Models\LoyaltyTier::getTierForSpending($this->lifetime_spent);
+        
+        if ($newTierModel && $previousTier !== $newTierModel->name) {
             $this->update([
-                'tier' => $newTier,
+                'tier' => $newTierModel->name,
                 'tier_achieved_date' => now()
             ]);
             

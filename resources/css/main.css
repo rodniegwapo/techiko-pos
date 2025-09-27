@@ -57,6 +57,7 @@
   border: #287e47 !important;
   background-color: #287e47ed !important;
 }
+
 .ant-tag {
   display: flex !important;
   align-items: center !important;
@@ -124,9 +125,14 @@
 .contact-filter-popover>.ant-popover-content>.ant-popover-inner>.ant-popover-inner-content>.ant-menu-inline>.ant-menu-item-selected::after {
   border-right: 0 !important;
 }
+
 .ant-modal-footer .ant-btn.ant-btn-primary {
   @apply bg-green-700;
   @apply border-green-700;
+}
+
+.loyalty-programs .ant-tabs-nav {
+  @apply px-8
 }
 
 @media (max-width: 700px) {

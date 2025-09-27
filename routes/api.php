@@ -67,9 +67,22 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Customer routes
     Route::prefix('customers')->group(function () {
+        Route::get('/', [\App\Http\Controllers\CustomerController::class, 'index']);
         Route::get('/search', [\App\Http\Controllers\CustomerController::class, 'search']);
+        Route::get('/tier-options', [\App\Http\Controllers\CustomerController::class, 'getTierOptions']);
         Route::post('/', [\App\Http\Controllers\CustomerController::class, 'store']);
         Route::get('/{customer}', [\App\Http\Controllers\CustomerController::class, 'show']);
+    });
+
+    // Loyalty Program API routes
+    Route::prefix('loyalty')->group(function () {
+        Route::get('/stats', [\App\Http\Controllers\LoyaltyController::class, 'stats']);
+        Route::get('/customers', [\App\Http\Controllers\LoyaltyController::class, 'customers']);
+        Route::get('/analytics', [\App\Http\Controllers\LoyaltyController::class, 'analytics']);
+        Route::post('/customers/{customer}/adjust-points', [\App\Http\Controllers\LoyaltyController::class, 'adjustPoints']);
+        
+        // Tier management routes
+        Route::apiResource('tiers', \App\Http\Controllers\LoyaltyTierController::class);
     });
 
 });

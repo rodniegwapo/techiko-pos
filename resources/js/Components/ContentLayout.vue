@@ -2,7 +2,7 @@
 const props = defineProps({
   title: {
     type: String,
-    default: "Title",
+    default: null,
   },
   filterMainClass: {
     type: String,
@@ -23,7 +23,7 @@ const props = defineProps({
       class="bg-white rounded-lg px-6 py-6 lg:w-full md:w-full sm:w-[750px] lg:overflow-auto md:overflow-auto sm:overflow-scroll"
     >
       <div :class="filterMainClass">
-        <h1 class="text-lg font-semibold">{{ title }}</h1>
+        <h1 class="text-lg font-semibold"  :class="{'visible': title, 'invisible':!title}">{{ title }}</h1>
         <div :class="filterClass">
           <slot name="filters" />
         </div>
