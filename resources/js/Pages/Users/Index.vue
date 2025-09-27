@@ -119,6 +119,19 @@ const handleUserSaved = () => {
   getItems();
 };
 
+const handleUserUpdated = (updatedUser) => {
+  // Update the selected user with the new data
+  selectedUser.value = updatedUser;
+  // Refresh the user list to show updated data
+  getItems();
+};
+
+// Check if current user can create users
+const canCreateUsers = computed(() => {
+  const currentUserRoles = page.props.auth.user?.data?.roles?.map(role => role.name.toLowerCase()) || [];
+  return currentUserRoles.some(role => ['super admin', 'admin', 'manager'].includes(role));
+});
+
 // Debug - log the items data
 console.log("Users data:", props.items);
 console.log("Roles data:", props.roles);
@@ -138,6 +151,7 @@ console.log("Roles data:", props.roles);
           class="min-w-[100px] max-w-[400px]"
         />
         <a-button
+          v-if="canCreateUsers"
           @click="handleAddUser"
           type="primary"
           class="bg-white border flex items-center border-green-500 text-green-500"
@@ -189,6 +203,7 @@ console.log("Roles data:", props.roles);
       :user="selectedUser"
       @close="handleModalClose"
       @edit="handleEditUser"
+      @userUpdated="handleUserUpdated"
     />
   </AuthenticatedLayout>
 </template>

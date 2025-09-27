@@ -18,13 +18,13 @@ const { selectedKeys, openKeys } = useGlobalVariables();
 
 const page = usePage();
 
-// Check if user has admin or super admin role (managers can also manage limited users)
+// Check if user has admin or super admin role (managers and supervisors can also manage limited users)
 const canManageUsers = computed(() => {
   const user = page.props.auth?.user?.data;
   if (!user || !user.roles) return false;
   return user.roles.some(role => {
     const roleName = role.name.toLowerCase();
-    return ['super admin', 'admin', 'manager'].includes(roleName);
+    return ['super admin', 'admin', 'manager', 'supervisor'].includes(roleName);
   });
 });
 
@@ -129,7 +129,7 @@ onMounted(() => {
       <template v-for="menu in menus" :key="menu.path">
         <a-menu-item
           v-if="!menu.children"
-          :key="menu.path"
+          :key="`item-${menu.path}`"
           @click="handleClick(menu)"
           class="font-semibold text-gray-800 items-center"
         >
@@ -149,7 +149,7 @@ onMounted(() => {
 
         <a-sub-menu
           v-else
-          :key="menu.path"
+          :key="`submenu-${menu.path}`"
           class="font-semibold text-gray-800 items-center"
         >
           <template #icon>

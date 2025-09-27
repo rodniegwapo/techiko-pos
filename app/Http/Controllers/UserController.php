@@ -13,8 +13,9 @@ class UserController extends Controller
 {
     public function __construct()
     {
-        // Only super admin and admin can access user management
-        $this->middleware(['auth', 'role:super admin|admin']);
+        // Super admin, admin, manager, and supervisor can access user management
+        // (read-only for managers and supervisors)
+        $this->middleware(['auth', 'role:super admin|admin|manager|supervisor']);
     }
 
     /**
@@ -25,7 +26,7 @@ class UserController extends Controller
         $currentUser = auth()->user();
         $currentUserRoles = $currentUser->roles->pluck('name')->map(fn($role) => strtolower($role))->toArray();
         
-        $users = User::with('roles')
+        $users = User::with(['roles', 'supervisor'])
             ->when($request->input('search'), function ($query, $search) {
                 return $query->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
@@ -37,33 +38,45 @@ class UserController extends Controller
                     $q->where('name', $role);
                 });
             })
-            // Filter users based on current user's role
-            ->when(!in_array('super admin', $currentUserRoles), function ($query) use ($currentUserRoles) {
-                // Admin cannot see Super Admin users
-                if (in_array('admin', $currentUserRoles)) {
-                    $query->whereDoesntHave('roles', function ($q) {
-                        $q->where('name', 'super admin');
-                    });
-                }
-                // Manager cannot see Super Admin and Admin users
-                elseif (in_array('manager', $currentUserRoles)) {
-                    $query->whereDoesntHave('roles', function ($q) {
-                        $q->whereIn('name', ['super admin', 'admin']);
-                    });
-                }
+            // Filter users based on current user's role hierarchy
+            ->when($currentUser->hasRole('manager'), function ($query) {
+                // Manager can only see cashiers and supervisors
+                return $query->whereHas('roles', function ($q) {
+                    $q->whereIn('name', ['cashier', 'supervisor']);
+                });
+            })
+            ->when($currentUser->hasRole('supervisor'), function ($query) use ($currentUser) {
+
+                logger('has supervisor');
+                // Supervisor can only see cashiers assigned to them
+                return $query->whereHas('roles', function ($q) {
+                    $q->where('name', 'cashier');
+                })->where('supervisor_id', $currentUser->id);
+            })
+            ->when($currentUser->hasRole('admin') && !$currentUser->hasRole('super admin'), function ($query) {
+                // Admin can see everyone except super admin
+                return $query->whereDoesntHave('roles', function ($q) {
+                    $q->where('name', 'super admin');
+                });
             })
             ->latest()
             ->paginate(15);
 
         // Filter available roles based on current user's permissions
-        $roles = Role::all(['id', 'name']);
-        if (!in_array('super admin', $currentUserRoles)) {
-            if (in_array('admin', $currentUserRoles)) {
-                $roles = $roles->where('name', '!=', 'super admin');
-            } elseif (in_array('manager', $currentUserRoles)) {
-                $roles = $roles->whereNotIn('name', ['super admin', 'admin']);
-            }
-        }
+        $roles = Role::query()
+            ->when($currentUser->hasRole('manager'), function ($query) {
+                // Manager can only assign cashier and supervisor roles
+                return $query->whereIn('name', ['cashier', 'supervisor']);
+            })
+            ->when($currentUser->hasRole('supervisor'), function ($query) {
+                // Supervisor cannot create users, so no roles needed
+                return $query->whereRaw('1 = 0'); // Return empty result
+            })
+            ->when($currentUser->hasRole('admin') && !$currentUser->hasRole('super admin'), function ($query) {
+                // Admin can assign all roles except super admin
+                return $query->where('name', '!=', 'super admin');
+            })
+            ->get(['id', 'name']);
 
         return Inertia::render('Users/Index', [
             'items' => $users,
@@ -76,14 +89,31 @@ class UserController extends Controller
      */
     public function store(Request $request)
     {
-        // Only Super Admin and Admin can create users
+        // Super Admin, Admin, and Manager can create users
         $this->authorize('create', User::class);
+
+        $currentUser = auth()->user();
+        
+        // Get available roles for the current user
+        $availableRoles = Role::query()
+            ->when($currentUser->hasRole('manager'), function ($query) {
+                // Manager can only create cashier and supervisor roles
+                return $query->whereIn('name', ['cashier', 'supervisor']);
+            })
+            ->when($currentUser->hasRole('admin') && !$currentUser->hasRole('super admin'), function ($query) {
+                return $query->where('name', '!=', 'super admin');
+            })
+            ->pluck('id');
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:8|confirmed',
-            'role_id' => 'required|exists:roles,id'
+            'role_id' => ['required', 'exists:roles,id', function ($attribute, $value, $fail) use ($availableRoles) {
+                if (!$availableRoles->contains($value)) {
+                    $fail('You are not authorized to assign this role.');
+                }
+            }]
         ]);
 
         $user = User::create([
@@ -92,8 +122,8 @@ class UserController extends Controller
             'password' => Hash::make($validated['password']),
         ]);
 
-        // Assign role
-        $role = Role::findById($validated['role_id']);
+        // Assign role with correct guard
+        $role = Role::findById($validated['role_id'], 'web');
         $user->assignRole($role);
 
         return response()->json([
@@ -108,30 +138,76 @@ class UserController extends Controller
      */
     public function update(Request $request, User $user)
     {
-        // Only Super Admin and Admin can edit users
+        // Check if user can update this model
         $this->authorize('update', $user);
 
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => ['required', 'email', Rule::unique('users')->ignore($user->id)],
-            'password' => 'nullable|string|min:8|confirmed',
-            'role_id' => 'required|exists:roles,id'
-        ]);
+        $currentUser = auth()->user();
+        
+        // Determine if current user can update sensitive fields
+        $canUpdateSensitive = $currentUser->hasAnyRole(['super admin', 'admin']) && 
+                             ($currentUser->hasRole('super admin') || !$user->hasRole('super admin'));
 
-        $updateData = [
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-        ];
+        // Build validation rules based on permissions
+        $rules = [];
+        
+        if ($canUpdateSensitive) {
+            // Admin/Super Admin can update all fields
+            $rules = [
+                'name' => 'required|string|max:255',
+                'email' => ['required', 'email', Rule::unique('users')->ignore($user->id)],
+                'password' => 'nullable|string|min:8|confirmed',
+                'role_id' => ['required', 'exists:roles,id']
+            ];
+            
+            // Get available roles for role validation
+            $availableRoles = Role::query()
+                ->when($currentUser->hasRole('admin') && !$currentUser->hasRole('super admin'), function ($query) {
+                    return $query->where('name', '!=', 'super admin');
+                })
+                ->pluck('id');
+                
+            $rules['role_id'][] = function ($attribute, $value, $fail) use ($availableRoles) {
+                if (!$availableRoles->contains($value)) {
+                    $fail('You are not authorized to assign this role.');
+                }
+            };
+        } else {
+            // Manager can only update non-sensitive fields
+            $rules = [
+                'status' => 'required|in:active,inactive',
+                // Add other non-sensitive fields as needed
+            ];
+        }
 
-        if (!empty($validated['password'])) {
-            $updateData['password'] = Hash::make($validated['password']);
+        $validated = $request->validate($rules);
+
+        // Build update data based on permissions
+        $updateData = [];
+        
+        if ($canUpdateSensitive) {
+            // Update sensitive fields for admin/super admin
+            $updateData = [
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+            ];
+
+            if (!empty($validated['password'])) {
+                $updateData['password'] = Hash::make($validated['password']);
+            }
+        } else {
+            // Update only non-sensitive fields for manager
+            if (isset($validated['status'])) {
+                $updateData['status'] = $validated['status'];
+            }
         }
 
         $user->update($updateData);
 
-        // Update role
-        $role = Role::findById($validated['role_id']);
-        $user->syncRoles([$role]);
+        // Update role only if user has permission
+        if ($canUpdateSensitive && isset($validated['role_id'])) {
+            $role = Role::findById($validated['role_id'], 'web');
+            $user->syncRoles([$role]);
+        }
 
         return response()->json([
             'success' => true,
