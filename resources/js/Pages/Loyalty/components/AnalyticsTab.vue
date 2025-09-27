@@ -10,7 +10,7 @@
           <div
             v-for="tier in tierStats"
             :key="tier.tier"
-            class="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+            class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border"
           >
             <div class="flex items-center">
               <div

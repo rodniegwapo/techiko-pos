@@ -29,6 +29,9 @@ class SaleDiscountController extends Controller
                 $regularDiscountIds = $validated['discount_ids'] ?? [];
                 $mandatoryDiscountIds = $validated['mandatory_discount_ids'] ?? [];
 
+                // First, recalculate totals to ensure we have accurate base amounts
+                $sale->recalcTotals();
+
                 // Clean up regular discounts not in the submitted list
                 if (!empty($regularDiscountIds)) {
                     $sale->saleDiscounts()
@@ -114,15 +117,19 @@ class SaleDiscountController extends Controller
             'discount_id' => 'required|integer|exists:discounts,id',
         ]);
 
-        return DB::transaction(function () use ($validated, $saleItem) {
+        return DB::transaction(function () use ($validated, $saleItem, $sale) {
             $discount = Discount::findOrFail($validated['discount_id']);
             $saleItem->setDiscountAmount($discount->type, (float) $discount->value);
 
             $saleItem->discounts()->sync([$discount->id]);
 
+            // Recalculate sale totals after applying item discount
+            $sale->recalcTotals();
+
             return response()->json([
                 'message' => 'Item discount applied',
                 'item' => $saleItem->fresh(),
+                'sale' => $sale->fresh(['saleItems', 'saleDiscounts']),
             ]);
         });
     }
@@ -133,16 +140,20 @@ class SaleDiscountController extends Controller
             abort(404);
         }
 
-        return DB::transaction(function () use ($saleItem, $discount) {
+        return DB::transaction(function () use ($saleItem, $discount, $sale) {
             // detach the discount
             $saleItem->discounts()->detach($discount->id);
 
             // reset discount amount on the item
             $saleItem->setDiscountAmount(null, 0);
 
+            // Recalculate sale totals after removing item discount
+            $sale->recalcTotals();
+
             return response()->json([
                 'message' => 'Item discount removed',
                 'item' => $saleItem->fresh(),
+                'sale' => $sale->fresh(['saleItems', 'saleDiscounts']),
             ]);
         });
     }

@@ -35,7 +35,8 @@ const amountReceived = ref(0);
 const openOrderDicountModal = ref(false);
 
 const showDiscountOrder = () => {
-  if (orders.value.length == 0) return;
+  // Check if there's an active order/draft instead of checking cart items
+  if (!orderId.value) return;
   
   // Get stored regular and mandatory discount IDs
   const regularDiscountIds = localStorage.getItem("regular_discount_ids") || "";
