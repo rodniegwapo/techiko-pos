@@ -3,163 +3,152 @@
 
   <AuthenticatedLayout>
     <ContentHeader class="mb-4" title="Loyalt Programs" />
-
-    <ContentLayout>
-      <template #table>
-        <!-- Enhanced Stats Overview with Animations -->
-        <div class="px-6 relative z-10">
+    <!-- Enhanced Stats Overview with Animations -->
+    <div class=" relative z-10">
+      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-6">
+        <!-- Total Members Card -->
+        <div
+          class="group hover:shadow-2xl transition-all duration-500 hover:-translate-y-2"
+        >
           <div
-            class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-12"
+            class="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 relative overflow-hidden"
           >
-            <!-- Total Members Card -->
             <div
-              class="group hover:shadow-2xl transition-all duration-500 hover:-translate-y-2"
-            >
-              <div
-                class="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 relative overflow-hidden"
-              >
+              class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-400/10 to-blue-600/10 rounded-full -translate-y-8 translate-x-8"
+            ></div>
+            <div class="relative">
+              <div class="flex items-center justify-between mb-4">
                 <div
-                  class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-400/10 to-blue-600/10 rounded-full -translate-y-8 translate-x-8"
-                ></div>
-                <div class="relative">
-                  <div class="flex items-center justify-between mb-4">
-                    <div
-                      class="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg"
-                    >
-                      <user-outlined class="text-xl text-white" />
-                    </div>
-                    <div class="text-right">
-                      <div
-                        class="text-2xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors"
-                      >
-                        {{ stats.total_customers?.toLocaleString() || 0 }}
-                      </div>
-                      <div class="text-sm text-gray-500">Total Members</div>
-                    </div>
+                  class="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg"
+                >
+                  <user-outlined class="text-xl text-white" />
+                </div>
+                <div class="text-right">
+                  <div
+                    class="text-2xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors"
+                  >
+                    {{ stats.total_customers?.toLocaleString() || 0 }}
                   </div>
-                  <div class="flex items-center text-sm">
-                    <div class="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
-                    <span class="text-green-600 font-medium"
-                      >+12% this month</span
-                    >
-                  </div>
+                  <div class="text-sm text-gray-500">Total Members</div>
                 </div>
               </div>
-            </div>
-
-            <!-- Active Points Card -->
-            <div
-              class="group hover:shadow-2xl transition-all duration-500 hover:-translate-y-2"
-            >
-              <div
-                class="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 relative overflow-hidden"
-              >
-                <div
-                  class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-400/10 to-green-600/10 rounded-full -translate-y-8 translate-x-8"
-                ></div>
-                <div class="relative">
-                  <div class="flex items-center justify-between mb-4">
-                    <div
-                      class="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-lg"
-                    >
-                      <gift-outlined class="text-xl text-white" />
-                    </div>
-                    <div class="text-right">
-                      <div
-                        class="text-2xl font-bold text-gray-900 group-hover:text-green-600 transition-colors"
-                      >
-                        {{ stats.total_points?.toLocaleString() || 0 }}
-                      </div>
-                      <div class="text-sm text-gray-500">Active Points</div>
-                    </div>
-                  </div>
-                  <div class="flex items-center text-sm">
-                    <div class="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
-                    <span class="text-green-600 font-medium"
-                      >+8% this month</span
-                    >
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Total Spending Card -->
-            <div
-              class="group hover:shadow-2xl transition-all duration-500 hover:-translate-y-2"
-            >
-              <div
-                class="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 relative overflow-hidden"
-              >
-                <div
-                  class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-400/10 to-purple-600/10 rounded-full -translate-y-8 translate-x-8"
-                ></div>
-                <div class="relative">
-                  <div class="flex items-center justify-between mb-4">
-                    <div
-                      class="w-12 h-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg"
-                    >
-                      <dollar-circle-outlined class="text-xl text-white" />
-                    </div>
-                    <div class="text-right">
-                      <div
-                        class="text-2xl font-bold text-gray-900 group-hover:text-purple-600 transition-colors"
-                      >
-                        ₱{{ stats.total_spending?.toLocaleString() || 0 }}
-                      </div>
-                      <div class="text-sm text-gray-500">Total Spending</div>
-                    </div>
-                  </div>
-                  <div class="flex items-center text-sm">
-                    <div class="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
-                    <span class="text-green-600 font-medium"
-                      >+15% this month</span
-                    >
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Average Transaction Card -->
-            <div
-              class="group hover:shadow-2xl transition-all duration-500 hover:-translate-y-2"
-            >
-              <div
-                class="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 relative overflow-hidden"
-              >
-                <div
-                  class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-orange-400/10 to-orange-600/10 rounded-full -translate-y-8 translate-x-8"
-                ></div>
-                <div class="relative">
-                  <div class="flex items-center justify-between mb-4">
-                    <div
-                      class="w-12 h-12 bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg"
-                    >
-                      <crown-outlined class="text-xl text-white" />
-                    </div>
-                    <div class="text-right">
-                      <div
-                        class="text-2xl font-bold text-gray-900 group-hover:text-orange-600 transition-colors"
-                      >
-                        ₱{{ stats.avg_transaction?.toLocaleString() || 0 }}
-                      </div>
-                      <div class="text-sm text-gray-500">Avg. Transaction</div>
-                    </div>
-                  </div>
-                  <div class="flex items-center text-sm">
-                    <div class="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
-                    <span class="text-green-600 font-medium"
-                      >+5% this month</span
-                    >
-                  </div>
-                </div>
+              <div class="flex items-center text-sm">
+                <div class="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+                <span class="text-green-600 font-medium">+12% this month</span>
               </div>
             </div>
           </div>
         </div>
 
+        <!-- Active Points Card -->
+        <div
+          class="group hover:shadow-2xl transition-all duration-500 hover:-translate-y-2"
+        >
+          <div
+            class="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 relative overflow-hidden"
+          >
+            <div
+              class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-400/10 to-green-600/10 rounded-full -translate-y-8 translate-x-8"
+            ></div>
+            <div class="relative">
+              <div class="flex items-center justify-between mb-4">
+                <div
+                  class="w-12 h-12 bg-gradient-to-r from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-lg"
+                >
+                  <gift-outlined class="text-xl text-white" />
+                </div>
+                <div class="text-right">
+                  <div
+                    class="text-2xl font-bold text-gray-900 group-hover:text-green-600 transition-colors"
+                  >
+                    {{ stats.total_points?.toLocaleString() || 0 }}
+                  </div>
+                  <div class="text-sm text-gray-500">Active Points</div>
+                </div>
+              </div>
+              <div class="flex items-center text-sm">
+                <div class="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+                <span class="text-green-600 font-medium">+8% this month</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Total Spending Card -->
+        <div
+          class="group hover:shadow-2xl transition-all duration-500 hover:-translate-y-2"
+        >
+          <div
+            class="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 relative overflow-hidden"
+          >
+            <div
+              class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-400/10 to-purple-600/10 rounded-full -translate-y-8 translate-x-8"
+            ></div>
+            <div class="relative">
+              <div class="flex items-center justify-between mb-4">
+                <div
+                  class="w-12 h-12 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg"
+                >
+                  <dollar-circle-outlined class="text-xl text-white" />
+                </div>
+                <div class="text-right">
+                  <div
+                    class="text-2xl font-bold text-gray-900 group-hover:text-purple-600 transition-colors"
+                  >
+                    ₱{{ stats.total_spending?.toLocaleString() || 0 }}
+                  </div>
+                  <div class="text-sm text-gray-500">Total Spending</div>
+                </div>
+              </div>
+              <div class="flex items-center text-sm">
+                <div class="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+                <span class="text-green-600 font-medium">+15% this month</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Average Transaction Card -->
+        <div
+          class="group hover:shadow-2xl transition-all duration-500 hover:-translate-y-2"
+        >
+          <div
+            class="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 relative overflow-hidden"
+          >
+            <div
+              class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-orange-400/10 to-orange-600/10 rounded-full -translate-y-8 translate-x-8"
+            ></div>
+            <div class="relative">
+              <div class="flex items-center justify-between mb-4">
+                <div
+                  class="w-12 h-12 bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg"
+                >
+                  <crown-outlined class="text-xl text-white" />
+                </div>
+                <div class="text-right">
+                  <div
+                    class="text-2xl font-bold text-gray-900 group-hover:text-orange-600 transition-colors"
+                  >
+                    ₱{{ stats.avg_transaction?.toLocaleString() || 0 }}
+                  </div>
+                  <div class="text-sm text-gray-500">Avg. Transaction</div>
+                </div>
+              </div>
+              <div class="flex items-center text-sm">
+                <div class="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+                <span class="text-green-600 font-medium">+5% this month</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <ContentLayout>
+      <template #table>
         <!-- Enhanced Tabs with Modern Design -->
 
-        <div class="loyalty-programs ">
+        <div class="loyalty-programs">
           <a-tabs v-model:activeKey="activeTab" size="large">
             <!-- Program Rules Tab -->
             <a-tab-pane key="rules">
@@ -172,16 +161,16 @@
               <ProgramRulesTab />
             </a-tab-pane>
 
-             <!-- Customer Management Tab -->
-             <a-tab-pane key="customers">
-               <template #tab>
-                 <div class="flex items-center space-x-2 px-2">
-                   <user-outlined class="text-lg" />
-                   <span class="font-medium">Customer Management</span>
-                 </div>
-               </template>
-               <CustomerManagementTab />
-             </a-tab-pane>
+            <!-- Customer Management Tab -->
+            <a-tab-pane key="customers">
+              <template #tab>
+                <div class="flex items-center space-x-2 px-2">
+                  <user-outlined class="text-lg" />
+                  <span class="font-medium">Customer Management</span>
+                </div>
+              </template>
+              <CustomerManagementTab />
+            </a-tab-pane>
 
             <!-- Tier Management Tab -->
             <a-tab-pane key="tier-management">
@@ -254,17 +243,11 @@ const loadStats = async () => {
 
 // Removed loadCustomers - now handled in CustomerManagementTab
 
-
 const loadAnalytics = async () => {
   try {
     const response = await axios.get("/api/loyalty/analytics");
     tierStats.value = response.data.tier_distribution || [];
     recentActivity.value = response.data.recent_activity || [];
-    
-    // Merge analytics stats with existing stats
-    if (response.data.stats) {
-      stats.value = { ...stats.value, ...response.data.stats };
-    }
   } catch (error) {
     console.error("Failed to load analytics:", error);
   }
@@ -278,8 +261,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-
-
 /* Background Grid Pattern */
 .bg-grid-pattern {
   background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%236366f1' fill-opacity='0.1'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");

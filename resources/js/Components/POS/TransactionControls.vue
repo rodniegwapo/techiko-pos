@@ -8,7 +8,7 @@
         @click="$emit('holdTransaction')"
         class="flex items-center gap-1"
       >
-        <hold-outlined />
+        <pause-outlined />
         Hold
       </a-button>
     </a-tooltip>
@@ -43,9 +43,9 @@
 
 <script setup>
 import { computed, ref, onMounted, onUnmounted } from 'vue';
-import { 
-  HoldOutlined, 
-  FolderOpenOutlined, 
+import {
+  PauseOutlined,
+  FolderOpenOutlined,
   ClockCircleOutlined,
   WifiOutlined
 } from '@ant-design/icons-vue';

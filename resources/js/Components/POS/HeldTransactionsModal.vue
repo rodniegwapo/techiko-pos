@@ -1,6 +1,6 @@
 <template>
   <a-modal
-    v-model:visible="visible"
+    :visible="visible"
     title="Held Transactions"
     width="900px"
     :footer="null"
@@ -23,7 +23,7 @@
     <div v-if="heldTransactions.length === 0" class="text-center py-8">
       <a-empty description="No held transactions">
         <template #image>
-          <hold-outlined style="font-size: 48px; color: #d9d9d9;" />
+          <pause-outlined style="font-size: 48px; color: #d9d9d9;" />
         </template>
       </a-empty>
     </div>
@@ -37,7 +37,7 @@
         <div class="flex justify-between items-start mb-3">
           <div>
             <h3 class="font-semibold text-lg flex items-center gap-2">
-              <hold-outlined class="text-orange-500" />
+              <pause-outlined class="text-orange-500" />
               Transaction #{{ transaction.displayId }}
             </h3>
             <p class="text-sm text-gray-600">
@@ -106,7 +106,7 @@
 <script setup>
 import { computed } from 'vue';
 import { 
-  HoldOutlined, 
+  PauseOutlined, 
   UserOutlined, 
   ClockCircleOutlined, 
   ShoppingCartOutlined,

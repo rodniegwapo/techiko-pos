@@ -72,6 +72,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/tier-options', [\App\Http\Controllers\CustomerController::class, 'getTierOptions']);
         Route::post('/', [\App\Http\Controllers\CustomerController::class, 'store']);
         Route::get('/{customer}', [\App\Http\Controllers\CustomerController::class, 'show']);
+        Route::put('/{customer}', [\App\Http\Controllers\CustomerController::class, 'update']);
     });
 
     // Loyalty Program API routes
@@ -83,6 +84,13 @@ Route::middleware('auth:sanctum')->group(function () {
         
         // Tier management routes
         Route::apiResource('tiers', \App\Http\Controllers\LoyaltyTierController::class);
+    });
+
+    // User Management API routes (Only for super admin, admin, and manager)
+    Route::middleware(['role:super admin|admin|manager'])->group(function () {
+        Route::get('/users/roles', [\App\Http\Controllers\UserController::class, 'getRoles']);
+        Route::patch('/users/{user}/toggle-status', [\App\Http\Controllers\UserController::class, 'toggleStatus']);
+        Route::apiResource('users', \App\Http\Controllers\UserController::class);
     });
 
 });

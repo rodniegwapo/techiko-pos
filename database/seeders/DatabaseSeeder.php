@@ -22,7 +22,9 @@ class DatabaseSeeder extends Seeder
             ProductSoldTypeSeeder::class,
             UserPinSeeder::class,
             DiscountSeeder::class,
-            MandatoryDiscountSeeder::class
+            MandatoryDiscountSeeder::class,
+            TierSeeder::class,
+            RolePermissionSeeder::class,
         ]);
     }
 }
