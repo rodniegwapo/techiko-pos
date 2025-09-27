@@ -52,8 +52,18 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/customers', [\App\Http\Controllers\CustomerController::class, 'webIndex'])->name('customers.index');
     
     // User Management (Only for super admin, admin, and manager)
-    Route::middleware(['role:super admin|admin|manager'])->group(function () {
+    Route::middleware(['role:super admin|admin|manager|supervisor'])->group(function () {
         Route::get('/users', [\App\Http\Controllers\UserController::class, 'index'])->name('users.index');
+        
+        // Supervisor Assignment Routes
+        Route::post('/users/{user}/assign-supervisor', [\App\Http\Controllers\SupervisorAssignmentController::class, 'assign'])
+            ->name('users.assign-supervisor');
+        Route::delete('/users/{user}/remove-supervisor', [\App\Http\Controllers\SupervisorAssignmentController::class, 'remove'])
+            ->name('users.remove-supervisor');
+        Route::get('/supervisors/available', [\App\Http\Controllers\SupervisorAssignmentController::class, 'availableSupervisors'])
+            ->name('supervisors.available');
+        Route::get('/users/{user}/supervisor-history', [\App\Http\Controllers\SupervisorAssignmentController::class, 'history'])
+            ->name('users.supervisor-history');
     });
     
     // terminal

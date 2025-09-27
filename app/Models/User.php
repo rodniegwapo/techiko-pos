@@ -14,6 +14,11 @@ class User extends Authenticatable
     use HasApiTokens, HasFactory, Notifiable,HasRoles;
 
     /**
+     * The guard name for Spatie Permission.
+     */
+    protected $guard_name = 'web';
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var array<int, string>
@@ -23,6 +28,7 @@ class User extends Authenticatable
         'email',
         'password',
         'status',
+        'supervisor_id',
     ];
 
     /**
@@ -44,4 +50,37 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
     ];
+
+    /**
+     * Get the supervisor that supervises this user.
+     */
+    public function supervisor()
+    {
+        return $this->belongsTo(User::class, 'supervisor_id');
+    }
+
+    /**
+     * Get the users that this user supervises.
+     */
+    public function subordinates()
+    {
+        return $this->hasMany(User::class, 'supervisor_id');
+    }
+
+    /**
+     * Check if this user can supervise the given user.
+     */
+    public function canSupervise(User $user): bool
+    {
+        // Only supervisors can supervise cashiers
+        return $this->hasRole('supervisor') && $user->hasRole('cashier');
+    }
+
+    /**
+     * Check if this user is supervised by the given user.
+     */
+    public function isSupervisedBy(User $supervisor): bool
+    {
+        return $this->supervisor_id === $supervisor->id;
+    }
 }

@@ -70,16 +70,6 @@
           </IconTooltipButton>
 
           <IconTooltipButton
-            v-if="canToggleStatus(record)"
-            hover="group-hover:bg-orange-500"
-            :name="record.status === 'active' ? 'Deactivate User' : 'Activate User'"
-            @click="handleToggleStatus(record)"
-          >
-            <IconUserX v-if="record.status === 'active'" size="20" class="mx-auto" />
-            <IconUserCheck v-else size="20" class="mx-auto" />
-          </IconTooltipButton>
-
-          <IconTooltipButton
             v-if="canDelete(record)"
             hover="group-hover:bg-red-500"
             name="Delete User"
@@ -95,7 +85,7 @@
 
 <script setup>
 import { computed } from "vue";
-import { IconEye, IconEdit, IconTrash, IconUserX, IconUserCheck } from "@tabler/icons-vue";
+import { IconEye, IconEdit, IconTrash } from "@tabler/icons-vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { Modal, notification } from "ant-design-vue";
 import { usePage } from "@inertiajs/vue3";
@@ -152,7 +142,7 @@ const columns = [
     title: "Actions",
     key: "actions",
     align: "center",
-    width: "20%",
+    width: "1%",
   },
 ];
 
@@ -165,61 +155,31 @@ const handleChange = (pagination, filters, sorter) => {
 };
 
 const canEdit = (user) => {
-  const currentUserRoles = currentUser.value?.roles?.map(role => role.name.toLowerCase()) || [];
-  const targetUserRoles = user.roles?.map(role => role.name.toLowerCase()) || [];
-  
-  // super admin can edit anyone except other super admins
-  if (currentUserRoles.includes('super admin')) {
-    return !targetUserRoles.includes('super admin') || user.id === currentUser.value?.id;
+  // super admin can edit anyone
+  if (currentUser.value.roles?.some(role => role.name.toLowerCase() === 'super admin')) {
+    return true;
   }
   
-  // admin can edit users except super admins and other admins
-  if (currentUserRoles.includes('admin')) {
-    return !targetUserRoles.includes('super admin') && !targetUserRoles.includes('admin');
-  }
-  
-  // manager can edit users except super admins, admins, and other managers
-  if (currentUserRoles.includes('manager')) {
-    return !targetUserRoles.includes('super admin') && 
-           !targetUserRoles.includes('admin') && 
-           !targetUserRoles.includes('manager');
+  // admin can edit users except super admins
+  if (currentUser.value.roles?.some(role => role.name.toLowerCase() === 'admin')) {
+    return !user.roles?.some(role => role.name.toLowerCase() === 'super admin');
   }
   
   return false;
 };
 
 const canDelete = (user) => {
-  const currentUserRoles = currentUser.value?.roles?.map(role => role.name.toLowerCase()) || [];
-  const targetUserRoles = user.roles?.map(role => role.name.toLowerCase()) || [];
-  
-  // Only super admin can delete users
-  if (!currentUserRoles.includes('super admin')) {
-    return false;
-  }
-  
-  // Super admin cannot delete other super admins (should use inactive instead)
-  if (targetUserRoles.includes('super admin')) {
-    return false;
-  }
-  
+  // Only super admin can delete
+    if (!currentUser.value.roles?.some(role => role.name.toLowerCase() === 'super admin')) {
+      return false;
+    }
+    
   // Cannot delete yourself
-  if (user.id === currentUser.value?.id) {
+  if (user.id === currentUser.value.id) {
     return false;
   }
   
   return true;
-};
-
-const canToggleStatus = (user) => {
-  const currentUserRoles = currentUser.value?.roles?.map(role => role.name.toLowerCase()) || [];
-  const targetUserRoles = user.roles?.map(role => role.name.toLowerCase()) || [];
-  
-  // Only super admin can toggle status of super admins
-  if (targetUserRoles.includes('super admin')) {
-    return currentUserRoles.includes('super admin') && user.id !== currentUser.value?.id;
-  }
-  
-  return false;
 };
 
 const handleDelete = (user) => {
@@ -243,36 +203,6 @@ const handleDelete = (user) => {
         notification.error({
           message: "Delete Failed",
           description: error.response?.data?.message || "Failed to delete user",
-        });
-      }
-    },
-  });
-};
-
-const handleToggleStatus = (user) => {
-  const isActive = user.status === 'active'; // Assuming we have a status field
-  const action = isActive ? 'deactivate' : 'activate';
-  
-  Modal.confirm({
-    title: `${action.charAt(0).toUpperCase() + action.slice(1)} User`,
-    content: `Are you sure you want to ${action} ${user.name}?`,
-    okText: `Yes, ${action.charAt(0).toUpperCase() + action.slice(1)}`,
-    okType: isActive ? "danger" : "primary",
-    cancelText: "Cancel",
-    onOk: async () => {
-      try {
-        await axios.patch(`/api/users/${user.id}/toggle-status`);
-        notification.success({
-          message: "Status Updated",
-          description: `${user.name} has been ${action}d successfully`,
-        });
-        // Refresh the page data
-        window.location.reload();
-      } catch (error) {
-        console.error("Toggle status error:", error);
-        notification.error({
-          message: "Update Failed",
-          description: error.response?.data?.message || `Failed to ${action} user`,
         });
       }
     },
