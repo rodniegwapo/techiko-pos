@@ -124,6 +124,10 @@
 .contact-filter-popover>.ant-popover-content>.ant-popover-inner>.ant-popover-inner-content>.ant-menu-inline>.ant-menu-item-selected::after {
   border-right: 0 !important;
 }
+.ant-modal-footer .ant-btn.ant-btn-primary {
+  @apply bg-green-700;
+  @apply border-green-700;
+}
 
 @media (max-width: 700px) {
 

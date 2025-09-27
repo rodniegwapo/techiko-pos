@@ -6,16 +6,13 @@ import ApplyOrderDiscountModal from "./ApplyOrderDiscountModal.vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import CustomerLoyaltyCard from "@/Components/Loyalty/CustomerLoyaltyCard.vue";
 import { ref, inject, computed, createVNode } from "vue";
-import {
-  IconArmchair,
-  IconUsers,
-} from "@tabler/icons-vue";
+import { IconArmchair, IconUsers } from "@tabler/icons-vue";
 import {
   CloseOutlined,
   PlusSquareOutlined,
   MinusSquareOutlined,
   ExclamationCircleOutlined,
-  PlusOutlined
+  PlusOutlined,
 } from "@ant-design/icons-vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useOrders } from "@/Composables/useOrderV2";
@@ -90,7 +87,6 @@ const handleSubmitVoid = async () => {
   }
 };
 
-
 const clearForm = () => {
   formData.value = {
     amount: "",
@@ -116,7 +112,7 @@ const customer = ref("");
 
 // Customer loyalty state
 const selectedCustomer = ref(null);
-const customerSearchQuery = ref('');
+const customerSearchQuery = ref("");
 const customerOptions = ref([]);
 const searchingCustomers = ref(false);
 const showAddCustomerModal = ref(false);
@@ -125,9 +121,9 @@ const addingCustomer = ref(false);
 
 // New customer form
 const newCustomerForm = ref({
-  name: '',
-  phone: '',
-  email: '',
+  name: "",
+  phone: "",
+  email: "",
   date_of_birth: null,
 });
 
@@ -135,45 +131,63 @@ const openOrderDicountModal = ref(false);
 
 const showDiscountOrder = () => {
   if (orders.value.length == 0) return;
-  
+
   // Get stored regular and mandatory discount IDs
   const regularDiscountIds = localStorage.getItem("regular_discount_ids") || "";
-  const mandatoryDiscountIds = localStorage.getItem("mandatory_discount_ids") || "";
-  
+  const mandatoryDiscountIds =
+    localStorage.getItem("mandatory_discount_ids") || "";
+
   // Convert stored IDs back to option objects for the select components
-  const regularDiscountOptions = regularDiscountIds 
-    ? regularDiscountIds.split(",")
-        .map(id => Number(id))
-        .filter(id => id)
-        .map(id => {
+  const regularDiscountOptions = regularDiscountIds
+    ? regularDiscountIds
+        .split(",")
+        .map((id) => Number(id))
+        .filter((id) => id)
+        .map((id) => {
           // Find the matching option from available discounts
-          const discount = (page.props.discounts || []).find(d => d.id === id);
-          return discount ? {
-            label: `${discount.name} (${discount.type === 'percentage' ? discount.value + '%' : '₱' + discount.value})`,
-            value: discount.id,
-            amount: discount.value,
-            type: discount.type,
-          } : null;
+          const discount = (page.props.discounts || []).find(
+            (d) => d.id === id
+          );
+          return discount
+            ? {
+                label: `${discount.name} (${
+                  discount.type === "percentage"
+                    ? discount.value + "%"
+                    : "₱" + discount.value
+                })`,
+                value: discount.id,
+                amount: discount.value,
+                type: discount.type,
+              }
+            : null;
         })
         .filter(Boolean)
     : [];
-  
-  const mandatoryDiscountId = mandatoryDiscountIds 
+
+  const mandatoryDiscountId = mandatoryDiscountIds
     ? Number(mandatoryDiscountIds.split(",")[0])
     : null;
-    
-  const mandatoryDiscountOption = mandatoryDiscountId 
+
+  const mandatoryDiscountOption = mandatoryDiscountId
     ? (() => {
-        const discount = (page.props.mandatoryDiscounts || []).find(d => d.id === mandatoryDiscountId);
-        return discount ? {
-          label: `${discount.name} (${discount.type === 'percentage' ? discount.value + '%' : '₱' + discount.value})`,
-          value: discount.id,
-          amount: discount.value,
-          type: discount.type,
-        } : null;
+        const discount = (page.props.mandatoryDiscounts || []).find(
+          (d) => d.id === mandatoryDiscountId
+        );
+        return discount
+          ? {
+              label: `${discount.name} (${
+                discount.type === "percentage"
+                  ? discount.value + "%"
+                  : "₱" + discount.value
+              })`,
+              value: discount.id,
+              amount: discount.value,
+              type: discount.type,
+            }
+          : null;
       })()
     : null;
-  
+
   formData.value = {
     orderDiscount: regularDiscountOptions,
     mandatoryDiscount: mandatoryDiscountOption,
@@ -184,37 +198,36 @@ const showDiscountOrder = () => {
 const cardClass =
   "w-1/2 border shadow text-center flex justify-center rounded-lg items-center gap-2 p-2 hover:bg-blue-400 hover:text-white  cursor-pointer";
 
-
 const showPayment = ref(false);
 
 // Customer search with debounce
 const handleCustomerSearch = useDebounceFn(async (query) => {
-  console.log('Searching for:', query); // Debug log
-  
+  console.log("Searching for:", query); // Debug log
+
   if (!query || query.length < 2) {
     customerOptions.value = [];
     return;
   }
 
   searchingCustomers.value = true;
-  
+
   try {
-    const response = await axios.get('/api/customers/search', {
-      params: { q: query }
+    const response = await axios.get("/api/customers/search", {
+      params: { q: query },
     });
-    
-    console.log('Search results:', response.data); // Debug log
-    
-    customerOptions.value = response.data.map(customer => ({
+
+    console.log("Search results:", response.data); // Debug log
+
+    customerOptions.value = response.data.map((customer) => ({
       value: customer.id,
       label: customer.display_text,
       customer: customer,
     }));
   } catch (error) {
-    console.error('Customer search error:', error);
+    console.error("Customer search error:", error);
     notification.error({
-      message: 'Search Error',
-      description: 'Failed to search customers. Please try again.',
+      message: "Search Error",
+      description: "Failed to search customers. Please try again.",
     });
   } finally {
     searchingCustomers.value = false;
@@ -223,23 +236,23 @@ const handleCustomerSearch = useDebounceFn(async (query) => {
 
 // Handle customer selection
 const handleCustomerSelect = (customerId) => {
-  console.log('Customer selected:', customerId); // Debug log
-  
-  const option = customerOptions.value.find(opt => opt.value === customerId);
+  console.log("Customer selected:", customerId); // Debug log
+
+  const option = customerOptions.value.find((opt) => opt.value === customerId);
   if (option) {
     selectedCustomer.value = option.customer;
-    customerSearchQuery.value = '';
+    customerSearchQuery.value = "";
     customerOptions.value = [];
-    
-    console.log('Selected customer:', option.customer); // Debug log
-    
+
+    console.log("Selected customer:", option.customer); // Debug log
+
     notification.success({
-      message: 'Customer Selected',
+      message: "Customer Selected",
       description: `${option.customer.name} (${option.customer.tier_info.name} tier) selected`,
       duration: 2,
     });
   } else {
-    console.error('Customer option not found for ID:', customerId);
+    console.error("Customer option not found for ID:", customerId);
   }
 };
 
@@ -253,7 +266,7 @@ const handleCustomerTypeChange = (isLoyal) => {
 // Clear selected customer
 const clearCustomer = () => {
   selectedCustomer.value = null;
-  customerSearchQuery.value = '';
+  customerSearchQuery.value = "";
   customerOptions.value = [];
 };
 
@@ -262,47 +275,45 @@ const showCustomerDetails = () => {
   showCustomerDetailsModal.value = true;
 };
 
-
 // Add new customer
 const handleAddCustomer = async () => {
   if (!newCustomerForm.value.name) {
     notification.error({
-      message: 'Validation Error',
-      description: 'Customer name is required',
+      message: "Validation Error",
+      description: "Customer name is required",
     });
     return;
   }
 
   addingCustomer.value = true;
-  
+
   try {
-    const response = await axios.post('/api/customers', newCustomerForm.value);
-    
+    const response = await axios.post("/api/customers", newCustomerForm.value);
+
     selectedCustomer.value = response.data.customer;
     showAddCustomerModal.value = false;
-    
+
     // Reset form
     newCustomerForm.value = {
-      name: '',
-      phone: '',
-      email: '',
+      name: "",
+      phone: "",
+      email: "",
       date_of_birth: null,
     };
-    
+
     notification.success({
-      message: 'Customer Added',
+      message: "Customer Added",
       description: `${response.data.customer.name} has been added and selected`,
     });
   } catch (error) {
     notification.error({
-      message: 'Error',
-      description: error.response?.data?.message || 'Failed to add customer',
+      message: "Error",
+      description: error.response?.data?.message || "Failed to add customer",
     });
   } finally {
     addingCustomer.value = false;
   }
 };
-
 
 // Export customer data for parent component
 defineExpose({
@@ -321,15 +332,18 @@ defineExpose({
       @change="handleCustomerTypeChange"
     />
   </div>
-  
+
   <!-- Customer Search/Display -->
   <div class="mt-1">
     <div v-if="isLoyalCustomer" class="space-y-2 max-h-52 overflow-y-auto">
       <!-- Search Instructions -->
-      <div v-if="!selectedCustomer && customerSearchQuery.length < 2" class="text-xs text-gray-500 mb-1">
+      <div
+        v-if="!selectedCustomer && customerSearchQuery.length < 2"
+        class="text-xs text-gray-500 mb-1"
+      >
         💡 Type at least 2 characters to search for existing customers
       </div>
-      
+
       <!-- Customer Search -->
       <a-auto-complete
         v-if="!selectedCustomer"
@@ -339,21 +353,30 @@ defineExpose({
         :loading="searchingCustomers"
         @search="handleCustomerSearch"
         @select="handleCustomerSelect"
-        @clear="() => { customerOptions = []; }"
+        @clear="
+          () => {
+            customerOptions = [];
+          }
+        "
         allow-clear
         class="w-full"
         :filter-option="false"
       >
         <template #option="{ value, label, customer }">
-          <div class="flex justify-between items-center py-2 px-1 hover:bg-gray-50 rounded transition-colors">
+          <div
+            class="flex justify-between items-center py-2 px-1 hover:bg-gray-50 rounded transition-colors"
+          >
             <div class="flex-1">
               <div class="font-medium text-sm">{{ customer.name }}</div>
               <div class="text-xs text-gray-500">
-                {{ customer.phone || customer.email || 'No contact info' }}
+                {{ customer.phone || customer.email || "No contact info" }}
               </div>
             </div>
             <div class="text-right ml-2">
-              <div class="text-xs font-medium px-2 py-0.5 rounded-full text-white" :style="{ backgroundColor: customer.tier_info.color }">
+              <div
+                class="text-xs font-medium px-2 py-0.5 rounded-full text-white"
+                :style="{ backgroundColor: customer.tier_info.color }"
+              >
                 {{ customer.tier_info.name }}
               </div>
               <div class="text-xs text-purple-600 mt-0.5">
@@ -362,19 +385,30 @@ defineExpose({
             </div>
           </div>
         </template>
-        
+
         <!-- Loading state -->
         <template #notFoundContent v-if="searchingCustomers">
           <div class="text-center py-2 text-gray-500">
             <a-spin size="small" /> Searching...
           </div>
         </template>
-        
+
         <!-- Empty state -->
-        <template #notFoundContent v-else-if="customerSearchQuery && customerSearchQuery.length >= 2 && customerOptions.length === 0">
+        <template
+          #notFoundContent
+          v-else-if="
+            customerSearchQuery &&
+            customerSearchQuery.length >= 2 &&
+            customerOptions.length === 0
+          "
+        >
           <div class="text-center py-2 text-gray-500">
-            No customers found. 
-            <a-button type="link" size="small" @click="showAddCustomerModal = true">
+            No customers found.
+            <a-button
+              type="link"
+              size="small"
+              @click="showAddCustomerModal = true"
+            >
               Add new customer
             </a-button>
           </div>
@@ -393,9 +427,14 @@ defineExpose({
 
       <!-- Quick Add Customer -->
       <div class="flex gap-2">
-        <a-button size="small" @click="showAddCustomerModal = true">
-          <plus-outlined />
-          Add New Customer
+        <a-button
+          type="primary"
+          size="small"
+          @click="showAddCustomerModal = true"
+        >
+          <div class="flex items-center gap-2">
+            <plus-outlined /> <span class="text-xs"> Add New Customer</span>
+          </div>
         </a-button>
       </div>
     </div>
@@ -427,16 +466,18 @@ defineExpose({
     <!-- Transition wrapper -->
     <Transition name="slide-x" mode="out-in">
       <!-- 🟥 ORDER SUMMARY PAGE -->
-      <div v-if="!showPayment" key="order" >
+      <div v-if="!showPayment" key="order">
         <div
           :class="[
             'scrollable-orders relative flex flex-col gap-2 mt-4 overflow-auto overflow-x-hidden transition-all duration-300',
             {
               'h-[calc(100vh-430px)]': !isLoyalCustomer,
               'h-[calc(100vh-480px)]': isLoyalCustomer && !selectedCustomer,
-              'h-[calc(100vh-570px)]': isLoyalCustomer && selectedCustomer && totalAmount <= 0,
-              'h-[calc(100vh-540px)]': isLoyalCustomer && selectedCustomer && totalAmount > 0
-            }
+              'h-[calc(100vh-570px)]':
+                isLoyalCustomer && selectedCustomer && totalAmount <= 0,
+              'h-[calc(100vh-540px)]':
+                isLoyalCustomer && selectedCustomer && totalAmount > 0,
+            },
           ]"
         >
           <div
@@ -458,9 +499,9 @@ defineExpose({
 
                 <div class="text-md flex items-center gap-1 text-gray-800">
                   <a-tooltip title="Add item">
-                    <a-button 
-                      type="text" 
-                      size="small" 
+                    <a-button
+                      type="text"
+                      size="small"
                       @click.stop="handleAddOrder(order)"
                       class="p-0 h-auto border-0 text-green-600 hover:text-green-700"
                     >
@@ -471,9 +512,9 @@ defineExpose({
                   </a-tooltip>
                   <span class="mx-2 font-medium">{{ order.quantity }}</span>
                   <a-tooltip title="Remove item">
-                    <a-button 
-                      type="text" 
-                      size="small" 
+                    <a-button
+                      type="text"
+                      size="small"
                       @click.stop="handleSubtractOrder(order)"
                       class="p-0 h-auto border-0 text-red-600 hover:text-red-700"
                     >
@@ -490,9 +531,9 @@ defineExpose({
 
               <div class="text-right flex flex-col py-1 items-end gap-1">
                 <a-tooltip title="Remove item from order">
-                  <a-button 
-                    type="text" 
-                    size="small" 
+                  <a-button
+                    type="text"
+                    size="small"
                     @click.stop="showVoidItem(order)"
                     class="p-1 h-auto border-0 text-red-600 hover:text-red-700 hover:bg-red-50"
                   >
@@ -536,7 +577,6 @@ defineExpose({
           </div>
         </div>
       </div>
-
     </Transition>
   </div>
 
@@ -574,21 +614,34 @@ defineExpose({
     v-model:visible="showAddCustomerModal"
     title="Add New Customer"
     @ok="handleAddCustomer"
+    okText="Add Customer"
     @cancel="showAddCustomerModal = false"
     :confirm-loading="addingCustomer"
   >
     <a-form :model="newCustomerForm" layout="vertical">
       <a-form-item label="Name" required>
-        <a-input v-model:value="newCustomerForm.name" placeholder="Customer name" />
+        <a-input
+          v-model:value="newCustomerForm.name"
+          placeholder="Customer name"
+        />
       </a-form-item>
       <a-form-item label="Phone">
-        <a-input v-model:value="newCustomerForm.phone" placeholder="Phone number" />
+        <a-input
+          v-model:value="newCustomerForm.phone"
+          placeholder="Phone number"
+        />
       </a-form-item>
       <a-form-item label="Email">
-        <a-input v-model:value="newCustomerForm.email" placeholder="Email address" />
+        <a-input
+          v-model:value="newCustomerForm.email"
+          placeholder="Email address"
+        />
       </a-form-item>
       <a-form-item label="Date of Birth">
-        <a-date-picker v-model:value="newCustomerForm.date_of_birth" class="w-full" />
+        <a-date-picker
+          v-model:value="newCustomerForm.date_of_birth"
+          class="w-full"
+        />
       </a-form-item>
     </a-form>
   </a-modal>
@@ -605,15 +658,25 @@ defineExpose({
         <div>
           <h4 class="font-medium text-gray-700">Contact Information</h4>
           <p><strong>Name:</strong> {{ selectedCustomer.name }}</p>
-          <p><strong>Phone:</strong> {{ selectedCustomer.phone || 'N/A' }}</p>
-          <p><strong>Email:</strong> {{ selectedCustomer.email || 'N/A' }}</p>
+          <p><strong>Phone:</strong> {{ selectedCustomer.phone || "N/A" }}</p>
+          <p><strong>Email:</strong> {{ selectedCustomer.email || "N/A" }}</p>
         </div>
         <div>
           <h4 class="font-medium text-gray-700">Loyalty Status</h4>
           <p><strong>Tier:</strong> {{ selectedCustomer.tier_info.name }}</p>
-          <p><strong>Points:</strong> {{ selectedCustomer.loyalty_points?.toLocaleString() || 0 }}</p>
-          <p><strong>Lifetime Spent:</strong> ₱{{ selectedCustomer.lifetime_spent?.toLocaleString() || 0 }}</p>
-          <p><strong>Total Purchases:</strong> {{ selectedCustomer.total_purchases || 0 }}</p>
+          <p>
+            <strong>Points:</strong>
+            {{ selectedCustomer.loyalty_points?.toLocaleString() || 0 }}
+          </p>
+          <p>
+            <strong>Lifetime Spent:</strong> ₱{{
+              selectedCustomer.lifetime_spent?.toLocaleString() || 0
+            }}
+          </p>
+          <p>
+            <strong>Total Purchases:</strong>
+            {{ selectedCustomer.total_purchases || 0 }}
+          </p>
         </div>
       </div>
     </div>
@@ -635,6 +698,5 @@ defineExpose({
   opacity: 0;
   transform: translateX(-100%);
 }
-
 </style>
 
