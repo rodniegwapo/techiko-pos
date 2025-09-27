@@ -44,6 +44,10 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('mandatory-discounts', \App\Http\Controllers\MandatoryDiscountController::class)->names('mandatory-discounts');
 
     Route::get('/sales', [\App\Http\Controllers\SaleController::class, 'index'])->name('sales.index');
+    
+    // Loyalty Program
+    Route::get('/loyalty', [\App\Http\Controllers\LoyaltyController::class, 'index'])->name('loyalty.index');
+    
     // terminal
     Route::post('/setup-terminal', [\App\Http\Controllers\TerminalController::class, 'setupTerminal'])->name('setup.terminal');
 

@@ -3,10 +3,34 @@
 namespace App\Http\Controllers;
 
 use App\Models\Customer;
+use App\Models\LoyaltyTier;
 use Illuminate\Http\Request;
 
 class CustomerController extends Controller
 {
+    public function index(Request $request)
+    {
+        $query = Customer::query()
+            ->when($request->input('search'), function ($query, $search) {
+                return $query->search($search);
+            })
+            ->when($request->input('tier'), function ($query, $tier) {
+                return $query->where('tier', $tier);
+            });
+
+        $customers = $query->paginate($request->get('per_page', 10));
+
+        return response()->json([
+            'data' => $customers->items(),
+            'pagination' => [
+                'current_page' => $customers->currentPage(),
+                'last_page' => $customers->lastPage(),
+                'per_page' => $customers->perPage(),
+                'total' => $customers->total(),
+            ]
+        ]);
+    }
+
     public function search(Request $request)
     {
         $query = $request->get('q', '');
@@ -37,6 +61,18 @@ class CustomerController extends Controller
             });
 
         return response()->json($customers);
+    }
+
+    public function getTierOptions()
+    {
+        $tiers = LoyaltyTier::active()->ordered()->get(['name', 'display_name']);
+        
+        return response()->json($tiers->map(function ($tier) {
+            return [
+                'value' => $tier->name,
+                'label' => $tier->display_name,
+            ];
+        }));
     }
 
     public function store(Request $request)

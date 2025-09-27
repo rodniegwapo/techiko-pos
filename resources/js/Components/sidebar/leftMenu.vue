@@ -7,6 +7,7 @@ import {
   IconBrandProducthunt,
   IconHeartHandshake,
   IconHistory,
+  IconGift,
 } from "@tabler/icons-vue";
 import { router, usePage } from "@inertiajs/vue3";
 
@@ -51,6 +52,12 @@ const menus = computed(() => {
           path: route("mandatory-discounts.index"),
         },
       ],
+    },
+    {
+      title: "Loyalty Program",
+      path: route("loyalty.index"),
+      icon: IconGift,
+      pathName: "loyalty",
     },
     {
       title: "Void logs",
