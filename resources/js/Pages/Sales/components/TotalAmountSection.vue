@@ -22,6 +22,14 @@ const {
   finalizeOrder,
 } = useOrders();
 
+// Get customer data from parent component (will be passed as prop)
+const props = defineProps({
+  selectedCustomer: {
+    type: Object,
+    default: null
+  }
+});
+
 const amountReceived = ref(0);
 
 const openOrderDicountModal = ref(false);
@@ -109,23 +117,58 @@ const handleProceedPaymentConfirmation = () => {
 const handleProceedPayment = async () => {
   try {
     proceedPaymentLoading.value = true;
-    await axios.post(
+    
+    // Single API call to process payment and loyalty together
+    const response = await axios.post(
       route("sales.payment.store", {
         sale: orderId.value,
-      })
+      }),
+      {
+        // Include customer data for loyalty processing
+        customer_id: props.selectedCustomer?.id || null,
+        sale_amount: totalAmount.value
+      }
     );
+    
+    // Clean up and finalize
     amountReceived.value = 0;
     finalizeOrder();
-    notification["success"]({
-      message: "Success",
-    });
+    
+    // Show success notification based on response
+    const loyaltyResults = response.data.loyalty_results;
+    
+    if (loyaltyResults && loyaltyResults.points_earned) {
+      notification.success({
+        message: "Payment Successful!",
+        description: `Transaction completed. ${props.selectedCustomer.name} earned ${loyaltyResults.points_earned} points!`,
+        duration: 5,
+      });
+      
+      // Show tier upgrade notification if applicable
+      if (loyaltyResults.tier_upgraded) {
+        setTimeout(() => {
+          notification.info({
+            message: "Tier Upgraded!",
+            description: `🎉 ${props.selectedCustomer.name} is now ${loyaltyResults.new_tier.toUpperCase()} tier!`,
+            duration: 8,
+          });
+        }, 1000);
+      }
+    } else {
+      notification.success({
+        message: "Payment Successful!",
+        description: "Transaction completed successfully.",
+      });
+    }
+    
     localStorage.setItem("order_discount_amount", 0);
     localStorage.setItem("order_discount_ids", "");
     orderDiscountAmount.value = 0;
     orderDiscountId.value = "";
   } catch (error) {
-    notification["error"]({
+    notification.error({
       message: "Payment failed",
+      description: "Please try again or contact support.",
     });
     throw error;
   } finally {

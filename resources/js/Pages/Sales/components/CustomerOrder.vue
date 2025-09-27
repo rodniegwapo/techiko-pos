@@ -5,7 +5,7 @@ import ApplyProductDiscountModal from "./ApplyProductDiscountModal.vue";
 import ApplyOrderDiscountModal from "./ApplyOrderDiscountModal.vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import CustomerLoyaltyCard from "@/Components/Loyalty/CustomerLoyaltyCard.vue";
-import { ref, inject, computed, createVNode } from "vue";
+import { ref, inject, computed, createVNode, watch } from "vue";
 import { IconArmchair, IconUsers } from "@tabler/icons-vue";
 import {
   CloseOutlined,
@@ -314,6 +314,14 @@ const handleAddCustomer = async () => {
     addingCustomer.value = false;
   }
 };
+
+// Emit customer changes to parent
+const emit = defineEmits(['customerChanged']);
+
+// Watch for customer changes and emit to parent
+watch(selectedCustomer, (newCustomer) => {
+  emit('customerChanged', newCustomer);
+}, { immediate: true });
 
 // Export customer data for parent component
 defineExpose({
