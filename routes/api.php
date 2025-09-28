@@ -105,11 +105,11 @@ Route::middleware('auth:sanctum')->group(function () {
         // Stock adjustments API
         Route::get('/adjustments', [\App\Http\Controllers\StockAdjustmentController::class, 'index'])->name('adjustments.index');
         Route::post('/adjustments', [\App\Http\Controllers\StockAdjustmentController::class, 'store'])->name('adjustments.store');
-        Route::get('/adjustments/{stockAdjustment}', [\App\Http\Controllers\StockAdjustmentController::class, 'show'])->name('adjustments.show');
-        Route::put('/adjustments/{stockAdjustment}', [\App\Http\Controllers\StockAdjustmentController::class, 'update'])->name('adjustments.update');
-        Route::post('/adjustments/{stockAdjustment}/submit', [\App\Http\Controllers\StockAdjustmentController::class, 'submitForApproval'])->name('adjustments.submit');
-        Route::post('/adjustments/{stockAdjustment}/approve', [\App\Http\Controllers\StockAdjustmentController::class, 'approve'])->name('adjustments.approve');
-        Route::post('/adjustments/{stockAdjustment}/reject', [\App\Http\Controllers\StockAdjustmentController::class, 'reject'])->name('adjustments.reject');
+        Route::get('/adjustments/{adjustment}', [\App\Http\Controllers\StockAdjustmentController::class, 'show'])->name('adjustments.show');
+        Route::put('/adjustments/{adjustment}', [\App\Http\Controllers\StockAdjustmentController::class, 'update'])->name('adjustments.update');
+        Route::post('/adjustments/{adjustment}/submit', [\App\Http\Controllers\StockAdjustmentController::class, 'submitForApproval'])->name('adjustments.submit');
+        Route::post('/adjustments/{adjustment}/approve', [\App\Http\Controllers\StockAdjustmentController::class, 'approve'])->name('adjustments.approve');
+        Route::post('/adjustments/{adjustment}/reject', [\App\Http\Controllers\StockAdjustmentController::class, 'reject'])->name('adjustments.reject');
         Route::get('/adjustment-products', [\App\Http\Controllers\StockAdjustmentController::class, 'getProductsForAdjustment'])->name('adjustment-products');
     });
 

@@ -141,10 +141,10 @@ class StockAdjustmentController extends Controller
     /**
      * Display the specified stock adjustment
      */
-    public function show(Request $request, StockAdjustment $stockAdjustment)
+    public function show(Request $request, StockAdjustment $adjustment)
     {
         try {
-            $stockAdjustment->load([
+            $adjustment->load([
                 'location',
                 'createdBy',
                 'approvedBy',
@@ -155,25 +155,25 @@ class StockAdjustmentController extends Controller
             if ($request->expectsJson() || $request->is('api/*')) {
                 return response()->json([
                     'success' => true,
-                    'adjustment' => $stockAdjustment,
+                    'adjustment' => $adjustment,
                 ]);
             }
 
             // Return Inertia render for web requests
             return Inertia::render('Inventory/StockAdjustments/Show', [
-                'adjustment' => $stockAdjustment,
+                'adjustment' => $adjustment,
             ]);
         } catch (\Exception $e) {
-            \Log::error('Error in StockAdjustmentController@show: ' . $e->getMessage(), [
-                'adjustment_id' => $stockAdjustment->id ?? 'unknown',
+            \Log::error('Error in StockAdjustmentController@show: '.$e->getMessage(), [
+                'adjustment_id' => $adjustment->id ?? 'unknown',
                 'request_data' => $request->all(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             if ($request->expectsJson() || $request->is('api/*')) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Failed to load adjustment details: ' . $e->getMessage(),
+                    'message' => 'Failed to load adjustment details: '.$e->getMessage(),
                 ], 500);
             }
 
@@ -184,9 +184,9 @@ class StockAdjustmentController extends Controller
     /**
      * Update the specified stock adjustment
      */
-    public function update(Request $request, StockAdjustment $stockAdjustment)
+    public function update(Request $request, StockAdjustment $adjustment)
     {
-        if ($stockAdjustment->status !== 'draft') {
+        if ($adjustment->status !== 'draft') {
             return response()->json([
                 'success' => false,
                 'message' => 'Only draft adjustments can be updated',
@@ -200,7 +200,7 @@ class StockAdjustmentController extends Controller
         ]);
 
         try {
-            $stockAdjustment->update($validated);
+            $adjustment->update($validated);
 
             return response()->json([
                 'success' => true,
@@ -217,10 +217,10 @@ class StockAdjustmentController extends Controller
     /**
      * Submit stock adjustment for approval
      */
-    public function submitForApproval(Request $request, StockAdjustment $stockAdjustment)
+    public function submitForApproval(Request $request, StockAdjustment $adjustment)
     {
         try {
-            $stockAdjustment->submitForApproval();
+            $adjustment->submitForApproval();
 
             if ($request->expectsJson() || $request->is('api/*')) {
                 return response()->json([
@@ -245,10 +245,10 @@ class StockAdjustmentController extends Controller
     /**
      * Approve stock adjustment
      */
-    public function approve(Request $request, StockAdjustment $stockAdjustment)
+    public function approve(Request $request, StockAdjustment $adjustment)
     {
         try {
-            $stockAdjustment->approve(auth()->user());
+            $adjustment->approve(auth()->user());
 
             if ($request->expectsJson() || $request->is('api/*')) {
                 return response()->json([
@@ -273,10 +273,10 @@ class StockAdjustmentController extends Controller
     /**
      * Reject stock adjustment
      */
-    public function reject(Request $request, StockAdjustment $stockAdjustment)
+    public function reject(Request $request, StockAdjustment $adjustment)
     {
         try {
-            $stockAdjustment->reject();
+            $adjustment->reject();
 
             if ($request->expectsJson() || $request->is('api/*')) {
                 return response()->json([
@@ -301,9 +301,9 @@ class StockAdjustmentController extends Controller
     /**
      * Delete stock adjustment (only drafts)
      */
-    public function destroy(StockAdjustment $stockAdjustment)
+    public function destroy(StockAdjustment $adjustment)
     {
-        if ($stockAdjustment->status !== 'draft') {
+        if ($adjustment->status !== 'draft') {
             return response()->json([
                 'success' => false,
                 'message' => 'Only draft adjustments can be deleted',
@@ -311,7 +311,7 @@ class StockAdjustmentController extends Controller
         }
 
         try {
-            $stockAdjustment->delete();
+            $adjustment->delete();
 
             return response()->json([
                 'success' => true,
