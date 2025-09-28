@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\UserResource;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -46,8 +47,6 @@ class UserController extends Controller
                 });
             })
             ->when($currentUser->hasRole('supervisor'), function ($query) use ($currentUser) {
-
-                logger('has supervisor');
                 // Supervisor can only see cashiers assigned to them
                 return $query->whereHas('roles', function ($q) {
                     $q->where('name', 'cashier');
@@ -79,7 +78,7 @@ class UserController extends Controller
             ->get(['id', 'name']);
 
         return Inertia::render('Users/Index', [
-            'items' => $users,
+            'items' => UserResource::collection($users),
             'roles' => $roles->values()
         ]);
     }

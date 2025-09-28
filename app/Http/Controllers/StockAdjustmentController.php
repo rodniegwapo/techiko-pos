@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\StockAdjustmentResource;
 use App\Models\InventoryLocation;
 use App\Models\Product\Product;
 use App\Models\StockAdjustment;
@@ -55,7 +56,7 @@ class StockAdjustmentController extends Controller
         $adjustments = $query->paginate($request->per_page ?? 20);
 
         return Inertia::render('Inventory/StockAdjustments/Index', [
-            'adjustments' => $adjustments,
+            'adjustments' => StockAdjustmentResource::collection($adjustments),
             'locations' => InventoryLocation::active()->get(),
             'statuses' => [
                 'draft' => 'Draft',
@@ -179,6 +180,39 @@ class StockAdjustmentController extends Controller
 
             abort(500, 'Failed to load adjustment details');
         }
+    }
+
+    /**
+     * Show the form for editing the specified stock adjustment
+     */
+    public function edit(StockAdjustment $adjustment)
+    {
+        // Only allow editing of draft adjustments
+        if ($adjustment->status !== 'draft') {
+            abort(403, 'Only draft adjustments can be edited');
+        }
+
+        $adjustment->load([
+            'location',
+            'createdBy',
+            'items.product',
+        ]);
+
+        return Inertia::render('Inventory/StockAdjustments/Edit', [
+            'adjustment' => $adjustment,
+            'locations' => InventoryLocation::active()->get(),
+            'reasons' => [
+                'physical_count' => 'Physical Count',
+                'damaged_goods' => 'Damaged Goods',
+                'expired_goods' => 'Expired Goods',
+                'theft_loss' => 'Theft/Loss',
+                'supplier_error' => 'Supplier Error',
+                'system_error' => 'System Error',
+                'promotion' => 'Promotion',
+                'sample' => 'Sample',
+                'other' => 'Other',
+            ],
+        ]);
     }
 
     /**
