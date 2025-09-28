@@ -26,32 +26,22 @@ class StockAdjustmentController extends Controller
     {
         $query = StockAdjustment::with(['location', 'createdBy', 'approvedBy'])
             ->withCount('items')
+            ->when($request->input('search'), function ($query, $search) {
+                return $query->search($search);
+            })
+            ->when($request->input('status'), function ($query, $status) {
+                return $query->where('status', $status);
+            })
+            ->when($request->input('location_id'), function ($query, $locationId) {
+                return $query->where('location_id', $locationId);
+            })
+            ->when($request->input('date_from'), function ($query, $dateFrom) {
+                return $query->whereDate('created_at', '>=', $dateFrom);
+            })
+            ->when($request->input('date_to'), function ($query, $dateTo) {
+                return $query->whereDate('created_at', '<=', $dateTo);
+            })
             ->orderBy('created_at', 'desc');
-
-        // Apply filters
-        if ($request->search) {
-            $query->where(function ($q) use ($request) {
-                $q->where('adjustment_number', 'like', "%{$request->search}%")
-                    ->orWhere('reason', 'like', "%{$request->search}%")
-                    ->orWhere('notes', 'like', "%{$request->search}%");
-            });
-        }
-
-        if ($request->status) {
-            $query->where('status', $request->status);
-        }
-
-        if ($request->location_id) {
-            $query->where('location_id', $request->location_id);
-        }
-
-        if ($request->date_from) {
-            $query->whereDate('created_at', '>=', $request->date_from);
-        }
-
-        if ($request->date_to) {
-            $query->whereDate('created_at', '<=', $request->date_to);
-        }
 
         $adjustments = $query->paginate($request->per_page ?? 20);
 
