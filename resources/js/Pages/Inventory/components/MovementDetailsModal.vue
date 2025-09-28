@@ -1,14 +1,14 @@
 <script setup>
 import { computed, toRefs } from "vue";
-import { 
-  IconArrowUp, 
+import {
+  IconArrowUp,
   IconArrowDown,
   IconPackage,
   IconMapPin,
   IconUser,
   IconCalendar,
   IconFileText,
-  IconCurrencyDollar
+  IconCurrencyDollar,
 } from "@tabler/icons-vue";
 import { useHelpers } from "@/Composables/useHelpers";
 
@@ -27,42 +27,45 @@ const props = defineProps({
 
 const { visible } = toRefs(props);
 
-const emit = defineEmits(['update:visible']);
+const emit = defineEmits(["update:visible"]);
 
 const handleClose = () => {
-  emit('update:visible', false);
+  emit("update:visible", false);
 };
 
 const getMovementTypeColor = (type) => {
   const colors = {
-    'sale': 'red',
-    'purchase': 'green',
-    'adjustment': 'blue',
-    'transfer_in': 'cyan',
-    'transfer_out': 'orange',
-    'return': 'purple',
-    'damage': 'volcano',
-    'theft': 'magenta',
-    'expired': 'gold',
-    'promotion': 'lime',
+    sale: "red",
+    purchase: "green",
+    adjustment: "blue",
+    transfer_in: "cyan",
+    transfer_out: "orange",
+    return: "purple",
+    damage: "volcano",
+    theft: "magenta",
+    expired: "gold",
+    promotion: "lime",
   };
-  return colors[type] || 'default';
+  return colors[type] || "default";
 };
 
 const getMovementTypeDisplay = (type) => {
   const displays = {
-    'sale': 'Sale',
-    'purchase': 'Purchase',
-    'adjustment': 'Stock Adjustment',
-    'transfer_in': 'Transfer In',
-    'transfer_out': 'Transfer Out',
-    'return': 'Customer Return',
-    'damage': 'Damaged Goods',
-    'theft': 'Theft/Loss',
-    'expired': 'Expired Products',
-    'promotion': 'Promotional Giveaway',
+    sale: "Sale",
+    purchase: "Purchase",
+    adjustment: "Stock Adjustment",
+    transfer_in: "Transfer In",
+    transfer_out: "Transfer Out",
+    return: "Customer Return",
+    damage: "Damaged Goods",
+    theft: "Theft/Loss",
+    expired: "Expired Products",
+    promotion: "Promotional Giveaway",
   };
-  return displays[type] || type?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+  return (
+    displays[type] ||
+    type?.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase())
+  );
 };
 
 const isIncrease = computed(() => {
@@ -86,20 +89,28 @@ const isDecrease = computed(() => {
       <!-- Movement Header -->
       <div class="flex items-start justify-between pb-4 border-b">
         <div class="flex items-center space-x-3">
-          <div class="p-2 rounded-lg" :class="{
-            'bg-green-100 text-green-600': isIncrease,
-            'bg-red-100 text-red-600': isDecrease
-          }">
+          <div
+            class="p-2 rounded-lg"
+            :class="{
+              'bg-green-100 text-green-600': isIncrease,
+              'bg-red-100 text-red-600': isDecrease,
+            }"
+          >
             <IconArrowUp v-if="isIncrease" :size="24" />
             <IconArrowDown v-if="isDecrease" :size="24" />
           </div>
           <div>
-            <h3 class="text-lg font-semibold">{{ getMovementTypeDisplay(movement.movement_type) }}</h3>
+            <h3 class="text-lg font-semibold">
+              {{ getMovementTypeDisplay(movement.movement_type) }}
+            </h3>
             <p class="text-sm text-gray-500">Movement #{{ movement.id }}</p>
           </div>
         </div>
-        
-        <a-tag :color="getMovementTypeColor(movement.movement_type)" size="large">
+
+        <a-tag
+          :color="getMovementTypeColor(movement.movement_type)"
+          size="large"
+        >
           {{ getMovementTypeDisplay(movement.movement_type) }}
         </a-tag>
       </div>
@@ -110,23 +121,29 @@ const isDecrease = computed(() => {
           <IconPackage :size="18" class="mr-2" />
           Product Information
         </h4>
-        <div class="bg-gray-50 p-4 rounded-lg">
+        <div class="bg-gray-50 p-4 rounded-lg border">
           <div class="grid grid-cols-2 gap-4">
             <div>
               <p class="text-sm text-gray-600">Product Name</p>
-              <p class="font-semibold">{{ movement.product?.name || 'Unknown Product' }}</p>
+              <p class="font-semibold">
+                {{ movement.product?.name || "Unknown Product" }}
+              </p>
             </div>
             <div>
               <p class="text-sm text-gray-600">SKU</p>
-              <p class="font-semibold">{{ movement.product?.SKU || 'N/A' }}</p>
+              <p class="font-semibold">{{ movement.product?.SKU || "N/A" }}</p>
             </div>
             <div>
               <p class="text-sm text-gray-600">Category</p>
-              <p class="font-semibold">{{ movement.product?.category?.name || 'No Category' }}</p>
+              <p class="font-semibold">
+                {{ movement.product?.category?.name || "No Category" }}
+              </p>
             </div>
             <div>
               <p class="text-sm text-gray-600">Unit of Measure</p>
-              <p class="font-semibold">{{ movement.product?.unit_of_measure || 'pcs' }}</p>
+              <p class="font-semibold">
+                {{ movement.product?.unit_of_measure || "pcs" }}
+              </p>
             </div>
           </div>
         </div>
@@ -136,25 +153,35 @@ const isDecrease = computed(() => {
       <div>
         <h4 class="text-md font-semibold mb-3">Quantity Changes</h4>
         <div class="grid grid-cols-3 gap-4">
-          <div class="bg-blue-50 p-3 rounded-lg text-center">
+          <div class="bg-blue-50 p-3 rounded-lg text-center border">
             <p class="text-sm text-gray-600">Before</p>
-            <p class="text-xl font-bold text-blue-600">{{ movement.quantity_before }}</p>
-          </div>
-          <div class="p-3 rounded-lg text-center" :class="{
-            'bg-green-50': isIncrease,
-            'bg-red-50': isDecrease
-          }">
-            <p class="text-sm text-gray-600">Change</p>
-            <p class="text-xl font-bold" :class="{
-              'text-green-600': isIncrease,
-              'text-red-600': isDecrease
-            }">
-              {{ isIncrease ? '+' : '' }}{{ movement.quantity_change }}
+            <p class="text-xl font-bold text-blue-600">
+              {{ movement.quantity_before }}
             </p>
           </div>
-          <div class="bg-purple-50 p-3 rounded-lg text-center">
+          <div
+            class="p-3 rounded-lg text-center border"
+            :class="{
+              'bg-green-50': isIncrease,
+              'bg-red-50': isDecrease,
+            }"
+          >
+            <p class="text-sm text-gray-600">Change</p>
+            <p
+              class="text-xl font-bold"
+              :class="{
+                'text-green-600': isIncrease,
+                'text-red-600': isDecrease,
+              }"
+            >
+              {{ isIncrease ? "+" : "" }}{{ movement.quantity_change }}
+            </p>
+          </div>
+          <div class="bg-purple-50 p-3 rounded-lg text-center border">
             <p class="text-sm text-gray-600">After</p>
-            <p class="text-xl font-bold text-purple-600">{{ movement.quantity_after }}</p>
+            <p class="text-xl font-bold text-purple-600">
+              {{ movement.quantity_after }}
+            </p>
           </div>
         </div>
       </div>
@@ -170,11 +197,15 @@ const isDecrease = computed(() => {
           <div class="space-y-2">
             <div class="flex justify-between">
               <span class="text-gray-600">Location:</span>
-              <span class="font-semibold">{{ movement.location?.name || 'Unknown' }}</span>
+              <span class="font-semibold">{{
+                movement.location?.name || "Unknown"
+              }}</span>
             </div>
             <div class="flex justify-between">
               <span class="text-gray-600">Type:</span>
-              <span class="font-semibold">{{ movement.location?.type || 'N/A' }}</span>
+              <span class="font-semibold">{{
+                movement.location?.type || "N/A"
+              }}</span>
             </div>
           </div>
         </div>
@@ -188,11 +219,15 @@ const isDecrease = computed(() => {
           <div class="space-y-2">
             <div v-if="movement.unit_cost" class="flex justify-between">
               <span class="text-gray-600">Unit Cost:</span>
-              <span class="font-semibold">{{ formatCurrency(movement.unit_cost) }}</span>
+              <span class="font-semibold">{{
+                formatCurrency(movement.unit_cost)
+              }}</span>
             </div>
             <div v-if="movement.total_cost" class="flex justify-between">
               <span class="text-gray-600">Total Cost:</span>
-              <span class="font-semibold">{{ formatCurrency(movement.total_cost) }}</span>
+              <span class="font-semibold">{{
+                formatCurrency(movement.total_cost)
+              }}</span>
             </div>
           </div>
         </div>
@@ -204,7 +239,7 @@ const isDecrease = computed(() => {
           <IconFileText :size="18" class="mr-2" />
           Reference Information
         </h4>
-        <div class="bg-gray-50 p-3 rounded-lg">
+        <div class="bg-gray-50 p-3 rounded-lg border">
           <div class="grid grid-cols-2 gap-4">
             <div v-if="movement.reference_type">
               <p class="text-sm text-gray-600">Reference Type</p>
@@ -230,7 +265,9 @@ const isDecrease = computed(() => {
             </div>
             <div v-if="movement.expiry_date" class="flex justify-between">
               <span class="text-gray-600">Expiry Date:</span>
-              <span class="font-semibold">{{ formatDate(movement.expiry_date) }}</span>
+              <span class="font-semibold">{{
+                formatDate(movement.expiry_date)
+              }}</span>
             </div>
           </div>
         </div>
@@ -244,7 +281,9 @@ const isDecrease = computed(() => {
           <div class="space-y-2">
             <div class="flex justify-between">
               <span class="text-gray-600">Created:</span>
-              <span class="font-semibold">{{ formatDateTime(movement.created_at) }}</span>
+              <span class="font-semibold">{{
+                formatDateTime(movement.created_at)
+              }}</span>
             </div>
             <div v-if="movement.user" class="flex justify-between">
               <span class="text-gray-600">By User:</span>
@@ -257,7 +296,7 @@ const isDecrease = computed(() => {
       <!-- Notes -->
       <div v-if="movement.notes || movement.reason">
         <h4 class="text-md font-semibold mb-3">Notes & Reason</h4>
-        <div class="bg-gray-50 p-3 rounded-lg">
+        <div class="bg-gray-50 p-3 rounded-lg border">
           <div v-if="movement.reason" class="mb-2">
             <p class="text-sm text-gray-600">Reason:</p>
             <p class="font-semibold">{{ movement.reason }}</p>
