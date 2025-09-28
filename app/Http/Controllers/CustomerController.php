@@ -62,7 +62,7 @@ class CustomerController extends Controller
 
         $customers = $query->paginate($request->get('per_page', 10));
 
-        return response()->json(CustomerResource::collection($customers));
+        return CustomerResource::collection($customers);
     }
 
     public function search(Request $request)

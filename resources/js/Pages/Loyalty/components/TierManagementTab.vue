@@ -69,7 +69,7 @@ const loadTiers = async (page = 1) => {
 
     const response = await axios.get(`/api/loyalty/tiers?${params}`);
     tiers.value = response.data.data;
-    pagination.value = response.data.pagination;
+    pagination.value = response.data.meta;
   } catch (error) {
     console.error("Failed to load tiers:", error);
     notification.error({
