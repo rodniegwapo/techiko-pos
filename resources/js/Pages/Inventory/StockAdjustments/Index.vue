@@ -15,15 +15,14 @@ import RefreshButton from "@/Components/buttons/Refresh.vue";
 import FilterDropdown from "@/Components/filters/FilterDropdown.vue";
 import ActiveFilters from "@/Components/filters/ActiveFilters.vue";
 import StockAdjustmentsTable from "../components/StockAdjustmentsTable.vue";
+import AdjustmentDetailsModal from "../components/AdjustmentDetailsModal.vue";
 
 const page = usePage();
 const { showModal } = useHelpers();
 const { spinning } = useGlobalVariables();
 
+const search = ref("");
 const status = ref(null);
-const location_id = ref(null);
-const date_from = ref(null);
-const date_to = ref(null);
 
 // Props from backend
 const props = defineProps({
@@ -37,10 +36,8 @@ const props = defineProps({
 // Initialize filters from backend
 onMounted(() => {
   if (props.filters) {
+    search.value = props.filters.search || "";
     status.value = props.filters.status || null;
-    location_id.value = props.filters.location_id || null;
-    date_from.value = props.filters.date_from || null;
-    date_to.value = props.filters.date_to || null;
   }
 });
 
@@ -50,15 +47,16 @@ const getItems = () => {
     only: ["adjustments"],
     preserveScroll: true,
     data: {
+      search: search.value || undefined,
       status: status.value || undefined,
-      location_id: location_id.value || undefined,
-      date_from: date_from.value || undefined,
-      date_to: date_to.value || undefined,
     },
     onStart: () => (spinning.value = true),
     onFinish: () => (spinning.value = false),
   });
 };
+
+// Watch search with debounce
+watchDebounced(search, getItems, { debounce: 300 });
 
 // Filter options
 const statusOptions = computed(() => 
@@ -66,10 +64,6 @@ const statusOptions = computed(() =>
     label, 
     value: key 
   }))
-);
-
-const locationOptions = computed(() => 
-  props.locations?.map(loc => ({ label: loc.name, value: loc.id })) || []
 );
 
 // Filter management
@@ -82,17 +76,24 @@ const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
       ref: status,
       getLabel: toLabel(computed(() => statusOptions.value)),
     },
-    {
-      label: "Location",
-      key: "location_id",
-      ref: location_id,
-      getLabel: toLabel(computed(() => locationOptions.value)),
-    },
   ],
 });
 
+// FilterDropdown configuration (single filter like Products/Index)
+const filtersConfig = [
+  {
+    key: "status",
+    label: "Status",
+    type: "select",
+    options: statusOptions.value,
+  },
+];
+
+// Group filters in one object
+const tableFilters = { search, status };
+
 // Table management
-const { pagination, handleTableChange } = useTable(props.adjustments, getItems);
+const { pagination, handleTableChange } = useTable("adjustments", tableFilters);
 
 // Methods
 const createAdjustment = () => {
@@ -104,10 +105,13 @@ const exportAdjustments = () => {
   console.log("Export adjustments");
 };
 
-const clearDateFilters = () => {
-  date_from.value = null;
-  date_to.value = null;
-  getItems();
+// Modal states for adjustment details
+const detailsModalVisible = ref(false);
+const selectedAdjustment = ref(null);
+
+const showAdjustmentDetails = (adjustment) => {
+  selectedAdjustment.value = adjustment;
+  detailsModalVisible.value = true;
 };
 </script>
 
@@ -137,111 +141,53 @@ const clearDateFilters = () => {
 
     <ContentLayout title="Stock Adjustments">
       <template #filters>
-        <FilterDropdown
-          v-model:value="status"
-          :options="statusOptions"
-          placeholder="All Statuses"
-          @change="getItems"
+        <RefreshButton :loading="spinning" @click="getItems" />
+        <a-input-search
+          v-model:value="search"
+          placeholder="Search adjustments, reasons, or notes..."
+          class="min-w-[100px] max-w-[300px]"
         />
-
-        <FilterDropdown
-          v-model:value="location_id"
-          :options="locationOptions"
-          placeholder="All Locations"
-          @change="getItems"
-        />
-
-        <!-- Date Filters -->
-        <div class="flex items-center space-x-2">
-          <label class="text-sm font-medium text-gray-700">Date Range:</label>
-          <a-date-picker
-            v-model:value="date_from"
-            placeholder="From Date"
-            @change="getItems"
-          />
-          <span class="text-gray-500">to</span>
-          <a-date-picker
-            v-model:value="date_to"
-            placeholder="To Date"
-            @change="getItems"
-          />
-          <a-button 
-            v-if="date_from || date_to" 
-            type="link" 
-            size="small"
-            @click="clearDateFilters"
-          >
-            Clear Dates
-          </a-button>
-        </div>
+        <a-button type="primary" @click="createAdjustment">
+          <template #icon>
+            <PlusSquareOutlined />
+          </template>
+          New Adjustment
+        </a-button>
+        <a-button @click="exportAdjustments">
+          <template #icon>
+            <DownloadOutlined />
+          </template>
+          Export
+        </a-button>
+        <FilterDropdown v-model="filters" :filters="filtersConfig" />
       </template>
 
       <template #activeFilters>
-        <!-- Active Filters -->
         <ActiveFilters
-          v-if="activeFilters.length > 0 || date_from || date_to"
-          :filters="[
-            ...activeFilters,
-            ...(date_from ? [{ key: 'date_from', label: 'From Date', value: date_from }] : []),
-            ...(date_to ? [{ key: 'date_to', label: 'To Date', value: date_to }] : [])
-          ]"
-          @clear="(key) => {
-            if (key === 'date_from') date_from.value = null;
-            else if (key === 'date_to') date_to.value = null;
-            else handleClearSelectedFilter(key);
-            getItems();
-          }"
-          @clear-all="() => {
-            status.value = null;
-            location_id.value = null;
-            date_from.value = null;
-            date_to.value = null;
-            getItems();
-          }"
+          :filters="activeFilters"
+          @remove-filter="handleClearSelectedFilter"
+          @clear-all="
+            () => Object.keys(filters).forEach((k) => (filters[k] = null))
+          "
         />
-
-        <!-- Summary Stats -->
-        <div v-if="adjustments?.data?.length > 0" class="mb-4">
-          <a-card size="small">
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-              <div>
-                <p class="text-2xl font-bold text-blue-600">
-                  {{ adjustments.data?.filter(adj => adj.status === 'draft').length || 0 }}
-                </p>
-                <p class="text-sm text-gray-600">Draft</p>
-              </div>
-              <div>
-                <p class="text-2xl font-bold text-yellow-600">
-                  {{ adjustments.data?.filter(adj => adj.status === 'pending_approval').length || 0 }}
-                </p>
-                <p class="text-sm text-gray-600">Pending</p>
-              </div>
-              <div>
-                <p class="text-2xl font-bold text-green-600">
-                  {{ adjustments.data?.filter(adj => adj.status === 'approved').length || 0 }}
-                </p>
-                <p class="text-sm text-gray-600">Approved</p>
-              </div>
-              <div>
-                <p class="text-2xl font-bold text-red-600">
-                  {{ adjustments.data?.filter(adj => adj.status === 'rejected').length || 0 }}
-                </p>
-                <p class="text-sm text-gray-600">Rejected</p>
-              </div>
-            </div>
-          </a-card>
-        </div>
       </template>
 
       <template #table>
-        <!-- Adjustments Table -->
         <StockAdjustmentsTable
           :adjustments="adjustments"
           :pagination="pagination"
           @handle-table-change="handleTableChange"
+          @show-details="showAdjustmentDetails"
           @refresh="getItems"
         />
       </template>
     </ContentLayout>
+
+    <!-- Adjustment Details Modal -->
+    <AdjustmentDetailsModal 
+      v-model:visible="detailsModalVisible"
+      :adjustment="selectedAdjustment"
+      @refresh="getItems"
+    />
   </AuthenticatedLayout>
 </template>

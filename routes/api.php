@@ -94,23 +94,23 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // Inventory API routes
-    Route::prefix('inventory')->group(function () {
-        Route::get('/products', [\App\Http\Controllers\InventoryController::class, 'products']);
-        Route::get('/movements', [\App\Http\Controllers\InventoryController::class, 'movements']);
-        Route::get('/low-stock', [\App\Http\Controllers\InventoryController::class, 'lowStock']);
-        Route::get('/valuation', [\App\Http\Controllers\InventoryController::class, 'valuation']);
-        Route::post('/receive', [\App\Http\Controllers\InventoryController::class, 'receive']);
-        Route::post('/transfer', [\App\Http\Controllers\InventoryController::class, 'transfer']);
+    Route::prefix('inventory')->name('inventory.')->group(function () {
+        Route::get('/products', [\App\Http\Controllers\InventoryController::class, 'products'])->name('products');
+        Route::get('/movements', [\App\Http\Controllers\InventoryController::class, 'movements'])->name('movements');
+        Route::get('/low-stock', [\App\Http\Controllers\InventoryController::class, 'lowStock'])->name('low-stock');
+        Route::get('/valuation', [\App\Http\Controllers\InventoryController::class, 'valuation'])->name('valuation');
+        Route::post('/receive', [\App\Http\Controllers\InventoryController::class, 'receive'])->name('receive');
+        Route::post('/transfer', [\App\Http\Controllers\InventoryController::class, 'transfer'])->name('transfer');
         
         // Stock adjustments API
-        Route::get('/adjustments', [\App\Http\Controllers\StockAdjustmentController::class, 'index']);
-        Route::post('/adjustments', [\App\Http\Controllers\StockAdjustmentController::class, 'store']);
-        Route::get('/adjustments/{stockAdjustment}', [\App\Http\Controllers\StockAdjustmentController::class, 'show']);
-        Route::put('/adjustments/{stockAdjustment}', [\App\Http\Controllers\StockAdjustmentController::class, 'update']);
-        Route::post('/adjustments/{stockAdjustment}/submit', [\App\Http\Controllers\StockAdjustmentController::class, 'submitForApproval']);
-        Route::post('/adjustments/{stockAdjustment}/approve', [\App\Http\Controllers\StockAdjustmentController::class, 'approve']);
-        Route::post('/adjustments/{stockAdjustment}/reject', [\App\Http\Controllers\StockAdjustmentController::class, 'reject']);
-        Route::get('/adjustment-products', [\App\Http\Controllers\StockAdjustmentController::class, 'getProductsForAdjustment']);
+        Route::get('/adjustments', [\App\Http\Controllers\StockAdjustmentController::class, 'index'])->name('adjustments.index');
+        Route::post('/adjustments', [\App\Http\Controllers\StockAdjustmentController::class, 'store'])->name('adjustments.store');
+        Route::get('/adjustments/{stockAdjustment}', [\App\Http\Controllers\StockAdjustmentController::class, 'show'])->name('adjustments.show');
+        Route::put('/adjustments/{stockAdjustment}', [\App\Http\Controllers\StockAdjustmentController::class, 'update'])->name('adjustments.update');
+        Route::post('/adjustments/{stockAdjustment}/submit', [\App\Http\Controllers\StockAdjustmentController::class, 'submitForApproval'])->name('adjustments.submit');
+        Route::post('/adjustments/{stockAdjustment}/approve', [\App\Http\Controllers\StockAdjustmentController::class, 'approve'])->name('adjustments.approve');
+        Route::post('/adjustments/{stockAdjustment}/reject', [\App\Http\Controllers\StockAdjustmentController::class, 'reject'])->name('adjustments.reject');
+        Route::get('/adjustment-products', [\App\Http\Controllers\StockAdjustmentController::class, 'getProductsForAdjustment'])->name('adjustment-products');
     });
 
 });

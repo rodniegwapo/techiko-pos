@@ -24,18 +24,28 @@ class ProductInventory extends Model
         'last_movement_at',
         'last_restock_at',
         'last_sale_at',
+        'location_reorder_level',
+        'location_max_stock',
+        'location_markup_percentage',
+        'auto_reorder_enabled',
+        'demand_pattern',
     ];
 
     protected $casts = [
-        'quantity_on_hand' => 'decimal:3',
-        'quantity_reserved' => 'decimal:3',
-        'quantity_available' => 'decimal:3',
+        'quantity_on_hand' => 'integer',
+        'quantity_reserved' => 'integer',
+        'quantity_available' => 'integer',
         'average_cost' => 'decimal:4',
         'last_cost' => 'decimal:4',
         'total_value' => 'decimal:4',
         'last_movement_at' => 'datetime',
         'last_restock_at' => 'datetime',
         'last_sale_at' => 'datetime',
+        'location_reorder_level' => 'integer',
+        'location_max_stock' => 'integer',
+        'location_markup_percentage' => 'decimal:2',
+        'auto_reorder_enabled' => 'boolean',
+        'demand_pattern' => 'array',
     ];
 
     /**
@@ -86,11 +96,12 @@ class ProductInventory extends Model
     }
 
     /**
-     * Check if product is low stock
+     * Check if product is low stock (location-specific or global)
      */
     public function isLowStock()
     {
-        return $this->quantity_available <= $this->product->reorder_level;
+        $reorderLevel = $this->location_reorder_level ?? $this->product->reorder_level;
+        return $this->quantity_available <= $reorderLevel;
     }
 
     /**
@@ -175,5 +186,117 @@ class ProductInventory extends Model
     public function scopeOutOfStock($query)
     {
         return $query->where('quantity_available', '<=', 0);
+    }
+
+    /**
+     * Scope for products with auto-reorder enabled
+     */
+    public function scopeAutoReorderEnabled($query)
+    {
+        return $query->where('auto_reorder_enabled', true);
+    }
+
+    /**
+     * Get effective reorder level (location-specific or global)
+     */
+    public function getEffectiveReorderLevel()
+    {
+        return $this->location_reorder_level ?? $this->product->reorder_level ?? 0;
+    }
+
+    /**
+     * Get effective max stock level (location-specific or global)
+     */
+    public function getEffectiveMaxStock()
+    {
+        return $this->location_max_stock ?? $this->product->max_stock_level ?? null;
+    }
+
+    /**
+     * Calculate demand velocity (units per day)
+     */
+    public function calculateDemandVelocity($days = 30)
+    {
+        $movements = InventoryMovement::where('product_id', $this->product_id)
+            ->where('location_id', $this->location_id)
+            ->where('movement_type', 'sale')
+            ->where('created_at', '>=', now()->subDays($days))
+            ->sum('quantity_change');
+
+        return abs($movements) / $days; // Convert to positive and average per day
+    }
+
+    /**
+     * Calculate days of stock remaining
+     */
+    public function calculateDaysOfStockRemaining()
+    {
+        $velocity = $this->calculateDemandVelocity();
+        
+        if ($velocity <= 0) {
+            return 999; // Infinite if no sales
+        }
+
+        return ceil($this->quantity_available / $velocity);
+    }
+
+    /**
+     * Update demand pattern with recent sales data
+     */
+    public function updateDemandPattern()
+    {
+        $pattern = [
+            'velocity_7_days' => $this->calculateDemandVelocity(7),
+            'velocity_30_days' => $this->calculateDemandVelocity(30),
+            'velocity_90_days' => $this->calculateDemandVelocity(90),
+            'days_of_stock' => $this->calculateDaysOfStockRemaining(),
+            'last_updated' => now()->toISOString(),
+        ];
+
+        $this->update(['demand_pattern' => $pattern]);
+        return $pattern;
+    }
+
+    /**
+     * Check if needs reorder based on location-specific rules
+     */
+    public function needsReorder()
+    {
+        if (!$this->auto_reorder_enabled) {
+            return false;
+        }
+
+        $reorderLevel = $this->getEffectiveReorderLevel();
+        return $this->quantity_available <= $reorderLevel;
+    }
+
+    /**
+     * Get recommended order quantity
+     */
+    public function getRecommendedOrderQuantity()
+    {
+        $maxStock = $this->getEffectiveMaxStock();
+        
+        if (!$maxStock) {
+            // If no max stock defined, order enough for 30 days
+            $velocity = $this->calculateDemandVelocity();
+            return max(1, ceil($velocity * 30));
+        }
+
+        return max(1, $maxStock - $this->quantity_on_hand);
+    }
+
+    /**
+     * Get location-specific price with markup
+     */
+    public function getLocationPrice()
+    {
+        $basePrice = $this->product->price;
+        
+        if ($this->location_markup_percentage) {
+            return $basePrice * (1 + ($this->location_markup_percentage / 100));
+        }
+
+        return $basePrice;
     }
 }

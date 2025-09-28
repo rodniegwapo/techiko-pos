@@ -15,16 +15,14 @@ import RefreshButton from "@/Components/buttons/Refresh.vue";
 import FilterDropdown from "@/Components/filters/FilterDropdown.vue";
 import ActiveFilters from "@/Components/filters/ActiveFilters.vue";
 import MovementsTable from "./components/MovementsTable.vue";
+import MovementDetailsModal from "./components/MovementDetailsModal.vue";
 
 const page = usePage();
 const { showModal } = useHelpers();
 const { spinning } = useGlobalVariables();
 
-const location_id = ref(null);
-const product_id = ref(null);
+const search = ref("");
 const movement_type = ref(null);
-const date_from = ref(null);
-const date_to = ref(null);
 
 // Props from backend
 const props = defineProps({
@@ -38,11 +36,8 @@ const props = defineProps({
 // Initialize filters from backend
 onMounted(() => {
   if (props.filters) {
-    location_id.value = props.filters.location_id || null;
-    product_id.value = props.filters.product_id || null;
+    search.value = props.filters.search || "";
     movement_type.value = props.filters.movement_type || null;
-    date_from.value = props.filters.date_from || null;
-    date_to.value = props.filters.date_to || null;
   }
 });
 
@@ -52,29 +47,18 @@ const getItems = () => {
     only: ["movements"],
     preserveScroll: true,
     data: {
-      location_id: location_id.value || undefined,
-      product_id: product_id.value || undefined,
+      search: search.value || undefined,
       movement_type: movement_type.value || undefined,
-      date_from: date_from.value || undefined,
-      date_to: date_to.value || undefined,
     },
     onStart: () => (spinning.value = true),
     onFinish: () => (spinning.value = false),
   });
 };
 
+// Watch search with debounce
+watchDebounced(search, getItems, { debounce: 300 });
+
 // Filter options
-const locationOptions = computed(() => 
-  props.locations?.map(loc => ({ label: loc.name, value: loc.id })) || []
-);
-
-const productOptions = computed(() => 
-  props.products?.map(product => ({ 
-    label: `${product.name} (${product.SKU})`, 
-    value: product.id 
-  })) || []
-);
-
 const movementTypeOptions = computed(() => 
   Object.entries(props.movementTypes || {}).map(([key, label]) => ({ 
     label, 
@@ -87,18 +71,6 @@ const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
   getItems,
   configs: [
     {
-      label: "Location",
-      key: "location_id",
-      ref: location_id,
-      getLabel: toLabel(computed(() => locationOptions.value)),
-    },
-    {
-      label: "Product",
-      key: "product_id",
-      ref: product_id,
-      getLabel: toLabel(computed(() => productOptions.value)),
-    },
-    {
       label: "Movement Type",
       key: "movement_type",
       ref: movement_type,
@@ -107,8 +79,21 @@ const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
   ],
 });
 
+// FilterDropdown configuration (single filter like Products/Index)
+const filtersConfig = [
+  {
+    key: "movement_type",
+    label: "Movement Type",
+    type: "select",
+    options: movementTypeOptions.value,
+  },
+];
+
+// Group filters in one object
+const tableFilters = { search, movement_type };
+
 // Table management
-const { pagination, handleTableChange } = useTable(props.movements, getItems);
+const { pagination, handleTableChange } = useTable("movements", tableFilters);
 
 // Methods
 const exportMovements = () => {
@@ -116,10 +101,13 @@ const exportMovements = () => {
   console.log("Export movements");
 };
 
-const clearDateFilters = () => {
-  date_from.value = null;
-  date_to.value = null;
-  getItems();
+// Modal states for movement details
+const detailsModalVisible = ref(false);
+const selectedMovement = ref(null);
+
+const showMovementDetails = (movement) => {
+  selectedMovement.value = movement;
+  detailsModalVisible.value = true;
 };
 </script>
 
@@ -142,109 +130,45 @@ const clearDateFilters = () => {
 
     <ContentLayout title="Inventory Movements">
       <template #filters>
-        <FilterDropdown
-          v-model:value="location_id"
-          :options="locationOptions"
-          placeholder="All Locations"
-          @change="getItems"
+        <RefreshButton :loading="spinning" @click="getItems" />
+        <a-input-search
+          v-model:value="search"
+          placeholder="Search movements, products, or references..."
+          class="min-w-[100px] max-w-[300px]"
         />
-
-        <FilterDropdown
-          v-model:value="product_id"
-          :options="productOptions"
-          placeholder="All Products"
-          @change="getItems"
-          :show-search="true"
-        />
-
-        <FilterDropdown
-          v-model:value="movement_type"
-          :options="movementTypeOptions"
-          placeholder="All Movement Types"
-          @change="getItems"
-        />
-
-        <!-- Date Filters -->
-        <div class="flex items-center space-x-2">
-          <label class="text-sm font-medium text-gray-700">Date Range:</label>
-          <a-date-picker
-            v-model:value="date_from"
-            placeholder="From Date"
-            @change="getItems"
-          />
-          <span class="text-gray-500">to</span>
-          <a-date-picker
-            v-model:value="date_to"
-            placeholder="To Date"
-            @change="getItems"
-          />
-          <a-button 
-            v-if="date_from || date_to" 
-            type="link" 
-            size="small"
-            @click="clearDateFilters"
-          >
-            Clear Dates
-          </a-button>
-        </div>
+        <a-button @click="exportMovements">
+          <template #icon>
+            <DownloadOutlined />
+          </template>
+          Export
+        </a-button>
+        <FilterDropdown v-model="filters" :filters="filtersConfig" />
       </template>
 
       <template #activeFilters>
-        <!-- Active Filters -->
         <ActiveFilters
-          v-if="activeFilters.length > 0 || date_from || date_to"
-          :filters="[
-            ...activeFilters,
-            ...(date_from ? [{ key: 'date_from', label: 'From Date', value: date_from }] : []),
-            ...(date_to ? [{ key: 'date_to', label: 'To Date', value: date_to }] : [])
-          ]"
-          @clear="(key) => {
-            if (key === 'date_from') date_from.value = null;
-            else if (key === 'date_to') date_to.value = null;
-            else handleClearSelectedFilter(key);
-            getItems();
-          }"
-          @clear-all="() => {
-            location_id.value = null;
-            product_id.value = null;
-            movement_type.value = null;
-            date_from.value = null;
-            date_to.value = null;
-            getItems();
-          }"
+          :filters="activeFilters"
+          @remove-filter="handleClearSelectedFilter"
+          @clear-all="
+            () => Object.keys(filters).forEach((k) => (filters[k] = null))
+          "
         />
-
-        <!-- Summary Stats -->
-        <div v-if="movements?.data?.length > 0" class="mb-4">
-          <a-card size="small">
-            <div class="flex items-center justify-between text-sm">
-              <div class="flex space-x-6">
-                <span>
-                  <strong>{{ movements.total || 0 }}</strong> total movements
-                </span>
-                <span>
-                  <strong>{{ movements.data?.filter(m => m.quantity_change > 0).length || 0 }}</strong> stock increases
-                </span>
-                <span>
-                  <strong>{{ movements.data?.filter(m => m.quantity_change < 0).length || 0 }}</strong> stock decreases
-                </span>
-              </div>
-              <div>
-                Showing {{ movements.from || 0 }} - {{ movements.to || 0 }} of {{ movements.total || 0 }}
-              </div>
-            </div>
-          </a-card>
-        </div>
       </template>
 
       <template #table>
-        <!-- Movements Table -->
         <MovementsTable
           :movements="movements"
           :pagination="pagination"
           @handle-table-change="handleTableChange"
+          @show-details="showMovementDetails"
         />
       </template>
     </ContentLayout>
+
+    <!-- Movement Details Modal -->
+    <MovementDetailsModal 
+      v-model:visible="detailsModalVisible"
+      :movement="selectedMovement"
+    />
   </AuthenticatedLayout>
 </template>

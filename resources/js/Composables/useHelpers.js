@@ -127,7 +127,7 @@ export function useHelpers() {
     // Format date
     const formatDate = (date) => {
         if (!date) return "N/A";
-        return dayjs(date).format("MMM DD, YYYY");
+        return dayjs(date).format("MMMM DD, YYYY");
     };
 
     // Format date and time

@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from "vue";
+import { computed, toRefs } from "vue";
 import { 
   IconCircleCheck, 
   IconAlertTriangle, 
@@ -23,6 +23,8 @@ const props = defineProps({
     default: null,
   },
 });
+
+const { visible } = toRefs(props);
 
 const emit = defineEmits(['update:visible']);
 
@@ -60,7 +62,7 @@ const getStockStatusText = (status) => {
 
 <template>
   <a-modal
-    :open="visible"
+    v-model:visible="visible"
     title="Product Details"
     width="800px"
     @cancel="handleClose"

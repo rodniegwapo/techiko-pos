@@ -25,9 +25,9 @@ class StockAdjustmentItem extends Model
     ];
 
     protected $casts = [
-        'system_quantity' => 'decimal:3',
-        'actual_quantity' => 'decimal:3',
-        'adjustment_quantity' => 'decimal:3',
+        'system_quantity' => 'integer',
+        'actual_quantity' => 'integer',
+        'adjustment_quantity' => 'integer',
         'unit_cost' => 'decimal:4',
         'total_cost_change' => 'decimal:4',
         'expiry_date' => 'date',
@@ -157,6 +157,6 @@ class StockAdjustmentItem extends Model
     public function getAdjustmentQuantityWithSignAttribute()
     {
         $sign = $this->adjustment_quantity >= 0 ? '+' : '';
-        return $sign . number_format($this->adjustment_quantity, 3);
+        return $sign . number_format($this->adjustment_quantity);
     }
 }

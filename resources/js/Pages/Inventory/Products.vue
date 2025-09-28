@@ -17,6 +17,7 @@ import ActiveFilters from "@/Components/filters/ActiveFilters.vue";
 import InventoryProductTable from "./components/InventoryProductTable.vue";
 import ReceiveInventoryModal from "./components/ReceiveInventoryModal.vue";
 import TransferInventoryModal from "./components/TransferInventoryModal.vue";
+import ProductDetailsModal from "./components/ProductDetailsModal.vue";
 
 const page = usePage();
 const { showModal } = useHelpers();
@@ -52,7 +53,6 @@ const getItems = () => {
     data: {
       search: search.value || undefined,
       stock_status: stock_status.value || undefined,
-      category_id: category_id.value || undefined,
       location_id: location_id.value || undefined,
     },
     onStart: () => (spinning.value = true),
@@ -253,6 +253,7 @@ const handleTransferStock = (inventory) => {
       v-model:visible="transferModalVisible"
       :locations="locations"
       :current-location="currentLocation"
+      :selected-product="selectedProduct"
       @success="getItems"
     />
     
