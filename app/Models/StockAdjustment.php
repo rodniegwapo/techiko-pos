@@ -40,6 +40,7 @@ class StockAdjustment extends Model
                 $adjustment->adjustment_number = static::generateAdjustmentNumber();
             }
         });
+
     }
 
     /**
@@ -168,7 +169,7 @@ class StockAdjustment extends Model
     /**
      * Generate unique adjustment number
      */
-    protected static function generateAdjustmentNumber()
+    public static function generateAdjustmentNumber()
     {
         $year = date('Y');
         $lastAdjustment = static::where('adjustment_number', 'like', "ADJ-{$year}-%")
@@ -197,6 +198,20 @@ class StockAdjustment extends Model
             'rejected' => 'Rejected',
             default => ucfirst($this->status)
         };
+    }
+
+    /**
+     * Get adjustment number (ensure it's always available)
+     */
+    public function getAdjustmentNumberAttribute($value)
+    {
+        if (!$value) {
+            // Generate and save adjustment number if missing
+            $generated = static::generateAdjustmentNumber();
+            $this->updateQuietly(['adjustment_number' => $generated]);
+            return $generated;
+        }
+        return $value;
     }
 
     /**

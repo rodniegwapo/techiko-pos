@@ -1,5 +1,5 @@
 <script setup>
-import { computed, toRefs } from "vue";
+import { computed, toRefs, ref, watch } from "vue";
 import { 
   IconClipboardList,
   IconMapPin,
@@ -12,6 +12,7 @@ import {
   IconClock
 } from "@tabler/icons-vue";
 import { useHelpers } from "@/Composables/useHelpers";
+import axios from "axios";
 
 const { formatCurrency, formatDate, formatDateTime } = useHelpers();
 
@@ -30,9 +31,52 @@ const { visible } = toRefs(props);
 
 const emit = defineEmits(['update:visible', 'refresh']);
 
+const loading = ref(false);
+const fullAdjustment = ref(null);
+
 const handleClose = () => {
   emit('update:visible', false);
 };
+
+// Fetch full adjustment details with items
+const fetchAdjustmentDetails = async (adjustmentId) => {
+  if (!adjustmentId) return;
+  
+  loading.value = true;
+  try {
+    const response = await axios.get(route('inventory.adjustments.show', adjustmentId), {
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    });
+    
+    fullAdjustment.value = response.data.adjustment || response.data;
+  } catch (error) {
+    console.error('Error fetching adjustment details:', error);
+    fullAdjustment.value = null;
+  } finally {
+    loading.value = false;
+  }
+};
+
+// Watch for adjustment changes
+watch(() => props.adjustment, (newAdjustment) => {
+  if (newAdjustment && props.visible) {
+    fetchAdjustmentDetails(newAdjustment.id);
+  }
+}, { immediate: true });
+
+// Watch for modal visibility
+watch(() => props.visible, (isVisible) => {
+  if (isVisible && props.adjustment) {
+    fetchAdjustmentDetails(props.adjustment.id);
+  }
+});
+
+// Use fullAdjustment if available, otherwise fallback to props.adjustment
+const displayAdjustment = computed(() => fullAdjustment.value || props.adjustment);
 
 const getStatusColor = (status) => {
   const colors = {
@@ -67,16 +111,31 @@ const getStatusIcon = (status) => {
   return icons[status] || IconFileText;
 };
 
+const getReasonDisplay = (reason) => {
+  const reasons = {
+    'physical_count': 'Physical Count',
+    'damaged_goods': 'Damaged Goods',
+    'expired_goods': 'Expired Goods',
+    'theft_loss': 'Theft/Loss',
+    'supplier_error': 'Supplier Error',
+    'system_error': 'System Error',
+    'promotion': 'Promotion',
+    'sample': 'Sample',
+    'other': 'Other',
+  };
+  return reasons[reason] || reason?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+};
+
 const totalValueAdjusted = computed(() => {
-  if (!props.adjustment?.items) return 0;
-  return props.adjustment.items.reduce((sum, item) => {
+  if (!displayAdjustment.value?.items) return 0;
+  return displayAdjustment.value.items.reduce((sum, item) => {
     return sum + (item.total_cost_change || 0);
   }, 0);
 });
 
 const totalQuantityAdjusted = computed(() => {
-  if (!props.adjustment?.items) return 0;
-  return props.adjustment.items.reduce((sum, item) => {
+  if (!displayAdjustment.value?.items) return 0;
+  return displayAdjustment.value.items.reduce((sum, item) => {
     return sum + Math.abs(item.adjustment_quantity || 0);
   }, 0);
 });
@@ -89,8 +148,9 @@ const totalQuantityAdjusted = computed(() => {
     width="900px"
     @cancel="handleClose"
     :footer="null"
+    :loading="loading"
   >
-    <div v-if="adjustment" class="space-y-6">
+    <div v-if="displayAdjustment" class="space-y-6">
       <!-- Adjustment Header -->
       <div class="flex items-start justify-between pb-4 border-b">
         <div class="flex items-center space-x-3">
@@ -98,21 +158,23 @@ const totalQuantityAdjusted = computed(() => {
             <IconClipboardList :size="24" />
           </div>
           <div>
-            <h3 class="text-lg font-semibold">Stock Adjustment #{{ adjustment.id }}</h3>
-            <p class="text-sm text-gray-500">{{ formatDate(adjustment.adjustment_date) }}</p>
+            <h3 class="text-lg font-semibold">
+              {{ displayAdjustment.adjustment_number || `Stock Adjustment #${displayAdjustment.id}` }}
+            </h3>
+            <p class="text-sm text-gray-500">{{ formatDate(displayAdjustment.created_at) }}</p>
           </div>
         </div>
         
-        <a-tag :color="getStatusColor(adjustment.status)" size="large">
-          <component :is="getStatusIcon(adjustment.status)" :size="16" class="mr-1" />
-          {{ getStatusDisplay(adjustment.status) }}
+        <a-tag :color="getStatusColor(displayAdjustment.status)" size="large">
+          <component :is="getStatusIcon(displayAdjustment.status)" :size="16" class="mr-1" />
+          {{ getStatusDisplay(displayAdjustment.status) }}
         </a-tag>
       </div>
 
       <!-- Summary Information -->
       <div class="grid grid-cols-3 gap-4">
         <div class="bg-blue-50 p-4 rounded-lg text-center">
-          <p class="text-2xl font-bold text-blue-600">{{ adjustment.items?.length || 0 }}</p>
+          <p class="text-2xl font-bold text-blue-600">{{ displayAdjustment.items?.length || 0 }}</p>
           <p class="text-sm text-gray-600">Products Adjusted</p>
         </div>
         <div class="bg-orange-50 p-4 rounded-lg text-center">
@@ -157,41 +219,41 @@ const totalQuantityAdjusted = computed(() => {
           </h4>
           <div class="space-y-2">
             <div class="flex justify-between">
-              <span class="text-gray-600">Adjustment Date:</span>
-              <span class="font-semibold">{{ formatDate(adjustment.adjustment_date) }}</span>
-            </div>
-            <div class="flex justify-between">
               <span class="text-gray-600">Created:</span>
-              <span class="font-semibold">{{ formatDateTime(adjustment.created_at) }}</span>
+              <span class="font-semibold">{{ formatDateTime(displayAdjustment.created_at) }}</span>
             </div>
-            <div v-if="adjustment.updated_at !== adjustment.created_at" class="flex justify-between">
+            <div v-if="displayAdjustment.approved_at" class="flex justify-between">
+              <span class="text-gray-600">Approved:</span>
+              <span class="font-semibold">{{ formatDateTime(displayAdjustment.approved_at) }}</span>
+            </div>
+            <div v-if="displayAdjustment.updated_at !== displayAdjustment.created_at" class="flex justify-between">
               <span class="text-gray-600">Last Updated:</span>
-              <span class="font-semibold">{{ formatDateTime(adjustment.updated_at) }}</span>
+              <span class="font-semibold">{{ formatDateTime(displayAdjustment.updated_at) }}</span>
             </div>
           </div>
         </div>
       </div>
 
       <!-- Reason & Notes -->
-      <div v-if="adjustment.reason || adjustment.notes">
+      <div v-if="displayAdjustment.reason || displayAdjustment.notes">
         <h4 class="text-md font-semibold mb-3 flex items-center">
           <IconFileText :size="18" class="mr-2" />
           Reason & Notes
         </h4>
         <div class="bg-gray-50 p-4 rounded-lg space-y-2">
-          <div v-if="adjustment.reason">
+          <div v-if="displayAdjustment.reason">
             <p class="text-sm text-gray-600">Reason:</p>
-            <p class="font-semibold">{{ adjustment.reason }}</p>
+            <p class="font-semibold">{{ getReasonDisplay(displayAdjustment.reason) }}</p>
           </div>
-          <div v-if="adjustment.notes">
+          <div v-if="displayAdjustment.notes">
             <p class="text-sm text-gray-600">Notes:</p>
-            <p>{{ adjustment.notes }}</p>
+            <p>{{ displayAdjustment.notes }}</p>
           </div>
         </div>
       </div>
 
       <!-- Adjustment Items -->
-      <div v-if="adjustment.items?.length > 0">
+      <div v-if="displayAdjustment.items?.length > 0">
         <h4 class="text-md font-semibold mb-3">Adjustment Items</h4>
         <div class="border border-gray-200 rounded-lg overflow-hidden">
           <div class="bg-gray-50 px-4 py-2 grid grid-cols-12 gap-2 text-sm font-medium text-gray-700">
@@ -203,7 +265,7 @@ const totalQuantityAdjusted = computed(() => {
           </div>
 
           <div
-            v-for="(item, index) in adjustment.items"
+            v-for="(item, index) in displayAdjustment.items"
             :key="index"
             class="px-4 py-3 grid grid-cols-12 gap-2 items-center border-b border-gray-100 last:border-b-0"
           >
@@ -256,7 +318,7 @@ const totalQuantityAdjusted = computed(() => {
       </div>
 
       <!-- Action Buttons (if applicable) -->
-      <div v-if="adjustment.status === 'pending_approval'" class="flex justify-end space-x-2 pt-4 border-t">
+      <div v-if="displayAdjustment.status === 'pending_approval'" class="flex justify-end space-x-2 pt-4 border-t">
         <a-button type="default" @click="handleClose">
           Close
         </a-button>

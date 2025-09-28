@@ -165,7 +165,7 @@ const timeOpen = ref(false);
           :options="
             field.options.map((o) =>
               typeof o === 'object'
-                ? {
+                ? { 
                     label: o.label ?? o.name ?? o.value,
                     value: o.id ?? o.value ?? o,
                   }

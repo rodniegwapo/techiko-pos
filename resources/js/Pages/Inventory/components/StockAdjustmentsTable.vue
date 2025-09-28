@@ -241,11 +241,11 @@ const dataSource = computed(() => {
 
       <!-- Location Column -->
       <template v-else-if="column.key === 'location'">
-        <div class="text-center">
+
           <p class="font-medium text-sm">
             {{ record.location?.name || "Unknown" }}
           </p>
-        </div>
+       
       </template>
 
       <!-- Reason Column -->
@@ -288,12 +288,58 @@ const dataSource = computed(() => {
 
       <!-- Actions Column -->
       <template v-else-if="column.key === 'actions'">
-        <div class="flex justify-center">
+        <div class="flex justify-center gap-1">
+          <!-- View Details (Always available) -->
           <IconTooltipButton
             name="View Details"
             @click="showDetails(record.adjustment)"
           >
             <IconEye :size="20" class="mx-auto" />
+          </IconTooltipButton>
+
+          <!-- Submit for Approval (Draft status only) -->
+          <IconTooltipButton
+            v-if="record.status === 'draft'"
+            name="Submit for Approval"
+            @click="submitForApproval(record.adjustment)"
+          >
+            <IconSend :size="20" class="mx-auto" />
+          </IconTooltipButton>
+
+          <!-- Approve (Pending approval status only) -->
+          <IconTooltipButton
+            v-if="record.status === 'pending_approval'"
+            name="Approve"
+            @click="approveAdjustment(record.adjustment)"
+          >
+            <IconCheck :size="20" class="mx-auto" />
+          </IconTooltipButton>
+
+          <!-- Reject (Pending approval status only) -->
+          <IconTooltipButton
+            v-if="record.status === 'pending_approval'"
+            name="Reject"
+            @click="rejectAdjustment(record.adjustment)"
+          >
+            <IconX :size="20" class="mx-auto" />
+          </IconTooltipButton>
+
+          <!-- Edit (Draft status only) -->
+          <IconTooltipButton
+            v-if="record.status === 'draft'"
+            name="Edit"
+            @click="editAdjustment(record.adjustment)"
+          >
+            <IconEdit :size="20" class="mx-auto" />
+          </IconTooltipButton>
+
+          <!-- Delete (Draft status only) -->
+          <IconTooltipButton
+            v-if="record.status === 'draft'"
+            name="Delete"
+            @click="deleteAdjustment(record.adjustment)"
+          >
+            <IconTrash :size="20" class="mx-auto" />
           </IconTooltipButton>
         </div>
       </template>
