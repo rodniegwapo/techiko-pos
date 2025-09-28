@@ -8,7 +8,7 @@ import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import isocalendar from "dayjs/plugin/isoWeek";
-import { Modal } from 'ant-design-vue';
+import { Modal, notification } from "ant-design-vue";
 dayjs.extend(utc);
 dayjs.extend(timezone);
 dayjs.extend(isocalendar);
@@ -139,7 +139,11 @@ export function useHelpers() {
     // Show notification
     const showNotification = (type, title, message) => {
         // You can implement this with ant-design-vue notification
-        console.log(`${type.toUpperCase()}: ${title} - ${message}`);
+
+        return notification[type]({
+            message: title,
+            description: message,
+        });
     };
 
     return {
@@ -154,6 +158,6 @@ export function useHelpers() {
         formatCurrency,
         formatDate,
         formatDateTime,
-        showNotification
+        showNotification,
     };
 }

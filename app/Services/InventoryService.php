@@ -286,6 +286,7 @@ class InventoryService
     {
         return DB::transaction(function () use ($data, $items, $user) {
             $adjustment = StockAdjustment::create(array_merge($data, [
+                'adjustment_number' => StockAdjustment::generateAdjustmentNumber(),
                 'created_by' => $user->id,
                 'status' => 'draft',
             ]));

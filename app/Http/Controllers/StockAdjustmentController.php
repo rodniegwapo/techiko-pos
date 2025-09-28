@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\StockAdjustment;
 use App\Models\InventoryLocation;
 use App\Models\Product\Product;
+use App\Models\StockAdjustment;
 use App\Services\InventoryService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -31,8 +31,8 @@ class StockAdjustmentController extends Controller
         if ($request->search) {
             $query->where(function ($q) use ($request) {
                 $q->where('adjustment_number', 'like', "%{$request->search}%")
-                  ->orWhere('reason', 'like', "%{$request->search}%")
-                  ->orWhere('notes', 'like', "%{$request->search}%");
+                    ->orWhere('reason', 'like', "%{$request->search}%")
+                    ->orWhere('notes', 'like', "%{$request->search}%");
             });
         }
 
@@ -133,7 +133,7 @@ class StockAdjustmentController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to create stock adjustment: ' . $e->getMessage(),
+                'message' => 'Failed to create stock adjustment: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -141,18 +141,44 @@ class StockAdjustmentController extends Controller
     /**
      * Display the specified stock adjustment
      */
-    public function show(StockAdjustment $stockAdjustment)
+    public function show(Request $request, StockAdjustment $stockAdjustment)
     {
-        $stockAdjustment->load([
-            'location',
-            'createdBy',
-            'approvedBy',
-            'items.product'
-        ]);
+        try {
+            $stockAdjustment->load([
+                'location',
+                'createdBy',
+                'approvedBy',
+                'items.product',
+            ]);
 
-        return Inertia::render('Inventory/StockAdjustments/Show', [
-            'adjustment' => $stockAdjustment,
-        ]);
+            // Return JSON for API requests
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json([
+                    'success' => true,
+                    'adjustment' => $stockAdjustment,
+                ]);
+            }
+
+            // Return Inertia render for web requests
+            return Inertia::render('Inventory/StockAdjustments/Show', [
+                'adjustment' => $stockAdjustment,
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Error in StockAdjustmentController@show: ' . $e->getMessage(), [
+                'adjustment_id' => $stockAdjustment->id ?? 'unknown',
+                'request_data' => $request->all(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to load adjustment details: ' . $e->getMessage(),
+                ], 500);
+            }
+
+            abort(500, 'Failed to load adjustment details');
+        }
     }
 
     /**
@@ -183,7 +209,7 @@ class StockAdjustmentController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update stock adjustment: ' . $e->getMessage(),
+                'message' => 'Failed to update stock adjustment: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -191,60 +217,84 @@ class StockAdjustmentController extends Controller
     /**
      * Submit stock adjustment for approval
      */
-    public function submitForApproval(StockAdjustment $stockAdjustment)
+    public function submitForApproval(Request $request, StockAdjustment $stockAdjustment)
     {
         try {
             $stockAdjustment->submitForApproval();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Stock adjustment submitted for approval',
-            ]);
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Stock adjustment submitted for approval',
+                ]);
+            }
+
+            return redirect()->back()->with('success', 'Stock adjustment submitted for approval');
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to submit for approval: ' . $e->getMessage(),
-            ], 400);
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to submit for approval: '.$e->getMessage(),
+                ], 400);
+            }
+
+            return redirect()->back()->with('error', 'Failed to submit for approval: '.$e->getMessage());
         }
     }
 
     /**
      * Approve stock adjustment
      */
-    public function approve(StockAdjustment $stockAdjustment)
+    public function approve(Request $request, StockAdjustment $stockAdjustment)
     {
         try {
             $stockAdjustment->approve(auth()->user());
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Stock adjustment approved and processed',
-            ]);
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Stock adjustment approved and processed',
+                ]);
+            }
+
+            return redirect()->back()->with('success', 'Stock adjustment approved and processed');
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to approve adjustment: ' . $e->getMessage(),
-            ], 400);
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to approve adjustment: '.$e->getMessage(),
+                ], 400);
+            }
+
+            return redirect()->back()->with('error', 'Failed to approve adjustment: '.$e->getMessage());
         }
     }
 
     /**
      * Reject stock adjustment
      */
-    public function reject(StockAdjustment $stockAdjustment)
+    public function reject(Request $request, StockAdjustment $stockAdjustment)
     {
         try {
             $stockAdjustment->reject();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Stock adjustment rejected',
-            ]);
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Stock adjustment rejected',
+                ]);
+            }
+
+            return redirect()->back()->with('success', 'Stock adjustment rejected');
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to reject adjustment: ' . $e->getMessage(),
-            ], 400);
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to reject adjustment: '.$e->getMessage(),
+                ], 400);
+            }
+
+            return redirect()->back()->with('error', 'Failed to reject adjustment: '.$e->getMessage());
         }
     }
 
@@ -270,7 +320,7 @@ class StockAdjustmentController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to delete adjustment: ' . $e->getMessage(),
+                'message' => 'Failed to delete adjustment: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -285,25 +335,25 @@ class StockAdjustmentController extends Controller
                 'location_id' => 'required|exists:inventory_locations,id',
                 'search' => 'nullable|string|max:255',
             ]);
-            
+
             $locationId = $validated['location_id'];
-            
+
             $query = Product::with(['inventories' => function ($q) use ($locationId) {
                 $q->where('location_id', $locationId);
             }])->where('track_inventory', true);
 
-            if (!empty($validated['search'])) {
+            if (! empty($validated['search'])) {
                 $search = $validated['search'];
                 $query->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
-                      ->orWhere('SKU', 'like', "%{$search}%")
-                      ->orWhere('barcode', 'like', "%{$search}%");
+                        ->orWhere('SKU', 'like', "%{$search}%")
+                        ->orWhere('barcode', 'like', "%{$search}%");
                 });
             }
 
-            $products = $query->limit(50)->get()->map(function ($product) use ($locationId) {
+            $products = $query->limit(50)->get()->map(function ($product) {
                 $inventory = $product->inventories->first();
-                
+
                 return [
                     'id' => $product->id,
                     'name' => $product->name,
@@ -319,14 +369,14 @@ class StockAdjustmentController extends Controller
                 'data' => $products,
             ]);
         } catch (\Exception $e) {
-            \Log::error('Error in getProductsForAdjustment: ' . $e->getMessage(), [
+            \Log::error('Error in getProductsForAdjustment: '.$e->getMessage(), [
                 'request' => $request->all(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
-            
+
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to fetch products: ' . $e->getMessage(),
+                'message' => 'Failed to fetch products: '.$e->getMessage(),
                 'data' => [],
             ], 500);
         }
