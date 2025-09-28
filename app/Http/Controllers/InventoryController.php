@@ -82,6 +82,33 @@ class InventoryController extends Controller
         $inventories = $query->orderBy('quantity_available', 'asc')
             ->paginate($request->per_page ?? 20);
 
+        // Check if this is an API request
+        if ($request->expectsJson() || $request->is('api/*')) {
+            // Add location-specific stock status to each inventory item
+            $inventoryData = $inventories->items();
+            foreach ($inventoryData as $inventory) {
+                $inventory->location_stock_status = $inventory->getStockStatus();
+            }
+            
+            return response()->json([
+                'success' => true,
+                'data' => $inventoryData,
+                'pagination' => [
+                    'current_page' => $inventories->currentPage(),
+                    'last_page' => $inventories->lastPage(),
+                    'per_page' => $inventories->perPage(),
+                    'total' => $inventories->total(),
+                ],
+                'current_location' => $location,
+            ]);
+        }
+
+        // Add location-specific stock status to each inventory item for web response
+        $inventories->getCollection()->transform(function ($inventory) {
+            $inventory->location_stock_status = $inventory->getStockStatus();
+            return $inventory;
+        });
+
         return Inertia::render('Inventory/Products', [
             'inventories' => $inventories,
             'locations' => InventoryLocation::active()->get(),
@@ -208,7 +235,7 @@ class InventoryController extends Controller
                 $validated['notes'] ?? null
             );
 
-            return response()->noContent();
+            return response()->noContent(200);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,

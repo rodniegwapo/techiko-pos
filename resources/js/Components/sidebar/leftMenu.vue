@@ -122,24 +122,44 @@ const menus = computed(() => {
 });
 
 const handleClick = (menu, parentMenu = null) => {
-  router.visit(menu.path);
-
+  // Set the selected key first
   selectedKeys.value = [menu.path];
+  
+  // If this is a child menu, ensure parent stays open
   if (parentMenu) {
-    openKeys.value = [parentMenu.path];
+    openKeys.value = [`submenu-${parentMenu.path}`];
+  }
+  
+  // Navigate to the page
+  router.visit(menu.path);
+};
+
+// Initialize menu state
+const initializeMenuState = () => {
+  const url = new URL(window.location.href);
+  const currentPath = url.origin + url.pathname;
+  selectedKeys.value = [currentPath];
+  
+  // Find parent menu for current path
+  const parent = menus.value.find((m) =>
+    m.children?.some((c) => c.path === currentPath)
+  );
+  
+  if (parent) {
+    const submenuKey = `submenu-${parent.path}`;
+    openKeys.value = [submenuKey];
   }
 };
 
 onMounted(() => {
-  const url = new URL(window.location.href);
-  selectedKeys.value = [url.origin + url.pathname]; // only path, no params
-  const parent = menus.value.find((m) =>
-    m.children?.some((c) => c.path === selectedKeys.value[0])
-  );
-  if (parent) {
-    openKeys.value = [parent.path];
-  }
+  initializeMenuState();
 });
+
+// Watch for route changes to maintain menu state
+watch(() => page.url, () => {
+  initializeMenuState();
+});
+
 </script>
 
 <template>
@@ -149,6 +169,7 @@ onMounted(() => {
       v-model:selectedKeys="selectedKeys"
       mode="inline"
       theme="light"
+      :inlineCollapsed="false"
     >
       <template v-for="menu in menus" :key="menu.path">
         <a-menu-item
