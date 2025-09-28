@@ -5,6 +5,7 @@ import {
   PlusOutlined,
   MinusOutlined,
   SearchOutlined,
+  ArrowLeftOutlined,
 } from "@ant-design/icons-vue";
 import { notification } from "ant-design-vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
@@ -24,6 +25,7 @@ const props = defineProps({
 // Form state
 const form = reactive({
   location_id: null,
+  type: "recount", // Default to recount type
   reason: null,
   description: "",
   items: [],
@@ -99,7 +101,7 @@ const addProduct = (product) => {
     return;
   }
 
-  form.items.push({
+  const newItem = {
     product_id: product.id,
     product: product,
     system_quantity: product.current_stock || 0,
@@ -110,7 +112,12 @@ const addProduct = (product) => {
     batch_number: "",
     expiry_date: null,
     notes: "",
-  });
+  };
+
+  // Calculate initial adjustment
+  calculateAdjustment(newItem);
+
+  form.items.push(newItem);
 
   // Clear search
   productSearch.value = "";
@@ -184,9 +191,25 @@ const handleSubmit = async () => {
   loading.value = true;
 
   try {
+    // Clean the form data to only send required fields
+    const cleanedForm = {
+      location_id: form.location_id,
+      type: form.type,
+      reason: form.reason,
+      description: form.description,
+      items: form.items.map((item) => ({
+        product_id: item.product_id,
+        actual_quantity: item.actual_quantity,
+        unit_cost: item.unit_cost,
+        batch_number: item.batch_number || null,
+        expiry_date: item.expiry_date || null,
+        notes: item.notes || null,
+      })),
+    };
+
     const response = await axios.post(
       route("inventory.adjustments.store"),
-      form
+      cleanedForm
     );
 
     if (response.data.success) {
@@ -225,16 +248,7 @@ const handleCancel = () => {
   <Head title="Create Stock Adjustment" />
 
   <AuthenticatedLayout>
-    <ContentHeader title="Create Stock Adjustment">
-      <template #actions>
-        <a-button @click="handleCancel" style="margin-right: 8px">
-          Cancel
-        </a-button>
-        <a-button type="primary" @click="handleSubmit" :loading="loading">
-          Create Adjustment
-        </a-button>
-      </template>
-    </ContentHeader>
+    <ContentHeader title="Create Stock Adjustment" />
 
     <div class="max-w-6xl mx-auto p-6 space-y-6">
       <!-- Basic Information -->
@@ -476,7 +490,9 @@ const handleCancel = () => {
             </div>
 
             <!-- Additional Details (Full Width) -->
-            <div class="px-4 col-span-12 pb-4 grid grid-cols- md:grid-cols-2 gap-4 w-[400px] ">
+            <div
+              class="px-4 col-span-12 pb-4 grid grid-cols- md:grid-cols-2 gap-4 w-[400px]"
+            >
               <div>
                 <label class="block text-xs font-medium text-gray-700 mb-1">
                   Batch Number
@@ -543,6 +559,24 @@ const handleCancel = () => {
           </div>
         </div>
       </a-card>
+
+      <!-- Action Buttons -->
+      <div class="flex justify-end space-x-4 pt-6 border-t">
+        <a-button @click="handleCancel">
+          <template #icon>
+            <ArrowLeftOutlined />
+          </template>
+          Back
+        </a-button>
+        <a-button
+          type="primary"
+          @click="handleSubmit"
+          :loading="loading"
+          class="bg-green-700 text-white border flex items-center border-green-500 "
+        >
+          Save Adjustment
+        </a-button>
+      </div>
     </div>
   </AuthenticatedLayout>
 </template>

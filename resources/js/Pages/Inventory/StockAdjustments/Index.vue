@@ -147,7 +147,7 @@ const showAdjustmentDetails = (adjustment) => {
           placeholder="Search adjustments, reasons, or notes..."
           class="min-w-[100px] max-w-[300px]"
         />
-        <a-button type="primary" @click="createAdjustment">
+        <a-button class="bg-white border flex items-center border-green-500 text-green-500" type="primary" @click="createAdjustment">
           <template #icon>
             <PlusSquareOutlined />
           </template>

@@ -24,6 +24,7 @@ class StockAdjustmentController extends Controller
     public function index(Request $request)
     {
         $query = StockAdjustment::with(['location', 'createdBy', 'approvedBy'])
+            ->withCount('items')
             ->orderBy('created_at', 'desc');
 
         // Apply filters
