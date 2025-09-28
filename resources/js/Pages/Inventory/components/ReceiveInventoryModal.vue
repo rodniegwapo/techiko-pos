@@ -2,12 +2,8 @@
 import { ref, reactive, computed, watch,toRefs } from "vue";
 import { router } from "@inertiajs/vue3";
 import { IconPlus, IconTrash, IconSearch } from "@tabler/icons-vue";
-import { useGlobalVariables } from "@/Composables/useGlobalVariable";
-import { useHelpers } from "@/Composables/useHelpers";
+import { notification } from "ant-design-vue";
 import axios from "axios";
-
-// Remove unused openModal import
-const { showNotification } = useHelpers();
 
 const emit = defineEmits(["success", "update:visible"]);
 
@@ -79,11 +75,10 @@ const addProduct = (product) => {
 
   if (existingIndex >= 0) {
     // If product already exists, focus on quantity input
-    showNotification(
-      "warning",
-      "Product already added",
-      "This product is already in the list"
-    );
+    notification.warning({
+      message: "Product Already Added",
+      description: "This product is already in the list",
+    });
     return;
   }
 
@@ -116,11 +111,10 @@ const totalValue = computed(() => {
 // Submit form
 const handleSubmit = async () => {
   if (form.items.length === 0) {
-    showNotification(
-      "warning",
-      "No Items",
-      "Please add at least one product to receive"
-    );
+    notification.warning({
+      message: "No Items",
+      description: "Please add at least one product to receive",
+    });
     return;
   }
 
@@ -130,21 +124,26 @@ const handleSubmit = async () => {
     const response = await axios.post(route('inventory.receive'), form);
 
     if (response.data.success) {
-      showNotification("success", "Success", "Inventory received successfully");
+      notification.success({
+        message: "Receive Successful",
+        description: "Inventory received successfully",
+      });
       closeModal();
       emit("success");
     } else {
-      showNotification(
-        "error",
-        "Error",
-        response.data.message || "Failed to receive inventory"
-      );
+      notification.error({
+        message: "Receive Failed",
+        description: response.data.message || "Failed to receive inventory",
+      });
     }
   } catch (error) {
     console.error("Submit error:", error);
     const errorMessage =
       error.response?.data?.message || "An unexpected error occurred";
-    showNotification("error", "Error", errorMessage);
+    notification.error({
+      message: "Receive Failed",
+      description: errorMessage,
+    });
   } finally {
     loading.value = false;
   }

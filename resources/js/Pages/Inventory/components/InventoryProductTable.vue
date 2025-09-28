@@ -92,7 +92,7 @@ const dataSource = computed(() => {
       stock: inventory.quantity_on_hand,
       available: inventory.quantity_available,
       reserved: inventory.quantity_reserved,
-      status: inventory.product?.stock_status || "unknown",
+      status: inventory.location_stock_status || inventory.product?.stock_status || "unknown",
       value: inventory.total_value,
       last_movement: inventory.last_movement_at,
       inventory: inventory,
@@ -108,7 +108,6 @@ const dataSource = computed(() => {
     :pagination="pagination"
     :loading="false"
     @change="$emit('handleTableChange', $event)"
-
   >
     <!-- Product Column -->
     <template #bodyCell="{ column, record }">
@@ -154,11 +153,13 @@ const dataSource = computed(() => {
 
       <!-- Stock Column -->
       <template v-else-if="column.key === 'stock'">
-        <div class="text-center">
-          <p class="font-semibold text-lg">{{ Math.floor(record.stock) }}</p>
-          <p class="text-xs text-gray-500">
-            {{ record.product?.unit_of_measure || "pcs" }}
-          </p>
+        <div class="flex items-center gap-2">
+          <div class="font-semibold text-lg ">{{
+            Math.floor(record.stock)
+          }}</div>
+          <div class="text-xs text-gray-500">
+            {{ record.product?.unit_of_measure || "pcs" }} (s)
+          </div>
         </div>
       </template>
 

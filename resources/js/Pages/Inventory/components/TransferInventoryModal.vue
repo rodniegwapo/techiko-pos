@@ -2,12 +2,11 @@
 import { ref, reactive, computed, watch, toRefs } from "vue";
 import { router } from "@inertiajs/vue3";
 import { SearchOutlined, SwapOutlined } from "@ant-design/icons-vue";
+import { notification } from "ant-design-vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
-import { useHelpers } from "@/Composables/useHelpers";
 import axios from "axios";
 
 const { openModal } = useGlobalVariables();
-const { showNotification } = useHelpers();
 
 const emit = defineEmits(["success", "update:visible"]);
 
@@ -26,7 +25,7 @@ const form = reactive({
   from_location_id: null,
   to_location_id: null,
   quantity: 1,
-  notes: '',
+  notes: "",
 });
 
 const loading = ref(false);
@@ -44,13 +43,13 @@ const initializeForm = () => {
     form.from_location_id = props.currentLocation?.id || null;
     form.to_location_id = null;
     form.quantity = 1;
-    form.notes = '';
-    
+    form.notes = "";
+
     // Set the product search to show the selected product name
     productSearch.value = props.selectedProduct.product?.name || "";
     searchResults.value = [];
     selectedProduct.value = props.selectedProduct;
-    
+
     // Set the available stock from the selected inventory
     availableStock.value = props.selectedProduct.quantity_available || 0;
   } else {
@@ -59,7 +58,7 @@ const initializeForm = () => {
     form.from_location_id = props.currentLocation?.id || null;
     form.to_location_id = null;
     form.quantity = 1;
-    form.notes = '';
+    form.notes = "";
     productSearch.value = "";
     searchResults.value = [];
     selectedProduct.value = null;
@@ -69,7 +68,9 @@ const initializeForm = () => {
 
 // Available locations for transfer (exclude from_location)
 const availableToLocations = computed(() => {
-  return props.locations?.filter(loc => loc.id !== form.from_location_id) || [];
+  return (
+    props.locations?.filter((loc) => loc.id !== form.from_location_id) || []
+  );
 });
 
 // Product search
@@ -81,12 +82,12 @@ const searchProducts = async () => {
 
   searchLoading.value = true;
   try {
-    const response = await axios.get(route('sales.products'), {
-      params: { search: productSearch.value }
+    const response = await axios.get(route("sales.products"), {
+      params: { search: productSearch.value },
     });
     searchResults.value = response.data.data || [];
   } catch (error) {
-    console.error('Product search error:', error);
+    console.error("Product search error:", error);
     searchResults.value = [];
   } finally {
     searchLoading.value = false;
@@ -108,7 +109,7 @@ const selectProduct = async (product) => {
   form.product_id = product.id;
   productSearch.value = product.name;
   searchResults.value = [];
-  
+
   // Get available stock for this product at from_location
   await getAvailableStock();
 };
@@ -121,70 +122,159 @@ const getAvailableStock = async () => {
   }
 
   try {
-    const response = await axios.get(route('inventory.products'), {
+    // Get the product info to use for search
+    let searchTerm = "";
+    if (selectedProduct.value) {
+      // If we have selectedProduct, get the search term from the right place
+      if (selectedProduct.value.product) {
+        // This is from inventory table (pre-selected product)
+        searchTerm =
+          selectedProduct.value.product.SKU ||
+          selectedProduct.value.product.name;
+      } else if (selectedProduct.value.SKU || selectedProduct.value.name) {
+        // This is from product search
+        searchTerm = selectedProduct.value.SKU || selectedProduct.value.name;
+      }
+    }
+
+    // Check if we're making the right API call
+    const apiUrl = route("inventory.products");
+
+    // First try with search term
+    let response = await axios.get(apiUrl, {
       params: {
         location_id: form.from_location_id,
-        search: selectedProduct.value?.SKU || selectedProduct.value?.name
-      }
+        search: searchTerm,
+        per_page: 100,
+      },
     });
-    
-    const inventory = response.data.data?.find(inv => inv.product_id === form.product_id);
+
+    // Check if response is HTML (error case)
+    if (
+      typeof response.data === "string" &&
+      response.data.includes("<!DOCTYPE html>")
+    ) {
+      availableStock.value = 0;
+      return;
+    }
+
+    let inventory = response.data.data?.find(
+      (inv) => inv.product_id === form.product_id
+    );
+
+    // If not found with search term, try without search (get all products for this location)
+    if (!inventory && searchTerm) {
+      response = await axios.get(apiUrl, {
+        params: {
+          location_id: form.from_location_id,
+          per_page: 1000, // Get more results
+        },
+      });
+
+      // Check if response is HTML (error case)
+      if (
+        typeof response.data === "string" &&
+        response.data.includes("<!DOCTYPE html>")
+      ) {
+        availableStock.value = 0;
+        return;
+      }
+
+      inventory = response.data.data?.find(
+        (inv) => inv.product_id === form.product_id
+      );
+    }
+
     availableStock.value = inventory?.quantity_available || 0;
   } catch (error) {
-    console.error('Error getting available stock:', error);
     availableStock.value = 0;
   }
 };
 
 // Watch from_location change to update available stock
-watch(() => form.from_location_id, () => {
-  if (form.product_id) {
-    getAvailableStock();
+watch(
+  () => form.from_location_id,
+  async (newLocationId, oldLocationId) => {
+    // Reset to_location if it's the same as from_location
+    if (form.to_location_id === form.from_location_id) {
+      form.to_location_id = null;
+    }
+
+    // Only update stock if we have both location and product, and location actually changed
+    if (newLocationId && form.product_id && newLocationId !== oldLocationId) {
+      await getAvailableStock();
+    }
   }
-  // Reset to_location if it's the same as from_location
-  if (form.to_location_id === form.from_location_id) {
-    form.to_location_id = null;
+);
+
+// Watch for product changes to update available stock
+watch(
+  () => form.product_id,
+  async (newProductId, oldProductId) => {
+    // Only update stock if we have both product and location, and product actually changed
+    if (
+      newProductId &&
+      form.from_location_id &&
+      newProductId !== oldProductId
+    ) {
+      await getAvailableStock();
+    }
   }
-});
+);
 
 // Submit form
 const handleSubmit = async () => {
   if (!form.product_id) {
-    showNotification('warning', 'No Product Selected', 'Please select a product to transfer');
+    notification.warning({
+      message: "No Product Selected",
+      description: "Please select a product to transfer",
+    });
     return;
   }
 
   if (!form.from_location_id || !form.to_location_id) {
-    showNotification('warning', 'Missing Locations', 'Please select both from and to locations');
+    notification.warning({
+      message: "Missing Locations",
+      description: "Please select both from and to locations",
+    });
     return;
   }
 
   if (form.quantity <= 0) {
-    showNotification('warning', 'Invalid Quantity', 'Please enter a valid quantity');
+    notification.warning({
+      message: "Invalid Quantity",
+      description: "Please enter a valid quantity",
+    });
     return;
   }
 
   if (form.quantity > availableStock.value) {
-    showNotification('warning', 'Insufficient Stock', `Only ${availableStock.value} units available`);
+    notification.warning({
+      message: "Insufficient Stock",
+      description: `Only ${availableStock.value} units available`,
+    });
     return;
   }
 
   loading.value = true;
-  
+
   try {
-    const response = await axios.post(route('inventory.transfer'), form);
-    
-    if (response.data.success) {
-      showNotification('success', 'Success', 'Inventory transferred successfully');
-      closeModal();
-      emit('success');
-    } else {
-      showNotification('error', 'Error', response.data.message || 'Failed to transfer inventory');
-    }
+    const response = await axios.post(route("inventory.transfer"), form);
+
+    notification.success({
+      message: "Transfer Successful",
+      description: "Inventory transferred successfully",
+    });
+    closeModal();
+    emit("success");
   } catch (error) {
-    console.error('Submit error:', error);
-    const errorMessage = error.response?.data?.message || 'An unexpected error occurred';
-    showNotification('error', 'Error', errorMessage);
+    console.error("Submit error:", error);
+    const errorMessage =
+      error.response?.data?.message || "An unexpected error occurred";
+    notification.error({
+      message: "Transfer Failed",
+      description: errorMessage,
+    });
   } finally {
     loading.value = false;
   }
@@ -200,23 +290,30 @@ const clearSelectedProduct = () => {
 
 // Close modal
 const closeModal = () => {
-  emit('update:visible', false);
+  emit("update:visible", false);
   initializeForm();
 };
 
 // Watch for selectedProduct changes
-watch(() => props.selectedProduct, (newProduct) => {
-  if (newProduct && props.visible) {
-    initializeForm();
-  }
-}, { immediate: true });
+watch(
+  () => props.selectedProduct,
+  (newProduct) => {
+    if (newProduct && props.visible) {
+      initializeForm();
+    }
+  },
+  { immediate: true }
+);
 
 // Initialize when modal opens
-watch(() => props.visible, (isOpen) => {
-  if (isOpen) {
-    initializeForm();
+watch(
+  () => props.visible,
+  (isOpen) => {
+    if (isOpen) {
+      initializeForm();
+    }
   }
-});
+);
 </script>
 
 <template>
@@ -236,12 +333,22 @@ watch(() => props.visible, (isOpen) => {
         </label>
 
         <!-- Show selected product if pre-selected -->
-        <div v-if="selectedProduct && form.product_id" class="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+        <div
+          v-if="selectedProduct && form.product_id"
+          class="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200"
+        >
           <div class="flex items-center justify-between">
             <div>
-              <p class="font-semibold text-blue-900">{{ selectedProduct.product?.name }}</p>
-              <p class="text-sm text-blue-700">SKU: {{ selectedProduct.product?.SKU }}</p>
-              <p class="text-sm text-blue-700">Available: {{ availableStock }} {{ selectedProduct.product?.unit_of_measure || 'pcs' }}</p>
+              <p class="font-semibold text-blue-900">
+                {{ selectedProduct.product?.name }}
+              </p>
+              <p class="text-sm text-blue-700">
+                SKU: {{ selectedProduct.product?.SKU }}
+              </p>
+              <p class="text-sm text-blue-700">
+                Available: {{ availableStock }}
+                {{ selectedProduct.product?.unit_of_measure || "pcs" }}
+              </p>
             </div>
             <a-button type="link" size="small" @click="clearSelectedProduct">
               Change Product
@@ -260,10 +367,10 @@ watch(() => props.visible, (isOpen) => {
               <SearchOutlined />
             </template>
           </a-input>
-          
+
           <!-- Search Results Dropdown -->
-          <div 
-            v-if="searchResults.length > 0" 
+          <div
+            v-if="searchResults.length > 0"
             class="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto"
           >
             <div
@@ -278,8 +385,12 @@ watch(() => props.visible, (isOpen) => {
                   <p class="text-sm text-gray-500">SKU: {{ product.SKU }}</p>
                 </div>
                 <div class="text-right">
-                  <p class="text-sm font-medium">₱{{ product.price?.toFixed(2) || '0.00' }}</p>
-                  <p class="text-xs text-gray-500">{{ product.category?.name || 'No Category' }}</p>
+                  <p class="text-sm font-medium">
+                    ₱{{ product.price?.toFixed(2) || "0.00" }}
+                  </p>
+                  <p class="text-xs text-gray-500">
+                    {{ product.category?.name || "No Category" }}
+                  </p>
                 </div>
               </div>
             </div>
@@ -299,16 +410,16 @@ watch(() => props.visible, (isOpen) => {
             class="w-full"
             :disabled="loading"
           >
-            <a-select-option 
-              v-for="location in locations" 
-              :key="location.id" 
+            <a-select-option
+              v-for="location in locations"
+              :key="location.id"
               :value="location.id"
             >
               {{ location.name }}
             </a-select-option>
           </a-select>
         </div>
-        
+
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">
             To Location *
@@ -319,9 +430,9 @@ watch(() => props.visible, (isOpen) => {
             class="w-full"
             :disabled="loading"
           >
-            <a-select-option 
-              v-for="location in availableToLocations" 
-              :key="location.id" 
+            <a-select-option
+              v-for="location in availableToLocations"
+              :key="location.id"
               :value="location.id"
             >
               {{ location.name }}
@@ -331,20 +442,25 @@ watch(() => props.visible, (isOpen) => {
       </div>
 
       <!-- Transfer Arrow -->
-      <div v-if="form.from_location_id && form.to_location_id" class="text-center">
-        <div class="inline-flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
+      <div
+        v-if="form.from_location_id && form.to_location_id"
+        class="text-center"
+      >
+        <div
+          class="inline-flex items-center space-x-4 p-4 bg-gray-50 rounded-lg"
+        >
           <div class="text-center">
             <p class="font-medium text-gray-900">
-              {{ locations?.find(l => l.id === form.from_location_id)?.name }}
+              {{ locations?.find((l) => l.id === form.from_location_id)?.name }}
             </p>
             <p class="text-sm text-gray-500">From</p>
           </div>
-          
+
           <SwapOutlined class="text-2xl text-blue-600" />
-          
+
           <div class="text-center">
             <p class="font-medium text-gray-900">
-              {{ locations?.find(l => l.id === form.to_location_id)?.name }}
+              {{ locations?.find((l) => l.id === form.to_location_id)?.name }}
             </p>
             <p class="text-sm text-gray-500">To</p>
           </div>
@@ -366,7 +482,8 @@ watch(() => props.visible, (isOpen) => {
           :disabled="loading || !selectedProduct"
         />
         <p v-if="availableStock > 0" class="text-sm text-gray-500 mt-1">
-          Maximum available: {{ availableStock }} {{ selectedProduct?.unit_of_measure || 'pcs' }}
+          Maximum available: {{ availableStock }}
+          {{ selectedProduct?.unit_of_measure || "pcs" }}
         </p>
       </div>
 
@@ -384,7 +501,10 @@ watch(() => props.visible, (isOpen) => {
       </div>
 
       <!-- Stock Warning -->
-      <div v-if="selectedProduct && availableStock <= 0" class="p-4 bg-red-50 border border-red-200 rounded-lg">
+      <div
+        v-if="selectedProduct && availableStock <= 0"
+        class="p-4 bg-red-50 border border-red-200 rounded-lg"
+      >
         <div class="flex items-center">
           <div class="text-red-600 mr-3">⚠️</div>
           <div>
@@ -401,18 +521,23 @@ watch(() => props.visible, (isOpen) => {
       <div class="flex justify-between">
         <div>
           <span v-if="selectedProduct" class="text-sm text-gray-500">
-            {{ selectedProduct.product?.name }} • {{ form.quantity }} {{ selectedProduct.product?.unit_of_measure || 'pcs' }}
+            {{ selectedProduct.product?.name }} • {{ form.quantity }}
+            {{ selectedProduct.product?.unit_of_measure || "pcs" }}
           </span>
         </div>
         <div class="space-x-2">
-          <a-button @click="closeModal" :disabled="loading">
-            Cancel
-          </a-button>
-          <a-button 
-            type="primary" 
-            @click="handleSubmit" 
+          <a-button @click="closeModal" :disabled="loading"> Cancel </a-button>
+          <a-button
+            type="primary"
+            @click="handleSubmit"
             :loading="loading"
-            :disabled="!selectedProduct || !form.from_location_id || !form.to_location_id || form.quantity <= 0 || form.quantity > availableStock"
+            :disabled="
+              !selectedProduct ||
+              !form.from_location_id ||
+              !form.to_location_id ||
+              form.quantity <= 0 ||
+              form.quantity > availableStock
+            "
           >
             Transfer Inventory
           </a-button>
