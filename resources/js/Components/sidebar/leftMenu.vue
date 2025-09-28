@@ -138,16 +138,52 @@ const handleClick = (menu, parentMenu = null) => {
 const initializeMenuState = () => {
   const url = new URL(window.location.href);
   const currentPath = url.origin + url.pathname;
-  selectedKeys.value = [currentPath];
   
-  // Find parent menu for current path
-  const parent = menus.value.find((m) =>
-    m.children?.some((c) => c.path === currentPath)
-  );
+  // Find exact match first
+  let matchedMenu = null;
+  let parentMenu = null;
   
-  if (parent) {
-    const submenuKey = `submenu-${parent.path}`;
-    openKeys.value = [submenuKey];
+  // Check for exact match in child menus
+  for (const menu of menus.value) {
+    if (menu.children) {
+      const childMatch = menu.children.find(child => child.path === currentPath);
+      if (childMatch) {
+        matchedMenu = childMatch;
+        parentMenu = menu;
+        break;
+      }
+    } else if (menu.path === currentPath) {
+      matchedMenu = menu;
+      break;
+    }
+  }
+  
+  // If no exact match, try to find parent route match (for create/edit pages)
+  if (!matchedMenu) {
+    for (const menu of menus.value) {
+      if (menu.children) {
+        const childMatch = menu.children.find(child => 
+          currentPath.startsWith(child.path) && currentPath !== child.path
+        );
+        if (childMatch) {
+          matchedMenu = childMatch;
+          parentMenu = menu;
+          break;
+        }
+      } else if (currentPath.startsWith(menu.path) && currentPath !== menu.path) {
+        matchedMenu = menu;
+        break;
+      }
+    }
+  }
+  
+  if (matchedMenu) {
+    selectedKeys.value = [matchedMenu.path];
+    
+    if (parentMenu) {
+      const submenuKey = `submenu-${parentMenu.path}`;
+      openKeys.value = [submenuKey];
+    }
   }
 };
 
