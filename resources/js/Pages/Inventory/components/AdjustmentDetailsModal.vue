@@ -173,15 +173,15 @@ const totalQuantityAdjusted = computed(() => {
 
       <!-- Summary Information -->
       <div class="grid grid-cols-3 gap-4">
-        <div class="bg-blue-50 p-4 rounded-lg text-center">
+        <div class="bg-blue-50 p-4 rounded-lg text-center border">
           <p class="text-2xl font-bold text-blue-600">{{ displayAdjustment.items?.length || 0 }}</p>
           <p class="text-sm text-gray-600">Products Adjusted</p>
         </div>
-        <div class="bg-orange-50 p-4 rounded-lg text-center">
+        <div class="bg-orange-50 p-4 rounded-lg text-center border">
           <p class="text-2xl font-bold text-orange-600">{{ totalQuantityAdjusted }}</p>
           <p class="text-sm text-gray-600">Total Quantity</p>
         </div>
-        <div class="bg-green-50 p-4 rounded-lg text-center">
+        <div class="bg-green-50 p-4 rounded-lg text-center border">
           <p class="text-2xl font-bold text-green-600">{{ formatCurrency(totalValueAdjusted) }}</p>
           <p class="text-sm text-gray-600">Value Impact</p>
         </div>
@@ -240,7 +240,7 @@ const totalQuantityAdjusted = computed(() => {
           <IconFileText :size="18" class="mr-2" />
           Reason & Notes
         </h4>
-        <div class="bg-gray-50 p-4 rounded-lg space-y-2">
+        <div class="bg-gray-50 p-4 rounded-lg space-y-2 border">
           <div v-if="displayAdjustment.reason">
             <p class="text-sm text-gray-600">Reason:</p>
             <p class="font-semibold">{{ getReasonDisplay(displayAdjustment.reason) }}</p>

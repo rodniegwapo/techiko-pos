@@ -133,7 +133,7 @@ export function useHelpers() {
     // Format date and time
     const formatDateTime = (date) => {
         if (!date) return "N/A";
-        return dayjs(date).format("MMM DD, YYYY HH:mm");
+        return dayjs(date).format("MMMM DD, YYYY HH:mm");
     };
 
     // Show notification
