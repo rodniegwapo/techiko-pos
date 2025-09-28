@@ -1,21 +1,21 @@
 <script setup>
 import { computed } from "vue";
 import { 
-  EyeOutlined,
-  EditOutlined,
-  CheckOutlined,
-  CloseOutlined,
-  SendOutlined,
-  DeleteOutlined,
-  FileTextOutlined
-} from "@ant-design/icons-vue";
+  IconEye,
+  IconEdit,
+  IconCheck,
+  IconX,
+  IconSend,
+  IconTrash,
+  IconFileText
+} from "@tabler/icons-vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { useHelpers } from "@/Composables/useHelpers";
 import { router } from "@inertiajs/vue3";
 
 const { formatCurrency, formatDate, confirmDelete, showNotification } = useHelpers();
 
-const emit = defineEmits(["handleTableChange", "refresh"]);
+const emit = defineEmits(["handleTableChange", "refresh", "showDetails"]);
 
 const props = defineProps({
   adjustments: {
@@ -28,25 +28,30 @@ const props = defineProps({
   },
 });
 
+// Simplified columns - only essential information
 const columns = [
   { title: "Adjustment #", dataIndex: "number", key: "number", align: "left", width: "15%" },
-  { title: "Location", dataIndex: "location", key: "location", align: "left", width: "15%" },
-  { title: "Type & Reason", dataIndex: "type_reason", key: "type_reason", align: "left", width: "20%" },
-  { title: "Status", dataIndex: "status", key: "status", align: "center", width: "12%" },
-  { title: "Value Change", dataIndex: "value", key: "value", align: "right", width: "12%" },
-  { title: "Created By", dataIndex: "created_by", key: "created_by", align: "left", width: "12%" },
-  { title: "Date", dataIndex: "date", key: "date", align: "center", width: "12%" },
-  { title: "Actions", key: "actions", align: "center", width: "15%" },
+  { title: "Location", dataIndex: "location", key: "location", align: "center", width: "15%" },
+  { title: "Reason", dataIndex: "reason", key: "reason", align: "left", width: "20%" },
+  { title: "Status", dataIndex: "status", key: "status", align: "center", width: "15%" },
+  { title: "Items", dataIndex: "items", key: "items", align: "center", width: "10%" },
+  { title: "Value", dataIndex: "value", key: "value", align: "right", width: "15%" },
+  { title: "Actions", key: "actions", align: "center", width: "10%" },
 ];
 
 const getStatusColor = (status) => {
   const colors = {
-    draft: 'default',
-    pending_approval: 'processing',
-    approved: 'success',
-    rejected: 'error',
+    draft: 'blue',
+    pending_approval: 'orange',
+    approved: 'green',
+    rejected: 'red',
+    completed: 'purple',
   };
   return colors[status] || 'default';
+};
+
+const showDetails = (adjustment) => {
+  emit('showDetails', adjustment);
 };
 
 const getStatusText = (status) => {
@@ -179,37 +184,36 @@ const dataSource = computed(() => {
 
       <!-- Location Column -->
       <template v-else-if="column.key === 'location'">
-        <div>
+        <div class="text-center">
           <p class="font-medium text-sm">{{ record.location?.name || 'Unknown' }}</p>
-          <p class="text-xs text-gray-500">{{ record.location?.code || '' }}</p>
         </div>
       </template>
 
-      <!-- Type & Reason Column -->
-      <template v-else-if="column.key === 'type_reason'">
+      <!-- Reason Column -->
+      <template v-else-if="column.key === 'reason'">
         <div>
-          <a-tag :color="getTypeColor(record.type)" class="mb-1">
-            {{ record.type?.charAt(0).toUpperCase() + record.type?.slice(1) || 'Unknown' }}
-          </a-tag>
-          <p class="text-sm text-gray-600">
-            {{ record.adjustment?.reason_display || record.reason }}
-          </p>
+          <p class="text-sm text-gray-900">{{ record.reason || 'No reason provided' }}</p>
         </div>
       </template>
 
       <!-- Status Column -->
       <template v-else-if="column.key === 'status'">
-        <a-tag :color="getStatusColor(record.status)">
-          {{ getStatusText(record.status) }}
-        </a-tag>
-        <div v-if="record.approved_at" class="mt-1">
-          <p class="text-xs text-gray-500">
-            {{ formatDate(record.approved_at) }}
-          </p>
+        <div class="text-center">
+          <a-tag :color="getStatusColor(record.status)">
+            {{ getStatusText(record.status) }}
+          </a-tag>
         </div>
       </template>
 
-      <!-- Value Change Column -->
+      <!-- Items Column -->
+      <template v-else-if="column.key === 'items'">
+        <div class="text-center">
+          <p class="font-semibold">{{ record.adjustment?.items?.length || 0 }}</p>
+          <p class="text-xs text-gray-500">items</p>
+        </div>
+      </template>
+
+      <!-- Value Column -->
       <template v-else-if="column.key === 'value'">
         <div class="text-right">
           <p class="font-semibold" :class="{
@@ -222,81 +226,15 @@ const dataSource = computed(() => {
         </div>
       </template>
 
-      <!-- Created By Column -->
-      <template v-else-if="column.key === 'created_by'">
-        <div>
-          <p class="font-medium text-sm">{{ record.created_by?.name || 'Unknown' }}</p>
-          <p v-if="record.approved_by" class="text-xs text-gray-500">
-            Approved by: {{ record.approved_by.name }}
-          </p>
-        </div>
-      </template>
-
-      <!-- Date Column -->
-      <template v-else-if="column.key === 'date'">
-        <div class="text-center">
-          <p class="font-medium text-sm">{{ formatDate(record.created_at) }}</p>
-          <p class="text-xs text-gray-500">{{ formatDate(record.created_at).split(' ')[1] || '' }}</p>
-        </div>
-      </template>
 
       <!-- Actions Column -->
       <template v-else-if="column.key === 'actions'">
-        <div class="flex justify-center space-x-1">
-          <!-- View -->
+        <div class="flex justify-center">
           <IconTooltipButton
-            tooltip="View Details"
-            @click="viewAdjustment(record.adjustment)"
+            name="View Details"
+            @click="showDetails(record.adjustment)"
           >
-            <EyeOutlined />
-          </IconTooltipButton>
-
-          <!-- Edit (only for draft) -->
-          <IconTooltipButton
-            v-if="record.status === 'draft'"
-            tooltip="Edit Adjustment"
-            @click="editAdjustment(record.adjustment)"
-          >
-            <EditOutlined />
-          </IconTooltipButton>
-
-          <!-- Submit for Approval (only for draft) -->
-          <IconTooltipButton
-            v-if="record.status === 'draft'"
-            tooltip="Submit for Approval"
-            @click="submitForApproval(record.adjustment)"
-          >
-            <SendOutlined />
-          </IconTooltipButton>
-
-          <!-- Approve (only for pending) -->
-          <IconTooltipButton
-            v-if="record.status === 'pending_approval'"
-            tooltip="Approve Adjustment"
-            @click="approveAdjustment(record.adjustment)"
-            type="primary"
-          >
-            <CheckOutlined />
-          </IconTooltipButton>
-
-          <!-- Reject (only for pending) -->
-          <IconTooltipButton
-            v-if="record.status === 'pending_approval'"
-            tooltip="Reject Adjustment"
-            @click="rejectAdjustment(record.adjustment)"
-            danger
-          >
-            <CloseOutlined />
-          </IconTooltipButton>
-
-          <!-- Delete (only for draft) -->
-          <IconTooltipButton
-            v-if="record.status === 'draft'"
-            tooltip="Delete Adjustment"
-            @click="deleteAdjustment(record.adjustment)"
-            danger
-          >
-            <DeleteOutlined />
+            <IconEye :size="20" class="mx-auto" />
           </IconTooltipButton>
         </div>
       </template>
@@ -305,7 +243,7 @@ const dataSource = computed(() => {
     <!-- Empty State -->
     <template #emptyText>
       <div class="text-center py-8">
-        <FileTextOutlined class="text-4xl text-gray-400 mb-4" />
+        <IconFileText :size="48" class="mx-auto text-gray-400 mb-4" />
         <p class="text-gray-500">No stock adjustments found</p>
         <p class="text-sm text-gray-400">Create your first adjustment to get started</p>
       </div>

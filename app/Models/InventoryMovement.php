@@ -29,9 +29,9 @@ class InventoryMovement extends Model
     ];
 
     protected $casts = [
-        'quantity_before' => 'decimal:3',
-        'quantity_change' => 'decimal:3',
-        'quantity_after' => 'decimal:3',
+        'quantity_before' => 'integer',
+        'quantity_change' => 'integer',
+        'quantity_after' => 'integer',
         'unit_cost' => 'decimal:4',
         'total_cost' => 'decimal:4',
         'expiry_date' => 'date',

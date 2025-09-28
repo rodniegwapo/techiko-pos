@@ -151,7 +151,7 @@ class InventoryController extends Controller
             'location_id' => 'required|exists:inventory_locations,id',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
-            'items.*.quantity' => 'required|numeric|min:0.001',
+            'items.*.quantity' => 'required|integer|min:1',
             'items.*.unit_cost' => 'required|numeric|min:0',
             'items.*.batch_number' => 'nullable|string|max:255',
             'items.*.expiry_date' => 'nullable|date',
@@ -190,7 +190,7 @@ class InventoryController extends Controller
             'product_id' => 'required|exists:products,id',
             'from_location_id' => 'required|exists:inventory_locations,id',
             'to_location_id' => 'required|exists:inventory_locations,id|different:from_location_id',
-            'quantity' => 'required|numeric|min:0.001',
+            'quantity' => 'required|integer|min:1',
             'notes' => 'nullable|string|max:500',
         ]);
 
@@ -208,10 +208,7 @@ class InventoryController extends Controller
                 $validated['notes'] ?? null
             );
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Inventory transferred successfully',
-            ]);
+            return response()->noContent();
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,

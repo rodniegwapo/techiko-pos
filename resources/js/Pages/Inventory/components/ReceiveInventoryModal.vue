@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed, watch } from "vue";
+import { ref, reactive, computed, watch,toRefs } from "vue";
 import { router } from "@inertiajs/vue3";
 import { IconPlus, IconTrash, IconSearch } from "@tabler/icons-vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
@@ -17,6 +17,7 @@ const props = defineProps({
   visible: Boolean,
 });
 
+const { visible } = toRefs(props);
 // Form state
 const form = reactive({
   location_id: null,
@@ -49,12 +50,12 @@ const searchProducts = async () => {
 
   searchLoading.value = true;
   try {
-    const response = await axios.get('/api/sales/products', {
-      params: { search: productSearch.value }
+    const response = await axios.get(route('sales.products'), {
+      params: { search: productSearch.value },
     });
     searchResults.value = response.data.data || [];
   } catch (error) {
-    console.error('Product search error:', error);
+    console.error("Product search error:", error);
     searchResults.value = [];
   } finally {
     searchLoading.value = false;
@@ -72,11 +73,17 @@ watch(productSearch, () => {
 
 // Add product to items
 const addProduct = (product) => {
-  const existingIndex = form.items.findIndex(item => item.product_id === product.id);
-  
+  const existingIndex = form.items.findIndex(
+    (item) => item.product_id === product.id
+  );
+
   if (existingIndex >= 0) {
     // If product already exists, focus on quantity input
-    showNotification('warning', 'Product already added', 'This product is already in the list');
+    showNotification(
+      "warning",
+      "Product already added",
+      "This product is already in the list"
+    );
     return;
   }
 
@@ -85,9 +92,9 @@ const addProduct = (product) => {
     product: product,
     quantity: 1,
     unit_cost: product.cost || 0,
-    batch_number: '',
+    batch_number: "",
     expiry_date: null,
-    notes: '',
+    notes: "",
   });
 
   productSearch.value = "";
@@ -102,33 +109,42 @@ const removeItem = (index) => {
 // Calculate total value
 const totalValue = computed(() => {
   return form.items.reduce((sum, item) => {
-    return sum + (item.quantity * item.unit_cost);
+    return sum + item.quantity * item.unit_cost;
   }, 0);
 });
 
 // Submit form
 const handleSubmit = async () => {
   if (form.items.length === 0) {
-    showNotification('warning', 'No Items', 'Please add at least one product to receive');
+    showNotification(
+      "warning",
+      "No Items",
+      "Please add at least one product to receive"
+    );
     return;
   }
 
   loading.value = true;
-  
+
   try {
-    const response = await axios.post('/api/inventory/receive', form);
-    
+    const response = await axios.post(route('inventory.receive'), form);
+
     if (response.data.success) {
-      showNotification('success', 'Success', 'Inventory received successfully');
+      showNotification("success", "Success", "Inventory received successfully");
       closeModal();
-      emit('success');
+      emit("success");
     } else {
-      showNotification('error', 'Error', response.data.message || 'Failed to receive inventory');
+      showNotification(
+        "error",
+        "Error",
+        response.data.message || "Failed to receive inventory"
+      );
     }
   } catch (error) {
-    console.error('Submit error:', error);
-    const errorMessage = error.response?.data?.message || 'An unexpected error occurred';
-    showNotification('error', 'Error', errorMessage);
+    console.error("Submit error:", error);
+    const errorMessage =
+      error.response?.data?.message || "An unexpected error occurred";
+    showNotification("error", "Error", errorMessage);
   } finally {
     loading.value = false;
   }
@@ -136,21 +152,24 @@ const handleSubmit = async () => {
 
 // Close modal
 const closeModal = () => {
-  emit('update:visible', false);
+  emit("update:visible", false);
   initializeForm();
 };
 
 // Initialize when modal opens
-watch(() => props.visible, (isOpen) => {
-  if (isOpen) {
-    initializeForm();
+watch(
+  () => props.visible,
+  (isOpen) => {
+    if (isOpen) {
+      initializeForm();
+    }
   }
-});
+);
 </script>
 
 <template>
   <a-modal
-    :open="visible"
+    v-model:visible="visible"
     title="Receive Inventory"
     width="900px"
     :confirm-loading="loading"
@@ -169,9 +188,9 @@ watch(() => props.visible, (isOpen) => {
           class="w-full"
           :disabled="loading"
         >
-          <a-select-option 
-            v-for="location in locations" 
-            :key="location.id" 
+          <a-select-option
+            v-for="location in locations"
+            :key="location.id"
             :value="location.id"
           >
             {{ location.name }}
@@ -220,10 +239,10 @@ watch(() => props.visible, (isOpen) => {
               <IconSearch :size="16" />
             </template>
           </a-input>
-          
+
           <!-- Search Results Dropdown -->
-          <div 
-            v-if="searchResults.length > 0" 
+          <div
+            v-if="searchResults.length > 0"
             class="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto"
           >
             <div
@@ -238,8 +257,12 @@ watch(() => props.visible, (isOpen) => {
                   <p class="text-sm text-gray-500">SKU: {{ product.SKU }}</p>
                 </div>
                 <div class="text-right">
-                  <p class="text-sm font-medium">₱{{ product.cost?.toFixed(2) || '0.00' }}</p>
-                  <p class="text-xs text-gray-500">{{ product.category?.name || 'No Category' }}</p>
+                  <p class="text-sm font-medium">
+                    ₱{{ product.cost?.toFixed(2) || "0.00" }}
+                  </p>
+                  <p class="text-xs text-gray-500">
+                    {{ product.category?.name || "No Category" }}
+                  </p>
                 </div>
               </div>
             </div>
@@ -252,9 +275,11 @@ watch(() => props.visible, (isOpen) => {
         <label class="block text-sm font-medium text-gray-700 mb-2">
           Items to Receive ({{ form.items.length }})
         </label>
-        
+
         <div class="border border-gray-200 rounded-lg overflow-hidden">
-          <div class="bg-gray-50 px-4 py-2 grid grid-cols-12 gap-2 text-sm font-medium text-gray-700">
+          <div
+            class="bg-gray-50 px-4 py-2 grid grid-cols-12 gap-2 text-sm font-medium text-gray-700"
+          >
             <div class="col-span-3">Product</div>
             <div class="col-span-2">Quantity</div>
             <div class="col-span-2">Unit Cost</div>
@@ -262,7 +287,7 @@ watch(() => props.visible, (isOpen) => {
             <div class="col-span-2">Expiry Date</div>
             <div class="col-span-1">Action</div>
           </div>
-          
+
           <div
             v-for="(item, index) in form.items"
             :key="index"
@@ -273,19 +298,19 @@ watch(() => props.visible, (isOpen) => {
               <p class="font-medium text-sm">{{ item.product.name }}</p>
               <p class="text-xs text-gray-500">{{ item.product.SKU }}</p>
             </div>
-            
+
             <!-- Quantity -->
             <div class="col-span-2">
               <a-input-number
                 v-model:value="item.quantity"
-                :min="0.001"
+                :min="1"
                 :step="1"
-                :precision="3"
+                :precision="0"
                 class="w-full"
                 :disabled="loading"
               />
             </div>
-            
+
             <!-- Unit Cost -->
             <div class="col-span-2">
               <a-input-number
@@ -297,7 +322,7 @@ watch(() => props.visible, (isOpen) => {
                 :disabled="loading"
               />
             </div>
-            
+
             <!-- Batch Number -->
             <div class="col-span-2">
               <a-input
@@ -306,7 +331,7 @@ watch(() => props.visible, (isOpen) => {
                 :disabled="loading"
               />
             </div>
-            
+
             <!-- Expiry Date -->
             <div class="col-span-2">
               <a-date-picker
@@ -316,7 +341,7 @@ watch(() => props.visible, (isOpen) => {
                 :disabled="loading"
               />
             </div>
-            
+
             <!-- Remove Button -->
             <div class="col-span-1 text-center">
               <a-button
@@ -352,16 +377,16 @@ watch(() => props.visible, (isOpen) => {
       <div class="flex justify-between">
         <div>
           <span class="text-sm text-gray-500">
-            {{ form.items.length }} item(s) • Total: ₱{{ totalValue.toFixed(2) }}
+            {{ form.items.length }} item(s) • Total: ₱{{
+              totalValue.toFixed(2)
+            }}
           </span>
         </div>
         <div class="space-x-2">
-          <a-button @click="closeModal" :disabled="loading">
-            Cancel
-          </a-button>
-          <a-button 
-            type="primary" 
-            @click="handleSubmit" 
+          <a-button @click="closeModal" :disabled="loading"> Cancel </a-button>
+          <a-button
+            type="primary"
+            @click="handleSubmit"
             :loading="loading"
             :disabled="form.items.length === 0"
           >

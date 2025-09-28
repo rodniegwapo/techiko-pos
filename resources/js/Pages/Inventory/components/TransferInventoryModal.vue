@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed, watch } from "vue";
+import { ref, reactive, computed, watch, toRefs } from "vue";
 import { router } from "@inertiajs/vue3";
 import { SearchOutlined, SwapOutlined } from "@ant-design/icons-vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
@@ -15,7 +15,10 @@ const props = defineProps({
   locations: Array,
   currentLocation: Object,
   visible: Boolean,
+  selectedProduct: Object,
 });
+
+const { visible } = toRefs(props);
 
 // Form state
 const form = reactive({
@@ -35,15 +38,33 @@ const availableStock = ref(0);
 
 // Initialize form
 const initializeForm = () => {
-  form.product_id = null;
-  form.from_location_id = props.currentLocation?.id || null;
-  form.to_location_id = null;
-  form.quantity = 1;
-  form.notes = '';
-  productSearch.value = "";
-  searchResults.value = [];
-  selectedProduct.value = null;
-  availableStock.value = 0;
+  // If we have a selected product, pre-populate the form
+  if (props.selectedProduct) {
+    form.product_id = props.selectedProduct.product?.id || null;
+    form.from_location_id = props.currentLocation?.id || null;
+    form.to_location_id = null;
+    form.quantity = 1;
+    form.notes = '';
+    
+    // Set the product search to show the selected product name
+    productSearch.value = props.selectedProduct.product?.name || "";
+    searchResults.value = [];
+    selectedProduct.value = props.selectedProduct;
+    
+    // Set the available stock from the selected inventory
+    availableStock.value = props.selectedProduct.quantity_available || 0;
+  } else {
+    // Default initialization when no product is selected
+    form.product_id = null;
+    form.from_location_id = props.currentLocation?.id || null;
+    form.to_location_id = null;
+    form.quantity = 1;
+    form.notes = '';
+    productSearch.value = "";
+    searchResults.value = [];
+    selectedProduct.value = null;
+    availableStock.value = 0;
+  }
 };
 
 // Available locations for transfer (exclude from_location)
@@ -60,7 +81,7 @@ const searchProducts = async () => {
 
   searchLoading.value = true;
   try {
-    const response = await axios.get('/api/sales/products', {
+    const response = await axios.get(route('sales.products'), {
       params: { search: productSearch.value }
     });
     searchResults.value = response.data.data || [];
@@ -100,7 +121,7 @@ const getAvailableStock = async () => {
   }
 
   try {
-    const response = await axios.get('/api/inventory/products', {
+    const response = await axios.get(route('inventory.products'), {
       params: {
         location_id: form.from_location_id,
         search: selectedProduct.value?.SKU || selectedProduct.value?.name
@@ -151,23 +172,30 @@ const handleSubmit = async () => {
   loading.value = true;
   
   try {
-    await router.post('/api/inventory/transfer', form, {
-      onSuccess: () => {
-        showNotification('success', 'Success', 'Inventory transferred successfully');
-        closeModal();
-        emit('success');
-      },
-      onError: (errors) => {
-        console.error('Transfer inventory errors:', errors);
-        showNotification('error', 'Error', 'Failed to transfer inventory');
-      },
-    });
+    const response = await axios.post(route('inventory.transfer'), form);
+    
+    if (response.data.success) {
+      showNotification('success', 'Success', 'Inventory transferred successfully');
+      closeModal();
+      emit('success');
+    } else {
+      showNotification('error', 'Error', response.data.message || 'Failed to transfer inventory');
+    }
   } catch (error) {
     console.error('Submit error:', error);
-    showNotification('error', 'Error', 'An unexpected error occurred');
+    const errorMessage = error.response?.data?.message || 'An unexpected error occurred';
+    showNotification('error', 'Error', errorMessage);
   } finally {
     loading.value = false;
   }
+};
+
+// Clear selected product
+const clearSelectedProduct = () => {
+  form.product_id = null;
+  selectedProduct.value = null;
+  availableStock.value = 0;
+  productSearch.value = "";
 };
 
 // Close modal
@@ -175,6 +203,13 @@ const closeModal = () => {
   emit('update:visible', false);
   initializeForm();
 };
+
+// Watch for selectedProduct changes
+watch(() => props.selectedProduct, (newProduct) => {
+  if (newProduct && props.visible) {
+    initializeForm();
+  }
+}, { immediate: true });
 
 // Initialize when modal opens
 watch(() => props.visible, (isOpen) => {
@@ -186,7 +221,7 @@ watch(() => props.visible, (isOpen) => {
 
 <template>
   <a-modal
-    :open="visible"
+    v-model:visible="visible"
     title="Transfer Inventory"
     width="600px"
     :confirm-loading="loading"
@@ -199,7 +234,22 @@ watch(() => props.visible, (isOpen) => {
         <label class="block text-sm font-medium text-gray-700 mb-2">
           Select Product *
         </label>
-        <div class="relative">
+
+        <!-- Show selected product if pre-selected -->
+        <div v-if="selectedProduct && form.product_id" class="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="font-semibold text-blue-900">{{ selectedProduct.product?.name }}</p>
+              <p class="text-sm text-blue-700">SKU: {{ selectedProduct.product?.SKU }}</p>
+              <p class="text-sm text-blue-700">Available: {{ availableStock }} {{ selectedProduct.product?.unit_of_measure || 'pcs' }}</p>
+            </div>
+            <a-button type="link" size="small" @click="clearSelectedProduct">
+              Change Product
+            </a-button>
+          </div>
+        </div>
+
+        <div class="relative" v-if="!form.product_id">
           <a-input
             v-model:value="productSearch"
             placeholder="Search products by name, SKU, or barcode..."
@@ -232,20 +282,6 @@ watch(() => props.visible, (isOpen) => {
                   <p class="text-xs text-gray-500">{{ product.category?.name || 'No Category' }}</p>
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Selected Product Display -->
-        <div v-if="selectedProduct" class="mt-2 p-3 bg-blue-50 rounded-lg">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="font-medium text-blue-900">{{ selectedProduct.name }}</p>
-              <p class="text-sm text-blue-700">SKU: {{ selectedProduct.SKU }}</p>
-            </div>
-            <div class="text-right">
-              <p class="text-sm font-medium text-blue-900">Available: {{ availableStock }}</p>
-              <p class="text-xs text-blue-700">{{ selectedProduct.unit_of_measure || 'pcs' }}</p>
             </div>
           </div>
         </div>
@@ -322,10 +358,10 @@ watch(() => props.visible, (isOpen) => {
         </label>
         <a-input-number
           v-model:value="form.quantity"
-          :min="0.001"
+          :min="1"
           :max="availableStock"
           :step="1"
-          :precision="3"
+          :precision="0"
           class="w-full"
           :disabled="loading || !selectedProduct"
         />
@@ -365,7 +401,7 @@ watch(() => props.visible, (isOpen) => {
       <div class="flex justify-between">
         <div>
           <span v-if="selectedProduct" class="text-sm text-gray-500">
-            {{ selectedProduct.name }} • {{ form.quantity }} {{ selectedProduct.unit_of_measure || 'pcs' }}
+            {{ selectedProduct.product?.name }} • {{ form.quantity }} {{ selectedProduct.product?.unit_of_measure || 'pcs' }}
           </span>
         </div>
         <div class="space-x-2">

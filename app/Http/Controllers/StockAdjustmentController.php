@@ -102,7 +102,7 @@ class StockAdjustmentController extends Controller
             'description' => 'nullable|string|max:1000',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
-            'items.*.actual_quantity' => 'required|numeric|min:0',
+            'items.*.actual_quantity' => 'required|integer|min:0',
             'items.*.unit_cost' => 'nullable|numeric|min:0',
             'items.*.batch_number' => 'nullable|string|max:255',
             'items.*.expiry_date' => 'nullable|date',
