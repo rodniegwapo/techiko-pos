@@ -127,7 +127,10 @@ const handleClick = (menu, parentMenu = null) => {
   
   // If this is a child menu, ensure parent stays open
   if (parentMenu) {
-    openKeys.value = [`submenu-${parentMenu.path}`];
+    const submenuKey = `submenu-${parentMenu.path}`;
+    if (!openKeys.value.includes(submenuKey)) {
+      openKeys.value = [...openKeys.value, submenuKey];
+    }
   }
   
   // Navigate to the page
@@ -182,7 +185,13 @@ const initializeMenuState = () => {
     
     if (parentMenu) {
       const submenuKey = `submenu-${parentMenu.path}`;
-      openKeys.value = [submenuKey];
+      // Preserve existing open keys and add the new one
+      if (!openKeys.value.includes(submenuKey)) {
+        openKeys.value = [...openKeys.value, submenuKey];
+      }
+    } else {
+      // If it's a top-level menu, we might want to close submenus
+      // but let's keep them open for better UX
     }
   }
 };
@@ -196,6 +205,11 @@ watch(() => page.url, () => {
   initializeMenuState();
 });
 
+// Handle submenu open/close events
+const handleOpenChange = (keys) => {
+  openKeys.value = keys;
+};
+
 </script>
 
 <template>
@@ -206,11 +220,12 @@ watch(() => page.url, () => {
       mode="inline"
       theme="light"
       :inlineCollapsed="false"
+      @openChange="handleOpenChange"
     >
       <template v-for="menu in menus" :key="menu.path">
         <a-menu-item
           v-if="!menu.children"
-          :key="`item-${menu.path}`"
+          :key="menu.path"
           @click="handleClick(menu)"
           class="font-semibold text-gray-800 items-center"
         >
