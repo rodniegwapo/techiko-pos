@@ -84,7 +84,7 @@ const loadCustomers = async (page = 1) => {
         tier_info: tierInfo,
       };
     });
-    pagination.value = response.data.pagination;
+    pagination.value = response.data.meta;
   } catch (error) {
     console.error("Failed to load customers:", error);
     notification.error({

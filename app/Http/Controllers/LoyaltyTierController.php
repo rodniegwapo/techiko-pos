@@ -16,23 +16,14 @@ class LoyaltyTierController extends Controller
      */
     public function index(Request $request)
     {
-        $query = LoyaltyTier::query();
-
-        // Search filter
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('display_name', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%");
+        $query = LoyaltyTier::query()
+            ->when($request->input('search'), function ($query, $search) {
+                return $query->search($search);
+            })
+            ->when($request->input('status'), function ($query, $status) {
+                $isActive = $status === 'active';
+                return $query->where('is_active', $isActive);
             });
-        }
-
-        // Status filter
-        if ($request->filled('status')) {
-            $isActive = $request->status === 'active';
-            $query->where('is_active', $isActive);
-        }
 
         // Always order by sort_order
         $query->ordered();
@@ -42,7 +33,7 @@ class LoyaltyTierController extends Controller
 
         // Check if this is an API request
         if ($request->expectsJson() || $request->is('api/*')) {
-            return response()->json(LoyaltyTierResource::collection($tiers));
+            return LoyaltyTierResource::collection($tiers);
         }
 
         // Return Inertia render for web requests

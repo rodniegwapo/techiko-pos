@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\Searchable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class LoyaltyTier extends Model
 {
-    use HasFactory;
+    use HasFactory, Searchable;
 
     protected $fillable = [
         'name',
@@ -18,6 +19,15 @@ class LoyaltyTier extends Model
         'description',
         'is_active',
         'sort_order'
+    ];
+
+    /**
+     * The attributes that are searchable.
+     */
+    protected $searchable = [
+        'name',
+        'display_name',
+        'description',
     ];
 
     protected $casts = [
