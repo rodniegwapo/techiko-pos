@@ -9,6 +9,7 @@ import {
   IconHistory,
   IconGift,
   IconUserCog,
+  IconPackage,
 } from "@tabler/icons-vue";
 import { router, usePage } from "@inertiajs/vue3";
 
@@ -62,6 +63,29 @@ const menus = computed(() => {
         {
           title: "Mandatory Discounts",
           path: route("mandatory-discounts.index"),
+        },
+      ],
+    },
+    {
+      title: "Inventory",
+      icon: IconPackage,
+      path: "/inventory", // important: give parent submenu a path (for key)
+      children: [
+        {
+          title: "Dashboard",
+          path: route("inventory.index"),
+        },
+        {
+          title: "Products",
+          path: route("inventory.products"),
+        },
+        {
+          title: "Movements",
+          path: route("inventory.movements"),
+        },
+        {
+          title: "Stock Adjustments",
+          path: route("inventory.adjustments.index"),
         },
       ],
     },

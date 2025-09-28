@@ -93,4 +93,24 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('users', \App\Http\Controllers\UserController::class);
     });
 
+    // Inventory API routes
+    Route::prefix('inventory')->group(function () {
+        Route::get('/products', [\App\Http\Controllers\InventoryController::class, 'products']);
+        Route::get('/movements', [\App\Http\Controllers\InventoryController::class, 'movements']);
+        Route::get('/low-stock', [\App\Http\Controllers\InventoryController::class, 'lowStock']);
+        Route::get('/valuation', [\App\Http\Controllers\InventoryController::class, 'valuation']);
+        Route::post('/receive', [\App\Http\Controllers\InventoryController::class, 'receive']);
+        Route::post('/transfer', [\App\Http\Controllers\InventoryController::class, 'transfer']);
+        
+        // Stock adjustments API
+        Route::get('/adjustments', [\App\Http\Controllers\StockAdjustmentController::class, 'index']);
+        Route::post('/adjustments', [\App\Http\Controllers\StockAdjustmentController::class, 'store']);
+        Route::get('/adjustments/{stockAdjustment}', [\App\Http\Controllers\StockAdjustmentController::class, 'show']);
+        Route::put('/adjustments/{stockAdjustment}', [\App\Http\Controllers\StockAdjustmentController::class, 'update']);
+        Route::post('/adjustments/{stockAdjustment}/submit', [\App\Http\Controllers\StockAdjustmentController::class, 'submitForApproval']);
+        Route::post('/adjustments/{stockAdjustment}/approve', [\App\Http\Controllers\StockAdjustmentController::class, 'approve']);
+        Route::post('/adjustments/{stockAdjustment}/reject', [\App\Http\Controllers\StockAdjustmentController::class, 'reject']);
+        Route::get('/adjustment-products', [\App\Http\Controllers\StockAdjustmentController::class, 'getProductsForAdjustment']);
+    });
+
 });
