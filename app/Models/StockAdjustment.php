@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\Searchable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class StockAdjustment extends Model
 {
-    use HasFactory;
+    use HasFactory, Searchable;
 
     protected $fillable = [
         'adjustment_number',
@@ -20,6 +21,15 @@ class StockAdjustment extends Model
         'approved_at',
         'created_by',
         'approved_by',
+    ];
+
+    /**
+     * The attributes that are searchable.
+     */
+    protected $searchable = [
+        'adjustment_number',
+        'reason',
+        'description',
     ];
 
     protected $casts = [
