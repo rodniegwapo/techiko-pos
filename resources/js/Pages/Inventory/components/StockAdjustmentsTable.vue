@@ -27,6 +27,10 @@ const props = defineProps({
     type: Object,
     default: () => ({}),
   },
+  loading: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 // Simplified columns - only essential information
@@ -217,7 +221,7 @@ const dataSource = computed(() => {
     :columns="columns"
     :data-source="dataSource"
     :pagination="pagination"
-    :loading="false"
+    :loading="loading"
     @change="$emit('handleTableChange', $event)"
   >
     <!-- Adjustment Number Column -->

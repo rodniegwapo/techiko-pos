@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\LoyaltyTierResource;
 use App\Models\LoyaltyTier;
 use App\Models\Customer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
 
 class LoyaltyTierController extends Controller
 {
@@ -38,14 +40,14 @@ class LoyaltyTierController extends Controller
         // Add pagination support
         $tiers = $query->paginate($request->get('per_page', 10));
 
-        return response()->json([
-            'data' => $tiers->items(),
-            'pagination' => [
-                'current_page' => $tiers->currentPage(),
-                'last_page' => $tiers->lastPage(),
-                'per_page' => $tiers->perPage(),
-                'total' => $tiers->total(),
-            ]
+        // Check if this is an API request
+        if ($request->expectsJson() || $request->is('api/*')) {
+            return response()->json(LoyaltyTierResource::collection($tiers));
+        }
+
+        // Return Inertia render for web requests
+        return Inertia::render('LoyaltyTiers/Index', [
+            'items' => LoyaltyTierResource::collection($tiers)
         ]);
     }
 

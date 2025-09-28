@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\InventoryMovementResource;
+use App\Http\Resources\ProductInventoryResource;
 use App\Models\Product\Product;
 use App\Models\InventoryLocation;
 use App\Models\ProductInventory;
@@ -110,7 +112,7 @@ class InventoryController extends Controller
         });
 
         return Inertia::render('Inventory/Products', [
-            'inventories' => $inventories,
+            'inventories' => ProductInventoryResource::collection($inventories),
             'locations' => InventoryLocation::active()->get(),
             'currentLocation' => $location,
             'categories' => \App\Models\Category::all(),
@@ -134,7 +136,7 @@ class InventoryController extends Controller
                                 ->orWhere('SKU', 'like', "%{$request->search}%")
                                 ->orWhere('barcode', 'like', "%{$request->search}%");
                 })
-                ->orWhere('reference', 'like', "%{$request->search}%")
+                ->orWhere('reference_type', 'like', "%{$request->search}%")
                 ->orWhere('notes', 'like', "%{$request->search}%")
                 ->orWhere('reason', 'like', "%{$request->search}%");
             });
@@ -163,7 +165,7 @@ class InventoryController extends Controller
         $movements = $query->paginate($request->per_page ?? 50);
 
         return Inertia::render('Inventory/Movements', [
-            'movements' => $movements,
+            'movements' => InventoryMovementResource::collection($movements),
             'locations' => InventoryLocation::active()->get(),
             'products' => Product::select('id', 'name', 'SKU')->get(),
             'movementTypes' => [

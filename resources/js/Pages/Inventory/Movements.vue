@@ -159,6 +159,7 @@ const showMovementDetails = (movement) => {
         <MovementsTable
           :movements="movements"
           :pagination="pagination"
+          :loading="spinning"
           @handle-table-change="handleTableChange"
           @show-details="showMovementDetails"
         />

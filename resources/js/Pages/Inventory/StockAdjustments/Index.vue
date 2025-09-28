@@ -176,6 +176,7 @@ const showAdjustmentDetails = (adjustment) => {
         <StockAdjustmentsTable
           :adjustments="adjustments"
           :pagination="pagination"
+          :loading="spinning"
           @handle-table-change="handleTableChange"
           @show-details="showAdjustmentDetails"
           @refresh="getItems"

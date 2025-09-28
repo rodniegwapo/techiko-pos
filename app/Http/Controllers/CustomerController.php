@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\CustomerResource;
 use App\Models\Customer;
 use App\Models\LoyaltyTier;
 use Illuminate\Http\Request;
@@ -45,7 +46,7 @@ class CustomerController extends Controller
             ->paginate(15);
 
         return Inertia::render('Customers/Index', [
-            'items' => $customers
+            'items' => CustomerResource::collection($customers)
         ]);
     }
 
@@ -61,15 +62,7 @@ class CustomerController extends Controller
 
         $customers = $query->paginate($request->get('per_page', 10));
 
-        return response()->json([
-            'data' => $customers->items(),
-            'pagination' => [
-                'current_page' => $customers->currentPage(),
-                'last_page' => $customers->lastPage(),
-                'per_page' => $customers->perPage(),
-                'total' => $customers->total(),
-            ]
-        ]);
+        return response()->json(CustomerResource::collection($customers));
     }
 
     public function search(Request $request)

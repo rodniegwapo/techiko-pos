@@ -234,6 +234,7 @@ const handleTransferStock = (inventory) => {
         <InventoryProductTable
           :inventories="inventories"
           :pagination="pagination"
+          :loading="spinning"
           @handle-table-change="handleTableChange"
           @show-details="showProductDetails"
           @transfer-stock="handleTransferStock"
