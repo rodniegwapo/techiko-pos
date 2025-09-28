@@ -128,7 +128,8 @@ const handleProceedPayment = async () => {
       {
         // Include customer data for loyalty processing
         customer_id: props.selectedCustomer?.id || null,
-        sale_amount: totalAmount.value
+        sale_amount: totalAmount.value,
+        payment_method: paymentMethod.value
       }
     );
     
