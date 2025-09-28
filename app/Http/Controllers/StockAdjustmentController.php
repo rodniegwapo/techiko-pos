@@ -27,6 +27,14 @@ class StockAdjustmentController extends Controller
             ->orderBy('created_at', 'desc');
 
         // Apply filters
+        if ($request->search) {
+            $query->where(function ($q) use ($request) {
+                $q->where('adjustment_number', 'like', "%{$request->search}%")
+                  ->orWhere('reason', 'like', "%{$request->search}%")
+                  ->orWhere('notes', 'like', "%{$request->search}%");
+            });
+        }
+
         if ($request->status) {
             $query->where('status', $request->status);
         }
@@ -65,7 +73,7 @@ class StockAdjustmentController extends Controller
                 'sample' => 'Sample',
                 'other' => 'Other',
             ],
-            'filters' => $request->only(['status', 'location_id', 'date_from', 'date_to']),
+            'filters' => $request->only(['search', 'status', 'location_id', 'date_from', 'date_to']),
         ]);
     }
 
@@ -271,33 +279,55 @@ class StockAdjustmentController extends Controller
      */
     public function getProductsForAdjustment(Request $request)
     {
-        $locationId = $request->validate(['location_id' => 'required|exists:inventory_locations,id'])['location_id'];
-        
-        $query = Product::with(['inventories' => function ($q) use ($locationId) {
-            $q->where('location_id', $locationId);
-        }])->where('track_inventory', true);
-
-        if ($request->search) {
-            $query->where(function ($q) use ($request) {
-                $q->where('name', 'like', "%{$request->search}%")
-                  ->orWhere('SKU', 'like', "%{$request->search}%")
-                  ->orWhere('barcode', 'like', "%{$request->search}%");
-            });
-        }
-
-        $products = $query->limit(50)->get()->map(function ($product) use ($locationId) {
-            $inventory = $product->inventories->first();
+        try {
+            $validated = $request->validate([
+                'location_id' => 'required|exists:inventory_locations,id',
+                'search' => 'nullable|string|max:255',
+            ]);
             
-            return [
-                'id' => $product->id,
-                'name' => $product->name,
-                'sku' => $product->SKU,
-                'current_quantity' => $inventory ? $inventory->quantity_on_hand : 0,
-                'average_cost' => $inventory ? $inventory->average_cost : $product->cost,
-                'unit_of_measure' => $product->unit_of_measure ?? 'piece',
-            ];
-        });
+            $locationId = $validated['location_id'];
+            
+            $query = Product::with(['inventories' => function ($q) use ($locationId) {
+                $q->where('location_id', $locationId);
+            }])->where('track_inventory', true);
 
-        return response()->json(['products' => $products]);
+            if (!empty($validated['search'])) {
+                $search = $validated['search'];
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('SKU', 'like', "%{$search}%")
+                      ->orWhere('barcode', 'like', "%{$search}%");
+                });
+            }
+
+            $products = $query->limit(50)->get()->map(function ($product) use ($locationId) {
+                $inventory = $product->inventories->first();
+                
+                return [
+                    'id' => $product->id,
+                    'name' => $product->name,
+                    'SKU' => $product->SKU,
+                    'current_stock' => $inventory ? $inventory->quantity_on_hand : 0,
+                    'unit_cost' => $inventory ? $inventory->average_cost : ($product->cost ?? 0),
+                    'unit_of_measure' => $product->unit_of_measure ?? 'piece',
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => $products,
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Error in getProductsForAdjustment: ' . $e->getMessage(), [
+                'request' => $request->all(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch products: ' . $e->getMessage(),
+                'data' => [],
+            ], 500);
+        }
     }
 }

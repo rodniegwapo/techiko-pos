@@ -127,6 +127,19 @@ class InventoryController extends Controller
             ->orderBy('created_at', 'desc');
 
         // Apply filters
+        if ($request->search) {
+            $query->where(function ($q) use ($request) {
+                $q->whereHas('product', function ($productQuery) use ($request) {
+                    $productQuery->where('name', 'like', "%{$request->search}%")
+                                ->orWhere('SKU', 'like', "%{$request->search}%")
+                                ->orWhere('barcode', 'like', "%{$request->search}%");
+                })
+                ->orWhere('reference', 'like', "%{$request->search}%")
+                ->orWhere('notes', 'like', "%{$request->search}%")
+                ->orWhere('reason', 'like', "%{$request->search}%");
+            });
+        }
+
         if ($request->location_id) {
             $query->where('location_id', $request->location_id);
         }
@@ -165,7 +178,7 @@ class InventoryController extends Controller
                 'expired' => 'Expired Products',
                 'promotion' => 'Promotional Giveaway',
             ],
-            'filters' => $request->only(['location_id', 'product_id', 'movement_type', 'date_from', 'date_to']),
+            'filters' => $request->only(['search', 'location_id', 'product_id', 'movement_type', 'date_from', 'date_to']),
         ]);
     }
 
