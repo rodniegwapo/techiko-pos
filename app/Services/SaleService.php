@@ -7,12 +7,20 @@ use App\Jobs\SyncSaleDraft;
 use App\Models\Sale;
 use App\Models\UserPin;
 use App\Models\VoidLog;
+use App\Models\InventoryLocation;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class SaleService
 {
+    protected $inventoryService;
+
+    public function __construct(InventoryService $inventoryService)
+    {
+        $this->inventoryService = $inventoryService;
+    }
+
     public function storeDraft($user)
     {
         $sale = Sale::create([
@@ -35,6 +43,21 @@ class SaleService
         // Validate items array
         if (empty($items) || !is_array($items)) {
             return;
+        }
+
+        // Check inventory availability before processing
+        $inventoryItems = collect($items)->map(function ($item) {
+            return [
+                'product_id' => $item['id'],
+                'quantity' => max(1, (int) $item['quantity']),
+            ];
+        })->toArray();
+
+        $unavailableItems = $this->inventoryService->checkStockAvailability($inventoryItems);
+        
+        if (!empty($unavailableItems)) {
+            throw new \Exception('Some items are not available in sufficient quantities: ' . 
+                collect($unavailableItems)->pluck('product_name')->implode(', '));
         }
 
         // Get all discount IDs to fetch in one query
@@ -158,5 +181,52 @@ class SaleService
         }
 
         return $managerPin->user_id;
+    }
+
+    /**
+     * Complete sale and process inventory
+     */
+    public function completeSale(Sale $sale, $user, InventoryLocation $location = null)
+    {
+        if ($sale->payment_status === 'paid') {
+            throw new \Exception('Sale is already completed');
+        }
+
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($sale, $user, $location) {
+            // Prepare inventory items from sale items
+            $inventoryItems = $sale->saleItems()->with('product')->get()->map(function ($saleItem) {
+                return [
+                    'product_id' => $saleItem->product_id,
+                    'quantity' => $saleItem->quantity,
+                    'unit_price' => $saleItem->unit_price,
+                ];
+            })->toArray();
+
+            // Process inventory deduction
+            $this->inventoryService->processSaleInventory($inventoryItems, $sale->id, $user, $location);
+
+            // Update sale status
+            $sale->update([
+                'payment_status' => 'paid',
+                'transaction_date' => now(),
+            ]);
+
+            return $sale;
+        });
+    }
+
+    /**
+     * Validate stock availability for sale items
+     */
+    public function validateStockAvailability(Sale $sale, InventoryLocation $location = null): array
+    {
+        $inventoryItems = $sale->saleItems()->with('product')->get()->map(function ($saleItem) {
+            return [
+                'product_id' => $saleItem->product_id,
+                'quantity' => $saleItem->quantity,
+            ];
+        })->toArray();
+
+        return $this->inventoryService->checkStockAvailability($inventoryItems, $location);
     }
 }

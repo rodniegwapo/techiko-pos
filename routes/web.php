@@ -71,6 +71,27 @@ Route::middleware(['auth'])->group(function () {
 
     // Void logs
     Route::get('/void-logs', [\App\Http\Controllers\VoidLogController::class, 'index'])->name('voids.index');
+    
+    // Inventory Management Routes
+    Route::prefix('inventory')->name('inventory.')->group(function () {
+        // Inventory Overview
+        Route::get('/', [\App\Http\Controllers\InventoryController::class, 'index'])->name('index');
+        Route::get('/products', [\App\Http\Controllers\InventoryController::class, 'products'])->name('products');
+        Route::get('/movements', [\App\Http\Controllers\InventoryController::class, 'movements'])->name('movements');
+        Route::get('/low-stock', [\App\Http\Controllers\InventoryController::class, 'lowStock'])->name('low-stock');
+        Route::get('/valuation', [\App\Http\Controllers\InventoryController::class, 'valuation'])->name('valuation');
+        
+        // Inventory Operations
+        Route::post('/receive', [\App\Http\Controllers\InventoryController::class, 'receive'])->name('receive');
+        Route::post('/transfer', [\App\Http\Controllers\InventoryController::class, 'transfer'])->name('transfer');
+        
+        // Stock Adjustments
+        Route::resource('adjustments', \App\Http\Controllers\StockAdjustmentController::class)->names('adjustments');
+        Route::post('/adjustments/{stockAdjustment}/submit', [\App\Http\Controllers\StockAdjustmentController::class, 'submitForApproval'])->name('adjustments.submit');
+        Route::post('/adjustments/{stockAdjustment}/approve', [\App\Http\Controllers\StockAdjustmentController::class, 'approve'])->name('adjustments.approve');
+        Route::post('/adjustments/{stockAdjustment}/reject', [\App\Http\Controllers\StockAdjustmentController::class, 'reject'])->name('adjustments.reject');
+        Route::get('/adjustment-products', [\App\Http\Controllers\StockAdjustmentController::class, 'getProductsForAdjustment'])->name('adjustment-products');
+    });
 });
 
 Route::get('/test-order', function () {

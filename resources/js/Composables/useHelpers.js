@@ -24,7 +24,7 @@ const { formData, spinning, errors, openModal, isEdit } = useGlobalVariables();
 const { emitClose } = useEmits();
 
 export function useHelpers() {
-    const showModal = () => {
+    const showModal = (modalName) => {
         formData.value = {};
         openModal.value = true;
         isEdit.value = false;
@@ -113,6 +113,35 @@ export function useHelpers() {
         }).format(value / 100);
     };
 
+    // Format currency (alias for formattedTotal)
+    const formatCurrency = (value) => {
+        if (value === null || value === undefined || isNaN(value)) {
+            return "₱0.00";
+        }
+        return new Intl.NumberFormat("en-PH", {
+            style: "currency",
+            currency: "PHP",
+        }).format(value);
+    };
+
+    // Format date
+    const formatDate = (date) => {
+        if (!date) return "N/A";
+        return dayjs(date).format("MMM DD, YYYY");
+    };
+
+    // Format date and time
+    const formatDateTime = (date) => {
+        if (!date) return "N/A";
+        return dayjs(date).format("MMM DD, YYYY HH:mm");
+    };
+
+    // Show notification
+    const showNotification = (type, title, message) => {
+        // You can implement this with ant-design-vue notification
+        console.log(`${type.toUpperCase()}: ${title} - ${message}`);
+    };
+
     return {
         confirmDelete,
         inertiaProgressLifecyle,
@@ -121,6 +150,10 @@ export function useHelpers() {
         startDateFormat,
         endDateFormat,
         formattedTotal,
-        formattedPercent
+        formattedPercent,
+        formatCurrency,
+        formatDate,
+        formatDateTime,
+        showNotification
     };
 }

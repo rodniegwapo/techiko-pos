@@ -8,7 +8,9 @@ use App\Models\Customer;
 use App\Models\Product\Discount;
 use App\Models\Product\Product;
 use App\Models\Sale;
+use App\Models\InventoryLocation;
 use App\Services\SaleService;
+use App\Services\InventoryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -16,10 +18,12 @@ use Inertia\Inertia;
 class SaleController extends Controller
 {
     protected $saleService;
+    protected $inventoryService;
 
-    public function __construct(SaleService $saleService)
+    public function __construct(SaleService $saleService, InventoryService $inventoryService)
     {
         $this->saleService = $saleService;
+        $this->inventoryService = $inventoryService;
     }
 
     public function index()
@@ -52,22 +56,36 @@ class SaleController extends Controller
     {
         $validated = $request->validate([
             'customer_id' => 'nullable|exists:customers,id',
-            'sale_amount' => 'nullable|numeric|min:0'
+            'sale_amount' => 'nullable|numeric|min:0',
+            'payment_method' => 'required|string'
         ]);
         
         $loyaltyResults = null;
         
         try {
+            // Check inventory availability before processing payment
+            $unavailableItems = $this->saleService->validateStockAvailability($sale);
+            
+            if (!empty($unavailableItems)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Some items are not available in sufficient quantities',
+                    'unavailable_items' => $unavailableItems
+                ], 400);
+            }
+
             // Use database transaction to ensure data consistency
             DB::transaction(function () use ($sale, $validated, &$loyaltyResults) {
-                // 1. Update sale payment status
+                // 1. Complete sale and process inventory
+                $this->saleService->completeSale($sale, auth()->user());
+                
+                // 2. Update payment details
                 $sale->update([
-                    'payment_status' => 'paid',
-                    'transaction_date' => now(),
                     'grand_total' => $sale->total_amount,
+                    'payment_method' => $validated['payment_method']
                 ]);
                 
-                // 2. Process loyalty if customer is provided
+                // 3. Process loyalty if customer is provided
                 if ($validated['customer_id']) {
                     $customer = Customer::findOrFail($validated['customer_id']);
                     
