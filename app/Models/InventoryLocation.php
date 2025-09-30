@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\Searchable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class InventoryLocation extends Model
 {
-    use HasFactory;
+    use HasFactory, Searchable;
 
     protected $fillable = [
         'name',
@@ -25,6 +26,16 @@ class InventoryLocation extends Model
     protected $casts = [
         'is_active' => 'boolean',
         'is_default' => 'boolean',
+    ];
+
+    protected $searchable = [
+        'name',
+        'code',
+        'type',
+        'address',
+        'contact_person',
+        'phone',
+        'email',
     ];
 
     /**

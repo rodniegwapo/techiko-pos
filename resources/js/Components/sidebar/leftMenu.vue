@@ -87,6 +87,10 @@ const menus = computed(() => {
           title: "Stock Adjustments",
           path: route("inventory.adjustments.index"),
         },
+        {
+          title: "Locations",
+          path: route("inventory.locations.index"),
+        },
       ],
     },
     {
