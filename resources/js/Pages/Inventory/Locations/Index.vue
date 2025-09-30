@@ -1,8 +1,20 @@
 <script setup>
 import { ref, computed, onMounted } from "vue";
 import { usePage, router, Head } from "@inertiajs/vue3";
-import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, SettingOutlined } from "@ant-design/icons-vue";
-import { IconBuilding, IconBuildingWarehouse, IconTruck, IconUser } from "@tabler/icons-vue";
+import {
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  EyeOutlined,
+  SettingOutlined,
+  PlusSquareOutlined,
+} from "@ant-design/icons-vue";
+import {
+  IconBuilding,
+  IconBuildingWarehouse,
+  IconTruck,
+  IconUser,
+} from "@tabler/icons-vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { watchDebounced } from "@vueuse/core";
 import { useFilters, toLabel } from "@/Composables/useFilters";
@@ -108,23 +120,23 @@ const { pagination, handleTableChange } = useTable("locations", tableFilters);
 
 // Methods
 const createLocation = () => {
-  router.visit(route('inventory.locations.create'));
+  router.visit(route("inventory.locations.create"));
 };
 
 const viewLocation = (location) => {
-  router.visit(route('inventory.locations.show', location.id));
+  router.visit(route("inventory.locations.show", location.id));
 };
 
 const editLocation = (location) => {
-  router.visit(route('inventory.locations.edit', location.id));
+  router.visit(route("inventory.locations.edit", location.id));
 };
 
 const deleteLocation = (location) => {
   showConfirm({
-    title: 'Delete Location',
+    title: "Delete Location",
     content: `Are you sure you want to delete "${location.name}"?`,
     onOk: () => {
-      router.delete(route('inventory.locations.destroy', location.id), {
+      router.delete(route("inventory.locations.destroy", location.id), {
         onSuccess: () => {
           // Success handled by redirect
         },
@@ -134,43 +146,56 @@ const deleteLocation = (location) => {
 };
 
 const setAsDefault = (location) => {
-  router.post(route('inventory.locations.set-default', location.id), {}, {
-    preserveScroll: true,
-    onSuccess: () => {
-      getItems();
-    },
-  });
+  router.post(
+    route("inventory.locations.set-default", location.id),
+    {},
+    {
+      preserveScroll: true,
+      onSuccess: () => {
+        getItems();
+      },
+    }
+  );
 };
 
 const toggleStatus = (location) => {
-  router.post(route('inventory.locations.toggle-status', location.id), {}, {
-    preserveScroll: true,
-    onSuccess: () => {
-      getItems();
-    },
-  });
+  router.post(
+    route("inventory.locations.toggle-status", location.id),
+    {},
+    {
+      preserveScroll: true,
+      onSuccess: () => {
+        getItems();
+      },
+    }
+  );
 };
 
 // Get icon for location type
 const getTypeIcon = (type) => {
   switch (type) {
-    case 'store': return IconBuilding;
-    case 'warehouse': return IconBuildingWarehouse;
-    case 'supplier': return IconTruck;
-    case 'customer': return IconUser;
-    default: return IconBuilding;
+    case "store":
+      return IconBuilding;
+    case "warehouse":
+      return IconBuildingWarehouse;
+    case "supplier":
+      return IconTruck;
+    case "customer":
+      return IconUser;
+    default:
+      return IconBuilding;
   }
 };
 
 // Table columns - simplified like InventoryProductTable
 const columns = [
-  { title: 'Location', dataIndex: 'name', key: 'name', align: 'left' },
-  { title: 'Type', dataIndex: 'type', key: 'type', align: 'left' },
-  { title: 'Address', dataIndex: 'address', key: 'address', align: 'left' },
-  { title: 'Contact', key: 'contact', align: 'left' },
-  { title: 'Products', key: 'products', align: 'left' },
-  { title: 'Status', key: 'status', align: 'left' },
-  { title: 'Actions', key: 'actions', align: 'center', width: '1%' },
+  { title: "Location", dataIndex: "name", key: "name", align: "left" },
+  { title: "Type", dataIndex: "type", key: "type", align: "left" },
+  { title: "Address", dataIndex: "address", key: "address", align: "left" },
+  { title: "Contact", key: "contact", align: "left" },
+  { title: "Products", key: "products", align: "left" },
+  { title: "Status", key: "status", align: "left" },
+  { title: "Actions", key: "actions", align: "center", width: "1%" },
 ];
 </script>
 
@@ -189,16 +214,18 @@ const columns = [
           placeholder="Search locations..."
           class="min-w-[100px] max-w-[300px]"
         />
-        <a-button type="primary" @click="createLocation">
+        <a-button
+          type="primary"
+          @click="createLocation"
+          class="bg-white border flex items-center border-green-500 text-green-500"
+        >
           <template #icon>
-            <PlusOutlined />
+            <PlusSquareOutlined />
           </template>
           Add Location
         </a-button>
-        <FilterDropdown
-          v-model="filters"
-          :filters="filtersConfig"
-        />
+
+        <FilterDropdown v-model="filters" :filters="filtersConfig" />
       </template>
 
       <!-- Active Filters -->
@@ -225,16 +252,27 @@ const columns = [
             <template v-if="column.key === 'name'">
               <div class="flex items-center space-x-3">
                 <!-- Location Icon -->
-                <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <component :is="getTypeIcon(record.type)" class="text-blue-600" :size="20" />
+                <div
+                  class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center"
+                >
+                  <component
+                    :is="getTypeIcon(record.type)"
+                    class="text-blue-600"
+                    :size="20"
+                  />
                 </div>
-                
+
                 <!-- Location Info -->
                 <div>
-                  <p class="font-semibold text-gray-900">{{ record.name }}</p>
+                  <div class="font-semibold text-gray-900">{{ record.name }}</div>
                   <div class="flex items-center gap-2">
-                    <p class="text-sm text-gray-500">{{ record.code }}</p>
-                    <a-tag v-if="record.is_default" color="processing" size="small">Default</a-tag>
+                    <div class="text-sm text-gray-500">{{ record.code }}</div>
+                    <a-tag
+                      v-if="record.is_default"
+                      color="processing"
+                      size="small"
+                      >Default</a-tag
+                    >
                   </div>
                 </div>
               </div>
@@ -258,7 +296,10 @@ const columns = [
             <!-- Contact column -->
             <template v-else-if="column.key === 'contact'">
               <div class="text-sm">
-                <div v-if="record.contact_person" class="font-medium text-gray-900">
+                <div
+                  v-if="record.contact_person"
+                  class="font-medium text-gray-900"
+                >
                   {{ record.contact_person }}
                 </div>
                 <div v-if="record.phone" class="text-gray-600">
@@ -267,14 +308,22 @@ const columns = [
                 <div v-if="record.email" class="text-gray-600">
                   {{ record.email }}
                 </div>
-                <span v-if="!record.contact_person && !record.phone && !record.email" class="text-gray-400">No contact info</span>
+                <span
+                  v-if="
+                    !record.contact_person && !record.phone && !record.email
+                  "
+                  class="text-gray-400"
+                  >No contact info</span
+                >
               </div>
             </template>
 
             <!-- Products column -->
             <template v-else-if="column.key === 'products'">
               <div class="flex items-center gap-2">
-                <div class="font-semibold text-lg">{{ record.product_inventories_count || 0 }}</div>
+                <div class="font-semibold text-lg">
+                  {{ record.product_inventories_count || 0 }}
+                </div>
                 <div class="text-xs text-gray-500">products</div>
               </div>
             </template>
@@ -309,24 +358,24 @@ const columns = [
                   </IconTooltipButton>
                   <template #overlay>
                     <a-menu>
-                      <a-menu-item 
+                      <a-menu-item
                         v-if="!record.is_default"
                         key="default"
                         @click="setAsDefault(record)"
                       >
                         Set as Default
                       </a-menu-item>
-                      <a-menu-item 
-                        key="toggle"
-                        @click="toggleStatus(record)"
-                      >
-                        {{ record.is_active ? 'Deactivate' : 'Activate' }}
+                      <a-menu-item key="toggle" @click="toggleStatus(record)">
+                        {{ record.is_active ? "Deactivate" : "Activate" }}
                       </a-menu-item>
                       <a-menu-divider />
-                      <a-menu-item 
+                      <a-menu-item
                         key="delete"
                         danger
-                        :disabled="record.is_default || record.product_inventories_count > 0"
+                        :disabled="
+                          record.is_default ||
+                          record.product_inventories_count > 0
+                        "
                         @click="deleteLocation(record)"
                       >
                         Delete
@@ -354,13 +403,3 @@ const columns = [
   </AuthenticatedLayout>
 </template>
 
-<style scoped>
-.ant-table-tbody > tr > td {
-  padding: 12px 8px;
-}
-
-.ant-table-thead > tr > th {
-  background-color: #fafafa;
-  font-weight: 600;
-}
-</style>
