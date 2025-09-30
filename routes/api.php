@@ -100,7 +100,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // Inventory API routes
-    Route::prefix('inventory')->name('inventory.')->group(function () {
+    Route::prefix('inventory')->name('inventory.api.')->group(function () {
         Route::get('/products', [\App\Http\Controllers\InventoryController::class, 'products'])->name('products');
         Route::get('/movements', [\App\Http\Controllers\InventoryController::class, 'movements'])->name('movements');
         Route::get('/low-stock', [\App\Http\Controllers\InventoryController::class, 'lowStock'])->name('low-stock');
@@ -120,6 +120,18 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/adjustments/{adjustment}/approve', [\App\Http\Controllers\StockAdjustmentController::class, 'approve'])->name('adjustments.approve');
         Route::post('/adjustments/{adjustment}/reject', [\App\Http\Controllers\StockAdjustmentController::class, 'reject'])->name('adjustments.reject');
         Route::get('/adjustment-products', [\App\Http\Controllers\StockAdjustmentController::class, 'getProductsForAdjustment'])->name('adjustment-products');
+        
+        // Location Management API
+        Route::apiResource('locations', \App\Http\Controllers\InventoryLocationController::class)->names([
+            'index' => 'api.locations.index',
+            'store' => 'api.locations.store',
+            'show' => 'api.locations.show',
+            'update' => 'api.locations.update',
+            'destroy' => 'api.locations.destroy',
+        ]);
+        Route::get('/search/locations', [\App\Http\Controllers\InventoryLocationController::class, 'search'])->name('search.locations');
+        Route::post('/locations/{location}/set-default', [\App\Http\Controllers\InventoryLocationController::class, 'setDefault'])->name('api.locations.set-default');
+        Route::post('/locations/{location}/toggle-status', [\App\Http\Controllers\InventoryLocationController::class, 'toggleStatus'])->name('api.locations.toggle-status');
     });
 
 });
