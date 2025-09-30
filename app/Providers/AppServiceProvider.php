@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -19,6 +20,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Set up morph map for polymorphic relationships
+        Relation::morphMap([
+            'Order' => 'App\Models\Sale',
+            'Sale' => 'App\Models\Sale',
+            'StockAdjustment' => 'App\Models\StockAdjustment',
+        ]);
     }
 }

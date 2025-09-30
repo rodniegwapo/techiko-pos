@@ -1,5 +1,5 @@
 <script setup>
-import { computed, toRefs } from "vue";
+import { computed, toRefs, ref, watch } from "vue";
 import {
   IconCircleCheck,
   IconAlertTriangle,
@@ -8,8 +8,11 @@ import {
   IconTag,
   IconCurrencyDollar,
   IconCalendar,
+  IconShoppingCart,
+  IconAlertOctagon,
 } from "@tabler/icons-vue";
 import { useHelpers } from "@/Composables/useHelpers";
+import axios from "axios";
 
 const { formatCurrency, formatDate, formatDateTime } = useHelpers();
 
@@ -27,6 +30,47 @@ const props = defineProps({
 const { visible } = toRefs(props);
 
 const emit = defineEmits(["update:visible"]);
+
+// Store summary state
+const storeData = ref(null);
+const storeLoading = ref(false);
+
+// Load store summary when product changes
+const loadStoreData = async () => {
+  if (!props.product?.location_id) return;
+  
+  storeLoading.value = true;
+  try {
+    const response = await axios.get(`/api/inventory/locations/${props.product.location_id}/summary`);
+    storeData.value = response.data;
+  } catch (error) {
+    console.error('Failed to load store data:', error);
+    storeData.value = null;
+  } finally {
+    storeLoading.value = false;
+  }
+};
+
+// Watch for product changes
+watch(
+  () => props.product,
+  (newProduct) => {
+    if (newProduct && props.visible) {
+      loadStoreData();
+    }
+  },
+  { immediate: true }
+);
+
+// Watch for modal visibility
+watch(
+  () => props.visible,
+  (isVisible) => {
+    if (isVisible && props.product) {
+      loadStoreData();
+    }
+  }
+);
 
 const handleClose = () => {
   emit("update:visible", false);
@@ -75,12 +119,66 @@ const getStockStatusText = (status) => {
 <template>
   <a-modal
     v-model:visible="visible"
-    title="Product Details"
-    width="800px"
+    width="900px"
     @cancel="handleClose"
     :footer="null"
   >
+    <template #title>
+      <div class="flex items-center justify-between">
+        <span>Product Details</span>
+        <div v-if="storeData" class="flex items-center space-x-2">
+          <a-tag color="blue" size="small">
+            <IconShoppingCart :size="14" class="mr-1" />
+            {{ storeData.total_products_count }} total items
+          </a-tag>
+          <a-tag v-if="storeData.low_stock_products_count > 0" color="orange" size="small">
+            <IconAlertTriangle :size="14" class="mr-1" />
+            {{ storeData.low_stock_products_count }} low stock
+          </a-tag>
+          <a-tag v-if="storeData.out_of_stock_products_count > 0" color="red" size="small">
+            <IconAlertOctagon :size="14" class="mr-1" />
+            {{ storeData.out_of_stock_products_count }} out of stock
+          </a-tag>
+        </div>
+      </div>
+    </template>
     <div v-if="product" class="space-y-6">
+      <!-- Store Context Banner -->
+      <div v-if="storeData" class="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border border-blue-200">
+        <div class="flex items-center justify-between">
+          <div>
+            <h5 class="font-semibold text-blue-900">{{ storeData.name }}</h5>
+            <p class="text-sm text-blue-700">{{ storeData.address }}</p>
+          </div>
+          <div class="grid grid-cols-4 gap-4 text-center">
+            <div>
+              <p class="text-lg font-bold text-blue-600">{{ storeData.total_products_count || 0 }}</p>
+              <p class="text-xs text-gray-600">Total Items</p>
+            </div>
+            <div>
+              <p class="text-lg font-bold text-green-600">{{ storeData.in_stock_products_count || 0 }}</p>
+              <p class="text-xs text-gray-600">In Stock</p>
+            </div>
+            <div>
+              <p class="text-lg font-bold text-yellow-600">{{ storeData.low_stock_products_count || 0 }}</p>
+              <p class="text-xs text-gray-600">Low Stock</p>
+            </div>
+            <div>
+              <p class="text-lg font-bold text-red-600">{{ storeData.out_of_stock_products_count || 0 }}</p>
+              <p class="text-xs text-gray-600">Out of Stock</p>
+            </div>
+          </div>
+        </div>
+        <div class="mt-3 pt-3 border-t border-blue-200">
+          <div class="text-center">
+            <p class="text-sm text-blue-700">Total Store Inventory Value</p>
+            <p class="text-xl font-bold text-purple-600">
+              ₱{{ (storeData.total_inventory_value || 0).toLocaleString('en-US', { minimumFractionDigits: 2 }) }}
+            </p>
+          </div>
+        </div>
+      </div>
+
       <!-- Product Header -->
       <div class="flex items-start space-x-4 pb-4 border-b">
         <!-- Product Image/Avatar -->

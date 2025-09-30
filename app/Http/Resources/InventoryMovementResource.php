@@ -23,7 +23,11 @@ class InventoryMovementResource extends JsonResource
             'quantity_after' => $this->quantity_after,
             'unit_cost' => $this->unit_cost,
             'total_cost' => $this->total_cost,
-            'reference' => $this->reference,
+            'reference' => $this->when($this->reference && $this->reference->exists, [
+                'id' => $this->reference->id ?? null,
+                'type' => $this->reference_type,
+                'data' => $this->reference,
+            ]),
             'notes' => $this->notes,
             'reason' => $this->reason,
             'batch_number' => $this->batch_number,

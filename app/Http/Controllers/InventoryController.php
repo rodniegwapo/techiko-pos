@@ -55,9 +55,7 @@ class InventoryController extends Controller
         // Apply filters
         if ($request->search) {
             $query->whereHas('product', function ($q) use ($request) {
-                $q->where('name', 'like', "%{$request->search}%")
-                  ->orWhere('SKU', 'like', "%{$request->search}%")
-                  ->orWhere('barcode', 'like', "%{$request->search}%");
+                $q->search($request->search);
             });
         }
 
@@ -125,22 +123,14 @@ class InventoryController extends Controller
      */
     public function movements(Request $request)
     {
-        $query = InventoryMovement::with(['product', 'location', 'user'])
-            ->orderBy('created_at', 'desc');
+        try {
+            $query = InventoryMovement::with(['product', 'location', 'user'])
+                ->orderBy('created_at', 'desc');
 
-        // Apply filters
-        if ($request->search) {
-            $query->where(function ($q) use ($request) {
-                $q->whereHas('product', function ($productQuery) use ($request) {
-                    $productQuery->where('name', 'like', "%{$request->search}%")
-                                ->orWhere('SKU', 'like', "%{$request->search}%")
-                                ->orWhere('barcode', 'like', "%{$request->search}%");
-                })
-                ->orWhere('reference_type', 'like', "%{$request->search}%")
-                ->orWhere('notes', 'like', "%{$request->search}%")
-                ->orWhere('reason', 'like', "%{$request->search}%");
-            });
-        }
+            // Apply filters
+            if ($request->search) {
+                $query->search($request->search);
+            }
 
         if ($request->location_id) {
             $query->where('location_id', $request->location_id);
@@ -182,6 +172,8 @@ class InventoryController extends Controller
             ],
             'filters' => $request->only(['search', 'location_id', 'product_id', 'movement_type', 'date_from', 'date_to']),
         ]);
+        } catch (\Exception $e) {
+        }
     }
 
     /**
@@ -326,5 +318,107 @@ class InventoryController extends Controller
             ],
             'items' => $valuationData,
         ]);
+    }
+
+    /**
+     * Get store summary for create pages
+     */
+    public function getLocationSummary(Request $request, $locationId)
+    {
+        $location = InventoryLocation::findOrFail($locationId);
+        
+        $summary = [
+            'id' => $location->id,
+            'name' => $location->name,
+            'address' => $location->address,
+            'total_products_count' => ProductInventory::where('location_id', $location->id)->count(),
+            'in_stock_products_count' => ProductInventory::where('location_id', $location->id)
+                ->where('quantity_available', '>', 0)->count(),
+            'low_stock_products_count' => ProductInventory::where('location_id', $location->id)
+                ->whereRaw('quantity_available <= COALESCE(location_reorder_level, (SELECT reorder_level FROM products WHERE products.id = product_inventory.product_id))')
+                ->count(),
+            'out_of_stock_products_count' => ProductInventory::where('location_id', $location->id)
+                ->where('quantity_available', '<=', 0)->count(),
+            'total_inventory_value' => ProductInventory::where('location_id', $location->id)
+                ->sum('total_value'),
+        ];
+        
+        return response()->json($summary);
+    }
+
+    /**
+     * Search products for API endpoints
+     */
+    public function searchProducts(Request $request)
+    {
+        $query = $request->get('q', '');
+        $locationId = $request->get('location_id');
+
+        if (empty($query)) {
+            return response()->json([]);
+        }
+
+        $location = $locationId 
+            ? InventoryLocation::findOrFail($locationId)
+            : InventoryLocation::getDefault();
+
+        $products = ProductInventory::with(['product'])
+            ->where('location_id', $location->id)
+            ->whereHas('product', function ($q) use ($query) {
+                $q->search($query);
+            })
+            ->limit(10)
+            ->get()
+            ->map(function ($inventory) {
+                return [
+                    'id' => $inventory->product->id,
+                    'name' => $inventory->product->name,
+                    'sku' => $inventory->product->SKU,
+                    'barcode' => $inventory->product->barcode,
+                    'quantity_available' => $inventory->quantity_available,
+                    'unit_cost' => $inventory->unit_cost,
+                    'location_id' => $inventory->location_id,
+                ];
+            });
+
+        return response()->json($products);
+    }
+
+    /**
+     * Search inventory movements for API endpoints
+     */
+    public function searchMovements(Request $request)
+    {
+        $query = $request->get('q', '');
+        $locationId = $request->get('location_id');
+
+        if (empty($query)) {
+            return response()->json([]);
+        }
+
+        $movementsQuery = InventoryMovement::with(['product', 'location', 'user'])
+            ->search($query);
+
+        if ($locationId) {
+            $movementsQuery->where('location_id', $locationId);
+        }
+
+        $movements = $movementsQuery
+            ->limit(10)
+            ->latest()
+            ->get()
+            ->map(function ($movement) {
+                return [
+                    'id' => $movement->id,
+                    'product_name' => $movement->product->name ?? 'N/A',
+                    'movement_type' => $movement->movement_type,
+                    'quantity_change' => $movement->quantity_change,
+                    'reference_type' => $movement->reference_type,
+                    'notes' => $movement->notes,
+                    'created_at' => $movement->created_at,
+                ];
+            });
+
+        return response()->json($movements);
     }
 }

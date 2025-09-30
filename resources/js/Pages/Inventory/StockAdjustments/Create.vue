@@ -6,6 +6,9 @@ import {
   MinusOutlined,
   SearchOutlined,
   ArrowLeftOutlined,
+  ShoppingCartOutlined,
+  WarningOutlined,
+  StopOutlined,
 } from "@ant-design/icons-vue";
 import { notification } from "ant-design-vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
@@ -35,6 +38,8 @@ const loading = ref(false);
 const productSearch = ref("");
 const searchResults = ref([]);
 const searchLoading = ref(false);
+const selectedStore = ref(null);
+const storeLoading = ref(false);
 
 // Product search
 const searchProducts = async () => {
@@ -77,13 +82,33 @@ watch(productSearch, () => {
   }
 });
 
-// Watch location change to clear products
+// Load store summary when location changes
+const loadStoreItemCount = async (locationId) => {
+  if (!locationId) {
+    selectedStore.value = null;
+    return;
+  }
+  
+  storeLoading.value = true;
+  try {
+    const response = await axios.get(`/api/inventory/locations/${locationId}/summary`);
+    selectedStore.value = response.data;
+  } catch (error) {
+    console.error('Failed to load store summary:', error);
+    selectedStore.value = null;
+  } finally {
+    storeLoading.value = false;
+  }
+};
+
+// Watch location change to clear products and load store summary
 watch(
   () => form.location_id,
-  () => {
+  (newLocationId) => {
     form.items = [];
     productSearch.value = "";
     searchResults.value = [];
+    loadStoreItemCount(newLocationId);
   }
 );
 
@@ -252,7 +277,27 @@ const handleCancel = () => {
 
     <div class="max-w-6xl mx-auto p-6 space-y-6">
       <!-- Basic Information -->
-      <a-card title="Basic Information" class="shadow-sm">
+      <a-card class="shadow-sm">
+        <template #title>
+          <div class="flex items-center justify-between">
+            <span>Basic Information</span>
+            <div v-if="selectedStore" class="flex items-center space-x-2">
+              <a-tag color="blue">
+                <ShoppingCartOutlined class="mr-1" />
+                {{ selectedStore.total_products_count }} items in store
+              </a-tag>
+              <a-tag v-if="selectedStore.low_stock_products_count > 0" color="orange">
+                <WarningOutlined class="mr-1" />
+                {{ selectedStore.low_stock_products_count }} low stock
+              </a-tag>
+              <a-tag v-if="selectedStore.out_of_stock_products_count > 0" color="red">
+                <StopOutlined class="mr-1" />
+                {{ selectedStore.out_of_stock_products_count }} out of stock
+              </a-tag>
+            </div>
+          </div>
+        </template>
+
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           <!-- Location -->
           <div>
@@ -264,15 +309,51 @@ const handleCancel = () => {
               placeholder="Select location"
               class="w-full"
               :disabled="loading"
+              :loading="storeLoading"
             >
               <a-select-option
                 v-for="location in locations"
                 :key="location.id"
                 :value="location.id"
               >
-                {{ location.name }}
+                <div class="flex justify-between items-center">
+                  <span>{{ location.name }}</span>
+                  <span class="text-gray-500 text-sm">
+                    {{ location.address }}
+                  </span>
+                </div>
               </a-select-option>
             </a-select>
+            
+            <!-- Store Details Card -->
+            <div v-if="selectedStore" class="mt-4 p-4 bg-gray-50 rounded-lg">
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="text-center">
+                  <p class="text-lg font-bold text-blue-600">{{ selectedStore.total_products_count || 0 }}</p>
+                  <p class="text-xs text-gray-600">Total Items</p>
+                </div>
+                <div class="text-center">
+                  <p class="text-lg font-bold text-green-600">{{ selectedStore.in_stock_products_count || 0 }}</p>
+                  <p class="text-xs text-gray-600">In Stock</p>
+                </div>
+                <div class="text-center">
+                  <p class="text-lg font-bold text-yellow-600">{{ selectedStore.low_stock_products_count || 0 }}</p>
+                  <p class="text-xs text-gray-600">Low Stock</p>
+                </div>
+                <div class="text-center">
+                  <p class="text-lg font-bold text-red-600">{{ selectedStore.out_of_stock_products_count || 0 }}</p>
+                  <p class="text-xs text-gray-600">Out of Stock</p>
+                </div>
+              </div>
+              <div class="mt-3 pt-3 border-t border-gray-200">
+                <div class="text-center">
+                  <p class="text-sm text-gray-600">Total Inventory Value</p>
+                  <p class="text-lg font-bold text-purple-600">
+                    ₱{{ (selectedStore.total_inventory_value || 0).toLocaleString('en-US', { minimumFractionDigits: 2 }) }}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- Reason -->
