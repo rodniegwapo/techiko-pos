@@ -3,30 +3,15 @@
 namespace App\Models;
 
 use App\Models\Product\Product;
+use App\Traits\Searchable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class InventoryMovement extends Model
 {
-    use HasFactory;
+    use HasFactory, Searchable;
 
-    protected $fillable = [
-        'product_id',
-        'location_id',
-        'movement_type',
-        'quantity_before',
-        'quantity_change',
-        'quantity_after',
-        'unit_cost',
-        'total_cost',
-        'reference_type',
-        'reference_id',
-        'batch_number',
-        'expiry_date',
-        'user_id',
-        'notes',
-        'reason',
-    ];
+    protected $guarded = [];
 
     protected $casts = [
         'quantity_before' => 'integer',
@@ -35,6 +20,16 @@ class InventoryMovement extends Model
         'unit_cost' => 'decimal:4',
         'total_cost' => 'decimal:4',
         'expiry_date' => 'date',
+    ];
+
+    protected $searchable = [
+        'reference_type',
+        'notes',
+        'reason',
+        'batch_number',
+        'product.name',
+        'product.SKU',
+        'product.barcode',
     ];
 
     /**
@@ -76,7 +71,8 @@ class InventoryMovement extends Model
      */
     public function reference()
     {
-        return $this->morphTo('reference', 'reference_type', 'reference_id');
+        return $this->morphTo('reference', 'reference_type', 'reference_id')
+            ->withDefault();
     }
 
     /**
@@ -132,7 +128,7 @@ class InventoryMovement extends Model
      */
     public function getMovementTypeDisplayAttribute()
     {
-        return match($this->movement_type) {
+        return match ($this->movement_type) {
             'sale' => 'Sale',
             'purchase' => 'Purchase',
             'adjustment' => 'Stock Adjustment',
@@ -155,7 +151,7 @@ class InventoryMovement extends Model
         // Validate required fields
         $required = ['product_id', 'location_id', 'movement_type', 'quantity_change'];
         foreach ($required as $field) {
-            if (!isset($data[$field])) {
+            if (! isset($data[$field])) {
                 throw new \InvalidArgumentException("Missing required field: {$field}");
             }
         }

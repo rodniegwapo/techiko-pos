@@ -12,24 +12,7 @@ class ProductInventory extends Model
 
     protected $table = 'product_inventory';
 
-    protected $fillable = [
-        'product_id',
-        'location_id',
-        'quantity_on_hand',
-        'quantity_reserved',
-        'quantity_available',
-        'average_cost',
-        'last_cost',
-        'total_value',
-        'last_movement_at',
-        'last_restock_at',
-        'last_sale_at',
-        'location_reorder_level',
-        'location_max_stock',
-        'location_markup_percentage',
-        'auto_reorder_enabled',
-        'demand_pattern',
-    ];
+    protected $guarded = [];
 
     protected $casts = [
         'quantity_on_hand' => 'integer',

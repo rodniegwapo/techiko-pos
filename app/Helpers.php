@@ -8,11 +8,6 @@ class Helpers
 {
     public static function getDateRange($startDate = null, $endDate = null)
     {
-       logger($startDate);
-       logger($endDate);
-       
-        return 
-        
         $range = [
             Carbon::parse($startDate)
                 ->startOfDay()

@@ -1,7 +1,7 @@
 <script setup>
 import { ref, reactive, computed, watch,toRefs } from "vue";
 import { router } from "@inertiajs/vue3";
-import { IconPlus, IconTrash, IconSearch } from "@tabler/icons-vue";
+import { IconPlus, IconTrash, IconSearch, IconShoppingCart, IconAlertTriangle, IconX } from "@tabler/icons-vue";
 import { notification } from "ant-design-vue";
 import axios from "axios";
 
@@ -26,6 +26,27 @@ const loading = ref(false);
 const productSearch = ref("");
 const searchResults = ref([]);
 const searchLoading = ref(false);
+const selectedStore = ref(null);
+const storeLoading = ref(false);
+
+// Load store summary when location changes
+const loadStoreItemCount = async (locationId) => {
+  if (!locationId) {
+    selectedStore.value = null;
+    return;
+  }
+  
+  storeLoading.value = true;
+  try {
+    const response = await axios.get(`/api/inventory/locations/${locationId}/summary`);
+    selectedStore.value = response.data;
+  } catch (error) {
+    console.error('Failed to load store summary:', error);
+    selectedStore.value = null;
+  } finally {
+    storeLoading.value = false;
+  }
+};
 
 // Initialize form
 const initializeForm = () => {
@@ -35,7 +56,16 @@ const initializeForm = () => {
   form.reference_id = null;
   productSearch.value = "";
   searchResults.value = [];
+  loadStoreItemCount(form.location_id);
 };
+
+// Watch location change to load store summary
+watch(
+  () => form.location_id,
+  (newLocationId) => {
+    loadStoreItemCount(newLocationId);
+  }
+);
 
 // Product search
 const searchProducts = async () => {
@@ -169,12 +199,27 @@ watch(
 <template>
   <a-modal
     v-model:visible="visible"
-    title="Receive Inventory"
     width="900px"
     :confirm-loading="loading"
     @ok="handleSubmit"
     @cancel="closeModal"
   >
+    <template #title>
+      <div class="flex items-center justify-between">
+        <span>Receive Inventory</span>
+        <div v-if="selectedStore" class="flex items-center space-x-2">
+          <a-tag color="blue" size="small">
+            <IconShoppingCart :size="14" class="mr-1" />
+            {{ selectedStore.total_products_count }} items
+          </a-tag>
+          <a-tag v-if="selectedStore.low_stock_products_count > 0" color="orange" size="small">
+            <IconAlertTriangle :size="14" class="mr-1" />
+            {{ selectedStore.low_stock_products_count }} low
+          </a-tag>
+        </div>
+      </div>
+    </template>
+
     <div class="space-y-6">
       <!-- Location Selection -->
       <div>
@@ -186,15 +231,43 @@ watch(
           placeholder="Select location"
           class="w-full"
           :disabled="loading"
+          :loading="storeLoading"
         >
           <a-select-option
             v-for="location in locations"
             :key="location.id"
             :value="location.id"
           >
-            {{ location.name }}
+            <div class="flex justify-between items-center">
+              <span>{{ location.name }}</span>
+              <span class="text-gray-500 text-sm">
+                {{ location.address }}
+              </span>
+            </div>
           </a-select-option>
         </a-select>
+        
+        <!-- Store Summary -->
+        <div v-if="selectedStore" class="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+          <div class="grid grid-cols-4 gap-3 text-center">
+            <div>
+              <p class="text-sm font-bold text-blue-600">{{ selectedStore.total_products_count || 0 }}</p>
+              <p class="text-xs text-gray-600">Total</p>
+            </div>
+            <div>
+              <p class="text-sm font-bold text-green-600">{{ selectedStore.in_stock_products_count || 0 }}</p>
+              <p class="text-xs text-gray-600">In Stock</p>
+            </div>
+            <div>
+              <p class="text-sm font-bold text-yellow-600">{{ selectedStore.low_stock_products_count || 0 }}</p>
+              <p class="text-xs text-gray-600">Low Stock</p>
+            </div>
+            <div>
+              <p class="text-sm font-bold text-red-600">{{ selectedStore.out_of_stock_products_count || 0 }}</p>
+              <p class="text-xs text-gray-600">Out of Stock</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Reference Information -->

@@ -12,7 +12,7 @@ class Customer extends Model
 
     protected $fillable = [
         'name',
-        'phone', 
+        'phone',
         'email',
         'address',
         'loyalty_points',
@@ -20,19 +20,19 @@ class Customer extends Model
         'tier',
         'lifetime_spent',
         'total_purchases',
-        'tier_achieved_date'
+        'tier_achieved_date',
     ];
 
     protected $searchable = [
         'name',
         'phone',
-        'email'
+        'email',
     ];
 
     protected $casts = [
         'date_of_birth' => 'date',
         'tier_achieved_date' => 'date',
-        'lifetime_spent' => 'decimal:2'
+        'lifetime_spent' => 'decimal:2',
     ];
 
     // Relationships
@@ -45,6 +45,7 @@ class Customer extends Model
     public function addPoints(int $points, string $description = 'Purchase reward')
     {
         $this->increment('loyalty_points', $points);
+
         return $this;
     }
 
@@ -55,6 +56,7 @@ class Customer extends Model
         }
 
         $this->decrement('loyalty_points', $points);
+
         return $this;
     }
 
@@ -62,13 +64,13 @@ class Customer extends Model
     {
         // Get tier from database instead of hardcoded values
         $tierModel = \App\Models\LoyaltyTier::where('name', $this->tier ?? 'bronze')->first();
-        
-        if (!$tierModel) {
+
+        if (! $tierModel) {
             // Fallback to bronze if tier not found
             $tierModel = \App\Models\LoyaltyTier::where('name', 'bronze')->first();
         }
-        
-        if (!$tierModel) {
+
+        if (! $tierModel) {
             // Ultimate fallback if no tiers exist
             return [
                 'id' => null,
@@ -79,7 +81,7 @@ class Customer extends Model
                 'spending_threshold' => 0,
             ];
         }
-        
+
         return [
             'id' => $tierModel->id,
             'name' => $tierModel->display_name,
@@ -94,23 +96,23 @@ class Customer extends Model
     {
         $basePoints = floor($amount / 10); // 1 point per ₱10
         $tierInfo = $this->getTierInfo();
-        
+
         return (int) ($basePoints * $tierInfo['multiplier']);
     }
 
     public function updateTierBasedOnSpending(): bool
     {
         $previousTier = $this->tier;
-        
+
         // Get appropriate tier based on spending from database
         $newTierModel = \App\Models\LoyaltyTier::getTierForSpending($this->lifetime_spent);
-        
+
         if ($newTierModel && $previousTier !== $newTierModel->name) {
             $this->update([
                 'tier' => $newTierModel->name,
-                'tier_achieved_date' => now()
+                'tier_achieved_date' => now(),
             ]);
-            
+
             return true; // Tier upgraded
         }
 
@@ -120,25 +122,59 @@ class Customer extends Model
     public function processLoyaltyForSale(float $saleAmount): array
     {
         $results = [];
-        
+
         // Calculate and add points
         $pointsEarned = $this->calculatePointsForPurchase($saleAmount);
         if ($pointsEarned > 0) {
             $this->addPoints($pointsEarned);
             $results['points_earned'] = $pointsEarned;
         }
-        
+
         // Update spending stats
         $this->increment('lifetime_spent', $saleAmount);
         $this->increment('total_purchases');
-        
+
         // Check for tier upgrade
         $tierUpgraded = $this->updateTierBasedOnSpending();
         if ($tierUpgraded) {
             $results['tier_upgraded'] = true;
             $results['new_tier'] = $this->tier;
         }
-        
+
         return $results;
+    }
+
+    public function scopeFilters($query, array $filters)
+    {
+        return $query
+            ->when($filters['search'] ?? null, fn ($q, $search) => $q->search($search))
+            ->when($filters['loyalty_status'] ?? null, function ($q, $status) {
+                return $status === 'enrolled'
+                    ? $q->whereNotNull('loyalty_points')
+                    : ($status === 'not_enrolled' ? $q->whereNull('loyalty_points') : $q);
+            })
+            ->when($filters['tier'] ?? null, fn ($q, $tier) => $q->where('tier', $tier))
+            ->when($filters['date_range'] ?? null, function ($q, $range) {
+                $now = now();
+
+                return match ($range) {
+                    '7_days' => $q->where('created_at', '>=', $now->subDays(7)),
+                    '30_days' => $q->where('created_at', '>=', $now->subDays(30)),
+                    '3_months' => $q->where('created_at', '>=', $now->subMonths(3)),
+                    '1_year' => $q->where('created_at', '>=', $now->subYear()),
+                    default => $q,
+                };
+            });
+    }
+
+    public static function defaultLoyaltyData(): array
+    {
+        return [
+            'loyalty_points' => 0,
+            'tier' => 'bronze',
+            'lifetime_spent' => 0,
+            'total_purchases' => 0,
+            'tier_achieved_date' => now(),
+        ];
     }
 }

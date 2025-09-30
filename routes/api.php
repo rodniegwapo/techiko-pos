@@ -90,7 +90,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware(['role:super admin|admin|manager'])->group(function () {
         Route::get('/users/roles', [\App\Http\Controllers\UserController::class, 'getRoles']);
         Route::patch('/users/{user}/toggle-status', [\App\Http\Controllers\UserController::class, 'toggleStatus']);
-        Route::apiResource('users', \App\Http\Controllers\UserController::class);
+        Route::apiResource('users', \App\Http\Controllers\UserController::class)->names([
+            'index' => 'api.users.index',
+            'store' => 'api.users.store',
+            'show' => 'api.users.show',
+            'update' => 'api.users.update',
+            'destroy' => 'api.users.destroy',
+        ]);
     });
 
     // Inventory API routes
@@ -101,6 +107,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/valuation', [\App\Http\Controllers\InventoryController::class, 'valuation'])->name('valuation');
         Route::post('/receive', [\App\Http\Controllers\InventoryController::class, 'receive'])->name('receive');
         Route::post('/transfer', [\App\Http\Controllers\InventoryController::class, 'transfer'])->name('transfer');
+        Route::get('/locations/{location}/summary', [\App\Http\Controllers\InventoryController::class, 'getLocationSummary'])->name('locations.summary');
+        Route::get('/search/products', [\App\Http\Controllers\InventoryController::class, 'searchProducts'])->name('search.products');
+        Route::get('/search/movements', [\App\Http\Controllers\InventoryController::class, 'searchMovements'])->name('search.movements');
         
         // Stock adjustments API
         Route::get('/adjustments', [\App\Http\Controllers\StockAdjustmentController::class, 'index'])->name('adjustments.index');

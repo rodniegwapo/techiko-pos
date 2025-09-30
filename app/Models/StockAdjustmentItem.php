@@ -11,18 +11,7 @@ class StockAdjustmentItem extends Model
 {
     use HasFactory;
 
-    protected $fillable = [
-        'stock_adjustment_id',
-        'product_id',
-        'system_quantity',
-        'actual_quantity',
-        'adjustment_quantity',
-        'unit_cost',
-        'total_cost_change',
-        'batch_number',
-        'expiry_date',
-        'notes',
-    ];
+    protected $guarded = [];
 
     protected $casts = [
         'system_quantity' => 'integer',

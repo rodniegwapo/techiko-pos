@@ -1,7 +1,7 @@
 <script setup>
 import { ref, reactive, computed, watch, toRefs } from "vue";
 import { router } from "@inertiajs/vue3";
-import { SearchOutlined, SwapOutlined } from "@ant-design/icons-vue";
+import { SearchOutlined, SwapOutlined, ShoppingCartOutlined, WarningOutlined } from "@ant-design/icons-vue";
 import { notification } from "ant-design-vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import axios from "axios";
@@ -34,6 +34,9 @@ const searchResults = ref([]);
 const searchLoading = ref(false);
 const selectedProduct = ref(null);
 const availableStock = ref(0);
+const fromStore = ref(null);
+const toStore = ref(null);
+const storeLoading = ref(false);
 
 // Initialize form
 const initializeForm = () => {
@@ -66,12 +69,46 @@ const initializeForm = () => {
   }
 };
 
+// Load store summary
+const loadStoreItemCount = async (locationId, storeRef) => {
+  if (!locationId) {
+    storeRef.value = null;
+    return;
+  }
+  
+  storeLoading.value = true;
+  try {
+    const response = await axios.get(`/api/inventory/locations/${locationId}/summary`);
+    storeRef.value = response.data;
+  } catch (error) {
+    console.error('Failed to load store summary:', error);
+    storeRef.value = null;
+  } finally {
+    storeLoading.value = false;
+  }
+};
+
 // Available locations for transfer (exclude from_location)
 const availableToLocations = computed(() => {
   return (
     props.locations?.filter((loc) => loc.id !== form.from_location_id) || []
   );
 });
+
+// Watch location changes to load store summaries
+watch(
+  () => form.from_location_id,
+  (newLocationId) => {
+    loadStoreItemCount(newLocationId, fromStore);
+  }
+);
+
+watch(
+  () => form.to_location_id,
+  (newLocationId) => {
+    loadStoreItemCount(newLocationId, toStore);
+  }
+);
 
 // Product search
 const searchProducts = async () => {
@@ -319,12 +356,33 @@ watch(
 <template>
   <a-modal
     v-model:visible="visible"
-    title="Transfer Inventory"
-    width="600px"
+    width="700px"
     :confirm-loading="loading"
     @ok="handleSubmit"
     @cancel="closeModal"
   >
+    <template #title>
+      <div class="flex items-center justify-between">
+        <span>Transfer Inventory</span>
+        <div class="flex items-center space-x-2">
+          <div v-if="fromStore" class="flex items-center space-x-1">
+            <span class="text-xs text-gray-500">From:</span>
+            <a-tag color="blue" size="small">
+              <ShoppingCartOutlined :size="12" class="mr-1" />
+              {{ fromStore.total_products_count }}
+            </a-tag>
+          </div>
+          <SwapOutlined class="text-gray-400" />
+          <div v-if="toStore" class="flex items-center space-x-1">
+            <span class="text-xs text-gray-500">To:</span>
+            <a-tag color="green" size="small">
+              <ShoppingCartOutlined :size="12" class="mr-1" />
+              {{ toStore.total_products_count }}
+            </a-tag>
+          </div>
+        </div>
+      </div>
+    </template>
     <div class="space-y-6">
       <!-- Product Selection -->
       <div>
@@ -409,6 +467,51 @@ watch(
             placeholder="Select source location"
             class="w-full"
             :disabled="loading"
+            :loading="storeLoading"
+          >
+            <a-select-option
+              v-for="location in locations"
+              :key="location.id"
+              :value="location.id"
+            >
+              <div class="flex justify-between items-center">
+                <span>{{ location.name }}</span>
+                <span class="text-gray-500 text-xs">
+                  {{ location.address }}
+                </span>
+              </div>
+            </a-select-option>
+          </a-select>
+          
+          <!-- From Store Summary -->
+          <div v-if="fromStore" class="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
+            <div class="grid grid-cols-3 gap-2 text-center">
+              <div>
+                <p class="text-xs font-bold text-blue-600">{{ fromStore.total_products_count || 0 }}</p>
+                <p class="text-xs text-gray-600">Total</p>
+              </div>
+              <div>
+                <p class="text-xs font-bold text-green-600">{{ fromStore.in_stock_products_count || 0 }}</p>
+                <p class="text-xs text-gray-600">In Stock</p>
+              </div>
+              <div>
+                <p class="text-xs font-bold text-red-600">{{ fromStore.out_of_stock_products_count || 0 }}</p>
+                <p class="text-xs text-gray-600">Out</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            To Location *
+          </label>
+          <a-select
+            v-model:value="form.to_location_id"
+            placeholder="Select destination location"
+            class="w-full"
+            :disabled="loading"
+            :loading="storeLoading"
           >
             <a-select-option
               v-for="location in locations"
@@ -435,9 +538,32 @@ watch(
               :key="location.id"
               :value="location.id"
             >
-              {{ location.name }}
+              <div class="flex justify-between items-center">
+                <span>{{ location.name }}</span>
+                <span class="text-gray-500 text-xs">
+                  {{ location.address }}
+                </span>
+              </div>
             </a-select-option>
           </a-select>
+          
+          <!-- To Store Summary -->
+          <div v-if="toStore" class="mt-2 p-2 bg-green-50 rounded border border-green-200">
+            <div class="grid grid-cols-3 gap-2 text-center">
+              <div>
+                <p class="text-xs font-bold text-green-600">{{ toStore.total_products_count || 0 }}</p>
+                <p class="text-xs text-gray-600">Total</p>
+              </div>
+              <div>
+                <p class="text-xs font-bold text-blue-600">{{ toStore.in_stock_products_count || 0 }}</p>
+                <p class="text-xs text-gray-600">In Stock</p>
+              </div>
+              <div>
+                <p class="text-xs font-bold text-yellow-600">{{ toStore.low_stock_products_count || 0 }}</p>
+                <p class="text-xs text-gray-600">Low</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
