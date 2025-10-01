@@ -12,6 +12,7 @@ import {
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useFilters, toLabel } from "@/Composables/useFilters";
 import { watchDebounced } from "@vueuse/core";
+import { useHelpers } from "@/Composables/useHelpers";  
 
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
@@ -22,6 +23,7 @@ import ActiveFilters from "@/Components/filters/ActiveFilters.vue";
 
 const page = usePage();
 const { spinning } = useGlobalVariables();
+const {formattedTotal} = useHelpers()
 
 const selectedLocation = ref(null);
 
@@ -152,7 +154,7 @@ const navigateToAdjustments = () => {
 
       <template #table>
         <!-- Summary Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6 p-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-6">
           <!-- Total Products -->
           <a-card class="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:shadow-lg transition-all duration-300">
             <div class="flex items-center">
@@ -207,9 +209,9 @@ const navigateToAdjustments = () => {
         </div>
 
         <!-- Location Info and Inventory Value -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 p-6">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6 px-6">
           <!-- Location Info -->
-          <a-card class="bg-gradient-to-br from-indigo-50 to-indigo-100 border-indigo-200 hover:shadow-lg transition-all duration-300">
+          <div class=" p-6 border rounded-lg bg-gradient-to hover:shadow-lg transition-all duration-300">
             <div class="flex items-center justify-between">
               <div>
                 <h3 class="text-lg font-semibold text-indigo-800">
@@ -225,10 +227,10 @@ const navigateToAdjustments = () => {
                 </div>
               </div>
             </div>
-          </a-card>
+          </div>
 
           <!-- Inventory Value Card -->
-          <a-card class="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 hover:shadow-lg transition-all duration-300">
+          <div class="p-6 rounded-lg border bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 hover:shadow-lg transition-all duration-300">
             <div class="flex items-center justify-between">
               <div class="flex items-center">
                 <div class="p-3 rounded-full bg-gradient-to-r from-purple-500 to-purple-600 mr-4 shadow-lg">
@@ -237,7 +239,8 @@ const navigateToAdjustments = () => {
                 <div>
                   <p class="text-sm text-purple-700 font-medium">Total Inventory Value</p>
                   <p class="text-3xl font-bold text-purple-800">
-                    ₱{{ (summary.total_inventory_value || 0).toLocaleString('en-US', { minimumFractionDigits: 2 }) }}
+                  
+                    {{ formattedTotal(summary.total_inventory_value ) }}
                   </p>
                 </div>
               </div>
@@ -245,11 +248,11 @@ const navigateToAdjustments = () => {
                 View Report
               </a-button>
             </div>
-          </a-card>
+          </div>
         </div>
 
         <!-- Quick Actions -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 p-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 px-6">
           <a-card class="bg-gradient-to-br from-cyan-50 to-cyan-100 border-cyan-200 hover:shadow-lg transition-all duration-300 cursor-pointer" @click="navigateToProducts">
             <div class="text-center">
               <div class="w-16 h-16 bg-gradient-to-r from-cyan-500 to-cyan-600 rounded-xl flex items-center justify-center shadow-lg mx-auto mb-4">
@@ -282,7 +285,7 @@ const navigateToAdjustments = () => {
         </div>
 
         <!-- Low Stock Alert -->
-        <div v-if="lowStockProducts.length > 0" class="mb-6 p-6">
+        <div v-if="lowStockProducts.length > 0" class="mb-6 px-6">
           <a-card class="bg-gradient-to-br from-amber-50 to-amber-100 border-amber-300 shadow-lg">
             <template #title>
               <div class="flex items-center justify-between">
