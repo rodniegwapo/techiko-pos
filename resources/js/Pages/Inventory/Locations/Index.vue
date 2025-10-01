@@ -231,9 +231,11 @@ const columns = [
       <!-- Active Filters -->
       <template #activeFilters>
         <ActiveFilters
-          v-if="activeFilters.length > 0"
           :filters="activeFilters"
-          @clear="handleClearSelectedFilter"
+          @remove-filter="handleClearSelectedFilter"
+          @clear-all="
+            () => Object.keys(filters).forEach((k) => (filters[k] = null))
+          "
         />
       </template>
 
@@ -264,7 +266,9 @@ const columns = [
 
                 <!-- Location Info -->
                 <div>
-                  <div class="font-semibold text-gray-900">{{ record.name }}</div>
+                  <div class="font-semibold text-gray-900">
+                    {{ record.name }}
+                  </div>
                   <div class="flex items-center gap-2">
                     <div class="text-sm text-gray-500">{{ record.code }}</div>
                     <a-tag

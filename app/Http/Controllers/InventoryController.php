@@ -309,7 +309,7 @@ class InventoryController extends Controller
             ];
         });
 
-        return response()->json([
+        return Inertia::render('Inventory/Valuation', [
             'location' => $location,
             'summary' => [
                 'total_value' => $totalValue,
@@ -317,6 +317,7 @@ class InventoryController extends Controller
                 'total_products' => $inventories->count(),
             ],
             'items' => $valuationData,
+            'locations' => InventoryLocation::active()->get(),
         ]);
     }
 

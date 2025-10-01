@@ -91,6 +91,10 @@ const menus = computed(() => {
           title: "Locations",
           path: route("inventory.locations.index"),
         },
+        {
+          title: "Valuation Report",
+          path: route("inventory.valuation"),
+        },
       ],
     },
     {
