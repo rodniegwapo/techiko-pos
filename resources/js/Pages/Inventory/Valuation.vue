@@ -159,7 +159,7 @@ const printValuation = () => {
         <!-- Summary Cards -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 p-6">
           <!-- Total Value -->
-          <a-card class="bg-gray-50">
+          <div class="bg-gray-50 rounded-lg p-6 border">
             <div class="flex items-center">
               <div class="p-3 rounded-full bg-green-100 mr-4">
                 <DollarOutlined class="text-2xl text-green-600" />
@@ -175,10 +175,10 @@ const printValuation = () => {
                 </p>
               </div>
             </div>
-          </a-card>
+          </div>
 
           <!-- Total Quantity -->
-          <a-card>
+          <div class="bg-gray-50 rounded-lg p-6 border">
             <div class="flex items-center">
               <div class="p-3 rounded-full bg-blue-100 mr-4">
                 <BoxPlotOutlined class="text-2xl text-blue-600" />
@@ -190,10 +190,10 @@ const printValuation = () => {
                 </p>
               </div>
             </div>
-          </a-card>
+          </div>
 
           <!-- Total Products -->
-          <a-card>
+             <div class="bg-gray-50 rounded-lg p-6 border">
             <div class="flex items-center">
               <div class="p-3 rounded-full bg-purple-100 mr-4">
                 <BoxPlotOutlined class="text-2xl text-purple-600" />
@@ -205,7 +205,7 @@ const printValuation = () => {
                 </p>
               </div>
             </div>
-          </a-card>
+          </div>
         </div>
 
         <!-- Valuation Table -->
