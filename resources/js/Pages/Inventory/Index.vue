@@ -1,18 +1,19 @@
 <script setup>
 import { ref, computed, onMounted } from "vue";
 import { usePage, router, Head } from "@inertiajs/vue3";
-import { 
-  ShoppingCartOutlined, 
-  WarningOutlined, 
+import {
+  ShoppingCartOutlined,
+  WarningOutlined,
   StopOutlined,
   DollarOutlined,
   BoxPlotOutlined,
-  HistoryOutlined
+  HistoryOutlined,
 } from "@ant-design/icons-vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useFilters, toLabel } from "@/Composables/useFilters";
 import { watchDebounced } from "@vueuse/core";
-import { useHelpers } from "@/Composables/useHelpers";  
+import { useHelpers } from "@/Composables/useHelpers";
+import VueApexCharts from "vue3-apexcharts";
 
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
@@ -23,7 +24,7 @@ import ActiveFilters from "@/Components/filters/ActiveFilters.vue";
 
 const page = usePage();
 const { spinning } = useGlobalVariables();
-const {formattedTotal} = useHelpers()
+const { formattedTotal } = useHelpers();
 
 const selectedLocation = ref(null);
 
@@ -38,7 +39,8 @@ const props = defineProps({
 // Initialize filters from backend
 onMounted(() => {
   if (props.filters) {
-    selectedLocation.value = props.filters.location_id || props.currentLocation?.id || null;
+    selectedLocation.value =
+      props.filters.location_id || props.currentLocation?.id || null;
   }
 });
 
@@ -60,13 +62,13 @@ const getItems = () => {
   });
 };
 
-
 // Filter options
-const locationOptions = computed(() => 
-  props.locations?.map(loc => ({
-    label: loc.name,
-    value: loc.id,
-  })) || []
+const locationFilterOptions = computed(
+  () =>
+    props.locations?.map((loc) => ({
+      label: loc.name,
+      value: loc.id,
+    })) || []
 );
 
 // Filter management
@@ -77,7 +79,7 @@ const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
       label: "Location",
       key: "location_id",
       ref: selectedLocation,
-      getLabel: toLabel(computed(() => locationOptions.value)),
+      getLabel: toLabel(computed(() => locationFilterOptions.value)),
     },
   ],
 });
@@ -88,7 +90,7 @@ const filtersConfig = [
     key: "location_id",
     label: "Location",
     type: "select",
-    options: locationOptions.value,
+    options: locationFilterOptions.value,
   },
 ];
 
@@ -103,20 +105,125 @@ const changeLocation = (locationId) => {
 };
 
 const navigateToProducts = () => {
-  router.visit(route('inventory.products'), {
-    data: { location_id: selectedLocation.value }
+  router.visit(route("inventory.products"), {
+    data: { location_id: selectedLocation.value },
   });
 };
 
 const navigateToMovements = () => {
-  router.visit(route('inventory.movements'), {
-    data: { location_id: selectedLocation.value }
+  router.visit(route("inventory.movements"), {
+    data: { location_id: selectedLocation.value },
   });
 };
 
 const navigateToAdjustments = () => {
-  router.visit(route('inventory.adjustments.index'));
+  router.visit(route("inventory.adjustments.index"));
 };
+
+// Chart data for stock levels by category
+const stockLevelChart = computed(() => {
+  // Sample data - in real implementation, this would come from props or API
+  const categories = [
+    { name: 'Electronics', inStock: 45, lowStock: 8, outOfStock: 2 },
+    { name: 'Clothing', inStock: 32, lowStock: 5, outOfStock: 1 },
+    { name: 'Home & Garden', inStock: 28, lowStock: 3, outOfStock: 0 },
+    { name: 'Sports', inStock: 15, lowStock: 2, outOfStock: 1 },
+    { name: 'Books', inStock: 22, lowStock: 4, outOfStock: 0 },
+  ];
+
+  return {
+    series: [
+      {
+        name: 'In Stock',
+        data: categories.map(cat => cat.inStock),
+        color: '#10B981'
+      },
+      {
+        name: 'Low Stock',
+        data: categories.map(cat => cat.lowStock),
+        color: '#F59E0B'
+      },
+      {
+        name: 'Out of Stock',
+        data: categories.map(cat => cat.outOfStock),
+        color: '#EF4444'
+      }
+    ],
+    chartOptions: {
+      chart: {
+        type: 'bar',
+        height: 300,
+        stacked: true,
+        toolbar: {
+          show: false
+        }
+      },
+      plotOptions: {
+        bar: {
+          horizontal: false,
+          columnWidth: '60%',
+          borderRadius: 4,
+        }
+      },
+      dataLabels: {
+        enabled: false
+      },
+      xaxis: {
+        categories: categories.map(cat => cat.name),
+        labels: {
+          style: {
+            fontSize: '12px',
+            fontFamily: 'Inter, sans-serif',
+          }
+        }
+      },
+      yaxis: {
+        title: {
+          text: 'Number of Products',
+          style: {
+            fontSize: '12px',
+            fontFamily: 'Inter, sans-serif',
+          }
+        },
+        labels: {
+          style: {
+            fontSize: '11px',
+            fontFamily: 'Inter, sans-serif',
+          }
+        }
+      },
+      legend: {
+        position: 'top',
+        fontSize: '12px',
+        fontFamily: 'Inter, sans-serif',
+        markers: {
+          width: 8,
+          height: 8,
+          radius: 4
+        }
+      },
+      colors: ['#10B981', '#F59E0B', '#EF4444'],
+      grid: {
+        borderColor: '#f1f1f1',
+        strokeDashArray: 3
+      },
+      responsive: [{
+        breakpoint: 768,
+        options: {
+          chart: {
+            height: 250
+          },
+          legend: {
+            position: 'bottom'
+          }
+        }
+      }]
+    }
+  };
+});
+
+// Register ApexCharts component
+const apexchart = VueApexCharts;
 </script>
 
 <template>
@@ -124,7 +231,7 @@ const navigateToAdjustments = () => {
 
   <AuthenticatedLayout>
     <ContentHeader title="Inventory Dashboard" />
-    
+
     <ContentLayout title="Inventory Overview">
       <template #filters>
         <RefreshButton :loading="spinning" @click="getItems" />
@@ -139,7 +246,7 @@ const navigateToAdjustments = () => {
             () => Object.keys(filters).forEach((k) => (filters[k] = null))
           "
         />
-        
+
         <!-- Current Location Info -->
         <div v-if="location.name" class="mb-4">
           <a-alert
@@ -156,215 +263,270 @@ const navigateToAdjustments = () => {
         <!-- Summary Cards -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-6">
           <!-- Total Products -->
-          <a-card class="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:shadow-lg transition-all duration-300">
-            <div class="flex items-center">
-              <div class="p-3 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 mr-4 shadow-lg">
-                <BoxPlotOutlined class="text-2xl text-white" />
-              </div>
-              <div>
-                <p class="text-sm text-blue-700 font-medium">Total Products</p>
-                <p class="text-2xl font-bold text-blue-800">{{ summary.total_products || 0 }}</p>
-              </div>
-            </div>
-          </a-card>
-
-          <!-- In Stock Products -->
-          <a-card class="bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:shadow-lg transition-all duration-300">
-            <div class="flex items-center">
-              <div class="p-3 rounded-full bg-gradient-to-r from-green-500 to-green-600 mr-4 shadow-lg">
-                <ShoppingCartOutlined class="text-2xl text-white" />
-              </div>
-              <div>
-                <p class="text-sm text-green-700 font-medium">In Stock</p>
-                <p class="text-2xl font-bold text-green-800">{{ summary.in_stock_products || 0 }}</p>
-              </div>
-            </div>
-          </a-card>
-
-          <!-- Low Stock Products -->
-          <a-card class="bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200 hover:shadow-lg transition-all duration-300">
-            <div class="flex items-center">
-              <div class="p-3 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 mr-4 shadow-lg">
-                <WarningOutlined class="text-2xl text-white" />
-              </div>
-              <div>
-                <p class="text-sm text-amber-700 font-medium">Low Stock</p>
-                <p class="text-2xl font-bold text-amber-800">{{ summary.low_stock_products || 0 }}</p>
-              </div>
-            </div>
-          </a-card>
-
-          <!-- Out of Stock Products -->
-          <a-card class="bg-gradient-to-br from-red-50 to-red-100 border-red-200 hover:shadow-lg transition-all duration-300">
-            <div class="flex items-center">
-              <div class="p-3 rounded-full bg-gradient-to-r from-red-500 to-red-600 mr-4 shadow-lg">
-                <StopOutlined class="text-2xl text-white" />
-              </div>
-              <div>
-                <p class="text-sm text-red-700 font-medium">Out of Stock</p>
-                <p class="text-2xl font-bold text-red-800">{{ summary.out_of_stock_products || 0 }}</p>
-              </div>
-            </div>
-          </a-card>
-        </div>
-
-        <!-- Location Info and Inventory Value -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6 px-6">
-          <!-- Location Info -->
-          <div class=" p-6 border rounded-lg bg-gradient-to hover:shadow-lg transition-all duration-300">
-            <div class="flex items-center justify-between">
-              <div>
-                <h3 class="text-lg font-semibold text-indigo-800">
-                  {{ location.name || 'All Locations' }}
-                </h3>
-                <p class="text-sm text-indigo-600">
-                  {{ location.type ? location.type.charAt(0).toUpperCase() + location.type.slice(1) : '' }}
-                  {{ location.address ? ' • ' + location.address : '' }}
-                </p>
-                <div class="mt-2">
-                  <p class="text-sm text-indigo-600">Location Code</p>
-                  <p class="text-lg font-semibold text-indigo-800">{{ location.code || 'ALL' }}</p>
+          <div
+            class="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 p-6 rounded-lg hover:shadow-lg transition-all duration-300 relative overflow-hidden"
+          >
+            <div
+              class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-400/10 to-blue-600/10 rounded-full -translate-y-8 translate-x-8"
+            ></div>
+            <div class="relative">
+              <div class="flex items-center">
+                <div class="p-3 rounded-full bg-blue-100 mr-4">
+                  <BoxPlotOutlined class="text-2xl text-blue-600" />
+                </div>
+                <div>
+                  <p class="text-sm text-blue-600 font-medium">
+                    Total Products
+                  </p>
+                  <p class="text-2xl font-bold text-blue-800">
+                    {{ summary.total_products || 0 }}
+                  </p>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Inventory Value Card -->
-          <div class="p-6 rounded-lg border bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 hover:shadow-lg transition-all duration-300">
-            <div class="flex items-center justify-between">
+          <!-- In Stock Products -->
+          <div
+            class="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 p-6 rounded-lg hover:shadow-lg transition-all duration-300 relative overflow-hidden"
+          >
+            <div
+              class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-400/10 to-green-600/10 rounded-full -translate-y-8 translate-x-8"
+            ></div>
+            <div class="relative">
               <div class="flex items-center">
-                <div class="p-3 rounded-full bg-gradient-to-r from-purple-500 to-purple-600 mr-4 shadow-lg">
-                  <DollarOutlined class="text-2xl text-white" />
+                <div class="p-3 rounded-full bg-green-100 mr-4">
+                  <ShoppingCartOutlined class="text-2xl text-green-600" />
                 </div>
                 <div>
-                  <p class="text-sm text-purple-700 font-medium">Total Inventory Value</p>
-                  <p class="text-3xl font-bold text-purple-800">
-                  
-                    {{ formattedTotal(summary.total_inventory_value ) }}
+                  <p class="text-sm text-green-600 font-medium">In Stock</p>
+                  <p class="text-2xl font-bold text-green-800">
+                    {{ summary.in_stock_products || 0 }}
                   </p>
                 </div>
               </div>
-              <a-button type="primary" class="bg-gradient-to-r from-purple-500 to-purple-600 border-purple-500 hover:from-purple-600 hover:to-purple-700" @click="router.visit(route('inventory.valuation'))">
-                View Report
-              </a-button>
+            </div>
+          </div>
+
+          <!-- Low Stock Products -->
+          <div
+            class="bg-gradient-to-br from-orange-50 to-orange-100 border border-orange-200 p-6 rounded-lg hover:shadow-lg transition-all duration-300 relative overflow-hidden"
+          >
+            <div
+              class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-orange-400/10 to-orange-600/10 rounded-full -translate-y-8 translate-x-8"
+            ></div>
+            <div class="relative">
+              <div class="flex items-center">
+                <div class="p-3 rounded-full bg-orange-100 mr-4">
+                  <WarningOutlined class="text-2xl text-orange-600" />
+                </div>
+                <div>
+                  <p class="text-sm text-orange-600 font-medium">Low Stock</p>
+                  <p class="text-2xl font-bold text-orange-800">
+                    {{ summary.low_stock_products || 0 }}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Out of Stock Products -->
+          <div
+            class="bg-gradient-to-br from-red-50 to-red-100 border border-red-200 p-6 rounded-lg hover:shadow-lg transition-all duration-300 relative overflow-hidden"
+          >
+            <div
+              class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-red-400/10 to-red-600/10 rounded-full -translate-y-8 translate-x-8"
+            ></div>
+            <div class="relative">
+              <div class="flex items-center">
+                <div class="p-3 rounded-full bg-red-100 mr-4">
+                  <StopOutlined class="text-2xl text-red-600" />
+                </div>
+                <div>
+                  <p class="text-sm text-red-600 font-medium">Out of Stock</p>
+                  <p class="text-2xl font-bold text-red-800">
+                    {{ summary.out_of_stock_products || 0 }}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Combined Inventory Value and Chart Card -->
+        <div class="mb-6 px-6">
+          <div class="bg-white border border-gray-200 p-6 rounded-lg hover:shadow-lg transition-all duration-300">
+            <!-- Header Section -->
+            <div class="flex items-center justify-between mb-6">
+              <div class="flex items-center">
+                <div class="p-3 rounded-full bg-indigo-100 mr-4">
+                  <BoxPlotOutlined class="text-2xl text-indigo-600" />
+                </div>
+                <div>
+                  <h3 class="text-lg font-semibold text-gray-800">
+                    {{ location.name || "All Locations" }}
+                  </h3>
+                  <p class="text-sm text-gray-600">
+                    {{
+                      location.type
+                        ? location.type.charAt(0).toUpperCase() +
+                          location.type.slice(1)
+                        : ""
+                    }}
+                    {{ location.address ? " • " + location.address : "" }}
+                  </p>
+                  <div class="mt-2">
+                    <p class="text-sm text-gray-600">
+                      Location Code:
+                      <span class="font-semibold text-indigo-600">
+                        {{ location.code || "ALL" }}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div class="text-right">
+                <p class="text-sm text-gray-600 font-medium">
+                  Total Inventory Value
+                </p>
+                <p class="text-3xl font-bold text-gray-800">
+                  {{ formattedTotal(summary.total_inventory_value) }}
+                </p>
+                <a-button
+                  type="primary"
+                  class="bg-purple-600 border-purple-600 hover:bg-purple-700 mt-2"
+                  @click="router.visit(route('inventory.valuation'))"
+                >
+                  View Report
+                </a-button>
+              </div>
+            </div>
+
+            <!-- Chart Section -->
+            <div class="border-t border-gray-100 pt-6">
+              <div class="flex items-center justify-between mb-4">
+                <h4 class="text-md font-semibold text-gray-800">Stock Level by Category</h4>
+                <p class="text-sm text-gray-600">Inventory distribution across categories</p>
+              </div>
+              <div class="w-full">
+                <apexchart
+                  type="bar"
+                  height="300"
+                  width="500"
+                  :options="stockLevelChart.chartOptions"
+                  :series="stockLevelChart.series"
+                />
+              </div>
             </div>
           </div>
         </div>
 
         <!-- Quick Actions -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 px-6">
-          <a-card class="bg-gradient-to-br from-cyan-50 to-cyan-100 border-cyan-200 hover:shadow-lg transition-all duration-300 cursor-pointer" @click="navigateToProducts">
+          <div
+            class="bg-gray-50 border border-gray-200 p-6 rounded-lg hover:shadow-lg transition-all duration-300 cursor-pointer"
+            @click="navigateToProducts"
+          >
             <div class="text-center">
-              <div class="w-16 h-16 bg-gradient-to-r from-cyan-500 to-cyan-600 rounded-xl flex items-center justify-center shadow-lg mx-auto mb-4">
-                <BoxPlotOutlined class="text-2xl text-white" />
+              <div
+                class="w-16 h-16 bg-blue-100 rounded-xl flex items-center justify-center mx-auto mb-4"
+              >
+                <BoxPlotOutlined class="text-2xl text-blue-600" />
               </div>
-              <h3 class="text-lg font-semibold mb-2 text-cyan-800">Manage Products</h3>
-              <p class="text-cyan-600 text-sm">View and manage product inventory levels</p>
+              <h3 class="text-lg font-semibold mb-2 text-gray-800">
+                Manage Products
+              </h3>
+              <p class="text-gray-600 text-sm">
+                View and manage product inventory levels
+              </p>
             </div>
-          </a-card>
+          </div>
 
-          <a-card class="bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200 hover:shadow-lg transition-all duration-300 cursor-pointer" @click="navigateToMovements">
+          <div
+            class="bg-gray-50 border border-gray-200 p-6 rounded-lg hover:shadow-lg transition-all duration-300 cursor-pointer"
+            @click="navigateToMovements"
+          >
             <div class="text-center">
-              <div class="w-16 h-16 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg mx-auto mb-4">
-                <HistoryOutlined class="text-2xl text-white" />
+              <div
+                class="w-16 h-16 bg-green-100 rounded-xl flex items-center justify-center mx-auto mb-4"
+              >
+                <HistoryOutlined class="text-2xl text-green-600" />
               </div>
-              <h3 class="text-lg font-semibold mb-2 text-emerald-800">Inventory Movements</h3>
-              <p class="text-emerald-600 text-sm">Track all inventory transactions</p>
+              <h3 class="text-lg font-semibold mb-2 text-gray-800">
+                Inventory Movements
+              </h3>
+              <p class="text-gray-600 text-sm">
+                Track all inventory transactions
+              </p>
             </div>
-          </a-card>
+          </div>
 
-          <a-card class="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200 hover:shadow-lg transition-all duration-300 cursor-pointer" @click="navigateToAdjustments">
+          <div
+            class="bg-gray-50 border border-gray-200 p-6 rounded-lg hover:shadow-lg transition-all duration-300 cursor-pointer"
+            @click="navigateToAdjustments"
+          >
             <div class="text-center">
-              <div class="w-16 h-16 bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg mx-auto mb-4">
-                <WarningOutlined class="text-2xl text-white" />
+              <div
+                class="w-16 h-16 bg-orange-100 rounded-xl flex items-center justify-center mx-auto mb-4"
+              >
+                <WarningOutlined class="text-2xl text-orange-600" />
               </div>
-              <h3 class="text-lg font-semibold mb-2 text-orange-800">Stock Adjustments</h3>
-              <p class="text-orange-600 text-sm">Create and manage stock adjustments</p>
+              <h3 class="text-lg font-semibold mb-2 text-gray-800">
+                Stock Adjustments
+              </h3>
+              <p class="text-gray-600 text-sm">
+                Create and manage stock adjustments
+              </p>
             </div>
-          </a-card>
+          </div>
+          
         </div>
 
-        <!-- Low Stock Alert -->
-        <div v-if="lowStockProducts.length > 0" class="mb-6 px-6">
-          <a-card class="bg-gradient-to-br from-amber-50 to-amber-100 border-amber-300 shadow-lg">
-            <template #title>
+        <div v-if="lowStockProducts.length > 0" class="w-full p-6">
+            <div
+              class="bg-white border border-orange-200 p-6 rounded-lg hover:shadow-lg transition-all duration-300 h-full"
+            >
               <div class="flex items-center justify-between">
                 <div class="flex items-center">
-                  <div class="p-2 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 mr-3 shadow-lg">
-                    <WarningOutlined class="text-amber-100 text-lg" />
+                  <div class="p-2 rounded-full bg-orange-100 mr-3">
+                    <WarningOutlined class="text-orange-600 text-lg" />
                   </div>
-                  <span class="text-amber-800 font-semibold text-lg">
-                    Low Stock Alert ({{ lowStockProducts.length }} items)
-                  </span>
-                </div>
-                <a-button type="link" @click="navigateToProducts" class="text-amber-600 hover:text-amber-700 font-medium">
-                  View All
-                </a-button>
-              </div>
-            </template>
-            
-            <div class="space-y-3">
-              <div 
-                v-for="product in lowStockProducts.slice(0, 5)" 
-                :key="product.id"
-                class="flex items-center justify-between p-4 bg-gradient-to-r from-amber-100 to-amber-200 rounded-lg border border-amber-300 shadow-sm"
-              >
-                <div>
-                  <p class="font-semibold text-amber-800">{{ product.name }}</p>
-                  <p class="text-sm text-amber-600">SKU: {{ product.SKU }}</p>
+                  <div>
+                    <h3 class="text-lg font-semibold text-gray-800">
+                      Low Stock Alert
+                    </h3>
+                    <p class="text-sm text-gray-600">
+                      ⚠️ Items running low — check restocking needs
+                    </p>
+                  </div>
                 </div>
                 <div class="text-right">
-                  <p class="text-sm text-amber-600">Current Stock</p>
-                  <p class="text-lg font-bold text-amber-800">
-                    {{ product.total_available_quantity || 0 }}
+                  <p class="text-2xl font-bold text-orange-600">
+                    {{ lowStockProducts.length }}
                   </p>
-                  <p class="text-xs text-amber-500">
-                    Reorder at: {{ product.reorder_level }}
-                  </p>
+                  <p class="text-sm text-gray-600">items need attention</p>
+                  <a-button
+                    type="link"
+                    @click="navigateToProducts"
+                    class="text-orange-600 hover:text-orange-700 text-sm p-0"
+                  >
+                    View All →
+                  </a-button>
                 </div>
               </div>
-              
-              <div v-if="lowStockProducts.length > 5" class="text-center pt-3">
-                <a-button type="link" @click="navigateToProducts" class="text-amber-600 hover:text-amber-700 font-medium">
-                  View {{ lowStockProducts.length - 5 }} more items
-                </a-button>
-              </div>
             </div>
-          </a-card>
-        </div>
+          </div>
       </template>
     </ContentLayout>
   </AuthenticatedLayout>
 </template>
 
 <style scoped>
-.ant-card {
-  border-radius: 12px;
-  border-width: 1px;
-}
-
-.ant-card-body {
-  padding: 24px;
-}
-
 /* Enhanced hover effects */
-.ant-card:hover {
+.hover\:shadow-lg:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-}
-
-/* Gradient text effects */
-.gradient-text {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-/* Enhanced shadow effects */
-.shadow-luxury {
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25),
-    0 0 0 1px rgba(255, 255, 255, 0.05);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04);
 }
 
 /* Smooth transitions */
