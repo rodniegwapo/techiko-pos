@@ -346,6 +346,9 @@ class InventoryService
         $outOfStockProducts = Product::outOfStock($location)->count();
         $totalInventoryValue = $location->getTotalInventoryValue();
 
+        // Get category stock data
+        $categoryStockData = $this->getCategoryStockData($location);
+
         return [
             'location' => $location,
             'summary' => [
@@ -356,7 +359,55 @@ class InventoryService
                 'total_inventory_value' => $totalInventoryValue,
             ],
             'low_stock_products' => $this->getLowStockProducts($location),
+            'category_stock_data' => $categoryStockData,
         ];
+    }
+
+    /**
+     * Get category stock data for chart
+     */
+    public function getCategoryStockData(InventoryLocation $location = null): array
+    {
+        $query = Product::tracked()
+            ->with(['category', 'inventories' => function ($q) use ($location) {
+                if ($location) {
+                    $q->where('location_id', $location->id);
+                }
+            }]);
+
+        $products = $query->get();
+
+        // Group by category and calculate stock levels
+        $categoryData = $products->groupBy('category.name')->map(function ($categoryProducts) use ($location) {
+            $inStock = 0;
+            $lowStock = 0;
+            $outOfStock = 0;
+
+            foreach ($categoryProducts as $product) {
+                $stockStatus = $product->getStockStatus($location);
+                
+                switch ($stockStatus) {
+                    case 'in_stock':
+                        $inStock++;
+                        break;
+                    case 'low_stock':
+                        $lowStock++;
+                        break;
+                    case 'out_of_stock':
+                        $outOfStock++;
+                        break;
+                }
+            }
+
+            return [
+                'name' => $categoryProducts->first()->category->name ?? 'Uncategorized',
+                'in_stock' => $inStock,
+                'low_stock' => $lowStock,
+                'out_of_stock' => $outOfStock,
+            ];
+        })->values()->toArray();
+
+        return $categoryData;
     }
 
     /**
