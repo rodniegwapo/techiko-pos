@@ -59,6 +59,13 @@ class ProductFactory extends Factory
             },
             'category_id' => \App\Models\Category::inRandomOrder()->first()->id ?? 1,
             // ensures it uses a real category (fallback to 1 if none exist)
+            
+            // Inventory management fields
+            'track_inventory' => true,
+            'reorder_level' => $this->faker->numberBetween(3, 15), // Realistic reorder levels
+            'max_stock_level' => $this->faker->numberBetween(50, 200), // Max stock levels
+            'unit_weight' => $this->faker->randomFloat(3, 0.1, 10.0),
+            'unit_of_measure' => $this->faker->randomElement(['piece', 'kg', 'liter', 'box', 'pack']),
         ];
     }
 }
