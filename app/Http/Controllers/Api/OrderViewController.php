@@ -36,6 +36,11 @@ class OrderViewController extends Controller
                 'status' => $order->payment_status,
                 'created_at' => $order->created_at,
                 'updated_at' => $order->updated_at,
+                // Add sale totals directly to order object for easier access
+                'total_amount' => (float) $order->total_amount,
+                'discount_amount' => (float) $order->discount_amount,
+                'tax_amount' => (float) $order->tax_amount,
+                'grand_total' => (float) $order->grand_total,
                 'items' => $order->saleItems->map(function ($item) {
                     return [
                         'id' => $item->id,
@@ -44,8 +49,10 @@ class OrderViewController extends Controller
                         'product_sku' => $item->product->SKU ?? 'N/A',
                         'quantity' => $item->quantity,
                         'unit_price' => (float) $item->unit_price,
-                        'discount_amount' => (float) $item->discount_amount,
-                        'total_price' => (float) $item->total_price,
+                        'discount' => (float) $item->discount,
+                        'discount_amount' => (float) $item->discount,
+                        'subtotal' => (float) $item->subtotal,
+                        'total_price' => (float) $item->subtotal,
                     ];
                 }),
                 'customer' => $order->customer ? [
@@ -60,7 +67,7 @@ class OrderViewController extends Controller
                     'loyalty_points' => $order->customer->loyalty_points ?? 0,
                 ] : null,
                 'totals' => [
-                    'subtotal' => (float) $order->subtotal,
+                    'subtotal' => (float) $order->total_amount,
                     'discount_amount' => (float) $order->discount_amount,
                     'tax_amount' => (float) $order->tax_amount,
                     'grand_total' => (float) $order->grand_total,
@@ -110,6 +117,11 @@ class OrderViewController extends Controller
                 'status' => $order->payment_status,
                 'created_at' => $order->created_at,
                 'updated_at' => $order->updated_at,
+                // Add sale totals directly to order object for easier access
+                'total_amount' => (float) $order->total_amount,
+                'discount_amount' => (float) $order->discount_amount,
+                'tax_amount' => (float) $order->tax_amount,
+                'grand_total' => (float) $order->grand_total,
                 'items' => $order->saleItems->map(function ($item) {
                     return [
                         'id' => $item->id,
@@ -118,8 +130,10 @@ class OrderViewController extends Controller
                         'product_sku' => $item->product->SKU ?? 'N/A',
                         'quantity' => $item->quantity,
                         'unit_price' => (float) $item->unit_price,
-                        'discount_amount' => (float) $item->discount_amount,
-                        'total_price' => (float) $item->total_price,
+                        'discount' => (float) $item->discount,
+                        'discount_amount' => (float) $item->discount,
+                        'subtotal' => (float) $item->subtotal,
+                        'total_price' => (float) $item->subtotal,
                     ];
                 }),
                 'customer' => $order->customer ? [
@@ -134,7 +148,7 @@ class OrderViewController extends Controller
                     'loyalty_points' => $order->customer->loyalty_points ?? 0,
                 ] : null,
                 'totals' => [
-                    'subtotal' => (float) $order->subtotal,
+                    'subtotal' => (float) $order->total_amount,
                     'discount_amount' => (float) $order->discount_amount,
                     'tax_amount' => (float) $order->tax_amount,
                     'grand_total' => (float) $order->grand_total,
