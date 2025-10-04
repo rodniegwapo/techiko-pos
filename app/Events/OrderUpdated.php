@@ -28,7 +28,13 @@ class OrderUpdated implements ShouldBroadcast
     public function broadcastWith(): array
     {
         return [
-            'order' => $this->sale
+            'event_type' => 'order_updated',
+            'order' => $this->sale->fresh([
+                'saleItems.product',
+                'saleDiscounts',
+                'saleItems.discounts',
+                'customer'
+            ])
         ];
     }
 }

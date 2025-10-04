@@ -12,7 +12,8 @@ export function useCustomerOrder() {
 
     // Computed properties - Use actual sale data from backend
     const subtotal = computed(() => {
-        return order.value?.total_amount || order.value?.totals?.subtotal || 0;
+        const amount = order.value?.total_amount || order.value?.totals?.subtotal || 0;
+        return parseFloat(amount) || 0;
     });
 
     const itemDiscountAmount = computed(() => {
@@ -23,8 +24,8 @@ export function useCustomerOrder() {
 
     const orderDiscountAmount = computed(() => {
         const totalDiscounts =
-            order.value?.discount_amount ||
-            order.value?.totals?.discount_amount ||
+            parseFloat(order.value?.discount_amount) ||
+            parseFloat(order.value?.totals?.discount_amount) ||
             0;
         return Math.max(0, totalDiscounts - itemDiscountAmount.value);
     });
@@ -34,11 +35,13 @@ export function useCustomerOrder() {
     });
 
     const taxAmount = computed(() => {
-        return order.value?.tax_amount || order.value?.totals?.tax_amount || 0;
+        const amount = order.value?.tax_amount || order.value?.totals?.tax_amount || 0;
+        return parseFloat(amount) || 0;
     });
 
     const totalAmount = computed(() => {
-        return order.value?.grand_total || order.value?.totals?.grand_total || 0;
+        const amount = order.value?.grand_total || order.value?.totals?.grand_total || 0;
+        return parseFloat(amount) || 0;
     });
 
     // Methods
@@ -50,7 +53,7 @@ export function useCustomerOrder() {
     };
 
     const handleOrderUpdate = (data) => {
-        console.log("Order update received:", data);
+        console.log(`📦 Order update received (${data.event_type || 'unknown'}):`, data);
         order.value = data.order;
         orderItems.value = data.order.sale_items || data.order.items || [];
         customer.value = data.order.customer;
@@ -90,22 +93,16 @@ export function useCustomerOrder() {
         console.log("Setting up Echo listeners for customer order view");
 
         // Listen to order updates
-        window.Echo.channel("order").listen(
-            "OrderUpdated",
-            (event) => {
-                console.log("OrderUpdated event received:", event);
-                handleOrderUpdate(event);
-            }
-        );
+        window.Echo.channel("order").listen(".OrderUpdated", (event) => {
+            console.log("🔄 OrderUpdated event received:", event);
+            handleOrderUpdate(event);
+        });
 
         // Listen to customer updates
-        window.Echo.channel("order").listen(
-            "CustomerUpdated",
-            (event) => {
-                console.log("CustomerUpdated event received:", event);
-                handleOrderUpdate(event);
-            }
-        );
+        window.Echo.channel("order").listen(".CustomerUpdated", (event) => {
+            console.log("👤 CustomerUpdated event received:", event);
+            handleOrderUpdate(event);
+        });
     });
 
     onBeforeUnmount(() => {
@@ -122,7 +119,7 @@ export function useCustomerOrder() {
         lastUpdated,
         orderId,
         loading,
-        
+
         // Computed
         subtotal,
         itemDiscountAmount,
@@ -130,7 +127,7 @@ export function useCustomerOrder() {
         discountAmount,
         taxAmount,
         totalAmount,
-        
+
         // Methods
         formatCurrency,
         handleOrderUpdate,

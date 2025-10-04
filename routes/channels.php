@@ -17,8 +17,14 @@ Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
     return (int) $user->id === (int) $id;
 });
 
+// Public order channel for real-time order updates
+Broadcast::channel('order', function () {
+    return true; // Allow anyone to listen to order updates
+});
 
-// Broadcast::channel('orders.{id}', function ($user, $orderId) {
-//     // Example: only owner can listen
-//     return (int) $user->id === (int) \App\Models\Sale::find($orderId)->user_id;
-// });
+// Private order channel for specific order updates
+Broadcast::channel('orders.{id}', function ($user, $orderId) {
+    // Allow the user who created the order to listen
+    $sale = \App\Models\Sale::find($orderId);
+    return $sale && (int) $user->id === (int) $sale->user_id;
+});

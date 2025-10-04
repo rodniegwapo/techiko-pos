@@ -1,8 +1,8 @@
 <script setup>
-import { watch } from 'vue';
+import { watch } from "vue";
 import { Head } from "@inertiajs/vue3";
 import { Spin } from "ant-design-vue";
-import axios from 'axios';
+import axios from "axios";
 import { ShoppingCartOutlined } from "@ant-design/icons-vue";
 
 // Components
@@ -33,29 +33,53 @@ const {
 } = useCustomerOrder();
 
 // Debug customer data
-console.log('CustomerOrderView - Customer data:', customer.value);
+console.log("CustomerOrderView - Customer data:", customer.value);
 
 // Watch for customer changes
-watch(customer, (newCustomer, oldCustomer) => {
-    console.log('CustomerOrderView - Customer changed:', {
-        old: oldCustomer,
-        new: newCustomer
-    });
-}, { deep: true, immediate: true });
+watch(
+    customer,
+    (newCustomer, oldCustomer) => {
+        console.log("CustomerOrderView - Customer changed:", {
+            old: oldCustomer,
+            new: newCustomer,
+        });
+    },
+    { deep: true, immediate: true }
+);
 
 // Test function to manually trigger customer event
 const testCustomerEvent = async () => {
     if (!orderId.value) {
-        console.error('No order ID available for testing');
+        console.error("No order ID available for testing");
         return;
     }
-    
+
     try {
-        console.log('Testing CustomerUpdated event for order:', orderId.value);
-        const response = await axios.post(`/api/sales/${orderId.value}/test-customer-event`);
-        console.log('Test event response:', response.data);
+        console.log("Testing CustomerUpdated event for order:", orderId.value);
+        const response = await axios.post(
+            `/api/sales/${orderId.value}/test-customer-event`
+        );
+        console.log("Test event response:", response.data);
     } catch (error) {
-        console.error('Error testing customer event:', error);
+        console.error("Error testing customer event:", error);
+    }
+};
+
+// Test function to manually trigger order event
+const testOrderEvent = async () => {
+    if (!orderId.value) {
+        console.error("No order ID available for testing");
+        return;
+    }
+
+    try {
+        console.log("Testing OrderUpdated event for order:", orderId.value);
+        const response = await axios.post(
+            `/api/sales/${orderId.value}/test-order-event`
+        );
+        console.log("Test order event response:", response.data);
+    } catch (error) {
+        console.error("Error testing order event:", error);
     }
 };
 </script>
@@ -128,11 +152,7 @@ const testCustomerEvent = async () => {
             </div>
         </div>
 
-
         <!-- Footer -->
-        <OrderFooter 
-            :order-id="orderId" 
-            :last-updated="lastUpdated" 
-        />
+        <OrderFooter :order-id="orderId" :last-updated="lastUpdated" />
     </div>
 </template>
