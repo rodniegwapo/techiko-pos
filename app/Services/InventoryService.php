@@ -323,7 +323,7 @@ class InventoryService
      */
     public function getLowStockProducts(InventoryLocation $location = null): \Illuminate\Database\Eloquent\Collection
     {
-        return Product::tracked()
+        $products = Product::tracked()
             ->lowStock($location)
             ->with(['inventories' => function ($query) use ($location) {
                 if ($location) {
@@ -331,6 +331,16 @@ class InventoryService
                 }
             }])
             ->get();
+
+        // Transform the collection to include formatted data
+        $products->transform(function ($product) use ($location) {
+            $inventory = $product->inventories->where('location_id', $location->id ?? null)->first();
+            $product->current_stock = $inventory ? $inventory->quantity_available : 0;
+            $product->min_stock_level = $inventory ? $inventory->getEffectiveReorderLevel() : $product->reorder_level;
+            return $product;
+        });
+
+        return $products;
     }
 
     /**

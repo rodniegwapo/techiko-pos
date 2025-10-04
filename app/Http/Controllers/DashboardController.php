@@ -166,11 +166,39 @@ class DashboardController extends Controller
     {
         $inventoryReport = $this->inventoryService->getInventoryReport($location);
 
-        // Low stock products
+        // Low stock products with proper inventory data
         $lowStockProducts = $inventoryReport['low_stock_products'] ?? [];
+        
+        // Transform low stock products to include current stock info
+        $lowStockProducts = $lowStockProducts->map(function ($product) {
+            return [
+                'id' => $product->id,
+                'name' => $product->name,
+                'SKU' => $product->SKU,
+                'current_stock' => $product->current_stock,
+                'min_stock_level' => $product->min_stock_level,
+            ];
+        });
 
-        // Out of stock products
-        $outOfStockProducts = Product::outOfStock($location)->limit(5)->get();
+        // Out of stock products with proper inventory data
+        $outOfStockProducts = Product::outOfStock($location)
+            ->with(['inventories' => function ($query) use ($location) {
+                if ($location) {
+                    $query->where('location_id', $location->id);
+                }
+            }])
+            ->limit(5)
+            ->get()
+            ->map(function ($product) use ($location) {
+                $inventory = $product->inventories->where('location_id', $location->id ?? null)->first();
+                return [
+                    'id' => $product->id,
+                    'name' => $product->name,
+                    'SKU' => $product->SKU,
+                    'current_stock' => $inventory ? $inventory->quantity_available : 0,
+                    'min_stock_level' => $inventory ? $inventory->getEffectiveReorderLevel() : $product->reorder_level,
+                ];
+            });
 
         // Recent stock movements
         $recentMovements = InventoryMovement::with(['product', 'user'])

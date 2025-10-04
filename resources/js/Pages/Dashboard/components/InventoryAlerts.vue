@@ -79,9 +79,11 @@
                     </div>
                     <div class="text-right">
                         <div class="text-sm font-medium text-red-600">
-                            0 in stock
+                            {{ p.current_stock }} left
                         </div>
-                        <div class="text-xs text-gray-500">Restock needed</div>
+                        <div class="text-xs text-gray-500">
+                            Min: {{ p.min_stock_level }}
+                        </div>
                     </div>
                 </div>
             </div>
