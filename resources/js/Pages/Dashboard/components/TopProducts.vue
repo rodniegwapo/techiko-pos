@@ -1,7 +1,7 @@
 <template>
     <div class="bg-white rounded-lg border p-6 shadow-sm">
         <div class="flex items-center justify-between mb-3">
-            <h3 class="text-lg font-semibold text-gray-900">Top Products</h3>
+            <div class="text-lg font-semibold text-gray-900">Top Products</div>
             <span class="text-sm text-gray-500">This week</span>
         </div>
         <div class="space-y-2">
