@@ -26,7 +26,7 @@ const {
 </script>
 
 <template>
-    <Head title="POS Dashboard" />
+    <Head title="Dashboard" />
 
     <AuthenticatedLayout>
         <ContentHeader title="Dashboard" :isDashboard="true">
