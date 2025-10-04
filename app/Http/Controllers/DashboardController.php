@@ -27,7 +27,7 @@ class DashboardController extends Controller
 
     public function index(Request $request)
     {
-        $location = $request->location_id 
+        $location = $request->location_id
             ? InventoryLocation::findOrFail($request->location_id)
             : InventoryLocation::getDefault();
 
@@ -41,7 +41,7 @@ class DashboardController extends Controller
             'operational_status' => $this->getOperationalStatus(),
         ];
 
-        return Inertia::render('Dashboard', [
+        return Inertia::render('Dashboard/Index', [
             'stats' => $stats,
             'locations' => InventoryLocation::active()->get(),
             'currentLocation' => $location,
@@ -65,7 +65,7 @@ class DashboardController extends Controller
             ->whereDate('created_at', $yesterday)
             ->sum('grand_total') ?? 0;
 
-        $salesGrowth = $yesterdaySales > 0 
+        $salesGrowth = $yesterdaySales > 0
             ? round((($todaySales - $yesterdaySales) / $yesterdaySales) * 100, 1)
             : 0;
 
@@ -79,7 +79,7 @@ class DashboardController extends Controller
             ->where('created_at', '<', $thisWeek)
             ->sum('grand_total') ?? 0;
 
-        $revenueGrowth = $lastWeekRevenue > 0 
+        $revenueGrowth = $lastWeekRevenue > 0
             ? round((($thisWeekRevenue - $lastWeekRevenue) / $lastWeekRevenue) * 100, 1)
             : 0;
 
@@ -132,7 +132,7 @@ class DashboardController extends Controller
             $sales = Sale::where('payment_status', 'paid')
                 ->whereDate('created_at', $date)
                 ->sum('grand_total') ?? 0;
-            
+
             $salesData[] = [
                 'date' => $date->format('M d'),
                 'sales' => $sales,
@@ -165,13 +165,13 @@ class DashboardController extends Controller
     private function getInventoryAlerts($location)
     {
         $inventoryReport = $this->inventoryService->getInventoryReport($location);
-        
+
         // Low stock products
         $lowStockProducts = $inventoryReport['low_stock_products'] ?? [];
-        
+
         // Out of stock products
         $outOfStockProducts = Product::outOfStock($location)->limit(5)->get();
-        
+
         // Recent stock movements
         $recentMovements = InventoryMovement::with(['product', 'user'])
             ->where('location_id', $location->id ?? null)
@@ -193,7 +193,7 @@ class DashboardController extends Controller
         $totalCustomers = Customer::count();
         $loyaltyMembers = Customer::whereNotNull('loyalty_points')->count();
         $newCustomersToday = Customer::whereDate('created_at', now()->startOfDay())->count();
-        
+
         // Customer tier distribution
         $tierDistribution = DB::table('customers')
             ->select(
@@ -281,7 +281,7 @@ class DashboardController extends Controller
 
     private function getTierColor($tier)
     {
-        return match($tier) {
+        return match ($tier) {
             'bronze' => '#CD7F32',
             'silver' => '#C0C0C0',
             'gold' => '#FFD700',
