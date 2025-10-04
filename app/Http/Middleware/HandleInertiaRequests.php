@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Http\Resources\AuthUserResource;
+use App\Models\InventoryLocation;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -35,6 +36,7 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user() ? AuthUserResource::make($request->user()->load('roles')) : null,
             ],
+            'default_store' => $request->user() ? InventoryLocation::query()->where('is_default', true)->first() : null,
         ];
     }
 }
