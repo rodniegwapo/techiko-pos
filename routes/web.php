@@ -101,18 +101,5 @@ Route::get('/customer-order', function () {
     return Inertia::render('CustomerOrderView');
 })->name('customer-order');
 
-Route::get('/test-order', function () {
-    $sales = Sale::all();
 
-    if ($sales->isNotEmpty()) {
-        // Trigger broadcast for each sale (if you want all sales individually)
-        foreach ($sales as $sale) {
-            event(new OrderUpdated($sale));
-        }
-
-        return Inertia::render('Sales/components/CustomerOrderView');
-    }
-
-    return "No orders found";
-});
 require __DIR__ . '/auth.php';

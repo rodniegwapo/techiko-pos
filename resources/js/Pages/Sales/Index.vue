@@ -21,6 +21,7 @@ import {
 import { usePage, router, Head } from "@inertiajs/vue3";
 import { useFilters, toLabel } from "@/Composables/useFilters";
 import { watchDebounced } from "@vueuse/core";
+import { useOrders } from "@/Composables/useOrderV2";
 
 const page = usePage();
 
@@ -28,13 +29,29 @@ const search = ref("");
 const category = ref();
 const spinning = ref(false);
 
+// Get order ID from useOrders composable
+const { orderId } = useOrders();
+
 // Customer state management
 const selectedCustomer = ref(null);
 
 // Handle customer changes from CustomerOrder component
-const handleCustomerChanged = (customer) => {
+const handleCustomerChanged = async (customer) => {
   selectedCustomer.value = customer;
   console.log('Customer changed:', customer);
+  
+  // Call API to assign customer to sale
+  if (orderId.value) {
+    try {
+      const response = await axios.post(`/api/sales/${orderId.value}/assign-customer`, {
+        customer_id: customer?.id || null
+      });
+      
+      console.log('Customer assigned to sale:', response.data);
+    } catch (error) {
+      console.error('Error assigning customer to sale:', error);
+    }
+  }
 };
 
 // Filters setup
