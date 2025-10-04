@@ -366,7 +366,7 @@ onMounted(() => {
                 >
                     <!-- Total Products -->
                     <div
-                        class="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 p-6 rounded-lg hover:shadow-lg transition-all duration-300 relative overflow-hidden"
+                        class="bg-gray-50 from-blue-50 to-blue-100 border border-blue-200 p-6 rounded-lg hover:shadow-lg transition-all duration-300 relative overflow-hidden"
                     >
                         <div
                             class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-400/10 to-blue-600/10 rounded-full -translate-y-8 translate-x-8"
@@ -394,7 +394,7 @@ onMounted(() => {
 
                     <!-- In Stock Products -->
                     <div
-                        class="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 p-6 rounded-lg hover:shadow-lg transition-all duration-300 relative overflow-hidden"
+                        class="bg-gray-50 from-green-50 to-green-100 border border-green-200 p-6 rounded-lg hover:shadow-lg transition-all duration-300 relative overflow-hidden"
                     >
                         <div
                             class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-400/10 to-green-600/10 rounded-full -translate-y-8 translate-x-8"
@@ -424,7 +424,7 @@ onMounted(() => {
 
                     <!-- Low Stock Products -->
                     <div
-                        class="bg-gradient-to-br from-orange-50 to-orange-100 border border-orange-200 p-6 rounded-lg hover:shadow-lg transition-all duration-300 relative overflow-hidden"
+                        class="bg-gray-50 from-orange-50 to-orange-100 border border-orange-200 p-6 rounded-lg hover:shadow-lg transition-all duration-300 relative overflow-hidden"
                     >
                         <div
                             class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-orange-400/10 to-orange-600/10 rounded-full -translate-y-8 translate-x-8"
@@ -456,7 +456,7 @@ onMounted(() => {
 
                     <!-- Out of Stock Products -->
                     <div
-                        class="bg-gradient-to-br from-red-50 to-red-100 border border-red-200 p-6 rounded-lg hover:shadow-lg transition-all duration-300 relative overflow-hidden"
+                        class="bg-gray-50 from-red-50 to-red-100 border border-red-200 p-6 rounded-lg hover:shadow-lg transition-all duration-300 relative overflow-hidden"
                     >
                         <div
                             class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-red-400/10 to-red-600/10 rounded-full -translate-y-8 translate-x-8"
@@ -484,7 +484,7 @@ onMounted(() => {
                 <!-- Combined Inventory Value and Chart Card -->
 
                 <div
-                    class="p-6 rounded-lg transition-all duration-300 grid grid-cols-10 gap-4"
+                    class="py-2 px-6 rounded-lg transition-all duration-300 grid grid-cols-10 gap-4"
                 >
                     <!-- Left Card (30%) -->
                     <div
@@ -580,11 +580,21 @@ onMounted(() => {
                             </p>
                         </div>
                         <div class="w-full">
-                            <div v-if="!props.report?.category_stock_data?.length" class="flex items-center justify-center h-80 text-gray-500">
+                            <div
+                                v-if="
+                                    !props.report?.category_stock_data?.length
+                                "
+                                class="flex items-center justify-center h-80 text-gray-500"
+                            >
                                 <div class="text-center">
                                     <BoxPlotOutlined class="text-4xl mb-2" />
-                                    <p class="text-lg font-medium">No Category Data Available</p>
-                                    <p class="text-sm">Add products with categories to see stock distribution</p>
+                                    <p class="text-lg font-medium">
+                                        No Category Data Available
+                                    </p>
+                                    <p class="text-sm">
+                                        Add products with categories to see
+                                        stock distribution
+                                    </p>
                                 </div>
                             </div>
                             <apexchart
@@ -600,7 +610,9 @@ onMounted(() => {
                 </div>
 
                 <!-- Quick Actions -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 px-6">
+                <div
+                    class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 px-6 pt-4"
+                >
                     <div
                         class="bg-gray-50 border border-gray-200 p-6 rounded-lg hover:shadow-lg transition-all duration-300 cursor-pointer"
                         @click="navigateToProducts"
@@ -671,7 +683,7 @@ onMounted(() => {
                     </div>
                 </div>
 
-                <div v-if="lowStockProducts.length > 0" class="w-full p-6">
+                <div v-if="lowStockProducts.length > 0" class="w-full px-6">
                     <div
                         class="bg-white border border-orange-200 p-6 rounded-lg hover:shadow-lg transition-all duration-300 h-full"
                     >
