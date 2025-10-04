@@ -116,6 +116,9 @@ class SaleController extends Controller
             ], 500);
         }
         
+        // Trigger payment completed event to clear the order view
+        event(new \App\Events\PaymentCompleted($sale));
+        
         // Return response with loyalty results
         return response()->json([
             'success' => true,
