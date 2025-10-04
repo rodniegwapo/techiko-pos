@@ -25,6 +25,7 @@ class AppServiceProvider extends ServiceProvider
             'Order' => 'App\Models\Sale',
             'Sale' => 'App\Models\Sale',
             'StockAdjustment' => 'App\Models\StockAdjustment',
+            'Purchase' => 'App\Models\Purchase',
         ]);
     }
 }
