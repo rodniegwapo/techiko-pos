@@ -28,7 +28,6 @@ const { formattedTotal } = useHelpers();
 
 const selectedLocation = ref(null);
 
-// Props from backend
 const props = defineProps({
     report: Object,
     locations: Array,
@@ -36,33 +35,29 @@ const props = defineProps({
     filters: Object,
 });
 
-// Initialize filters from backend
+// Initialize filters
 onMounted(() => {
-    if (props.filters) {
-        selectedLocation.value =
-            props.filters.location_id || props.currentLocation?.id || null;
-    }
+    selectedLocation.value =
+        props.filters?.location_id || props.currentLocation?.id || null;
 });
 
-// Computed values
+// Computed Data
 const summary = computed(() => props.report?.summary || {});
 const location = computed(() => props.report?.location || {});
 const lowStockProducts = computed(() => props.report?.low_stock_products || []);
 
-// Fetch items
+// Fetch Data
 const getItems = () => {
     router.reload({
         only: ["report"],
         preserveScroll: true,
-        data: {
-            location_id: selectedLocation.value || undefined,
-        },
+        data: { location_id: selectedLocation.value || undefined },
         onStart: () => (spinning.value = true),
         onFinish: () => (spinning.value = false),
     });
 };
 
-// Filter options
+// Filter Options
 const locationFilterOptions = computed(
     () =>
         props.locations?.map((loc) => ({
@@ -71,7 +66,7 @@ const locationFilterOptions = computed(
         })) || []
 );
 
-// Filter management
+// Filters
 const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
     getItems,
     configs: [
@@ -84,7 +79,6 @@ const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
     ],
 });
 
-// FilterDropdown configuration
 const filtersConfig = [
     {
         key: "location_id",
@@ -94,218 +88,114 @@ const filtersConfig = [
     },
 ];
 
-// Methods
-const refreshData = () => {
-    getItems();
-};
-
-const changeLocation = (locationId) => {
-    selectedLocation.value = locationId;
-    getItems();
-};
-
-const navigateToProducts = () => {
+// Navigation
+const navigateToProducts = () =>
     router.visit(route("inventory.products"), {
         data: { location_id: selectedLocation.value },
     });
-};
 
-const navigateToMovements = () => {
+const navigateToMovements = () =>
     router.visit(route("inventory.movements"), {
         data: { location_id: selectedLocation.value },
     });
-};
 
-const navigateToAdjustments = () => {
+const navigateToAdjustments = () =>
     router.visit(route("inventory.adjustments.index"));
-};
 
-// Chart data for stock levels by category
+const summaryCards = computed(() => [
+    {
+        title: "Total Products",
+        value: summary.value.total_products,
+        icon: BoxPlotOutlined,
+        color: "blue",
+    },
+    {
+        title: "In Stock",
+        value: summary.value.in_stock_products,
+        icon: ShoppingCartOutlined,
+        color: "green",
+    },
+    {
+        title: "Low Stock",
+        value: summary.value.low_stock_products,
+        icon: WarningOutlined,
+        color: "orange",
+    },
+    {
+        title: "Out of Stock",
+        value: summary.value.out_of_stock_products,
+        icon: StopOutlined,
+        color: "red",
+    },
+]);
+
+const quickActions = [
+    {
+        title: "Manage Products",
+        desc: "View and manage product inventory levels",
+        color: "blue",
+        icon: BoxPlotOutlined,
+        action: navigateToProducts,
+    },
+    {
+        title: "Inventory Movements",
+        desc: "Track all inventory transactions",
+        color: "green",
+        icon: HistoryOutlined,
+        action: navigateToMovements,
+    },
+    {
+        title: "Stock Adjustments",
+        desc: "Create and manage stock adjustments",
+        color: "orange",
+        icon: WarningOutlined,
+        action: navigateToAdjustments,
+    },
+];
+
+// Chart Setup
+const chartColors = ["#10B981", "#F59E0B", "#EF4444"];
 const stockLevelChart = computed(() => {
-    // Get dynamic data from backend
     const categories = props.report?.category_stock_data || [];
-
-    // If no data available, show empty state
-    if (categories.length === 0) {
-        return {
-            series: [
-                {
-                    name: "In Stock",
-                    data: [],
-                    color: "#10B981",
-                },
-                {
-                    name: "Low Stock",
-                    data: [],
-                    color: "#F59E0B",
-                },
-                {
-                    name: "Out of Stock",
-                    data: [],
-                    color: "#EF4444",
-                },
-            ],
-            chartOptions: {
-                chart: {
-                    type: "bar",
-                    height: 300,
-                    stacked: true,
-                    toolbar: {
-                        show: false,
-                    },
-                },
-                plotOptions: {
-                    bar: {
-                        horizontal: false,
-                        columnWidth: "60%",
-                        borderRadius: 4,
-                    },
-                },
-                dataLabels: {
-                    enabled: false,
-                },
-                xaxis: {
-                    categories: [],
-                    labels: {
-                        style: {
-                            fontSize: "12px",
-                            fontFamily: "Inter, sans-serif",
-                        },
-                    },
-                },
-                yaxis: {
-                    title: {
-                        text: "Number of Products",
-                        style: {
-                            fontSize: "12px",
-                            fontFamily: "Inter, sans-serif",
-                        },
-                    },
-                    labels: {
-                        style: {
-                            fontSize: "11px",
-                            fontFamily: "Inter, sans-serif",
-                        },
-                    },
-                },
-                legend: {
-                    position: "top",
-                    fontSize: "12px",
-                    fontFamily: "Inter, sans-serif",
-                    markers: {
-                        width: 8,
-                        height: 8,
-                        radius: 4,
-                    },
-                },
-                colors: ["#10B981", "#F59E0B", "#EF4444"],
-                grid: {
-                    borderColor: "#f1f1f1",
-                    strokeDashArray: 3,
-                },
-                responsive: [
-                    {
-                        breakpoint: 768,
-                        options: {
-                            chart: {
-                                height: 250,
-                            },
-                            legend: {
-                                position: "bottom",
-                            },
-                        },
-                    },
-                ],
-            },
-        };
-    }
-
+    const series = [
+        { name: "In Stock", data: categories.map((c) => c.in_stock) },
+        { name: "Low Stock", data: categories.map((c) => c.low_stock) },
+        { name: "Out of Stock", data: categories.map((c) => c.out_of_stock) },
+    ];
     return {
-        series: [
-            {
-                name: "In Stock",
-                data: categories.map((cat) => cat.in_stock),
-                color: "#10B981",
-            },
-            {
-                name: "Low Stock",
-                data: categories.map((cat) => cat.low_stock),
-                color: "#F59E0B",
-            },
-            {
-                name: "Out of Stock",
-                data: categories.map((cat) => cat.out_of_stock),
-                color: "#EF4444",
-            },
-        ],
+        series,
         chartOptions: {
             chart: {
                 type: "bar",
                 height: 300,
                 stacked: true,
-                toolbar: {
-                    show: false,
-                },
+                toolbar: { show: false },
             },
             plotOptions: {
-                bar: {
-                    horizontal: false,
-                    columnWidth: "60%",
-                    borderRadius: 4,
-                },
+                bar: { horizontal: false, columnWidth: "60%", borderRadius: 4 },
             },
-            dataLabels: {
-                enabled: false,
-            },
+            dataLabels: { enabled: false },
             xaxis: {
-                categories: categories.map((cat) => cat.name),
-                labels: {
-                    style: {
-                        fontSize: "12px",
-                        fontFamily: "Inter, sans-serif",
-                    },
-                },
+                categories: categories.map((c) => c.name),
+                labels: { style: { fontSize: "12px" } },
             },
             yaxis: {
-                title: {
-                    text: "Number of Products",
-                    style: {
-                        fontSize: "12px",
-                        fontFamily: "Inter, sans-serif",
-                    },
-                },
-                labels: {
-                    style: {
-                        fontSize: "11px",
-                        fontFamily: "Inter, sans-serif",
-                    },
-                },
+                title: { text: "Number of Products" },
+                labels: { style: { fontSize: "11px" } },
             },
             legend: {
                 position: "top",
                 fontSize: "12px",
-                fontFamily: "Inter, sans-serif",
-                markers: {
-                    width: 8,
-                    height: 8,
-                    radius: 4,
-                },
+                markers: { width: 8, height: 8, radius: 4 },
             },
-            colors: ["#10B981", "#F59E0B", "#EF4444"],
-            grid: {
-                borderColor: "#f1f1f1",
-                strokeDashArray: 3,
-            },
+            colors: chartColors,
+            grid: { borderColor: "#f1f1f1", strokeDashArray: 3 },
             responsive: [
                 {
                     breakpoint: 768,
                     options: {
-                        chart: {
-                            height: 250,
-                        },
-                        legend: {
-                            position: "bottom",
-                        },
+                        chart: { height: 250 },
+                        legend: { position: "bottom" },
                     },
                 },
             ],
@@ -313,14 +203,9 @@ const stockLevelChart = computed(() => {
     };
 });
 
-// Register ApexCharts component
 const apexchart = VueApexCharts;
-
 const chartLoaded = ref(false);
-
-onMounted(() => {
-    setTimeout(() => (chartLoaded.value = true), 400);
-});
+onMounted(() => setTimeout(() => (chartLoaded.value = true), 400));
 </script>
 
 <template>
@@ -346,8 +231,6 @@ onMounted(() => {
                             )
                     "
                 />
-
-                <!-- Current Location Info -->
                 <div v-if="location.name" class="mb-2">
                     <a-alert
                         :message="`Viewing inventory for: ${location.name}`"
@@ -364,131 +247,46 @@ onMounted(() => {
                 <div
                     class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-6"
                 >
-                    <!-- Total Products -->
                     <div
-                        class="bg-gray-50 from-blue-50 to-blue-100 border border-blue-200 p-6 rounded-lg hover:shadow-lg transition-all duration-300 relative overflow-hidden"
+                        v-for="card in summaryCards"
+                        :key="card.title"
+                        class="bg-gray-50 border p-6 rounded-lg hover:shadow-lg transition-all relative overflow-hidden"
+                        :class="`border-${card.color}-200`"
                     >
                         <div
-                            class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-400/10 to-blue-600/10 rounded-full -translate-y-8 translate-x-8"
+                            class="absolute top-0 right-0 w-32 h-32 rounded-full"
+                            :class="`bg-${card.color}-400/10`"
                         ></div>
-                        <div class="relative">
-                            <div class="flex items-center">
-                                <div class="p-3 rounded-full bg-blue-100 mr-4">
-                                    <BoxPlotOutlined
-                                        class="text-2xl text-blue-600"
-                                    />
-                                </div>
-                                <div>
-                                    <p
-                                        class="text-sm text-blue-600 font-medium"
-                                    >
-                                        Total Products
-                                    </p>
-                                    <p class="text-2xl font-bold text-blue-800">
-                                        {{ summary.total_products || 0 }}
-                                    </p>
-                                </div>
+                        <div class="relative flex items-center">
+                            <div
+                                :class="`p-3 rounded-full bg-${card.color}-100 mr-4`"
+                            >
+                                <component
+                                    :is="card.icon"
+                                    :class="`text-2xl text-${card.color}-600`"
+                                />
                             </div>
-                        </div>
-                    </div>
-
-                    <!-- In Stock Products -->
-                    <div
-                        class="bg-gray-50 from-green-50 to-green-100 border border-green-200 p-6 rounded-lg hover:shadow-lg transition-all duration-300 relative overflow-hidden"
-                    >
-                        <div
-                            class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-400/10 to-green-600/10 rounded-full -translate-y-8 translate-x-8"
-                        ></div>
-                        <div class="relative">
-                            <div class="flex items-center">
-                                <div class="p-3 rounded-full bg-green-100 mr-4">
-                                    <ShoppingCartOutlined
-                                        class="text-2xl text-green-600"
-                                    />
-                                </div>
-                                <div>
-                                    <p
-                                        class="text-sm text-green-600 font-medium"
-                                    >
-                                        In Stock
-                                    </p>
-                                    <p
-                                        class="text-2xl font-bold text-green-800"
-                                    >
-                                        {{ summary.in_stock_products || 0 }}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Low Stock Products -->
-                    <div
-                        class="bg-gray-50 from-orange-50 to-orange-100 border border-orange-200 p-6 rounded-lg hover:shadow-lg transition-all duration-300 relative overflow-hidden"
-                    >
-                        <div
-                            class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-orange-400/10 to-orange-600/10 rounded-full -translate-y-8 translate-x-8"
-                        ></div>
-                        <div class="relative">
-                            <div class="flex items-center">
-                                <div
-                                    class="p-3 rounded-full bg-orange-100 mr-4"
+                            <div>
+                                <p
+                                    :class="`text-sm text-${card.color}-600 font-medium`"
                                 >
-                                    <WarningOutlined
-                                        class="text-2xl text-orange-600"
-                                    />
-                                </div>
-                                <div>
-                                    <p
-                                        class="text-sm text-orange-600 font-medium"
-                                    >
-                                        Low Stock
-                                    </p>
-                                    <p
-                                        class="text-2xl font-bold text-orange-800"
-                                    >
-                                        {{ summary.low_stock_products || 0 }}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Out of Stock Products -->
-                    <div
-                        class="bg-gray-50 from-red-50 to-red-100 border border-red-200 p-6 rounded-lg hover:shadow-lg transition-all duration-300 relative overflow-hidden"
-                    >
-                        <div
-                            class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-red-400/10 to-red-600/10 rounded-full -translate-y-8 translate-x-8"
-                        ></div>
-                        <div class="relative">
-                            <div class="flex items-center">
-                                <div class="p-3 rounded-full bg-red-100 mr-4">
-                                    <StopOutlined
-                                        class="text-2xl text-red-600"
-                                    />
-                                </div>
-                                <div>
-                                    <p class="text-sm text-red-600 font-medium">
-                                        Out of Stock
-                                    </p>
-                                    <p class="text-2xl font-bold text-red-800">
-                                        {{ summary.out_of_stock_products || 0 }}
-                                    </p>
-                                </div>
+                                    {{ card.title }}
+                                </p>
+                                <p
+                                    :class="`text-2xl font-bold text-${card.color}-800`"
+                                >
+                                    {{ card.value || 0 }}
+                                </p>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Combined Inventory Value and Chart Card -->
-
-                <div
-                    class="py-2 px-6 rounded-lg transition-all duration-300 grid grid-cols-10 gap-4"
-                >
-                    <!-- Left Card (30%) -->
+                <!-- Inventory Value + Chart -->
+                <div class="grid grid-cols-10 gap-4 px-6 py-2 rounded-lg">
+                    <!-- Left -->
                     <div
-                        class="flex flex-col justify-between border rounded-lg p-6 hover:shadow-lg col-span-3"
+                        class="col-span-3 flex flex-col border rounded-lg p-6 hover:shadow-lg"
                     >
                         <div>
                             <div class="flex items-center">
@@ -524,53 +322,40 @@ onMounted(() => {
                             </div>
 
                             <div class="mt-8">
-                                <div>Total Inventory Value</div>
-                                <div>
-                                    <p
-                                        class="text-4xl font-bold text-green-700"
-                                    >
-                                        {{
-                                            formattedTotal(
-                                                summary.total_inventory_value
-                                            )
-                                        }}
-                                    </p>
-                                </div>
+                                <p>Total Inventory Value</p>
+                                <p class="text-4xl font-bold text-green-700">
+                                    {{
+                                        formattedTotal(
+                                            summary.total_inventory_value
+                                        )
+                                    }}
+                                </p>
                             </div>
 
                             <div class="border rounded-lg p-6 mt-6">
-                                <div>
-                                    <div
-                                        class="text-md uppercase text-gray-600 font-bold"
-                                    >
-                                        Location Code
-                                    </div>
-                                    <div
-                                        class="font-semibold text-indigo-600 mt-4"
-                                    >
-                                        {{ location.code || "ALL" }}
-                                    </div>
-                                </div>
+                                <p
+                                    class="text-md uppercase text-gray-600 font-bold"
+                                >
+                                    Location Code
+                                </p>
+                                <p class="font-semibold text-indigo-600 mt-4">
+                                    {{ location.code || "ALL" }}
+                                </p>
                             </div>
                         </div>
 
-                        <!-- Stick button at bottom -->
-                        <div class="mt-4 w-full">
-                            <a-button
-                                type="primary"
-                                class="bg-purple-600 border-purple-600 hover:bg-purple-700 mt-2 w-full rounded-lg"
-                                @click="
-                                    router.visit(route('inventory.valuation'))
-                                "
-                                size="large"
-                            >
-                                View Report
-                            </a-button>
-                        </div>
+                        <a-button
+                            type="primary"
+                            class="bg-purple-600 border-purple-600 hover:bg-purple-700 mt-4 w-full rounded-lg"
+                            @click="router.visit(route('inventory.valuation'))"
+                            size="large"
+                        >
+                            View Report
+                        </a-button>
                     </div>
 
-                    <!-- Right Chart Section (70%) -->
-                    <div class="border rounded-lg p-6 col-span-7">
+                    <!-- Right -->
+                    <div class="col-span-7 border rounded-lg p-6">
                         <div class="flex items-center justify-between mb-4">
                             <h4 class="text-md font-semibold text-gray-800">
                                 Stock Level by Category
@@ -579,33 +364,31 @@ onMounted(() => {
                                 Inventory distribution across categories
                             </p>
                         </div>
-                        <div class="w-full">
-                            <div
-                                v-if="
-                                    !props.report?.category_stock_data?.length
-                                "
-                                class="flex items-center justify-center h-80 text-gray-500"
-                            >
-                                <div class="text-center">
-                                    <BoxPlotOutlined class="text-4xl mb-2" />
-                                    <p class="text-lg font-medium">
-                                        No Category Data Available
-                                    </p>
-                                    <p class="text-sm">
-                                        Add products with categories to see
-                                        stock distribution
-                                    </p>
-                                </div>
+
+                        <div
+                            v-if="!props.report?.category_stock_data?.length"
+                            class="flex items-center justify-center h-80 text-gray-500"
+                        >
+                            <div class="text-center">
+                                <BoxPlotOutlined class="text-4xl mb-2" />
+                                <p class="text-lg font-medium">
+                                    No Category Data Available
+                                </p>
+                                <p class="text-sm">
+                                    Add products with categories to see stock
+                                    distribution
+                                </p>
                             </div>
-                            <apexchart
-                                v-else
-                                :width="chartLoaded ? '100%' : 500"
-                                type="bar"
-                                height="300"
-                                :options="stockLevelChart.chartOptions"
-                                :series="stockLevelChart.series"
-                            />
                         </div>
+
+                        <apexchart
+                            v-else
+                            :width="chartLoaded ? '100%' : 500"
+                            type="bar"
+                            height="300"
+                            :options="stockLevelChart.chartOptions"
+                            :series="stockLevelChart.series"
+                        />
                     </div>
                 </div>
 
@@ -614,78 +397,36 @@ onMounted(() => {
                     class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 px-6 pt-4"
                 >
                     <div
-                        class="bg-gray-50 border border-gray-200 p-6 rounded-lg hover:shadow-lg transition-all duration-300 cursor-pointer"
-                        @click="navigateToProducts"
+                        v-for="action in quickActions"
+                        :key="action.title"
+                        class="bg-gray-50 border border-gray-200 p-6 rounded-lg hover:shadow-lg transition-all cursor-pointer"
+                        @click="action.action"
                     >
                         <div class="text-center">
                             <div
-                                class="w-16 h-16 bg-blue-100 rounded-xl flex items-center justify-center mx-auto mb-4"
+                                :class="`w-16 h-16 bg-${action.color}-100 rounded-xl flex items-center justify-center mx-auto mb-4`"
                             >
-                                <BoxPlotOutlined
-                                    class="text-2xl text-blue-600"
+                                <component
+                                    :is="action.icon"
+                                    :class="`text-2xl text-${action.color}-600`"
                                 />
                             </div>
                             <h3
                                 class="text-lg font-semibold mb-2 text-gray-800"
                             >
-                                Manage Products
+                                {{ action.title }}
                             </h3>
                             <p class="text-gray-600 text-sm">
-                                View and manage product inventory levels
-                            </p>
-                        </div>
-                    </div>
-
-                    <div
-                        class="bg-gray-50 border border-gray-200 p-6 rounded-lg hover:shadow-lg transition-all duration-300 cursor-pointer"
-                        @click="navigateToMovements"
-                    >
-                        <div class="text-center">
-                            <div
-                                class="w-16 h-16 bg-green-100 rounded-xl flex items-center justify-center mx-auto mb-4"
-                            >
-                                <HistoryOutlined
-                                    class="text-2xl text-green-600"
-                                />
-                            </div>
-                            <h3
-                                class="text-lg font-semibold mb-2 text-gray-800"
-                            >
-                                Inventory Movements
-                            </h3>
-                            <p class="text-gray-600 text-sm">
-                                Track all inventory transactions
-                            </p>
-                        </div>
-                    </div>
-
-                    <div
-                        class="bg-gray-50 border border-gray-200 p-6 rounded-lg hover:shadow-lg transition-all duration-300 cursor-pointer"
-                        @click="navigateToAdjustments"
-                    >
-                        <div class="text-center">
-                            <div
-                                class="w-16 h-16 bg-orange-100 rounded-xl flex items-center justify-center mx-auto mb-4"
-                            >
-                                <WarningOutlined
-                                    class="text-2xl text-orange-600"
-                                />
-                            </div>
-                            <h3
-                                class="text-lg font-semibold mb-2 text-gray-800"
-                            >
-                                Stock Adjustments
-                            </h3>
-                            <p class="text-gray-600 text-sm">
-                                Create and manage stock adjustments
+                                {{ action.desc }}
                             </p>
                         </div>
                     </div>
                 </div>
 
-                <div v-if="lowStockProducts.length > 0" class="w-full px-6">
+                <!-- Low Stock Alert -->
+                <div v-if="lowStockProducts.length > 0" class="px-6">
                     <div
-                        class="bg-white border border-orange-200 p-6 rounded-lg hover:shadow-lg transition-all duration-300 h-full"
+                        class="bg-white border border-orange-200 p-6 rounded-lg hover:shadow-lg"
                     >
                         <div class="flex items-center justify-between">
                             <div class="flex items-center">
@@ -732,14 +473,11 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* Enhanced hover effects */
 .hover\:shadow-lg:hover {
     transform: translateY(-2px);
     box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1),
         0 10px 10px -5px rgba(0, 0, 0, 0.04);
 }
-
-/* Smooth transitions */
 * {
     transition: all 0.3s ease;
 }
