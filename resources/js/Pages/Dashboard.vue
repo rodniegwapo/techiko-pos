@@ -274,12 +274,12 @@ const graphFilter = ref("weekly");
             >
                 <div class="flex items-center justify-between">
                     <div class="flex-1">
-                        <p class="text-sm font-medium text-gray-600 mb-1">
+                        <div class="text-sm font-medium text-gray-600 mb-1">
                             {{ card.title }}
-                        </p>
-                        <p class="text-2xl font-bold text-gray-900 mb-2">
+                        </div>
+                        <div class="text-2xl font-bold text-green-700 mb-2">
                             {{ card.value }}
-                        </p>
+                        </div>
                         <div class="flex items-center">
                             <component
                                 :is="
@@ -411,13 +411,13 @@ const graphFilter = ref("weekly");
                             <WarningOutlined class="w-5 h-5 text-orange-600" />
                         </div>
                         <div>
-                            <h3 class="text-lg font-semibold text-gray-900">
+                            <div class="text-lg font-semibold text-gray-900">
                                 Low Stock Alert
-                            </h3>
-                            <p class="text-sm text-gray-500">
+                            </div>
+                            <div class="text-sm text-gray-500">
                                 {{ inventoryAlerts.low_stock.length }}
                                 products need attention
-                            </p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -432,20 +432,20 @@ const graphFilter = ref("weekly");
                         class="flex items-center justify-between p-3 bg-orange-50 rounded-lg border border-orange-200"
                     >
                         <div>
-                            <p class="font-medium text-gray-900">
+                            <div class="font-medium text-gray-900">
                                 {{ product.name }}
-                            </p>
-                            <p class="text-sm text-gray-500">
+                            </div>
+                            <div class="text-sm text-gray-500">
                                 SKU: {{ product.SKU }}
-                            </p>
+                            </div>
                         </div>
                         <div class="text-right">
-                            <p class="text-sm font-medium text-orange-600">
+                            <div class="text-sm font-medium text-orange-600">
                                 {{ product.current_stock }} left
-                            </p>
-                            <p class="text-xs text-gray-500">
+                            </div>
+                            <div class="text-xs text-gray-500">
                                 Min: {{ product.min_stock_level }}
-                            </p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -464,13 +464,13 @@ const graphFilter = ref("weekly");
                             <StopOutlined class="w-5 h-5 text-red-600" />
                         </div>
                         <div>
-                            <h3 class="text-lg font-semibold text-gray-900">
+                            <div class="text-lg font-semibold text-gray-900">
                                 Out of Stock
-                            </h3>
-                            <p class="text-sm text-gray-500">
+                            </div>
+                            <div class="text-sm text-gray-500">
                                 {{ inventoryAlerts.out_of_stock.length }}
                                 products unavailable
-                            </p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -485,18 +485,20 @@ const graphFilter = ref("weekly");
                         class="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200"
                     >
                         <div>
-                            <p class="font-medium text-gray-900">
+                            <div class="font-medium text-gray-900">
                                 {{ product.name }}
-                            </p>
-                            <p class="text-sm text-gray-500">
+                            </div>
+                            <div class="text-sm text-gray-500">
                                 SKU: {{ product.SKU }}
-                            </p>
+                            </div>
                         </div>
                         <div class="text-right">
-                            <p class="text-sm font-medium text-red-600">
+                            <div class="text-sm font-medium text-red-600">
                                 0 in stock
-                            </p>
-                            <p class="text-xs text-gray-500">Restock needed</p>
+                            </div>
+                            <div class="text-xs text-gray-500">
+                                Restock needed
+                            </div>
                         </div>
                     </div>
                 </div>
