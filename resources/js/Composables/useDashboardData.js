@@ -3,6 +3,7 @@ import { usePage, router } from "@inertiajs/vue3";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useFilters, toLabel } from "@/Composables/useFilters";
+import { useSalesChartData } from "@/Composables/useSalesChartData";
 import {
     DollarOutlined,
     LineChartOutlined,
@@ -112,41 +113,8 @@ export function useDashboardData() {
         },
     ]);
 
-    const salesChartOptions = computed(() => ({
-        chart: { type: "line", height: 500, toolbar: { show: false } },
-        stroke: { curve: "smooth", width: 5 },
-        xaxis: {
-            categories:
-                props.stats?.sales_analytics?.daily_sales?.map((d) => d.date) ||
-                [],
-        },
-        yaxis: {
-            labels: {
-                formatter: (val) => "₱" + val.toLocaleString(),
-            },
-        },
-        grid: {
-            borderColor: "#F3F4F6",
-            strokeDashArray: 4,
-        },
-    }));
-
-    const salesChartSeries = computed(() => [
-        {
-            name: "Sales",
-            data:
-                props.stats?.sales_analytics?.daily_sales?.map(
-                    (d) => d.sales
-                ) || [],
-        },
-        {
-            name: "Transactions",
-            data:
-                props.stats?.sales_analytics?.daily_sales?.map(
-                    (d) => d.transactions
-                ) || [],
-        },
-    ]);
+    // Use the dedicated sales chart data composable
+    const { chartOptions: salesChartOptions, chartSeries: salesChartSeries } = useSalesChartData(graphFilter, selectedLocation);
 
     const topProducts = computed(() =>
         (props.stats?.top_products || []).slice(0, 5).map((p, i) => ({

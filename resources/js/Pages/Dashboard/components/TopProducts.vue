@@ -28,10 +28,10 @@
                     </div>
                 </div>
                 <div class="text-right">
-                    <div class="text-sm text-gray-900 py-2">
+                    <p class="text-sm font-semibold text-gray-900 py-2">
                         {{ product.revenue }}
-                    </div>
-                    <div class="text-xs text-gray-500">revenue</div>
+                    </p>
+                    <p class="text-xs text-gray-500">revenue</p>
                 </div>
             </div>
         </div>

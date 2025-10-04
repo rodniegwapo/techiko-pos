@@ -99,6 +99,11 @@ Route::middleware('auth:sanctum')->group(function () {
         ]);
     });
 
+    // Dashboard API routes
+    Route::prefix('dashboard')->name('dashboard.api.')->group(function () {
+        Route::post('/sales-chart', [\App\Http\Controllers\Api\DashboardController::class, 'getSalesChartData'])->name('sales-chart');
+    });
+
     // Inventory API routes
     Route::prefix('inventory')->name('inventory.api.')->group(function () {
         Route::get('/products', [\App\Http\Controllers\InventoryController::class, 'products'])->name('products');
