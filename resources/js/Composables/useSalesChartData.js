@@ -282,7 +282,7 @@ export function useSalesChartData(graphFilter, selectedLocation) {
         colors: ["#3B82F6", "#10B981"],
         stroke: {
             curve: "smooth",
-            width: 3,
+            width: 4,
         },
         xaxis: {
             categories: chartData.value.categories,
@@ -317,7 +317,7 @@ export function useSalesChartData(graphFilter, selectedLocation) {
         ],
         grid: {
             borderColor: "#F3F4F6",
-            strokeDashArray: 4,
+            strokeDashArray: 20,
         },
         tooltip: {
             y: [
