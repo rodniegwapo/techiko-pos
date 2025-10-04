@@ -89,8 +89,8 @@ class SaleController extends Controller
                 if ($validated['customer_id']) {
                     $customer = Customer::findOrFail($validated['customer_id']);
                     
-                    // Link customer to sale
-                    $sale->update(['customer_id' => $customer->id]);
+                    // Link customer to sale and trigger order update event
+                    $sale->updateCustomer($customer->id);
                     
                     // Process loyalty rewards
                     $loyaltyResults = $customer->processLoyaltyForSale($validated['sale_amount'] ?? $sale->total_amount);
@@ -169,6 +169,57 @@ class SaleController extends Controller
             ->first();
     }
 
+    public function assignCustomer(Request $request, Sale $sale)
+    {
+        $validated = $request->validate([
+            'customer_id' => 'nullable|exists:customers,id'
+        ]);
+        
+        \Log::info("SaleController::assignCustomer called", [
+            'sale_id' => $sale->id,
+            'customer_id' => $validated['customer_id']
+        ]);
+        
+        // Update sale with customer and trigger customer update event
+        $sale->updateCustomer($validated['customer_id']);
+        
+        $response = [
+            'success' => true,
+            'message' => $validated['customer_id'] ? 'Customer assigned successfully' : 'Customer removed successfully'
+        ];
+        
+        // If customer is assigned, include customer data in response
+        if ($validated['customer_id']) {
+            $customer = \App\Models\Customer::findOrFail($validated['customer_id']);
+            $response['customer'] = [
+                'id' => $customer->id,
+                'name' => $customer->name,
+                'phone' => $customer->phone,
+                'loyalty_points' => $customer->loyalty_points,
+                'tier_info' => $customer->tier_info,
+                'loyalty_id' => $customer->loyalty_id,
+                'membership_number' => $customer->membership_number,
+            ];
+        }
+        
+        return response()->json($response);
+    }
+
+    public function testCustomerEvent(Request $request, Sale $sale)
+    {
+        \Log::info("Testing CustomerUpdated event", [
+            'sale_id' => $sale->id
+        ]);
+        
+        // Manually trigger the CustomerUpdated event
+        event(new \App\Events\CustomerUpdated($sale));
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'CustomerUpdated event triggered for testing'
+        ]);
+    }
+
     public function processLoyalty(Request $request, Sale $sale)
     {
         // Ensure sale is paid (optional validation)
@@ -183,8 +234,8 @@ class SaleController extends Controller
         
         $customer = Customer::findOrFail($validated['customer_id']);
         
-        // Update sale with customer
-        $sale->update(['customer_id' => $customer->id]);
+        // Update sale with customer and trigger order update event
+        $sale->updateCustomer($customer->id);
         
         // Process loyalty rewards
         $results = $customer->processLoyaltyForSale($validated['sale_amount']);

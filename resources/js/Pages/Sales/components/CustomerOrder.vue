@@ -270,6 +270,8 @@ const clearCustomer = () => {
   selectedCustomer.value = null;
   customerSearchQuery.value = "";
   customerOptions.value = [];
+  // Emit the change to parent
+  emit('customerChanged', null);
 };
 
 // Show customer details

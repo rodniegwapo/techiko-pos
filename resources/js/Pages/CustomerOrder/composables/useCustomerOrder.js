@@ -1,0 +1,139 @@
+import { ref, computed, onMounted, onBeforeUnmount } from "vue";
+import { usePage } from "@inertiajs/vue3";
+
+export function useCustomerOrder() {
+    const page = usePage();
+    const order = ref(null);
+    const orderItems = ref([]);
+    const customer = ref(null);
+    const lastUpdated = ref(new Date().toLocaleTimeString());
+    const orderId = ref(null);
+    const loading = ref(true);
+
+    // Computed properties - Use actual sale data from backend
+    const subtotal = computed(() => {
+        return order.value?.total_amount || order.value?.totals?.subtotal || 0;
+    });
+
+    const itemDiscountAmount = computed(() => {
+        return orderItems.value.reduce((sum, item) => {
+            return sum + (parseFloat(item.discount) || 0);
+        }, 0);
+    });
+
+    const orderDiscountAmount = computed(() => {
+        const totalDiscounts =
+            order.value?.discount_amount ||
+            order.value?.totals?.discount_amount ||
+            0;
+        return Math.max(0, totalDiscounts - itemDiscountAmount.value);
+    });
+
+    const discountAmount = computed(() => {
+        return itemDiscountAmount.value + orderDiscountAmount.value;
+    });
+
+    const taxAmount = computed(() => {
+        return order.value?.tax_amount || order.value?.totals?.tax_amount || 0;
+    });
+
+    const totalAmount = computed(() => {
+        return order.value?.grand_total || order.value?.totals?.grand_total || 0;
+    });
+
+    // Methods
+    const formatCurrency = (amount) => {
+        return new Intl.NumberFormat("en-PH", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        }).format(amount);
+    };
+
+    const handleOrderUpdate = (data) => {
+        console.log("Order update received:", data);
+        order.value = data.order;
+        orderItems.value = data.order.sale_items || data.order.items || [];
+        customer.value = data.order.customer;
+        orderId.value = data.order.id;
+        lastUpdated.value = new Date().toLocaleTimeString();
+        loading.value = false;
+    };
+
+    const fetchInitialOrder = async () => {
+        try {
+            const response = await fetch("/api/orders/recent-pending");
+            if (response.ok) {
+                const data = await response.json();
+                if (data.order) {
+                    handleOrderUpdate(data);
+                } else {
+                    loading.value = false;
+                }
+            } else {
+                loading.value = false;
+            }
+        } catch (error) {
+            console.error("Error fetching initial order:", error);
+            loading.value = false;
+        }
+    };
+
+    // Lifecycle
+    onMounted(() => {
+        fetchInitialOrder();
+
+        if (!window.Echo) {
+            console.error("Echo is not initialized!");
+            return;
+        }
+
+        console.log("Setting up Echo listeners for customer order view");
+
+        // Listen to order updates
+        window.Echo.channel("order").listen(
+            "OrderUpdated",
+            (event) => {
+                console.log("OrderUpdated event received:", event);
+                handleOrderUpdate(event);
+            }
+        );
+
+        // Listen to customer updates
+        window.Echo.channel("order").listen(
+            "CustomerUpdated",
+            (event) => {
+                console.log("CustomerUpdated event received:", event);
+                handleOrderUpdate(event);
+            }
+        );
+    });
+
+    onBeforeUnmount(() => {
+        if (window.Echo) {
+            window.Echo.leaveChannel("order");
+        }
+    });
+
+    return {
+        // State
+        order,
+        orderItems,
+        customer,
+        lastUpdated,
+        orderId,
+        loading,
+        
+        // Computed
+        subtotal,
+        itemDiscountAmount,
+        orderDiscountAmount,
+        discountAmount,
+        taxAmount,
+        totalAmount,
+        
+        // Methods
+        formatCurrency,
+        handleOrderUpdate,
+        fetchInitialOrder,
+    };
+}

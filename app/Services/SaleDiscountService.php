@@ -81,7 +81,7 @@ class SaleDiscountService
 
             return [
                 'sale_discounts' => $saleDiscounts,
-                'sale' => $sale->fresh(['saleItems', 'saleDiscounts']),
+                'sale' => $sale->fresh(['saleItems.product', 'saleDiscounts']),
             ];
         });
     }
@@ -115,7 +115,7 @@ class SaleDiscountService
             Log::info("- grand_total: {$sale->grand_total}");
             Log::info("=== SaleDiscountService: Order discount removal completed ===");
 
-            return $sale->fresh(['saleItems', 'saleDiscounts']);
+            return $sale->fresh(['saleItems.product', 'saleDiscounts']);
         });
     }
 
@@ -151,8 +151,8 @@ class SaleDiscountService
             Log::info("=== SaleDiscountService: Item discount application completed ===");
 
             return [
-                'item' => $saleItem->fresh(),
-                'sale' => $sale->fresh(['saleItems', 'saleDiscounts']),
+                'item' => $saleItem->fresh(['product']),
+                'sale' => $sale->fresh(['saleItems.product', 'saleDiscounts']),
             ];
         });
     }
@@ -195,8 +195,8 @@ class SaleDiscountService
             Log::info("=== SaleDiscountService: Item discount removal completed ===");
 
             return [
-                'item' => $saleItem->fresh(),
-                'sale' => $sale->fresh(['saleItems', 'saleDiscounts']),
+                'item' => $saleItem->fresh(['product']),
+                'sale' => $sale->fresh(['saleItems.product', 'saleDiscounts']),
             ];
         });
     }

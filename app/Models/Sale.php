@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Events\OrderUpdated;
+use App\Events\CustomerUpdated;
 use App\Models\Product\Discount;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -54,11 +55,33 @@ class Sale extends Model
 
         // 🔹 Fire event here with fresh relationships
         event(new OrderUpdated($this->fresh([
-            'saleItems',
+            'saleItems.product',
             'saleDiscounts',
-            'saleItems.discounts'
+            'saleItems.discounts',
+            'customer'
         ])));
 
+    }
+
+    /**
+     * Update customer and trigger customer update event
+     */
+    public function updateCustomer(?int $customerId): void
+    {
+        \Log::info("Sale::updateCustomer called", [
+            'sale_id' => $this->id,
+            'customer_id' => $customerId
+        ]);
+        
+        $this->update(['customer_id' => $customerId]);
+        
+        \Log::info("CustomerUpdated event being fired", [
+            'sale_id' => $this->id,
+            'customer_id' => $customerId
+        ]);
+        
+        // Trigger customer update event to notify frontend
+        event(new CustomerUpdated($this));
     }
 
     public function applyOrderDiscount(Discount $discount): SaleDiscount
