@@ -18,28 +18,34 @@
                             :is="
                                 card.trend === 'up'
                                     ? 'ArrowUpOutlined'
-                                    : 'ArrowDownOutlined'
+                                    : card.trend === 'down'
+                                    ? 'ArrowDownOutlined'
+                                    : 'MinusOutlined'
                             "
                             class="w-4 h-4 mr-1"
                             :class="
                                 card.trend === 'up'
                                     ? 'text-green-500'
-                                    : 'text-red-500'
+                                    : card.trend === 'down'
+                                    ? 'text-red-500'
+                                    : 'text-gray-500'
                             "
                         />
                         <span
                             :class="
                                 card.trend === 'up'
                                     ? 'text-green-600'
-                                    : 'text-red-600'
+                                    : card.trend === 'down'
+                                    ? 'text-red-600'
+                                    : 'text-gray-600'
                             "
                             class="text-sm font-medium"
                         >
-                            {{ card.change > 0 ? "+" : "" }}{{ card.change }}%
+                            {{ formatChange(card.change) }}
                         </span>
-                        <span class="text-sm text-gray-500 ml-2"
-                            >vs yesterday</span
-                        >
+                        <span class="text-sm text-gray-500 ml-2">
+                            {{ getComparisonLabel(card.title) }}
+                        </span>
                     </div>
                 </div>
                 <div
@@ -53,7 +59,31 @@
 </template>
 
 <script setup>
+import { ArrowUpOutlined, ArrowDownOutlined, MinusOutlined } from "@ant-design/icons-vue";
+
 defineProps({
     cards: Array,
 });
+
+// Function to format the change percentage
+const formatChange = (change) => {
+    if (change === 0) return "0%";
+    return `${change > 0 ? "+" : ""}${change}%`;
+};
+
+// Function to get the correct comparison label based on card title
+const getComparisonLabel = (title) => {
+    switch (title) {
+        case "Today's Sales":
+            return "vs yesterday";
+        case "This Week Revenue":
+            return "vs last week";
+        case "Pending Orders":
+            return "vs yesterday";
+        case "Inventory Value":
+            return "vs last month";
+        default:
+            return "vs previous";
+    }
+};
 </script>
