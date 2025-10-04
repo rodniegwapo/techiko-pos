@@ -253,4 +253,25 @@ class SaleController extends Controller
             ]
         ], $results));
     }
+
+    public function testOrderEvent(Request $request, Sale $sale)
+    {
+        \Log::info("Testing OrderUpdated event", [
+            'sale_id' => $sale->id
+        ]);
+        
+        // Manually trigger the OrderUpdated event
+        event(new \App\Events\OrderUpdated($sale->fresh([
+            'saleItems.product',
+            'saleDiscounts',
+            'saleItems.discounts',
+            'customer'
+        ])));
+        
+        return response()->json([
+            'success' => true,
+            'message' => 'OrderUpdated event triggered for testing',
+            'sale_id' => $sale->id
+        ]);
+    }
 }

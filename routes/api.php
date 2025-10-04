@@ -55,7 +55,6 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/{sale}/sync-immediate', [SaleController::class, 'syncDraftImmediate'])->name('sales.syncDraftImmediate');
             Route::get('/{sale}/find-sale-item', [SaleController::class, 'findSaleItem'])->name('find-sale-item');
             Route::post('/{sale}/assign-customer', [SaleController::class, 'assignCustomer'])->name('sales.assignCustomer');
-            Route::post('/{sale}/test-customer-event', [SaleController::class, 'testCustomerEvent'])->name('sales.testCustomerEvent');
             Route::post('/{sale}/process-loyalty', [SaleController::class, 'processLoyalty'])->name('sales.processLoyalty');
 
             // Discounts
