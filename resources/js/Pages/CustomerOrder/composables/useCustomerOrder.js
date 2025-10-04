@@ -55,7 +55,7 @@ export function useCustomerOrder() {
     const handleOrderUpdate = (data) => {
         console.log(`📦 Order update received (${data.event_type || 'unknown'}):`, data);
         order.value = data.order;
-        orderItems.value = data.order.sale_items || data.order.items || [];
+        orderItems.value = data.order.saleItems || data.order.sale_items || data.order.items || [];
         customer.value = data.order.customer;
         orderId.value = data.order.id;
         lastUpdated.value = new Date().toLocaleTimeString();
