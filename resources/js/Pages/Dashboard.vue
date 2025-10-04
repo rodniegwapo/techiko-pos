@@ -241,6 +241,8 @@ const inventoryAlerts = computed(() => {
             [],
     };
 });
+
+const graphFilter = ref("weekly");
 </script>
 
 <template>
@@ -329,15 +331,21 @@ const inventoryAlerts = computed(() => {
             </div>
         </div>
 
-        <!-- Charts and Analytics Section -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-            <!-- Sales Overview Chart -->
-            <div class="bg-white rounded-lg border p-6 shadow-sm">
+        <div class="flex w-full gap-6 mb-8">
+            <!-- Sales Overview Chart (70%) -->
+            <div class="bg-white rounded-lg border p-6 shadow-sm w-[60%]">
                 <div class="flex items-center justify-between mb-4">
                     <h3 class="text-lg font-semibold text-gray-900">
                         Sales Overview
                     </h3>
-                    <span class="text-sm text-gray-500">Last 7 days</span>
+                    <a-radio-group
+                        v-model:value="graphFilter"
+                        button-style="solid"
+                    >
+                        <a-radio-button value="weekly">Weekly</a-radio-button>
+                        <a-radio-button value="monthly">Monthly</a-radio-button>
+                        <a-radio-button value="yearly">Yearly</a-radio-button>
+                    </a-radio-group>
                 </div>
                 <VueApexCharts
                     :options="salesChartOptions"
@@ -347,43 +355,43 @@ const inventoryAlerts = computed(() => {
                 />
             </div>
 
-            <!-- Top Products -->
-            <div class="bg-white rounded-lg border p-6 shadow-sm">
-                <div class="flex items-center justify-between mb-4">
+            <!-- Top Products (30%) -->
+            <div class="bg-white rounded-lg border p-6 shadow-sm w-[40%]">
+                <div class="flex items-center justify-between mb-3">
                     <h3 class="text-lg font-semibold text-gray-900">
                         Top Products
                     </h3>
                     <span class="text-sm text-gray-500">This week</span>
                 </div>
 
-                <div class="space-y-3">
+                <div class="space-y-2">
                     <div
                         v-for="(product, index) in topProducts"
                         :key="product.name"
-                        class="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                        class="flex items-center justify-between px-3 py-1 border bg-gray-50 rounded-lg"
                     >
                         <div class="flex items-center">
                             <div
-                                class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3"
+                                class="bg-blue-100 rounded-full flex items-center justify-center mr-3"
                             >
-                                <span class="text-sm font-bold text-blue-600"
-                                    >#{{ index + 1 }}</span
-                                >
+                                <span class="text-sm font-bold text-blue-600">
+                                    #{{ index + 1 }}
+                                </span>
                             </div>
                             <div>
-                                <p class="font-medium text-gray-900">
+                                <div class="font-medium text-gray-900">
                                     {{ product.name }}
-                                </p>
-                                <p class="text-sm text-gray-500">
+                                </div>
+                                <div class="text-sm text-gray-500">
                                     {{ product.sales }} sales
-                                </p>
+                                </div>
                             </div>
                         </div>
                         <div class="text-right">
-                            <p class="font-semibold text-gray-900">
+                            <div class="text-sm text-gray-900 py-2">
                                 {{ product.revenue }}
-                            </p>
-                            <p class="text-sm text-gray-500">revenue</p>
+                            </div>
+                            <div class="text-xs text-gray-500">revenue</div>
                         </div>
                     </div>
                 </div>
