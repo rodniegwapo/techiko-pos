@@ -9,6 +9,7 @@ export function useCustomerOrder() {
     const lastUpdated = ref(new Date().toLocaleTimeString());
     const orderId = ref(null);
     const loading = ref(true);
+    const paymentSuccessMessage = ref(null);
 
     // Computed properties - Use actual sale data from backend
     const subtotal = computed(() => {
@@ -62,6 +63,26 @@ export function useCustomerOrder() {
         loading.value = false;
     };
 
+    const handlePaymentCompleted = (data) => {
+        console.log(`💳 Payment completed for order ${data.sale_id}:`, data);
+        
+        // Show success message
+        paymentSuccessMessage.value = data.message;
+        
+        // Clear the order to restart the view
+        order.value = null;
+        orderItems.value = [];
+        customer.value = null;
+        orderId.value = null;
+        lastUpdated.value = new Date().toLocaleTimeString();
+        loading.value = false;
+        
+        // Clear success message after 5 seconds
+        setTimeout(() => {
+            paymentSuccessMessage.value = null;
+        }, 5000);
+    };
+
     const fetchInitialOrder = async () => {
         try {
             const response = await fetch("/api/orders/recent-pending");
@@ -103,6 +124,12 @@ export function useCustomerOrder() {
             console.log("👤 CustomerUpdated event received:", event);
             handleOrderUpdate(event);
         });
+
+        // Listen to payment completion
+        window.Echo.channel("order").listen(".PaymentCompleted", (event) => {
+            console.log("💳 PaymentCompleted event received:", event);
+            handlePaymentCompleted(event);
+        });
     });
 
     onBeforeUnmount(() => {
@@ -119,6 +146,7 @@ export function useCustomerOrder() {
         lastUpdated,
         orderId,
         loading,
+        paymentSuccessMessage,
 
         // Computed
         subtotal,
@@ -131,6 +159,7 @@ export function useCustomerOrder() {
         // Methods
         formatCurrency,
         handleOrderUpdate,
+        handlePaymentCompleted,
         fetchInitialOrder,
     };
 }
