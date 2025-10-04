@@ -42,17 +42,17 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('mandatory-discounts', \App\Http\Controllers\MandatoryDiscountController::class)->names('mandatory-discounts');
 
     Route::get('/sales', [\App\Http\Controllers\SaleController::class, 'index'])->name('sales.index');
-    
+
     // Loyalty Program
     Route::get('/loyalty', [\App\Http\Controllers\LoyaltyController::class, 'index'])->name('loyalty.index');
-    
+
     // Customers
     Route::get('/customers', [\App\Http\Controllers\CustomerController::class, 'webIndex'])->name('customers.index');
-    
+
     // User Management (Only for super admin, admin, and manager)
     Route::middleware(['role:super admin|admin|manager'])->group(function () {
         Route::get('/users', [\App\Http\Controllers\UserController::class, 'index'])->name('users.index');
-        
+
         // Supervisor Assignment Routes
         Route::post('/users/{user}/assign-supervisor', [\App\Http\Controllers\SupervisorAssignmentController::class, 'assign'])
             ->name('users.assign-supervisor');
@@ -63,13 +63,13 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/users/{user}/supervisor-history', [\App\Http\Controllers\SupervisorAssignmentController::class, 'history'])
             ->name('users.supervisor-history');
     });
-    
+
     // terminal
     Route::post('/setup-terminal', [\App\Http\Controllers\TerminalController::class, 'setupTerminal'])->name('setup.terminal');
 
     // Void logs
     Route::get('/void-logs', [\App\Http\Controllers\VoidLogController::class, 'index'])->name('voids.index');
-    
+
     // Inventory Management Routes
     Route::prefix('inventory')->name('inventory.')->group(function () {
         // Inventory Overview
@@ -78,24 +78,28 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/movements', [\App\Http\Controllers\InventoryController::class, 'movements'])->name('movements');
         Route::get('/low-stock', [\App\Http\Controllers\InventoryController::class, 'lowStock'])->name('low-stock');
         Route::get('/valuation', [\App\Http\Controllers\InventoryController::class, 'valuation'])->name('valuation');
-        
+
         // Inventory Operations
         Route::post('/receive', [\App\Http\Controllers\InventoryController::class, 'receive'])->name('receive');
         Route::post('/transfer', [\App\Http\Controllers\InventoryController::class, 'transfer'])->name('transfer');
-        
+
         // Stock Adjustments
         Route::resource('adjustments', \App\Http\Controllers\StockAdjustmentController::class)->names('adjustments');
         Route::post('/adjustments/{adjustment}/submit', [\App\Http\Controllers\StockAdjustmentController::class, 'submitForApproval'])->name('adjustments.submit');
         Route::post('/adjustments/{adjustment}/approve', [\App\Http\Controllers\StockAdjustmentController::class, 'approve'])->name('adjustments.approve');
         Route::post('/adjustments/{adjustment}/reject', [\App\Http\Controllers\StockAdjustmentController::class, 'reject'])->name('adjustments.reject');
         Route::get('/adjustment-products', [\App\Http\Controllers\StockAdjustmentController::class, 'getProductsForAdjustment'])->name('adjustment-products');
-        
+
         // Location Management
         Route::resource('locations', \App\Http\Controllers\InventoryLocationController::class)->names('locations');
         Route::post('/locations/{location}/set-default', [\App\Http\Controllers\InventoryLocationController::class, 'setDefault'])->name('locations.set-default');
         Route::post('/locations/{location}/toggle-status', [\App\Http\Controllers\InventoryLocationController::class, 'toggleStatus'])->name('locations.toggle-status');
     });
 });
+
+Route::get('/customer-order', function () {
+    return Inertia::render('CustomerOrderView');
+})->name('customer-order');
 
 Route::get('/test-order', function () {
     $sales = Sale::all();
@@ -111,4 +115,4 @@ Route::get('/test-order', function () {
 
     return "No orders found";
 });
-require __DIR__.'/auth.php';
+require __DIR__ . '/auth.php';
