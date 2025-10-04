@@ -20,7 +20,7 @@ export function useDashboardData() {
 
     const props = page.props;
     const selectedLocation = ref(null);
-    const graphFilter = ref("weekly");
+    const graphFilter = ref("daily");
 
     onMounted(() => {
         selectedLocation.value =
@@ -114,7 +114,8 @@ export function useDashboardData() {
     ]);
 
     // Use the dedicated sales chart data composable
-    const { chartOptions: salesChartOptions, chartSeries: salesChartSeries } = useSalesChartData(graphFilter, selectedLocation);
+    const { chartOptions: salesChartOptions, chartSeries: salesChartSeries } =
+        useSalesChartData(graphFilter, selectedLocation);
 
     const topProducts = computed(() =>
         (props.stats?.top_products || []).slice(0, 5).map((p, i) => ({
