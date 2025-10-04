@@ -18,6 +18,12 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
 
+// Public API routes (no authentication required)
+Route::prefix('orders')->group(function () {
+    Route::get('/{orderId}/view', [\App\Http\Controllers\Api\OrderViewController::class, 'show'])->name('orders.view');
+    Route::get('/recent-pending', [\App\Http\Controllers\Api\OrderViewController::class, 'getRecentPending'])->name('orders.recent-pending');
+});
+
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/sales/products', [\App\Http\Controllers\SaleController::class, 'products'])
         ->name('sales.products');
