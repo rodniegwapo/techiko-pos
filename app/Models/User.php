@@ -29,6 +29,7 @@ class User extends Authenticatable
         'password',
         'status',
         'supervisor_id',
+        'is_super_user',
     ];
 
     /**
@@ -49,6 +50,7 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
+        'is_super_user' => 'boolean',
     ];
 
     /**
@@ -82,5 +84,52 @@ class User extends Authenticatable
     public function isSupervisedBy(User $supervisor): bool
     {
         return $this->supervisor_id === $supervisor->id;
+    }
+
+    /**
+     * Check if this user is a super user.
+     */
+    public function isSuperUser(): bool
+    {
+        return $this->is_super_user;
+    }
+
+    /**
+     * Override hasPermissionTo to allow super users to bypass all permission checks.
+     */
+    public function hasPermissionTo($permission, $guardName = null): bool
+    {
+        // Super users have all permissions
+        if ($this->isSuperUser()) {
+            return true;
+        }
+
+        return parent::hasPermissionTo($permission, $guardName);
+    }
+
+    /**
+     * Override hasRole to allow super users to bypass role checks.
+     */
+    public function hasRole($roles, string $guard = null): bool
+    {
+        // Super users have all roles
+        if ($this->isSuperUser()) {
+            return true;
+        }
+
+        return parent::hasRole($roles, $guard);
+    }
+
+    /**
+     * Override hasAnyRole to allow super users to bypass role checks.
+     */
+    public function hasAnyRole($roles, string $guard = null): bool
+    {
+        // Super users have all roles
+        if ($this->isSuperUser()) {
+            return true;
+        }
+
+        return parent::hasAnyRole($roles, $guard);
     }
 }

@@ -109,7 +109,7 @@ Route::middleware('auth:sanctum')->group(function () {
      * (Super Admin / Admin / Manager)
      * -----------------------
      */
-    Route::middleware(['role:super admin|admin|manager'])->group(function () {
+    Route::middleware(['check.permission:users.view'])->group(function () {
         Route::get('/users/roles', [UserController::class, 'getRoles']);
         Route::patch('/users/{user}/toggle-status', [UserController::class, 'toggleStatus']);
 

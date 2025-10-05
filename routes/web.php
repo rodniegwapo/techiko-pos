@@ -65,8 +65,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/customers', [\App\Http\Controllers\CustomerController::class, 'webIndex'])->name('customers.index');
     });
 
-    // User Management (Only for super admin, admin, and manager)
-    Route::middleware(['role:super admin|admin|manager'])->group(function () {
+    // User Management (Super user, admin, and manager)
+    Route::middleware(['check.permission:users.view'])->group(function () {
         Route::get('/users', [\App\Http\Controllers\UserController::class, 'index'])->name('users.index');
 
         // Supervisor Assignment Routes
@@ -80,8 +80,8 @@ Route::middleware(['auth'])->group(function () {
             ->name('users.supervisor-history');
     });
 
-    // Role Management (Only for super admin)
-    Route::middleware(['role:super admin'])->group(function () {
+    // Role Management (Only for super user)
+    Route::middleware(['check.super.user'])->group(function () {
         Route::get('/roles', [\App\Http\Controllers\RoleController::class, 'index'])->name('roles.index');
         Route::get('/roles/create', [\App\Http\Controllers\RoleController::class, 'create'])->name('roles.create');
         Route::post('/roles', [\App\Http\Controllers\RoleController::class, 'store'])->name('roles.store');
