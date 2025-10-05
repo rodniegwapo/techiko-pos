@@ -171,4 +171,39 @@ class InventoryMovement extends Model
             'total_cost' => isset($data['unit_cost']) ? $data['quantity_change'] * $data['unit_cost'] : null,
         ]));
     }
+
+    /**
+     * Valid reference types for inventory movements
+     */
+    public static function getValidReferenceTypes(): array
+    {
+        return [
+            'Sale',
+            'Purchase',
+            'StockAdjustment',
+            'InventoryTransfer',
+            'CustomerReturn',
+            'DamagedGoods',
+            'Theft',
+            'ExpiredProducts',
+            'PromotionalGiveaway',
+        ];
+    }
+
+    /**
+     * Validate reference type before saving
+     */
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::saving(function ($movement) {
+            if ($movement->reference_type) {
+                $validTypes = static::getValidReferenceTypes();
+                if (!in_array($movement->reference_type, $validTypes)) {
+                    throw new \InvalidArgumentException("Invalid reference type: {$movement->reference_type}. Valid types are: " . implode(', ', $validTypes));
+                }
+            }
+        });
+    }
 }
