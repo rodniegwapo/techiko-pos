@@ -24,7 +24,7 @@ const { openModal, isEdit, spinning } = useGlobalVariables();
 const { showModal } = useHelpers();
 
 // Use permission composable
-const { canManageUsers } = usePermissions();
+const { canManageUsers, isSuperUser } = usePermissions();
 
 const props = defineProps({
   items: Object,
@@ -149,7 +149,7 @@ console.log("Roles data:", props.roles);
           class="min-w-[100px] max-w-[400px]"
         />
         <a-button
-          v-if="canManageUsers.value"
+          v-if="isSuperUser || canManageUsers"
           @click="handleAddUser"
           type="primary"
           class="bg-white border flex items-center border-green-500 text-green-500"

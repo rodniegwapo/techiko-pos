@@ -95,7 +95,7 @@ import { usePermissions } from "@/Composables/usePermissions";
 const page = usePage();
 
 // Use permission composable
-const { canManageUsers } = usePermissions();
+const { canManageUsers, isSuperUser } = usePermissions();
 
 // Props
 const props = defineProps({
@@ -159,25 +159,30 @@ const handleChange = (pagination, filters, sorter) => {
 };
 
 const canEdit = (user) => {
+  // Super user can edit anyone
+  if (isSuperUser.value) {
+    return true;
+  }
+  
   // Users with manage permissions can edit
   if (!canManageUsers.value) {
     return false;
   }
   
-  // super admin can edit anyone
-  if (currentUser.value.roles?.some(role => role.name.toLowerCase() === 'super admin')) {
-    return true;
-  }
-  
-  // admin can edit users except super admins
+  // admin can edit users except super users
   if (currentUser.value.roles?.some(role => role.name.toLowerCase() === 'admin')) {
-    return !user.roles?.some(role => role.name.toLowerCase() === 'super admin');
+    return !user.is_super_user;
   }
   
   return false;
 };
 
 const canDelete = (user) => {
+  // Super user can delete anyone (except themselves)
+  if (isSuperUser.value) {
+    return user.id !== currentUser.value.id;
+  }
+  
   // Only users with manage permissions can delete
   if (!canManageUsers.value) {
     return false;
@@ -185,6 +190,11 @@ const canDelete = (user) => {
   
   // Cannot delete yourself
   if (user.id === currentUser.value.id) {
+    return false;
+  }
+  
+  // Cannot delete super users
+  if (user.is_super_user) {
     return false;
   }
   

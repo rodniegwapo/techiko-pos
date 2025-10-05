@@ -22,7 +22,7 @@ const { openModal, isEdit, spinning } = useGlobalVariables();
 const { showModal } = useHelpers();
 
 // Use permission composable
-const { canManageRoles } = usePermissions();
+const { canManageRoles, isSuperUser } = usePermissions();
 
 const props = defineProps({
     roles: Object,
@@ -66,19 +66,19 @@ const { pagination, handleTableChange } = useTable("roles", tableFilters);
 
 // Methods
 const handleAddRole = () => {
-    router.visit(route('roles.create'));
+    router.visit(route("roles.create"));
 };
 
 const handleEditRole = (role) => {
-    router.visit(route('roles.edit', role.id));
+    router.visit(route("roles.edit", role.id));
 };
 
 const handleViewRole = (role) => {
-    router.visit(route('roles.show', role.id));
+    router.visit(route("roles.show", role.id));
 };
 
 const handlePermissionMatrix = () => {
-    router.visit(route('roles.permission-matrix'));
+    router.visit(route("roles.permission-matrix"));
 };
 
 // Debug - log the roles data
@@ -90,7 +90,7 @@ console.log("Permissions data:", props.permissions);
     <AuthenticatedLayout>
         <Head title="Role Management" />
         <ContentHeader class="mb-8" title="Role Management" />
-        
+
         <ContentLayout title="Role Management">
             <template #filters>
                 <RefreshButton :loading="spinning" @click="getItems" />
@@ -99,8 +99,9 @@ console.log("Permissions data:", props.permissions);
                     placeholder="Search roles by name..."
                     class="min-w-[100px] max-w-[400px]"
                 />
+
                 <a-button
-                    v-if="canCreate && canManageRoles.value"
+                    v-if="(canCreate && canManageRoles.value) || isSuperUser"
                     @click="handleAddRole"
                     type="primary"
                     class="bg-white border flex items-center border-green-500 text-green-500"
@@ -111,7 +112,7 @@ console.log("Permissions data:", props.permissions);
                     Add Role
                 </a-button>
                 <a-button
-                    v-if="canManageRoles.value"
+                    v-if="canManageRoles.value || isSuperUser"
                     @click="handlePermissionMatrix"
                     type="default"
                     class="bg-white border flex items-center border-blue-500 text-blue-500"
@@ -142,14 +143,15 @@ console.log("Permissions data:", props.permissions);
                     :roles="roles?.data || []"
                     :loading="spinning"
                     :pagination="pagination"
-                    :can-edit="canEdit && canManageRoles.value"
-                    :can-delete="canDelete && canManageRoles.value"
+                    :can-edit="(canEdit && canManageRoles.value) || isSuperUser"
+                    :can-delete="
+                        (canDelete && canManageRoles.value) || isSuperUser
+                    "
                     @change="handleTableChange"
                     @edit="handleEditRole"
                     @view="handleViewRole"
                 />
             </template>
         </ContentLayout>
-
     </AuthenticatedLayout>
 </template>

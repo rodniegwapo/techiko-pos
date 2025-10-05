@@ -10,7 +10,7 @@ import { usePermissions } from "@/Composables/usePermissions";
 const page = usePage();
 
 // Use permission composable
-const { canManageRoles } = usePermissions();
+const { canManageRoles, isSuperUser } = usePermissions();
 
 // Props
 const props = defineProps({
@@ -82,12 +82,12 @@ const handleChange = (pagination, filters, sorter) => {
 };
 
 const canEditRole = (role) => {
-    return canManageRoles.value;
+    return canManageRoles.value || isSuperUser.value;
 };
 
 const canDeleteRole = (role) => {
-    // Only super admin can delete roles
-    if (!canManageRoles.value) {
+    // Only super user can delete roles
+    if (!canManageRoles.value && !isSuperUser.value) {
         return false;
     }
 
