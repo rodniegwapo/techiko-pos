@@ -93,6 +93,21 @@ const handleCancel = () => {
   router.visit(route('roles.index'));
 };
 
+const handlePermissionChange = (permissionId, checked) => {
+  if (checked) {
+    // Add permission if not already present
+    if (!form.permissions.includes(permissionId)) {
+      form.permissions.push(permissionId);
+    }
+  } else {
+    // Remove permission
+    const index = form.permissions.indexOf(permissionId);
+    if (index > -1) {
+      form.permissions.splice(index, 1);
+    }
+  }
+};
+
 const getRoleColor = (roleName) => {
   const roleColors = {
     'Super Admin': 'red',
@@ -189,34 +204,28 @@ const getPermissionLabel = (permissionName) => {
             <span>Permissions</span>
           </template>
           
-          <a-form-item
-            name="permissions"
-          >
-            <div class="border rounded-lg p-4 max-h-96 overflow-y-auto">
-              <div
-                v-for="(modulePermissions, moduleName) in permissions"
-                :key="moduleName"
-                class="mb-6 last:mb-0"
-              >
-                <h4 class="text-sm font-semibold text-gray-900 mb-3 capitalize border-b pb-1">
-                  {{ moduleName.replace('_', ' ') }}
-                </h4>
-                <a-checkbox-group
-                  v-model:value="form.permissions"
-                  class="grid grid-cols-2 gap-2"
+          <div class="border rounded-lg p-4 max-h-96 overflow-y-auto">
+            <div
+              v-for="(modulePermissions, moduleName) in permissions"
+              :key="moduleName"
+              class="mb-6 last:mb-0"
+            >
+              <h4 class="text-sm font-semibold text-gray-900 mb-3 capitalize border-b pb-1">
+                {{ moduleName.replace('_', ' ') }}
+              </h4>
+              <div class="grid grid-cols-2 gap-2">
+                <a-checkbox
+                  v-for="permission in modulePermissions"
+                  :key="permission.id"
+                  :checked="form.permissions.includes(permission.id)"
+                  @change="handlePermissionChange(permission.id, $event.target.checked)"
+                  class="text-sm"
                 >
-                  <a-checkbox
-                    v-for="permission in modulePermissions"
-                    :key="permission.id"
-                    :value="permission.id"
-                    class="text-sm"
-                  >
-                    {{ getPermissionLabel(permission.name) }}
-                  </a-checkbox>
-                </a-checkbox-group>
+                  {{ getPermissionLabel(permission.name) }}
+                </a-checkbox>
               </div>
             </div>
-          </a-form-item>
+          </div>
         </a-card>
 
         <!-- Role Preview -->
