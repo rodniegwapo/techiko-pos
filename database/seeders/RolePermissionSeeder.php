@@ -63,6 +63,22 @@ class RolePermissionSeeder extends Seeder
             'loyalty.view',
             'loyalty.manage',
             'loyalty.adjust_points',
+            'loyalty.tiers_manage',
+            'loyalty.customers_manage',
+            'loyalty.points_adjust',
+            'loyalty.reports_view',
+            
+            // Inventory Management
+            'inventory.view',
+            'inventory.dashboard',
+            'inventory.products',
+            'inventory.movements',
+            'inventory.adjustments',
+            'inventory.locations',
+            'inventory.valuation',
+            'inventory.receive',
+            'inventory.transfer',
+            'inventory.low_stock',
             
             // System Settings
             'settings.view',
@@ -70,6 +86,12 @@ class RolePermissionSeeder extends Seeder
             
             // Void Logs
             'void_logs.view',
+            
+            // Role Management
+            'roles.view',
+            'roles.create',
+            'roles.edit',
+            'roles.delete',
         ];
 
         foreach ($permissions as $permission) {
@@ -79,11 +101,11 @@ class RolePermissionSeeder extends Seeder
         // Create roles and assign permissions
         
         // Super Admin - Full access
-        $superAdmin = Role::firstOrCreate(['name' => 'Super Admin']);
+        $superAdmin = Role::firstOrCreate(['name' => 'super admin']);
         $superAdmin->syncPermissions(Permission::all());
         
         // Admin - Most permissions except system settings
-        $admin = Role::firstOrCreate(['name' => 'Admin']);
+        $admin = Role::firstOrCreate(['name' => 'admin']);
         $admin->syncPermissions([
             'users.view',
             'users.create',
@@ -113,11 +135,25 @@ class RolePermissionSeeder extends Seeder
             'loyalty.view',
             'loyalty.manage',
             'loyalty.adjust_points',
+            'loyalty.tiers_manage',
+            'loyalty.customers_manage',
+            'loyalty.points_adjust',
+            'loyalty.reports_view',
+            'inventory.view',
+            'inventory.dashboard',
+            'inventory.products',
+            'inventory.movements',
+            'inventory.adjustments',
+            'inventory.locations',
+            'inventory.valuation',
+            'inventory.receive',
+            'inventory.transfer',
+            'inventory.low_stock',
             'void_logs.view',
         ]);
         
         // Manager - Operational permissions
-        $manager = Role::firstOrCreate(['name' => 'Manager']);
+        $manager = Role::firstOrCreate(['name' => 'manager']);
         $manager->syncPermissions([
             'sales.view',
             'sales.create',
@@ -136,11 +172,50 @@ class RolePermissionSeeder extends Seeder
             'reports.view',
             'loyalty.view',
             'loyalty.adjust_points',
+            'loyalty.customers_manage',
+            'loyalty.points_adjust',
+            'loyalty.reports_view',
+            'inventory.view',
+            'inventory.dashboard',
+            'inventory.products',
+            'inventory.movements',
+            'inventory.adjustments',
+            'inventory.locations',
+            'inventory.valuation',
+            'inventory.receive',
+            'inventory.transfer',
+            'inventory.low_stock',
+            'void_logs.view',
+        ]);
+        
+        // Supervisor - Shift supervision permissions
+        $supervisor = Role::firstOrCreate(['name' => 'supervisor']);
+        $supervisor->syncPermissions([
+            'sales.view',
+            'sales.create',
+            'sales.void',
+            'products.view',
+            'products.create',
+            'products.edit',
+            'categories.view',
+            'customers.view',
+            'customers.create',
+            'customers.edit',
+            'discounts.view',
+            'discounts.apply',
+            'reports.view',
+            'loyalty.view',
+            'loyalty.customers_manage',
+            'loyalty.points_adjust',
+            'inventory.view',
+            'inventory.products',
+            'inventory.movements',
+            'inventory.low_stock',
             'void_logs.view',
         ]);
         
         // Cashier - Basic sales permissions
-        $cashier = Role::firstOrCreate(['name' => 'Cashier']);
+        $cashier = Role::firstOrCreate(['name' => 'cashier']);
         $cashier->syncPermissions([
             'sales.view',
             'sales.create',
@@ -150,6 +225,9 @@ class RolePermissionSeeder extends Seeder
             'discounts.view',
             'discounts.apply',
             'loyalty.view',
+            'loyalty.customers_manage',
+            'inventory.view',
+            'inventory.products',
         ]);
 
         $this->command->info('Roles and permissions created successfully!');
