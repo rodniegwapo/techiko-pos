@@ -4,6 +4,7 @@ import { router, Head } from "@inertiajs/vue3";
 import { ArrowLeftOutlined, EditOutlined } from "@ant-design/icons-vue";
 import { IconShield, IconUsers, IconAlertTriangle } from "@tabler/icons-vue";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
+import ContentHeader from "@/Components/ContentHeader.vue";
 import { usePage } from "@inertiajs/vue3";
 
 const page = usePage();
@@ -126,9 +127,9 @@ const formatDate = (dateString) => {
     <Head title="Role Details" />
 
     <AuthenticatedLayout>
-         <ContentHeader title="Role Details" />
+        <ContentHeader title="Role Details" />
 
-         <div v-if="roleData" class="max-w-4xl mx-auto p-6 space-y-6">
+        <div v-if="roleData" class="max-w-4xl mx-auto p-6 space-y-6">
             <!-- Role Header -->
             <div
                 class="flex items-center space-x-4 p-6 bg-white border rounded-lg"
@@ -201,10 +202,12 @@ const formatDate = (dateString) => {
                     Permissions
                 </h4>
 
-                 <div
-                     v-if="roleData.permissions && roleData.permissions.length > 0"
-                     class="space-y-4"
-                 >
+                <div
+                    v-if="
+                        roleData.permissions && roleData.permissions.length > 0
+                    "
+                    class="space-y-4"
+                >
                     <div
                         v-for="(
                             modulePermissions, moduleName
@@ -236,33 +239,33 @@ const formatDate = (dateString) => {
                 </div>
             </div>
 
-             <!-- Users Section -->
-             <div
-                 v-if="roleData.users_count > 0"
-                 class="bg-white border rounded-lg p-6"
-             >
-                 <h4
-                     class="text-lg font-medium text-gray-900 mb-4 flex items-center"
-                 >
-                     <IconUsers class="mr-2 text-green-600" />
-                     Assigned Users
-                 </h4>
-                 <div class="text-center py-4">
-                     <a-badge
-                         :count="roleData.users_count"
-                         :number-style="{
-                             backgroundColor: '#52c41a',
-                             fontSize: '20px',
-                         }"
-                     />
-                     <p class="text-sm text-gray-600 mt-2">
-                         {{ roleData.users_count }} user{{
-                             roleData.users_count !== 1 ? "s" : ""
-                         }}
-                         assigned to this role
-                     </p>
-                 </div>
-             </div>
+            <!-- Users Section -->
+            <div
+                v-if="roleData.users_count > 0"
+                class="bg-white border rounded-lg p-6"
+            >
+                <h4
+                    class="text-lg font-medium text-gray-900 mb-4 flex items-center"
+                >
+                    <IconUsers class="mr-2 text-green-600" />
+                    Assigned Users
+                </h4>
+                <div class="text-center py-4">
+                    <a-badge
+                        :count="roleData.users_count"
+                        :number-style="{
+                            backgroundColor: '#52c41a',
+                            fontSize: '20px',
+                        }"
+                    />
+                    <p class="text-sm text-gray-600 mt-2">
+                        {{ roleData.users_count }} user{{
+                            roleData.users_count !== 1 ? "s" : ""
+                        }}
+                        assigned to this role
+                    </p>
+                </div>
+            </div>
 
             <!-- Role Statistics -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
