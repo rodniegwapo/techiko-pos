@@ -90,8 +90,12 @@ import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { Modal, notification } from "ant-design-vue";
 import { usePage } from "@inertiajs/vue3";
 import axios from "axios";
+import { usePermissions } from "@/Composables/usePermissions";
 
 const page = usePage();
+
+// Use permission composable
+const { canManageUsers } = usePermissions();
 
 // Props
 const props = defineProps({
@@ -155,6 +159,11 @@ const handleChange = (pagination, filters, sorter) => {
 };
 
 const canEdit = (user) => {
+  // Users with manage permissions can edit
+  if (!canManageUsers.value) {
+    return false;
+  }
+  
   // super admin can edit anyone
   if (currentUser.value.roles?.some(role => role.name.toLowerCase() === 'super admin')) {
     return true;
@@ -169,11 +178,11 @@ const canEdit = (user) => {
 };
 
 const canDelete = (user) => {
-  // Only super admin can delete
-    if (!currentUser.value.roles?.some(role => role.name.toLowerCase() === 'super admin')) {
-      return false;
-    }
-    
+  // Only users with manage permissions can delete
+  if (!canManageUsers.value) {
+    return false;
+  }
+  
   // Cannot delete yourself
   if (user.id === currentUser.value.id) {
     return false;

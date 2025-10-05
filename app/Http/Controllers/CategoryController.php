@@ -8,6 +8,11 @@ use Illuminate\Http\Request;
 
 class CategoryController extends Controller
 {
+    public function __construct()
+    {
+        // Middleware is handled at route level
+    }
+
     public function index(Request $request)
     {
         $category = Category::query()->when($request->input('search'), function ($query, $search) {

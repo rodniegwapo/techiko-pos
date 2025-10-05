@@ -18,10 +18,12 @@ use Inertia\Inertia;
 class SaleController extends Controller
 {
     protected $saleService;
+
     protected $inventoryService;
 
     public function __construct(SaleService $saleService, InventoryService $inventoryService)
     {
+        // Middleware is handled at route level
         $this->saleService = $saleService;
         $this->inventoryService = $inventoryService;
     }

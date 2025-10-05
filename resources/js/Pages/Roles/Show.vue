@@ -6,6 +6,7 @@ import { IconShield, IconUsers, IconAlertTriangle } from "@tabler/icons-vue";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
 import { usePage } from "@inertiajs/vue3";
+import { usePermissions } from "@/Composables/usePermissions";
 
 const page = usePage();
 
@@ -16,15 +17,8 @@ const props = defineProps({
 // Extract role data from the wrapped structure
 const roleData = computed(() => props.role?.data || props.role);
 
-// Current user
-const currentUser = computed(() => page.props.auth.user?.data);
-
-// Check if current user can edit roles
-const canEdit = computed(() => {
-    return currentUser.value?.roles?.some(
-        (role) => role.name.toLowerCase() === "super admin"
-    );
-});
+// Use permission composable
+const { canManageRoles } = usePermissions();
 
 // Check if this is a system role
 const isSystemRole = computed(() => {
@@ -297,7 +291,7 @@ const formatDate = (dateString) => {
                     </template>
                     Back to Roles
                 </a-button>
-                <a-button v-if="canEdit" type="primary" @click="handleEdit">
+                <a-button v-if="canManageRoles.value" type="primary" @click="handleEdit">
                     <template #icon>
                         <EditOutlined />
                     </template>

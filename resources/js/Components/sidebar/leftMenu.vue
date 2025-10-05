@@ -15,118 +15,151 @@ import {
 import { router, usePage } from "@inertiajs/vue3";
 
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
+import { usePermissions } from "@/Composables/usePermissions";
 
 const { selectedKeys, openKeys } = useGlobalVariables();
-
 const page = usePage();
 
-// Check if user has admin or super admin role (managers and supervisors can also manage limited users)
-const canManageUsers = computed(() => {
-    const user = page.props.auth?.user?.data;
-    if (!user || !user.roles) return false;
-    return user.roles.some((role) => {
-        const roleName = role.name.toLowerCase();
-        return ["super admin", "admin", "manager", "supervisor"].includes(
-            roleName
-        );
-    });
-});
-
-// Check if user can manage roles (only super admin)
-const canManageRoles = computed(() => {
-    const user = page.props.auth?.user?.data;
-    if (!user || !user.roles) return false;
-    return user.roles.some((role) => {
-        const roleName = role.name.toLowerCase();
-        return roleName === "super admin";
-    });
-});
+// Use permission composable
+const {
+    canViewDashboard,
+    canViewCategories,
+    canViewProducts,
+    canViewSales,
+    canViewInventory,
+    canViewLoyalty,
+    canViewCustomers,
+    canManageUsers,
+    canManageRoles,
+    canViewVoidLogs
+} = usePermissions();
 
 const menus = computed(() => {
-    const baseMenus = [
-        {
+    const baseMenus = [];
+    
+    // Dashboard - All authenticated users
+    if (canViewDashboard.value) {
+        baseMenus.push({
             title: "Dashboard",
             path: route("dashboard"),
             icon: IconDashboard,
             pathName: "dashboard",
-        },
-        {
+        });
+    }
+    
+    // Sales - All authenticated users
+    if (canViewSales.value) {
+        baseMenus.push({
             title: "Sales",
             path: route("sales.index"),
             icon: IconHeartHandshake,
             pathName: "sales",
-        },
-        {
-            title: "Products",
-            icon: IconCategory,
-            path: "/products", // important: give parent submenu a path (for key)
-            children: [
-                {
-                    title: "Items",
-                    path: route("products.index"),
-                },
-                {
-                    title: "Categories",
-                    path: route("categories.index"),
-                },
-                {
-                    title: "Discounts",
-                    path: route("products.discounts.index"),
-                },
-                {
-                    title: "Mandatory Discounts",
-                    path: route("mandatory-discounts.index"),
-                },
-            ],
-        },
-        {
+        });
+    }
+    
+    // Products - Admin, Manager, Supervisor
+    if (canViewProducts.value || canViewCategories.value) {
+        const productChildren = [];
+        
+        if (canViewProducts.value) {
+            productChildren.push({
+                title: "Items",
+                path: route("products.index"),
+            });
+        }
+        
+        if (canViewCategories.value) {
+            productChildren.push({
+                title: "Categories",
+                path: route("categories.index"),
+            });
+        }
+        
+        if (canViewProducts.value) {
+            productChildren.push({
+                title: "Discounts",
+                path: route("products.discounts.index"),
+            });
+            productChildren.push({
+                title: "Mandatory Discounts",
+                path: route("mandatory-discounts.index"),
+            });
+        }
+        
+        if (productChildren.length > 0) {
+            baseMenus.push({
+                title: "Products",
+                icon: IconCategory,
+                path: "/products",
+                children: productChildren,
+            });
+        }
+    }
+    
+    // Inventory - Admin, Manager
+    if (canViewInventory.value) {
+        const inventoryChildren = [
+            {
+                title: "Dashboard",
+                path: route("inventory.index"),
+            },
+            {
+                title: "Products",
+                path: route("inventory.products"),
+            },
+            {
+                title: "Movements",
+                path: route("inventory.movements"),
+            },
+            {
+                title: "Stock Adjustments",
+                path: route("inventory.adjustments.index"),
+            },
+            {
+                title: "Locations",
+                path: route("inventory.locations.index"),
+            },
+            {
+                title: "Valuation Report",
+                path: route("inventory.valuation"),
+            },
+        ];
+        
+        baseMenus.push({
             title: "Inventory",
             icon: IconPackage,
-            path: "/inventory", // important: give parent submenu a path (for key)
-            children: [
-                {
-                    title: "Dashboard",
-                    path: route("inventory.index"),
-                },
-                {
-                    title: "Products",
-                    path: route("inventory.products"),
-                },
-                {
-                    title: "Movements",
-                    path: route("inventory.movements"),
-                },
-                {
-                    title: "Stock Adjustments",
-                    path: route("inventory.adjustments.index"),
-                },
-                {
-                    title: "Locations",
-                    path: route("inventory.locations.index"),
-                },
-                {
-                    title: "Valuation Report",
-                    path: route("inventory.valuation"),
-                },
-            ],
-        },
-        {
+            path: "/inventory",
+            children: inventoryChildren,
+        });
+    }
+    
+    // Loyalty Program - Admin, Manager, Supervisor
+    if (canViewLoyalty.value) {
+        baseMenus.push({
             title: "Loyalty Program",
             path: route("loyalty.index"),
             icon: IconGift,
             pathName: "loyalty",
-        },
-        {
+        });
+    }
+    
+    // Void Logs - Admin, Manager, Supervisor
+    if (canViewVoidLogs.value) {
+        baseMenus.push({
             title: "Void logs",
             path: route("voids.index"),
             icon: IconHistory,
-        },
-        {
+        });
+    }
+    
+    // Customers - Admin, Manager, Supervisor
+    if (canViewCustomers.value) {
+        baseMenus.push({
             title: "Customers",
             path: "/customers",
             icon: IconUsers,
-        },
-    ];
+        });
+    }
 
     // Add User Management menu item only for Super Admin and Admin
     if (canManageUsers.value) {

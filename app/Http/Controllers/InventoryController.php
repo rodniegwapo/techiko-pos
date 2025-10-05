@@ -18,6 +18,7 @@ class InventoryController extends Controller
 
     public function __construct(InventoryService $inventoryService)
     {
+        // Middleware is handled at route level
         $this->inventoryService = $inventoryService;
     }
 
