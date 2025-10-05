@@ -16,6 +16,9 @@ const props = defineProps({
   permissions: Object,
 });
 
+// Extract role data from the wrapped structure
+const roleData = computed(() => props.role?.data || props.role);
+
 // Form state
 const form = reactive({
   name: "",
@@ -27,10 +30,10 @@ const loading = ref(false);
 
 // Initialize form with existing role data
 onMounted(() => {
-  if (props.role) {
-    form.name = props.role.name || "";
-    form.description = props.role.description || "";
-    form.permissions = props.role.permissions?.map(p => p.id) || [];
+  if (roleData.value) {
+    form.name = roleData.value.name || "";
+    form.description = roleData.value.description || "";
+    form.permissions = roleData.value.permissions?.map(p => p.id) || [];
   }
 });
 
@@ -56,9 +59,9 @@ const selectedPermissionsCount = computed(() => {
 
 // Check if this is a system role
 const isSystemRole = computed(() => {
-  if (!props.role || !props.role.name) return false;
+  if (!roleData.value || !roleData.value.name) return false;
   const systemRoles = ['super admin', 'admin', 'manager', 'supervisor', 'cashier'];
-  return systemRoles.includes(props.role.name.toLowerCase());
+  return systemRoles.includes(roleData.value.name.toLowerCase());
 });
 
 // Methods
@@ -72,7 +75,7 @@ const handleSave = async () => {
       permissions: form.permissions,
     };
 
-    await router.put(route('roles.update', props.role.id), roleData, {
+    await router.put(route('roles.update', roleData.value.id), roleData, {
       onStart: () => {
         spinning.value = true;
       },
