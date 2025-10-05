@@ -116,4 +116,46 @@ class User extends Authenticatable
 
         return false;
     }
+
+    /**
+     * Check if this user can manage another user based on hierarchy
+     */
+    public function canManageUser(User $user): bool
+    {
+        return \App\Services\UserHierarchyService::canManageUser($this, $user);
+    }
+
+    /**
+     * Check if this user can view another user based on hierarchy
+     */
+    public function canViewUser(User $user): bool
+    {
+        return \App\Services\UserHierarchyService::canViewUser($this, $user);
+    }
+
+    /**
+     * Get all users this user can manage
+     */
+    public function getManagedUsers()
+    {
+        return \App\Services\UserHierarchyService::getUsersInHierarchy($this);
+    }
+
+    /**
+     * Get the hierarchy level of this user
+     */
+    public function getHierarchyLevel(): int
+    {
+        return \App\Services\UserHierarchyService::getUserLevel($this);
+    }
+
+    /**
+     * Get all subordinates (recursively)
+     */
+    public function getAllSubordinates()
+    {
+        return $this->subordinates()->with('subordinates')->get()->flatMap(function ($subordinate) {
+            return collect([$subordinate])->merge($subordinate->getAllSubordinates());
+        });
+    }
 }

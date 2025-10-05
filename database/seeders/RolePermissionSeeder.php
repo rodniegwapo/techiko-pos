@@ -103,8 +103,14 @@ class RolePermissionSeeder extends Seeder
 
         // Create roles and assign permissions
         
+        // Super Admin - Full access
+        $superAdmin = Role::firstOrCreate(['name' => 'super admin']);
+        $superAdmin->update(['level' => 1, 'description' => 'Full system access with all permissions']);
+        $superAdmin->syncPermissions(Permission::all());
+        
         // Admin - Most permissions except system settings
         $admin = Role::firstOrCreate(['name' => 'admin']);
+        $admin->update(['level' => 2, 'description' => 'Administrative access with user management capabilities']);
         $admin->syncPermissions([
             'dashboard.view',
             'users.view',
@@ -154,6 +160,7 @@ class RolePermissionSeeder extends Seeder
         
         // Manager - Operational permissions
         $manager = Role::firstOrCreate(['name' => 'manager']);
+        $manager->update(['level' => 3, 'description' => 'Operational management with reporting and staff oversight']);
         $manager->syncPermissions([
             'dashboard.view',
             'sales.view',
@@ -191,6 +198,7 @@ class RolePermissionSeeder extends Seeder
         
         // Supervisor - Shift supervision permissions
         $supervisor = Role::firstOrCreate(['name' => 'supervisor']);
+        $supervisor->update(['level' => 4, 'description' => 'Shift supervision with limited management capabilities']);
         $supervisor->syncPermissions([
             'dashboard.view',
             'sales.view',
@@ -218,6 +226,7 @@ class RolePermissionSeeder extends Seeder
         
         // Cashier - Basic sales permissions
         $cashier = Role::firstOrCreate(['name' => 'cashier']);
+        $cashier->update(['level' => 5, 'description' => 'Front-line operations with sales processing capabilities']);
         $cashier->syncPermissions([
             'dashboard.view',
             'sales.view',

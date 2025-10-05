@@ -23,6 +23,7 @@ const props = defineProps({
 const form = reactive({
   name: "",
   description: "",
+  level: 5,
   permissions: [],
 });
 
@@ -37,6 +38,10 @@ const rules = computed(() => ({
   ],
   description: [
     { max: 500, message: "Description cannot exceed 500 characters" },
+  ],
+  level: [
+    { required: true, message: "Please enter hierarchy level" },
+    { type: 'number', min: 1, max: 99, message: "Level must be between 1 and 99" },
   ],
   permissions: [
     { required: true, message: "Please select at least one permission" },
@@ -189,9 +194,27 @@ const getPermissionLabel = (permissionName) => {
             </a-form-item>
 
             <a-form-item
+              label="Hierarchy Level"
+              name="level"
+              class="md:col-span-1"
+            >
+              <a-input-number
+                v-model:value="form.level"
+                :min="1"
+                :max="99"
+                placeholder="Enter hierarchy level"
+                size="large"
+                class="w-full"
+              />
+              <div class="text-xs text-gray-500 mt-1">
+                Lower number = higher authority (1 = highest, 99 = lowest)
+              </div>
+            </a-form-item>
+
+            <a-form-item
               label="Description"
               name="description"
-              class="md:col-span-2"
+              class="md:col-span-1"
             >
               <a-textarea
                 v-model:value="form.description"

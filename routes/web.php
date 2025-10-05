@@ -55,16 +55,29 @@ Route::middleware(['auth', 'user.permission'])->group(function () {
 
     // User Management
     Route::get('/users', [\App\Http\Controllers\UserController::class, 'index'])->name('users.index');
+    Route::get('/users/hierarchy', [\App\Http\Controllers\UserController::class, 'hierarchy'])->name('users.hierarchy');
+    Route::get('/users/{user}', [\App\Http\Controllers\UserController::class, 'show'])->name('users.show');
+    Route::get('/users/{user}/edit', [\App\Http\Controllers\UserController::class, 'edit'])->name('users.edit');
 
-    // Supervisor Assignment Routes
+    // Supervisor Assignment Routes (Level-based)
     Route::post('/users/{user}/assign-supervisor', [\App\Http\Controllers\SupervisorAssignmentController::class, 'assign'])
         ->name('users.assign-supervisor');
     Route::delete('/users/{user}/remove-supervisor', [\App\Http\Controllers\SupervisorAssignmentController::class, 'remove'])
         ->name('users.remove-supervisor');
     Route::get('/supervisors/available', [\App\Http\Controllers\SupervisorAssignmentController::class, 'availableSupervisors'])
         ->name('supervisors.available');
+    Route::get('/supervisors/available/{user}', [\App\Http\Controllers\SupervisorAssignmentController::class, 'availableSupervisors'])
+        ->name('supervisors.available-for-user');
+    Route::post('/supervisors/auto-assign', [\App\Http\Controllers\SupervisorAssignmentController::class, 'autoAssign'])
+        ->name('supervisors.auto-assign');
     Route::get('/users/{user}/supervisor-history', [\App\Http\Controllers\SupervisorAssignmentController::class, 'history'])
         ->name('users.supervisor-history');
+    
+    // Cascading Assignment Routes
+    Route::get('/supervisors/cascading-options', [\App\Http\Controllers\SupervisorAssignmentController::class, 'cascadingOptions'])
+        ->name('supervisors.cascading-options');
+    Route::post('/supervisors/{supervisor}/cascading-assign', [\App\Http\Controllers\SupervisorAssignmentController::class, 'cascadingAssign'])
+        ->name('supervisors.cascading-assign');
 
     // Role Management (Only for super user)
     Route::middleware(['check.super.user'])->group(function () {

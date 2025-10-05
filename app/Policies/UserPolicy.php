@@ -13,6 +13,11 @@ class UserPolicy
      */
     public function viewAny(User $user): bool
     {
+        // Super users have all permissions
+        if ($user->isSuperUser()) {
+            return true;
+        }
+        
         return $user->hasAnyRole(['super admin', 'admin', 'manager', 'supervisor']);
     }
 
@@ -21,6 +26,11 @@ class UserPolicy
      */
     public function view(User $user, User $model): bool
     {
+        // Super users can view anyone
+        if ($user->isSuperUser()) {
+            return true;
+        }
+        
         if ($user->hasAnyRole(['super admin', 'admin'])) {
             return true;
         }
@@ -54,6 +64,11 @@ class UserPolicy
      */
     public function create(User $user): bool
     {
+        // Super users can create anyone
+        if ($user->isSuperUser()) {
+            return true;
+        }
+        
         // Super Admin, Admin, and Manager can create users
         // Managers can only create cashiers and supervisors
         return $user->hasAnyRole(['super admin', 'admin', 'manager']);
@@ -64,6 +79,11 @@ class UserPolicy
      */
     public function update(User $user, User $model): bool
     {
+        // Super users can edit anyone
+        if ($user->isSuperUser()) {
+            return true;
+        }
+        
         // super admin can edit anyone
         if ($user->hasRole('super admin')) {
             return true;
@@ -87,6 +107,11 @@ class UserPolicy
      */
     public function updateSensitiveFields(User $user, User $model): bool
     {
+        // Super users can update sensitive fields for anyone
+        if ($user->isSuperUser()) {
+            return true;
+        }
+        
         // Only Super Admin and Admin can update sensitive fields
         if ($user->hasRole('super admin')) {
             return true;
@@ -105,6 +130,11 @@ class UserPolicy
      */
     public function delete(User $user, User $model): bool
     {
+        // Super users can delete anyone (except themselves)
+        if ($user->isSuperUser()) {
+            return $user->id !== $model->id;
+        }
+        
         // Only super admin can delete users
         if (!$user->hasRole('super admin')) {
             return false;
@@ -123,7 +153,7 @@ class UserPolicy
      */
     public function restore(User $user, User $model): bool
     {
-        return $user->hasRole('super admin');
+        return $user->isSuperUser() || $user->hasRole('super admin');
     }
 
     /**
@@ -131,7 +161,7 @@ class UserPolicy
      */
     public function forceDelete(User $user, User $model): bool
     {
-        return $user->hasRole('super admin');
+        return $user->isSuperUser() || $user->hasRole('super admin');
     }
 
     /**
@@ -139,6 +169,11 @@ class UserPolicy
      */
     public function assignSupervisor(User $user, User $model): bool
     {
+        // Super users can assign supervisors to anyone
+        if ($user->isSuperUser()) {
+            return true;
+        }
+        
         // Super Admin and Admin can assign supervisors to anyone
         if ($user->hasAnyRole(['super admin', 'admin'])) {
             return true;

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\UserHierarchyService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
@@ -16,22 +17,35 @@ class SupervisorAssignmentController extends Controller
     }
 
     /**
-     * Assign a supervisor to a cashier
+     * Assign a supervisor to a user (level-based)
      */
     public function assign(Request $request, User $user)
     {
-        // Load roles for authorization check
-        $user->load('roles');
-        $this->authorize('assignSupervisor', $user);
+        $currentUser = auth()->user();
+        
+        // Check if current user can assign supervisor to this user
+        if (!UserHierarchyService::canAssignSupervisor($currentUser, $user)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to assign supervisors to this user.'
+            ], 403);
+        }
 
         $validated = $request->validate([
             'supervisor_id' => [
                 'required',
                 'exists:users,id',
-                function ($attribute, $value, $fail) {
+                function ($attribute, $value, $fail) use ($user) {
                     $supervisor = User::find($value);
-                    if (!$supervisor || !$supervisor->hasRole('supervisor')) {
-                        $fail('Selected user must be a supervisor.');
+                    if (!$supervisor) {
+                        $fail('Selected supervisor does not exist.');
+                        return;
+                    }
+                    
+                    // Check if supervisor can supervise this user (level-based)
+                    if (!UserHierarchyService::canAssignSupervisor($supervisor, $user)) {
+                        $fail('Selected supervisor cannot supervise this user based on hierarchy levels.');
+                        return;
                     }
                 }
             ]
@@ -41,33 +55,41 @@ class SupervisorAssignmentController extends Controller
         $user->update(['supervisor_id' => $validated['supervisor_id']]);
         
         // Log the assignment
-        Log::info('Supervisor assignment', [
-            'manager_id' => auth()->id(),
-            'manager_name' => auth()->user()->name,
-            'cashier_id' => $user->id,
-            'cashier_name' => $user->name,
+        Log::info('Supervisor assignment (level-based)', [
+            'assigner_id' => $currentUser->id,
+            'assigner_name' => $currentUser->name,
+            'assigner_role' => $currentUser->roles->first()?->name,
+            'user_id' => $user->id,
+            'user_name' => $user->name,
+            'user_role' => $user->roles->first()?->name,
             'old_supervisor_id' => $oldSupervisorId,
             'new_supervisor_id' => $validated['supervisor_id'],
             'supervisor_name' => User::find($validated['supervisor_id'])->name,
-            'action' => 'assign_supervisor',
+            'action' => 'assign_supervisor_level_based',
             'timestamp' => now()
         ]);
 
         return response()->json([
             'success' => true,
             'message' => 'Supervisor assigned successfully',
-            'cashier' => $user->fresh(['supervisor'])
+            'user' => $user->fresh(['supervisor', 'roles'])
         ]);
     }
 
     /**
-     * Remove supervisor assignment from a cashier
+     * Remove supervisor assignment from a user (level-based)
      */
     public function remove(Request $request, User $user)
     {
-        // Load roles for authorization check
-        $user->load('roles');
-        $this->authorize('removeSupervisor', $user);
+        $currentUser = auth()->user();
+        
+        // Check if current user can manage this user
+        if (!UserHierarchyService::canManageUser($currentUser, $user)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You do not have permission to remove supervisor from this user.'
+            ], 403);
+        }
 
         $oldSupervisorId = $user->supervisor_id;
         $oldSupervisorName = $user->supervisor ? $user->supervisor->name : 'None';
@@ -75,36 +97,160 @@ class SupervisorAssignmentController extends Controller
         $user->update(['supervisor_id' => null]);
 
         // Log the removal
-        Log::info('Supervisor assignment removed', [
-            'manager_id' => auth()->id(),
-            'manager_name' => auth()->user()->name,
-            'cashier_id' => $user->id,
-            'cashier_name' => $user->name,
+        Log::info('Supervisor assignment removed (level-based)', [
+            'remover_id' => $currentUser->id,
+            'remover_name' => $currentUser->name,
+            'remover_role' => $currentUser->roles->first()?->name,
+            'user_id' => $user->id,
+            'user_name' => $user->name,
+            'user_role' => $user->roles->first()?->name,
             'removed_supervisor_id' => $oldSupervisorId,
             'removed_supervisor_name' => $oldSupervisorName,
-            'action' => 'remove_supervisor',
+            'action' => 'remove_supervisor_level_based',
             'timestamp' => now()
         ]);
 
         return response()->json([
             'success' => true,
             'message' => 'Supervisor assignment removed successfully',
-            'cashier' => $user->fresh(['supervisor'])
+            'user' => $user->fresh(['supervisor', 'roles'])
         ]);
     }
 
     /**
-     * Get available supervisors for assignment
+     * Get available supervisors for assignment (level-based)
      */
-    public function availableSupervisors()
+    public function availableSupervisors(Request $request, User $user = null)
     {
-        $supervisors = User::whereHas('roles', function ($query) {
-            $query->where('name', 'supervisor');
-        })->select('id', 'name', 'email')->get();
+        if ($user) {
+            // Get supervisors that can supervise this specific user
+            $supervisors = UserHierarchyService::getAssignableSupervisors($user);
+        } else {
+            // Check if role parameter is provided for role-based supervisor fetching
+            if ($request->has('role')) {
+                $roleName = $request->input('role');
+                $role = \Spatie\Permission\Models\Role::where('name', $roleName)->first();
+                
+                if ($role) {
+                    // If cascading mode is requested, only return immediate next level (role.level - 1)
+                    $isCascading = $request->boolean('cascading', false) || $request->boolean('next', false);
+                    if ($isCascading) {
+                        $nextLevel = max(1, ($role->level ?? 0) - 1);
+                        $supervisors = User::whereHas('roles', function ($q) use ($nextLevel) {
+                            $q->where('level', $nextLevel);
+                        })->with('roles')->select('id','name','email')->get();
+                    } else {
+                        // Create a temporary user with the specified role to get available supervisors
+                        $tempUser = new User();
+                        $tempUser->id = 'temp';
+                        $tempUser->setRelation('roles', collect([$role]));
+                        $supervisors = UserHierarchyService::getAssignableSupervisors($tempUser);
+                    }
+                } else {
+                    $supervisors = [];
+                }
+            } else {
+                // Get all users that can be supervisors (have lower level roles)
+                $currentUser = auth()->user();
+                $supervisors = UserHierarchyService::getSupervisableUsers($currentUser);
+            }
+        }
 
         return response()->json([
             'supervisors' => $supervisors
         ]);
+    }
+
+    /**
+     * Auto-assign supervisors based on hierarchy levels
+     */
+    public function autoAssign()
+    {
+        $currentUser = auth()->user();
+        
+        // Only super users, super admin and admin can auto-assign
+        if (!$currentUser->isSuperUser() && !$currentUser->hasRole(['super admin', 'admin'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only administrators can perform auto-assignment.'
+            ], 403);
+        }
+
+        $results = UserHierarchyService::autoAssignSupervisors();
+
+        // Log the auto-assignment
+        Log::info('Auto-assignment of supervisors', [
+            'admin_id' => $currentUser->id,
+            'admin_name' => $currentUser->name,
+            'results' => $results,
+            'action' => 'auto_assign_supervisors',
+            'timestamp' => now()
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Auto-assignment completed',
+            'results' => $results
+        ]);
+    }
+
+    /**
+     * Get cascading assignment options for current user
+     */
+    public function cascadingOptions()
+    {
+        $currentUser = auth()->user();
+        
+        $options = UserHierarchyService::getCascadingAssignmentOptions($currentUser);
+        
+        return response()->json([
+            'success' => true,
+            'options' => $options,
+            'user_level' => UserHierarchyService::getUserLevel($currentUser)
+        ]);
+    }
+
+    /**
+     * Perform cascading assignment
+     */
+    public function cascadingAssign(Request $request, User $supervisor)
+    {
+        $currentUser = auth()->user();
+        
+        // Check if current user can perform cascading assignment
+        if (!UserHierarchyService::canCascadingAssign($currentUser, $supervisor)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You cannot assign this user as your supervisor based on hierarchy levels.'
+            ], 403);
+        }
+
+        $success = UserHierarchyService::performCascadingAssignment($currentUser, $supervisor);
+        
+        if ($success) {
+            // Log the cascading assignment
+            Log::info('Cascading supervisor assignment', [
+                'assigner_id' => $currentUser->id,
+                'assigner_name' => $currentUser->name,
+                'assigner_role' => $currentUser->roles->first()?->name,
+                'supervisor_id' => $supervisor->id,
+                'supervisor_name' => $supervisor->name,
+                'supervisor_role' => $supervisor->roles->first()?->name,
+                'action' => 'cascading_assign_supervisor',
+                'timestamp' => now()
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Successfully assigned {$supervisor->name} as your supervisor",
+                'supervisor' => $supervisor->fresh(['roles'])
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to assign supervisor. Please try again.'
+        ], 500);
     }
 
     /**
