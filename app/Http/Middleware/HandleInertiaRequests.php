@@ -34,7 +34,7 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'auth' => [
-                'user' => $request->user() ? AuthUserResource::make($request->user()->load('roles')) : null,
+                'user' => $request->user() ? AuthUserResource::make($request->user()->load('roles', 'permissions')) : null,
             ],
             'default_store' => $request->user() ? InventoryLocation::query()->where('is_default', true)->first() : null,
         ];
