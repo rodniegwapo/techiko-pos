@@ -135,9 +135,7 @@ const getPermissionLabel = (permissionName) => {
 
         <div class="max-w-7xl mx-auto p-6 space-y-6">
             <!-- Header Info -->
-            <div
-                class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6"
-            >
+            <div class="bg-gray-50 border rounded-lg p-6">
                 <div class="flex items-center justify-between">
                     <div>
                         <h3
@@ -163,10 +161,7 @@ const getPermissionLabel = (permissionName) => {
                         </a-button>
                     </div>
                 </div>
-            </div>
-
-            <!-- Filters -->
-            <div class="bg-white border rounded-xl p-4 shadow-sm">
+                <!-- filters -->
                 <div class="flex flex-col md:flex-row gap-4">
                     <div class="flex-1">
                         <a-input
@@ -201,7 +196,7 @@ const getPermissionLabel = (permissionName) => {
             </div>
 
             <!-- Matrix Table -->
-            <div class="bg-white border rounded-xl overflow-hidden shadow-sm">
+            <div class="bg-white border rounded-lg overflow-hidden shadow-sm">
                 <div class="overflow-x-auto">
                     <table class="w-full">
                         <thead
@@ -241,9 +236,7 @@ const getPermissionLabel = (permissionName) => {
                                         <div
                                             class="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full"
                                         >
-                                            {{
-                                                role.permissions?.length || 0
-                                            }}
+                                            {{ role.permissions?.length || 0 }}
                                             perms
                                         </div>
                                     </div>
@@ -276,9 +269,7 @@ const getPermissionLabel = (permissionName) => {
                                             <span
                                                 class="ml-2 text-xs bg-blue-200 text-blue-800 px-2 py-1 rounded-full"
                                             >
-                                                {{
-                                                    modulePermissions.length
-                                                }}
+                                                {{ modulePermissions.length }}
                                                 permissions
                                             </span>
                                         </div>
@@ -388,7 +379,7 @@ const getPermissionLabel = (permissionName) => {
             <!-- Summary Cards -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div
-                    class="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-6 text-center shadow-sm"
+                    class="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-lg p-6 text-center shadow-sm"
                 >
                     <div class="flex items-center justify-center mb-3">
                         <div
@@ -405,7 +396,7 @@ const getPermissionLabel = (permissionName) => {
                     </div>
                 </div>
                 <div
-                    class="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-xl p-6 text-center shadow-sm"
+                    class="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-lg p-6 text-center shadow-sm"
                 >
                     <div class="flex items-center justify-center mb-3">
                         <div
@@ -422,7 +413,7 @@ const getPermissionLabel = (permissionName) => {
                     </div>
                 </div>
                 <div
-                    class="bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-xl p-6 text-center shadow-sm"
+                    class="bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-lg p-6 text-center shadow-sm"
                 >
                     <div class="flex items-center justify-center mb-3">
                         <div
@@ -444,7 +435,7 @@ const getPermissionLabel = (permissionName) => {
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <!-- Legend -->
                 <div
-                    class="bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 rounded-xl p-6"
+                    class="bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 rounded-lg p-6"
                 >
                     <h4
                         class="font-semibold text-gray-900 mb-4 flex items-center"
@@ -482,7 +473,7 @@ const getPermissionLabel = (permissionName) => {
 
                 <!-- Role Summary -->
                 <div
-                    class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm"
+                    class="bg-white border border-gray-200 rounded-lg p-6 shadow-sm"
                 >
                     <h4
                         class="font-semibold text-gray-900 mb-4 flex items-center"
