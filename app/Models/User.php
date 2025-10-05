@@ -8,10 +8,11 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
+use Spatie\Permission\Traits\HasPermissions;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable,HasRoles;
+    use HasApiTokens, HasFactory, Notifiable, HasRoles, HasPermissions;
 
     /**
      * The guard name for Spatie Permission.
@@ -94,42 +95,25 @@ class User extends Authenticatable
         return $this->is_super_user;
     }
 
+
     /**
-     * Override hasPermissionTo to allow super users to bypass all permission checks.
+     * Check if user has any of the specified permissions.
      */
-    public function hasPermissionTo($permission, $guardName = null): bool
+    public function hasAnyPermission($permissions, string $guard = null): bool
     {
         // Super users have all permissions
         if ($this->isSuperUser()) {
             return true;
         }
 
-        return parent::hasPermissionTo($permission, $guardName);
-    }
-
-    /**
-     * Override hasRole to allow super users to bypass role checks.
-     */
-    public function hasRole($roles, string $guard = null): bool
-    {
-        // Super users have all roles
-        if ($this->isSuperUser()) {
-            return true;
+        $permissions = is_array($permissions) ? $permissions : [$permissions];
+        
+        foreach ($permissions as $permission) {
+            if ($this->hasPermissionTo($permission, $guard)) {
+                return true;
+            }
         }
 
-        return parent::hasRole($roles, $guard);
-    }
-
-    /**
-     * Override hasAnyRole to allow super users to bypass role checks.
-     */
-    public function hasAnyRole($roles, string $guard = null): bool
-    {
-        // Super users have all roles
-        if ($this->isSuperUser()) {
-            return true;
-        }
-
-        return parent::hasAnyRole($roles, $guard);
+        return false;
     }
 }

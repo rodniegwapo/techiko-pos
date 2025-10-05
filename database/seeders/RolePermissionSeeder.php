@@ -19,6 +19,9 @@ class RolePermissionSeeder extends Seeder
 
         // Create permissions
         $permissions = [
+            // Dashboard
+            'dashboard.view',
+            
             // User Management
             'users.view',
             'users.create',
@@ -103,6 +106,7 @@ class RolePermissionSeeder extends Seeder
         // Admin - Most permissions except system settings
         $admin = Role::firstOrCreate(['name' => 'admin']);
         $admin->syncPermissions([
+            'dashboard.view',
             'users.view',
             'users.create',
             'users.edit',
@@ -151,6 +155,7 @@ class RolePermissionSeeder extends Seeder
         // Manager - Operational permissions
         $manager = Role::firstOrCreate(['name' => 'manager']);
         $manager->syncPermissions([
+            'dashboard.view',
             'sales.view',
             'sales.create',
             'sales.void',
@@ -187,6 +192,7 @@ class RolePermissionSeeder extends Seeder
         // Supervisor - Shift supervision permissions
         $supervisor = Role::firstOrCreate(['name' => 'supervisor']);
         $supervisor->syncPermissions([
+            'dashboard.view',
             'sales.view',
             'sales.create',
             'sales.void',
@@ -213,8 +219,10 @@ class RolePermissionSeeder extends Seeder
         // Cashier - Basic sales permissions
         $cashier = Role::firstOrCreate(['name' => 'cashier']);
         $cashier->syncPermissions([
+            'dashboard.view',
             'sales.view',
             'sales.create',
+            'sales.void',
             'products.view',
             'customers.view',
             'customers.create',

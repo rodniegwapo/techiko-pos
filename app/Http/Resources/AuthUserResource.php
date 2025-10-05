@@ -26,6 +26,12 @@ class AuthUserResource extends JsonResource
                     'name' => $role->name,
                 ];
             }),
+            'permissions' => $this->getAllPermissions()->map(function ($permission) {
+                return [
+                    'id' => $permission->id,
+                    'name' => $permission->name,
+                ];
+            }),
         ]);
     }
 }
