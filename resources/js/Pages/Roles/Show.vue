@@ -18,7 +18,7 @@ const props = defineProps({
 const roleData = computed(() => props.role?.data || props.role);
 
 // Use permission composable
-const { canManageRoles } = usePermissions();
+const { canManageRoles, isSuperUser } = usePermissions();
 
 // Check if this is a system role
 const isSystemRole = computed(() => {
@@ -291,7 +291,7 @@ const formatDate = (dateString) => {
                     </template>
                     Back to Roles
                 </a-button>
-                <a-button v-if="canManageRoles.value" type="primary" @click="handleEdit">
+                <a-button v-if="canManageRoles || isSuperUser" type="primary" @click="handleEdit">
                     <template #icon>
                         <EditOutlined />
                     </template>

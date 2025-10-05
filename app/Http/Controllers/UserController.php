@@ -14,9 +14,7 @@ class UserController extends Controller
 {
     public function __construct()
     {
-        // Super admin, admin, manager, and supervisor can access user management
-        // (read-only for managers and supervisors)
-        $this->middleware(['auth', 'role:super admin|admin|manager|supervisor']);
+        // Middleware is handled at route level
     }
 
     /**
@@ -25,7 +23,6 @@ class UserController extends Controller
     public function index(Request $request)
     {
         $currentUser = auth()->user();
-        $currentUserRoles = $currentUser->roles->pluck('name')->map(fn($role) => strtolower($role))->toArray();
         
         $users = User::with(['roles', 'supervisor'])
             ->when($request->input('search'), function ($query, $search) {
@@ -39,41 +36,39 @@ class UserController extends Controller
                     $q->where('name', $role);
                 });
             })
-            // Filter users based on current user's role hierarchy
-            ->when($currentUser->hasRole('manager'), function ($query) {
+            // Filter users based on current user's permissions
+            ->when(!$currentUser->isSuperUser() && $currentUser->hasRole('manager'), function ($query) {
                 // Manager can only see cashiers and supervisors
                 return $query->whereHas('roles', function ($q) {
                     $q->whereIn('name', ['cashier', 'supervisor']);
                 });
             })
-            ->when($currentUser->hasRole('supervisor'), function ($query) use ($currentUser) {
+            ->when(!$currentUser->isSuperUser() && $currentUser->hasRole('supervisor'), function ($query) use ($currentUser) {
                 // Supervisor can only see cashiers assigned to them
                 return $query->whereHas('roles', function ($q) {
                     $q->where('name', 'cashier');
                 })->where('supervisor_id', $currentUser->id);
             })
-            ->when($currentUser->hasRole('admin') && !$currentUser->hasRole('super admin'), function ($query) {
-                // Admin can see everyone except super admin
-                return $query->whereDoesntHave('roles', function ($q) {
-                    $q->where('name', 'super admin');
-                });
+            ->when(!$currentUser->isSuperUser() && $currentUser->hasRole('admin'), function ($query) {
+                // Admin can see everyone except super users
+                return $query->where('is_super_user', false);
             })
             ->latest()
             ->paginate(15);
 
         // Filter available roles based on current user's permissions
         $roles = Role::query()
-            ->when($currentUser->hasRole('manager'), function ($query) {
+            ->when(!$currentUser->isSuperUser() && $currentUser->hasRole('manager'), function ($query) {
                 // Manager can only assign cashier and supervisor roles
                 return $query->whereIn('name', ['cashier', 'supervisor']);
             })
-            ->when($currentUser->hasRole('supervisor'), function ($query) {
+            ->when(!$currentUser->isSuperUser() && $currentUser->hasRole('supervisor'), function ($query) {
                 // Supervisor cannot create users, so no roles needed
                 return $query->whereRaw('1 = 0'); // Return empty result
             })
-            ->when($currentUser->hasRole('admin') && !$currentUser->hasRole('super admin'), function ($query) {
-                // Admin can assign all roles except super admin
-                return $query->where('name', '!=', 'super admin');
+            ->when(!$currentUser->isSuperUser() && $currentUser->hasRole('admin'), function ($query) {
+                // Admin can assign all roles (no super admin role exists anymore)
+                return $query;
             })
             ->get(['id', 'name']);
 

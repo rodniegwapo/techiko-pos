@@ -13,7 +13,7 @@ import ContentHeader from "@/Components/ContentHeader.vue";
 const { spinning } = useGlobalVariables();
 
 // Use permission composable
-const { canManageRoles } = usePermissions();
+const { canManageRoles, isSuperUser } = usePermissions();
 
 const props = defineProps({
   permissions: Object,
