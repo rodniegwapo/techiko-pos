@@ -7,6 +7,7 @@ import { useTable } from "@/Composables/useTable";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useFilters, toLabel } from "@/Composables/useFilters";
+import { usePermissions } from "@/Composables/usePermissions";
 
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
@@ -19,6 +20,9 @@ import RoleTable from "./components/RoleTable.vue";
 const page = usePage();
 const { openModal, isEdit, spinning } = useGlobalVariables();
 const { showModal } = useHelpers();
+
+// Use permission composable
+const { canManageRoles } = usePermissions();
 
 const props = defineProps({
     roles: Object,
@@ -77,15 +81,6 @@ const handlePermissionMatrix = () => {
     router.visit(route('roles.permission-matrix'));
 };
 
-// Check if current user can manage roles
-const canManageRoles = computed(() => {
-    const currentUserRoles =
-        page.props.auth.user?.data?.roles?.map((role) =>
-            role.name.toLowerCase()
-        ) || [];
-    return currentUserRoles.includes("super admin");
-});
-
 // Debug - log the roles data
 console.log("Roles data:", props.roles);
 console.log("Permissions data:", props.permissions);
@@ -105,7 +100,7 @@ console.log("Permissions data:", props.permissions);
                     class="min-w-[100px] max-w-[400px]"
                 />
                 <a-button
-                    v-if="canCreate && canManageRoles"
+                    v-if="canCreate && canManageRoles.value"
                     @click="handleAddRole"
                     type="primary"
                     class="bg-white border flex items-center border-green-500 text-green-500"
@@ -116,7 +111,7 @@ console.log("Permissions data:", props.permissions);
                     Add Role
                 </a-button>
                 <a-button
-                    v-if="canManageRoles"
+                    v-if="canManageRoles.value"
                     @click="handlePermissionMatrix"
                     type="default"
                     class="bg-white border flex items-center border-blue-500 text-blue-500"
@@ -147,8 +142,8 @@ console.log("Permissions data:", props.permissions);
                     :roles="roles?.data || []"
                     :loading="spinning"
                     :pagination="pagination"
-                    :can-edit="canEdit"
-                    :can-delete="canDelete"
+                    :can-edit="canEdit && canManageRoles.value"
+                    :can-delete="canDelete && canManageRoles.value"
                     @change="handleTableChange"
                     @edit="handleEditRole"
                     @view="handleViewRole"

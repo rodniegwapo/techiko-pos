@@ -7,6 +7,7 @@ import { useTable } from "@/Composables/useTable";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useFilters, toLabel } from "@/Composables/useFilters";
+import { usePermissions } from "@/Composables/usePermissions";
 
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
@@ -21,6 +22,9 @@ import UserDetailsModal from "./components/UserDetailsModal.vue";
 const page = usePage();
 const { openModal, isEdit, spinning } = useGlobalVariables();
 const { showModal } = useHelpers();
+
+// Use permission composable
+const { canManageUsers } = usePermissions();
 
 const props = defineProps({
   items: Object,
@@ -126,12 +130,6 @@ const handleUserUpdated = (updatedUser) => {
   getItems();
 };
 
-// Check if current user can create users
-const canCreateUsers = computed(() => {
-  const currentUserRoles = page.props.auth.user?.data?.roles?.map(role => role.name.toLowerCase()) || [];
-  return currentUserRoles.some(role => ['super admin', 'admin', 'manager'].includes(role));
-});
-
 // Debug - log the items data
 console.log("Users data:", props.items);
 console.log("Roles data:", props.roles);
@@ -151,7 +149,7 @@ console.log("Roles data:", props.roles);
           class="min-w-[100px] max-w-[400px]"
         />
         <a-button
-          v-if="canCreateUsers"
+          v-if="canManageUsers.value"
           @click="handleAddUser"
           type="primary"
           class="bg-white border flex items-center border-green-500 text-green-500"

@@ -36,7 +36,10 @@ const truncate = (str, length = 100, ending = "...") => {
       >
         <template #content>
           <div class="flex flex-col gap-4 py-2">
-            <Link class="flex items-center text-gray-800 hover:text-green-500">
+            <Link 
+              class="flex items-center text-gray-800 hover:text-green-500"
+              :href="route('profile.edit')"
+            >
               <SettingOutlined class="mr-4" /> Account Settings
             </Link>
             <Link

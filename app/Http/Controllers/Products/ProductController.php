@@ -11,6 +11,11 @@ use Illuminate\Http\Request;
 
 class ProductController extends Controller
 {
+    public function __construct()
+    {
+        // Middleware is handled at route level
+    }
+
     public function index(Request $request)
     {
         $product = Product::query()

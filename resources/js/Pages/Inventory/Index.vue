@@ -14,6 +14,7 @@ import {
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useFilters, toLabel } from "@/Composables/useFilters";
 import { useHelpers } from "@/Composables/useHelpers";
+import { usePermissions } from "@/Composables/usePermissions";
 import VueApexCharts from "vue3-apexcharts";
 
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
@@ -25,6 +26,9 @@ import ActiveFilters from "@/Components/filters/ActiveFilters.vue";
 const page = usePage();
 const { spinning } = useGlobalVariables();
 const { formattedTotal } = useHelpers();
+
+// Use permission composable
+const { canViewInventory, canManageInventory } = usePermissions();
 
 const selectedLocation = ref(null);
 
@@ -99,8 +103,11 @@ const navigateToMovements = () =>
         data: { location_id: selectedLocation.value },
     });
 
-const navigateToAdjustments = () =>
-    router.visit(route("inventory.adjustments.index"));
+const navigateToAdjustments = () => {
+    if (canManageInventory.value) {
+        router.visit(route("inventory.adjustments.index"));
+    }
+};
 
 const summaryCards = computed(() => [
     {
@@ -137,29 +144,40 @@ const summaryCards = computed(() => [
     },
 ]);
 
-const quickActions = [
-    {
-        title: "Manage Products",
-        desc: "View and manage product inventory levels",
-        color: "blue",
-        icon: BoxPlotOutlined,
-        action: navigateToProducts,
-    },
-    {
-        title: "Inventory Movements",
-        desc: "Track all inventory transactions",
-        color: "green",
-        icon: HistoryOutlined,
-        action: navigateToMovements,
-    },
-    {
-        title: "Stock Adjustments",
-        desc: "Create and manage stock adjustments",
-        color: "orange",
-        icon: WarningOutlined,
-        action: navigateToAdjustments,
-    },
-];
+const quickActions = computed(() => {
+    const actions = [];
+    
+    if (canViewInventory.value) {
+        actions.push(
+            {
+                title: "Manage Products",
+                desc: "View and manage product inventory levels",
+                color: "blue",
+                icon: BoxPlotOutlined,
+                action: navigateToProducts,
+            },
+            {
+                title: "Inventory Movements",
+                desc: "Track all inventory transactions",
+                color: "green",
+                icon: HistoryOutlined,
+                action: navigateToMovements,
+            }
+        );
+    }
+    
+    if (canManageInventory.value) {
+        actions.push({
+            title: "Stock Adjustments",
+            desc: "Create and manage stock adjustments",
+            color: "orange",
+            icon: WarningOutlined,
+            action: navigateToAdjustments,
+        });
+    }
+    
+    return actions;
+});
 
 // Chart Setup
 const chartColors = ["#10B981", "#F59E0B", "#EF4444"];

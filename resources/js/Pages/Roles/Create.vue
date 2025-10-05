@@ -5,11 +5,15 @@ import { ArrowLeftOutlined, SaveOutlined } from "@ant-design/icons-vue";
 import { IconShield } from "@tabler/icons-vue";
 import { notification } from "ant-design-vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
+import { usePermissions } from "@/Composables/usePermissions";
 
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
 
 const { spinning } = useGlobalVariables();
+
+// Use permission composable
+const { canManageRoles } = usePermissions();
 
 const props = defineProps({
   permissions: Object,

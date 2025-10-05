@@ -5,8 +5,12 @@ import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { Modal, notification } from "ant-design-vue";
 import { usePage } from "@inertiajs/vue3";
 import axios from "axios";
+import { usePermissions } from "@/Composables/usePermissions";
 
 const page = usePage();
+
+// Use permission composable
+const { canManageRoles } = usePermissions();
 
 // Props
 const props = defineProps({
@@ -78,25 +82,12 @@ const handleChange = (pagination, filters, sorter) => {
 };
 
 const canEditRole = (role) => {
-    // Super admin can edit any role
-    if (
-        currentUser.value.roles?.some(
-            (role) => role.name.toLowerCase() === "super admin"
-        )
-    ) {
-        return true;
-    }
-
-    return false;
+    return canManageRoles.value;
 };
 
 const canDeleteRole = (role) => {
     // Only super admin can delete roles
-    if (
-        !currentUser.value.roles?.some(
-            (role) => role.name.toLowerCase() === "super admin"
-        )
-    ) {
+    if (!canManageRoles.value) {
         return false;
     }
 
