@@ -10,6 +10,7 @@ import {
     IconGift,
     IconUserCog,
     IconPackage,
+    IconShield,
 } from "@tabler/icons-vue";
 import { router, usePage } from "@inertiajs/vue3";
 
@@ -28,6 +29,16 @@ const canManageUsers = computed(() => {
         return ["super admin", "admin", "manager", "supervisor"].includes(
             roleName
         );
+    });
+});
+
+// Check if user can manage roles (only super admin)
+const canManageRoles = computed(() => {
+    const user = page.props.auth?.user?.data;
+    if (!user || !user.roles) return false;
+    return user.roles.some((role) => {
+        const roleName = role.name.toLowerCase();
+        return roleName === "super admin";
     });
 });
 
@@ -124,6 +135,16 @@ const menus = computed(() => {
             path: route("users.index"),
             icon: IconUserCog,
             pathName: "users",
+        });
+    }
+
+    // Add Role Management menu item only for Super Admin
+    if (canManageRoles.value) {
+        baseMenus.push({
+            title: "Role Management",
+            path: route("roles.index"),
+            icon: IconShield,
+            pathName: "roles",
         });
     }
 
