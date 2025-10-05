@@ -13,7 +13,7 @@ class RolePolicy
      */
     public function viewAny(User $user): bool
     {
-        return $user->hasRole('super admin');
+        return $user->isSuperUser();
     }
 
     /**
@@ -21,7 +21,7 @@ class RolePolicy
      */
     public function view(User $user, Role $role): bool
     {
-        return $user->hasRole('super admin');
+        return $user->isSuperUser();
     }
 
     /**
@@ -29,7 +29,7 @@ class RolePolicy
      */
     public function create(User $user): bool
     {
-        return $user->hasRole('super admin');
+        return $user->isSuperUser();
     }
 
     /**
@@ -37,7 +37,7 @@ class RolePolicy
      */
     public function update(User $user, Role $role): bool
     {
-        return $user->hasRole('super admin');
+        return $user->isSuperUser();
     }
 
     /**
@@ -45,13 +45,13 @@ class RolePolicy
      */
     public function delete(User $user, Role $role): bool
     {
-        // Only super admin can delete roles
-        if (!$user->hasRole('super admin')) {
+        // Only super user can delete roles
+        if (!$user->isSuperUser()) {
             return false;
         }
 
         // Prevent deletion of system roles
-        $systemRoles = ['super admin', 'admin', 'manager', 'supervisor', 'cashier'];
+        $systemRoles = ['admin', 'manager', 'supervisor', 'cashier'];
         if (in_array(strtolower($role->name), $systemRoles)) {
             return false;
         }
@@ -69,7 +69,7 @@ class RolePolicy
      */
     public function restore(User $user, Role $role): bool
     {
-        return $user->hasRole('super admin');
+        return $user->isSuperUser();
     }
 
     /**
@@ -77,6 +77,6 @@ class RolePolicy
      */
     public function forceDelete(User $user, Role $role): bool
     {
-        return $user->hasRole('super admin');
+        return $user->isSuperUser();
     }
 }

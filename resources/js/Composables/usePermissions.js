@@ -41,59 +41,59 @@ export function usePermissions() {
         return permissions.some(permission => hasPermission(permission))
     }
     
-    // Check if user is super admin (has all permissions)
-    const isSuperAdmin = computed(() => hasRole('super admin'))
+    // Check if user is super user (has all permissions)
+    const isSuperUser = computed(() => currentUser.value?.is_super_user || false)
     
     // Check if user can manage users
-    const canManageUsers = computed(() => hasAnyRole(['super admin', 'admin', 'manager', 'supervisor']))
+    const canManageUsers = computed(() => isSuperUser.value || hasAnyRole(['admin', 'manager', 'supervisor']))
     
     // Check if user can manage roles
-    const canManageRoles = computed(() => hasRole('super admin'))
+    const canManageRoles = computed(() => isSuperUser.value)
     
     // Check if user can view categories
-    const canViewCategories = computed(() => hasPermission('categories.view') || isSuperAdmin.value)
+    const canViewCategories = computed(() => isSuperUser.value || hasPermission('categories.view'))
     
     // Check if user can manage categories
-    const canManageCategories = computed(() => hasAnyPermission(['categories.create', 'categories.edit', 'categories.delete']) || isSuperAdmin.value)
+    const canManageCategories = computed(() => isSuperUser.value || hasAnyPermission(['categories.create', 'categories.edit', 'categories.delete']))
     
     // Check if user can view products
-    const canViewProducts = computed(() => hasPermission('products.view') || isSuperAdmin.value)
+    const canViewProducts = computed(() => isSuperUser.value || hasPermission('products.view'))
     
     // Check if user can manage products
-    const canManageProducts = computed(() => hasAnyPermission(['products.create', 'products.edit', 'products.delete']) || isSuperAdmin.value)
+    const canManageProducts = computed(() => isSuperUser.value || hasAnyPermission(['products.create', 'products.edit', 'products.delete']))
     
     // Check if user can view sales
-    const canViewSales = computed(() => hasPermission('sales.view') || isSuperAdmin.value)
+    const canViewSales = computed(() => isSuperUser.value || hasPermission('sales.view'))
     
     // Check if user can manage sales
-    const canManageSales = computed(() => hasAnyPermission(['sales.create', 'sales.edit', 'sales.delete']) || isSuperAdmin.value)
+    const canManageSales = computed(() => isSuperUser.value || hasAnyPermission(['sales.create', 'sales.edit', 'sales.delete']))
     
     // Check if user can view inventory
-    const canViewInventory = computed(() => hasPermission('inventory.view') || isSuperAdmin.value)
+    const canViewInventory = computed(() => isSuperUser.value || hasPermission('inventory.view'))
     
     // Check if user can manage inventory
-    const canManageInventory = computed(() => hasAnyPermission(['inventory.receive', 'inventory.transfer', 'inventory.adjustments', 'inventory.locations']) || isSuperAdmin.value)
+    const canManageInventory = computed(() => isSuperUser.value || hasAnyPermission(['inventory.receive', 'inventory.transfer', 'inventory.adjustments', 'inventory.locations']))
     
     // Check if user can view loyalty
-    const canViewLoyalty = computed(() => hasPermission('loyalty.view') || isSuperAdmin.value)
+    const canViewLoyalty = computed(() => isSuperUser.value || hasPermission('loyalty.view'))
     
     // Check if user can manage loyalty
-    const canManageLoyalty = computed(() => hasAnyPermission(['loyalty.manage', 'loyalty.adjust_points']) || isSuperAdmin.value)
+    const canManageLoyalty = computed(() => isSuperUser.value || hasAnyPermission(['loyalty.manage', 'loyalty.adjust_points']))
     
     // Check if user can view customers
-    const canViewCustomers = computed(() => hasPermission('customers.view') || isSuperAdmin.value)
+    const canViewCustomers = computed(() => isSuperUser.value || hasPermission('customers.view'))
     
     // Check if user can manage customers
-    const canManageCustomers = computed(() => hasPermission('customers.manage') || isSuperAdmin.value)
+    const canManageCustomers = computed(() => isSuperUser.value || hasPermission('customers.manage'))
     
     // Check if user can view dashboard
-    const canViewDashboard = computed(() => hasPermission('dashboard.view') || isSuperAdmin.value)
+    const canViewDashboard = computed(() => isSuperUser.value || hasPermission('dashboard.view'))
     
     // Check if user can manage terminal
-    const canManageTerminal = computed(() => hasPermission('terminal.manage') || isSuperAdmin.value)
+    const canManageTerminal = computed(() => isSuperUser.value || hasPermission('terminal.manage'))
     
     // Check if user can view void logs
-    const canViewVoidLogs = computed(() => hasPermission('voids.view') || isSuperAdmin.value)
+    const canViewVoidLogs = computed(() => isSuperUser.value || hasPermission('voids.view'))
     
     return {
         currentUser,
@@ -103,7 +103,7 @@ export function usePermissions() {
         hasAnyRole,
         hasPermission,
         hasAnyPermission,
-        isSuperAdmin,
+        isSuperUser,
         canManageUsers,
         canManageRoles,
         canViewCategories,

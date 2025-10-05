@@ -20,6 +20,16 @@ class UserSeeder extends Seeder
             SpatieRole::firstOrCreate(['name' => $enumRole->value]);
         }
 
+        // Create super user (no role needed)
+        $superUser = User::updateOrCreate(
+            ['email' => 'super.admin@example.com'],
+            [
+                'name' => 'Super Admin',
+                'password' => Hash::make('password'),
+                'is_super_user' => true,
+            ]
+        );
+
         // Users mapped to their roles
         $users = [
             [
@@ -40,12 +50,6 @@ class UserSeeder extends Seeder
                 'password' => 'cashier',
                 'role' => Role::CASHIER,
             ],
-              [
-                'name' => 'Super Admin',
-                'email' => 'super.admin@example.com',
-                'password' => 'password',
-                'role' => Role::SUPER_ADMIN,
-            ],
         ];
 
         foreach ($users as $data) {
@@ -54,6 +58,7 @@ class UserSeeder extends Seeder
                 [
                     'name' => $data['name'],
                     'password' => Hash::make($data['password']),
+                    'is_super_user' => false,
                 ]
             );
 

@@ -7,14 +7,14 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
 
-class CheckPermission
+class CheckSuperUser
 {
     /**
      * Handle an incoming request.
      *
      * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
      */
-    public function handle(Request $request, Closure $next, string $permission): Response
+    public function handle(Request $request, Closure $next): Response
     {
         // Check if user is authenticated
         if (!Auth::check()) {
@@ -23,13 +23,8 @@ class CheckPermission
 
         $user = Auth::user();
 
-        // Super user has all permissions
-        if ($user->isSuperUser()) {
-            return $next($request);
-        }
-
-        // Check if user has the specific permission
-        if (!$user->hasPermissionTo($permission)) {
+        // Check if user is super user
+        if (!$user->isSuperUser()) {
             // If it's an API request, return JSON error
             if ($request->expectsJson()) {
                 return response()->json([

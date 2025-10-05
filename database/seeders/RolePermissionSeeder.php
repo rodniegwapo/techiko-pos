@@ -100,10 +100,6 @@ class RolePermissionSeeder extends Seeder
 
         // Create roles and assign permissions
         
-        // Super Admin - Full access
-        $superAdmin = Role::firstOrCreate(['name' => 'super admin']);
-        $superAdmin->syncPermissions(Permission::all());
-        
         // Admin - Most permissions except system settings
         $admin = Role::firstOrCreate(['name' => 'admin']);
         $admin->syncPermissions([
