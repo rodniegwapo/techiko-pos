@@ -50,6 +50,32 @@
         </div>
       </template>
 
+      <template v-if="column.key === 'hierarchy'">
+        <div class="text-sm">
+          <div v-if="record.is_super_user" class="flex items-center gap-1">
+            <a-tag color="purple" class="font-medium">
+              <template #icon>
+                <IconCrown size="12" />
+              </template>
+              Super User
+            </a-tag>
+          </div>
+          <div v-else class="space-y-1">
+            <div v-if="getUserHierarchyLevel(record) !== null" class="flex items-center gap-1">
+              <a-tag :color="getHierarchyLevelColor(getUserHierarchyLevel(record))" class="font-medium">
+                Level {{ getUserHierarchyLevel(record) }}
+              </a-tag>
+            </div>
+            <div v-if="record.supervisor" class="text-xs text-gray-500">
+              Reports to: {{ record.supervisor.name }}
+            </div>
+            <div v-if="getSubordinatesCount(record) > 0" class="text-xs text-gray-500">
+              Manages: {{ getSubordinatesCount(record) }} user(s)
+            </div>
+          </div>
+        </div>
+      </template>
+
       <template v-if="column.key === 'actions'">
         <div class="flex items-center gap-2">
           <IconTooltipButton
@@ -85,7 +111,7 @@
 
 <script setup>
 import { computed } from "vue";
-import { IconEye, IconEdit, IconTrash } from "@tabler/icons-vue";
+import { IconEye, IconEdit, IconTrash, IconCrown } from "@tabler/icons-vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { Modal, notification } from "ant-design-vue";
 import { usePage } from "@inertiajs/vue3";
@@ -108,6 +134,10 @@ const props = defineProps({
     default: false,
   },
   pagination: {
+    type: Object,
+    default: () => ({}),
+  },
+  hierarchy: {
     type: Object,
     default: () => ({}),
   },
@@ -141,6 +171,12 @@ const columns = [
     key: "created_at",
     align: "center",
     width: "15%",
+  },
+  {
+    title: "Hierarchy",
+    key: "hierarchy",
+    align: "center",
+    width: "20%",
   },
   {
     title: "Actions",
@@ -265,5 +301,33 @@ const formatDate = (date) => {
     month: "short",
     day: "numeric",
   });
+};
+
+// Hierarchy helper methods
+const getUserHierarchyLevel = (user) => {
+  if (user.is_super_user) return -1;
+  
+  if (!user.roles || user.roles.length === 0) return null;
+  
+  const userRole = user.roles[0]?.name?.toLowerCase();
+  if (!userRole || !props.hierarchy[userRole]) return null;
+  
+  return props.hierarchy[userRole].level;
+};
+
+const getHierarchyLevelColor = (level) => {
+  if (level === -1) return 'purple'; // Super user
+  if (level === 1) return 'red';     // Grand Manager
+  if (level === 2) return 'orange';  // Admin
+  if (level === 3) return 'blue';    // Manager
+  if (level === 4) return 'cyan';    // Supervisor
+  if (level === 5) return 'green';   // Cashier
+  return 'default';
+};
+
+const getSubordinatesCount = (user) => {
+  // This would need to be calculated on the backend
+  // For now, return 0 as we don't have this data
+  return 0;
 };
 </script>

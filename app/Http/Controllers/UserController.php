@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\UserResource;
 use App\Models\User;
+use App\Services\UserHierarchyService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -36,45 +37,31 @@ class UserController extends Controller
                     $q->where('name', $role);
                 });
             })
-            // Filter users based on current user's permissions
-            ->when(!$currentUser->isSuperUser() && $currentUser->hasRole('manager'), function ($query) {
-                // Manager can only see cashiers and supervisors
-                return $query->whereHas('roles', function ($q) {
-                    $q->whereIn('name', ['cashier', 'supervisor']);
-                });
+            // Dynamic hierarchy filtering
+            ->when(!$currentUser->isSuperUser(), function ($query) use ($currentUser) {
+                $viewableRoles = UserHierarchyService::getViewableRoles($currentUser);
+                return $query->whereHas('roles', function ($q) use ($viewableRoles) {
+                    $q->whereIn('name', $viewableRoles);
+                })->where('is_super_user', false);
             })
             ->when(!$currentUser->isSuperUser() && $currentUser->hasRole('supervisor'), function ($query) use ($currentUser) {
-                // Supervisor can only see cashiers assigned to them
-                return $query->whereHas('roles', function ($q) {
-                    $q->where('name', 'cashier');
-                })->where('supervisor_id', $currentUser->id);
-            })
-            ->when(!$currentUser->isSuperUser() && $currentUser->hasRole('admin'), function ($query) {
-                // Admin can see everyone except super users
-                return $query->where('is_super_user', false);
+                // Supervisor can only see their direct subordinates
+                return $query->where('supervisor_id', $currentUser->id);
             })
             ->latest()
             ->paginate(15);
 
-        // Filter available roles based on current user's permissions
-        $roles = Role::query()
-            ->when(!$currentUser->isSuperUser() && $currentUser->hasRole('manager'), function ($query) {
-                // Manager can only assign cashier and supervisor roles
-                return $query->whereIn('name', ['cashier', 'supervisor']);
-            })
-            ->when(!$currentUser->isSuperUser() && $currentUser->hasRole('supervisor'), function ($query) {
-                // Supervisor cannot create users, so no roles needed
-                return $query->whereRaw('1 = 0'); // Return empty result
-            })
-            ->when(!$currentUser->isSuperUser() && $currentUser->hasRole('admin'), function ($query) {
-                // Admin can assign all roles (no super admin role exists anymore)
-                return $query;
-            })
-            ->get(['id', 'name']);
+        // Get assignable roles based on simple hierarchy
+        $manageableRoles = $currentUser->isSuperUser() 
+            ? array_keys(UserHierarchyService::getRoleHierarchy())
+            : UserHierarchyService::getManageableRoles($currentUser);
+            
+        $roles = Role::whereIn('name', $manageableRoles)->get(['id', 'name']);
 
         return Inertia::render('Users/Index', [
             'items' => UserResource::collection($users),
-            'roles' => $roles->values()
+            'roles' => $roles,
+            'hierarchy' => UserHierarchyService::getRoleHierarchy(),
         ]);
     }
 
@@ -107,13 +94,15 @@ class UserController extends Controller
                 if (!$availableRoles->contains($value)) {
                     $fail('You are not authorized to assign this role.');
                 }
-            }]
+            }],
+            'supervisor_id' => 'nullable|exists:users,id'
         ]);
 
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
+            'supervisor_id' => $validated['supervisor_id'],
         ]);
 
         // Assign role with correct guard
@@ -150,7 +139,8 @@ class UserController extends Controller
                 'name' => 'required|string|max:255',
                 'email' => ['required', 'email', Rule::unique('users')->ignore($user->id)],
                 'password' => 'nullable|string|min:8|confirmed',
-                'role_id' => ['required', 'exists:roles,id']
+                'role_id' => ['required', 'exists:roles,id'],
+                'supervisor_id' => 'nullable|exists:users,id'
             ];
             
             // Get available roles for role validation
@@ -183,6 +173,7 @@ class UserController extends Controller
             $updateData = [
                 'name' => $validated['name'],
                 'email' => $validated['email'],
+                'supervisor_id' => $validated['supervisor_id'],
             ];
 
             if (!empty($validated['password'])) {
@@ -235,12 +226,14 @@ class UserController extends Controller
     }
 
     /**
-     * Get user details
+     * Display the specified user.
      */
     public function show(User $user)
     {
-        return response()->json([
-            'user' => $user->load('roles', 'permissions')
+        $user->load(['roles', 'supervisor', 'subordinates']);
+        
+        return Inertia::render('Users/Show', [
+            'user' => $user,
         ]);
     }
 
@@ -290,5 +283,57 @@ class UserController extends Controller
         }
 
         return response()->json($roles);
+    }
+
+    /**
+     * Display the user hierarchy page
+     */
+    public function hierarchy(Request $request)
+    {
+        $currentUser = auth()->user();
+        
+        // Get all users with their relationships (simplified)
+        $users = User::with(['roles', 'supervisor', 'subordinates'])
+            ->when(!$currentUser->isSuperUser(), function ($query) use ($currentUser) {
+                // Simple hierarchy-based filtering
+                $viewableRoles = UserHierarchyService::getViewableRoles($currentUser);
+                return $query->whereHas('roles', function ($q) use ($viewableRoles) {
+                    $q->whereIn('name', $viewableRoles);
+                })->where('is_super_user', false);
+            })
+            ->when(!$currentUser->isSuperUser() && $currentUser->hasRole('supervisor'), function ($query) use ($currentUser) {
+                // Supervisor can only see their direct subordinates
+                return $query->where('supervisor_id', $currentUser->id);
+            })
+            ->orderBy('name')
+            ->get();
+
+        // Get hierarchy data from UserHierarchyService
+        $hierarchy = UserHierarchyService::getRoleHierarchy();
+
+        return Inertia::render('Users/Hierarchy', [
+            'users' => $users,
+            'hierarchy' => $hierarchy,
+        ]);
+    }
+
+    /**
+     * Show the form for editing the specified user.
+     */
+    public function edit(User $user)
+    {
+        $user->load(['roles']);
+        
+        $currentUser = auth()->user();
+        $manageableRoles = $currentUser->isSuperUser() 
+            ? array_keys(UserHierarchyService::getRoleHierarchy())
+            : UserHierarchyService::getManageableRoles($currentUser);
+            
+        $roles = Role::whereIn('name', $manageableRoles)->get(['id', 'name']);
+        
+        return Inertia::render('Users/Edit', [
+            'user' => $user,
+            'roles' => $roles,
+        ]);
     }
 }

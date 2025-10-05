@@ -30,25 +30,104 @@ class UserSeeder extends Seeder
             ]
         );
 
-        // Users mapped to their roles
+        // Users mapped to their roles - Expanded for cascading hierarchy
         $users = [
+            // Level 2 - Admin
             [
-                'name' => 'Admin',
+                'name' => 'John Admin',
                 'email' => 'admin@example.com',
                 'password' => 'admin',
-                'role' => Role::ADMIN,
+                'role' => 'admin',
             ],
             [
-                'name' => 'Manager',
+                'name' => 'Sarah Admin',
+                'email' => 'admin2@example.com',
+                'password' => 'admin',
+                'role' => 'admin',
+            ],
+            
+            // Level 3 - Manager
+            [
+                'name' => 'Mike Manager',
                 'email' => 'manager@example.com',
                 'password' => 'manager',
-                'role' => Role::MANAGER,
+                'role' => 'manager',
             ],
             [
-                'name' => 'Cashier',
+                'name' => 'Lisa Manager',
+                'email' => 'manager2@example.com',
+                'password' => 'manager',
+                'role' => 'manager',
+            ],
+            [
+                'name' => 'David Manager',
+                'email' => 'manager3@example.com',
+                'password' => 'manager',
+                'role' => 'manager',
+            ],
+            
+            // Level 4 - Supervisor
+            [
+                'name' => 'Emma Supervisor',
+                'email' => 'supervisor@example.com',
+                'password' => 'supervisor',
+                'role' => 'supervisor',
+            ],
+            [
+                'name' => 'Tom Supervisor',
+                'email' => 'supervisor2@example.com',
+                'password' => 'supervisor',
+                'role' => 'supervisor',
+            ],
+            [
+                'name' => 'Anna Supervisor',
+                'email' => 'supervisor3@example.com',
+                'password' => 'supervisor',
+                'role' => 'supervisor',
+            ],
+            [
+                'name' => 'Chris Supervisor',
+                'email' => 'supervisor4@example.com',
+                'password' => 'supervisor',
+                'role' => 'supervisor',
+            ],
+            
+            // Level 5 - Cashier
+            [
+                'name' => 'Alex Cashier',
                 'email' => 'cashier@example.com',
                 'password' => 'cashier',
-                'role' => Role::CASHIER,
+                'role' => 'cashier',
+            ],
+            [
+                'name' => 'Maria Cashier',
+                'email' => 'cashier2@example.com',
+                'password' => 'cashier',
+                'role' => 'cashier',
+            ],
+            [
+                'name' => 'James Cashier',
+                'email' => 'cashier3@example.com',
+                'password' => 'cashier',
+                'role' => 'cashier',
+            ],
+            [
+                'name' => 'Sophie Cashier',
+                'email' => 'cashier4@example.com',
+                'password' => 'cashier',
+                'role' => 'cashier',
+            ],
+            [
+                'name' => 'Ryan Cashier',
+                'email' => 'cashier5@example.com',
+                'password' => 'cashier',
+                'role' => 'cashier',
+            ],
+            [
+                'name' => 'Nina Cashier',
+                'email' => 'cashier6@example.com',
+                'password' => 'cashier',
+                'role' => 'cashier',
             ],
         ];
 
@@ -62,8 +141,8 @@ class UserSeeder extends Seeder
                 ]
             );
 
-            // Assign role using enum value
-            $user->assignRole($data['role']->value);
+            // Assign role using string value
+            $user->assignRole($data['role']);
         }
     }
 }
