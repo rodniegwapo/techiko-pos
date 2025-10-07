@@ -92,6 +92,19 @@ Route::middleware(['auth', 'user.permission'])->group(function () {
         Route::get('/roles-permissions/permissions', [\App\Http\Controllers\RoleController::class, 'permissions'])->name('roles.permissions');
     });
 
+    // Permission Management (Only for super user)
+    Route::middleware(['check.super.user'])->group(function () {
+        Route::get('/permissions', [\App\Http\Controllers\PermissionController::class, 'index'])->name('permissions.index');
+        Route::get('/permissions/create', [\App\Http\Controllers\PermissionController::class, 'create'])->name('permissions.create');
+        Route::post('/permissions', [\App\Http\Controllers\PermissionController::class, 'store'])->name('permissions.store');
+        Route::get('/permissions/{permission}', [\App\Http\Controllers\PermissionController::class, 'show'])->name('permissions.show');
+        Route::get('/permissions/{permission}/edit', [\App\Http\Controllers\PermissionController::class, 'edit'])->name('permissions.edit');
+        Route::put('/permissions/{permission}', [\App\Http\Controllers\PermissionController::class, 'update'])->name('permissions.update');
+        Route::delete('/permissions/{permission}', [\App\Http\Controllers\PermissionController::class, 'destroy'])->name('permissions.destroy');
+        Route::post('/permissions/bulk-delete', [\App\Http\Controllers\PermissionController::class, 'bulkDelete'])->name('permissions.bulk-delete');
+        Route::get('/permissions-grouped', [\App\Http\Controllers\PermissionController::class, 'getGroupedPermissions'])->name('permissions.grouped');
+    });
+
     // Terminal Setup
     Route::post('/setup-terminal', [\App\Http\Controllers\TerminalController::class, 'setupTerminal'])->name('setup.terminal');
 
