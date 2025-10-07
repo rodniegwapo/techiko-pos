@@ -20,6 +20,7 @@ const page = usePage();
 // ======================
 // USER PERMISSIONS LOGIC
 // ======================
+const isSuperUser = computed(() => !!page.props.auth?.user?.data?.is_super_user);
 const userPermissionNames = computed(() =>
     (page.props.auth?.user?.data?.permissions || []).map((p) => p.name)
 );
@@ -149,6 +150,20 @@ const allMenus = [
 // FILTER MENUS BASED ON PERMISSIONS
 // ===================================
 const menus = computed(() => {
+    // Helper to attach path from routeName recursively
+    const attachPaths = (menuList) =>
+        menuList.map((m) => {
+            const item = { ...m };
+            if (!item.path && item.routeName) item.path = route(item.routeName);
+            if (item.children) item.children = attachPaths(item.children);
+            return item;
+        });
+
+    // Super user: show everything
+    if (isSuperUser.value) {
+        return attachPaths(allMenus);
+    }
+
     const filterMenu = (menuList) => {
         return menuList
             .map((menu) => {
