@@ -144,6 +144,12 @@ const allMenus = [
         routeName: "roles.index",
         path: route("roles.index"),
     },
+    {
+        title: "Permission Management",
+        icon: IconShield,
+        routeName: "permissions.index",
+        path: route("permissions.index"),
+    },
 ];
 
 // ===================================

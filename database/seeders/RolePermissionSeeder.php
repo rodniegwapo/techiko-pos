@@ -101,6 +101,12 @@ class RolePermissionSeeder extends Seeder
             'roles.create',
             'roles.edit',
             'roles.delete',
+            
+            // Permission Management
+            'permissions.view',
+            'permissions.create',
+            'permissions.edit',
+            'permissions.delete',
         ];
 
         foreach ($permissions as $permission) {
@@ -167,6 +173,8 @@ class RolePermissionSeeder extends Seeder
             'inventory.transfer',
             'inventory.low_stock',
             'void_logs.view',
+            // Permission Management (admin can view only)
+            'permissions.view',
         ]);
         
         // Manager - Operational permissions
