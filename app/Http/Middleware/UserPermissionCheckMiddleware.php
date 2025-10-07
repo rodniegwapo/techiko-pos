@@ -28,6 +28,12 @@ class UserPermissionCheckMiddleware
             return $next($request);
         }
 
+        // Special-case: allow supervisors to view Users index/show without explicit users.view
+        $routeName = $request->route()?->getName();
+        if ($user->hasRole('supervisor') && in_array($routeName, ['users.index', 'users.show'])) {
+            return $next($request);
+        }
+
         // Get the required permission for this route
         $requiredPermission = $this->getRequiredPermission($request);
 
@@ -57,7 +63,7 @@ class UserPermissionCheckMiddleware
         $routePermissionMap = [
             // Dashboard
             'dashboard' => 'dashboard.view',
-            
+
             // Users
             'users.index' => 'users.view',
             'users.create' => 'users.create',
@@ -66,7 +72,7 @@ class UserPermissionCheckMiddleware
             'users.edit' => 'users.edit',
             'users.update' => 'users.edit',
             'users.destroy' => 'users.delete',
-            
+
             // Roles
             'roles.index' => 'roles.view',
             'roles.create' => 'roles.create',
@@ -76,7 +82,7 @@ class UserPermissionCheckMiddleware
             'roles.update' => 'roles.edit',
             'roles.destroy' => 'roles.delete',
             'roles.permission-matrix' => 'roles.view',
-            
+
             // Categories
             'categories.index' => 'categories.view',
             'categories.create' => 'categories.create',
@@ -85,7 +91,7 @@ class UserPermissionCheckMiddleware
             'categories.edit' => 'categories.edit',
             'categories.update' => 'categories.edit',
             'categories.destroy' => 'categories.delete',
-            
+
             // Products
             'products.index' => 'products.view',
             'products.create' => 'products.create',
@@ -94,7 +100,7 @@ class UserPermissionCheckMiddleware
             'products.edit' => 'products.edit',
             'products.update' => 'products.edit',
             'products.destroy' => 'products.delete',
-            
+
             // Sales
             'sales.index' => 'sales.view',
             'sales.create' => 'sales.create',
@@ -117,7 +123,7 @@ class UserPermissionCheckMiddleware
             'sales.discounts.order.remove' => 'sales.create',
             'sales.items.discount.apply' => 'sales.create',
             'sales.items.discount.remove' => 'sales.create',
-            
+
             // Customers
             'customers.index' => 'customers.view',
             'customers.create' => 'customers.create',
@@ -126,7 +132,7 @@ class UserPermissionCheckMiddleware
             'customers.edit' => 'customers.edit',
             'customers.update' => 'customers.edit',
             'customers.destroy' => 'customers.delete',
-            
+
             // Inventory
             'inventory.index' => 'inventory.view',
             'inventory.dashboard' => 'inventory.dashboard',
@@ -137,7 +143,7 @@ class UserPermissionCheckMiddleware
             'inventory.receive' => 'inventory.receive',
             'inventory.transfer' => 'inventory.transfer',
             'inventory.low-stock' => 'inventory.low_stock',
-            
+
             // Stock Adjustments
             'stock-adjustments.index' => 'inventory.adjustments',
             'stock-adjustments.create' => 'inventory.adjustments',
@@ -146,18 +152,18 @@ class UserPermissionCheckMiddleware
             'stock-adjustments.edit' => 'inventory.adjustments',
             'stock-adjustments.update' => 'inventory.adjustments',
             'stock-adjustments.destroy' => 'inventory.adjustments',
-            
+
             // Loyalty
             'loyalty.index' => 'loyalty.view',
             'loyalty.customers' => 'loyalty.customers_manage',
             'loyalty.points' => 'loyalty.points_adjust',
             'loyalty.tiers' => 'loyalty.tiers_manage',
             'loyalty.reports' => 'loyalty.reports_view',
-            
+
             // Reports
             'reports.index' => 'reports.view',
             'reports.export' => 'reports.export',
-            
+
             // Void Logs
             'void-logs.index' => 'void_logs.view',
         ];
@@ -171,7 +177,7 @@ class UserPermissionCheckMiddleware
         if ($controller && $action) {
             $controllerName = class_basename($controller);
             $module = $this->getModuleFromController($controllerName);
-            
+
             if ($module) {
                 return $this->generatePermissionFromAction($module, $action);
             }
@@ -219,7 +225,7 @@ class UserPermissionCheckMiddleware
         ];
 
         $permissionAction = $actionMap[$action] ?? $action;
-        
+
         return "{$module}.{$permissionAction}";
     }
 

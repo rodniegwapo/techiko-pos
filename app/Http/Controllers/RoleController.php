@@ -32,9 +32,7 @@ class RoleController extends Controller
             ->paginate(10);
 
         // Get all permissions grouped by module
-        $permissions = Permission::all()->groupBy(function ($permission) {
-            return explode('.', $permission->name)[0];
-        });
+        $permissions = $this->getPermissionsGroupedByModule();
 
         return Inertia::render('Roles/Index', [
             'roles' => RoleResource::collection($roles),
@@ -53,9 +51,7 @@ class RoleController extends Controller
         $this->authorize('create', new Role());
 
         // Get all permissions grouped by module
-        $permissions = Permission::all()->groupBy(function ($permission) {
-            return explode('.', $permission->name)[0];
-        });
+        $permissions = $this->getPermissionsGroupedByModule();
 
         return Inertia::render('Roles/Create', [
             'permissions' => $permissions,
@@ -69,13 +65,7 @@ class RoleController extends Controller
     {
         $this->authorize('create', new Role());
 
-        $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:roles,name',
-            'description' => 'nullable|string|max:500',
-            'level' => 'required|integer|min:1|max:99',
-            'permissions' => 'array',
-            'permissions.*' => 'exists:permissions,id',
-        ]);
+        $validated = $this->validateRole($request);
 
         try {
             $role = Role::create([
@@ -86,10 +76,7 @@ class RoleController extends Controller
             ]);
 
             // Assign permissions if provided
-            if (!empty($validated['permissions'])) {
-                $permissions = Permission::whereIn('id', $validated['permissions'])->get();
-                $role->syncPermissions($permissions);
-            }
+            $this->syncRolePermissions($role, $validated['permissions'] ?? []);
 
             // Log the role creation
             Log::info('Role created', [
@@ -140,13 +127,7 @@ class RoleController extends Controller
     {
         $this->authorize('update', $role);
 
-        $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:roles,name,' . $role->id,
-            'description' => 'nullable|string|max:500',
-            'level' => 'required|integer|min:1|max:99',
-            'permissions' => 'array',
-            'permissions.*' => 'exists:permissions,id',
-        ]);
+        $validated = $this->validateRole($request, $role);
 
         try {
             $oldPermissions = $role->permissions->pluck('id')->toArray();
@@ -158,10 +139,7 @@ class RoleController extends Controller
             ]);
 
             // Update permissions
-            if (isset($validated['permissions'])) {
-                $permissions = Permission::whereIn('id', $validated['permissions'])->get();
-                $role->syncPermissions($permissions);
-            }
+            $this->syncRolePermissions($role, $validated['permissions'] ?? []);
 
             // Log the role update
             Log::info('Role updated', [
@@ -187,6 +165,81 @@ class RoleController extends Controller
 
             return back()->withErrors(['error' => 'Failed to update role: ' . $e->getMessage()]);
         }
+    }
+
+    /**
+     * DRY: Group permissions by module prefix
+     */
+    private function getPermissionsGroupedByModule()
+    {
+        return Permission::all()->groupBy(function ($permission) {
+            return explode('.', $permission->name)[0];
+        });
+    }
+
+    /**
+     * DRY: Validate role data for store/update
+     */
+    private function validateRole(Request $request, ?Role $role = null): array
+    {
+        return $request->validate([
+            'name' => ['required','string','max:255','unique:roles,name' . ($role ? ',' . $role->id : '')],
+            'description' => 'nullable|string|max:500',
+            'level' => 'required|integer|min:1|max:99',
+            'permissions' => 'array',
+            'permissions.*' => 'exists:permissions,id',
+        ]);
+    }
+
+    /**
+     * DRY: Sync role permissions from ids
+     */
+    private function syncRolePermissions(Role $role, array $permissionIds): void
+    {
+        // If no permissions provided, clear all
+        if (empty($permissionIds)) {
+            $role->syncPermissions([]);
+            return;
+        }
+
+        // Load selected permissions by id
+        $selected = Permission::whereIn('id', $permissionIds)->get();
+
+        // Normalize permission names to match route-style actions
+        // view->index, create->store, edit->update, delete->destroy
+        $normalizedPermissions = $selected->map(function (Permission $perm) {
+            $normalizedName = $this->normalizePermissionName($perm->name);
+            if ($normalizedName === $perm->name) {
+                return $perm; // already normalized
+            }
+            // Find or create normalized permission
+            return Permission::firstOrCreate(['name' => $normalizedName]);
+        });
+
+        // Sync using normalized permissions set
+        $role->syncPermissions($normalizedPermissions);
+    }
+
+    /**
+     * Convert legacy permission action names to RESTful route-aligned actions.
+     * Example: users.view -> users.index, sales.create -> sales.store
+     */
+    private function normalizePermissionName(string $permissionName): string
+    {
+        // Expect format module.action, e.g., users.view
+        $parts = explode('.', $permissionName, 2);
+        if (count($parts) !== 2) {
+            return $permissionName; // unknown format
+        }
+        [$module, $action] = $parts;
+        $map = [
+            'view' => 'index',
+            'create' => 'store',
+            'edit' => 'update',
+            'delete' => 'destroy',
+        ];
+        $normalizedAction = $map[$action] ?? $action;
+        return $module . '.' . $normalizedAction;
     }
 
     /**

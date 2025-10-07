@@ -201,6 +201,7 @@ class RolePermissionSeeder extends Seeder
         $supervisor->update(['level' => 4, 'description' => 'Shift supervision with limited management capabilities']);
         $supervisor->syncPermissions([
             'dashboard.view',
+            'users.view',
             'sales.view',
             'sales.create',
             'sales.void',

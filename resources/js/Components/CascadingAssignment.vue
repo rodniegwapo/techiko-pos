@@ -93,7 +93,7 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { router } from '@inertiajs/vue3';
-import { IconUserCheck, IconInfoCircle } from '@tabler/icons-vue';
+import { IconUserCheck, IconInfoCircle, IconShield, IconUser } from '@tabler/icons-vue';
 
 const props = defineProps({
   currentUser: Object,
@@ -170,12 +170,12 @@ const getRoleColor = (roleName) => {
 
 const getRoleIcon = (roleName) => {
   const roleIcons = {
-    'super admin': 'IconShield',
-    'admin': 'IconUser',
-    'manager': 'IconUser',
-    'supervisor': 'IconUser',
-    'cashier': 'IconUser',
-    'default': 'IconUser'
+    'super admin': IconShield,
+    'admin': IconUser,
+    'manager': IconUser,
+    'supervisor': IconUser,
+    'cashier': IconUser,
+    'default': IconUser
   };
   return roleIcons[roleName.toLowerCase()] || roleIcons['default'];
 };

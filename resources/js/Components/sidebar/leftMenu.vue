@@ -4,7 +4,6 @@ import {
     IconDashboard,
     IconCategory,
     IconUsers,
-    IconBrandProducthunt,
     IconHeartHandshake,
     IconHistory,
     IconGift,
@@ -13,203 +12,148 @@ import {
     IconShield,
 } from "@tabler/icons-vue";
 import { router, usePage } from "@inertiajs/vue3";
-
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
-import { usePermissions } from "@/Composables/usePermissions";
 
 const { selectedKeys, openKeys } = useGlobalVariables();
 const page = usePage();
 
-// Use permission composable
-const {
-    canViewDashboard,
-    canViewCategories,
-    canViewProducts,
-    canViewSales,
-    canViewInventory,
-    canViewLoyalty,
-    canViewCustomers,
-    canManageUsers,
-    canManageRoles,
-    canViewVoidLogs
-} = usePermissions();
+// ======================
+// USER PERMISSIONS LOGIC
+// ======================
+const userPermissionNames = computed(() =>
+    (page.props.auth?.user?.data?.permissions || []).map((p) => p.name)
+);
 
-const menus = computed(() => {
-    const baseMenus = [];
-    
-    // Dashboard - All authenticated users
-    if (canViewDashboard.value) {
-        baseMenus.push({
-            title: "Dashboard",
-            path: route("dashboard"),
-            icon: IconDashboard,
-            pathName: "dashboard",
-        });
-    }
-    
-    // Sales - All authenticated users
-    if (canViewSales.value) {
-        baseMenus.push({
-            title: "Sales",
-            path: route("sales.index"),
-            icon: IconHeartHandshake,
-            pathName: "sales",
-        });
-    }
-    
-    // Products - Admin, Manager, Supervisor
-    if (canViewProducts.value || canViewCategories.value) {
-        const productChildren = [];
-        
-        if (canViewProducts.value) {
-            productChildren.push({
-                title: "Items",
-                path: route("products.index"),
-            });
-        }
-        
-        if (canViewCategories.value) {
-            productChildren.push({
-                title: "Categories",
-                path: route("categories.index"),
-            });
-        }
-        
-        if (canViewProducts.value) {
-            productChildren.push({
-                title: "Discounts",
-                path: route("products.discounts.index"),
-            });
-            productChildren.push({
+// Check if user has a specific permission
+const hasPerm = (perm) => userPermissionNames.value.includes(perm);
+
+// Optional: Support wildcard like "sales.*"
+const hasPermLike = (perm) => {
+    const base = perm.split(".")[0];
+    return userPermissionNames.value.some(
+        (p) => p === perm || p.startsWith(`${base}.`)
+    );
+};
+
+// ======================
+// STATIC MENU DEFINITION
+// ======================
+const allMenus = [
+    {
+        title: "Dashboard",
+        icon: IconDashboard,
+        routeName: "dashboard",
+    },
+    {
+        title: "Sales",
+        icon: IconHeartHandshake,
+        routeName: "sales.index",
+    },
+    {
+        title: "Products",
+        icon: IconCategory,
+        children: [
+            { title: "Items", routeName: "products.index" },
+            { title: "Categories", routeName: "categories.index" },
+            { title: "Discounts", routeName: "products.discounts.index" },
+            {
                 title: "Mandatory Discounts",
-                path: route("mandatory-discounts.index"),
-            });
-        }
-        
-        if (productChildren.length > 0) {
-            baseMenus.push({
-                title: "Products",
-                icon: IconCategory,
-                path: "/products",
-                children: productChildren,
-            });
-        }
-    }
-    
-    // Inventory - Admin, Manager
-    if (canViewInventory.value) {
-        const inventoryChildren = [
-            {
-                title: "Dashboard",
-                path: route("inventory.index"),
+                routeName: "mandatory-discounts.index",
             },
-            {
-                title: "Products",
-                path: route("inventory.products"),
-            },
-            {
-                title: "Movements",
-                path: route("inventory.movements"),
-            },
+        ],
+    },
+    {
+        title: "Inventory",
+        icon: IconPackage,
+        children: [
+            { title: "Dashboard", routeName: "inventory.index" },
+            { title: "Products", routeName: "inventory.products" },
+            { title: "Movements", routeName: "inventory.movements" },
             {
                 title: "Stock Adjustments",
-                path: route("inventory.adjustments.index"),
+                routeName: "inventory.adjustments.index",
             },
-            {
-                title: "Locations",
-                path: route("inventory.locations.index"),
-            },
-            {
-                title: "Valuation Report",
-                path: route("inventory.valuation"),
-            },
-        ];
-        
-        baseMenus.push({
-            title: "Inventory",
-            icon: IconPackage,
-            path: "/inventory",
-            children: inventoryChildren,
-        });
-    }
-    
-    // Loyalty Program - Admin, Manager, Supervisor
-    if (canViewLoyalty.value) {
-        baseMenus.push({
-            title: "Loyalty Program",
-            path: route("loyalty.index"),
-            icon: IconGift,
-            pathName: "loyalty",
-        });
-    }
-    
-    // Void Logs - Admin, Manager, Supervisor
-    if (canViewVoidLogs.value) {
-        baseMenus.push({
-            title: "Void logs",
-            path: route("voids.index"),
-            icon: IconHistory,
-        });
-    }
-    
-    // Customers - Admin, Manager, Supervisor
-    if (canViewCustomers.value) {
-        baseMenus.push({
-            title: "Customers",
-            path: "/customers",
-            icon: IconUsers,
-        });
-    }
+            { title: "Locations", routeName: "inventory.locations.index" },
+            { title: "Valuation Report", routeName: "inventory.valuation" },
+        ],
+    },
+    {
+        title: "Loyalty Program",
+        icon: IconGift,
+        routeName: "loyalty.index",
+    },
+    {
+        title: "Void Logs",
+        icon: IconHistory,
+        routeName: "voids.index",
+    },
+    {
+        title: "Customers",
+        icon: IconUsers,
+        routeName: "customers.index",
+    },
+    {
+        title: "Users",
+        icon: IconUserCog,
+        routeName: "users.index",
+    },
+    {
+        title: "Role Management",
+        icon: IconShield,
+        routeName: "roles.index",
+    },
+];
 
-    // Add User Management menu item only for Super Admin and Admin
-    if (canManageUsers.value) {
-        baseMenus.push({
-            title: "Users",
-            path: route("users.index"),
-            icon: IconUserCog,
-            pathName: "users",
-        });
-    }
+// ===================================
+// FILTER MENUS BASED ON PERMISSIONS
+// ===================================
+const menus = computed(() => {
+    const filterMenu = (menuList) => {
+        return menuList
+            .map((menu) => {
+                if (menu.children) {
+                    const filteredChildren = filterMenu(menu.children);
+                    if (filteredChildren.length > 0) {
+                        return { ...menu, children: filteredChildren };
+                    }
+                } else if (
+                    menu.routeName &&
+                    (hasPerm(menu.routeName) || hasPermLike(menu.routeName))
+                ) {
+                    return { ...menu, path: route(menu.routeName) };
+                }
+                return null;
+            })
+            .filter(Boolean);
+    };
 
-    // Add Role Management menu item only for Super Admin
-    if (canManageRoles.value) {
-        baseMenus.push({
-            title: "Role Management",
-            path: route("roles.index"),
-            icon: IconShield,
-            pathName: "roles",
-        });
-    }
-
-    return baseMenus;
+    return filterMenu(allMenus);
 });
 
+// ===================
+// MENU CLICK HANDLER
+// ===================
 const handleClick = (menu, parentMenu = null) => {
-    // Set the selected key first
     selectedKeys.value = [menu.path];
-
-    // If this is a child menu, ensure parent stays open
     if (parentMenu) {
         const submenuKey = `submenu-${parentMenu.path}`;
         if (!openKeys.value.includes(submenuKey)) {
             openKeys.value = [...openKeys.value, submenuKey];
         }
     }
-
-    // Navigate to the page
     router.visit(menu.path);
 };
 
-// Initialize menu state
+// ===================
+// MENU STATE HANDLING
+// ===================
 const initializeMenuState = () => {
     const url = new URL(window.location.href);
     const currentPath = url.origin + url.pathname;
 
-    // Find exact match first
     let matchedMenu = null;
     let parentMenu = null;
 
-    // Check for exact match in child menus
     for (const menu of menus.value) {
         if (menu.children) {
             const childMatch = menu.children.find(
@@ -226,42 +170,13 @@ const initializeMenuState = () => {
         }
     }
 
-    // If no exact match, try to find parent route match (for create/edit pages)
-    if (!matchedMenu) {
-        for (const menu of menus.value) {
-            if (menu.children) {
-                const childMatch = menu.children.find(
-                    (child) =>
-                        currentPath.startsWith(child.path) &&
-                        currentPath !== child.path
-                );
-                if (childMatch) {
-                    matchedMenu = childMatch;
-                    parentMenu = menu;
-                    break;
-                }
-            } else if (
-                currentPath.startsWith(menu.path) &&
-                currentPath !== menu.path
-            ) {
-                matchedMenu = menu;
-                break;
-            }
-        }
-    }
-
     if (matchedMenu) {
         selectedKeys.value = [matchedMenu.path];
-
         if (parentMenu) {
             const submenuKey = `submenu-${parentMenu.path}`;
-            // Preserve existing open keys and add the new one
             if (!openKeys.value.includes(submenuKey)) {
                 openKeys.value = [...openKeys.value, submenuKey];
             }
-        } else {
-            // If it's a top-level menu, we might want to close submenus
-            // but let's keep them open for better UX
         }
     }
 };
@@ -270,15 +185,11 @@ onMounted(() => {
     initializeMenuState();
 });
 
-// Watch for route changes to maintain menu state
 watch(
     () => page.url,
-    () => {
-        initializeMenuState();
-    }
+    () => initializeMenuState()
 );
 
-// Handle submenu open/close events
 const handleOpenChange = (keys) => {
     openKeys.value = keys;
 };
@@ -295,6 +206,7 @@ const handleOpenChange = (keys) => {
             @openChange="handleOpenChange"
         >
             <template v-for="menu in menus" :key="menu.path">
+                <!-- Single menu -->
                 <a-menu-item
                     v-if="!menu.children"
                     :key="menu.path"
@@ -312,19 +224,21 @@ const handleOpenChange = (keys) => {
                             />
                         </span>
                     </template>
+
                     <div class="flex items-center gap-2">
                         {{ menu.title }}
                         <span v-if="menu.title == 'Dashboard'" class="text-xs">
                             <a-tag color="blue" class="text-[10px]">
-                                {{ page.props.default_store.name }}</a-tag
-                            ></span
-                        >
+                                {{ page.props.default_store.name }}
+                            </a-tag>
+                        </span>
                     </div>
                 </a-menu-item>
 
+                <!-- Sub-menu -->
                 <a-sub-menu
                     v-else
-                    :key="`submenu-${menu.path}`"
+                    :key="`submenu-${menu.path || menu.title}`"
                     class="font-semibold text-gray-800 items-center"
                 >
                     <template #icon>
@@ -357,9 +271,9 @@ const handleOpenChange = (keys) => {
                                 class="text-xs"
                             >
                                 <a-tag color="blue" class="text-[10px]">
-                                    {{ page.props.default_store.name }}</a-tag
-                                ></span
-                            >
+                                    {{ page.props.default_store.name }}
+                                </a-tag>
+                            </span>
                         </div>
                     </a-menu-item>
                 </a-sub-menu>
