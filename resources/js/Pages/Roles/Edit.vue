@@ -27,6 +27,7 @@ const roleData = computed(() => props.role?.data || props.role);
 const form = reactive({
   name: "",
   description: "",
+  level: 1,
   permissions: [],
 });
 
@@ -37,6 +38,7 @@ onMounted(() => {
   if (roleData.value) {
     form.name = roleData.value.name || "";
     form.description = roleData.value.description || "";
+    form.level = roleData.value.level || 1;
     form.permissions = roleData.value.permissions?.map(p => p.id) || [];
   }
 });
@@ -50,6 +52,19 @@ const rules = computed(() => ({
   ],
   description: [
     { max: 500, message: "Description cannot exceed 500 characters" },
+  ],
+  level: [
+    { required: true, message: "Please enter a role level" },
+    {
+      validator: (_rule, value) => {
+        if (value == null || value === '') return Promise.reject("Please enter a role level");
+        const num = Number(value);
+        if (!Number.isInteger(num)) return Promise.reject("Level must be an integer");
+        if (num < 1 || num > 99) return Promise.reject("Level must be between 1 and 99");
+        return Promise.resolve();
+      },
+      trigger: 'change'
+    }
   ],
   permissions: [
     { required: true, message: "Please select at least one permission" },
@@ -76,6 +91,7 @@ const handleSave = async () => {
     const formData = {
       name: form.name,
       description: form.description,
+      level: form.level,
       permissions: form.permissions,
     };
 
@@ -221,6 +237,19 @@ const getPermissionLabel = (permissionName) => {
                 size="large"
               />
             </a-form-item>
+
+          <a-form-item
+            label="Level"
+            name="level"
+          >
+            <a-input-number
+              v-model:value="form.level"
+              :min="1"
+              :max="99"
+              :step="1"
+              style="width: 100%"
+            />
+          </a-form-item>
 
             <a-form-item
               label="Description"

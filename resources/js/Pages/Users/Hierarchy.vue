@@ -232,24 +232,6 @@ const closeSupervisorModal = () => {
     <ContentHeader title="User Hierarchy" />
 
     <div class="max-w-7xl mx-auto p-6 space-y-6">
-      <!-- Debug Information -->
-      <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <h4 class="text-sm font-medium text-yellow-800 mb-2">Debug Information:</h4>
-        <div class="text-sm text-yellow-700 grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div>
-            <p><strong>Total Users:</strong> {{ users?.length || 0 }}</p>
-          </div>
-          <div>
-            <p><strong>Top Level Users:</strong> {{ topLevelUsers.length }}</p>
-          </div>
-          <div>
-            <p><strong>With Supervisors:</strong> {{ users?.filter(u => u.supervisor_id).length || 0 }}</p>
-          </div>
-          <div>
-            <p><strong>Org Chart Data:</strong> {{ orgChartData ? orgChartData.length : 'null' }}</p>
-          </div>
-        </div>
-      </div>
 
       <!-- Header Section -->
       <div class="bg-white rounded-lg shadow-sm border p-6">
@@ -337,68 +319,6 @@ const closeSupervisorModal = () => {
         </div>
       </div>
 
-      <!-- Simple User List (Fallback) -->
-      <div class="bg-white rounded-lg shadow-sm border p-6">
-        <h3 class="text-lg font-semibold text-gray-900 mb-6">All Users (Simple View)</h3>
-        
-        <div v-if="!users || users.length === 0" class="text-center py-8">
-          <IconUsers class="mx-auto h-12 w-12 text-gray-400" />
-          <h3 class="mt-2 text-sm font-medium text-gray-900">No users found</h3>
-          <p class="mt-1 text-sm text-gray-500">
-            There are no users to display.
-          </p>
-        </div>
-
-        <div v-else class="space-y-4">
-          <div 
-            v-for="user in users" 
-            :key="user.id"
-            class="border rounded-lg p-4 hover:bg-gray-50"
-          >
-            <div class="flex items-center justify-between">
-              <div class="flex items-center space-x-4">
-                <div class="flex-shrink-0">
-                  <component 
-                    :is="getRoleIcon(getUserRole(user))" 
-                    class="w-8 h-8"
-                    :class="`text-${getRoleColor(getUserRole(user))}-600`"
-                  />
-                </div>
-                <div>
-                  <h4 class="text-lg font-medium text-gray-900">{{ user.name }}</h4>
-                  <p class="text-sm text-gray-500">{{ getUserRole(user) }}</p>
-                  <p class="text-sm text-gray-500">{{ user.email }}</p>
-                  <p v-if="user.supervisor" class="text-xs text-gray-400">
-                    Reports to: {{ user.supervisor.name }}
-                  </p>
-                  <p v-else class="text-xs text-gray-400">
-                    No supervisor assigned
-                  </p>
-                </div>
-              </div>
-              <div class="flex space-x-2">
-                <a-button size="small" @click="handleViewUser({id: user.id})">
-                  <template #icon>
-                    <IconEye />
-                  </template>
-                  View
-                </a-button>
-                <a-button 
-                  v-if="canManageUsers || isSuperUser"
-                  size="small" 
-                  type="primary" 
-                  @click="handleEditUser({id: user.id})"
-                >
-                  <template #icon>
-                    <IconSettings />
-                  </template>
-                  Edit
-                </a-button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
 
       <!-- Hierarchy Tree (Advanced) -->
       <div class="bg-white rounded-lg shadow-sm border p-6">
@@ -519,107 +439,10 @@ const closeSupervisorModal = () => {
         </div>
       </div>
 
-      <!-- Users Without Supervisors -->
-      <div v-if="usersWithoutSupervisors.length > 0" class="bg-white rounded-lg shadow-sm border p-6 mt-6">
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">Users Without Supervisors</h3>
-        <p class="text-sm text-gray-600 mb-4">These users are not currently assigned to any supervisor in the hierarchy.</p>
-        
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div 
-            v-for="user in usersWithoutSupervisors"
-            :key="user.id"
-            class="border rounded-lg p-4 hover:shadow-md transition-shadow"
-          >
-            <div class="flex items-center space-x-3 mb-3">
-              <div 
-                class="p-2 rounded-lg"
-                :class="`bg-${getRoleColor(getUserRole(user))}-100`"
-              >
-                <component 
-                  :is="getRoleIcon(getUserRole(user))" 
-                  class="w-6 h-6"
-                  :class="`text-${getRoleColor(getUserRole(user))}-600`"
-                />
-              </div>
-              <div>
-                <h4 class="font-semibold text-gray-900">{{ user.name }}</h4>
-                <p class="text-sm text-gray-600">{{ getUserRole(user) }}</p>
-              </div>
-            </div>
-            
-            <div class="flex items-center justify-between">
-              <a-tag 
-                :color="getStatusColor(user.status)" 
-                size="small"
-              >
-                {{ getStatusText(user.status) }}
-              </a-tag>
-              
-              <a-dropdown v-if="canManageUsers || isSuperUser" placement="bottomRight">
-                <a-button size="small">
-                  <template #icon>
-                    <IconUserCheck />
-                  </template>
-                  Assign Supervisor
-                </a-button>
-                <template #overlay>
-                  <a-menu>
-                    <a-menu-item 
-                      v-for="supervisor in availableSupervisors.filter(s => s.id !== user.id)"
-                      :key="supervisor.id"
-                      @click="assignSupervisor(user.id, supervisor.id)"
-                    >
-                      Assign to {{ supervisor.name }}
-                    </a-menu-item>
-                  </a-menu>
-                </template>
-              </a-dropdown>
-            </div>
-          </div>
-        </div>
-      </div>
 
       <!-- Cascading Assignment -->
       <CascadingAssignment :current-user="users?.find(u => u.id === $page.props.auth.user?.id)" />
 
-      <!-- Quick Actions -->
-      <div class="bg-white rounded-lg shadow-sm border p-6">
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-        
-        <div class="flex flex-wrap gap-4">
-          <a-button 
-            @click="router.visit(route('users.index'))"
-            class="flex items-center"
-          >
-            <template #icon>
-              <IconUsers />
-            </template>
-            View All Users
-          </a-button>
-          
-          <a-button 
-            v-if="canManageUsers || isSuperUser"
-            @click="router.visit(route('users.create'))"
-            type="primary"
-            class="flex items-center"
-          >
-            <template #icon>
-              <IconUser />
-            </template>
-            Add New User
-          </a-button>
-          
-          <a-button 
-            @click="router.visit(route('roles.permission-matrix'))"
-            class="flex items-center"
-          >
-            <template #icon>
-              <IconShield />
-            </template>
-            Permission Matrix
-          </a-button>
-        </div>
-      </div>
     </div>
 
     <!-- Supervisor Assignment Modal -->
