@@ -172,9 +172,32 @@ class RoleController extends Controller
      */
     private function getPermissionsGroupedByModule()
     {
-        return Permission::all()->groupBy(function ($permission) {
-            return explode('.', $permission->name)[0];
-        });
+        // Load all permissions and prefer normalized (route-aligned) names
+        $all = Permission::all();
+
+        // Build a map keyed by normalized name, preferring the entry whose
+        // actual name already matches the normalized form
+        $normalizedMap = [];
+        foreach ($all as $perm) {
+            $normalizedName = $this->normalizePermissionName($perm->name);
+            if (!isset($normalizedMap[$normalizedName])) {
+                $normalizedMap[$normalizedName] = $perm->name === $normalizedName ? $perm : $perm;
+            } else {
+                // If an entry exists but current permission is the normalized one, replace
+                if ($perm->name === $normalizedName) {
+                    $normalizedMap[$normalizedName] = $perm;
+                }
+            }
+        }
+
+        // Group by module based on normalized name
+        $grouped = collect($normalizedMap)
+            ->values()
+            ->groupBy(function (Permission $permission) {
+                return explode('.', $this->normalizePermissionName($permission->name))[0];
+            });
+
+        return $grouped;
     }
 
     /**

@@ -13,8 +13,11 @@ class Roleseeder extends Seeder
      */
     public function run(): void
     {
-        Role::create(['name' => 'admin']);
-        Role::create(['name' => 'cashier']);
-        Role::create(['name' => 'manager']);
+        // Ensure core roles exist with correct guard
+        Role::findOrCreate('super admin', 'web');
+        Role::findOrCreate('admin', 'web');
+        Role::findOrCreate('manager', 'web');
+        Role::findOrCreate('supervisor', 'web');
+        Role::findOrCreate('cashier', 'web');
     }
 }
