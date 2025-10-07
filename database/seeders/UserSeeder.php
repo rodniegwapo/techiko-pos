@@ -17,7 +17,7 @@ class UserSeeder extends Seeder
     {
         // Ensure roles exist in DB
         foreach (Role::cases() as $enumRole) {
-            SpatieRole::firstOrCreate(['name' => $enumRole->value]);
+            SpatieRole::findOrCreate($enumRole->value, 'web');
         }
 
         // Create super user (no role needed)

@@ -43,22 +43,37 @@ const allMenus = [
         title: "Dashboard",
         icon: IconDashboard,
         routeName: "dashboard",
+        path: route("dashboard"),
     },
     {
         title: "Sales",
         icon: IconHeartHandshake,
         routeName: "sales.index",
+        path: route("sales.index"),
     },
     {
         title: "Products",
         icon: IconCategory,
         children: [
-            { title: "Items", routeName: "products.index" },
-            { title: "Categories", routeName: "categories.index" },
-            { title: "Discounts", routeName: "products.discounts.index" },
+            {
+                title: "Items",
+                routeName: "products.index",
+                path: route("products.index"),
+            },
+            {
+                title: "Categories",
+                routeName: "categories.index",
+                path: route("categories.index"),
+            },
+            {
+                title: "Discounts",
+                routeName: "products.discounts.index",
+                path: route("products.discounts.index"),
+            },
             {
                 title: "Mandatory Discounts",
                 routeName: "mandatory-discounts.index",
+                path: route("mandatory-discounts.index"),
             },
         ],
     },
@@ -66,41 +81,67 @@ const allMenus = [
         title: "Inventory",
         icon: IconPackage,
         children: [
-            { title: "Dashboard", routeName: "inventory.index" },
-            { title: "Products", routeName: "inventory.products" },
-            { title: "Movements", routeName: "inventory.movements" },
+            {
+                title: "Dashboard",
+                routeName: "inventory.index",
+                path: route("inventory.index"),
+            },
+            {
+                title: "Products",
+                routeName: "inventory.products",
+                path: route("inventory.products"),
+            },
+            {
+                title: "Movements",
+                routeName: "inventory.movements",
+                path: route("inventory.movements"),
+            },
             {
                 title: "Stock Adjustments",
                 routeName: "inventory.adjustments.index",
+                path: route("inventory.adjustments.index"),
             },
-            { title: "Locations", routeName: "inventory.locations.index" },
-            { title: "Valuation Report", routeName: "inventory.valuation" },
+            {
+                title: "Locations",
+                routeName: "inventory.locations.index",
+                path: route("inventory.locations.index"),
+            },
+            {
+                title: "Valuation Report",
+                routeName: "inventory.valuation",
+                path: route("inventory.valuation"),
+            },
         ],
     },
     {
         title: "Loyalty Program",
         icon: IconGift,
         routeName: "loyalty.index",
+        path: route("loyalty.index"),
     },
     {
         title: "Void Logs",
         icon: IconHistory,
         routeName: "voids.index",
+        path: route("voids.index"),
     },
     {
         title: "Customers",
         icon: IconUsers,
         routeName: "customers.index",
+        path: route("customers.index"),
     },
     {
         title: "Users",
         icon: IconUserCog,
         routeName: "users.index",
+        path: route("users.index"),
     },
     {
         title: "Role Management",
         icon: IconShield,
         routeName: "roles.index",
+        path: route("roles.index"),
     },
 ];
 
@@ -114,13 +155,17 @@ const menus = computed(() => {
                 if (menu.children) {
                     const filteredChildren = filterMenu(menu.children);
                     if (filteredChildren.length > 0) {
-                        return { ...menu, children: filteredChildren };
+                        // Ensure parent has a clickable path if defined via routeName
+                        const path = menu.path || (menu.routeName ? route(menu.routeName) : undefined);
+                        return { ...menu, path, children: filteredChildren };
                     }
                 } else if (
                     menu.routeName &&
                     (hasPerm(menu.routeName) || hasPermLike(menu.routeName))
                 ) {
-                    return { ...menu, path: route(menu.routeName) };
+                    // Attach path if missing so the item is clickable
+                    const path = menu.path || route(menu.routeName);
+                    return { ...menu, path };
                 }
                 return null;
             })
@@ -227,7 +272,7 @@ const handleOpenChange = (keys) => {
 
                     <div class="flex items-center gap-2">
                         {{ menu.title }}
-                        <span v-if="menu.title == 'Dashboard'" class="text-xs">
+                        <span v-if="menu.title === 'Dashboard'" class="text-xs">
                             <a-tag color="blue" class="text-[10px]">
                                 {{ page.props.default_store.name }}
                             </a-tag>
@@ -267,7 +312,7 @@ const handleOpenChange = (keys) => {
                         <div class="flex items-center gap-2">
                             <span>{{ child.title }}</span>
                             <span
-                                v-if="child.title == 'Dashboard'"
+                                v-if="child.title === 'Dashboard'"
                                 class="text-xs"
                             >
                                 <a-tag color="blue" class="text-[10px]">

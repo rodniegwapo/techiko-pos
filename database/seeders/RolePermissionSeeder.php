@@ -57,6 +57,12 @@ class RolePermissionSeeder extends Seeder
             'discounts.edit',
             'discounts.delete',
             'discounts.apply',
+
+            // Mandatory Discounts (route-aligned permissions)
+            'mandatory-discounts.index',
+            'mandatory-discounts.store',
+            'mandatory-discounts.update',
+            'mandatory-discounts.destroy',
             
             // Reports
             'reports.view',
@@ -98,18 +104,18 @@ class RolePermissionSeeder extends Seeder
         ];
 
         foreach ($permissions as $permission) {
-            Permission::firstOrCreate(['name' => $permission]);
+            Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
         }
 
         // Create roles and assign permissions
         
         // Super Admin - Full access
-        $superAdmin = Role::firstOrCreate(['name' => 'super admin']);
+        $superAdmin = Role::findOrCreate('super admin', 'web');
         $superAdmin->update(['level' => 1, 'description' => 'Full system access with all permissions']);
         $superAdmin->syncPermissions(Permission::all());
         
         // Admin - Most permissions except system settings
-        $admin = Role::firstOrCreate(['name' => 'admin']);
+        $admin = Role::findOrCreate('admin', 'web');
         $admin->update(['level' => 2, 'description' => 'Administrative access with user management capabilities']);
         $admin->syncPermissions([
             'dashboard.view',
@@ -136,6 +142,11 @@ class RolePermissionSeeder extends Seeder
             'discounts.edit',
             'discounts.delete',
             'discounts.apply',
+            // Mandatory Discounts (admin full access)
+            'mandatory-discounts.index',
+            'mandatory-discounts.store',
+            'mandatory-discounts.update',
+            'mandatory-discounts.destroy',
             'reports.view',
             'reports.export',
             'loyalty.view',
@@ -159,7 +170,7 @@ class RolePermissionSeeder extends Seeder
         ]);
         
         // Manager - Operational permissions
-        $manager = Role::firstOrCreate(['name' => 'manager']);
+        $manager = Role::findOrCreate('manager', 'web');
         $manager->update(['level' => 3, 'description' => 'Operational management with reporting and staff oversight']);
         $manager->syncPermissions([
             'dashboard.view',
@@ -177,6 +188,8 @@ class RolePermissionSeeder extends Seeder
             'customers.edit',
             'discounts.view',
             'discounts.apply',
+            // Mandatory Discounts (manager read-only)
+            'mandatory-discounts.index',
             'reports.view',
             'loyalty.view',
             'loyalty.adjust_points',
@@ -197,7 +210,7 @@ class RolePermissionSeeder extends Seeder
         ]);
         
         // Supervisor - Shift supervision permissions
-        $supervisor = Role::firstOrCreate(['name' => 'supervisor']);
+        $supervisor = Role::findOrCreate('supervisor', 'web');
         $supervisor->update(['level' => 4, 'description' => 'Shift supervision with limited management capabilities']);
         $supervisor->syncPermissions([
             'dashboard.view',
@@ -214,6 +227,8 @@ class RolePermissionSeeder extends Seeder
             'customers.edit',
             'discounts.view',
             'discounts.apply',
+            // Mandatory Discounts (optional: view)
+            'mandatory-discounts.index',
             'reports.view',
             'loyalty.view',
             'loyalty.customers_manage',
@@ -226,7 +241,7 @@ class RolePermissionSeeder extends Seeder
         ]);
         
         // Cashier - Basic sales permissions
-        $cashier = Role::firstOrCreate(['name' => 'cashier']);
+        $cashier = Role::findOrCreate('cashier', 'web');
         $cashier->update(['level' => 5, 'description' => 'Front-line operations with sales processing capabilities']);
         $cashier->syncPermissions([
             'dashboard.view',

@@ -190,6 +190,37 @@ const getPermissionLabel = (permissionName) => {
   
   return actionLabels[action] || action.charAt(0).toUpperCase() + action.slice(1);
 };
+
+// =======
+// Select All helpers per module
+// =======
+const getModulePermissionIds = (moduleName) => {
+  return (props.permissions?.[moduleName] || []).map(p => p.id);
+};
+
+const isModuleAllChecked = (moduleName) => {
+  const ids = getModulePermissionIds(moduleName);
+  if (ids.length === 0) return false;
+  return ids.every(id => form.permissions.includes(id));
+};
+
+const isModuleIndeterminate = (moduleName) => {
+  const ids = getModulePermissionIds(moduleName);
+  if (ids.length === 0) return false;
+  const checkedCount = ids.filter(id => form.permissions.includes(id)).length;
+  return checkedCount > 0 && checkedCount < ids.length;
+};
+
+const onModuleCheckAllChange = (moduleName, checked) => {
+  const ids = getModulePermissionIds(moduleName);
+  if (checked) {
+    const next = new Set(form.permissions);
+    ids.forEach(id => next.add(id));
+    form.permissions = Array.from(next);
+  } else {
+    form.permissions = form.permissions.filter(id => !ids.includes(id));
+  }
+};
 </script>
 
 <template>
@@ -271,28 +302,38 @@ const getPermissionLabel = (permissionName) => {
             <span>Permissions</span>
           </template>
           
-              <div class="border rounded-lg p-4 max-h-96 overflow-y-auto">
-                <div
-                  v-for="(modulePermissions, moduleName) in permissions"
-                  :key="moduleName"
-                  class="mb-6 last:mb-0"
+          <div class="border rounded-lg p-4 max-h-96 overflow-y-auto">
+            <div
+              v-for="(modulePermissions, moduleName) in permissions"
+              :key="moduleName"
+              class="mb-6 last:mb-0"
+            >
+              <div class="flex items-center justify-between mb-3">
+                <h4 class="text-sm font-semibold text-gray-900 capitalize">
+                  {{ moduleName.replace('_', ' ') }}
+                </h4>
+                <a-checkbox
+                  :checked="isModuleAllChecked(moduleName)"
+                  :indeterminate="isModuleIndeterminate(moduleName)"
+                  @change="onModuleCheckAllChange(moduleName, $event.target.checked)"
                 >
-                  <h4 class="text-sm font-semibold text-gray-900 mb-3 capitalize border-b pb-1">
-                    {{ moduleName.replace('_', ' ') }}
-                  </h4>
-                  <div class="grid grid-cols-2 gap-2">
-                    <a-checkbox
-                      v-for="permission in modulePermissions"
-                      :key="permission.id"
-                      :checked="form.permissions.includes(permission.id)"
-                      @change="handlePermissionChange(permission.id, $event.target.checked)"
-                      class="text-sm"
-                    >
-                      {{ getPermissionLabel(permission.name) }}
-                    </a-checkbox>
-                  </div>
-                </div>
+                  Select all
+                </a-checkbox>
               </div>
+
+              <div class="grid grid-cols-2 gap-2">
+                <a-checkbox
+                  v-for="permission in modulePermissions"
+                  :key="permission.id"
+                  :checked="form.permissions.includes(permission.id)"
+                  @change="handlePermissionChange(permission.id, $event.target.checked)"
+                  class="text-sm"
+                >
+                  {{ getPermissionLabel(permission.name) }}
+                </a-checkbox>
+              </div>
+            </div>
+          </div>
         </a-card>
 
         <!-- Role Preview -->
