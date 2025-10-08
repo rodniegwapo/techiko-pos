@@ -22,7 +22,7 @@ class RoleController extends Controller
     public function index(Request $request)
     {
         $currentUser = auth()->user();
-        
+
         // Get roles with permissions (exclude super admin)
         $roles = Role::with('permissions')
             ->where('name', '!=', 'super admin')
@@ -79,25 +79,8 @@ class RoleController extends Controller
             // Assign permissions if provided
             $this->syncRolePermissions($role, $validated['permissions'] ?? []);
 
-            // Log the role creation
-            Log::info('Role created', [
-                'user_id' => auth()->id(),
-                'user_name' => auth()->user()->name,
-                'role_id' => $role->id,
-                'role_name' => $role->name,
-                'permissions_count' => $role->permissions->count(),
-                'action' => 'create_role',
-                'timestamp' => now()
-            ]);
-
-            return redirect()->route('roles.index')->with('success', 'Role created successfully');
-
+            return redirect()->back();
         } catch (\Exception $e) {
-            Log::error('Role creation failed', [
-                'user_id' => auth()->id(),
-                'error' => $e->getMessage(),
-                'data' => $validated
-            ]);
 
             return back()->withErrors(['error' => 'Failed to create role: ' . $e->getMessage()]);
         }
@@ -132,7 +115,7 @@ class RoleController extends Controller
 
         try {
             $oldPermissions = $role->permissions->pluck('id')->toArray();
-            
+
             $role->update([
                 'name' => $validated['name'],
                 'level' => $validated['level'],
@@ -142,28 +125,9 @@ class RoleController extends Controller
             // Update permissions
             $this->syncRolePermissions($role, $validated['permissions'] ?? []);
 
-            // Log the role update
-            Log::info('Role updated', [
-                'user_id' => auth()->id(),
-                'user_name' => auth()->user()->name,
-                'role_id' => $role->id,
-                'role_name' => $role->name,
-                'old_permissions' => $oldPermissions,
-                'new_permissions' => $role->permissions->pluck('id')->toArray(),
-                'action' => 'update_role',
-                'timestamp' => now()
-            ]);
 
             return redirect()->route('roles.index')->with('success', 'Role updated successfully');
-
         } catch (\Exception $e) {
-            Log::error('Role update failed', [
-                'user_id' => auth()->id(),
-                'role_id' => $role->id,
-                'error' => $e->getMessage(),
-                'data' => $validated
-            ]);
-
             return back()->withErrors(['error' => 'Failed to update role: ' . $e->getMessage()]);
         }
     }
@@ -207,7 +171,7 @@ class RoleController extends Controller
     private function validateRole(Request $request, ?Role $role = null): array
     {
         return $request->validate([
-            'name' => ['required','string','max:255','unique:roles,name' . ($role ? ',' . $role->id : '')],
+            'name' => ['required', 'string', 'max:255', 'unique:roles,name' . ($role ? ',' . $role->id : '')],
             'description' => 'nullable|string|max:500',
             'level' => 'required|integer|min:1|max:99',
             'permissions' => 'array',
@@ -293,7 +257,7 @@ class RoleController extends Controller
         try {
             $roleName = $role->name;
             $roleId = $role->id;
-            
+
             $role->delete();
 
             // Log the role deletion
@@ -310,7 +274,6 @@ class RoleController extends Controller
                 'success' => true,
                 'message' => 'Role deleted successfully'
             ]);
-
         } catch (\Exception $e) {
             Log::error('Role deletion failed', [
                 'user_id' => auth()->id(),
@@ -371,6 +334,4 @@ class RoleController extends Controller
             'permissions' => $permissions
         ]);
     }
-
-
 }

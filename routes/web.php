@@ -32,17 +32,18 @@ Route::middleware('auth')->group(function () {
 
 Route::middleware(['auth', 'user.permission'])->group(function () {
     // Categories Management
-    Route::resource('categories', \App\Http\Controllers\CategoryController::class)->names('categories');
+    Route::resource('categories', \App\Http\Controllers\CategoryController::class)->only(['index', 'store', 'udpate', 'destroy'])
+        ->names('categories');
 
     // Products Management
-    Route::resource('products', \App\Http\Controllers\Products\ProductController::class)->names('products');
+    Route::resource('products', \App\Http\Controllers\Products\ProductController::class)->only(['index', 'store', 'udpate', 'destroy'])->names('products');
     Route::name('products.')->group(function () {
-        Route::resource('discounts', \App\Http\Controllers\Products\DiscountController::class)
+        Route::resource('discounts', \App\Http\Controllers\Products\DiscountController::class)->only(['index', 'store', 'udpate', 'destroy'])
             ->names('discounts');
     });
 
     // Mandatory Discounts
-    Route::resource('mandatory-discounts', \App\Http\Controllers\MandatoryDiscountController::class)->names('mandatory-discounts');
+    Route::resource('mandatory-discounts', \App\Http\Controllers\MandatoryDiscountController::class)->only(['index', 'store', 'udpate', 'destroy'])->names('mandatory-discounts');
 
     // Sales
     Route::get('/sales', [\App\Http\Controllers\SaleController::class, 'index'])->name('sales.index');
@@ -72,7 +73,7 @@ Route::middleware(['auth', 'user.permission'])->group(function () {
         ->name('supervisors.auto-assign');
     Route::get('/users/{user}/supervisor-history', [\App\Http\Controllers\SupervisorAssignmentController::class, 'history'])
         ->name('users.supervisor-history');
-    
+
     // Cascading Assignment Routes
     Route::get('/supervisors/cascading-options', [\App\Http\Controllers\SupervisorAssignmentController::class, 'cascadingOptions'])
         ->name('supervisors.cascading-options');
@@ -80,7 +81,7 @@ Route::middleware(['auth', 'user.permission'])->group(function () {
         ->name('supervisors.cascading-assign');
 
     // Role Management (Only for super user)
-    Route::middleware(['check.super.user'])->group(function () {
+    Route::middleware(['auth', 'check.super.user'])->group(function () {
         Route::get('/roles', [\App\Http\Controllers\RoleController::class, 'index'])->name('roles.index');
         Route::get('/roles/create', [\App\Http\Controllers\RoleController::class, 'create'])->name('roles.create');
         Route::post('/roles', [\App\Http\Controllers\RoleController::class, 'store'])->name('roles.store');
@@ -93,15 +94,14 @@ Route::middleware(['auth', 'user.permission'])->group(function () {
     });
 
     // Permission Management (Only for super user)
-    Route::middleware(['check.super.user'])->group(function () {
+    Route::middleware(['auth', 'check.super.user'])->group(function () {
         Route::get('/permissions', [\App\Http\Controllers\PermissionController::class, 'index'])->name('permissions.index');
-        Route::get('/permissions/create', [\App\Http\Controllers\PermissionController::class, 'create'])->name('permissions.create');
         Route::post('/permissions', [\App\Http\Controllers\PermissionController::class, 'store'])->name('permissions.store');
         Route::get('/permissions/{permission}', [\App\Http\Controllers\PermissionController::class, 'show'])->name('permissions.show');
-        Route::get('/permissions/{permission}/edit', [\App\Http\Controllers\PermissionController::class, 'edit'])->name('permissions.edit');
         Route::put('/permissions/{permission}', [\App\Http\Controllers\PermissionController::class, 'update'])->name('permissions.update');
-        Route::delete('/permissions/{permission}', [\App\Http\Controllers\PermissionController::class, 'destroy'])->name('permissions.destroy');
-        Route::post('/permissions/bulk-delete', [\App\Http\Controllers\PermissionController::class, 'bulkDelete'])->name('permissions.bulk-delete');
+        Route::post('/permissions/{permission}/deactivate', [\App\Http\Controllers\PermissionController::class, 'deactivate'])->name('permissions.deactivate');
+        Route::post('/permissions/{permission}/activate', [\App\Http\Controllers\PermissionController::class, 'activate'])->name('permissions.activate');
+        Route::post('/permissions/bulk-deactivate', [\App\Http\Controllers\PermissionController::class, 'bulkDeactivate'])->name('permissions.bulk-deactivate');
         Route::get('/permissions-grouped', [\App\Http\Controllers\PermissionController::class, 'getGroupedPermissions'])->name('permissions.grouped');
     });
 

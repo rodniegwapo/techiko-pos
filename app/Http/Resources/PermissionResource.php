@@ -24,6 +24,7 @@ class PermissionResource extends JsonResource
             'module' => $module,
             'action' => $action,
             'guard_name' => $this->guard_name,
+            'is_active' => $this->is_active,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
             'roles_count' => $this->when(isset($this->roles_count), $this->roles_count),

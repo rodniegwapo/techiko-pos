@@ -21,11 +21,14 @@ class PermissionController extends Controller
     public function index(Request $request)
     {
         $currentUser = auth()->user();
-        
+
         // Get permissions with usage count
         $permissions = Permission::withCount('roles')
             ->when($request->search, function ($query, $search) {
                 return $query->where('name', 'like', "%{$search}%");
+            })
+            ->when($request->module, function ($query, $module) {
+                return $query->where('name', 'like', "{$module}.%");
             })
             ->orderBy('name')
             ->paginate(15);
@@ -36,7 +39,7 @@ class PermissionController extends Controller
         });
 
         return Inertia::render('Permissions/Index', [
-            'permissions' => PermissionResource::collection($permissions),
+            'items' => PermissionResource::collection($permissions),
             'permissionsGrouped' => $permissionsGrouped,
             'canCreate' => $currentUser->isSuperUser(),
             'canEdit' => $currentUser->isSuperUser(),
@@ -44,40 +47,17 @@ class PermissionController extends Controller
         ]);
     }
 
-    /**
-     * Show the form for creating a new permission
-     */
-    public function create()
-    {
-        $this->authorize('create', new Permission());
-
-        // Get existing modules for suggestions
-        $modules = Permission::all()
-            ->pluck('name')
-            ->map(function ($name) {
-                return explode('.', $name)[0];
-            })
-            ->unique()
-            ->sort()
-            ->values();
-
-        return Inertia::render('Permissions/Create', [
-            'modules' => $modules,
-        ]);
-    }
 
     /**
      * Store a newly created permission
      */
     public function store(Request $request)
     {
-        $this->authorize('create', new Permission());
-
         $request->validate([
             'name' => 'required|string|max:255|unique:permissions,name',
+            'description' => 'nullable|string|max:500',
             'module' => 'required|string|max:100',
             'action' => 'required|string|max:100',
-            'description' => 'nullable|string|max:500',
         ]);
 
         $permission = Permission::create([
@@ -94,9 +74,6 @@ class PermissionController extends Controller
      */
     public function show(Permission $permission)
     {
-        $this->authorize('view', $permission);
-
-        // Get roles that have this permission
         $roles = $permission->roles()->with('users')->get();
 
         return Inertia::render('Permissions/Show', [
@@ -105,41 +82,17 @@ class PermissionController extends Controller
         ]);
     }
 
-    /**
-     * Show the form for editing the specified permission
-     */
-    public function edit(Permission $permission)
-    {
-        $this->authorize('update', $permission);
-
-        // Get existing modules for suggestions
-        $modules = Permission::all()
-            ->pluck('name')
-            ->map(function ($name) {
-                return explode('.', $name)[0];
-            })
-            ->unique()
-            ->sort()
-            ->values();
-
-        return Inertia::render('Permissions/Edit', [
-            'permission' => new PermissionResource($permission),
-            'modules' => $modules,
-        ]);
-    }
 
     /**
      * Update the specified permission
      */
     public function update(Request $request, Permission $permission)
     {
-        $this->authorize('update', $permission);
-
         $request->validate([
             'name' => 'required|string|max:255|unique:permissions,name,' . $permission->id,
+            'description' => 'nullable|string|max:500',
             'module' => 'required|string|max:100',
             'action' => 'required|string|max:100',
-            'description' => 'nullable|string|max:500',
         ]);
 
         $permission->update([
@@ -151,22 +104,37 @@ class PermissionController extends Controller
     }
 
     /**
-     * Remove the specified permission
+     * Deactivate the specified permission
      */
-    public function destroy(Permission $permission)
+    public function deactivate(Permission $permission)
     {
-        $this->authorize('delete', $permission);
-
         // Check if permission is in use
         if ($permission->roles()->count() > 0) {
-            return redirect()->back()
-                ->with('error', 'Cannot delete permission that is assigned to roles.');
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot deactivate permission that is assigned to roles.'
+            ], 400);
         }
 
-        $permission->delete();
+        $permission->update(['is_active' => false]);
 
-        return redirect()->route('permissions.index')
-            ->with('success', 'Permission deleted successfully.');
+        return response()->json([
+            'success' => true,
+            'message' => 'Permission deactivated successfully.'
+        ]);
+    }
+
+    /**
+     * Activate the specified permission
+     */
+    public function activate(Permission $permission)
+    {
+        $permission->update(['is_active' => true]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Permission activated successfully.'
+        ]);
     }
 
     /**
@@ -184,33 +152,34 @@ class PermissionController extends Controller
     }
 
     /**
-     * Bulk delete permissions
+     * Bulk deactivate permissions
      */
-    public function bulkDelete(Request $request)
+    public function bulkDeactivate(Request $request)
     {
-        $this->authorize('delete', new Permission());
-
         $request->validate([
             'permission_ids' => 'required|array',
             'permission_ids.*' => 'exists:permissions,id',
         ]);
 
         $permissions = Permission::whereIn('id', $request->permission_ids)->get();
-        
+
         // Check if any permission is in use
         $inUse = $permissions->filter(function ($permission) {
             return $permission->roles()->count() > 0;
         });
 
         if ($inUse->count() > 0) {
-            return redirect()->back()
-                ->with('error', 'Cannot delete permissions that are assigned to roles: ' . $inUse->pluck('name')->join(', '));
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot deactivate permissions that are assigned to roles: ' . $inUse->pluck('name')->join(', ')
+            ], 400);
         }
 
-        Permission::whereIn('id', $request->permission_ids)->delete();
+        Permission::whereIn('id', $request->permission_ids)->update(['is_active' => false]);
 
-        return redirect()->route('permissions.index')
-            ->with('success', 'Selected permissions deleted successfully.');
+        return response()->json([
+            'success' => true,
+            'message' => 'Selected permissions deactivated successfully.'
+        ]);
     }
 }
-
