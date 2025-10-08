@@ -17,12 +17,13 @@ class RolePermissionSeeder extends Seeder
         // Reset cached roles and permissions
         app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
 
-        // Create permissions based on actual routes in web.php and api.php
+        // Create permissions based on actual route names from ->name() method calls
         $permissions = [
             // Dashboard
-            'dashboard.index',
+            'dashboard',
+            'dashboard.sales-chart',
             
-            // User Management (from web.php)
+            // User Management
             'users.index',
             'users.hierarchy',
             'users.show',
@@ -35,36 +36,47 @@ class RolePermissionSeeder extends Seeder
             'supervisors.auto-assign',
             'supervisors.cascading-options',
             'supervisors.cascading-assign',
+            'users.store',
+            'users.store',
+            'users.show',
+            'users.update',
+            'users.destroy',
+            'users.roles',
+            'users.toggle-status',
             
-            // Sales (from web.php and api.php)
+            // Sales
             'sales.index',
             'sales.products',
             'sales.drafts.store',
             'sales.items.void',
             'sales.payment.store',
-            'sales.syncDraft',
-            'sales.syncDraftImmediate',
+            'sales.sales.syncDraft',
+            'sales.sales.syncDraftImmediate',
             'sales.find-sale-item',
-            'sales.assignCustomer',
-            'sales.processLoyalty',
+            'sales.sales.assignCustomer',
+            'sales.sales.processLoyalty',
             'sales.discounts.order.apply',
             'sales.discounts.order.remove',
             'sales.items.discount.apply',
             'sales.items.discount.remove',
             
-            // Products (from web.php)
+            // Products
             'products.index',
             'products.store',
             'products.update',
             'products.destroy',
+            'products.create',
+            'products.edit',
             
-            // Categories (from web.php)
+            // Categories
             'categories.index',
             'categories.store',
             'categories.update',
             'categories.destroy',
+            'categories.create',
+            'categories.edit',
             
-            // Customers (from web.php and api.php)
+            // Customers
             'customers.index',
             'customers.search',
             'customers.tier-options',
@@ -72,32 +84,64 @@ class RolePermissionSeeder extends Seeder
             'customers.show',
             'customers.update',
             
-            // Discounts (from web.php)
+            // Discounts
             'products.discounts.index',
             'products.discounts.store',
             'products.discounts.update',
             'products.discounts.destroy',
+            'products.discounts.create',
+            'products.discounts.edit',
             
-            // Mandatory Discounts (from web.php)
+            // Mandatory Discounts
             'mandatory-discounts.index',
             'mandatory-discounts.store',
             'mandatory-discounts.update',
             'mandatory-discounts.destroy',
+            'mandatory-discounts.create',
+            'mandatory-discounts.edit',
             
-            // Loyalty Program (from web.php and api.php)
+            // Loyalty Program
             'loyalty.index',
             'loyalty.stats',
             'loyalty.customers',
             'loyalty.analytics',
-            'loyalty.customers.adjust-points',
+            'loyalty.adjust-points',
             'loyalty.tiers.index',
             'loyalty.tiers.store',
             'loyalty.tiers.show',
             'loyalty.tiers.update',
             'loyalty.tiers.destroy',
             
-            // Inventory Management (from web.php and api.php)
+            // Inventory Management
             'inventory.index',
+            'inventory.products',
+            'inventory.movements',
+            'inventory.low-stock',
+            'inventory.valuation',
+            'inventory.receive',
+            'inventory.transfer',
+            'inventory.adjustment-products',
+            'inventory.adjustments.index',
+            'inventory.adjustments.store',
+            'inventory.adjustments.create',
+            'inventory.adjustments.show',
+            'inventory.adjustments.update',
+            'inventory.adjustments.destroy',
+            'inventory.adjustments.edit',
+            'inventory.adjustments.submit',
+            'inventory.adjustments.approve',
+            'inventory.adjustments.reject',
+            'inventory.locations.index',
+            'inventory.locations.store',
+            'inventory.locations.create',
+            'inventory.locations.show',
+            'inventory.locations.update',
+            'inventory.locations.destroy',
+            'inventory.locations.edit',
+            'inventory.locations.set-default',
+            'inventory.locations.toggle-status',
+            
+            // Inventory API
             'inventory.products',
             'inventory.movements',
             'inventory.low-stock',
@@ -112,9 +156,9 @@ class RolePermissionSeeder extends Seeder
             'inventory.locations.show',
             'inventory.locations.update',
             'inventory.locations.destroy',
-            'inventory.search.locations',
             'inventory.locations.set-default',
             'inventory.locations.toggle-status',
+            'inventory.search.locations',
             'inventory.adjustments.index',
             'inventory.adjustments.store',
             'inventory.adjustments.show',
@@ -124,13 +168,13 @@ class RolePermissionSeeder extends Seeder
             'inventory.adjustments.reject',
             'inventory.adjustment-products',
             
-            // Void Logs (from web.php)
+            // Void Logs
             'voids.index',
             
-            // Terminal Setup (from web.php)
+            // Terminal Setup
             'setup.terminal',
             
-            // Role Management (from web.php - super user only)
+            // Role Management (super user only)
             'roles.index',
             'roles.create',
             'roles.store',
@@ -141,7 +185,7 @@ class RolePermissionSeeder extends Seeder
             'roles.permission-matrix',
             'roles.permissions',
             
-            // Permission Management (from web.php - super user only)
+            // Permission Management (super user only)
             'permissions.index',
             'permissions.store',
             'permissions.show',
@@ -151,48 +195,12 @@ class RolePermissionSeeder extends Seeder
             'permissions.bulk-deactivate',
             'permissions.grouped',
             
-            // Dashboard API (from api.php)
-            'dashboard.api.sales-chart',
-            
-            // User Management API (from api.php)
-            'api.users.index',
-            'api.users.store',
-            'api.users.show',
-            'api.users.update',
-            'api.users.destroy',
-            'users.roles',
-            'users.toggle-status',
-            
-            // Inventory API (from api.php)
-            'inventory.api.products',
-            'inventory.api.movements',
-            'inventory.api.low-stock',
-            'inventory.api.valuation',
-            'inventory.api.receive',
-            'inventory.api.transfer',
-            'inventory.api.search.products',
-            'inventory.api.search.movements',
-            'inventory.api.locations.summary',
-            'api.locations.index',
-            'api.locations.store',
-            'api.locations.show',
-            'api.locations.update',
-            'api.locations.destroy',
-            'inventory.api.search.locations',
-            'api.locations.set-default',
-            'api.locations.toggle-status',
-            'inventory.api.adjustments.index',
-            'inventory.api.adjustments.store',
-            'inventory.api.adjustments.show',
-            'inventory.api.adjustments.update',
-            'inventory.api.adjustments.submit',
-            'inventory.api.adjustments.approve',
-            'inventory.api.adjustments.reject',
-            'inventory.api.adjustment-products',
-            
-            // Orders API (from api.php)
+            // Orders
             'orders.view',
             'orders.recent-pending',
+            
+            // Customer Order
+            'customer-order',
         ];
 
         foreach ($permissions as $permission) {
@@ -211,8 +219,8 @@ class RolePermissionSeeder extends Seeder
         $admin->update(['level' => 2, 'description' => 'Administrative access with user management capabilities']);
         $admin->syncPermissions([
             // Dashboard
-            'dashboard.index',
-            'dashboard.api.sales-chart',
+            'dashboard',
+            'dashboard.sales-chart',
             
             // User Management
             'users.index',
@@ -227,11 +235,11 @@ class RolePermissionSeeder extends Seeder
             'supervisors.auto-assign',
             'supervisors.cascading-options',
             'supervisors.cascading-assign',
-            'api.users.index',
-            'api.users.store',
-            'api.users.show',
-            'api.users.update',
-            'api.users.destroy',
+            'users.store',
+            'users.store',
+            'users.show',
+            'users.update',
+            'users.destroy',
             'users.roles',
             'users.toggle-status',
             
@@ -241,11 +249,11 @@ class RolePermissionSeeder extends Seeder
             'sales.drafts.store',
             'sales.items.void',
             'sales.payment.store',
-            'sales.syncDraft',
-            'sales.syncDraftImmediate',
+            'sales.sales.syncDraft',
+            'sales.sales.syncDraftImmediate',
             'sales.find-sale-item',
-            'sales.assignCustomer',
-            'sales.processLoyalty',
+            'sales.sales.assignCustomer',
+            'sales.sales.processLoyalty',
             'sales.discounts.order.apply',
             'sales.discounts.order.remove',
             'sales.items.discount.apply',
@@ -256,12 +264,16 @@ class RolePermissionSeeder extends Seeder
             'products.store',
             'products.update',
             'products.destroy',
+            'products.create',
+            'products.edit',
             
             // Categories
             'categories.index',
             'categories.store',
             'categories.update',
             'categories.destroy',
+            'categories.create',
+            'categories.edit',
             
             // Customers
             'customers.index',
@@ -276,19 +288,23 @@ class RolePermissionSeeder extends Seeder
             'products.discounts.store',
             'products.discounts.update',
             'products.discounts.destroy',
+            'products.discounts.create',
+            'products.discounts.edit',
             
             // Mandatory Discounts
             'mandatory-discounts.index',
             'mandatory-discounts.store',
             'mandatory-discounts.update',
             'mandatory-discounts.destroy',
+            'mandatory-discounts.create',
+            'mandatory-discounts.edit',
             
             // Loyalty Program
             'loyalty.index',
             'loyalty.stats',
             'loyalty.customers',
             'loyalty.analytics',
-            'loyalty.customers.adjust-points',
+            'loyalty.adjust-points',
             'loyalty.tiers.index',
             'loyalty.tiers.store',
             'loyalty.tiers.show',
@@ -303,6 +319,34 @@ class RolePermissionSeeder extends Seeder
             'inventory.valuation',
             'inventory.receive',
             'inventory.transfer',
+            'inventory.adjustment-products',
+            'inventory.adjustments.index',
+            'inventory.adjustments.store',
+            'inventory.adjustments.create',
+            'inventory.adjustments.show',
+            'inventory.adjustments.update',
+            'inventory.adjustments.destroy',
+            'inventory.adjustments.edit',
+            'inventory.adjustments.submit',
+            'inventory.adjustments.approve',
+            'inventory.adjustments.reject',
+            'inventory.locations.index',
+            'inventory.locations.store',
+            'inventory.locations.create',
+            'inventory.locations.show',
+            'inventory.locations.update',
+            'inventory.locations.destroy',
+            'inventory.locations.edit',
+            'inventory.locations.set-default',
+            'inventory.locations.toggle-status',
+            
+            // Inventory API
+            'inventory.products',
+            'inventory.movements',
+            'inventory.low-stock',
+            'inventory.valuation',
+            'inventory.receive',
+            'inventory.transfer',
             'inventory.search.products',
             'inventory.search.movements',
             'inventory.locations.summary',
@@ -311,9 +355,9 @@ class RolePermissionSeeder extends Seeder
             'inventory.locations.show',
             'inventory.locations.update',
             'inventory.locations.destroy',
-            'inventory.search.locations',
             'inventory.locations.set-default',
             'inventory.locations.toggle-status',
+            'inventory.search.locations',
             'inventory.adjustments.index',
             'inventory.adjustments.store',
             'inventory.adjustments.show',
@@ -322,31 +366,6 @@ class RolePermissionSeeder extends Seeder
             'inventory.adjustments.approve',
             'inventory.adjustments.reject',
             'inventory.adjustment-products',
-            'inventory.api.products',
-            'inventory.api.movements',
-            'inventory.api.low-stock',
-            'inventory.api.valuation',
-            'inventory.api.receive',
-            'inventory.api.transfer',
-            'inventory.api.search.products',
-            'inventory.api.search.movements',
-            'inventory.api.locations.summary',
-            'api.locations.index',
-            'api.locations.store',
-            'api.locations.show',
-            'api.locations.update',
-            'api.locations.destroy',
-            'inventory.api.search.locations',
-            'api.locations.set-default',
-            'api.locations.toggle-status',
-            'inventory.api.adjustments.index',
-            'inventory.api.adjustments.store',
-            'inventory.api.adjustments.show',
-            'inventory.api.adjustments.update',
-            'inventory.api.adjustments.submit',
-            'inventory.api.adjustments.approve',
-            'inventory.api.adjustments.reject',
-            'inventory.api.adjustment-products',
             
             // Void Logs
             'voids.index',
@@ -357,6 +376,9 @@ class RolePermissionSeeder extends Seeder
             // Orders
             'orders.view',
             'orders.recent-pending',
+            
+            // Customer Order
+            'customer-order',
             
             // Permission Management (admin can view only)
             'permissions.index',
@@ -369,8 +391,8 @@ class RolePermissionSeeder extends Seeder
         $manager->update(['level' => 3, 'description' => 'Operational management with reporting and staff oversight']);
         $manager->syncPermissions([
             // Dashboard
-            'dashboard.index',
-            'dashboard.api.sales-chart',
+            'dashboard',
+            'dashboard.sales-chart',
             
             // Sales
             'sales.index',
@@ -378,11 +400,11 @@ class RolePermissionSeeder extends Seeder
             'sales.drafts.store',
             'sales.items.void',
             'sales.payment.store',
-            'sales.syncDraft',
-            'sales.syncDraftImmediate',
+            'sales.sales.syncDraft',
+            'sales.sales.syncDraftImmediate',
             'sales.find-sale-item',
-            'sales.assignCustomer',
-            'sales.processLoyalty',
+            'sales.sales.assignCustomer',
+            'sales.sales.processLoyalty',
             'sales.discounts.order.apply',
             'sales.discounts.order.remove',
             'sales.items.discount.apply',
@@ -392,11 +414,15 @@ class RolePermissionSeeder extends Seeder
             'products.index',
             'products.store',
             'products.update',
+            'products.create',
+            'products.edit',
             
             // Categories
             'categories.index',
             'categories.store',
             'categories.update',
+            'categories.create',
+            'categories.edit',
             
             // Customers
             'customers.index',
@@ -417,12 +443,28 @@ class RolePermissionSeeder extends Seeder
             'loyalty.stats',
             'loyalty.customers',
             'loyalty.analytics',
-            'loyalty.customers.adjust-points',
+            'loyalty.adjust-points',
             'loyalty.tiers.index',
             'loyalty.tiers.show',
             
             // Inventory Management
             'inventory.index',
+            'inventory.products',
+            'inventory.movements',
+            'inventory.low-stock',
+            'inventory.valuation',
+            'inventory.receive',
+            'inventory.transfer',
+            'inventory.adjustment-products',
+            'inventory.adjustments.index',
+            'inventory.adjustments.show',
+            'inventory.adjustments.submit',
+            'inventory.adjustments.approve',
+            'inventory.adjustments.reject',
+            'inventory.locations.index',
+            'inventory.locations.show',
+            
+            // Inventory API
             'inventory.products',
             'inventory.movements',
             'inventory.low-stock',
@@ -441,24 +483,6 @@ class RolePermissionSeeder extends Seeder
             'inventory.adjustments.approve',
             'inventory.adjustments.reject',
             'inventory.adjustment-products',
-            'inventory.api.products',
-            'inventory.api.movements',
-            'inventory.api.low-stock',
-            'inventory.api.valuation',
-            'inventory.api.receive',
-            'inventory.api.transfer',
-            'inventory.api.search.products',
-            'inventory.api.search.movements',
-            'inventory.api.locations.summary',
-            'api.locations.index',
-            'api.locations.show',
-            'inventory.api.search.locations',
-            'inventory.api.adjustments.index',
-            'inventory.api.adjustments.show',
-            'inventory.api.adjustments.submit',
-            'inventory.api.adjustments.approve',
-            'inventory.api.adjustments.reject',
-            'inventory.api.adjustment-products',
             
             // Void Logs
             'voids.index',
@@ -466,6 +490,9 @@ class RolePermissionSeeder extends Seeder
             // Orders
             'orders.view',
             'orders.recent-pending',
+            
+            // Customer Order
+            'customer-order',
         ]);
         
         // Supervisor - Shift supervision permissions
@@ -473,8 +500,8 @@ class RolePermissionSeeder extends Seeder
         $supervisor->update(['level' => 4, 'description' => 'Shift supervision with limited management capabilities']);
         $supervisor->syncPermissions([
             // Dashboard
-            'dashboard.index',
-            'dashboard.api.sales-chart',
+            'dashboard',
+            'dashboard.sales-chart',
             
             // User Management (view only)
             'users.index',
@@ -486,11 +513,11 @@ class RolePermissionSeeder extends Seeder
             'sales.drafts.store',
             'sales.items.void',
             'sales.payment.store',
-            'sales.syncDraft',
-            'sales.syncDraftImmediate',
+            'sales.sales.syncDraft',
+            'sales.sales.syncDraftImmediate',
             'sales.find-sale-item',
-            'sales.assignCustomer',
-            'sales.processLoyalty',
+            'sales.sales.assignCustomer',
+            'sales.sales.processLoyalty',
             'sales.discounts.order.apply',
             'sales.discounts.order.remove',
             'sales.items.discount.apply',
@@ -500,6 +527,8 @@ class RolePermissionSeeder extends Seeder
             'products.index',
             'products.store',
             'products.update',
+            'products.create',
+            'products.edit',
             
             // Categories
             'categories.index',
@@ -523,12 +552,19 @@ class RolePermissionSeeder extends Seeder
             'loyalty.stats',
             'loyalty.customers',
             'loyalty.analytics',
-            'loyalty.customers.adjust-points',
+            'loyalty.adjust-points',
             'loyalty.tiers.index',
             'loyalty.tiers.show',
             
             // Inventory Management
             'inventory.index',
+            'inventory.products',
+            'inventory.movements',
+            'inventory.low-stock',
+            'inventory.locations.index',
+            'inventory.locations.show',
+            
+            // Inventory API
             'inventory.products',
             'inventory.movements',
             'inventory.low-stock',
@@ -538,15 +574,6 @@ class RolePermissionSeeder extends Seeder
             'inventory.locations.index',
             'inventory.locations.show',
             'inventory.search.locations',
-            'inventory.api.products',
-            'inventory.api.movements',
-            'inventory.api.low-stock',
-            'inventory.api.search.products',
-            'inventory.api.search.movements',
-            'inventory.api.locations.summary',
-            'api.locations.index',
-            'api.locations.show',
-            'inventory.api.search.locations',
             
             // Void Logs
             'voids.index',
@@ -554,6 +581,9 @@ class RolePermissionSeeder extends Seeder
             // Orders
             'orders.view',
             'orders.recent-pending',
+            
+            // Customer Order
+            'customer-order',
         ]);
         
         // Cashier - Basic sales permissions
@@ -561,8 +591,8 @@ class RolePermissionSeeder extends Seeder
         $cashier->update(['level' => 5, 'description' => 'Front-line operations with sales processing capabilities']);
         $cashier->syncPermissions([
             // Dashboard
-            'dashboard.index',
-            'dashboard.api.sales-chart',
+            'dashboard',
+            'dashboard.sales-chart',
             
             // Sales
             'sales.index',
@@ -570,11 +600,11 @@ class RolePermissionSeeder extends Seeder
             'sales.drafts.store',
             'sales.items.void',
             'sales.payment.store',
-            'sales.syncDraft',
-            'sales.syncDraftImmediate',
+            'sales.sales.syncDraft',
+            'sales.sales.syncDraftImmediate',
             'sales.find-sale-item',
-            'sales.assignCustomer',
-            'sales.processLoyalty',
+            'sales.sales.assignCustomer',
+            'sales.sales.processLoyalty',
             'sales.discounts.order.apply',
             'sales.discounts.order.remove',
             'sales.items.discount.apply',
@@ -599,28 +629,30 @@ class RolePermissionSeeder extends Seeder
             'loyalty.stats',
             'loyalty.customers',
             'loyalty.analytics',
-            'loyalty.customers.adjust-points',
+            'loyalty.adjust-points',
             'loyalty.tiers.index',
             'loyalty.tiers.show',
             
             // Inventory Management (view only)
             'inventory.index',
             'inventory.products',
+            'inventory.locations.index',
+            'inventory.locations.show',
+            
+            // Inventory API
+            'inventory.products',
             'inventory.search.products',
             'inventory.locations.summary',
             'inventory.locations.index',
             'inventory.locations.show',
             'inventory.search.locations',
-            'inventory.api.products',
-            'inventory.api.search.products',
-            'inventory.api.locations.summary',
-            'api.locations.index',
-            'api.locations.show',
-            'inventory.api.search.locations',
             
             // Orders
             'orders.view',
             'orders.recent-pending',
+            
+            // Customer Order
+            'customer-order',
         ]);
 
         $this->command->info('Roles and permissions created successfully!');

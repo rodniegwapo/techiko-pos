@@ -19,18 +19,17 @@ use App\Http\Controllers\{
 |--------------------------------------------------------------------------
 | API Routes
 |--------------------------------------------------------------------------
-|
-| Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "api" middleware group. Make something great!
-|
 */
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
-});
+})->name('user');
 
-// Public API routes (no authentication required)
+/**
+ * -----------------------
+ * Public API routes (no authentication required)
+ * -----------------------
+ */
 Route::prefix('orders')->group(function () {
     Route::get('/{orderId}/view', [\App\Http\Controllers\Api\OrderViewController::class, 'show'])->name('orders.view');
     Route::get('/recent-pending', [\App\Http\Controllers\Api\OrderViewController::class, 'getRecentPending'])->name('orders.recent-pending');
@@ -72,12 +71,12 @@ Route::middleware(['auth:sanctum', 'user.permission'])->group(function () {
      * -----------------------
      */
     Route::prefix('customers')->group(function () {
-        Route::get('/', [CustomerController::class, 'index']);
-        Route::get('/search', [CustomerController::class, 'search']);
-        Route::get('/tier-options', [CustomerController::class, 'getTierOptions']);
-        Route::post('/', [CustomerController::class, 'store']);
-        Route::get('/{customer}', [CustomerController::class, 'show']);
-        Route::put('/{customer}', [CustomerController::class, 'update']);
+        Route::get('/', [CustomerController::class, 'index'])->name('customers.index');
+        Route::get('/search', [CustomerController::class, 'search'])->name('customers.search');
+        Route::get('/tier-options', [CustomerController::class, 'getTierOptions'])->name('customers.tier-options');
+        Route::post('/', [CustomerController::class, 'store'])->name('customers.store');
+        Route::get('/{customer}', [CustomerController::class, 'show'])->name('customers.show');
+        Route::put('/{customer}', [CustomerController::class, 'update'])->name('customers.update');
     });
 
 
@@ -87,13 +86,19 @@ Route::middleware(['auth:sanctum', 'user.permission'])->group(function () {
      * -----------------------
      */
     Route::prefix('loyalty')->group(function () {
-        Route::get('/stats', [LoyaltyController::class, 'stats']);
-        Route::get('/customers', [LoyaltyController::class, 'customers']);
-        Route::get('/analytics', [LoyaltyController::class, 'analytics']);
-        Route::post('/customers/{customer}/adjust-points', [LoyaltyController::class, 'adjustPoints']);
+        Route::get('/stats', [LoyaltyController::class, 'stats'])->name('loyalty.stats');
+        Route::get('/customers', [LoyaltyController::class, 'customers'])->name('loyalty.customers');
+        Route::get('/analytics', [LoyaltyController::class, 'analytics'])->name('loyalty.analytics');
+        Route::post('/customers/{customer}/adjust-points', [LoyaltyController::class, 'adjustPoints'])->name('loyalty.adjust-points');
 
         // Tier Management
-        Route::apiResource('tiers', LoyaltyTierController::class);
+        Route::apiResource('tiers', LoyaltyTierController::class)->names([
+            'index'   => 'loyalty.tiers.index',
+            'store'   => 'loyalty.tiers.store',
+            'show'    => 'loyalty.tiers.show',
+            'update'  => 'loyalty.tiers.update',
+            'destroy' => 'loyalty.tiers.destroy',
+        ]);
     });
 
 
@@ -102,15 +107,15 @@ Route::middleware(['auth:sanctum', 'user.permission'])->group(function () {
      * User Management Routes
      * -----------------------
      */
-    Route::get('/users/roles', [UserController::class, 'getRoles']);
-    Route::patch('/users/{user}/toggle-status', [UserController::class, 'toggleStatus']);
+    Route::get('/users/roles', [UserController::class, 'getRoles'])->name('users.roles');
+    Route::patch('/users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
 
     Route::apiResource('users', UserController::class)->names([
-        'index'   => 'api.users.index',
-        'store'   => 'api.users.store',
-        'show'    => 'api.users.show',
-        'update'  => 'api.users.update',
-        'destroy' => 'api.users.destroy',
+        'index'   => 'users.index',
+        'store'   => 'users.store',
+        'show'    => 'users.show',
+        'update'  => 'users.update',
+        'destroy' => 'users.destroy',
     ]);
 
 
@@ -119,7 +124,7 @@ Route::middleware(['auth:sanctum', 'user.permission'])->group(function () {
      * Dashboard Routes
      * -----------------------
      */
-    Route::prefix('dashboard')->name('dashboard.api.')->group(function () {
+    Route::prefix('dashboard')->name('dashboard.')->group(function () {
         Route::post('/sales-chart', [DashboardController::class, 'getSalesChartData'])->name('sales-chart');
     });
 
@@ -129,7 +134,7 @@ Route::middleware(['auth:sanctum', 'user.permission'])->group(function () {
      * Inventory Routes
      * -----------------------
      */
-    Route::prefix('inventory')->name('inventory.api.')->group(function () {
+    Route::prefix('inventory')->name('inventory.')->group(function () {
         // Core Inventory
         Route::get('/products', [InventoryController::class, 'products'])->name('products');
         Route::get('/movements', [InventoryController::class, 'movements'])->name('movements');
@@ -147,15 +152,15 @@ Route::middleware(['auth:sanctum', 'user.permission'])->group(function () {
         // Locations
         Route::get('/locations/{location}/summary', [InventoryController::class, 'getLocationSummary'])->name('locations.summary');
         Route::apiResource('locations', InventoryLocationController::class)->names([
-            'index'   => 'api.locations.index',
-            'store'   => 'api.locations.store',
-            'show'    => 'api.locations.show',
-            'update'  => 'api.locations.update',
-            'destroy' => 'api.locations.destroy',
+            'index'   => 'locations.index',
+            'store'   => 'locations.store',
+            'show'    => 'locations.show',
+            'update'  => 'locations.update',
+            'destroy' => 'locations.destroy',
         ]);
         Route::get('/search/locations', [InventoryLocationController::class, 'search'])->name('search.locations');
-        Route::post('/locations/{location}/set-default', [InventoryLocationController::class, 'setDefault'])->name('api.locations.set-default');
-        Route::post('/locations/{location}/toggle-status', [InventoryLocationController::class, 'toggleStatus'])->name('api.locations.toggle-status');
+        Route::post('/locations/{location}/set-default', [InventoryLocationController::class, 'setDefault'])->name('locations.set-default');
+        Route::post('/locations/{location}/toggle-status', [InventoryLocationController::class, 'toggleStatus'])->name('locations.toggle-status');
 
         // Stock Adjustments
         Route::get('/adjustments', [StockAdjustmentController::class, 'index'])->name('adjustments.index');
