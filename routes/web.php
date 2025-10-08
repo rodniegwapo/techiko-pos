@@ -11,18 +11,15 @@ use Inertia\Inertia;
 |--------------------------------------------------------------------------
 | Web Routes
 |--------------------------------------------------------------------------
-|
-| Here is where you can register web routes for your application. These
-| routes are loaded by the RouteServiceProvider within a group which
-| contains the "web" middleware group. Now create something great!
-|
 */
 
 Route::get('/', function () {
     return Inertia::render('Auth/Login');
-});
+})->name('login');
 
-Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])->middleware(['auth', 'verified'])->name('dashboard');
+Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])
+    ->middleware(['auth', 'verified'])
+    ->name('dashboard');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -32,18 +29,25 @@ Route::middleware('auth')->group(function () {
 
 Route::middleware(['auth', 'user.permission'])->group(function () {
     // Categories Management
-    Route::resource('categories', \App\Http\Controllers\CategoryController::class)->only(['index', 'store', 'udpate', 'destroy'])
+    Route::resource('categories', \App\Http\Controllers\CategoryController::class)
+        ->only(['index', 'store', 'update', 'destroy', 'create', 'edit'])
         ->names('categories');
 
     // Products Management
-    Route::resource('products', \App\Http\Controllers\Products\ProductController::class)->only(['index', 'store', 'udpate', 'destroy'])->names('products');
+    Route::resource('products', \App\Http\Controllers\Products\ProductController::class)
+        ->only(['index', 'store', 'update', 'destroy', 'create', 'edit'])
+        ->names('products');
+
     Route::name('products.')->group(function () {
-        Route::resource('discounts', \App\Http\Controllers\Products\DiscountController::class)->only(['index', 'store', 'udpate', 'destroy'])
+        Route::resource('discounts', \App\Http\Controllers\Products\DiscountController::class)
+            ->only(['index', 'store', 'update', 'destroy', 'create', 'edit'])
             ->names('discounts');
     });
 
     // Mandatory Discounts
-    Route::resource('mandatory-discounts', \App\Http\Controllers\MandatoryDiscountController::class)->only(['index', 'store', 'udpate', 'destroy'])->names('mandatory-discounts');
+    Route::resource('mandatory-discounts', \App\Http\Controllers\MandatoryDiscountController::class)
+        ->only(['index', 'store', 'update', 'destroy', 'create', 'edit'])
+        ->names('mandatory-discounts');
 
     // Sales
     Route::get('/sales', [\App\Http\Controllers\SaleController::class, 'index'])->name('sales.index');
@@ -141,6 +145,5 @@ Route::middleware(['auth', 'user.permission'])->group(function () {
 Route::get('/customer-order', function () {
     return Inertia::render('CustomerOrderView');
 })->name('customer-order');
-
 
 require __DIR__ . '/auth.php';

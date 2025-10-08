@@ -28,7 +28,7 @@ const handleBack = () => {
 };
 
 const handleSubmit = () => {
-  form.put(route('api.users.update', props.user.id), {
+  form.put(route('users.update', props.user.id), {
     onSuccess: () => {
       router.visit(route('users.show', props.user.id));
     }
