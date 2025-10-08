@@ -28,7 +28,6 @@ class UserPermissionCheckMiddleware
             return $next($request);
         }
 
-
         $permissions = auth()->user()->getAllPermissions();
         $find = collect($permissions)->where('name', $request->route()?->getName())->first();
 

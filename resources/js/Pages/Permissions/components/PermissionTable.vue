@@ -1,10 +1,8 @@
 <script setup>
 import { computed } from "vue";
-import { IconEye, IconEdit, IconTrash, IconShield } from "@tabler/icons-vue";
+import { IconEye, IconEdit, IconTrash, IconShield, IconPower, IconX } from "@tabler/icons-vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
-import { Modal, notification } from "ant-design-vue";
 import { usePage } from "@inertiajs/vue3";
-import axios from "axios";
 import { usePermissions } from "@/Composables/usePermissions";
 
 const page = usePage();
@@ -37,7 +35,7 @@ const props = defineProps({
 });
 
 // Emits
-const emit = defineEmits(["change", "edit", "view"]);
+const emit = defineEmits(["change", "edit", "view", "deactivate", "activate"]);
 
 // Table columns
 const columns = [
@@ -45,7 +43,7 @@ const columns = [
         title: "Permission",
         dataIndex: "name",
         key: "name",
-        width: "40%",
+        width: "35%",
     },
     {
         title: "Module",
@@ -58,6 +56,12 @@ const columns = [
         dataIndex: "action",
         key: "action",
         width: "15%",
+    },
+    {
+        title: "Status",
+        key: "status",
+        align: "center",
+        width: "10%",
     },
     {
         title: "Roles",
@@ -96,8 +100,12 @@ const canEditPermission = (permission) => {
     return canManageRoles.value || isSuperUser.value;
 };
 
-const canDeletePermission = (permission) => {
-    return canManageRoles.value || isSuperUser.value;
+const canDeactivatePermission = (permission) => {
+    return (canManageRoles.value || isSuperUser.value) && permission.is_active;
+};
+
+const canActivatePermission = (permission) => {
+    return (canManageRoles.value || isSuperUser.value) && !permission.is_active;
 };
 
 const handleEdit = (permission) => {
@@ -108,72 +116,78 @@ const handleView = (permission) => {
     emit("view", permission);
 };
 
-const handleDelete = (permission) => {
-    Modal.confirm({
-        title: "Delete Permission",
-        content: `Are you sure you want to delete the permission "${permission.name}"? This action cannot be undone.`,
-        okText: "Delete",
-        okType: "danger",
-        cancelText: "Cancel",
-        onOk() {
-            axios
-                .delete(route("permissions.destroy", permission.id))
-                .then(() => {
-                    notification.success({
-                        message: "Success",
-                        description: "Permission deleted successfully.",
-                    });
-                    // Reload the page to refresh the data
-                    window.location.reload();
-                })
-                .catch((error) => {
-                    console.error("Delete error:", error);
-                    notification.error({
-                        message: "Error",
-                        description: error.response?.data?.message || "Failed to delete permission.",
-                    });
-                });
-        },
-    });
+const handleDeactivate = (permission) => {
+    emit("deactivate", permission);
+};
+
+const handleActivate = (permission) => {
+    emit("activate", permission);
 };
 
 // Format date
-const formatDate = (date) => {
-    if (!date) return "-";
-    return new Date(date).toLocaleDateString();
+const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+    });
 };
 </script>
 
 <template>
     <a-table
+        class="ant-table-striped"
         :columns="columns"
         :data-source="permissions"
+        :row-class-name="
+            (_, index) => (index % 2 === 1 ? 'bg-gray-50 group' : 'group')
+        "
         :loading="loading"
         :pagination="pagination"
-        :scroll="{ x: 800 }"
         @change="handleChange"
         row-key="id"
     >
         <!-- Permission Name -->
         <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'name'">
-                <div class="flex items-center gap-2">
-                    <IconShield class="text-blue-500" size="16" />
-                    <span class="font-medium text-gray-900">{{ record.name }}</span>
+                <div class="flex items-center space-x-3">
+                    <a-avatar
+                        :size="32"
+                        :style="{ backgroundColor: '#4299e1' }"
+                    >
+                        <IconShield size="16" />
+                    </a-avatar>
+                    <div>
+                        <div class="font-medium text-gray-900">
+                            {{ record.name }}
+                        </div>
+                        <div class="text-sm text-gray-500">
+                            {{ record.description || 'No description' }}
+                        </div>
+                    </div>
                 </div>
             </template>
 
             <!-- Module -->
             <template v-else-if="column.key === 'module'">
-                <a-tag color="blue" class="capitalize">
+                <a-tag color="blue" class="capitalize w-fit">
                     {{ record.module }}
                 </a-tag>
             </template>
 
             <!-- Action -->
             <template v-else-if="column.key === 'action'">
-                <a-tag color="green" class="capitalize">
+                <a-tag color="green" class="capitalize w-fit">
                     {{ record.action }}
+                </a-tag>
+            </template>
+
+            <!-- Status -->
+            <template v-else-if="column.key === 'status'">
+                <a-tag :color="record.is_active ? 'green' : 'red'" class="w-fit">
+                    {{ record.is_active ? 'Active' : 'Inactive' }}
                 </a-tag>
             </template>
 
@@ -182,41 +196,55 @@ const formatDate = (date) => {
                 <a-badge
                     :count="record.roles_count || 0"
                     :number-style="{ backgroundColor: '#52c41a' }"
+                    class="w-fit"
                 />
             </template>
 
             <!-- Created Date -->
             <template v-else-if="column.key === 'created_at'">
-                <span class="text-gray-600">{{ formatDate(record.created_at) }}</span>
+                <div class="text-sm text-gray-600">
+                    {{ formatDate(record.created_at) }}
+                </div>
             </template>
 
             <!-- Actions -->
             <template v-else-if="column.key === 'actions'">
-                <div class="flex items-center justify-center gap-1">
+                <div class="flex items-center gap-2">
                     <IconTooltipButton
                         v-if="canViewPermission(record)"
+                        hover="group-hover:bg-blue-500"
+                        name="View Permission Details"
                         @click="handleView(record)"
-                        icon="eye"
-                        tooltip="View Permission"
-                        type="primary"
-                        size="small"
-                    />
+                    >
+                        <IconEye size="20" class="mx-auto" />
+                    </IconTooltipButton>
+
                     <IconTooltipButton
                         v-if="canEditPermission(record)"
+                        hover="group-hover:bg-green-500"
+                        name="Edit Permission"
                         @click="handleEdit(record)"
-                        icon="edit"
-                        tooltip="Edit Permission"
-                        type="default"
-                        size="small"
-                    />
+                    >
+                        <IconEdit size="20" class="mx-auto" />
+                    </IconTooltipButton>
+
                     <IconTooltipButton
-                        v-if="canDeletePermission(record)"
-                        @click="handleDelete(record)"
-                        icon="delete"
-                        tooltip="Delete Permission"
-                        type="danger"
-                        size="small"
-                    />
+                        v-if="canDeactivatePermission(record)"
+                        hover="group-hover:bg-orange-500"
+                        name="Deactivate Permission"
+                        @click="handleDeactivate(record)"
+                    >
+                        <IconX size="20" class="mx-auto" />
+                    </IconTooltipButton>
+
+                    <IconTooltipButton
+                        v-if="canActivatePermission(record)"
+                        hover="group-hover:bg-green-500"
+                        name="Activate Permission"
+                        @click="handleActivate(record)"
+                    >
+                        <IconPower size="20" class="mx-auto" />
+                    </IconTooltipButton>
                 </div>
             </template>
         </template>

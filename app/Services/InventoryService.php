@@ -152,7 +152,7 @@ class InventoryService
                     'movement_type' => 'sale',
                     'quantity_change' => -$quantity, // Negative for sale
                     'unit_cost' => $product->cost,
-                    'reference_type' => 'App\Models\Sale',
+                    'reference_type' => 'Sale',
                     'reference_id' => $saleId,
                     'user_id' => $user->id,
                     'notes' => "Sale - Unit Price: {$unitPrice}",
