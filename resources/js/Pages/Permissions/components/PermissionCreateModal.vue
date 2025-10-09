@@ -11,7 +11,7 @@ const props = defineProps({
     },
 });
 
-const emit = defineEmits(['close', 'saved']);
+const emit = defineEmits(["close", "saved"]);
 
 // Form handling
 const form = useForm({
@@ -38,7 +38,7 @@ const modules = [
 ];
 
 const actions = [
-    { value: "view", label: "View" },
+    { value: "index", label: "View" },
     { value: "create", label: "Create" },
     { value: "edit", label: "Edit" },
     { value: "delete", label: "Delete" },
@@ -73,13 +73,14 @@ const handleSubmit = () => {
                 description: `Permission "${form.name}" has been created successfully`,
             });
             handleClose();
-            emit('saved');
+            emit("saved");
         },
         onError: (errors) => {
             console.error("Form errors:", errors);
             notification.error({
                 message: "Create Failed",
-                description: "Failed to create permission. Please check the form for errors.",
+                description:
+                    "Failed to create permission. Please check the form for errors.",
             });
         },
     });
@@ -88,7 +89,7 @@ const handleSubmit = () => {
 const handleClose = () => {
     form.reset();
     form.clearErrors();
-    emit('close');
+    emit("close");
 };
 
 const handleCancel = () => {
@@ -170,14 +171,14 @@ const handleCancel = () => {
                 <a-input
                     v-model:value="form.name"
                     placeholder="Auto-generated from module and action"
-                    readonly
                 >
                     <template #prefix>
                         <IconShield class="text-blue-500" />
                     </template>
                 </a-input>
                 <div class="text-sm text-gray-500 mt-1">
-                    This will be automatically generated as: {{ permissionName || 'module.action' }}
+                    This will be automatically generated as:
+                    {{ permissionName || "module.action" }}
                 </div>
             </a-form-item>
 
@@ -198,9 +199,7 @@ const handleCancel = () => {
 
         <template #footer>
             <div class="flex justify-end gap-2">
-                <a-button @click="handleCancel">
-                    Cancel
-                </a-button>
+                <a-button @click="handleCancel"> Cancel </a-button>
                 <a-button
                     type="primary"
                     @click="handleSubmit"
