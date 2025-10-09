@@ -23,8 +23,6 @@ class CheckSuperUser
 
         $user = Auth::user();
 
-        logger($user->isSuperUser());
-
 
         // Check if user is super user
         if (!$user->isSuperUser()) {
