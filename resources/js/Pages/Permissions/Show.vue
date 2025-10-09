@@ -10,12 +10,14 @@ import {
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
 import { usePermissions } from "@/Composables/usePermissions";
+import { useHelpers } from "@/Composables/useHelpers";
 
 const props = defineProps({
     permission: Object,
     roles: Array,
 });
 
+const { formatDateTime } = useHelpers();
 const { canManageRoles, isSuperUser } = usePermissions();
 
 // Computed
@@ -28,11 +30,6 @@ const handleEdit = () => {
 
 const handleBack = () => {
     router.visit(route("permissions.index"));
-};
-
-const formatDate = (date) => {
-    if (!date) return "-";
-    return new Date(date).toLocaleDateString();
 };
 </script>
 
@@ -76,8 +73,8 @@ const formatDate = (date) => {
                             </label>
                             <div class="flex items-center gap-2">
                                 <IconShield class="text-blue-500" size="16" />
-                                <span class="text-gray-900 font-mono">{{
-                                    permission.name
+                                <span class="text-gray-900 font-mono w-fit">{{
+                                    permission.data?.name || "N/A"
                                 }}</span>
                             </div>
                         </div>
@@ -88,8 +85,8 @@ const formatDate = (date) => {
                             >
                                 Module
                             </label>
-                            <a-tag color="blue" class="capitalize">
-                                {{ permission.module }}
+                            <a-tag color="blue" class="capitalize w-fit">
+                                {{ permission.data?.module }}
                             </a-tag>
                         </div>
 
@@ -99,8 +96,8 @@ const formatDate = (date) => {
                             >
                                 Action
                             </label>
-                            <a-tag color="green" class="capitalize">
-                                {{ permission.action }}
+                            <a-tag color="green" class="capitalize w-fit">
+                                {{ permission.data?.action }}
                             </a-tag>
                         </div>
                     </div>
@@ -114,7 +111,7 @@ const formatDate = (date) => {
                                 Guard Name
                             </label>
                             <span class="text-gray-900">{{
-                                permission.guard_name
+                                permission?.data?.name || "N/A"
                             }}</span>
                         </div>
 
@@ -125,7 +122,7 @@ const formatDate = (date) => {
                                 Created At
                             </label>
                             <span class="text-gray-900">{{
-                                formatDate(permission.created_at)
+                                formatDateTime(permission?.data.created_at)
                             }}</span>
                         </div>
 
@@ -136,7 +133,7 @@ const formatDate = (date) => {
                                 Updated At
                             </label>
                             <span class="text-gray-900">{{
-                                formatDate(permission.updated_at)
+                                formatDateTime(permission?.data.updated_at)
                             }}</span>
                         </div>
                     </div>
