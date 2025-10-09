@@ -379,11 +379,6 @@ class RolePermissionSeeder extends Seeder
             
             // Customer Order
             'customer-order',
-            
-            // Permission Management (admin can view only)
-            'permissions.index',
-            'permissions.show',
-            'permissions.grouped',
         ]);
         
         // Manager - Operational permissions

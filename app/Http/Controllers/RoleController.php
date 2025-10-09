@@ -38,9 +38,9 @@ class RoleController extends Controller
         return Inertia::render('Roles/Index', [
             'roles' => RoleResource::collection($roles),
             'permissions' => $permissions,
-            'canCreate' => $currentUser->isSuperUser(),
-            'canEdit' => $currentUser->isSuperUser(),
-            'canDelete' => $currentUser->isSuperUser(),
+            'canCreate' => $currentUser->isSuperUser() || $currentUser->hasAnyPermission(['roles.create', 'roles.store']),
+            'canEdit' => $currentUser->isSuperUser() || $currentUser->hasAnyPermission(['roles.edit', 'roles.update']),
+            'canDelete' => $currentUser->isSuperUser() || $currentUser->can('roles.destroy'),
         ]);
     }
 
