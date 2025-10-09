@@ -16,9 +16,11 @@ import RefreshButton from "@/Components/buttons/Refresh.vue";
 import FilterDropdown from "@/Components/filters/FilterDropdown.vue";
 import ActiveFilters from "@/Components/filters/ActiveFilters.vue";
 import RoleTable from "./components/RoleTable.vue";
+import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 
 const page = usePage();
 const { openModal, isEdit, spinning } = useGlobalVariables();
+
 const { showModal } = useHelpers();
 
 // Use permission composable
@@ -101,7 +103,7 @@ console.log("Permissions data:", props.permissions);
                 />
 
                 <a-button
-                    v-if="(canCreate && canManageRoles.value) || isSuperUser"
+                    v-if="usePermissionsV2('roles.store')"
                     @click="handleAddRole"
                     type="primary"
                     class="bg-white border flex items-center border-green-500 text-green-500"

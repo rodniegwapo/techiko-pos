@@ -86,7 +86,7 @@ Route::middleware(['auth', 'user.permission'])->group(function () {
         ->name('supervisors.cascading-assign');
 
     // Role Management (Only for super user)
-    Route::middleware(['auth', 'check.super.user'])->group(function () {
+    Route::middleware(['auth', 'user.permission'])->group(function () {
         Route::get('/roles', [\App\Http\Controllers\RoleController::class, 'index'])->name('roles.index');
         Route::get('/roles/create', [\App\Http\Controllers\RoleController::class, 'create'])->name('roles.create');
         Route::post('/roles', [\App\Http\Controllers\RoleController::class, 'store'])->name('roles.store');

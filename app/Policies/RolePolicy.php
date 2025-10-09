@@ -13,7 +13,9 @@ class RolePolicy
      */
     public function viewAny(User $user): bool
     {
-        return $user->isSuperUser();
+        return $user->isSuperUser() ||
+            $user->can('roles.index') ||
+            $user->can('roles.permission-matrix');
     }
 
     /**
@@ -21,7 +23,10 @@ class RolePolicy
      */
     public function view(User $user, Role $role): bool
     {
-        return $user->isSuperUser();
+        // Either explicit show, or general index access
+        return $user->isSuperUser() ||
+            $user->can('roles.show') ||
+            $user->can('roles.index');
     }
 
     /**
@@ -29,7 +34,9 @@ class RolePolicy
      */
     public function create(User $user): bool
     {
-        return $user->isSuperUser();
+        return $user->isSuperUser() ||
+            $user->can('roles.create') ||
+            $user->can('roles.store');
     }
 
     /**
@@ -37,7 +44,9 @@ class RolePolicy
      */
     public function update(User $user, Role $role): bool
     {
-        return $user->isSuperUser();
+        return $user->isSuperUser() ||
+            $user->can('roles.update') ||
+            $user->can('roles.edit');
     }
 
     /**
@@ -45,13 +54,13 @@ class RolePolicy
      */
     public function delete(User $user, Role $role): bool
     {
-        // Only super user can delete roles
-        if (!$user->isSuperUser()) {
+        // Only super user or users with explicit destroy permission can delete
+        if (!($user->isSuperUser() || $user->can('roles.destroy'))) {
             return false;
         }
 
         // Prevent deletion of system roles
-        $systemRoles = ['admin', 'manager', 'supervisor', 'cashier'];
+        $systemRoles = ['manager', 'supervisor', 'cashier'];
         if (in_array(strtolower($role->name), $systemRoles)) {
             return false;
         }
