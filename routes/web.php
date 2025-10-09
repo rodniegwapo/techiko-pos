@@ -30,23 +30,23 @@ Route::middleware('auth')->group(function () {
 Route::middleware(['auth', 'user.permission'])->group(function () {
     // Categories Management
     Route::resource('categories', \App\Http\Controllers\CategoryController::class)
-        ->only(['index', 'store', 'update', 'destroy', 'create', 'edit'])
+        ->only(['index', 'store', 'update', 'destroy'])
         ->names('categories');
 
     // Products Management
     Route::resource('products', \App\Http\Controllers\Products\ProductController::class)
-        ->only(['index', 'store', 'update', 'destroy', 'create', 'edit'])
+        ->only(['index', 'store', 'update', 'destroy',])
         ->names('products');
 
     Route::name('products.')->group(function () {
         Route::resource('discounts', \App\Http\Controllers\Products\DiscountController::class)
-            ->only(['index', 'store', 'update', 'destroy', 'create', 'edit'])
+            ->only(['index', 'store', 'update', 'destroy',])
             ->names('discounts');
     });
 
     // Mandatory Discounts
     Route::resource('mandatory-discounts', \App\Http\Controllers\MandatoryDiscountController::class)
-        ->only(['index', 'store', 'update', 'destroy', 'create', 'edit'])
+        ->only(['index', 'store', 'update', 'destroy',])
         ->names('mandatory-discounts');
 
     // Sales
@@ -63,6 +63,7 @@ Route::middleware(['auth', 'user.permission'])->group(function () {
     Route::get('/users/hierarchy', [\App\Http\Controllers\UserController::class, 'hierarchy'])->name('users.hierarchy');
     Route::get('/users/{user}', [\App\Http\Controllers\UserController::class, 'show'])->name('users.show');
     Route::get('/users/{user}/edit', [\App\Http\Controllers\UserController::class, 'edit'])->name('users.edit');
+
 
     // Supervisor Assignment Routes (Level-based)
     Route::post('/users/{user}/assign-supervisor', [\App\Http\Controllers\SupervisorAssignmentController::class, 'assign'])
