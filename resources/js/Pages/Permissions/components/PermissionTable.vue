@@ -3,12 +3,12 @@ import { computed } from "vue";
 import { IconEye, IconEdit, IconTrash, IconShield, IconPower, IconX } from "@tabler/icons-vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { usePage } from "@inertiajs/vue3";
-import { usePermissions } from "@/Composables/usePermissions";
+import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 
 const page = usePage();
 
 // Use permission composable
-const { canManageRoles, isSuperUser } = usePermissions();
+const isSuperUser = computed(() => usePage().props.auth?.user?.data?.is_super_user || false);
 
 // Props
 const props = defineProps({
@@ -93,19 +93,19 @@ const handleChange = (pagination, filters, sorter) => {
 };
 
 const canViewPermission = (permission) => {
-    return canManageRoles.value || isSuperUser.value;
+    return usePermissionsV2('permissions.update') || isSuperUser.value;
 };
 
 const canEditPermission = (permission) => {
-    return canManageRoles.value || isSuperUser.value;
+    return usePermissionsV2('permissions.update') || isSuperUser.value;
 };
 
 const canDeactivatePermission = (permission) => {
-    return (canManageRoles.value || isSuperUser.value) && permission.is_active;
+    return (usePermissionsV2('permissions.deactivate') || isSuperUser.value) && permission.is_active;
 };
 
 const canActivatePermission = (permission) => {
-    return (canManageRoles.value || isSuperUser.value) && !permission.is_active;
+    return (usePermissionsV2('permissions.activate') || isSuperUser.value) && !permission.is_active;
 };
 
 const handleEdit = (permission) => {

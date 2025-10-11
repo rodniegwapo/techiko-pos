@@ -6,11 +6,12 @@ import { Modal, notification } from "ant-design-vue";
 import { usePage } from "@inertiajs/vue3";
 import axios from "axios";
 import { usePermissions } from "@/Composables/usePermissions";
+import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 
 const page = usePage();
 
 // Use permission composable
-const { canManageRoles, isSuperUser } = usePermissions();
+const isSuperUser = computed(() => usePage().props.auth?.user?.data?.is_super_user || false);
 
 // Props
 const props = defineProps({
@@ -82,12 +83,12 @@ const handleChange = (pagination, filters, sorter) => {
 };
 
 const canEditRole = (role) => {
-    return canManageRoles.value || isSuperUser.value;
+    return usePermissionsV2('roles.edit') || isSuperUser.value;
 };
 
 const canDeleteRole = (role) => {
     // Only super user can delete roles
-    if (!canManageRoles.value && !isSuperUser.value) {
+    if (!usePermissionsV2('roles.destroy') && !isSuperUser.value) {
         return false;
     }
 
@@ -120,7 +121,7 @@ const handleDelete = (role) => {
         cancelText: "Cancel",
         onOk: async () => {
             try {
-                await axios.delete(route('roles.destroy', role.id));
+                await axios.delete(route("roles.destroy", role.id));
                 notification.success({
                     message: "Role Deleted",
                     description: `Role "${role.name}" has been deleted successfully`,
@@ -235,7 +236,7 @@ const formatDate = (dateString) => {
                     </IconTooltipButton>
 
                     <IconTooltipButton
-                        v-if="canEdit && canEditRole(record)"
+                        v-if="usePermissionsV2('roles.edit')"
                         hover="group-hover:bg-green-500"
                         name="Edit Role"
                         @click="$emit('edit', record)"
@@ -244,7 +245,7 @@ const formatDate = (dateString) => {
                     </IconTooltipButton>
 
                     <IconTooltipButton
-                        v-if="canDelete && canDeleteRole(record)"
+                        v-if="usePermissionsV2('roles.destroy')"
                         hover="group-hover:bg-red-500"
                         name="Delete Role"
                         @click="handleDelete(record)"

@@ -6,7 +6,7 @@ import { IconShield, IconUsers, IconAlertTriangle } from "@tabler/icons-vue";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
 import { usePage } from "@inertiajs/vue3";
-import { usePermissions } from "@/Composables/usePermissions";
+import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 
 const page = usePage();
 
@@ -18,7 +18,7 @@ const props = defineProps({
 const roleData = computed(() => props.role?.data || props.role);
 
 // Use permission composable
-const { canManageRoles, isSuperUser } = usePermissions();
+const isSuperUser = computed(() => usePage().props.auth?.user?.data?.is_super_user || false);
 
 // Check if this is a system role
 const isSystemRole = computed(() => {
@@ -291,7 +291,7 @@ const formatDate = (dateString) => {
                     </template>
                     Back to Roles
                 </a-button>
-                <a-button v-if="canManageRoles || isSuperUser" type="primary" @click="handleEdit">
+                <a-button v-if="usePermissionsV2('roles.edit') || isSuperUser" type="primary" @click="handleEdit">
                     <template #icon>
                         <EditOutlined />
                     </template>

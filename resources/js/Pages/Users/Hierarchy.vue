@@ -18,7 +18,7 @@ import {
   IconChevronDown
 } from "@tabler/icons-vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
-import { usePermissions } from "@/Composables/usePermissions";
+import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 import { Vue3OrgChart } from 'vue3-org-chart';
 import 'vue3-org-chart/dist/style.css';
 
@@ -27,7 +27,7 @@ import ContentHeader from "@/Components/ContentHeader.vue";
 import CascadingAssignment from "@/Components/CascadingAssignment.vue";
 
 const { spinning } = useGlobalVariables();
-const { canManageUsers, isSuperUser } = usePermissions();
+const isSuperUser = computed(() => usePage().props.auth?.user?.data?.is_super_user || false);
 
 const props = defineProps({
   users: Array,
@@ -247,7 +247,7 @@ const closeSupervisorModal = () => {
           </div>
           <div class="flex items-center space-x-3">
             <a-button 
-              v-if="isSuperUser || canManageUsers"
+              v-if="isSuperUser || usePermissionsV2('users.store')"
               @click="autoAssignSupervisors" 
               :loading="autoAssignLoading"
               type="primary"
@@ -379,7 +379,7 @@ const closeSupervisorModal = () => {
                     View
                   </a-button>
                   <a-button 
-                    v-if="canManageUsers || isSuperUser"
+                    v-if="usePermissionsV2('users.update') || isSuperUser"
                     size="small"
                     type="primary"
                     @click="handleEditUser({id: item.id})"
@@ -392,7 +392,7 @@ const closeSupervisorModal = () => {
                   </a-button>
                   
                   <!-- Supervisor Assignment Actions -->
-                  <a-dropdown v-if="canManageUsers || isSuperUser" placement="bottomRight">
+                  <a-dropdown v-if="usePermissionsV2('users.update') || isSuperUser" placement="bottomRight">
                     <a-button size="small" class="action-btn">
                       <template #icon>
                         <IconUserCheck />

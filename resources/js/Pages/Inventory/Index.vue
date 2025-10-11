@@ -14,7 +14,7 @@ import {
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useFilters, toLabel } from "@/Composables/useFilters";
 import { useHelpers } from "@/Composables/useHelpers";
-import { usePermissions } from "@/Composables/usePermissions";
+import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 import VueApexCharts from "vue3-apexcharts";
 
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
@@ -28,7 +28,7 @@ const { spinning } = useGlobalVariables();
 const { formattedTotal } = useHelpers();
 
 // Use permission composable
-const { canViewInventory, canManageInventory } = usePermissions();
+const isSuperUser = computed(() => usePage().props.auth?.user?.data?.is_super_user || false);
 
 const selectedLocation = ref(null);
 
@@ -104,7 +104,7 @@ const navigateToMovements = () =>
     });
 
 const navigateToAdjustments = () => {
-    if (canManageInventory.value) {
+    if (usePermissionsV2('inventory.adjustments.store') || isSuperUser.value) {
         router.visit(route("inventory.adjustments.index"));
     }
 };
@@ -147,7 +147,7 @@ const summaryCards = computed(() => [
 const quickActions = computed(() => {
     const actions = [];
     
-    if (canViewInventory.value) {
+    if (usePermissionsV2('inventory.index') || isSuperUser.value) {
         actions.push(
             {
                 title: "Manage Products",
@@ -166,7 +166,7 @@ const quickActions = computed(() => {
         );
     }
     
-    if (canManageInventory.value) {
+    if (usePermissionsV2('inventory.adjustments.store') || isSuperUser.value) {
         actions.push({
             title: "Stock Adjustments",
             desc: "Create and manage stock adjustments",
