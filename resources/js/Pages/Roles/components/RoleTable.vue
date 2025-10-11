@@ -5,7 +5,6 @@ import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { Modal, notification } from "ant-design-vue";
 import { usePage } from "@inertiajs/vue3";
 import axios from "axios";
-import { usePermissions } from "@/Composables/usePermissions";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 
 const page = usePage();

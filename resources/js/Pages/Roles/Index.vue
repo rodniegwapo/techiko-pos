@@ -7,7 +7,6 @@ import { useTable } from "@/Composables/useTable";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useFilters, toLabel } from "@/Composables/useFilters";
-import { usePermissions } from "@/Composables/usePermissions";
 
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";

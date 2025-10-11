@@ -13,6 +13,7 @@ import {
 } from "@tabler/icons-vue";
 import { router, usePage } from "@inertiajs/vue3";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
+import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 
 const { selectedKeys, openKeys } = useGlobalVariables();
 const page = usePage();
@@ -21,20 +22,6 @@ const page = usePage();
 // USER PERMISSIONS LOGIC
 // ======================
 const isSuperUser = computed(() => !!page.props.auth?.user?.data?.is_super_user);
-const userPermissionNames = computed(() =>
-    (page.props.auth?.user?.data?.permissions || []).map((p) => p.name)
-);
-
-// Check if user has a specific permission
-const hasPerm = (perm) => userPermissionNames.value.includes(perm);
-
-// Optional: Support wildcard like "sales.*"
-const hasPermLike = (perm) => {
-    const base = perm.split(".")[0];
-    return userPermissionNames.value.some(
-        (p) => p === perm || p.startsWith(`${base}.`)
-    );
-};
 
 // ======================
 // STATIC MENU DEFINITION
@@ -182,7 +169,7 @@ const menus = computed(() => {
                     }
                 } else if (
                     menu.routeName &&
-                    (hasPerm(menu.routeName) || hasPermLike(menu.routeName))
+                    usePermissionsV2(menu.routeName)
                 ) {
                     // Attach path if missing so the item is clickable
                     const path = menu.path || route(menu.routeName);
