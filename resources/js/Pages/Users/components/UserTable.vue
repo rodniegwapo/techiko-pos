@@ -116,12 +116,12 @@ import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { Modal, notification } from "ant-design-vue";
 import { usePage } from "@inertiajs/vue3";
 import axios from "axios";
-import { usePermissions } from "@/Composables/usePermissions";
+import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 
 const page = usePage();
 
 // Use permission composable
-const { canManageUsers, isSuperUser } = usePermissions();
+const isSuperUser = computed(() => usePage().props.auth?.user?.data?.is_super_user || false);
 
 // Props
 const props = defineProps({
@@ -201,7 +201,7 @@ const canEdit = (user) => {
   }
   
   // Users with manage permissions can edit
-  if (!canManageUsers.value) {
+  if (!usePermissionsV2('users.update')) {
     return false;
   }
   
@@ -220,7 +220,7 @@ const canDelete = (user) => {
   }
   
   // Only users with manage permissions can delete
-  if (!canManageUsers.value) {
+  if (!usePermissionsV2('users.update')) {
     return false;
   }
   

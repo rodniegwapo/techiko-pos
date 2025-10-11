@@ -5,7 +5,7 @@ import { ArrowLeftOutlined, SaveOutlined } from "@ant-design/icons-vue";
 import { IconShield } from "@tabler/icons-vue";
 import { notification } from "ant-design-vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
-import { usePermissions } from "@/Composables/usePermissions";
+import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
@@ -13,7 +13,7 @@ import ContentHeader from "@/Components/ContentHeader.vue";
 const { spinning } = useGlobalVariables();
 
 // Use permission composable
-const { canManageRoles, isSuperUser } = usePermissions();
+const isSuperUser = computed(() => usePage().props.auth?.user?.data?.is_super_user || false);
 
 const props = defineProps({
   permissions: Object,

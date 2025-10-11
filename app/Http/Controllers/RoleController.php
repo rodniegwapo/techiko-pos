@@ -111,6 +111,8 @@ class RoleController extends Controller
     {
         $this->authorize('update', $role);
 
+        logger('role policey accepted');
+
         $validated = $this->validateRole($request, $role);
 
         try {
@@ -137,29 +139,28 @@ class RoleController extends Controller
      */
     private function getPermissionsGroupedByModule()
     {
-        // Load all permissions and prefer normalized (route-aligned) names
+        // Load all permissions
         $all = Permission::all();
 
-        // Build a map keyed by normalized name, preferring the entry whose
-        // actual name already matches the normalized form
-        $normalizedMap = [];
+        // For role and permission management, keep all permissions as-is
+        // For other modules, apply normalization logic
+        $permissionsToGroup = [];
+        
         foreach ($all as $perm) {
-            $normalizedName = $this->normalizePermissionName($perm->name);
-            if (!isset($normalizedMap[$normalizedName])) {
-                $normalizedMap[$normalizedName] = $perm->name === $normalizedName ? $perm : $perm;
+            // Keep role and permission management permissions as-is
+            if (str_starts_with($perm->name, 'roles.') || str_starts_with($perm->name, 'permissions.')) {
+                $permissionsToGroup[] = $perm;
             } else {
-                // If an entry exists but current permission is the normalized one, replace
-                if ($perm->name === $normalizedName) {
-                    $normalizedMap[$normalizedName] = $perm;
-                }
+                // Apply normalization for other permissions
+                $normalizedName = $this->normalizePermissionName($perm->name);
+                $permissionsToGroup[] = $perm;
             }
         }
 
-        // Group by module based on normalized name
-        $grouped = collect($normalizedMap)
-            ->values()
+        // Group by module based on permission name
+        $grouped = collect($permissionsToGroup)
             ->groupBy(function (Permission $permission) {
-                return explode('.', $this->normalizePermissionName($permission->name))[0];
+                return explode('.', $permission->name)[0];
             });
 
         return $grouped;
@@ -193,9 +194,15 @@ class RoleController extends Controller
         // Load selected permissions by id
         $selected = Permission::whereIn('id', $permissionIds)->get();
 
-        // Normalize permission names to match route-style actions
-        // view->index, create->store, edit->update, delete->destroy
-        $normalizedPermissions = $selected->map(function (Permission $perm) {
+        // For role and permission management permissions, keep them as-is
+        // For other permissions, apply normalization
+        $finalPermissions = $selected->map(function (Permission $perm) {
+            // Keep role and permission management permissions as-is
+            if (str_starts_with($perm->name, 'roles.') || str_starts_with($perm->name, 'permissions.')) {
+                return $perm;
+            }
+            
+            // Apply normalization for other permissions
             $normalizedName = $this->normalizePermissionName($perm->name);
             if ($normalizedName === $perm->name) {
                 return $perm; // already normalized
@@ -204,16 +211,27 @@ class RoleController extends Controller
             return Permission::firstOrCreate(['name' => $normalizedName]);
         });
 
-        // Sync using normalized permissions set
-        $role->syncPermissions($normalizedPermissions);
+        // Sync using final permissions set
+        $role->syncPermissions($finalPermissions);
     }
 
     /**
      * Convert legacy permission action names to RESTful route-aligned actions.
      * Example: users.view -> users.index, sales.create -> sales.store
+     * Note: Role management permissions are preserved as-is to maintain functionality
      */
     private function normalizePermissionName(string $permissionName): string
     {
+        // Don't normalize role management permissions - they need to keep their original names
+        if (str_starts_with($permissionName, 'roles.')) {
+            return $permissionName;
+        }
+        
+        // Don't normalize permission management permissions
+        if (str_starts_with($permissionName, 'permissions.')) {
+            return $permissionName;
+        }
+        
         // Expect format module.action, e.g., users.view
         $parts = explode('.', $permissionName, 2);
         if (count($parts) !== 2) {

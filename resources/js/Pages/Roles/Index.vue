@@ -24,7 +24,7 @@ const { openModal, isEdit, spinning } = useGlobalVariables();
 const { showModal } = useHelpers();
 
 // Use permission composable
-const { canManageRoles, isSuperUser } = usePermissions();
+const isSuperUser = computed(() => usePage().props.auth?.user?.data?.is_super_user || false);
 
 const props = defineProps({
     roles: Object,
@@ -114,7 +114,7 @@ console.log("Permissions data:", props.permissions);
                     Add Role
                 </a-button>
                 <a-button
-                    v-if="canManageRoles.value || isSuperUser"
+                    v-if="usePermissionsV2('roles.index') || isSuperUser"
                     @click="handlePermissionMatrix"
                     type="default"
                     class="bg-white border flex items-center border-blue-500 text-blue-500"
@@ -145,9 +145,9 @@ console.log("Permissions data:", props.permissions);
                     :roles="roles?.data || []"
                     :loading="spinning"
                     :pagination="pagination"
-                    :can-edit="(canEdit && canManageRoles.value) || isSuperUser"
+                    :can-edit="(canEdit && usePermissionsV2('roles.edit')) || isSuperUser"
                     :can-delete="
-                        (canDelete && canManageRoles.value) || isSuperUser
+                        (canDelete && usePermissionsV2('roles.destroy')) || isSuperUser
                     "
                     @change="handleTableChange"
                     @edit="handleEditRole"

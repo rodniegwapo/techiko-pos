@@ -7,7 +7,7 @@ import { useTable } from "@/Composables/useTable";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useFilters, toLabel } from "@/Composables/useFilters";
-import { usePermissions } from "@/Composables/usePermissions";
+import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
@@ -24,7 +24,7 @@ const { openModal, isEdit, spinning } = useGlobalVariables();
 const { showModal } = useHelpers();
 
 // Use permission composable
-const { canManageUsers, isSuperUser } = usePermissions();
+const isSuperUser = computed(() => usePage().props.auth?.user?.data?.is_super_user || false);
 
 const props = defineProps({
     items: Object,
@@ -182,7 +182,7 @@ const getRoleColorHex = (level) => {
                     class="min-w-[100px] max-w-[400px]"
                 />
                 <a-button
-                    v-if="isSuperUser || canManageUsers"
+                    v-if="isSuperUser || usePermissionsV2('users.store')"
                     @click="handleAddUser"
                     type="primary"
                     class="bg-white border flex items-center border-green-500 text-green-500"

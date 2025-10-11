@@ -9,7 +9,7 @@ import { useTable } from "@/Composables/useTable";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useFilters, toLabel } from "@/Composables/useFilters";
-import { usePermissions } from "@/Composables/usePermissions";
+import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
@@ -26,7 +26,7 @@ const { openModal, isEdit, spinning } = useGlobalVariables();
 const { showModal } = useHelpers();
 
 // Use permission composable
-const { canManageRoles, isSuperUser } = usePermissions();
+const isSuperUser = computed(() => usePage().props.auth?.user?.data?.is_super_user || false);
 
 const props = defineProps({
     items: Object,
@@ -204,7 +204,7 @@ console.log("Permissions grouped:", props.permissionsGrouped);
                 />
 
                 <a-button
-                    v-if="(canCreate && canManageRoles.value) || isSuperUser"
+                    v-if="(canCreate && usePermissionsV2('permissions.store')) || isSuperUser"
                     @click="handleAddPermission"
                     type="primary"
                     class="bg-white border flex items-center border-green-500 text-green-500"
@@ -236,9 +236,9 @@ console.log("Permissions grouped:", props.permissionsGrouped);
                     :permissions="items?.data || []"
                     :loading="spinning"
                     :pagination="pagination"
-                    :can-edit="(canEdit && canManageRoles.value) || isSuperUser"
+                    :can-edit="(canEdit && usePermissionsV2('permissions.update')) || isSuperUser"
                     :can-delete="
-                        (canDelete && canManageRoles.value) || isSuperUser
+                        (canDelete && usePermissionsV2('permissions.destroy')) || isSuperUser
                     "
                     @change="handleTableChange"
                     @edit="handleEditPermission"

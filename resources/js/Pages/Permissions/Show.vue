@@ -9,7 +9,7 @@ import {
 } from "@tabler/icons-vue";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
-import { usePermissions } from "@/Composables/usePermissions";
+import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 import { useHelpers } from "@/Composables/useHelpers";
 
 const props = defineProps({
@@ -18,10 +18,10 @@ const props = defineProps({
 });
 
 const { formatDateTime } = useHelpers();
-const { canManageRoles, isSuperUser } = usePermissions();
+const isSuperUser = computed(() => usePage().props.auth?.user?.data?.is_super_user || false);
 
 // Computed
-const canEdit = computed(() => canManageRoles.value || isSuperUser.value);
+const canEdit = computed(() => usePermissionsV2('permissions.update') || isSuperUser.value);
 
 // Methods
 const handleEdit = () => {
