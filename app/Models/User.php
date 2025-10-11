@@ -158,4 +158,30 @@ class User extends Authenticatable
             return collect([$subordinate])->merge($subordinate->getAllSubordinates());
         });
     }
+
+    /**
+     * Check if user has permission to access a specific route
+     */
+    public function hasPermissionToRoute(string $routeName): bool
+    {
+        if ($this->isSuperUser()) {
+            return true;
+        }
+        
+        return $this->permissions()
+            ->where('route_name', $routeName)
+            ->orWhere('name', $routeName) // Fallback for backward compatibility
+            ->exists();
+    }
+
+    /**
+     * Get permissions by route name
+     */
+    public function getPermissionsByRoute(string $routeName)
+    {
+        return $this->permissions()
+            ->where('route_name', $routeName)
+            ->orWhere('name', $routeName) // Fallback for backward compatibility
+            ->get();
+    }
 }

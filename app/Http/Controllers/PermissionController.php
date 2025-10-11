@@ -55,13 +55,15 @@ class PermissionController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255|unique:permissions,name',
+            'route_name' => 'required|string|max:255|unique:permissions,route_name',
             'description' => 'nullable|string|max:500',
             'module' => 'required|string|max:100',
             'action' => 'required|string|max:100',
         ]);
 
         $permission = Permission::create([
-            'name' => $request->name,
+            'name' => $request->name, // Display name
+            'route_name' => $request->route_name, // Technical route name
             'guard_name' => 'web',
         ]);
 
@@ -90,13 +92,15 @@ class PermissionController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255|unique:permissions,name,' . $permission->id,
+            'route_name' => 'required|string|max:255|unique:permissions,route_name,' . $permission->id,
             'description' => 'nullable|string|max:500',
             'module' => 'required|string|max:100',
             'action' => 'required|string|max:100',
         ]);
 
         $permission->update([
-            'name' => $request->name,
+            'name' => $request->name, // Display name
+            'route_name' => $request->route_name, // Technical route name
         ]);
 
         return redirect()->route('permissions.index')

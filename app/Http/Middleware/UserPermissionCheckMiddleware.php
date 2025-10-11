@@ -29,12 +29,11 @@ class UserPermissionCheckMiddleware
         }
 
         $permissions = auth()->user()->getAllPermissions();
-        $find = collect($permissions)->where('name', $request->route()?->getName())->first();
-        logger($request->route()?->getName());
-        logger('ttess');
-        logger($permissions);
+        // Use route_name for route matching, fallback to name for backward compatibility
+        $find = collect($permissions)->where('route_name', $request->route()?->getName())
+            ->orWhere('name', $request->route()?->getName())
+            ->first();
 
-        logger($find);
         if (!$find) {
             return $this->handleUnauthorized($request);
         }
