@@ -170,38 +170,18 @@ const getRoleColor = (roleName) => {
     return roleColors[roleName] || "default";
 };
 
-const getPermissionLabel = (permissionName) => {
-    const parts = permissionName.split(".");
-    if (parts.length < 2) return permissionName;
-
-    const action = parts[1];
-    const actionLabels = {
-        view: "View",
-        create: "Create",
-        edit: "Edit",
-        delete: "Delete",
-        apply: "Apply",
-        manage: "Manage",
-        adjust_points: "Adjust Points",
-        export: "Export",
-        dashboard: "Dashboard",
-        products: "Products",
-        movements: "Movements",
-        adjustments: "Adjustments",
-        locations: "Locations",
-        valuation: "Valuation",
-        receive: "Receive",
-        transfer: "Transfer",
-        low_stock: "Low Stock",
-        tiers_manage: "Manage Tiers",
-        customers_manage: "Manage Customers",
-        points_adjust: "Adjust Points",
-        reports_view: "View Reports",
-    };
-
-    return (
-        actionLabels[action] || action.charAt(0).toUpperCase() + action.slice(1)
-    );
+const getPermissionLabel = (permission) => {
+    // If permission is an object with name property, use it directly (display name)
+    if (typeof permission === 'object' && permission.name) {
+        return permission.name;
+    }
+    
+    // Fallback for string permission names (backward compatibility)
+    if (typeof permission === 'string') {
+        return permission;
+    }
+    
+    return 'Unknown Permission';
 };
 
 // =======
@@ -419,3 +399,9 @@ const onModuleCheckAllChange = (moduleName, checked) => {
         </div>
     </AuthenticatedLayout>
 </template>
+
+<style>
+.ant-checkbox-wrapper {
+    margin-left: 0 !important;
+}
+</style>

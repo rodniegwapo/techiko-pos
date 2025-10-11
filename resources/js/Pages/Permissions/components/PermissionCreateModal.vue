@@ -15,7 +15,8 @@ const emit = defineEmits(["close", "saved"]);
 
 // Form handling
 const form = useForm({
-    name: "",
+    name: "", // Display name
+    route_name: "", // Technical route name
     description: "",
     module: "",
     action: "",
@@ -49,18 +50,18 @@ const actions = [
     { value: "reject", label: "Reject" },
 ];
 
-// Computed property for auto-generated permission name
-const permissionName = computed(() => {
+// Computed property for auto-generated route name
+const routeName = computed(() => {
     if (form.module && form.action) {
         return `${form.module}.${form.action}`;
     }
     return "";
 });
 
-// Watch for changes to update the name field
-const updatePermissionName = () => {
+// Watch for changes to update the route_name field
+const updateRouteName = () => {
     if (form.module && form.action) {
-        form.name = `${form.module}.${form.action}`;
+        form.route_name = `${form.module}.${form.action}`;
     }
 };
 
@@ -125,7 +126,7 @@ const handleCancel = () => {
                     <a-select
                         v-model:value="form.module"
                         placeholder="Select module"
-                        @change="updatePermissionName"
+                        @change="updateRouteName"
                     >
                         <a-select-option
                             v-for="module in modules"
@@ -147,7 +148,7 @@ const handleCancel = () => {
                     <a-select
                         v-model:value="form.action"
                         placeholder="Select action"
-                        @change="updatePermissionName"
+                        @change="updateRouteName"
                     >
                         <a-select-option
                             v-for="action in actions"
@@ -160,9 +161,9 @@ const handleCancel = () => {
                 </a-form-item>
             </div>
 
-            <!-- Auto-generated Permission Name -->
+            <!-- Display Name -->
             <a-form-item
-                label="Permission Name"
+                label="Display Name"
                 name="name"
                 :validate-status="form.errors.name ? 'error' : ''"
                 :help="form.errors.name"
@@ -170,15 +171,36 @@ const handleCancel = () => {
             >
                 <a-input
                     v-model:value="form.name"
-                    placeholder="Auto-generated from module and action"
+                    placeholder="e.g., Create Product, View Users, etc."
                 >
                     <template #prefix>
                         <IconShield class="text-blue-500" />
                     </template>
                 </a-input>
                 <div class="text-sm text-gray-500 mt-1">
-                    This will be automatically generated as:
-                    {{ permissionName || "module.action" }}
+                    Human-readable name for this permission
+                </div>
+            </a-form-item>
+
+            <!-- Auto-generated Route Name -->
+            <a-form-item
+                label="Route Name"
+                name="route_name"
+                :validate-status="form.errors.route_name ? 'error' : ''"
+                :help="form.errors.route_name"
+                required
+            >
+                <a-input
+                    v-model:value="form.route_name"
+                    placeholder="Auto-generated from module and action"
+                    readonly
+                >
+                    <template #prefix>
+                        <IconShield class="text-green-500" />
+                    </template>
+                </a-input>
+                <div class="text-sm text-gray-500 mt-1">
+                    Technical route name: {{ routeName || "module.action" }}
                 </div>
             </a-form-item>
 

@@ -8,7 +8,7 @@ export function usePermissions() {
     const currentUser = computed(() => page.props.auth?.user?.data)
     const userPermissions = computed(() => {
         if (!currentUser.value?.permissions) return []
-        return currentUser.value.permissions.map(p => p.name)
+        return currentUser.value.permissions.map(p => p.route_name || p.name)
     })
 
     // Roles (kept for compatibility)

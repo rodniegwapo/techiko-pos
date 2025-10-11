@@ -28,8 +28,8 @@ class CheckPermission
             return $next($request);
         }
 
-        // Check if user has the specific permission
-        if (!$user->hasPermissionTo($permission)) {
+        // Check if user has the specific permission (check by route_name first, then name)
+        if (!$user->hasPermissionToRoute($permission)) {
             // If it's an API request, return JSON error
             if ($request->expectsJson()) {
                 return response()->json([

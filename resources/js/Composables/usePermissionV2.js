@@ -12,7 +12,7 @@ export function usePermissionsV2(routeName) {
     }
 
     const find = currentUser.value?.permissions.find(
-        (item) => item.name == routeName
+        (item) => (item.route_name || item.name) == routeName
     );
 
     if (!find) return false;

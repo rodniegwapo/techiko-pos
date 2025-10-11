@@ -142,25 +142,11 @@ class RoleController extends Controller
         // Load all permissions
         $all = Permission::all();
 
-        // For role and permission management, keep all permissions as-is
-        // For other modules, apply normalization logic
-        $permissionsToGroup = [];
-        
-        foreach ($all as $perm) {
-            // Keep role and permission management permissions as-is
-            if (str_starts_with($perm->name, 'roles.') || str_starts_with($perm->name, 'permissions.')) {
-                $permissionsToGroup[] = $perm;
-            } else {
-                // Apply normalization for other permissions
-                $normalizedName = $this->normalizePermissionName($perm->name);
-                $permissionsToGroup[] = $perm;
-            }
-        }
-
-        // Group by module based on permission name
-        $grouped = collect($permissionsToGroup)
+        // Group by module based on route_name (fallback to name for backward compatibility)
+        $grouped = collect($all)
             ->groupBy(function (Permission $permission) {
-                return explode('.', $permission->name)[0];
+                $routeName = $permission->route_name ?? $permission->name;
+                return explode('.', $routeName)[0];
             });
 
         return $grouped;
@@ -194,22 +180,8 @@ class RoleController extends Controller
         // Load selected permissions by id
         $selected = Permission::whereIn('id', $permissionIds)->get();
 
-        // For role and permission management permissions, keep them as-is
-        // For other permissions, apply normalization
-        $finalPermissions = $selected->map(function (Permission $perm) {
-            // Keep role and permission management permissions as-is
-            if (str_starts_with($perm->name, 'roles.') || str_starts_with($perm->name, 'permissions.')) {
-                return $perm;
-            }
-            
-            // Apply normalization for other permissions
-            $normalizedName = $this->normalizePermissionName($perm->name);
-            if ($normalizedName === $perm->name) {
-                return $perm; // already normalized
-            }
-            // Find or create normalized permission
-            return Permission::firstOrCreate(['name' => $normalizedName]);
-        });
+        // Use the permissions as-is since we now have proper route_name field
+        $finalPermissions = $selected;
 
         // Sync using final permissions set
         $role->syncPermissions($finalPermissions);
