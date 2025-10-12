@@ -1,6 +1,13 @@
 <script setup>
 import { computed } from "vue";
-import { IconEye, IconEdit, IconTrash, IconShield, IconPower, IconX } from "@tabler/icons-vue";
+import {
+    IconEye,
+    IconEdit,
+    IconTrash,
+    IconShield,
+    IconPower,
+    IconX,
+} from "@tabler/icons-vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { usePage } from "@inertiajs/vue3";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
@@ -8,7 +15,9 @@ import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 const page = usePage();
 
 // Use permission composable
-const isSuperUser = computed(() => usePage().props.auth?.user?.data?.is_super_user || false);
+const isSuperUser = computed(
+    () => page.props.auth?.user?.data?.is_super_user || false
+);
 
 // Props
 const props = defineProps({
@@ -35,7 +44,14 @@ const props = defineProps({
 });
 
 // Emits
-const emit = defineEmits(["change", "edit", "view", "deactivate", "activate"]);
+const emit = defineEmits([
+    "change",
+    "edit",
+    "view",
+    "deactivate",
+    "activate",
+    "delete",
+]);
 
 // Table columns
 const columns = [
@@ -93,19 +109,29 @@ const handleChange = (pagination, filters, sorter) => {
 };
 
 const canViewPermission = (permission) => {
-    return usePermissionsV2('permissions.update') || isSuperUser.value;
+    return usePermissionsV2("permissions.update") || isSuperUser.value;
 };
 
 const canEditPermission = (permission) => {
-    return usePermissionsV2('permissions.update') || isSuperUser.value;
+    return usePermissionsV2("permissions.update") || isSuperUser.value;
 };
 
 const canDeactivatePermission = (permission) => {
-    return (usePermissionsV2('permissions.deactivate') || isSuperUser.value) && permission.is_active;
+    return (
+        (usePermissionsV2("permissions.deactivate") || isSuperUser.value) &&
+        permission.is_active
+    );
 };
 
 const canActivatePermission = (permission) => {
-    return (usePermissionsV2('permissions.activate') || isSuperUser.value) && !permission.is_active;
+    return (
+        (usePermissionsV2("permissions.activate") || isSuperUser.value) &&
+        !permission.is_active
+    );
+};
+
+const canDeletePermission = (permission) => {
+    return usePermissionsV2("permissions.destroy") || isSuperUser.value;
 };
 
 const handleEdit = (permission) => {
@@ -124,6 +150,10 @@ const handleActivate = (permission) => {
     emit("activate", permission);
 };
 
+const handleDelete = (permission) => {
+    emit("delete", permission);
+};
+
 // Format date
 const formatDate = (dateString) => {
     if (!dateString) return "N/A";
@@ -133,6 +163,23 @@ const formatDate = (dateString) => {
         month: "short",
         day: "numeric",
     });
+};
+
+// Extract action name from permission name (e.g., "Users - View" -> "View")
+const getActionName = (permissionName) => {
+    if (!permissionName) return "";
+
+    // If it contains " - ", split and take the second part
+    if (permissionName.includes(" - ")) {
+        return permissionName.split(" - ")[1];
+    }
+
+    // If it contains " (", take everything before the parenthesis
+    if (permissionName.includes(" (")) {
+        return permissionName.split(" (")[0];
+    }
+
+    return permissionName;
 };
 </script>
 
@@ -164,7 +211,7 @@ const formatDate = (dateString) => {
                             {{ record.name }}
                         </div>
                         <div class="text-sm text-gray-500">
-                            {{ record.description || 'No description' }}
+                            {{ record.description || "No description" }}
                         </div>
                     </div>
                 </div>
@@ -173,21 +220,28 @@ const formatDate = (dateString) => {
             <!-- Module -->
             <template v-else-if="column.key === 'module'">
                 <a-tag color="blue" class="capitalize w-fit">
-                    {{ record.module }}
+                    {{
+                        record.module?.display_name ||
+                        record.module?.name ||
+                        "Unknown"
+                    }}
                 </a-tag>
             </template>
 
             <!-- Action -->
             <template v-else-if="column.key === 'action'">
                 <a-tag color="green" class="capitalize w-fit">
-                    {{ record.action }}
+                    {{ getActionName(record.name) }}
                 </a-tag>
             </template>
 
             <!-- Status -->
             <template v-else-if="column.key === 'status'">
-                <a-tag :color="record.is_active ? 'green' : 'red'" class="w-fit">
-                    {{ record.is_active ? 'Active' : 'Inactive' }}
+                <a-tag
+                    :color="record.is_active ? 'green' : 'red'"
+                    class="w-fit"
+                >
+                    {{ record.is_active ? "Active" : "Inactive" }}
                 </a-tag>
             </template>
 
@@ -244,6 +298,15 @@ const formatDate = (dateString) => {
                         @click="handleActivate(record)"
                     >
                         <IconPower size="20" class="mx-auto" />
+                    </IconTooltipButton>
+
+                    <IconTooltipButton
+                        v-if="canDeletePermission(record)"
+                        hover="group-hover:bg-red-500"
+                        name="Delete Permission"
+                        @click="handleDelete(record)"
+                    >
+                        <IconTrash size="20" class="mx-auto" />
                     </IconTooltipButton>
                 </div>
             </template>

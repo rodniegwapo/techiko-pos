@@ -10,7 +10,9 @@ import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 const page = usePage();
 
 // Use permission composable
-const isSuperUser = computed(() => usePage().props.auth?.user?.data?.is_super_user || false);
+const isSuperUser = computed(
+    () => usePage().props.auth?.user?.data?.is_super_user || false
+);
 
 // Props
 const props = defineProps({
@@ -82,12 +84,12 @@ const handleChange = (pagination, filters, sorter) => {
 };
 
 const canEditRole = (role) => {
-    return usePermissionsV2('roles.edit') || isSuperUser.value;
+    return usePermissionsV2("roles.edit") || isSuperUser.value;
 };
 
 const canDeleteRole = (role) => {
     // Only super user can delete roles
-    if (!usePermissionsV2('roles.destroy') && !isSuperUser.value) {
+    if (!usePermissionsV2("roles.destroy") && !isSuperUser.value) {
         return false;
     }
 
@@ -160,6 +162,40 @@ const formatDate = (dateString) => {
         day: "numeric",
     });
 };
+
+// Group permissions by module
+const getGroupedPermissions = (permissions) => {
+    if (!permissions) return {};
+    
+    const grouped = {};
+    permissions.forEach(permission => {
+        const moduleName = permission.module?.display_name || permission.module?.name || 'Other';
+        
+        if (!grouped[moduleName]) {
+            grouped[moduleName] = [];
+        }
+        grouped[moduleName].push(permission);
+    });
+    
+    return grouped;
+};
+
+// Extract action name from permission name (e.g., "Users - View" -> "View")
+const getActionName = (permissionName) => {
+    if (!permissionName) return '';
+    
+    // If it contains " - ", split and take the second part
+    if (permissionName.includes(' - ')) {
+        return permissionName.split(' - ')[1];
+    }
+    
+    // If it contains " (", take everything before the parenthesis
+    if (permissionName.includes(' (')) {
+        return permissionName.split(' (')[0];
+    }
+    
+    return permissionName;
+};
 </script>
 
 <template>
@@ -192,22 +228,31 @@ const formatDate = (dateString) => {
             </template>
 
             <template v-if="column.key === 'permissions'">
-                <div class="flex flex-wrap gap-1">
-                    <a-tag
-                        v-for="permission in record.permissions?.slice(0, 3)"
-                        :key="permission.id"
-                        size="small"
-                        color="blue"
+                <div class="space-y-2">
+                    <div
+                        v-for="(modulePermissions, moduleName) in getGroupedPermissions(record.permissions)"
+                        :key="moduleName"
+                        class="text-xs"
                     >
-                        {{ permission.action }}
-                    </a-tag>
-                    <a-tag
-                        v-if="record.permissions?.length > 3"
-                        size="small"
-                        color="default"
-                    >
-                        +{{ record.permissions.length - 3 }} more
-                    </a-tag>
+                        <div class="font-semibold text-gray-800 mb-1">{{ moduleName }}</div>
+                        <div class="flex flex-wrap gap-1 ml-2">
+                            <a-tag
+                                v-for="permission in modulePermissions.slice(0, 4)"
+                                :key="permission.id"
+                                size="small"
+                                color="green"
+                            >
+                                {{ getActionName(permission.name) }}
+                            </a-tag>
+                            <a-tag
+                                v-if="modulePermissions.length > 4"
+                                size="small"
+                                color="default"
+                            >
+                                +{{ modulePermissions.length - 4 }} more
+                            </a-tag>
+                        </div>
+                    </div>
                 </div>
             </template>
 
@@ -235,7 +280,7 @@ const formatDate = (dateString) => {
                     </IconTooltipButton>
 
                     <IconTooltipButton
-                        v-if="usePermissionsV2('roles.edit')"
+                        v-if="canEditRole(record)"
                         hover="group-hover:bg-green-500"
                         name="Edit Role"
                         @click="$emit('edit', record)"
@@ -244,7 +289,7 @@ const formatDate = (dateString) => {
                     </IconTooltipButton>
 
                     <IconTooltipButton
-                        v-if="usePermissionsV2('roles.destroy')"
+                        v-if="canDeleteRole(record)"
                         hover="group-hover:bg-red-500"
                         name="Delete Role"
                         @click="handleDelete(record)"

@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Spatie\Permission\Models\Role;
-use Spatie\Permission\Models\Permission;
+use App\Models\Permission;
 
 class RoleController extends Controller
 {
@@ -94,9 +94,7 @@ class RoleController extends Controller
         $this->authorize('update', $role);
 
         // Get all permissions grouped by module
-        $permissions = Permission::all()->groupBy(function ($permission) {
-            return explode('.', $permission->name)[0];
-        });
+        $permissions = $this->getPermissionsGroupedByModule();
 
         return Inertia::render('Roles/Edit', [
             'role' => new RoleResource($role->load('permissions')),
@@ -139,14 +137,13 @@ class RoleController extends Controller
      */
     private function getPermissionsGroupedByModule()
     {
-        // Load all permissions
-        $all = Permission::all();
+        // Load all permissions with their modules
+        $all = Permission::with('module')->get();
 
-        // Group by module based on route_name (fallback to name for backward compatibility)
+        // Group by module using the module relationship
         $grouped = collect($all)
             ->groupBy(function (Permission $permission) {
-                $routeName = $permission->route_name ?? $permission->name;
-                return explode('.', $routeName)[0];
+                return $permission->module ? $permission->module->display_name : 'Other';
             });
 
         return $grouped;

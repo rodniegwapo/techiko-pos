@@ -184,6 +184,36 @@ const handleActivatePermission = (permission) => {
     });
 };
 
+const handleDeletePermission = (permission) => {
+    Modal.confirm({
+        title: "Delete Permission",
+        content: `Are you sure you want to permanently delete the permission "${permission.name}"? This action cannot be undone.`,
+        okText: "Delete",
+        okType: "danger",
+        cancelText: "Cancel",
+        onOk() {
+            axios
+                .delete(route("permissions.destroy", permission.id))
+                .then((response) => {
+                    notification.success({
+                        message: "Success",
+                        description: response.data.message,
+                    });
+                    getItems(); // Refresh the list
+                })
+                .catch((error) => {
+                    console.error("Delete error:", error);
+                    notification.error({
+                        message: "Error",
+                        description:
+                            error.response?.data?.message ||
+                            "Failed to delete permission.",
+                    });
+                });
+        },
+    });
+};
+
 // Debug - log the permissions data
 console.log("Permissions data:", props.items);
 console.log("Permissions grouped:", props.permissionsGrouped);
@@ -245,6 +275,7 @@ console.log("Permissions grouped:", props.permissionsGrouped);
                     @view="handleViewPermission"
                     @deactivate="handleDeactivatePermission"
                     @activate="handleActivatePermission"
+                    @delete="handleDeletePermission"
                 />
             </template>
         </ContentLayout>

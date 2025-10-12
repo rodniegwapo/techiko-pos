@@ -17,15 +17,15 @@ import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 
 const { selectedKeys, openKeys } = useGlobalVariables();
 const page = usePage();
+const { hasPermission } = usePermissionsV2();
 
-// ======================
-// USER PERMISSIONS LOGIC
-// ======================
-const isSuperUser = computed(() => !!page.props.auth?.user?.data?.is_super_user);
+const isSuperUser = computed(
+    () => !!page.props.auth?.user?.data?.is_super_user
+);
 
-// ======================
+// ===================================
 // STATIC MENU DEFINITION
-// ======================
+// ===================================
 const allMenus = [
     {
         title: "Dashboard",
@@ -68,6 +68,7 @@ const allMenus = [
     {
         title: "Inventory",
         icon: IconPackage,
+        routeName: "inventory.index",
         children: [
             {
                 title: "Dashboard",
@@ -143,42 +144,32 @@ const allMenus = [
 // FILTER MENUS BASED ON PERMISSIONS
 // ===================================
 const menus = computed(() => {
-    // Helper to attach path from routeName recursively
-    const attachPaths = (menuList) =>
-        menuList.map((m) => {
-            const item = { ...m };
-            if (!item.path && item.routeName) item.path = route(item.routeName);
-            if (item.children) item.children = attachPaths(item.children);
-            return item;
-        });
+    if (isSuperUser.value) return allMenus;
 
-    // Super user: show everything
-    if (isSuperUser.value) {
-        return attachPaths(allMenus);
-    }
+    const filterMenu = (list) =>
+        list
+            .map((item) => {
+                const hasChildren =
+                    Array.isArray(item.children) && item.children.length > 0;
 
-    const filterMenu = (menuList) => {
-        return menuList
-            .map((menu) => {
-                if (menu.children) {
-                    const filteredChildren = filterMenu(menu.children);
-                    if (filteredChildren.length > 0) {
-                        // Ensure parent has a clickable path if defined via routeName
-                        const path = menu.path || (menu.routeName ? route(menu.routeName) : undefined);
-                        return { ...menu, path, children: filteredChildren };
+                if (hasChildren) {
+                    const visibleChildren = filterMenu(item.children);
+                    const parentAllowed = item.routeName
+                        ? hasPermission(item.routeName)
+                        : false;
+                    if (parentAllowed || visibleChildren.length > 0) {
+                        return { ...item, children: visibleChildren };
                     }
-                } else if (
-                    menu.routeName &&
-                    usePermissionsV2(menu.routeName)
-                ) {
-                    // Attach path if missing so the item is clickable
-                    const path = menu.path || route(menu.routeName);
-                    return { ...menu, path };
+                    return null;
                 }
-                return null;
+
+                // Hide if routeName missing or no permission
+                if (!item.routeName) return null;
+                if (!hasPermission(item.routeName)) return null;
+
+                return item;
             })
             .filter(Boolean);
-    };
 
     return filterMenu(allMenus);
 });
@@ -234,10 +225,7 @@ const initializeMenuState = () => {
     }
 };
 
-onMounted(() => {
-    initializeMenuState();
-});
-
+onMounted(() => initializeMenuState());
 watch(
     () => page.url,
     () => initializeMenuState()
@@ -259,7 +247,6 @@ const handleOpenChange = (keys) => {
             @openChange="handleOpenChange"
         >
             <template v-for="menu in menus" :key="menu.path">
-                <!-- Single menu -->
                 <a-menu-item
                     v-if="!menu.children"
                     :key="menu.path"
@@ -267,17 +254,12 @@ const handleOpenChange = (keys) => {
                     class="font-semibold text-gray-800 items-center"
                 >
                     <template #icon>
-                        <span
-                            class="leading-[40px] h-full flex items-center justify-center"
-                        >
-                            <component
-                                v-if="menu.icon"
-                                :is="menu.icon"
-                                class="flex-shrink-0"
-                            />
-                        </span>
+                        <component
+                            v-if="menu.icon"
+                            :is="menu.icon"
+                            class="flex-shrink-0"
+                        />
                     </template>
-
                     <div class="flex items-center gap-2">
                         {{ menu.title }}
                         <span v-if="menu.title === 'Dashboard'" class="text-xs">
@@ -288,22 +270,17 @@ const handleOpenChange = (keys) => {
                     </div>
                 </a-menu-item>
 
-                <!-- Sub-menu -->
                 <a-sub-menu
                     v-else
                     :key="`submenu-${menu.path || menu.title}`"
                     class="font-semibold text-gray-800 items-center"
                 >
                     <template #icon>
-                        <span
-                            class="leading-[40px] h-full flex items-center justify-center"
-                        >
-                            <component
-                                v-if="menu.icon"
-                                :is="menu.icon"
-                                class="flex-shrink-0"
-                            />
-                        </span>
+                        <component
+                            v-if="menu.icon"
+                            :is="menu.icon"
+                            class="flex-shrink-0"
+                        />
                     </template>
                     <template #title>{{ menu.title }}</template>
 
@@ -319,14 +296,6 @@ const handleOpenChange = (keys) => {
                         />
                         <div class="flex items-center gap-2">
                             <span>{{ child.title }}</span>
-                            <span
-                                v-if="child.title === 'Dashboard'"
-                                class="text-xs"
-                            >
-                                <a-tag color="blue" class="text-[10px]">
-                                    {{ page.props.default_store.name }}
-                                </a-tag>
-                            </span>
                         </div>
                     </a-menu-item>
                 </a-sub-menu>

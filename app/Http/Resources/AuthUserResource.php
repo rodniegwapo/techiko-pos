@@ -30,6 +30,7 @@ class AuthUserResource extends JsonResource
                 return [
                     'id' => $permission->id,
                     'name' => $permission->name,
+                    'route_name' => $permission->route_name
                 ];
             }),
         ]);

@@ -104,6 +104,7 @@ Route::middleware(['auth', 'user.permission'])->group(function () {
         Route::post('/permissions', [\App\Http\Controllers\PermissionController::class, 'store'])->name('permissions.store');
         Route::get('/permissions/{permission}', [\App\Http\Controllers\PermissionController::class, 'show'])->name('permissions.show');
         Route::put('/permissions/{permission}', [\App\Http\Controllers\PermissionController::class, 'update'])->name('permissions.update');
+        Route::delete('/permissions/{permission}', [\App\Http\Controllers\PermissionController::class, 'destroy'])->name('permissions.destroy');
         Route::post('/permissions/{permission}/deactivate', [\App\Http\Controllers\PermissionController::class, 'deactivate'])->name('permissions.deactivate');
         Route::post('/permissions/{permission}/activate', [\App\Http\Controllers\PermissionController::class, 'activate'])->name('permissions.activate');
         Route::post('/permissions/bulk-deactivate', [\App\Http\Controllers\PermissionController::class, 'bulkDeactivate'])->name('permissions.bulk-deactivate');
