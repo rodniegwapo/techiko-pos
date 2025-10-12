@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Resources\PermissionResource;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Spatie\Permission\Models\Permission;
+use App\Models\Permission;
 use Spatie\Permission\Models\Role;
 
 class PermissionController extends Controller
@@ -22,20 +22,23 @@ class PermissionController extends Controller
     {
         $currentUser = auth()->user();
 
-        // Get permissions with usage count
-        $permissions = Permission::withCount('roles')
+        // Get permissions with usage count and module relationship
+        $permissions = Permission::with(['module'])
+            ->withCount('roles')
             ->when($request->search, function ($query, $search) {
                 return $query->where('name', 'like', "%{$search}%");
             })
             ->when($request->module, function ($query, $module) {
-                return $query->where('name', 'like', "{$module}.%");
+                return $query->whereHas('module', function ($q) use ($module) {
+                    $q->where('name', $module);
+                });
             })
             ->orderBy('name')
             ->paginate(15);
 
         // Group permissions by module for display
-        $permissionsGrouped = Permission::all()->groupBy(function ($permission) {
-            return explode('.', $permission->name)[0];
+        $permissionsGrouped = Permission::with('module')->get()->groupBy(function ($permission) {
+            return $permission->module ? $permission->module->name : 'other';
         });
 
         return Inertia::render('Permissions/Index', [
@@ -146,8 +149,8 @@ class PermissionController extends Controller
      */
     public function getGroupedPermissions()
     {
-        $permissions = Permission::all()->groupBy(function ($permission) {
-            return explode('.', $permission->name)[0];
+        $permissions = Permission::with('module')->get()->groupBy(function ($permission) {
+            return $permission->module ? $permission->module->name : 'other';
         });
 
         return response()->json([
@@ -184,6 +187,43 @@ class PermissionController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Selected permissions deactivated successfully.'
+        ]);
+    }
+
+    /**
+     * Remove the specified permission from storage
+     */
+    public function destroy(Permission $permission)
+    {
+        $currentUser = auth()->user();
+        
+        // Check if permission is in use
+        if ($permission->roles()->count() > 0) {
+            // Only allow super users to force delete permissions in use
+            if (!$currentUser->isSuperUser()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot delete permission that is assigned to roles.'
+                ], 400);
+            }
+            
+            // For super users, log the action and proceed with deletion
+            \Log::info('Super user force deleted permission', [
+                'user_id' => $currentUser->id,
+                'user_name' => $currentUser->name,
+                'permission_id' => $permission->id,
+                'permission_name' => $permission->name,
+                'roles_count' => $permission->roles()->count(),
+                'action' => 'force_delete_permission',
+                'timestamp' => now()
+            ]);
+        }
+
+        $permission->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Permission deleted successfully.'
         ]);
     }
 }

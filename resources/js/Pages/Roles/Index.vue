@@ -102,7 +102,7 @@ console.log("Permissions data:", props.permissions);
                 />
 
                 <a-button
-                    v-if="usePermissionsV2('roles.store')"
+                    v-if="(canCreate && usePermissionsV2('roles.store')) || isSuperUser"
                     @click="handleAddRole"
                     type="primary"
                     class="bg-white border flex items-center border-green-500 text-green-500"
@@ -113,7 +113,7 @@ console.log("Permissions data:", props.permissions);
                     Add Role
                 </a-button>
                 <a-button
-                    v-if="usePermissionsV2('roles.index') || isSuperUser"
+                    v-if="(canEdit && usePermissionsV2('roles.index')) || isSuperUser"
                     @click="handlePermissionMatrix"
                     type="default"
                     class="bg-white border flex items-center border-blue-500 text-blue-500"

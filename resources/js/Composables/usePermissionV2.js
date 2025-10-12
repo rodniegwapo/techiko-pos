@@ -1,21 +1,17 @@
-import { computed, ref } from "vue";
+// Simplified + stable boolean version
 import { usePage } from "@inertiajs/vue3";
 
-export function usePermissionsV2(routeName) {
+export function usePermissionsV2() {
     const page = usePage();
 
-    // Current user and permissions from backend (names align with route names in seeder)
-    const currentUser = computed(() => page.props.auth?.user?.data);
+    const hasPermission = (routeName) => {
+        const user = page.props.auth?.user?.data;
+        if (!user) return false;
+        if (user.is_super_user) return true;
+        return !!user.permissions?.some(
+            (perm) => perm.route_name === routeName
+        );
+    };
 
-    if (currentUser.value.is_super_user) {
-        return true;
-    }
-
-    const find = currentUser.value?.permissions.find(
-        (item) => (item.route_name || item.name) == routeName
-    );
-
-    if (!find) return false;
-
-    return true;
+    return { hasPermission };
 }

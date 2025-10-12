@@ -11,47 +11,52 @@ class UserPermissionCheckMiddleware
 {
     /**
      * Handle an incoming request.
-     *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
      */
     public function handle(Request $request, Closure $next): Response
     {
-        // Check if user is authenticated
-        if (!Auth::check()) {
+        $user = Auth::user();
+
+        // Redirect unauthenticated users to login
+        if (!$user) {
             return redirect()->route('login');
         }
 
-        $user = Auth::user();
-
-        // Super user has all permissions
-        if ($user->isSuperUser()) {
+        // Super user has unrestricted access
+        if (method_exists($user, 'isSuperUser') && $user->isSuperUser()) {
             return $next($request);
         }
 
-        $permissions = auth()->user()->getAllPermissions();
-        // Use route_name for route matching, fallback to name for backward compatibility
-        $find = collect($permissions)->where('route_name', $request->route()?->getName())
-            ->orWhere('name', $request->route()?->getName())
-            ->first();
+        // Retrieve permissions once
+        $permissions = $user->getAllPermissions();
 
-        if (!$find) {
-            return $this->handleUnauthorized($request);
+        // Try to match route name
+        $routeName = $request->route()?->getName();
+        $hasPermission = collect($permissions)->contains('route_name', $routeName);
+
+
+        if (!$hasPermission) {
+            return $this->unauthorizedResponse($request);
         }
 
         return $next($request);
     }
 
-    private function handleUnauthorized(Request $request): Response
+    /**
+     * Handle unauthorized access.
+     */
+    private function unauthorizedResponse(Request $request): Response
     {
-        // If it's an API request, return JSON error
+        // API request → JSON error
         if ($request->expectsJson()) {
             return response()->json([
                 'message' => 'You do not have permission to access this resource.',
-                'error' => 'Forbidden'
+                'error' => 'Forbidden',
             ], 403);
         }
 
-        // For web requests, redirect with error message
-        return redirect()->back()->with('error', 'You do not have permission to access this page.');
+        // Web request → redirect back with flash message
+        return redirect()
+            ->back()
+            ->with('error', 'You do not have permission to access this page.');
     }
 }

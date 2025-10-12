@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
 
@@ -190,6 +191,7 @@ class RolePermissionSeeder extends Seeder
             'permissions.store',
             'permissions.show',
             'permissions.update',
+            'permissions.destroy',
             'permissions.deactivate',
             'permissions.activate',
             'permissions.bulk-deactivate',
@@ -203,28 +205,38 @@ class RolePermissionSeeder extends Seeder
             'customer-order',
         ];
 
-        $usedNames = [];
-        $createdPermissions = [];
+        // Get all permission modules
+        $modules = DB::table('permission_modules')->get()->keyBy('name');
         
         foreach ($permissions as $permission) {
-            $displayName = $this->generateDisplayName($permission);
+            $parts = explode('.', $permission);
+            $moduleName = $parts[0];
+            $action = $parts[count($parts) - 1]; // Get the last part as action
             
-            // Handle duplicate display names by adding a counter
-            $counter = 1;
-            $originalDisplayName = $displayName;
-            while (in_array($displayName, $usedNames)) {
-                $displayName = $originalDisplayName . " ({$counter})";
-                $counter++;
+            // Get module ID
+            $module = $modules->get($moduleName);
+            $moduleId = $module ? $module->id : null;
+            
+            // Generate display name (just the action)
+            $displayName = $this->getActionDisplayName($action);
+            
+            // Use just the action name since module is already shown as section header
+            $uniqueName = $displayName;
+            
+            // If we already have a permission with this name, make it unique by adding route info
+            $existingPermission = Permission::where('name', $uniqueName)->where('guard_name', 'web')->first();
+            if ($existingPermission) {
+                $uniqueName = $uniqueName . ' (' . $permission . ')';
             }
             
-            $createdPermission = Permission::firstOrCreate([
-                'name' => $displayName, // Human-readable name
-                'route_name' => $permission, // Technical route name
+            Permission::firstOrCreate([
+                'route_name' => $permission, // Technical route: "users.index"
                 'guard_name' => 'web'
+            ], [
+                'name' => $uniqueName, // "Users - View", "Products - Create"
+                'action' => $action, // Action: "index", "create", "edit"
+                'module_id' => $moduleId, // Foreign key to permission_modules
             ]);
-            
-            $createdPermissions[] = $createdPermission;
-            $usedNames[] = $displayName;
         }
 
         // Create roles and assign permissions
@@ -232,12 +244,12 @@ class RolePermissionSeeder extends Seeder
         // Super Admin - Full access
         $superAdmin = Role::findOrCreate('super admin', 'web');
         $superAdmin->update(['level' => 1, 'description' => 'Full system access with all permissions']);
-        $superAdmin->syncPermissions(collect($createdPermissions)->pluck('name')->toArray());
+        $superAdmin->syncPermissions(Permission::all()->pluck('name')->toArray());
         
         // Admin - Most permissions except system settings
         $admin = Role::findOrCreate('admin', 'web');
         $admin->update(['level' => 2, 'description' => 'Administrative access with user management capabilities']);
-        $admin->syncPermissions($this->getPermissionsByRouteNames([
+        $admin->syncPermissions($this->getPermissionNamesByRoutes([
             // Dashboard
             'dashboard',
             'dashboard.sales-chart',
@@ -399,12 +411,12 @@ class RolePermissionSeeder extends Seeder
             
             // Customer Order
             'customer-order',
-        ], $createdPermissions));
+        ]));
         
         // Manager - Operational permissions
         $manager = Role::findOrCreate('manager', 'web');
         $manager->update(['level' => 3, 'description' => 'Operational management with reporting and staff oversight']);
-        $manager->syncPermissions($this->getPermissionsByRouteNames([
+        $manager->syncPermissions($this->getPermissionNamesByRoutes([
             // Dashboard
             'dashboard',
             'dashboard.sales-chart',
@@ -508,12 +520,12 @@ class RolePermissionSeeder extends Seeder
             
             // Customer Order
             'customer-order',
-        ], $createdPermissions));
+        ]));
         
         // Supervisor - Shift supervision permissions
         $supervisor = Role::findOrCreate('supervisor', 'web');
         $supervisor->update(['level' => 4, 'description' => 'Shift supervision with limited management capabilities']);
-        $supervisor->syncPermissions($this->getPermissionsByRouteNames([
+        $supervisor->syncPermissions($this->getPermissionNamesByRoutes([
             // Dashboard
             'dashboard',
             'dashboard.sales-chart',
@@ -599,12 +611,12 @@ class RolePermissionSeeder extends Seeder
             
             // Customer Order
             'customer-order',
-        ], $createdPermissions));
+        ]));
         
         // Cashier - Basic sales permissions
         $cashier = Role::findOrCreate('cashier', 'web');
         $cashier->update(['level' => 5, 'description' => 'Front-line operations with sales processing capabilities']);
-        $cashier->syncPermissions($this->getPermissionsByRouteNames([
+        $cashier->syncPermissions($this->getPermissionNamesByRoutes([
             // Dashboard
             'dashboard',
             'dashboard.sales-chart',
@@ -668,155 +680,89 @@ class RolePermissionSeeder extends Seeder
             
             // Customer Order
             'customer-order',
-        ], $createdPermissions));
+        ]));
 
         $this->command->info('Roles and permissions created successfully!');
     }
 
     /**
+     * Get display name for action
+     */
+    private function getActionDisplayName(string $action): string
+    {
+        $actionLabels = [
+            'index' => 'View',
+            'create' => 'Create',
+            'store' => 'Create',
+            'edit' => 'Edit',
+            'update' => 'Update',
+            'show' => 'View',
+            'destroy' => 'Delete',
+            'delete' => 'Delete',
+            'apply' => 'Apply',
+            'manage' => 'Manage',
+            'export' => 'Export',
+            'dashboard' => 'Dashboard',
+            'search' => 'Search',
+            'approve' => 'Approve',
+            'reject' => 'Reject',
+            'submit' => 'Submit',
+            'toggle-status' => 'Toggle',
+            'set-default' => 'Set Default',
+            'hierarchy' => 'Hierarchy',
+            'assign-supervisor' => 'Assign Supervisor',
+            'remove-supervisor' => 'Remove Supervisor',
+            'supervisor-history' => 'Supervisor History',
+            'available' => 'Available',
+            'available-for-user' => 'Available For User',
+            'auto-assign' => 'Auto Assign',
+            'cascading-options' => 'Cascading Options',
+            'cascading-assign' => 'Cascading Assign',
+            'toggle-status' => 'Toggle Status',
+            'syncDraft' => 'Sync Draft',
+            'syncDraftImmediate' => 'Sync Draft Immediate',
+            'find-sale-item' => 'Find Sale Item',
+            'assignCustomer' => 'Assign Customer',
+            'processLoyalty' => 'Process Loyalty',
+            'void' => 'Void',
+            'store' => 'Store',
+            'products' => 'Products',
+            'movements' => 'Movements',
+            'low-stock' => 'Low Stock',
+            'valuation' => 'Valuation',
+            'receive' => 'Receive',
+            'transfer' => 'Transfer',
+            'adjustment-products' => 'Adjustment Products',
+            'adjustments' => 'Adjustments',
+            'locations' => 'Locations',
+            'summary' => 'Summary',
+            'stats' => 'Stats',
+            'customers' => 'Customers',
+            'analytics' => 'Analytics',
+            'adjust-points' => 'Adjust Points',
+            'tiers' => 'Tiers',
+            'permission-matrix' => 'Permission Matrix',
+            'permissions' => 'Permissions',
+            'deactivate' => 'Deactivate',
+            'activate' => 'Activate',
+            'bulk-deactivate' => 'Bulk Deactivate',
+            'grouped' => 'Grouped',
+            'view' => 'View',
+            'recent-pending' => 'Recent Pending',
+            'customer-order' => 'Customer Order',
+        ];
+
+        return $actionLabels[$action] ?? ucfirst($action);
+    }
+
+    /**
      * Get permission names by route names
      */
-    private function getPermissionsByRouteNames(array $routeNames, array $createdPermissions): array
+    private function getPermissionNamesByRoutes(array $routeNames): array
     {
-        return collect($createdPermissions)
-            ->filter(function ($permission) use ($routeNames) {
-                return in_array($permission->route_name, $routeNames);
-            })
+        return Permission::whereIn('route_name', $routeNames)
             ->pluck('name')
             ->toArray();
     }
 
-    /**
-     * Generate a display name from route name
-     */
-    private function generateDisplayName(string $routeName): string
-    {
-        $parts = explode('.', $routeName);
-        
-        if (count($parts) >= 3) {
-            // Handle nested resources (3+ parts: module.submodule.action)
-            $module = $parts[0];
-            $submodule = $parts[1];
-            $action = $parts[2];
-            
-            $actionLabels = [
-                'index' => 'View',
-                'create' => 'Create',
-                'store' => 'Create',
-                'edit' => 'Edit',
-                'update' => 'Update',
-                'show' => 'View',
-                'destroy' => 'Delete',
-                'delete' => 'Delete',
-                'apply' => 'Apply',
-                'manage' => 'Manage',
-                'adjust_points' => 'Adjust Points',
-                'export' => 'Export',
-                'dashboard' => 'Dashboard',
-                'movements' => 'Movements',
-                'adjustments' => 'Adjustments',
-                'valuation' => 'Valuation',
-                'receive' => 'Receive',
-                'transfer' => 'Transfer',
-                'low_stock' => 'Low Stock',
-                'tiers_manage' => 'Manage Tiers',
-                'customers_manage' => 'Manage Customers',
-                'points_adjust' => 'Adjust Points',
-                'reports_view' => 'View Reports',
-                'set-default' => 'Set Default',
-                'toggle-status' => 'Toggle Status',
-                'summary' => 'Summary',
-                'search' => 'Search',
-                'submit' => 'Submit',
-                'approve' => 'Approve',
-                'reject' => 'Reject',
-            ];
-            
-            $submoduleLabels = [
-                'locations' => 'Location',
-                'categories' => 'Category',
-                'adjustments' => 'Adjustment',
-                'movements' => 'Movement',
-                'products' => 'Product',
-                'tiers' => 'Tier',
-                'customers' => 'Customer',
-                'discounts' => 'Discount',
-                'orders' => 'Order',
-                'sales' => 'Sale',
-                'loyalty' => 'Loyalty',
-                'permissions' => 'Permission',
-                'roles' => 'Role',
-                'users' => 'User',
-                'voids' => 'Void',
-                'terminals' => 'Terminal',
-            ];
-            
-            $actionLabel = $actionLabels[$action] ?? ucfirst($action);
-            $submoduleLabel = $submoduleLabels[$submodule] ?? ucfirst($submodule);
-            
-            return "{$actionLabel} {$submoduleLabel}";
-        }
-        
-        // Handle simple permissions (2 parts: module.action)
-        if (count($parts) === 2) {
-            $module = $parts[0];
-            $action = $parts[1];
-            
-            $actionLabels = [
-                'index' => 'View',
-                'create' => 'Create',
-                'store' => 'Create',
-                'edit' => 'Edit',
-                'update' => 'Update',
-                'show' => 'View',
-                'destroy' => 'Delete',
-                'delete' => 'Delete',
-                'apply' => 'Apply',
-                'manage' => 'Manage',
-                'adjust_points' => 'Adjust Points',
-                'export' => 'Export',
-                'dashboard' => 'Dashboard',
-                'products' => 'Products',
-                'movements' => 'Movements',
-                'adjustments' => 'Adjustments',
-                'locations' => 'Locations',
-                'valuation' => 'Valuation',
-                'receive' => 'Receive',
-                'transfer' => 'Transfer',
-                'low_stock' => 'Low Stock',
-                'tiers_manage' => 'Manage Tiers',
-                'customers_manage' => 'Manage Customers',
-                'points_adjust' => 'Adjust Points',
-                'reports_view' => 'View Reports',
-            ];
-            
-            $moduleLabels = [
-                'users' => 'Users',
-                'roles' => 'Roles',
-                'permissions' => 'Permissions',
-                'products' => 'Products',
-                'categories' => 'Categories',
-                'customers' => 'Customers',
-                'sales' => 'Sales',
-                'inventory' => 'Inventory',
-                'loyalty' => 'Loyalty',
-                'discounts' => 'Discounts',
-                'reports' => 'Reports',
-                'settings' => 'Settings',
-                'dashboard' => 'Dashboard',
-                'voids' => 'Void Logs',
-                'orders' => 'Orders',
-                'supervisors' => 'Supervisors',
-                'mandatory-discounts' => 'Mandatory Discounts',
-                'setup' => 'Setup',
-            ];
-
-            $actionLabel = $actionLabels[$action] ?? ucfirst($action);
-            $moduleLabel = $moduleLabels[$module] ?? ucfirst($module);
-            
-            return "{$actionLabel} {$moduleLabel}";
-        }
-        
-        return ucfirst($routeName);
-    }
 }

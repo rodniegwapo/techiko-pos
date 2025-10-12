@@ -171,8 +171,15 @@ const getRoleColor = (roleName) => {
 };
 
 const getPermissionLabel = (permission) => {
-    // If permission is an object with name property, use it directly (display name)
+    // If permission is an object with name property, extract action name
     if (typeof permission === 'object' && permission.name) {
+        // Extract action name from permission name (e.g., "Users - View" -> "View")
+        if (permission.name.includes(' - ')) {
+            return permission.name.split(' - ')[1];
+        }
+        if (permission.name.includes(' (')) {
+            return permission.name.split(' (')[0];
+        }
         return permission.name;
     }
     
@@ -306,7 +313,7 @@ const onModuleCheckAllChange = (moduleName, checked) => {
                                 <h4
                                     class="text-sm font-semibold text-gray-900 capitalize"
                                 >
-                                    {{ moduleName.replace("_", " ") }}
+                                    {{ moduleName }}
                                 </h4>
                                 <a-checkbox
                                     :checked="isModuleAllChecked(moduleName)"

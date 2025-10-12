@@ -14,18 +14,21 @@ class PermissionResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        // Use route_name for technical parsing, fallback to name if route_name is null
-        $routeName = $this->route_name ?? $this->name;
-        $nameParts = explode('.', $routeName);
-        $module = $nameParts[0] ?? '';
-        $action = $nameParts[1] ?? '';
-
         return [
             'id' => $this->id,
-            'name' => $this->name, // This is now the display name
-            'route_name' => $this->route_name ?? $this->name, // Technical route name
-            'module' => $module,
-            'action' => $action,
+            'name' => $this->name, // Action display name: "View", "Create", "Edit"
+            'route_name' => $this->route_name, // Technical route name: "users.index"
+            'action' => $this->action, // Action: "index", "create", "edit"
+            'module_id' => $this->module_id,
+            'module' => $this->whenLoaded('module', function () {
+                return [
+                    'id' => $this->module->id,
+                    'name' => $this->module->name,
+                    'display_name' => $this->module->display_name,
+                    'icon' => $this->module->icon,
+                ];
+            }),
+            'full_display_name' => $this->full_display_name, // "Users - View", "Products - Create"
             'guard_name' => $this->guard_name,
             'is_active' => $this->is_active,
             'created_at' => $this->created_at,
