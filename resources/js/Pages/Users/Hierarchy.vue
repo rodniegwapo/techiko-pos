@@ -375,12 +375,12 @@ const autoAssignSupervisors = async () => {
                         </p>
                     </div>
                 </div>
-                <div>
-                    <a-button @click="handleBack">
+                <div class="flex items-center space-x-3">
+                    <a-button @click="handleBackToUsers">
                         <template #icon>
                             <ArrowLeftOutlined />
                         </template>
-                        Back to Roles
+                        Back
                     </a-button>
                 </div>
             </div>
@@ -388,30 +388,39 @@ const autoAssignSupervisors = async () => {
             <!-- Stats -->
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div
-                    class="stat-card bg-blue-100 text-blue-700"
-                    title="Total Users"
+                    class="stat-card bg-blue-50 border border-blue-300 text-blue-700"
                 >
-                    {{ users?.length || 0 }}
+                    <div class="text-2xl font-bold">
+                        {{ users?.length || 0 }}
+                    </div>
+                    <div class="text-sm font-medium">Total Users</div>
                 </div>
                 <div
-                    class="stat-card bg-green-100 text-green-700"
-                    title="Active Users"
+                    class="stat-card bg-green-50 border border-green-300 text-green-700"
                 >
-                    {{
-                        users?.filter((u) => u.status === "active").length || 0
-                    }}
+                    <div class="text-2xl font-bold">
+                        {{
+                            users?.filter((u) => u.status === "active")
+                                .length || 0
+                        }}
+                    </div>
+                    <div class="text-sm font-medium">Active Users</div>
                 </div>
                 <div
-                    class="stat-card bg-purple-100 text-purple-700"
-                    title="Top Level"
+                    class="stat-card bg-purple-50 border border-purple-300 text-purple-700"
                 >
-                    {{ topLevelUsers.length }}
+                    <div class="text-2xl font-bold">
+                        {{ topLevelUsers.length }}
+                    </div>
+                    <div class="text-sm font-medium">Top Level</div>
                 </div>
                 <div
-                    class="stat-card bg-orange-100 text-orange-700"
-                    title="Without Supervisor"
+                    class="stat-card bg-orange-50 border border-orange-300 text-orange-700"
                 >
-                    {{ usersWithoutSupervisors.length }}
+                    <div class="text-2xl font-bold">
+                        {{ usersWithoutSupervisors.length }}
+                    </div>
+                    <div class="text-sm font-medium">Without Supervisor</div>
                 </div>
             </div>
 
