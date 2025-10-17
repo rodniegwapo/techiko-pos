@@ -249,19 +249,34 @@ class UserHierarchyService
             return null;
         }
 
-        // Find the role with the next lower level (immediate supervisor level)
-        $supervisorRole = Role::where('level', '<', $userRole->level)
-            ->orderBy('level', 'desc')
-            ->first();
+        // Super users should not have supervisors
+        if ($user->isSuperUser()) {
+            return null;
+        }
+
+        // Find the role with the immediate next higher authority (lower level number)
+        // Hierarchy: Level 1=Super Admin, 2=Admin, 3=Manager, 4=Supervisor, 5=Cashier
+        // For example: Cashier (level 5) -> Supervisor (level 4), Supervisor (level 4) -> Manager (level 3)
+        $supervisorLevel = $userRole->level - 1;
+        
+        // If user is at level 2 (admin), they should report to Super Admin (level 1)
+        if ($supervisorLevel < 1) {
+            return null; // No supervisor available
+        }
+
+        $supervisorRole = Role::where('level', $supervisorLevel)->first();
 
         if (!$supervisorRole) {
             return null;
         }
 
         // Find users with that role who don't have too many subordinates
+        // Prioritize users with fewer subordinates for load balancing
         return User::whereHas('roles', function ($query) use ($supervisorRole) {
             $query->where('name', $supervisorRole->name);
         })
+        ->where('id', '!=', $user->id) // Don't assign user as their own supervisor
+        ->where('is_super_user', false) // Don't assign super users as supervisors
         ->withCount('subordinates')
         ->orderBy('subordinates_count', 'asc')
         ->first();
@@ -279,30 +294,69 @@ class UserHierarchyService
             'details' => []
         ];
 
-        // Get all users without supervisors
+        // Get all users without supervisors, excluding super users
         $usersWithoutSupervisors = User::whereNull('supervisor_id')
+            ->where('is_super_user', false)
             ->with('roles')
             ->get();
 
         foreach ($usersWithoutSupervisors as $user) {
             try {
+                $userRole = $user->roles()->orderBy('level')->first();
+                $userRoleName = $userRole ? $userRole->name : 'No Role';
+                
                 $bestSupervisor = static::getBestSupervisor($user);
                 
+                // Special case: If user is admin (level 2) and no supervisor found, assign to Super Admin
+                if (!$bestSupervisor && $userRole && $userRole->level === 2) {
+                    $superAdmin = User::where('is_super_user', true)->first();
+                    if ($superAdmin) {
+                        $bestSupervisor = $superAdmin;
+                    }
+                }
+                
                 if ($bestSupervisor && $bestSupervisor->id !== $user->id) {
+                    $supervisorRole = $bestSupervisor->roles()->orderBy('level')->first();
+                    $supervisorRoleName = $supervisorRole ? $supervisorRole->name : ($bestSupervisor->is_super_user ? 'Super User' : 'No Role');
+                    
                     $user->update(['supervisor_id' => $bestSupervisor->id]);
                     $results['assigned']++;
-                    $results['details'][] = "Assigned {$user->name} to {$bestSupervisor->name}";
+                    $results['details'][] = "✅ Assigned {$user->name} ({$userRoleName}) to {$bestSupervisor->name} ({$supervisorRoleName})";
                 } else {
                     $results['skipped']++;
-                    $results['details'][] = "No suitable supervisor found for {$user->name}";
+                    if ($user->isSuperUser()) {
+                        $results['details'][] = "⏭️ Skipped {$user->name} - Super users don't need supervisors";
+                    } else {
+                        $results['details'][] = "⚠️ No suitable supervisor found for {$user->name} ({$userRoleName}) - Check role hierarchy";
+                    }
                 }
             } catch (\Exception $e) {
                 $results['errors']++;
-                $results['details'][] = "Error assigning supervisor for {$user->name}: " . $e->getMessage();
+                $results['details'][] = "❌ Error assigning supervisor for {$user->name}: " . $e->getMessage();
             }
         }
 
         return $results;
+    }
+
+    /**
+     * Get role hierarchy information for debugging
+     */
+    public static function getRoleHierarchyInfo(): array
+    {
+        $roles = Role::orderBy('level')->get();
+        $info = [];
+        
+        foreach ($roles as $role) {
+            $info[] = [
+                'name' => $role->name,
+                'level' => $role->level,
+                'description' => $role->description,
+                'user_count' => $role->users()->count()
+            ];
+        }
+        
+        return $info;
     }
 
     /**

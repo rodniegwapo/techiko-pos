@@ -1,642 +1,561 @@
 <script setup>
-import { ref, computed, onMounted } from "vue";
-import { Head, router } from "@inertiajs/vue3";
-import { 
-  IconUser, 
-  IconUsers, 
-  IconUserCheck, 
-  IconShield, 
-  IconSettings,
-  IconEye,
-  IconHierarchy,
-  IconArrowUp,
-  IconArrowDown,
-  IconMail,
-  IconPhone,
-  IconCalendar,
-  IconChevronRight,
-  IconChevronDown
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from "vue";
+import { Head, router, usePage } from "@inertiajs/vue3";
+import {
+    IconUser,
+    IconUsers,
+    IconUserCheck,
+    IconShield,
+    IconSettings,
+    IconHierarchy,
+    IconArrowUp,
 } from "@tabler/icons-vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
-import { Vue3OrgChart } from 'vue3-org-chart';
-import 'vue3-org-chart/dist/style.css';
+import * as d3 from "d3";
+import { OrgChart } from "d3-org-chart";
 
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
-import CascadingAssignment from "@/Components/CascadingAssignment.vue";
 
 const { spinning } = useGlobalVariables();
-const isSuperUser = computed(() => usePage().props.auth?.user?.data?.is_super_user || false);
+const isSuperUser = computed(
+    () => usePage().props.auth?.user?.data?.is_super_user || false
+);
 
 const props = defineProps({
-  users: Array,
-  hierarchy: Object,
+    users: Array,
+    hierarchy: Object,
 });
 
-// State
-const selectedUser = ref(null);
-const showSupervisorModal = ref(false);
-const availableSupervisors = ref([]);
 const autoAssignLoading = ref(false);
+const chartContainer = ref(null);
+const orgChartInstance = ref(null);
 
-// Computed properties
+const getUserRole = (user) => user.roles?.[0]?.name || "No Role";
+
 const topLevelUsers = computed(() => {
-  return props.users?.filter(user => !user.supervisor_id) || [];
+    if (!props.users) return [];
+    const superUsers = props.users.filter((u) => u.is_super_user);
+    if (superUsers.length) return superUsers;
+    const admins = props.users.filter(
+        (u) => getUserRole(u) === "admin" && !u.supervisor_id
+    );
+    if (admins.length) return admins;
+    return props.users.filter((u) => !u.supervisor_id);
 });
 
-const getUserRole = (user) => {
-  return user.roles?.[0]?.name || 'No Role';
+const getSubordinates = (id) => {
+    if (!props.users) return [];
+    const user = props.users.find((u) => u.id === id);
+    if (!user) return [];
+    if (user.is_super_user) {
+        return props.users.filter(
+            (u) =>
+                !u.is_super_user &&
+                (u.supervisor_id === id ||
+                    (getUserRole(u) === "admin" && !u.supervisor_id))
+        );
+    }
+    return props.users.filter(
+        (u) => u.supervisor_id === id && !u.is_super_user
+    );
 };
 
-const getRoleColor = (roleName) => {
-  const roleColors = {
-    'super admin': 'red',
-    'admin': 'orange', 
-    'manager': 'blue',
-    'supervisor': 'purple',
-    'cashier': 'green',
-  };
-  return roleColors[roleName] || 'default';
-};
+// Transform your data to D3 org chart format with role-based hierarchy
+const chartData = computed(() => {
+    if (!props.users || topLevelUsers.value.length === 0) return null;
 
-const getRoleIcon = (roleName) => {
-  const roleIcons = {
-    'super admin': IconShield,
-    'admin': IconSettings,
-    'manager': IconUsers,
-    'supervisor': IconUserCheck,
-    'cashier': IconUser,
-  };
-  return roleIcons[roleName] || IconUser;
-};
+    const flatData = [];
 
-const getSubordinates = (userId) => {
-  return props.users?.filter(user => user.supervisor_id === userId) || [];
-};
+    // Find the Super Admin
+    const superAdmin = props.users.find((user) => user.is_super_user);
 
-const getUserStats = (user) => {
-  const subordinates = getSubordinates(user.id);
-  return {
-    subordinatesCount: subordinates.length,
-  };
-};
+    if (superAdmin) {
+        // Super Admin is the root
+        flatData.push({
+            id: String(superAdmin.id),
+            name: superAdmin.name,
+            title: "Super User",
+            parentId: null,
+            email: superAdmin.email,
+            status: superAdmin.status,
+            isSuperUser: true,
+            isAdmin: false,
+        });
 
-// Transform users data for vue3-org-chart
-const orgChartData = computed(() => {
-  if (!props.users) return null;
-  
-  const transformUser = (user) => {
-    const subordinates = getSubordinates(user.id);
-    return {
-      id: user.id,
-      name: user.name,
-      role: getUserRole(user),
-      email: user.email,
-      status: user.status,
-      supervisor: user.supervisor?.name || null,
-      subordinatesCount: subordinates.length,
-      children: subordinates.map(transformUser)
-    };
-  };
-  
-  return topLevelUsers.value.map(transformUser);
+        // Define role hierarchy levels
+        const roleHierarchy = {
+            admin: 1,
+            manager: 2,
+            supervisor: 3,
+            cashier: 4,
+        };
+
+        // Group users by role
+        const usersByRole = {
+            admin: [],
+            manager: [],
+            supervisor: [],
+            cashier: [],
+        };
+
+        // Categorize users by role
+        props.users.forEach((user) => {
+            if (user.id === superAdmin.id) return; // Skip super admin
+
+            const role = getUserRole(user);
+            if (usersByRole[role]) {
+                usersByRole[role].push(user);
+            }
+        });
+
+        // Add all users with their actual supervisor relationships
+        props.users.forEach((user) => {
+            if (user.id === superAdmin.id) return; // Skip super admin (already added)
+
+            const role = getUserRole(user);
+            let parentId = String(superAdmin.id); // Default to super admin
+
+            // If user has a specific supervisor, use that
+            if (user.supervisor_id) {
+                parentId = String(user.supervisor_id);
+            }
+            // Admins without supervisor report to Super Admin
+            else if (role === "admin") {
+                parentId = String(superAdmin.id);
+            }
+
+            flatData.push({
+                id: String(user.id),
+                name: user.name,
+                title: role,
+                email: user.email,
+                status: user.status,
+                isSuperUser: false,
+                isAdmin: role === "admin",
+                parentId: parentId,
+            });
+        });
+    } else {
+        // Fallback: no super admin found, use organization root
+        flatData.push({
+            id: "root",
+            name: "Organization",
+            title: "Root",
+            parentId: null,
+            email: "",
+            status: "active",
+            isSuperUser: false,
+            isAdmin: false,
+        });
+
+        // Add all users
+        props.users.forEach((user) => {
+            const role = getUserRole(user);
+            const isSuper = user.is_super_user;
+
+            let parentId = "root";
+
+            if (user.supervisor_id) {
+                parentId = String(user.supervisor_id);
+            }
+
+            flatData.push({
+                id: String(user.id),
+                name: user.name,
+                title: isSuper ? "Super User" : role,
+                email: user.email,
+                status: user.status,
+                isSuperUser: isSuper,
+                isAdmin: role === "admin",
+                parentId: parentId,
+            });
+        });
+    }
+
+    return flatData;
 });
 
-// Get users who can be supervisors (level-based)
-const getAvailableSupervisors = computed(() => {
-  if (!props.users) return [];
-  
-  return props.users.filter(user => {
-    const userRole = getUserRole(user);
-    // Level-based rule: only management roles can supervise others
-    return ['super admin', 'admin', 'manager', 'supervisor'].includes(userRole);
-  });
-});
-
-// Get users without supervisors (can be assigned)
-const usersWithoutSupervisors = computed(() => {
-  if (!props.users) return [];
-  
-  return props.users.filter(user => !user.supervisor_id);
-});
-
-// Methods
-const handleBackToUsers = () => {
-  router.visit(route('users.index'));
+// Chart utility functions
+const exportChart = () => {
+    if (orgChartInstance.value) {
+        try {
+            orgChartInstance.value.exportImg();
+        } catch (err) {}
+    }
 };
 
-const handleViewUser = (user) => {
-  router.visit(route('users.show', user.id));
+const resetZoom = () => {
+    if (orgChartInstance.value) {
+        try {
+            // Try different zoom reset methods
+            if (typeof orgChartInstance.value.zoomToFit === "function") {
+                orgChartInstance.value.zoomToFit();
+            } else if (typeof orgChartInstance.value.resetZoom === "function") {
+                orgChartInstance.value.resetZoom();
+            } else if (typeof orgChartInstance.value.zoom === "function") {
+                orgChartInstance.value.zoom(1);
+            } else {
+            }
+        } catch (err) {}
+    }
 };
 
-const handleEditUser = (user) => {
-  router.visit(route('users.edit', user.id));
+const initializeChart = () => {
+    if (!chartContainer.value || !chartData.value) {
+        return;
+    }
+
+    // Clear previous chart
+    chartContainer.value.innerHTML = "";
+
+    try {
+        orgChartInstance.value = new OrgChart()
+            .container(chartContainer.value)
+            .data(chartData.value)
+            .nodeHeight((d) => 85)
+            .nodeWidth((d) => 220)
+            .childrenMargin((d) => 50)
+            .compactMarginBetween((d) => 25)
+            .compactMarginPair((d) => 50)
+            .neighbourMargin((a, b) => 25)
+            .siblingsMargin((d) => 25)
+            .layout("top")
+            .compact(false)
+            .buttonContent(({ node, state }) => {
+                return `<div style="px;color:#716E7B;border-radius:5px;padding:4px;font-size:10px;margin:auto auto;background-color:white;border: 1px solid #E4E2E9"> <span style="font-size:9px">${
+                    node.children
+                        ? `<i class="fas fa-angle-up"></i>`
+                        : `<i class="fas fa-angle-down"></i>`
+                }</span> ${node.data._directSubordinates}  </div>`;
+            })
+            .linkUpdate(function (d, i, arr) {
+                d3.select(this)
+                    .attr("stroke", (d) =>
+                        d.data._upToTheRootHighlighted ? "#152785" : "#E4E2E9"
+                    )
+                    .attr("stroke-width", (d) =>
+                        d.data._upToTheRootHighlighted ? 5 : 1
+                    );
+
+                if (d.data._upToTheRootHighlighted) {
+                    d3.select(this).raise();
+                }
+            })
+            .nodeContent(function (d, i, arr, state) {
+                const node = d.data;
+                const color = "#FFFFFF";
+                const statusColor =
+                    node.status === "active" ? "#10B981" : "#EF4444";
+
+                return `
+                <div style="font-family: 'Inter', sans-serif;background-color:${color}; position:absolute;margin-top:-1px; margin-left:-1px;width:${d.width}px;height:${d.height}px;border-radius:10px;border: 1px solid #E4E2E9">
+                   <div style="background-color:${color};position:absolute;margin-top:-25px;margin-left:${15}px;border-radius:100px;width:50px;height:50px;" ></div>
+                   <div style="position:absolute;margin-top:-20px;margin-left:${20}px;border-radius:100px;width:40px;height:40px;background-color:#716E7B;display:flex;align-items:center;justify-content:center;color:white;font-size:16px;font-weight:bold;">
+                       ${
+                           node.isSuperUser
+                               ? "👑"
+                               : node.name.charAt(0).toUpperCase()
+                       }
+                   </div>
+                   
+                  <div style="color:#08011E;position:absolute;right:20px;top:17px;font-size:10px;"><i class="fas fa-ellipsis-h"></i></div>
+                  <div style="position:absolute;right:20px;top:35px;width:8px;height:8px;border-radius:50%;background-color:${statusColor};"></div>
+
+                  <div style="font-size:15px;color:#08011E;margin-left:20px;margin-top:32px"> ${
+                      node.name
+                  } </div>
+                  <div style="color:#716E7B;margin-left:20px;margin-top:3px;font-size:10px;"> ${
+                      node.title
+                  } </div>
+
+               </div>
+        `;
+            })
+            .render();
+    } catch (err) {}
 };
 
-const formatDate = (dateString) => {
-  if (!dateString) return 'N/A';
-  return new Date(dateString).toLocaleDateString();
-};
-
-const getStatusColor = (status) => {
-  return status === 'active' ? 'green' : 'red';
-};
-
-const getStatusText = (status) => {
-  return status === 'active' ? 'Active' : 'Inactive';
-};
-
-// Level-based supervisor assignment methods
-const assignSupervisor = async (userId, supervisorId) => {
-  try {
-    await router.post(route('users.assign-supervisor', userId), {
-      supervisor_id: supervisorId
-    }, {
-      onSuccess: () => {
-        // Refresh to show updated hierarchy
-        router.reload();
-      }
-    });
-  } catch (error) {
-    console.error('Error assigning supervisor:', error);
-  }
-};
-
-const removeSupervisor = async (userId) => {
-  try {
-    await router.delete(route('users.remove-supervisor', userId), {
-      onSuccess: () => {
-        // Refresh to show updated hierarchy
-        router.reload();
-      }
-    });
-  } catch (error) {
-    console.error('Error removing supervisor:', error);
-  }
-};
-
-// Auto-assign supervisors based on hierarchy levels
-const autoAssignSupervisors = async () => {
-  autoAssignLoading.value = true;
-  try {
-    await router.post(route('supervisors.auto-assign'), {}, {
-      onSuccess: (page) => {
-        // Show success message with results
-        if (page.props.flash?.message) {
-          console.log('Auto-assignment completed:', page.props.flash.message);
+// Watch for data changes and re-render
+watch(
+    chartData,
+    (newData, oldData) => {
+        if (newData && newData.length > 0) {
+            nextTick(initializeChart);
         }
-        // Refresh to show updated hierarchy
-        router.reload();
-      }
+    },
+    { deep: true }
+);
+
+// Also watch for changes in props.users
+watch(
+    () => props.users,
+    (newUsers, oldUsers) => {
+        if (newUsers && newUsers.length > 0) {
+            nextTick(initializeChart);
+        }
+    },
+    { deep: true }
+);
+
+onMounted(() => nextTick(initializeChart));
+
+onUnmounted(() => {
+    if (orgChartInstance.value) {
+        orgChartInstance.value = null;
+    }
+    if (chartContainer.value) {
+        chartContainer.value.innerHTML = "";
+    }
+});
+
+const usersWithoutSupervisors = computed(() => {
+    if (!props.users) return [];
+
+    return props.users.filter((user) => {
+        const role = getUserRole(user);
+        const isSuper = user.is_super_user;
+
+        // Only show users who should have supervisors but don't
+        // Exclude Super Admin and users who already have supervisors
+        return !isSuper && !user.supervisor_id;
     });
-  } catch (error) {
-    console.error('Error auto-assigning supervisors:', error);
-  } finally {
-    autoAssignLoading.value = false;
-  }
-};
+});
 
-// Get available supervisors for a specific user
-const getSupervisorsForUser = async (userId) => {
-  try {
-    const response = await fetch(route('supervisors.available-for-user', userId));
-    const data = await response.json();
-    availableSupervisors.value = data.supervisors;
-    return data.supervisors;
-  } catch (error) {
-    console.error('Error fetching available supervisors:', error);
-    return [];
-  }
-};
+const handleBackToUsers = () => router.visit(route("users.index"));
 
-// Show supervisor assignment modal
-const showAssignSupervisorModal = async (user) => {
-  selectedUser.value = user;
-  await getSupervisorsForUser(user.id);
-  showSupervisorModal.value = true;
-};
+const autoAssignSupervisors = async () => {
+    autoAssignLoading.value = true;
+    try {
+        await router.post(
+            route("supervisors.auto-assign"),
+            {},
+            {
+                onSuccess: (page) => {
+                    // Show success message if available
 
-// Close supervisor assignment modal
-const closeSupervisorModal = () => {
-  showSupervisorModal.value = false;
-  selectedUser.value = null;
-  availableSupervisors.value = [];
+                    router.reload();
+                },
+                onError: (errors) => {},
+            }
+        );
+    } catch (error) {
+    } finally {
+        autoAssignLoading.value = false;
+    }
 };
 </script>
 
 <template>
-  <Head title="User Hierarchy" />
-
-  <AuthenticatedLayout>
-    <ContentHeader title="User Hierarchy" />
-
-    <div class="max-w-7xl mx-auto p-6 space-y-6">
-
-      <!-- Header Section -->
-      <div class="bg-white rounded-lg shadow-sm border p-6">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center space-x-4">
-            <div class="p-3 bg-blue-100 rounded-lg">
-              <IconHierarchy class="w-8 h-8 text-blue-600" />
-            </div>
-            <div>
-              <h2 class="text-2xl font-bold text-gray-900">User Hierarchy</h2>
-              <p class="text-gray-600">Organizational structure showing supervisor-subordinate relationships</p>
-            </div>
-          </div>
-          <div class="flex items-center space-x-3">
-            <a-button 
-              v-if="isSuperUser || usePermissionsV2('users.store')"
-              @click="autoAssignSupervisors" 
-              :loading="autoAssignLoading"
-              type="primary"
-              class="flex items-center"
+    <Head title="User Hierarchy">
+        <link
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"
+            rel="stylesheet"
+        />
+    </Head>
+    <AuthenticatedLayout>
+        <ContentHeader title="User Hierarchy" />
+        <div class="max-w-7xl mx-auto p-6 space-y-6">
+            <div
+                class="bg-white rounded-lg shadow-sm border p-6 flex justify-between items-center"
             >
-              <template #icon>
-                <IconUserCheck />
-              </template>
-              Auto-Assign Supervisors
-            </a-button>
-            <a-button @click="handleBackToUsers" class="flex items-center">
-              <template #icon>
-                <IconArrowUp />
-              </template>
-              Back to Users
-            </a-button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Hierarchy Stats -->
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div class="bg-white rounded-lg shadow-sm border p-4">
-          <div class="flex items-center space-x-3">
-            <div class="p-2 bg-blue-100 rounded-lg">
-              <IconUsers class="w-6 h-6 text-blue-600" />
-            </div>
-            <div>
-              <div class="text-2xl font-bold text-gray-900">{{ users?.length || 0 }}</div>
-              <div class="text-sm text-gray-600">Total Users</div>
-            </div>
-          </div>
-        </div>
-        
-        <div class="bg-white rounded-lg shadow-sm border p-4">
-          <div class="flex items-center space-x-3">
-            <div class="p-2 bg-green-100 rounded-lg">
-              <IconUserCheck class="w-6 h-6 text-green-600" />
-            </div>
-            <div>
-              <div class="text-2xl font-bold text-gray-900">{{ users?.filter(u => u.status === 'active').length || 0 }}</div>
-              <div class="text-sm text-gray-600">Active Users</div>
-            </div>
-          </div>
-        </div>
-        
-        <div class="bg-white rounded-lg shadow-sm border p-4">
-          <div class="flex items-center space-x-3">
-            <div class="p-2 bg-purple-100 rounded-lg">
-              <IconShield class="w-6 h-6 text-purple-600" />
-            </div>
-            <div>
-              <div class="text-2xl font-bold text-gray-900">{{ topLevelUsers.length }}</div>
-              <div class="text-sm text-gray-600">Top Level Users</div>
-            </div>
-          </div>
-        </div>
-        
-        <div class="bg-white rounded-lg shadow-sm border p-4">
-          <div class="flex items-center space-x-3">
-            <div class="p-2 bg-orange-100 rounded-lg">
-              <IconUser class="w-6 h-6 text-orange-600" />
-            </div>
-            <div>
-              <div class="text-2xl font-bold text-gray-900">{{ usersWithoutSupervisors.length }}</div>
-              <div class="text-sm text-gray-600">Without Supervisor</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-
-      <!-- Hierarchy Tree (Advanced) -->
-      <div class="bg-white rounded-lg shadow-sm border p-6">
-        <h3 class="text-lg font-semibold text-gray-900 mb-6">Organizational Structure (Advanced)</h3>
-        
-        <div v-if="orgChartData && orgChartData.length > 0" class="org-chart-container">
-          <Vue3OrgChart :data="orgChartData">
-            <template #node="{item, children, open, toggleChildren}">
-              <div 
-                class="user-node-card"
-                :class="`role-${item.role.replace(' ', '-')}`"
-              >
-                <div class="user-avatar">
-                  <component 
-                    :is="getRoleIcon(item.role)" 
-                    class="w-8 h-8"
-                    :class="`text-${getRoleColor(item.role)}-600`"
-                  />
+                <div class="flex items-center space-x-4">
+                    <div class="p-3 bg-blue-100 rounded-lg">
+                        <IconHierarchy class="w-8 h-8 text-blue-600" />
+                    </div>
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-900">
+                            User Hierarchy
+                        </h2>
+                        <p class="text-gray-600">
+                            Supervisor-subordinate organizational structure
+                        </p>
+                    </div>
                 </div>
-                
-                <div class="user-info">
-                  <h4 class="user-name">{{ item.name }}</h4>
-                  <p class="user-role">{{ item.role }}</p>
-                  <p class="user-email">{{ item.email }}</p>
-                  
-                  <div v-if="item.supervisor" class="supervisor-info">
-                    <span class="text-xs text-gray-500">
-                      Reports to: <strong>{{ item.supervisor }}</strong>
-                    </span>
-                  </div>
-                  
-                  <div class="user-stats">
-                    <span class="stat-item">
-                      <IconUsers class="w-4 h-4" />
-                      {{ item.subordinatesCount }} direct reports
-                    </span>
-                  </div>
-                  
-                  <div class="user-status">
-                    <a-tag 
-                      :color="getStatusColor(item.status)" 
-                      size="small"
+                <div class="flex items-center space-x-3">
+                    <a-button
+                        v-if="isSuperUser || usePermissionsV2('users.store')"
+                        @click="autoAssignSupervisors"
+                        :loading="autoAssignLoading"
+                        type="primary"
                     >
-                      {{ getStatusText(item.status) }}
-                    </a-tag>
-                  </div>
-                </div>
-                
-                <div class="user-actions">
-                  <a-button 
-                    size="small"
-                    @click="handleViewUser({id: item.id})"
-                    class="action-btn"
-                  >
-                    <template #icon>
-                      <IconEye />
-                    </template>
-                    View
-                  </a-button>
-                  <a-button 
-                    v-if="usePermissionsV2('users.update') || isSuperUser"
-                    size="small"
-                    type="primary"
-                    @click="handleEditUser({id: item.id})"
-                    class="action-btn"
-                  >
-                    <template #icon>
-                      <IconSettings />
-                    </template>
-                    Edit
-                  </a-button>
-                  
-                  <!-- Supervisor Assignment Actions -->
-                  <a-dropdown v-if="usePermissionsV2('users.update') || isSuperUser" placement="bottomRight">
-                    <a-button size="small" class="action-btn">
-                      <template #icon>
-                        <IconUserCheck />
-                      </template>
-                      Assign
+                        <IconUserCheck /> Auto-Assign
                     </a-button>
-                    <template #overlay>
-                      <a-menu>
-                        <a-menu-item 
-                          v-for="supervisor in availableSupervisors.filter(s => s.id !== item.id)"
-                          :key="supervisor.id"
-                          @click="assignSupervisor(item.id, supervisor.id)"
-                        >
-                          Assign to {{ supervisor.name }}
-                        </a-menu-item>
-                        <a-menu-item 
-                          v-if="item.supervisor"
-                          @click="removeSupervisor(item.id)"
-                          class="text-red-600"
-                        >
-                          Remove Supervisor
-                        </a-menu-item>
-                      </a-menu>
-                    </template>
-                  </a-dropdown>
+                    <a-button @click="handleBackToUsers"
+                        ><IconArrowUp /> Back</a-button
+                    >
                 </div>
-                
-                <button 
-                  v-if="children.length > 0"
-                  @click="toggleChildren"
-                  class="toggle-btn"
+            </div>
+
+            <!-- Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div
+                    class="stat-card bg-blue-100 text-blue-700"
+                    title="Total Users"
                 >
-                  {{ open ? '−' : '+' }}
-                </button>
-              </div>
-            </template>
-          </Vue3OrgChart>
-        </div>
-        
-        <div v-else class="text-center py-12">
-          <IconUsers class="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 class="text-lg font-medium text-gray-900 mb-2">No Users Found</h3>
-          <p class="text-gray-600">There are no users in the hierarchy to display.</p>
-        </div>
-      </div>
-
-
-      <!-- Cascading Assignment -->
-      <CascadingAssignment :current-user="users?.find(u => u.id === $page.props.auth.user?.id)" />
-
-    </div>
-
-    <!-- Supervisor Assignment Modal -->
-    <a-modal
-      v-model:open="showSupervisorModal"
-      title="Assign Supervisor"
-      @ok="closeSupervisorModal"
-      @cancel="closeSupervisorModal"
-      :footer="null"
-    >
-      <div v-if="selectedUser" class="space-y-4">
-        <div class="bg-gray-50 p-4 rounded-lg">
-          <h4 class="font-semibold text-gray-900 mb-2">Assigning Supervisor For:</h4>
-          <div class="flex items-center space-x-3">
-            <component 
-              :is="getRoleIcon(getUserRole(selectedUser))" 
-              class="w-8 h-8"
-              :class="`text-${getRoleColor(getUserRole(selectedUser))}-600`"
-            />
-            <div>
-              <p class="font-medium text-gray-900">{{ selectedUser.name }}</p>
-              <p class="text-sm text-gray-600">{{ getUserRole(selectedUser) }}</p>
-            </div>
-          </div>
-        </div>
-
-        <div v-if="availableSupervisors.length > 0">
-          <h4 class="font-semibold text-gray-900 mb-3">Available Supervisors:</h4>
-          <div class="space-y-2 max-h-60 overflow-y-auto">
-            <div 
-              v-for="supervisor in availableSupervisors"
-              :key="supervisor.id"
-              class="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50"
-            >
-              <div class="flex items-center space-x-3">
-                <component 
-                  :is="getRoleIcon(getUserRole(supervisor))" 
-                  class="w-6 h-6"
-                  :class="`text-${getRoleColor(getUserRole(supervisor))}-600`"
-                />
-                <div>
-                  <p class="font-medium text-gray-900">{{ supervisor.name }}</p>
-                  <p class="text-sm text-gray-600">{{ getUserRole(supervisor) }}</p>
+                    {{ users?.length || 0 }}
                 </div>
-              </div>
-              <a-button 
-                size="small"
-                type="primary"
-                @click="assignSupervisor(selectedUser.id, supervisor.id); closeSupervisorModal()"
-              >
-                Assign
-              </a-button>
+                <div
+                    class="stat-card bg-green-100 text-green-700"
+                    title="Active Users"
+                >
+                    {{
+                        users?.filter((u) => u.status === "active").length || 0
+                    }}
+                </div>
+                <div
+                    class="stat-card bg-purple-100 text-purple-700"
+                    title="Top Level"
+                >
+                    {{ topLevelUsers.length }}
+                </div>
+                <div
+                    class="stat-card bg-orange-100 text-orange-700"
+                    title="Without Supervisor"
+                >
+                    {{ usersWithoutSupervisors.length }}
+                </div>
             </div>
-          </div>
-        </div>
 
-        <div v-else class="text-center py-8">
-          <IconUserCheck class="w-12 h-12 text-gray-400 mx-auto mb-2" />
-          <p class="text-gray-600">No available supervisors found for this user.</p>
-          <p class="text-sm text-gray-500">This may be due to hierarchy level restrictions.</p>
-        </div>
+            <!-- Chart -->
+            <div class="bg-white rounded-lg shadow-sm border p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-lg font-semibold text-gray-900">
+                        Organizational Structure
+                    </h3>
+                    <div class="flex gap-2" v-if="chartData">
+                        <button
+                            @click="exportChart"
+                            class="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                        >
+                            Export
+                        </button>
+                        <button
+                            @click="resetZoom"
+                            class="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                        >
+                            Reset Zoom
+                        </button>
+                    </div>
+                </div>
 
-        <div class="flex justify-end space-x-2 pt-4 border-t">
-          <a-button @click="closeSupervisorModal">Cancel</a-button>
+                <div
+                    v-if="chartData"
+                    ref="chartContainer"
+                    id="d3-org-chart"
+                    class="w-full min-h-[600px] border border-gray-200 rounded"
+                ></div>
+                <div v-else class="text-center py-12 text-gray-600">
+                    <IconUsers class="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                    <p>No users found for hierarchy.</p>
+                </div>
+            </div>
+
+            <!-- Users Without Supervisors Section -->
+            <div
+                v-if="usersWithoutSupervisors.length > 0"
+                class="bg-white rounded-lg shadow-sm border p-6"
+            >
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-900">
+                        Users Without Supervisors
+                    </h3>
+                    <span class="text-sm text-gray-500">
+                        {{ usersWithoutSupervisors.length }} users need
+                        supervisor assignment
+                    </span>
+                </div>
+
+                <div
+                    class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+                >
+                    <div
+                        v-for="user in usersWithoutSupervisors"
+                        :key="user.id"
+                        class="bg-gray-50 rounded-lg p-4 border border-gray-200"
+                    >
+                        <div class="flex items-center space-x-3">
+                            <div
+                                class="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center"
+                            >
+                                <span
+                                    class="text-gray-600 font-semibold text-sm"
+                                >
+                                    {{ user.name.charAt(0).toUpperCase() }}
+                                </span>
+                            </div>
+                            <div class="flex-1">
+                                <h4 class="font-medium text-gray-900">
+                                    {{ user.name }}
+                                </h4>
+                                <p class="text-sm text-gray-500">
+                                    {{ getUserRole(user) }}
+                                </p>
+                                <p class="text-xs text-gray-400">
+                                    {{ user.email }}
+                                </p>
+                            </div>
+                            <div class="flex items-center">
+                                <span
+                                    class="w-2 h-2 rounded-full"
+                                    :class="
+                                        user.status === 'active'
+                                            ? 'bg-green-400'
+                                            : 'bg-red-400'
+                                    "
+                                ></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4 text-center">
+                    <button
+                        @click="autoAssignSupervisors"
+                        :disabled="autoAssignLoading"
+                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                    >
+                        <IconUserCheck class="w-4 h-4 inline mr-2" />
+                        {{
+                            autoAssignLoading
+                                ? "Assigning..."
+                                : "Auto-Assign Supervisors"
+                        }}
+                    </button>
+                </div>
+            </div>
         </div>
-      </div>
-    </a-modal>
-  </AuthenticatedLayout>
+    </AuthenticatedLayout>
 </template>
 
-
 <style scoped>
-/* Org Chart Container */
-.org-chart-container {
-  min-height: 400px;
-  overflow: auto;
+.stat-card {
+    @apply flex flex-col justify-center items-center p-4 rounded-lg shadow-sm border bg-white font-bold text-xl;
 }
 
-/* User Node Card */
-.user-node-card {
-  @apply bg-white border-2 rounded-lg p-4 shadow-sm hover:shadow-md transition-all duration-300;
-  @apply border-gray-200 hover:border-blue-300;
-  min-width: 280px;
-  max-width: 320px;
-  position: relative;
+#d3-org-chart {
+    width: 100%;
+    height: auto;
+    min-height: 600px;
+    background-color: #fffeff;
+    border-radius: 8px;
 }
 
-.user-node-card:hover {
-  transform: translateY(-2px);
+/* D3 Org Chart custom styles */
+:deep(.org-chart-node) {
+    cursor: pointer;
+    transition: transform 0.2s ease;
 }
 
-/* Role-specific styling */
-.user-node-card.role-super-admin {
-  @apply border-red-200 hover:border-red-300;
+:deep(.org-chart-node:hover) {
+    transform: scale(1.05);
 }
 
-.user-node-card.role-admin {
-  @apply border-orange-200 hover:border-orange-300;
-}
-
-.user-node-card.role-manager {
-  @apply border-blue-200 hover:border-blue-300;
-}
-
-.user-node-card.role-supervisor {
-  @apply border-purple-200 hover:border-purple-300;
-}
-
-.user-node-card.role-cashier {
-  @apply border-green-200 hover:border-green-300;
-}
-
-/* User Avatar */
-.user-avatar {
-  @apply flex items-center justify-center w-12 h-12 rounded-full mb-3;
-  @apply bg-gray-100;
-}
-
-/* User Info */
-.user-info {
-  @apply flex-1;
-}
-
-.user-name {
-  @apply text-lg font-semibold text-gray-900 mb-1;
-}
-
-.user-role {
-  @apply text-sm font-medium text-gray-600 mb-1;
-}
-
-.user-email {
-  @apply text-xs text-gray-500 mb-2;
-}
-
-.user-stats {
-  @apply flex items-center space-x-3 mb-2;
-}
-
-.stat-item {
-  @apply flex items-center space-x-1 text-xs text-gray-500;
-}
-
-.user-status {
-  @apply mb-3;
-}
-
-.supervisor-info {
-  @apply mb-2 p-2 bg-gray-50 rounded text-xs;
-}
-
-/* User Actions */
-.user-actions {
-  @apply flex items-center space-x-2 mb-3;
-}
-
-.action-btn {
-  @apply text-xs;
-}
-
-/* Toggle Button */
-.toggle-btn {
-  @apply absolute top-2 right-2 w-6 h-6 rounded-full;
-  @apply bg-blue-500 text-white text-sm font-bold;
-  @apply hover:bg-blue-600 transition-colors;
-  @apply flex items-center justify-center;
-}
-
-/* Vue3 Org Chart Custom Variables */
-:root {
-  --vue3-org-chart-container-height: 70vh;
-  --vue3-org-chart-line-top: 1rem;
-  --vue3-org-chart-line-bottom: 1rem;
-  --vue3-org-chart-node-space-x: 2rem;
-  --vue3-org-chart-line-color: #3b82f6;
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-  .user-node-card {
-    min-width: 240px;
-    max-width: 280px;
-  }
-  
-  .user-name {
-    @apply text-base;
-  }
-  
-  .user-role {
-    @apply text-xs;
-  }
-  
-  .user-email {
-    @apply text-xs;
-  }
+:deep(.org-chart-link) {
+    stroke: lightgray;
+    stroke-width: 1.5;
+    stroke-dasharray: 4, 4;
+    fill: none;
 }
 </style>
