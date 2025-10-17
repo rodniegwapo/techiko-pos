@@ -10,11 +10,7 @@ use Illuminate\Validation\Rule;
 
 class SupervisorAssignmentController extends Controller
 {
-    public function __construct()
-    {
-        // Super admin, admin, and manager can access supervisor assignment
-        $this->middleware(['auth', 'role:super admin|admin|manager']);
-    }
+    public function __construct() {}
 
     /**
      * Assign a supervisor to a user (level-based)
@@ -178,6 +174,23 @@ class SupervisorAssignmentController extends Controller
 
         $results = UserHierarchyService::autoAssignSupervisors();
 
+        // Create a detailed message for the user
+        $message = "Auto-assignment completed: ";
+        $message .= "{$results['assigned']} assigned, ";
+        $message .= "{$results['skipped']} skipped, ";
+        $message .= "{$results['errors']} errors.";
+
+        if ($results['assigned'] > 0) {
+            session()->flash('success', $message);
+        } elseif ($results['errors'] > 0) {
+            session()->flash('error', $message);
+        } else {
+            session()->flash('info', $message);
+        }
+
+        // Log the detailed results for debugging
+        \Log::info('Auto-assignment results:', $results);
+
         return redirect()->back();
     }
 
@@ -186,15 +199,32 @@ class SupervisorAssignmentController extends Controller
      */
     public function cascadingOptions()
     {
-        $currentUser = auth()->user();
+        try {
+            $currentUser = auth()->user();
+            
+            if (!$currentUser) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not authenticated'
+                ], 401);
+            }
 
-        $options = UserHierarchyService::getCascadingAssignmentOptions($currentUser);
+            $options = UserHierarchyService::getCascadingAssignmentOptions($currentUser);
 
-        return response()->json([
-            'success' => true,
-            'options' => $options,
-            'user_level' => UserHierarchyService::getUserLevel($currentUser)
-        ]);
+            return response()->json([
+                'success' => true,
+                'options' => $options,
+                'user_level' => UserHierarchyService::getUserLevel($currentUser)
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Error in cascadingOptions: ' . $e->getMessage());
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error loading cascading options',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     /**

@@ -127,8 +127,9 @@ class UserController extends Controller
         $currentUser = auth()->user();
         
         // Determine if current user can update sensitive fields
-        $canUpdateSensitive = $currentUser->hasAnyRole(['super admin', 'admin']) && 
-                             ($currentUser->hasRole('super admin') || !$user->hasRole('super admin'));
+        $canUpdateSensitive = $currentUser->isSuperUser() || 
+                             ($currentUser->hasAnyRole(['super admin', 'admin']) && 
+                              ($currentUser->hasRole('super admin') || !$user->hasRole('super admin')));
 
         // Build validation rules based on permissions
         $rules = [];

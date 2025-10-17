@@ -109,7 +109,23 @@ const assigning = ref(null);
 const loadCascadingOptions = async () => {
   loading.value = true;
   try {
-    const response = await fetch(route('supervisors.cascading-options'));
+    const response = await fetch(route('supervisors.cascading-options'), {
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      throw new Error('Response is not JSON');
+    }
+    
     const data = await response.json();
     
     if (data.success) {
@@ -118,6 +134,9 @@ const loadCascadingOptions = async () => {
     }
   } catch (error) {
     console.error('Error loading cascading options:', error);
+    // Set empty options as fallback
+    options.value = [];
+    userLevel.value = null;
   } finally {
     loading.value = false;
   }

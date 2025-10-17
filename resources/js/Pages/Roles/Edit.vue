@@ -172,23 +172,23 @@ const getRoleColor = (roleName) => {
 
 const getPermissionLabel = (permission) => {
     // If permission is an object with name property, extract action name
-    if (typeof permission === 'object' && permission.name) {
+    if (typeof permission === "object" && permission.name) {
         // Extract action name from permission name (e.g., "Users - View" -> "View")
-        if (permission.name.includes(' - ')) {
-            return permission.name.split(' - ')[1];
+        if (permission.name.includes(" - ")) {
+            return permission.name.split(" - ")[1];
         }
-        if (permission.name.includes(' (')) {
-            return permission.name.split(' (')[0];
+        if (permission.name.includes(" (")) {
+            return permission.name.split(" (")[0];
         }
         return permission.name;
     }
-    
+
     // Fallback for string permission names (backward compatibility)
-    if (typeof permission === 'string') {
+    if (typeof permission === "string") {
         return permission;
     }
-    
-    return 'Unknown Permission';
+
+    return "Unknown Permission";
 };
 
 // =======
@@ -227,7 +227,6 @@ const onModuleCheckAllChange = (moduleName, checked) => {
 
 <template>
     <Head title="Edit Role" />
-
     <AuthenticatedLayout>
         <ContentHeader title="Edit Role" />
 

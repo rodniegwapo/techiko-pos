@@ -81,8 +81,10 @@ Route::middleware(['auth', 'user.permission'])->group(function () {
 
     // Cascading Assignment Routes
     Route::get('/supervisors/cascading-options', [\App\Http\Controllers\SupervisorAssignmentController::class, 'cascadingOptions'])
+        ->middleware('auth')
         ->name('supervisors.cascading-options');
     Route::post('/supervisors/{supervisor}/cascading-assign', [\App\Http\Controllers\SupervisorAssignmentController::class, 'cascadingAssign'])
+        ->middleware('auth')
         ->name('supervisors.cascading-assign');
 
     // Role Management (Only for super user)
@@ -147,5 +149,40 @@ Route::middleware(['auth', 'user.permission'])->group(function () {
 Route::get('/customer-order', function () {
     return Inertia::render('CustomerOrderView');
 })->name('customer-order');
+
+// Debug routes
+Route::get('/debug-super-user', function () {
+    $user = auth()->user();
+    return response()->json([
+        'user_id' => $user->id,
+        'user_name' => $user->name,
+        'is_super_user_field' => $user->is_super_user,
+        'isSuperUser_method' => $user->isSuperUser(),
+        'method_exists' => method_exists($user, 'isSuperUser')
+    ]);
+})->middleware('auth');
+
+Route::get('/debug-role-hierarchy', function () {
+    $hierarchy = \App\Services\UserHierarchyService::getRoleHierarchyInfo();
+    $usersWithoutSupervisors = \App\Models\User::whereNull('supervisor_id')
+        ->where('is_super_user', false)
+        ->with('roles')
+        ->get()
+        ->map(function ($user) {
+            $role = $user->roles()->orderBy('level')->first();
+            return [
+                'id' => $user->id,
+                'name' => $user->name,
+                'role' => $role ? $role->name : 'No Role',
+                'level' => $role ? $role->level : null,
+                'is_super_user' => $user->is_super_user
+            ];
+        });
+    
+    return response()->json([
+        'role_hierarchy' => $hierarchy,
+        'users_without_supervisors' => $usersWithoutSupervisors
+    ]);
+})->middleware('auth');
 
 require __DIR__ . '/auth.php';
