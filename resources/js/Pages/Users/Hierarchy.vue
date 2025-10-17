@@ -10,6 +10,8 @@ import {
     IconHierarchy,
     IconArrowUp,
 } from "@tabler/icons-vue";
+
+import { ArrowLeftOutlined } from "@ant-design/icons-vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 import * as d3 from "d3";
@@ -259,7 +261,7 @@ const initializeChart = () => {
                                : node.name.charAt(0).toUpperCase()
                        }
                    </div>
-                   
+
                   <div style="color:#08011E;position:absolute;right:20px;top:17px;font-size:10px;"><i class="fas fa-ellipsis-h"></i></div>
                   <div style="position:absolute;right:20px;top:35px;width:8px;height:8px;border-radius:50%;background-color:${statusColor};"></div>
 
@@ -373,18 +375,13 @@ const autoAssignSupervisors = async () => {
                         </p>
                     </div>
                 </div>
-                <div class="flex items-center space-x-3">
-                    <a-button
-                        v-if="isSuperUser || usePermissionsV2('users.store')"
-                        @click="autoAssignSupervisors"
-                        :loading="autoAssignLoading"
-                        type="primary"
-                    >
-                        <IconUserCheck /> Auto-Assign
+                <div>
+                    <a-button @click="handleBack">
+                        <template #icon>
+                            <ArrowLeftOutlined />
+                        </template>
+                        Back to Roles
                     </a-button>
-                    <a-button @click="handleBackToUsers"
-                        ><IconArrowUp /> Back</a-button
-                    >
                 </div>
             </div>
 
