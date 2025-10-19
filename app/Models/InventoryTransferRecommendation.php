@@ -40,6 +40,20 @@ class InventoryTransferRecommendation extends Model
     ];
 
     /**
+     * Get the domain that this recommendation belongs to.
+     */
+    // Remove domain relationship - now using domain string column
+    // public function domain()
+    // {
+    //     return $this->belongsTo(Domain::class);
+    // }
+
+    // Add scope for easy domain filtering
+    public function scopeForDomain($query, $domain) {
+        return $query->where('domain', $domain);
+    }
+
+    /**
      * Get the product that owns this recommendation
      */
     public function product()

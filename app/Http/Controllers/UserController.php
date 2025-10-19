@@ -24,13 +24,27 @@ class UserController extends Controller
     {
         $currentUser = auth()->user();
         
-        $users = $this->userService->getFilteredUsers($request, $currentUser);
-        $roles = $this->userService->getManageableRoles($currentUser);
+        // Check if this is a domain-specific route
+        $domain = $request->route('domain');
+        $isDomainRoute = $request->route()->named('domains.*');
+        
+        // Get users based on route type
+        if ($isDomainRoute && $domain) {
+            // Domain-specific users
+            $users = User::where('domain', $domain)->with(['roles', 'supervisor'])->latest()->paginate(15);
+            $roles = $this->userService->getManageableRoles($currentUser);
+        } else {
+            // Global users (super users only)
+            $users = $this->userService->getFilteredUsers($request, $currentUser);
+            $roles = $this->userService->getManageableRoles($currentUser);
+        }
 
         return Inertia::render('Users/Index', [
             'items' => UserResource::collection($users),
             'roles' => $roles,
             'hierarchy' => UserHierarchyService::getRoleHierarchy(),
+            'currentDomain' => $domain,
+            'isDomainRoute' => $isDomainRoute,
         ]);
     }
 
@@ -44,6 +58,15 @@ class UserController extends Controller
         $currentUser = auth()->user();
         $rules = $this->userService->getCreationValidationRules($currentUser);
         $validated = $request->validate($rules);
+
+        // Check if this is a domain-specific route
+        $domain = $request->route('domain');
+        $isDomainRoute = $request->route()->named('domains.*');
+        
+        // Set domain for new user if in domain context
+        if ($isDomainRoute && $domain) {
+            $validated['domain'] = $domain;
+        }
 
         $user = $this->userService->createUser($validated, $currentUser);
 

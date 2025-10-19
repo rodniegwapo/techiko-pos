@@ -62,6 +62,20 @@ class User extends Authenticatable
     ];
 
     /**
+     * Get the domain that this user belongs to.
+     * Remove domain relationship - now using domain string column
+     */
+    // public function domain()
+    // {
+    //     return $this->belongsTo(Domain::class);
+    // }
+
+    // Add scope for easy domain filtering
+    public function scopeForDomain($query, $domain) {
+        return $query->where('domain', $domain);
+    }
+
+    /**
      * Get the supervisor that supervises this user.
      */
     public function supervisor()
