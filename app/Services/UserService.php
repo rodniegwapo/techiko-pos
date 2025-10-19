@@ -41,12 +41,66 @@ class UserService
      */
     public function getHierarchyUsers(User $currentUser)
     {
-        $query = User::with(['roles', 'supervisor', 'subordinates']);
+        // Super users can see everyone
+        if ($currentUser->isSuperUser()) {
+            return User::with(['roles', 'supervisor', 'subordinates'])
+                ->orderBy('name')
+                ->get()
+                ->toArray();
+        }
 
-        // Apply hierarchy-based filtering
-        $query = $this->applyHierarchyFiltering($query, $currentUser);
+        // For other users, get only their hierarchy (subordinates and supervisor chain)
+        $hierarchyUsers = collect();
+        
+        // Add the current user
+        $hierarchyUsers->push($currentUser->load(['roles', 'supervisor', 'subordinates']));
+        
+        // Add supervisor chain (up the hierarchy) - only one level up
+        if ($currentUser->supervisor) {
+            $supervisor = $currentUser->supervisor->load(['roles', 'supervisor', 'subordinates']);
+            $hierarchyUsers->push($supervisor);
+        }
+        
+        // Add all subordinates (down the hierarchy) - only people they manage
+        $this->addAllSubordinates($currentUser, $hierarchyUsers);
+        
+        // Filter out users that shouldn't be visible based on role hierarchy
+        $filteredUsers = $hierarchyUsers->filter(function ($user) use ($currentUser) {
+            // Super users should not be visible to non-super users
+            if ($user->is_super_user && !$currentUser->is_super_user) {
+                return false;
+            }
+            
+            // Users with same or higher role level should not be visible (except supervisor and current user)
+            $userRole = $user->roles()->orderBy('level')->first();
+            $currentUserRole = $currentUser->roles()->orderBy('level')->first();
+            
+            if (!$userRole || !$currentUserRole) {
+                return true; // Keep if we can't determine roles
+            }
+            
+            // Allow supervisor (one level up)
+            if ($user->id === $currentUser->supervisor_id) {
+                return true;
+            }
+            
+            // Allow subordinates (lower level roles) OR the current user
+            return $userRole->level > $currentUserRole->level || $user->id === $currentUser->id;
+        });
+        
+        return $filteredUsers->unique('id')->sortBy('name')->values()->toArray();
+    }
 
-        return $query->orderBy('name')->get();
+    /**
+     * Recursively add all subordinates to the collection
+     */
+    private function addAllSubordinates(User $user, $collection)
+    {
+        foreach ($user->subordinates as $subordinate) {
+            $subordinate->load(['roles', 'supervisor', 'subordinates']);
+            $collection->push($subordinate);
+            $this->addAllSubordinates($subordinate, $collection);
+        }
     }
 
     /**

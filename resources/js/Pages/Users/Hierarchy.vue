@@ -36,148 +36,124 @@ const orgChartInstance = ref(null);
 
 const getUserRole = (user) => user.roles?.[0]?.name || "No Role";
 
+const getUserHierarchyLevel = (user) => {
+    const role = getUserRole(user);
+    const hierarchy = {
+        "super admin": 1,
+        admin: 2,
+        manager: 3,
+        supervisor: 4,
+        cashier: 5,
+    };
+    return hierarchy[role.toLowerCase()] || 6;
+};
+
+const getRoleColor = (role) => {
+    const colors = {
+        "super admin": "#FFFFFF", // White background
+        admin: "#F8FAFC", // Very light gray
+        manager: "#F1F5F9", // Light gray
+        supervisor: "#E2E8F0", // Medium light gray
+        cashier: "#CBD5E1", // Medium gray
+    };
+    return colors[role.toLowerCase()] || "#FFFFFF";
+};
+
+const getRoleIcon = (role) => {
+    const icons = {
+        "super admin": "👑",
+        admin: "🛡️",
+        manager: "👔",
+        supervisor: "👥",
+        cashier: "💰",
+    };
+    return icons[role.toLowerCase()] || "👤";
+};
+
+const getSubordinates = (userId) => {
+    if (!props.users || !Array.isArray(props.users)) return [];
+    return props.users.filter((user) => user.supervisor_id == userId);
+};
+
 const topLevelUsers = computed(() => {
-    if (!props.users) return [];
+    if (!props.users || !Array.isArray(props.users)) return [];
+
     const superUsers = props.users.filter((u) => u.is_super_user);
     if (superUsers.length) return superUsers;
+
     const admins = props.users.filter(
         (u) => getUserRole(u) === "admin" && !u.supervisor_id
     );
     if (admins.length) return admins;
+
     return props.users.filter((u) => !u.supervisor_id);
 });
 
-const getSubordinates = (id) => {
-    if (!props.users) return [];
-    const user = props.users.find((u) => u.id === id);
-    if (!user) return [];
-    if (user.is_super_user) {
-        return props.users.filter(
-            (u) =>
-                !u.is_super_user &&
-                (u.supervisor_id === id ||
-                    (getUserRole(u) === "admin" && !u.supervisor_id))
-        );
-    }
-    return props.users.filter(
-        (u) => u.supervisor_id === id && !u.is_super_user
-    );
-};
-
 // Transform your data to D3 org chart format with role-based hierarchy
 const chartData = computed(() => {
-    if (!props.users || topLevelUsers.value.length === 0) return null;
+    if (!props.users || !Array.isArray(props.users) || props.users.length === 0)
+        return null;
 
     const flatData = [];
+    const currentUser = usePage().props.auth.user?.data;
 
-    // Find the Super Admin
-    const superAdmin = props.users.find((user) => user.is_super_user);
+    // If current user is super admin, show full hierarchy
+    if (currentUser?.is_super_user) {
+        // Find the top-level user (Super Admin)
+        let topLevelUser = props.users.find((user) => user.is_super_user);
 
-    if (superAdmin) {
-        // Super Admin is the root
-        flatData.push({
-            id: String(superAdmin.id),
-            name: superAdmin.name,
-            title: "Super User",
-            parentId: null,
-            email: superAdmin.email,
-            status: superAdmin.status,
-            isSuperUser: true,
-            isAdmin: false,
-        });
-
-        // Define role hierarchy levels
-        const roleHierarchy = {
-            admin: 1,
-            manager: 2,
-            supervisor: 3,
-            cashier: 4,
-        };
-
-        // Group users by role
-        const usersByRole = {
-            admin: [],
-            manager: [],
-            supervisor: [],
-            cashier: [],
-        };
-
-        // Categorize users by role
-        props.users.forEach((user) => {
-            if (user.id === superAdmin.id) return; // Skip super admin
-
-            const role = getUserRole(user);
-            if (usersByRole[role]) {
-                usersByRole[role].push(user);
-            }
-        });
-
-        // Add all users with their actual supervisor relationships
-        props.users.forEach((user) => {
-            if (user.id === superAdmin.id) return; // Skip super admin (already added)
-
-            const role = getUserRole(user);
-            let parentId = String(superAdmin.id); // Default to super admin
-
-            // If user has a specific supervisor, use that
-            if (user.supervisor_id) {
-                parentId = String(user.supervisor_id);
-            }
-            // Admins without supervisor report to Super Admin
-            else if (role === "admin") {
-                parentId = String(superAdmin.id);
-            }
-
-            flatData.push({
-                id: String(user.id),
-                name: user.name,
-                title: role,
-                email: user.email,
-                status: user.status,
-                isSuperUser: false,
-                isAdmin: role === "admin",
-                parentId: parentId,
+        if (!topLevelUser) {
+            // Find the user with the highest role level
+            topLevelUser = props.users.reduce((highest, user) => {
+                const userLevel = getUserHierarchyLevel(user);
+                const highestLevel = getUserHierarchyLevel(highest);
+                return userLevel < highestLevel ? user : highest;
             });
-        });
+        }
+
+        // Build hierarchy starting from top level
+        buildHierarchyData(topLevelUser, null, flatData);
     } else {
-        // Fallback: no super admin found, use organization root
-        flatData.push({
-            id: "root",
-            name: "Organization",
-            title: "Root",
-            parentId: null,
-            email: "",
-            status: "active",
-            isSuperUser: false,
-            isAdmin: false,
-        });
+        // For non-super users, make current user the root of their hierarchy
+        const currentUserInData = props.users.find(
+            (user) => user.id === currentUser?.id
+        );
 
-        // Add all users
-        props.users.forEach((user) => {
-            const role = getUserRole(user);
-            const isSuper = user.is_super_user;
-
-            let parentId = "root";
-
-            if (user.supervisor_id) {
-                parentId = String(user.supervisor_id);
-            }
-
-            flatData.push({
-                id: String(user.id),
-                name: user.name,
-                title: isSuper ? "Super User" : role,
-                email: user.email,
-                status: user.status,
-                isSuperUser: isSuper,
-                isAdmin: role === "admin",
-                parentId: parentId,
-            });
-        });
+        if (currentUserInData) {
+            // Build hierarchy starting from current user
+            buildHierarchyData(currentUserInData, null, flatData);
+        }
     }
 
     return flatData;
 });
+
+const buildHierarchyData = (user, parentId, flatData) => {
+    const role = getUserRole(user);
+    const currentUser = usePage().props.auth.user?.data;
+
+    flatData.push({
+        id: String(user.id),
+        name: user.name,
+        title: role,
+        email: user.email,
+        status: user.status,
+        isSuperUser: user.is_super_user,
+        isAdmin: role === "admin",
+        parentId: parentId,
+        // Add visual indicators
+        nodeColor: getRoleColor(role),
+        nodeIcon: getRoleIcon(role),
+        // Highlight current user
+        isCurrentUser: user.id === currentUser?.id,
+    });
+
+    // Add all subordinates recursively
+    const subordinates = getSubordinates(user.id);
+    subordinates.forEach((subordinate) => {
+        buildHierarchyData(subordinate, String(user.id), flatData);
+    });
+};
 
 // Chart utility functions
 const exportChart = () => {
@@ -247,29 +223,41 @@ const initializeChart = () => {
             })
             .nodeContent(function (d, i, arr, state) {
                 const node = d.data;
-                const color = "#FFFFFF";
+                const backgroundColor = node.nodeColor || "#FFFFFF";
                 const statusColor =
                     node.status === "active" ? "#10B981" : "#EF4444";
+                const roleIcon = node.nodeIcon || "👤";
+                const isCurrentUser = node.isCurrentUser;
+
+                // Special styling for current user
+                const borderColor = isCurrentUser ? "#3B82F6" : "#E5E7EB";
+                const borderWidth = isCurrentUser ? "3px" : "1px";
+                const boxShadow = isCurrentUser
+                    ? "0 4px 8px rgba(59, 130, 246, 0.2)"
+                    : "0 2px 4px rgba(0,0,0,0.05)";
+                const currentUserBadge = isCurrentUser
+                    ? '<div style="position:absolute;top:-8px;right:-8px;background:#3B82F6;color:white;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:bold;">YOU</div>'
+                    : "";
 
                 return `
-                <div style="font-family: 'Inter', sans-serif;background-color:${color}; position:absolute;margin-top:-1px; margin-left:-1px;width:${d.width}px;height:${d.height}px;border-radius:10px;border: 1px solid #E4E2E9">
-                   <div style="background-color:${color};position:absolute;margin-top:-25px;margin-left:${15}px;border-radius:100px;width:50px;height:50px;" ></div>
-                   <div style="position:absolute;margin-top:-20px;margin-left:${20}px;border-radius:100px;width:40px;height:40px;background-color:#716E7B;display:flex;align-items:center;justify-content:center;color:white;font-size:16px;font-weight:bold;">
-                       ${
-                           node.isSuperUser
-                               ? "👑"
-                               : node.name.charAt(0).toUpperCase()
-                       }
+                <div style="font-family: 'Inter', sans-serif;background-color:${backgroundColor}; position:absolute;margin-top:-1px; margin-left:-1px;width:${d.width}px;height:${d.height}px;border-radius:8px;border: ${borderWidth} solid ${borderColor};box-shadow: ${boxShadow};">
+                   ${currentUserBadge}
+                   <div style="background-color:${backgroundColor};position:absolute;margin-top:-25px;margin-left:${15}px;border-radius:100px;width:50px;height:50px;" ></div>
+                   <div style="position:absolute;margin-top:-20px;margin-left:${20}px;border-radius:100px;width:40px;height:40px;background-color:#6B7280;display:flex;align-items:center;justify-content:center;color:white;font-size:18px;font-weight:bold;border: 2px solid white;">
+                       ${roleIcon}
                    </div>
 
-                  <div style="color:#08011E;position:absolute;right:20px;top:17px;font-size:10px;"><i class="fas fa-ellipsis-h"></i></div>
+                  <div style="color:#6B7280;position:absolute;right:20px;top:17px;font-size:10px;"><i class="fas fa-ellipsis-h"></i></div>
                   <div style="position:absolute;right:20px;top:35px;width:8px;height:8px;border-radius:50%;background-color:${statusColor};"></div>
 
-                  <div style="font-size:15px;color:#08011E;margin-left:20px;margin-top:32px"> ${
+                  <div style="font-size:14px;color:#1F2937;margin-left:20px;margin-top:32px;font-weight:600;"> ${
                       node.name
                   } </div>
-                  <div style="color:#716E7B;margin-left:20px;margin-top:3px;font-size:10px;"> ${
+                  <div style="color:#6B7280;margin-left:20px;margin-top:3px;font-size:11px;font-weight:500;"> ${
                       node.title
+                  } </div>
+                  <div style="color:#9CA3AF;margin-left:20px;margin-top:2px;font-size:9px;"> ${
+                      node.email
                   } </div>
 
                </div>
@@ -313,7 +301,7 @@ onUnmounted(() => {
 });
 
 const usersWithoutSupervisors = computed(() => {
-    if (!props.users) return [];
+    if (!props.users || !Array.isArray(props.users)) return [];
 
     return props.users.filter((user) => {
         const role = getUserRole(user);
@@ -391,7 +379,7 @@ const autoAssignSupervisors = async () => {
                     class="stat-card bg-blue-50 border border-blue-300 text-blue-700"
                 >
                     <div class="text-2xl font-bold">
-                        {{ users?.length || 0 }}
+                        {{ props.users?.length || 0 }}
                     </div>
                     <div class="text-sm font-medium">Total Users</div>
                 </div>
@@ -400,7 +388,7 @@ const autoAssignSupervisors = async () => {
                 >
                     <div class="text-2xl font-bold">
                         {{
-                            users?.filter((u) => u.status === "active")
+                            props.users?.filter((u) => u.status === "active")
                                 .length || 0
                         }}
                     </div>
@@ -410,7 +398,7 @@ const autoAssignSupervisors = async () => {
                     class="stat-card bg-purple-50 border border-purple-300 text-purple-700"
                 >
                     <div class="text-2xl font-bold">
-                        {{ topLevelUsers.length }}
+                        {{ topLevelUsers?.length || 0 }}
                     </div>
                     <div class="text-sm font-medium">Top Level</div>
                 </div>
@@ -418,7 +406,7 @@ const autoAssignSupervisors = async () => {
                     class="stat-card bg-orange-50 border border-orange-300 text-orange-700"
                 >
                     <div class="text-2xl font-bold">
-                        {{ usersWithoutSupervisors.length }}
+                        {{ usersWithoutSupervisors?.length || 0 }}
                     </div>
                     <div class="text-sm font-medium">Without Supervisor</div>
                 </div>
@@ -460,7 +448,7 @@ const autoAssignSupervisors = async () => {
 
             <!-- Users Without Supervisors Section -->
             <div
-                v-if="usersWithoutSupervisors.length > 0"
+                v-if="usersWithoutSupervisors?.length > 0"
                 class="bg-white rounded-lg shadow-sm border p-6"
             >
                 <div class="flex items-center justify-between mb-4">
@@ -468,7 +456,7 @@ const autoAssignSupervisors = async () => {
                         Users Without Supervisors
                     </h3>
                     <span class="text-sm text-gray-500">
-                        {{ usersWithoutSupervisors.length }} users need
+                        {{ usersWithoutSupervisors?.length || 0 }} users need
                         supervisor assignment
                     </span>
                 </div>

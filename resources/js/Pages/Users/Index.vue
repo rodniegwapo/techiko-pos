@@ -22,9 +22,12 @@ import UserDetailsModal from "./components/UserDetailsModal.vue";
 const page = usePage();
 const { openModal, isEdit, spinning } = useGlobalVariables();
 const { showModal } = useHelpers();
+const { hasPermission } = usePermissionsV2();
 
 // Use permission composable
-const isSuperUser = computed(() => usePage().props.auth?.user?.data?.is_super_user || false);
+const isSuperUser = computed(
+    () => usePage().props.auth?.user?.data?.is_super_user || false
+);
 
 const props = defineProps({
     items: Object,
@@ -182,7 +185,7 @@ const getRoleColorHex = (level) => {
                     class="min-w-[100px] max-w-[400px]"
                 />
                 <a-button
-                    v-if="isSuperUser || usePermissionsV2('users.store')"
+                    v-if="isSuperUser || hasPermission('users.store')"
                     @click="handleAddUser"
                     type="primary"
                     class="bg-white border flex items-center border-green-500 text-green-500"
@@ -192,7 +195,9 @@ const getRoleColorHex = (level) => {
                     </template>
                     Add User
                 </a-button>
+
                 <a-button
+                    v-if="hasPermission('users.hierarchy')"
                     @click="router.visit(route('users.hierarchy'))"
                     type="default"
                     class="bg-white border flex items-center border-purple-500 text-purple-500"
@@ -202,6 +207,7 @@ const getRoleColorHex = (level) => {
                     </template>
                     User Hierarchy
                 </a-button>
+
                 <FilterDropdown v-model="filters" :filters="filtersConfig" />
             </template>
 

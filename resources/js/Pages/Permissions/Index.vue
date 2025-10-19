@@ -23,6 +23,7 @@ import PermissionEditModal from "./components/PermissionEditModal.vue";
 
 const page = usePage();
 const { openModal, isEdit, spinning } = useGlobalVariables();
+const { hasPermission } = usePermissionsV2();
 const { showModal } = useHelpers();
 
 // Use permission composable
@@ -234,7 +235,7 @@ console.log("Permissions grouped:", props.permissionsGrouped);
                 />
 
                 <a-button
-                    v-if="(canCreate && usePermissionsV2('permissions.store')) || isSuperUser"
+                    v-if="(canCreate && hasPermission('permissions.store')) || isSuperUser"
                     @click="handleAddPermission"
                     type="primary"
                     class="bg-white border flex items-center border-green-500 text-green-500"
@@ -266,9 +267,9 @@ console.log("Permissions grouped:", props.permissionsGrouped);
                     :permissions="items?.data || []"
                     :loading="spinning"
                     :pagination="pagination"
-                    :can-edit="(canEdit && usePermissionsV2('permissions.update')) || isSuperUser"
+                    :can-edit="(canEdit && hasPermission('permissions.update')) || isSuperUser"
                     :can-delete="
-                        (canDelete && usePermissionsV2('permissions.destroy')) || isSuperUser
+                        (canDelete && hasPermission('permissions.destroy')) || isSuperUser
                     "
                     @change="handleTableChange"
                     @edit="handleEditPermission"
