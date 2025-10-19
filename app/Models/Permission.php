@@ -10,13 +10,10 @@ class Permission extends SpatiePermission
 {
     use HasFactory;
 
-    protected $fillable = [
-        'name',
-        'route_name',
-        'action',
-        'module_id',
-        'guard_name',
-        'is_active',
+    protected $guarded = [
+        'id',
+        'created_at',
+        'updated_at',
     ];
 
     protected $casts = [

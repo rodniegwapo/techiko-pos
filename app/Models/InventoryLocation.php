@@ -10,17 +10,10 @@ class InventoryLocation extends Model
 {
     use HasFactory, Searchable;
 
-    protected $fillable = [
-        'name',
-        'code',
-        'type',
-        'address',
-        'contact_person',
-        'phone',
-        'email',
-        'is_active',
-        'is_default',
-        'notes',
+    protected $guarded = [
+        'id',
+        'created_at',
+        'updated_at',
     ];
 
     protected $casts = [

@@ -10,17 +10,10 @@ class Customer extends Model
 {
     use HasFactory, Searchable;
 
-    protected $fillable = [
-        'name',
-        'phone',
-        'email',
-        'address',
-        'loyalty_points',
-        'date_of_birth',
-        'tier',
-        'lifetime_spent',
-        'total_purchases',
-        'tier_achieved_date',
+    protected $guarded = [
+        'id',
+        'created_at',
+        'updated_at',
     ];
 
     protected $searchable = [

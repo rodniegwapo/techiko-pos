@@ -10,26 +10,10 @@ class InventoryTransferRecommendation extends Model
 {
     use HasFactory;
 
-    protected $fillable = [
-        'product_id',
-        'from_location_id',
-        'to_location_id',
-        'recommended_quantity',
-        'priority',
-        'reason',
-        'current_stock_from',
-        'current_stock_to',
-        'demand_velocity_to',
-        'days_of_stock_remaining',
-        'potential_lost_sales',
-        'status',
-        'recommended_at',
-        'expires_at',
-        'approved_by',
-        'approved_at',
-        'processed_by',
-        'processed_at',
-        'notes',
+    protected $guarded = [
+        'id',
+        'created_at',
+        'updated_at',
     ];
 
     protected $casts = [
