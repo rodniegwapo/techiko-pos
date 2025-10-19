@@ -19,6 +19,7 @@ import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 
 const page = usePage();
 const { openModal, isEdit, spinning } = useGlobalVariables();
+const { hasPermission } = usePermissionsV2();
 
 const { showModal } = useHelpers();
 
@@ -102,7 +103,7 @@ console.log("Permissions data:", props.permissions);
                 />
 
                 <a-button
-                    v-if="(canCreate && usePermissionsV2('roles.store')) || isSuperUser"
+                    v-if="(canCreate && hasPermission('roles.store')) || isSuperUser"
                     @click="handleAddRole"
                     type="primary"
                     class="bg-white border flex items-center border-green-500 text-green-500"
@@ -113,7 +114,7 @@ console.log("Permissions data:", props.permissions);
                     Add Role
                 </a-button>
                 <a-button
-                    v-if="(canEdit && usePermissionsV2('roles.index')) || isSuperUser"
+                    v-if="(canEdit && hasPermission('roles.index')) || isSuperUser"
                     @click="handlePermissionMatrix"
                     type="default"
                     class="bg-white border flex items-center border-blue-500 text-blue-500"
@@ -144,9 +145,9 @@ console.log("Permissions data:", props.permissions);
                     :roles="roles?.data || []"
                     :loading="spinning"
                     :pagination="pagination"
-                    :can-edit="(canEdit && usePermissionsV2('roles.edit')) || isSuperUser"
+                    :can-edit="(canEdit && hasPermission('roles.edit')) || isSuperUser"
                     :can-delete="
-                        (canDelete && usePermissionsV2('roles.destroy')) || isSuperUser
+                        (canDelete && hasPermission('roles.destroy')) || isSuperUser
                     "
                     @change="handleTableChange"
                     @edit="handleEditRole"

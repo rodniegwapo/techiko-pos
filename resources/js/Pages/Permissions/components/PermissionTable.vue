@@ -13,6 +13,7 @@ import { usePage } from "@inertiajs/vue3";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 
 const page = usePage();
+const { hasPermission } = usePermissionsV2();
 
 // Use permission composable
 const isSuperUser = computed(
@@ -109,29 +110,29 @@ const handleChange = (pagination, filters, sorter) => {
 };
 
 const canViewPermission = (permission) => {
-    return usePermissionsV2("permissions.update") || isSuperUser.value;
+    return hasPermission("permissions.update") || isSuperUser.value;
 };
 
 const canEditPermission = (permission) => {
-    return usePermissionsV2("permissions.update") || isSuperUser.value;
+    return hasPermission("permissions.update") || isSuperUser.value;
 };
 
 const canDeactivatePermission = (permission) => {
     return (
-        (usePermissionsV2("permissions.deactivate") || isSuperUser.value) &&
+        (hasPermission("permissions.deactivate") || isSuperUser.value) &&
         permission.is_active
     );
 };
 
 const canActivatePermission = (permission) => {
     return (
-        (usePermissionsV2("permissions.activate") || isSuperUser.value) &&
+        (hasPermission("permissions.activate") || isSuperUser.value) &&
         !permission.is_active
     );
 };
 
 const canDeletePermission = (permission) => {
-    return usePermissionsV2("permissions.destroy") || isSuperUser.value;
+    return hasPermission("permissions.destroy") || isSuperUser.value;
 };
 
 const handleEdit = (permission) => {

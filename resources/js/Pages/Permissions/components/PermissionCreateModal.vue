@@ -193,7 +193,6 @@ const handleCancel = () => {
                 <a-input
                     v-model:value="form.route_name"
                     placeholder="Auto-generated from module and action"
-                    readonly
                 >
                     <template #prefix>
                         <IconShield class="text-green-500" />

@@ -119,6 +119,7 @@ import axios from "axios";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 
 const page = usePage();
+const { hasPermission } = usePermissionsV2();
 
 // Use permission composable
 const isSuperUser = computed(() => usePage().props.auth?.user?.data?.is_super_user || false);
@@ -216,7 +217,7 @@ const canEdit = (user) => {
   }
   
   // Users with manage permissions can edit
-  if (!usePermissionsV2('users.update')) {
+  if (!hasPermission('users.update')) {
     return false;
   }
   
@@ -238,7 +239,7 @@ const canDelete = (user) => {
   }
   
   // Only users with manage permissions can delete
-  if (!usePermissionsV2('users.update')) {
+  if (!hasPermission('users.update')) {
     return false;
   }
   

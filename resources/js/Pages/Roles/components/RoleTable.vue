@@ -8,6 +8,7 @@ import axios from "axios";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 
 const page = usePage();
+const { hasPermission } = usePermissionsV2();
 
 // Use permission composable
 const isSuperUser = computed(
@@ -84,12 +85,12 @@ const handleChange = (pagination, filters, sorter) => {
 };
 
 const canEditRole = (role) => {
-    return usePermissionsV2("roles.edit") || isSuperUser.value;
+    return hasPermission("roles.edit") || isSuperUser.value;
 };
 
 const canDeleteRole = (role) => {
     // Only super user can delete roles
-    if (!usePermissionsV2("roles.destroy") && !isSuperUser.value) {
+    if (!hasPermission("roles.destroy") && !isSuperUser.value) {
         return false;
     }
 

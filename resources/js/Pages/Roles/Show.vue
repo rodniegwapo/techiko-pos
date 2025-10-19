@@ -9,6 +9,7 @@ import { usePage } from "@inertiajs/vue3";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 
 const page = usePage();
+const { hasPermission } = usePermissionsV2();
 
 const props = defineProps({
     role: Object,
@@ -291,7 +292,7 @@ const formatDate = (dateString) => {
                     </template>
                     Back to Roles
                 </a-button>
-                <a-button v-if="usePermissionsV2('roles.edit') || isSuperUser" type="primary" @click="handleEdit">
+                <a-button v-if="hasPermission('roles.edit') || isSuperUser" type="primary" @click="handleEdit">
                     <template #icon>
                         <EditOutlined />
                     </template>
