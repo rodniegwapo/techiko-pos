@@ -39,6 +39,14 @@ class Domain extends Model
     ];
 
     /**
+     * Get the route key for the model.
+     */
+    public function getRouteKeyName()
+    {
+        return 'name_slug';
+    }
+
+    /**
      * Get the users for this domain.
      */
     public function users()

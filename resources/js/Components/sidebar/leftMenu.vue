@@ -80,6 +80,7 @@ const getDashboardTagText = () => {
 const getRoute = (routeName, params = {}) => {
     try {
         if (typeof window.route !== 'function') {
+            console.warn('window.route is not a function');
             return "#";
         }
         
@@ -87,24 +88,41 @@ const getRoute = (routeName, params = {}) => {
         const currentDomainSlug = getCurrentDomainFromUrl();
         const isInDomainContext = currentDomainSlug !== null;
         
+        console.log('Route generation debug:', {
+            routeName,
+            currentDomainSlug,
+            isInDomainContext,
+            isSuperUser: isSuperUser.value,
+            currentDomain: currentDomain.value
+        });
+        
         // Super users can access both global and domain-specific routes
         if (isSuperUser.value) {
             // If we're in a domain context, maintain it
             if (isInDomainContext) {
-                return window.route(`domains.${routeName}`, { domain: currentDomainSlug, ...params });
+                const domainRouteName = `domains.${routeName}`;
+                const result = window.route(domainRouteName, { domain: currentDomainSlug, ...params });
+                console.log('Generated domain route:', domainRouteName, '→', result);
+                return result;
             }
             // Otherwise use global route
-            return window.route(routeName, params);
+            const result = window.route(routeName, params);
+            console.log('Generated global route:', routeName, '→', result);
+            return result;
         } 
         // Regular users should use domain-specific routes
         else if (currentDomain.value || isInDomainContext) {
             const domainSlug = currentDomainSlug || currentDomain.value?.name_slug;
-            return window.route(`domains.${routeName}`, { domain: domainSlug, ...params });
+            const domainRouteName = `domains.${routeName}`;
+            const result = window.route(domainRouteName, { domain: domainSlug, ...params });
+            console.log('Generated domain route for regular user:', domainRouteName, '→', result);
+            return result;
         }
         
+        console.warn('No route generated for:', routeName);
         return "#";
     } catch (error) {
-        console.warn('Route generation error:', error);
+        console.warn('Route generation error:', error, 'for route:', routeName);
         return "#";
     }
 };
@@ -310,25 +328,30 @@ const menus = computed(() => {
 // ===================
 const handleClick = (menu) => {
     if (!menu.routeName) {
+        console.warn('No routeName for menu:', menu);
         return;
     }
     
     try {
         const routePath = getRoute(menu.routeName);
-        console.log('Navigation:', {
+        console.log('Navigation attempt:', {
             menu: menu.title,
             routeName: menu.routeName,
             currentPath: window.location.pathname,
             domainFromUrl: getCurrentDomainFromUrl(),
-            generatedRoute: routePath
+            generatedRoute: routePath,
+            isValidRoute: routePath && routePath !== '#'
         });
         
         if (routePath && routePath !== '#') {
             selectedKeys.value = [menu.key];
+            console.log('Navigating to:', routePath);
             router.visit(routePath);
+        } else {
+            console.error('Invalid route generated for menu:', menu.title, 'routeName:', menu.routeName, 'generated:', routePath);
         }
     } catch (error) {
-        console.warn('Navigation error:', error);
+        console.warn('Navigation error:', error, 'for menu:', menu);
     }
 };
 
