@@ -14,12 +14,12 @@
     <template #bodyCell="{ column, record }">
       <template v-if="column.key === 'name'">
         <div class="flex items-center">
-          <a-avatar class="mr-3" :style="{ backgroundColor: getAvatarColor(record.name) }">
-            {{ getInitials(record.name) }}
+          <a-avatar class="mr-3" :style="{ backgroundColor: getAvatarColor((record.data || record).name) }">
+            {{ getInitials((record.data || record).name) }}
           </a-avatar>
           <div>
-            <div class="font-medium text-gray-900">{{ record.name }}</div>
-            <div class="text-sm text-gray-500">{{ record.email }}</div>
+            <div class="font-medium text-gray-900">{{ (record.data || record).name }}</div>
+            <div class="text-sm text-gray-500">{{ (record.data || record).email }}</div>
           </div>
         </div>
       </template>
@@ -27,7 +27,7 @@
       <template v-if="column.key === 'roles'">
         <div class="flex flex-wrap gap-1">
           <a-tag
-            v-for="role in record.roles"
+            v-for="role in (record.data || record).roles"
             :key="role.id"
             :color="getRoleColor(role.name)"
             class="font-medium"
@@ -39,20 +39,20 @@
 
       <template v-if="column.key === 'status'">
         <a-badge
-          :status="record.email_verified_at ? 'success' : 'warning'"
-          :text="record.email_verified_at ? 'Active' : 'Pending'"
+          :status="(record.data || record).email_verified_at ? 'success' : 'warning'"
+          :text="(record.data || record).email_verified_at ? 'Active' : 'Pending'"
         />
       </template>
 
       <template v-if="column.key === 'created_at'">
         <div class="text-sm">
-          {{ formatDate(record.created_at) }}
+          {{ formatDate((record.data || record).created_at) }}
         </div>
       </template>
 
       <template v-if="column.key === 'hierarchy'">
         <div class="text-sm">
-          <div v-if="record.is_super_user" class="flex items-center gap-1">
+          <div v-if="(record.data || record).is_super_user" class="flex items-center gap-1">
             <a-tag color="purple" class="font-medium">
               <template #icon>
                 <IconCrown size="12" />
@@ -66,8 +66,8 @@
                 Level {{ getUserHierarchyLevel(record) }}
               </a-tag>
             </div>
-            <div v-if="record.supervisor" class="text-xs text-gray-500">
-              Reports to: {{ record.supervisor.name }}
+            <div v-if="(record.data || record).supervisor" class="text-xs text-gray-500">
+              Reports to: {{ (record.data || record).supervisor.name }}
             </div>
             <div v-if="getSubordinatesCount(record) > 0" class="text-xs text-gray-500">
               Manages: {{ getSubordinatesCount(record) }} user(s)
@@ -90,7 +90,7 @@
             v-if="canEdit(record)"
             hover="group-hover:bg-green-500"
             name="Edit User"
-            @click="$emit('edit', record)"
+            @click="handleEdit(record)"
           >
             <IconEdit size="20" class="mx-auto" />
           </IconTooltipButton>
@@ -194,7 +194,22 @@ const handleChange = (pagination, filters, sorter) => {
   emit('change', pagination, filters, sorter);
 };
 
+const handleEdit = (record) => {
+  // Handle data wrapping from resources
+  const userData = record.data || record;
+  
+  console.log("Edit button clicked for user:", userData);
+  console.log("User supervisor_id:", userData.supervisor_id);
+  console.log("User supervisor:", userData.supervisor);
+  console.log("User roles:", userData.roles);
+  
+  emit('edit', userData);
+};
+
 const canEdit = (user) => {
+  // Handle data wrapping from resources
+  const userData = user.data || user;
+  
   // Super user can edit anyone
   if (isSuperUser.value) {
     return true;
@@ -207,16 +222,19 @@ const canEdit = (user) => {
   
   // admin can edit users except super users
   if (currentUser.value.roles?.some(role => role.name.toLowerCase() === 'admin')) {
-    return !user.is_super_user;
+    return !userData.is_super_user;
   }
   
   return false;
 };
 
 const canDelete = (user) => {
+  // Handle data wrapping from resources
+  const userData = user.data || user;
+  
   // Super user can delete anyone (except themselves)
   if (isSuperUser.value) {
-    return user.id !== currentUser.value.id;
+    return userData.id !== currentUser.value.id;
   }
   
   // Only users with manage permissions can delete
@@ -225,12 +243,12 @@ const canDelete = (user) => {
   }
   
   // Cannot delete yourself
-  if (user.id === currentUser.value.id) {
+  if (userData.id === currentUser.value.id) {
     return false;
   }
   
   // Cannot delete super users
-  if (user.is_super_user) {
+  if (userData.is_super_user) {
     return false;
   }
   
@@ -238,18 +256,21 @@ const canDelete = (user) => {
 };
 
 const handleDelete = (user) => {
+  // Handle data wrapping from resources
+  const userData = user.data || user;
+  
   Modal.confirm({
     title: "Delete User",
-    content: `Are you sure you want to delete ${user.name}? This action cannot be undone.`,
+    content: `Are you sure you want to delete ${userData.name}? This action cannot be undone.`,
     okText: "Yes, Delete",
     okType: "danger",
     cancelText: "Cancel",
     onOk: async () => {
       try {
-        await axios.delete(`/api/users/${user.id}`);
+        await axios.delete(`/api/users/${userData.id}`);
         notification.success({
           message: "User Deleted",
-          description: `${user.name} has been deleted successfully`,
+          description: `${userData.name} has been deleted successfully`,
         });
         // Refresh the page data
         window.location.reload();
@@ -305,11 +326,13 @@ const formatDate = (date) => {
 
 // Hierarchy helper methods
 const getUserHierarchyLevel = (user) => {
-  if (user.is_super_user) return -1;
+  const userData = user.data || user;
   
-  if (!user.roles || user.roles.length === 0) return null;
+  if (userData.is_super_user) return -1;
   
-  const userRole = user.roles[0]?.name?.toLowerCase();
+  if (!userData.roles || userData.roles.length === 0) return null;
+  
+  const userRole = userData.roles[0]?.name?.toLowerCase();
   if (!userRole || !props.hierarchy[userRole]) return null;
   
   return props.hierarchy[userRole].level;
@@ -326,6 +349,7 @@ const getHierarchyLevelColor = (level) => {
 };
 
 const getSubordinatesCount = (user) => {
+  const userData = user.data || user;
   // This would need to be calculated on the backend
   // For now, return 0 as we don't have this data
   return 0;

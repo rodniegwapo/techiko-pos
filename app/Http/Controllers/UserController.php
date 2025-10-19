@@ -5,16 +5,15 @@ namespace App\Http\Controllers;
 use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Services\UserHierarchyService;
+use App\Services\UserService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rule;
 use Inertia\Inertia;
-use Spatie\Permission\Models\Role;
 
 class UserController extends Controller
 {
-    public function __construct()
-    {
+    public function __construct(
+        private UserService $userService
+    ) {
         // Middleware is handled at route level
     }
 
@@ -25,38 +24,8 @@ class UserController extends Controller
     {
         $currentUser = auth()->user();
         
-        $users = User::with(['roles', 'supervisor'])
-            ->when($request->input('search'), function ($query, $search) {
-                return $query->where(function ($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
-                      ->orWhere('email', 'like', "%{$search}%");
-                });
-            })
-            ->when($request->input('role'), function ($query, $role) {
-                return $query->whereHas('roles', function ($q) use ($role) {
-                    $q->where('name', $role);
-                });
-            })
-            // Dynamic hierarchy filtering
-            ->when(!$currentUser->isSuperUser(), function ($query) use ($currentUser) {
-                $viewableRoles = UserHierarchyService::getViewableRoles($currentUser);
-                return $query->whereHas('roles', function ($q) use ($viewableRoles) {
-                    $q->whereIn('name', $viewableRoles);
-                })->where('is_super_user', false);
-            })
-            ->when(!$currentUser->isSuperUser() && $currentUser->hasRole('supervisor'), function ($query) use ($currentUser) {
-                // Supervisor can only see their direct subordinates
-                return $query->where('supervisor_id', $currentUser->id);
-            })
-            ->latest()
-            ->paginate(15);
-
-        // Get assignable roles based on simple hierarchy
-        $manageableRoles = $currentUser->isSuperUser() 
-            ? array_keys(UserHierarchyService::getRoleHierarchy())
-            : UserHierarchyService::getManageableRoles($currentUser);
-            
-        $roles = Role::whereIn('name', $manageableRoles)->get(['id', 'name']);
+        $users = $this->userService->getFilteredUsers($request, $currentUser);
+        $roles = $this->userService->getManageableRoles($currentUser);
 
         return Inertia::render('Users/Index', [
             'items' => UserResource::collection($users),
@@ -70,49 +39,18 @@ class UserController extends Controller
      */
     public function store(Request $request)
     {
-        // Super Admin, Admin, and Manager can create users
         $this->authorize('create', User::class);
 
         $currentUser = auth()->user();
-        
-        // Get available roles for the current user
-        $availableRoles = Role::query()
-            ->when($currentUser->hasRole('manager'), function ($query) {
-                // Manager can only create cashier and supervisor roles
-                return $query->whereIn('name', ['cashier', 'supervisor']);
-            })
-            ->when($currentUser->hasRole('admin') && !$currentUser->hasRole('super admin'), function ($query) {
-                return $query->where('name', '!=', 'super admin');
-            })
-            ->pluck('id');
+        $rules = $this->userService->getCreationValidationRules($currentUser);
+        $validated = $request->validate($rules);
 
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|string|min:8|confirmed',
-            'role_id' => ['required', 'exists:roles,id', function ($attribute, $value, $fail) use ($availableRoles) {
-                if (!$availableRoles->contains($value)) {
-                    $fail('You are not authorized to assign this role.');
-                }
-            }],
-            'supervisor_id' => 'nullable|exists:users,id'
-        ]);
-
-        $user = User::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'password' => Hash::make($validated['password']),
-            'supervisor_id' => $validated['supervisor_id'],
-        ]);
-
-        // Assign role with correct guard
-        $role = Role::findById($validated['role_id'], 'web');
-        $user->assignRole($role);
+        $user = $this->userService->createUser($validated, $currentUser);
 
         return response()->json([
             'success' => true,
             'message' => 'User created successfully',
-            'user' => $user->load('roles')
+            'user' => $user
         ], 201);
     }
 
@@ -121,84 +59,18 @@ class UserController extends Controller
      */
     public function update(Request $request, User $user)
     {
-        // Check if user can update this model
         $this->authorize('update', $user);
 
         $currentUser = auth()->user();
-        
-        // Determine if current user can update sensitive fields
-        $canUpdateSensitive = $currentUser->isSuperUser() || 
-                             ($currentUser->hasAnyRole(['super admin', 'admin']) && 
-                              ($currentUser->hasRole('super admin') || !$user->hasRole('super admin')));
-
-        // Build validation rules based on permissions
-        $rules = [];
-        
-        if ($canUpdateSensitive) {
-            // Admin/Super Admin can update all fields
-            $rules = [
-                'name' => 'required|string|max:255',
-                'email' => ['required', 'email', Rule::unique('users')->ignore($user->id)],
-                'password' => 'nullable|string|min:8|confirmed',
-                'role_id' => ['required', 'exists:roles,id'],
-                'supervisor_id' => 'nullable|exists:users,id'
-            ];
-            
-            // Get available roles for role validation
-            $availableRoles = Role::query()
-                ->when($currentUser->hasRole('admin') && !$currentUser->hasRole('super admin'), function ($query) {
-                    return $query->where('name', '!=', 'super admin');
-                })
-                ->pluck('id');
-                
-            $rules['role_id'][] = function ($attribute, $value, $fail) use ($availableRoles) {
-                if (!$availableRoles->contains($value)) {
-                    $fail('You are not authorized to assign this role.');
-                }
-            };
-        } else {
-            // Manager can only update non-sensitive fields
-            $rules = [
-                'status' => 'required|in:active,inactive',
-                // Add other non-sensitive fields as needed
-            ];
-        }
-
+        $rules = $this->userService->getUpdateValidationRules($currentUser, $user);
         $validated = $request->validate($rules);
 
-        // Build update data based on permissions
-        $updateData = [];
-        
-        if ($canUpdateSensitive) {
-            // Update sensitive fields for admin/super admin
-            $updateData = [
-                'name' => $validated['name'],
-                'email' => $validated['email'],
-                'supervisor_id' => $validated['supervisor_id'],
-            ];
-
-            if (!empty($validated['password'])) {
-                $updateData['password'] = Hash::make($validated['password']);
-            }
-        } else {
-            // Update only non-sensitive fields for manager
-            if (isset($validated['status'])) {
-                $updateData['status'] = $validated['status'];
-            }
-        }
-
-        $user->update($updateData);
-
-        // Update role only if user has permission
-        if ($canUpdateSensitive && isset($validated['role_id'])) {
-            $role = Role::findById($validated['role_id'], 'web');
-            $user->syncRoles([$role]);
-        }
+        $updatedUser = $this->userService->updateUser($user, $validated, $currentUser);
 
         return response()->json([
             'success' => true,
             'message' => 'User updated successfully',
-            'user' => $user->fresh()->load('roles')
+            'user' => $updatedUser
         ]);
     }
 
@@ -207,7 +79,6 @@ class UserController extends Controller
      */
     public function destroy(User $user)
     {
-        // Only Super Admin can delete users
         $this->authorize('delete', $user);
 
         // Prevent deleting yourself
@@ -243,32 +114,22 @@ class UserController extends Controller
      */
     public function toggleStatus(User $user)
     {
-        // Only super admin can toggle status of super admin users
-        if ($user->hasRole('super admin') && !auth()->user()->hasRole('super admin')) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized to modify super admin users'
-            ], 403);
-        }
+        $currentUser = auth()->user();
 
-        // Cannot toggle your own status
-        if ($user->id === auth()->id()) {
+        try {
+            $result = $this->userService->toggleUserStatus($user, $currentUser);
+            
+            return response()->json([
+                'success' => true,
+                'message' => "User {$result['action']} successfully",
+                'user' => $result['user']
+            ]);
+        } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'You cannot modify your own status'
+                'message' => $e->getMessage()
             ], 400);
         }
-
-        $newStatus = $user->status === 'active' ? 'inactive' : 'active';
-        $user->update(['status' => $newStatus]);
-
-        $action = $newStatus === 'active' ? 'activated' : 'deactivated';
-        
-        return response()->json([
-            'success' => true,
-            'message' => "User {$action} successfully",
-            'user' => $user->fresh()
-        ]);
     }
 
     /**
@@ -276,13 +137,7 @@ class UserController extends Controller
      */
     public function getRoles()
     {
-        $roles = Role::all(['id', 'name']);
-        
-        // If user is admin (not super admin), exclude super admin role
-        if (!auth()->user()->hasRole('super admin')) {
-            $roles = $roles->where('name', '!=', 'super admin');
-        }
-
+        $roles = $this->userService->getManageableRoles(auth()->user());
         return response()->json($roles);
     }
 
@@ -292,24 +147,7 @@ class UserController extends Controller
     public function hierarchy(Request $request)
     {
         $currentUser = auth()->user();
-        
-        // Get all users with their relationships (simplified)
-        $users = User::with(['roles', 'supervisor', 'subordinates'])
-            ->when(!$currentUser->isSuperUser(), function ($query) use ($currentUser) {
-                // Simple hierarchy-based filtering
-                $viewableRoles = UserHierarchyService::getViewableRoles($currentUser);
-                return $query->whereHas('roles', function ($q) use ($viewableRoles) {
-                    $q->whereIn('name', $viewableRoles);
-                })->where('is_super_user', false);
-            })
-            ->when(!$currentUser->isSuperUser() && $currentUser->hasRole('supervisor'), function ($query) use ($currentUser) {
-                // Supervisor can only see their direct subordinates
-                return $query->where('supervisor_id', $currentUser->id);
-            })
-            ->orderBy('name')
-            ->get();
-
-        // Get hierarchy data from UserHierarchyService
+        $users = $this->userService->getHierarchyUsers($currentUser);
         $hierarchy = UserHierarchyService::getRoleHierarchy();
 
         return Inertia::render('Users/Hierarchy', [
@@ -324,13 +162,8 @@ class UserController extends Controller
     public function edit(User $user)
     {
         $user->load(['roles']);
-        
         $currentUser = auth()->user();
-        $manageableRoles = $currentUser->isSuperUser() 
-            ? array_keys(UserHierarchyService::getRoleHierarchy())
-            : UserHierarchyService::getManageableRoles($currentUser);
-            
-        $roles = Role::whereIn('name', $manageableRoles)->get(['id', 'name']);
+        $roles = $this->userService->getManageableRoles($currentUser);
         
         return Inertia::render('Users/Edit', [
             'user' => $user,
