@@ -27,43 +27,162 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
+// ===================================
+// GLOBAL ROUTES (Super Users Only)
+// ===================================
 Route::middleware(['auth', 'user.permission'])->group(function () {
-    // Categories Management
+    // Sales (Global - All Organizations)
+    Route::get('/sales', [\App\Http\Controllers\SaleController::class, 'index'])->name('sales.index');
+    
+    // Products (Global - All Organizations)
+    Route::resource('products', \App\Http\Controllers\Products\ProductController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->names('products');
+    
+    // Categories (Global - All Organizations)
     Route::resource('categories', \App\Http\Controllers\CategoryController::class)
         ->only(['index', 'store', 'update', 'destroy'])
         ->names('categories');
-
-    // Products Management
-    Route::resource('products', \App\Http\Controllers\Products\ProductController::class)
-        ->only(['index', 'store', 'update', 'destroy',])
-        ->names('products');
-
+    
+    // Product Discounts (Global)
     Route::name('products.')->group(function () {
         Route::resource('discounts', \App\Http\Controllers\Products\DiscountController::class)
-            ->only(['index', 'store', 'update', 'destroy',])
+            ->only(['index', 'store', 'update', 'destroy'])
             ->names('discounts');
     });
-
-    // Mandatory Discounts
+    
+    // Mandatory Discounts (Global)
     Route::resource('mandatory-discounts', \App\Http\Controllers\MandatoryDiscountController::class)
-        ->only(['index', 'store', 'update', 'destroy',])
+        ->only(['index', 'store', 'update', 'destroy'])
         ->names('mandatory-discounts');
-
-    // Sales
-    Route::get('/sales', [\App\Http\Controllers\SaleController::class, 'index'])->name('sales.index');
-
-    // Loyalty Program
+    
+    // Loyalty Program (Global)
     Route::get('/loyalty', [\App\Http\Controllers\LoyaltyController::class, 'index'])->name('loyalty.index');
-
-    // Customers
+    
+    // Customers (Global)
     Route::get('/customers', [\App\Http\Controllers\CustomerController::class, 'webIndex'])->name('customers.index');
+    
+    // Void Logs (Global)
+    Route::get('/void-logs', [\App\Http\Controllers\VoidLogController::class, 'index'])->name('voids.index');
+    
+    // Inventory Management (Global)
+    Route::prefix('inventory')->name('inventory.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\InventoryController::class, 'index'])->name('index');
+        Route::get('/products', [\App\Http\Controllers\InventoryController::class, 'products'])->name('products');
+        Route::get('/movements', [\App\Http\Controllers\InventoryController::class, 'movements'])->name('movements');
+        Route::get('/low-stock', [\App\Http\Controllers\InventoryController::class, 'lowStock'])->name('low-stock');
+        Route::get('/valuation', [\App\Http\Controllers\InventoryController::class, 'valuation'])->name('valuation');
+        
+        Route::post('/receive', [\App\Http\Controllers\InventoryController::class, 'receive'])->name('receive');
+        Route::post('/transfer', [\App\Http\Controllers\InventoryController::class, 'transfer'])->name('transfer');
+        
+        Route::resource('adjustments', \App\Http\Controllers\StockAdjustmentController::class)->names('adjustments');
+        Route::post('/adjustments/{adjustment}/submit', [\App\Http\Controllers\StockAdjustmentController::class, 'submitForApproval'])->name('adjustments.submit');
+        Route::post('/adjustments/{adjustment}/approve', [\App\Http\Controllers\StockAdjustmentController::class, 'approve'])->name('adjustments.approve');
+        Route::post('/adjustments/{adjustment}/reject', [\App\Http\Controllers\StockAdjustmentController::class, 'reject'])->name('adjustments.reject');
+        Route::get('/adjustment-products', [\App\Http\Controllers\StockAdjustmentController::class, 'getProductsForAdjustment'])->name('adjustment-products');
+        
+        Route::resource('locations', \App\Http\Controllers\InventoryLocationController::class)->names('locations');
+        Route::post('/locations/{location}/set-default', [\App\Http\Controllers\InventoryLocationController::class, 'setDefault'])->name('locations.set-default');
+        Route::post('/locations/{location}/toggle-status', [\App\Http\Controllers\InventoryLocationController::class, 'toggleStatus'])->name('locations.toggle-status');
+    });
+});
 
-    // User Management
+// ===================================
+// ORGANIZATION-SPECIFIC ROUTES
+// ===================================
+Route::prefix('domains/{domain}')->middleware(['auth', 'user.permission', 'domain'])->name('domains.')->group(function () {
+    // Dashboard (Organization-specific)
+    Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
+    
+    // Sales (Organization-specific)
+    Route::get('/sales', [\App\Http\Controllers\SaleController::class, 'index'])->name('sales.index');
+    
+    // Products (Organization-specific)
+    Route::resource('products', \App\Http\Controllers\Products\ProductController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->names('products');
+    
+    // Categories (Organization-specific)
+    Route::resource('categories', \App\Http\Controllers\CategoryController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->names('categories');
+    
+    // Product Discounts (Organization-specific)
+    Route::name('products.')->group(function () {
+        Route::resource('discounts', \App\Http\Controllers\Products\DiscountController::class)
+            ->only(['index', 'store', 'update', 'destroy'])
+            ->names('discounts');
+    });
+    
+    // Mandatory Discounts (Organization-specific)
+    Route::resource('mandatory-discounts', \App\Http\Controllers\MandatoryDiscountController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->names('mandatory-discounts');
+    
+    // Loyalty Program (Organization-specific)
+    Route::get('/loyalty', [\App\Http\Controllers\LoyaltyController::class, 'index'])->name('loyalty.index');
+    
+    // Customers (Organization-specific)
+    Route::get('/customers', [\App\Http\Controllers\CustomerController::class, 'webIndex'])->name('customers.index');
+    
+    // Users (Organization-specific)
+    Route::resource('users', \App\Http\Controllers\UserController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->names('users');
+    
+    // Roles (Organization-specific)
+    Route::resource('roles', \App\Http\Controllers\RoleController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->names('roles');
+    
+    // Void Logs (Organization-specific)
+    Route::get('/void-logs', [\App\Http\Controllers\VoidLogController::class, 'index'])->name('voids.index');
+    
+    // Inventory Management (Organization-specific)
+    Route::prefix('inventory')->name('inventory.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\InventoryController::class, 'index'])->name('index');
+        Route::get('/products', [\App\Http\Controllers\InventoryController::class, 'products'])->name('products');
+        Route::get('/movements', [\App\Http\Controllers\InventoryController::class, 'movements'])->name('movements');
+        Route::get('/low-stock', [\App\Http\Controllers\InventoryController::class, 'lowStock'])->name('low-stock');
+        Route::get('/valuation', [\App\Http\Controllers\InventoryController::class, 'valuation'])->name('valuation');
+        
+        Route::post('/receive', [\App\Http\Controllers\InventoryController::class, 'receive'])->name('receive');
+        Route::post('/transfer', [\App\Http\Controllers\InventoryController::class, 'transfer'])->name('transfer');
+        
+        Route::resource('adjustments', \App\Http\Controllers\StockAdjustmentController::class)->names('adjustments');
+        Route::post('/adjustments/{adjustment}/submit', [\App\Http\Controllers\StockAdjustmentController::class, 'submitForApproval'])->name('adjustments.submit');
+        Route::post('/adjustments/{adjustment}/approve', [\App\Http\Controllers\StockAdjustmentController::class, 'approve'])->name('adjustments.approve');
+        Route::post('/adjustments/{adjustment}/reject', [\App\Http\Controllers\StockAdjustmentController::class, 'reject'])->name('adjustments.reject');
+        Route::get('/adjustment-products', [\App\Http\Controllers\StockAdjustmentController::class, 'getProductsForAdjustment'])->name('adjustment-products');
+        
+        Route::resource('locations', \App\Http\Controllers\InventoryLocationController::class)->names('locations');
+        Route::post('/locations/{location}/set-default', [\App\Http\Controllers\InventoryLocationController::class, 'setDefault'])->name('locations.set-default');
+        Route::post('/locations/{location}/toggle-status', [\App\Http\Controllers\InventoryLocationController::class, 'toggleStatus'])->name('locations.toggle-status');
+    });
+    
+    // Terminal Setup (Organization-specific)
+    Route::post('/setup-terminal', [\App\Http\Controllers\TerminalController::class, 'setupTerminal'])->name('setup.terminal');
+});
+
+// Domain Management Routes (for super users)
+Route::middleware(['auth', 'user.permission'])->prefix('domains')->name('domains.')->group(function () {
+    Route::get('/', [\App\Http\Controllers\DomainController::class, 'index'])->name('index');
+    Route::get('/create', [\App\Http\Controllers\DomainController::class, 'create'])->name('create');
+    Route::post('/', [\App\Http\Controllers\DomainController::class, 'store'])->name('store');
+    Route::get('/{domain}', [\App\Http\Controllers\DomainController::class, 'show'])->name('show');
+    Route::get('/{domain}/edit', [\App\Http\Controllers\DomainController::class, 'edit'])->name('edit');
+    Route::put('/{domain}', [\App\Http\Controllers\DomainController::class, 'update'])->name('update');
+    Route::delete('/{domain}', [\App\Http\Controllers\DomainController::class, 'destroy'])->name('destroy');
+});
+
+// Global routes (not domain-specific)
+Route::middleware(['auth', 'user.permission'])->group(function () {
+    // User Management (global - not domain specific)
     Route::get('/users', [\App\Http\Controllers\UserController::class, 'index'])->name('users.index');
     Route::get('/users/hierarchy', [\App\Http\Controllers\UserController::class, 'hierarchy'])->name('users.hierarchy');
     Route::get('/users/{user}', [\App\Http\Controllers\UserController::class, 'show'])->name('users.show');
     Route::get('/users/{user}/edit', [\App\Http\Controllers\UserController::class, 'edit'])->name('users.edit');
-
 
     // Supervisor Assignment Routes (Level-based)
     Route::post('/users/{user}/assign-supervisor', [\App\Http\Controllers\SupervisorAssignmentController::class, 'assign'])
@@ -88,62 +207,19 @@ Route::middleware(['auth', 'user.permission'])->group(function () {
         ->name('supervisors.cascading-assign');
 
     // Role Management (Only for super user)
-    Route::middleware(['auth', 'user.permission'])->group(function () {
-        Route::get('/roles', [\App\Http\Controllers\RoleController::class, 'index'])->name('roles.index');
-        Route::get('/roles/create', [\App\Http\Controllers\RoleController::class, 'create'])->name('roles.create');
-        Route::post('/roles', [\App\Http\Controllers\RoleController::class, 'store'])->name('roles.store');
-        Route::get('/roles/{role}', [\App\Http\Controllers\RoleController::class, 'show'])->name('roles.show');
-        Route::get('/roles/{role}/edit', [\App\Http\Controllers\RoleController::class, 'edit'])->name('roles.edit');
-        Route::put('/roles/{role}', [\App\Http\Controllers\RoleController::class, 'update'])->name('roles.update');
-        Route::delete('/roles/{role}', [\App\Http\Controllers\RoleController::class, 'destroy'])->name('roles.destroy');
-        Route::get('/roles-permissions/matrix', [\App\Http\Controllers\RoleController::class, 'permissionMatrix'])->name('roles.permission-matrix');
-        Route::get('/roles-permissions/permissions', [\App\Http\Controllers\RoleController::class, 'permissions'])->name('roles.permissions');
-    });
+    Route::get('/roles', [\App\Http\Controllers\RoleController::class, 'index'])->name('roles.index');
+    Route::get('/roles/create', [\App\Http\Controllers\RoleController::class, 'create'])->name('roles.create');
+    Route::post('/roles', [\App\Http\Controllers\RoleController::class, 'store'])->name('roles.store');
+    Route::get('/roles/{role}', [\App\Http\Controllers\RoleController::class, 'show'])->name('roles.show');
+    Route::get('/roles/{role}/edit', [\App\Http\Controllers\RoleController::class, 'edit'])->name('roles.edit');
+    Route::put('/roles/{role}', [\App\Http\Controllers\RoleController::class, 'update'])->name('roles.update');
+    Route::delete('/roles/{role}', [\App\Http\Controllers\RoleController::class, 'destroy'])->name('roles.destroy');
+    Route::get('/roles-permissions/matrix', [\App\Http\Controllers\RoleController::class, 'permissionMatrix'])->name('roles.permission-matrix');
 
     // Permission Management (Only for super user)
-    Route::middleware(['auth', 'check.super.user'])->group(function () {
-        Route::get('/permissions', [\App\Http\Controllers\PermissionController::class, 'index'])->name('permissions.index');
-        Route::post('/permissions', [\App\Http\Controllers\PermissionController::class, 'store'])->name('permissions.store');
-        Route::get('/permissions/{permission}', [\App\Http\Controllers\PermissionController::class, 'show'])->name('permissions.show');
-        Route::put('/permissions/{permission}', [\App\Http\Controllers\PermissionController::class, 'update'])->name('permissions.update');
-        Route::delete('/permissions/{permission}', [\App\Http\Controllers\PermissionController::class, 'destroy'])->name('permissions.destroy');
-        Route::post('/permissions/{permission}/deactivate', [\App\Http\Controllers\PermissionController::class, 'deactivate'])->name('permissions.deactivate');
-        Route::post('/permissions/{permission}/activate', [\App\Http\Controllers\PermissionController::class, 'activate'])->name('permissions.activate');
-        Route::post('/permissions/bulk-deactivate', [\App\Http\Controllers\PermissionController::class, 'bulkDeactivate'])->name('permissions.bulk-deactivate');
-        Route::get('/permissions-grouped', [\App\Http\Controllers\PermissionController::class, 'getGroupedPermissions'])->name('permissions.grouped');
-    });
-
-    // Terminal Setup
-    Route::post('/setup-terminal', [\App\Http\Controllers\TerminalController::class, 'setupTerminal'])->name('setup.terminal');
-
-    // Void Logs
-    Route::get('/void-logs', [\App\Http\Controllers\VoidLogController::class, 'index'])->name('voids.index');
-
-    // Inventory Management Routes
-    Route::prefix('inventory')->name('inventory.')->group(function () {
-        // Inventory Overview
-        Route::get('/', [\App\Http\Controllers\InventoryController::class, 'index'])->name('index');
-        Route::get('/products', [\App\Http\Controllers\InventoryController::class, 'products'])->name('products');
-        Route::get('/movements', [\App\Http\Controllers\InventoryController::class, 'movements'])->name('movements');
-        Route::get('/low-stock', [\App\Http\Controllers\InventoryController::class, 'lowStock'])->name('low-stock');
-        Route::get('/valuation', [\App\Http\Controllers\InventoryController::class, 'valuation'])->name('valuation');
-
-        // Inventory Operations
-        Route::post('/receive', [\App\Http\Controllers\InventoryController::class, 'receive'])->name('receive');
-        Route::post('/transfer', [\App\Http\Controllers\InventoryController::class, 'transfer'])->name('transfer');
-
-        // Stock Adjustments
-        Route::resource('adjustments', \App\Http\Controllers\StockAdjustmentController::class)->names('adjustments');
-        Route::post('/adjustments/{adjustment}/submit', [\App\Http\Controllers\StockAdjustmentController::class, 'submitForApproval'])->name('adjustments.submit');
-        Route::post('/adjustments/{adjustment}/approve', [\App\Http\Controllers\StockAdjustmentController::class, 'approve'])->name('adjustments.approve');
-        Route::post('/adjustments/{adjustment}/reject', [\App\Http\Controllers\StockAdjustmentController::class, 'reject'])->name('adjustments.reject');
-        Route::get('/adjustment-products', [\App\Http\Controllers\StockAdjustmentController::class, 'getProductsForAdjustment'])->name('adjustment-products');
-
-        // Location Management
-        Route::resource('locations', \App\Http\Controllers\InventoryLocationController::class)->names('locations');
-        Route::post('/locations/{location}/set-default', [\App\Http\Controllers\InventoryLocationController::class, 'setDefault'])->name('locations.set-default');
-        Route::post('/locations/{location}/toggle-status', [\App\Http\Controllers\InventoryLocationController::class, 'toggleStatus'])->name('locations.toggle-status');
-    });
+    Route::resource('permissions', \App\Http\Controllers\PermissionController::class)->names('permissions');
+    Route::post('/permissions/{permission}/activate', [\App\Http\Controllers\PermissionController::class, 'activate'])->name('permissions.activate');
+    Route::post('/permissions/{permission}/deactivate', [\App\Http\Controllers\PermissionController::class, 'deactivate'])->name('permissions.deactivate');
 });
 
 Route::get('/customer-order', function () {

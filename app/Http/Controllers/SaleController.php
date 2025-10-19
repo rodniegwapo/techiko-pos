@@ -28,23 +28,54 @@ class SaleController extends Controller
         $this->inventoryService = $inventoryService;
     }
 
-    public function index()
+    public function index(Request $request)
     {
+        // Check if this is a domain-specific route
+        $domain = $request->route('domain');
+        $isDomainRoute = $request->route()->named('domains.*');
+        
+        // Get data based on route type
+        if ($isDomainRoute && $domain) {
+            // Organization-specific data
+            $categories = Category::where('domain', $domain)->get();
+            $discounts = Discount::where('domain', $domain)->get();
+            $mandatoryDiscounts = \App\Models\MandatoryDiscount::where('domain', $domain)
+                ->where('is_active', true)->get();
+        } else {
+            // Global data (super users)
+            $categories = Category::all();
+            $discounts = Discount::all();
+            $mandatoryDiscounts = \App\Models\MandatoryDiscount::where('is_active', true)->get();
+        }
+
         return Inertia::render('Sales/Index', [
-            'categories' => Category::all(),
-            'discounts' => Discount::all(),
-            'mandatoryDiscounts' => \App\Models\MandatoryDiscount::where('is_active', true)->get(),
+            'categories' => $categories,
+            'discounts' => $discounts,
+            'mandatoryDiscounts' => $mandatoryDiscounts,
+            'isGlobalView' => !$isDomainRoute,
+            'currentDomain' => $domain,
         ]);
     }
 
     public function products(Request $request)
     {
+        $domain = $request->route('domain');
+        $isDomainRoute = $request->route()->named('domains.*');
+        
         $query = Product::query()
             ->when($request->input('search'), fn ($q, $search) => $q->search($search))
             ->when($request->input('category'), function ($q, $category) {
                 $q->whereHas('category', fn ($q) => $q->where('name', $category));
             })
             ->with('category');
+
+        // Filter by domain if this is a domain-specific route
+        if ($isDomainRoute && $domain) {
+            $query->where('domain', $domain);
+        } elseif ($isDomainRoute) {
+            // If domain route but no domain, return empty
+            return ProductResource::collection(collect());
+        }
 
         $products = $query->when(
             ! $request->input('search') && ! $request->input('category'),

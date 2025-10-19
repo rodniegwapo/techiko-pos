@@ -18,6 +18,11 @@ class UserService
     {
         $query = User::with(['roles', 'supervisor']);
 
+        // Filter by domain (unless user is super user)
+        if (!$currentUser->isSuperUser() && $currentUser->domain) {
+            $query->where('domain', $currentUser->domain);
+        }
+
         // Apply search using Searchable trait
         if ($request->input('search')) {
             $query->search($request->input('search'));
@@ -41,9 +46,9 @@ class UserService
      */
     public function getHierarchyUsers(User $currentUser)
     {
-        // Super users can see everyone
+        // Super users can see everyone across all domains
         if ($currentUser->isSuperUser()) {
-            return User::with(['roles', 'supervisor', 'subordinates'])
+            return User::with(['roles', 'supervisor', 'subordinates', 'domain'])
                 ->orderBy('name')
                 ->get()
                 ->toArray();
@@ -53,11 +58,11 @@ class UserService
         $hierarchyUsers = collect();
         
         // Add the current user
-        $hierarchyUsers->push($currentUser->load(['roles', 'supervisor', 'subordinates']));
+        $hierarchyUsers->push($currentUser->load(['roles', 'supervisor', 'subordinates', 'domain']));
         
         // Add supervisor chain (up the hierarchy) - only one level up
         if ($currentUser->supervisor) {
-            $supervisor = $currentUser->supervisor->load(['roles', 'supervisor', 'subordinates']);
+            $supervisor = $currentUser->supervisor->load(['roles', 'supervisor', 'subordinates', 'domain']);
             $hierarchyUsers->push($supervisor);
         }
         
@@ -97,7 +102,7 @@ class UserService
     private function addAllSubordinates(User $user, $collection)
     {
         foreach ($user->subordinates as $subordinate) {
-            $subordinate->load(['roles', 'supervisor', 'subordinates']);
+            $subordinate->load(['roles', 'supervisor', 'subordinates', 'domain']);
             $collection->push($subordinate);
             $this->addAllSubordinates($subordinate, $collection);
         }

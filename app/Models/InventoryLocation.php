@@ -32,6 +32,20 @@ class InventoryLocation extends Model
     ];
 
     /**
+     * Get the domain that this location belongs to.
+     * Remove domain relationship - now using domain string column
+     */
+    // public function domain()
+    // {
+    //     return $this->belongsTo(Domain::class);
+    // }
+
+    // Add scope for easy domain filtering
+    public function scopeForDomain($query, $domain) {
+        return $query->where('domain', $domain);
+    }
+
+    /**
      * Get the product inventory records for this location
      */
     public function productInventories()

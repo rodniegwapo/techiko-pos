@@ -14,6 +14,17 @@ class Sale extends Model
 
     protected $guarded = [];
 
+    // Remove domain relationship - now using domain string column
+    // public function domain()
+    // {
+    //     return $this->belongsTo(Domain::class);
+    // }
+
+    // Add scope for easy domain filtering
+    public function scopeForDomain($query, $domain) {
+        return $query->where('domain', $domain);
+    }
+
     public function saleItems()
     {
         return $this->hasMany(SaleItem::class);

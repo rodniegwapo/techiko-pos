@@ -47,6 +47,20 @@ class StockAdjustment extends Model
     }
 
     /**
+     * Get the domain that this adjustment belongs to.
+     * Remove domain relationship - now using domain string column
+     */
+    // public function domain()
+    // {
+    //     return $this->belongsTo(Domain::class);
+    // }
+
+    // Add scope for easy domain filtering
+    public function scopeForDomain($query, $domain) {
+        return $query->where('domain', $domain);
+    }
+
+    /**
      * Get the location that owns this adjustment
      */
     public function location()

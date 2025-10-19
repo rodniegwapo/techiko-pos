@@ -31,6 +31,20 @@ class LoyaltyTier extends Model
         'is_active' => 'boolean'
     ];
 
+    /**
+     * Get the domain that this loyalty tier belongs to.
+     * Remove domain relationship - now using domain string column
+     */
+    // public function domain()
+    // {
+    //     return $this->belongsTo(Domain::class);
+    // }
+
+    // Add scope for easy domain filtering
+    public function scopeForDomain($query, $domain) {
+        return $query->where('domain', $domain);
+    }
+
     // Get tiers ordered by sort_order
     public function scopeActive($query)
     {

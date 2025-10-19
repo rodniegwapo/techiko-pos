@@ -23,4 +23,15 @@ class Discount extends Model
     {
         return $this->belongsToMany(SaleItem::class);
     }
+
+    // Remove domain relationship - now using domain string column
+    // public function domain()
+    // {
+    //     return $this->belongsTo(\App\Models\Domain::class);
+    // }
+
+    // Add scope for easy domain filtering
+    public function scopeForDomain($query, $domain) {
+        return $query->where('domain', $domain);
+    }
 }
