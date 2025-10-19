@@ -91,20 +91,21 @@ Route::middleware(['auth', 'user.permission'])->group(function () {
 // ===================================
 // ORGANIZATION-SPECIFIC ROUTES
 // ===================================
-Route::prefix('domains/{domain}')->middleware(['auth', 'user.permission', 'domain'])->name('domains.')->group(function () {
+Route::prefix('domains/{domain:name_slug}')->middleware(['auth', 'user.permission'])->name('domains.')->group(function () {
     // Dashboard (Organization-specific)
     Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
     
     // Sales (Organization-specific)
-    Route::get('/sales', [\App\Http\Controllers\SaleController::class, 'index'])->name('sales.index');
+    Route::get('/sales', [\App\Http\Controllers\Domains\SaleController::class, 'index'])->name('sales.index');
+    Route::get('/sales/products', [\App\Http\Controllers\Domains\SaleController::class, 'products'])->name('sales.products');
     
     // Products (Organization-specific)
-    Route::resource('products', \App\Http\Controllers\Products\ProductController::class)
+    Route::resource('products', \App\Http\Controllers\Domains\ProductController::class)
         ->only(['index', 'store', 'update', 'destroy'])
         ->names('products');
     
     // Categories (Organization-specific)
-    Route::resource('categories', \App\Http\Controllers\CategoryController::class)
+    Route::resource('categories', \App\Http\Controllers\Domains\CategoryController::class)
         ->only(['index', 'store', 'update', 'destroy'])
         ->names('categories');
     
@@ -124,15 +125,17 @@ Route::prefix('domains/{domain}')->middleware(['auth', 'user.permission', 'domai
     Route::get('/loyalty', [\App\Http\Controllers\LoyaltyController::class, 'index'])->name('loyalty.index');
     
     // Customers (Organization-specific)
-    Route::get('/customers', [\App\Http\Controllers\CustomerController::class, 'webIndex'])->name('customers.index');
+    Route::resource('customers', \App\Http\Controllers\Domains\CustomerController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->names('customers');
     
     // Users (Organization-specific)
-    Route::resource('users', \App\Http\Controllers\UserController::class)
+    Route::resource('users', \App\Http\Controllers\Domains\UserController::class)
         ->only(['index', 'store', 'update', 'destroy'])
         ->names('users');
     
     // Roles (Organization-specific)
-    Route::resource('roles', \App\Http\Controllers\RoleController::class)
+    Route::resource('roles', \App\Http\Controllers\Domains\RoleController::class)
         ->only(['index', 'store', 'update', 'destroy'])
         ->names('roles');
     

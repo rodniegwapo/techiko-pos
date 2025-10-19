@@ -17,23 +17,15 @@ class RoleController extends Controller
     }
 
     /**
-     * Display role management page
+     * Display role management page (Global - Super Users Only)
      */
     public function index(Request $request)
     {
         $currentUser = auth()->user();
 
-        // Check if this is a domain-specific route
-        $domain = $request->route('domain');
-        $isDomainRoute = $request->route()->named('domains.*');
-
         // Get roles with permissions (exclude super admin)
         $roles = Role::with('permissions')
             ->where('name', '!=', 'super admin')
-            ->when($isDomainRoute && $domain, function ($query) use ($domain) {
-                // Domain-specific roles
-                return $query->where('domain', $domain);
-            })
             ->when($request->search, function ($query, $search) {
                 return $query->where('name', 'like', "%{$search}%");
             })
@@ -49,8 +41,7 @@ class RoleController extends Controller
             'canCreate' => $currentUser->isSuperUser() || $currentUser->hasAnyPermission(['roles.create', 'roles.store']),
             'canEdit' => $currentUser->isSuperUser() || $currentUser->hasAnyPermission(['roles.edit', 'roles.update']),
             'canDelete' => $currentUser->isSuperUser() || $currentUser->can('roles.destroy'),
-            'currentDomain' => $domain,
-            'isDomainRoute' => $isDomainRoute,
+            'isGlobalView' => true,
         ]);
     }
 
@@ -70,7 +61,7 @@ class RoleController extends Controller
     }
 
     /**
-     * Store a newly created role
+     * Store a newly created role (Global - Super Users Only)
      */
     public function store(Request $request)
     {
@@ -78,24 +69,13 @@ class RoleController extends Controller
 
         $validated = $this->validateRole($request);
 
-        // Check if this is a domain-specific route
-        $domain = $request->route('domain');
-        $isDomainRoute = $request->route()->named('domains.*');
-
         try {
-            $roleData = [
+            $role = Role::create([
                 'name' => $validated['name'],
                 'guard_name' => 'web',
                 'level' => $validated['level'],
                 'description' => $validated['description'],
-            ];
-
-            // Set domain for new role if in domain context
-            if ($isDomainRoute && $domain) {
-                $roleData['domain'] = $domain;
-            }
-
-            $role = Role::create($roleData);
+            ]);
 
             // Assign permissions if provided
             $this->syncRolePermissions($role, $validated['permissions'] ?? []);

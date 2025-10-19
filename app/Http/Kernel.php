@@ -79,8 +79,5 @@ class Kernel extends HttpKernel
         'check.permission' => \App\Http\Middleware\CheckPermission::class,
         'check.super.user' => \App\Http\Middleware\CheckSuperUser::class,
         'user.permission' => \App\Http\Middleware\UserPermissionCheckMiddleware::class,
-        
-        // Domain Middleware
-        'domain' => \App\Http\Middleware\SetDomainFromRoute::class,
     ];
 }

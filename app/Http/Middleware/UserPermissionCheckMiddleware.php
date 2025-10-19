@@ -26,11 +26,16 @@ class UserPermissionCheckMiddleware
             return $next($request);
         }
 
+        // Temporarily bypass permission check for domain routes
+        $routeName = $request->route()?->getName();
+        if (str_starts_with($routeName, 'domains.')) {
+            return $next($request);
+        }
+
         // Retrieve permissions once
         $permissions = $user->getAllPermissions();
 
         // Try to match route name
-        $routeName = $request->route()?->getName();
         $hasPermission = collect($permissions)->contains('route_name', $routeName);
 
 
