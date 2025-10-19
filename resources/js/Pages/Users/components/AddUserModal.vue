@@ -266,16 +266,32 @@ const rules = computed(() => ({
 // Watch for user changes
 watch(
     () => props.user,
-    (newUser) => {
+    async (newUser) => {
+        console.log("User prop changed:", newUser, "isEdit:", props.isEdit);
+        
         if (newUser && props.isEdit) {
+            // Handle data wrapping from resources
+            const userData = newUser.data || newUser;
+            
             Object.assign(form, {
-                name: newUser.name || "",
-                email: newUser.email || "",
+                name: userData.name || "",
+                email: userData.email || "",
                 password: "",
                 password_confirmation: "",
-                role_id: newUser.roles?.[0]?.id || null,
-                supervisor_id: newUser.supervisor_id || null,
+                role_id: userData.roles?.[0]?.id || null,
+                supervisor_id: userData.supervisor_id || null,
             });
+            
+            console.log("Form assigned for edit:", form);
+            console.log("User supervisor_id:", userData.supervisor_id);
+            console.log("User supervisor:", userData.supervisor);
+            console.log("assignLabel:", assignLabel.value);
+            
+            // Fetch available supervisors for the current role when editing
+            if (form.role_id && assignLabel.value) {
+                console.log("Fetching supervisors for edit mode");
+                await fetchAvailableSupervisors();
+            }
         } else {
             // Reset form for new user
             Object.assign(form, {
@@ -286,9 +302,28 @@ watch(
                 role_id: null,
                 supervisor_id: null,
             });
+            availableSupervisors.value = [];
         }
     },
     { immediate: true }
+);
+
+// Watch for modal visibility to load supervisors when editing
+watch(
+    () => props.visible,
+    async (isVisible) => {
+        console.log("Modal visibility changed:", isVisible, "isEdit:", props.isEdit, "user:", props.user);
+        
+        if (isVisible && props.isEdit && props.user) {
+            const userData = props.user.data || props.user;
+            console.log("Modal opened for edit, user data:", userData);
+            
+            if (form.role_id && assignLabel.value) {
+                console.log("Fetching supervisors for modal edit");
+                await fetchAvailableSupervisors();
+            }
+        }
+    }
 );
 
 // Watch for role changes to fetch supervisors
@@ -311,20 +346,21 @@ const onRoleChange = () => {
 };
 
 const fetchAvailableSupervisors = async () => {
-    if (!selectedRole.value) return;
+    if (!selectedRole.value) {
+        console.log("No selected role, skipping supervisor fetch");
+        return;
+    }
 
+    console.log("Fetching supervisors for role:", selectedRole.value.name);
     loadingSupervisors.value = true;
+    
     try {
-        // Create a temporary user object with the selected role to get available supervisors
-        const tempUser = {
-            id: "temp",
-            roles: [{ name: selectedRole.value.name }],
-        };
-
         // Use the cascading assignment logic to get available supervisors
-    const response = await axios.get("/supervisors/available", {
+        const response = await axios.get("/supervisors/available", {
             params: { role: selectedRole.value.name, cascading: true },
         });
+
+        console.log("Supervisors API response:", response.data);
 
         if (response.data?.supervisors) {
             supervisorUsers.value = response.data.supervisors;
@@ -336,9 +372,14 @@ const fetchAvailableSupervisors = async () => {
                     role: user.roles?.[0]?.name || "No Role",
                 })
             );
+            console.log("availableSupervisors mapped:", availableSupervisors.value);
+        } else {
+            console.log("No supervisors found in response");
+            availableSupervisors.value = [];
         }
     } catch (error) {
         console.error("Error fetching supervisors:", error);
+        console.error("Error details:", error.response?.data);
         availableSupervisors.value = [];
     } finally {
         loadingSupervisors.value = false;

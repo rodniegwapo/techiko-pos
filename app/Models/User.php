@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Traits\Searchable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -12,7 +13,7 @@ use Spatie\Permission\Traits\HasPermissions;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable, HasRoles, HasPermissions;
+    use HasApiTokens, HasFactory, Notifiable, HasRoles, HasPermissions, Searchable;
 
     /**
      * The guard name for Spatie Permission.
@@ -20,17 +21,23 @@ class User extends Authenticatable
     protected $guard_name = 'web';
 
     /**
-     * The attributes that are mass assignable.
+     * The attributes that are not mass assignable.
      *
      * @var array<int, string>
      */
-    protected $fillable = [
+    protected $guarded = [
+        'id',
+        'remember_token',
+        'email_verified_at',
+    ];
+
+    /**
+     * Fields that can be searched using the Searchable trait
+     */
+    protected $searchable = [
         'name',
         'email',
-        'password',
-        'status',
-        'supervisor_id',
-        'is_super_user',
+        'roles.name'
     ];
 
     /**
