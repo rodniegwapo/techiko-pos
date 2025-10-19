@@ -10,13 +10,10 @@ class PermissionModule extends Model
 {
     use HasFactory;
 
-    protected $fillable = [
-        'name',
-        'display_name',
-        'icon',
-        'description',
-        'sort_order',
-        'is_active',
+    protected $guarded = [
+        'id',
+        'created_at',
+        'updated_at',
     ];
 
     protected $casts = [

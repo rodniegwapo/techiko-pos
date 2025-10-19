@@ -10,15 +10,10 @@ class LoyaltyTier extends Model
 {
     use HasFactory, Searchable;
 
-    protected $fillable = [
-        'name',
-        'display_name',
-        'multiplier',
-        'spending_threshold',
-        'color',
-        'description',
-        'is_active',
-        'sort_order'
+    protected $guarded = [
+        'id',
+        'created_at',
+        'updated_at',
     ];
 
     /**

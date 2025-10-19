@@ -10,17 +10,10 @@ class StockAdjustment extends Model
 {
     use HasFactory, Searchable;
 
-    protected $fillable = [
-        'adjustment_number',
-        'location_id',
-        'type',
-        'reason',
-        'description',
-        'total_value_change',
-        'status',
-        'approved_at',
-        'created_by',
-        'approved_by',
+    protected $guarded = [
+        'id',
+        'created_at',
+        'updated_at',
     ];
 
     /**
