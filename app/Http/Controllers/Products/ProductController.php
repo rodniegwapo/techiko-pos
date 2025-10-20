@@ -42,6 +42,7 @@ class ProductController extends Controller
             'items' => ProductResource::collection($product),
             'categories' => Category::all(),
             'sold_by_types' => ProductSoldType::all(),
+            'isGlobalView' => true,
         ]);
     }
 

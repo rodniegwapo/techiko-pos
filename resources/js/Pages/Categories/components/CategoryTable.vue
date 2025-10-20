@@ -1,6 +1,7 @@
 <script setup>
+import { computed } from "vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
-import { IconTrash, IconEdit } from "@tabler/icons-vue";
+import { IconTrash, IconEdit, IconWorld } from "@tabler/icons-vue";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 
@@ -11,18 +12,34 @@ const { formData, openModal, isEdit,spinning } = useGlobalVariables();
 const props = defineProps({
   categories: { type: Object, required: true },
   pagination: { type: Object, required: false, default: () => ({}) },
+  isGlobalView: { type: Boolean, default: false },
 });
 
-const columns = [
-  { title: "Category", dataIndex: "name", key: "name", align: "left" },
-  {
-    title: "Description",
-    dataIndex: "description",
-    key: "description",
-    align: "left",
-  },
-  { title: "Action", key: "action", align: "center", width: "1%" },
-];
+const columns = computed(() => {
+  const baseColumns = [
+    { title: "Category", dataIndex: "name", key: "name", align: "left" },
+    {
+      title: "Description",
+      dataIndex: "description",
+      key: "description",
+      align: "left",
+    },
+  ];
+
+  // Add domain column for global view
+  if (props.isGlobalView) {
+    baseColumns.splice(1, 0, {
+      title: "Domain",
+      dataIndex: "domain",
+      key: "domain",
+      align: "left",
+    });
+  }
+
+  baseColumns.push({ title: "Action", key: "action", align: "center", width: "1%" });
+  
+  return baseColumns;
+});
 
 const handleTableChange = (event) => {
   emit("handleTableChange", event);
@@ -56,6 +73,13 @@ const handleClickEdit = (record) => {
     :loading="spinning"
   >
     <template #bodyCell="{ index, column, record }">
+      <template v-if="column.key == 'domain'">
+        <div class="flex items-center">
+          <IconWorld class="mr-1" size="16" />
+          <span class="text-sm font-medium">{{ record.domain || 'N/A' }}</span>
+        </div>
+      </template>
+
       <template v-if="column.key == 'action'">
         <div class="flex items-center gap-2">
           <icon-tooltip-button

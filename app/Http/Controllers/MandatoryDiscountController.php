@@ -21,7 +21,8 @@ class MandatoryDiscountController extends Controller
             ->paginate();
 
         return Inertia::render('MandatoryDiscounts/Index', [
-            'items' => MandatoryDiscountResource::collection($data)
+            'items' => MandatoryDiscountResource::collection($data),
+            'isGlobalView' => !$domainSlug,
         ]);
     }
 

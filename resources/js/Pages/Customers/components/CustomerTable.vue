@@ -24,6 +24,13 @@
         </div>
       </template>
 
+      <template v-if="column.key === 'domain'">
+        <div class="flex items-center justify-center">
+          <IconWorld class="mr-1" size="16" />
+          <span class="text-sm font-medium">{{ record.domain || 'N/A' }}</span>
+        </div>
+      </template>
+
       <template v-if="column.key === 'contact'">
         <div>
           <div class="font-medium">{{ record.phone || 'N/A' }}</div>
@@ -90,7 +97,7 @@
 
 <script setup>
 import { computed } from "vue";
-import { IconEye, IconEdit } from "@tabler/icons-vue";
+import { IconEye, IconEdit, IconWorld } from "@tabler/icons-vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 
 // Props
@@ -107,50 +114,70 @@ const props = defineProps({
     type: Object,
     default: () => ({}),
   },
+  isGlobalView: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 // Emits
 const emit = defineEmits(['change', 'edit', 'view']);
 
 // Table columns
-const columns = [
-  {
-    title: "Customer",
-    dataIndex: "name",
-    key: "name",
-    width: "25%",
-  },
-  {
-    title: "Contact Info",
-    key: "contact",
-    width: "20%",
-  },
-  {
-    title: "Loyalty Status",
-    key: "loyalty_info",
-    align: "center",
-    width: "15%",
-  },
-  {
-    title: "Purchase Stats",
-    key: "stats",
-    align: "center",
-    width: "15%",
-  },
-  {
-    title: "Member Since",
-    dataIndex: "created_at",
-    key: "created_at",
-    align: "center",
-    width: "15%",
-  },
-  {
+const columns = computed(() => {
+  const baseColumns = [
+    {
+      title: "Customer",
+      dataIndex: "name",
+      key: "name",
+      width: "25%",
+    },
+    {
+      title: "Contact Info",
+      key: "contact",
+      width: "20%",
+    },
+    {
+      title: "Loyalty Status",
+      key: "loyalty_info",
+      align: "center",
+      width: "15%",
+    },
+    {
+      title: "Purchase Stats",
+      key: "stats",
+      align: "center",
+      width: "15%",
+    },
+    {
+      title: "Member Since",
+      dataIndex: "created_at",
+      key: "created_at",
+      align: "center",
+      width: "15%",
+    },
+  ];
+
+  // Add domain column for global view
+  if (props.isGlobalView) {
+    baseColumns.splice(2, 0, {
+      title: "Domain",
+      dataIndex: "domain",
+      key: "domain",
+      align: "center",
+      width: "15%",
+    });
+  }
+
+  baseColumns.push({
     title: "Actions",
     key: "actions",
     align: "center",
     width: "10%",
-  },
-];
+  });
+
+  return baseColumns;
+});
 
 // Methods
 const handleChange = (pagination, filters, sorter) => {

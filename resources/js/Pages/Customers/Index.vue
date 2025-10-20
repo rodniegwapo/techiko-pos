@@ -214,6 +214,7 @@ console.log("Items prop:", props.items);
           :customers="items?.data || []"
           :loading="spinning"
           :pagination="pagination"
+          :is-global-view="page.props.isGlobalView"
           @change="handleTableChange"
           @edit="handleEditCustomer"
           @view="handleViewCustomer"

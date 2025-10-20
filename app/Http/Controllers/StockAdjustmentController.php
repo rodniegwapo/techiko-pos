@@ -67,6 +67,7 @@ class StockAdjustmentController extends Controller
                 'other' => 'Other',
             ],
             'filters' => $request->only(['search', 'status', 'location_id', 'date_from', 'date_to']),
+            'isGlobalView' => true,
         ]);
     }
 

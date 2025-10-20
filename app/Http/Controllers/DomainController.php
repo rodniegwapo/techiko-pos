@@ -26,6 +26,7 @@ class DomainController extends Controller
             'timezones' => $this->domainService->getAvailableTimezones(),
             'currencies' => $this->domainService->getAvailableCurrencies(),
             'countries' => $this->domainService->getAvailableCountries(),
+            'isGlobalView' => true,
         ]);
     }
 

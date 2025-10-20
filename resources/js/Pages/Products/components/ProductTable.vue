@@ -1,6 +1,7 @@
 <script setup>
+import { computed } from "vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
-import { IconTrash, IconEdit, IconCurrencyPeso } from "@tabler/icons-vue";
+import { IconTrash, IconEdit, IconCurrencyPeso, IconWorld } from "@tabler/icons-vue";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 
@@ -18,28 +19,46 @@ const props = defineProps({
     type: Object,
     default: {},
   },
+  isGlobalView: {
+    type: Boolean,
+    default: false,
+  },
 });
 
-const columns = [
-  { title: "Avatar", dataIndex: "avatar", key: "avatar", align: "left" },
-  { title: "Product", dataIndex: "name", key: "name", align: "left" },
-  { title: "Category", dataIndex: "category", key: "category", align: "left" },
-  {
-    title: "Price",
-    dataIndex: "price",
-    key: "price",
-    align: "left",
-  },
+const columns = computed(() => {
+  const baseColumns = [
+    { title: "Avatar", dataIndex: "avatar", key: "avatar", align: "left" },
+    { title: "Product", dataIndex: "name", key: "name", align: "left" },
+    { title: "Category", dataIndex: "category", key: "category", align: "left" },
+    {
+      title: "Price",
+      dataIndex: "price",
+      key: "price",
+      align: "left",
+    },
+    { title: "Cost", dataIndex: "cost", key: "cost", align: "left" },
+    {
+      title: "SKU",
+      dataIndex: "SKU",
+      key: "SKU",
+      align: "left",
+    },
+  ];
 
-  { title: "Cost", dataIndex: "cost", key: "cost", align: "left" },
-  {
-    title: "SKU",
-    dataIndex: "SKU",
-    key: "SKU",
-    align: "left",
-  },
-  { title: "Action", key: "action", align: "center", width: "1%" },
-];
+  // Add domain column for global view
+  if (props.isGlobalView) {
+    baseColumns.splice(2, 0, {
+      title: "Domain",
+      dataIndex: "domain",
+      key: "domain",
+      align: "left",
+    });
+  }
+
+  baseColumns.push({ title: "Action", key: "action", align: "center", width: "1%" });
+  
+  return baseColumns;
+});
 
 const handleDeleteCategory = (record) => {
   confirmDelete(
@@ -84,6 +103,13 @@ const handleClickEdit = (record) => {
           :src="`https://ui-avatars.com/api/?name=${record.name}&background=blue&color=ffff`"
         >
         </a-avatar>
+      </template>
+
+      <template v-if="column.key == 'domain'">
+        <div class="flex items-center">
+          <IconWorld class="mr-1" size="16" />
+          <span class="text-sm font-medium">{{ record.domain || 'N/A' }}</span>
+        </div>
       </template>
 
       <template v-if="column.key == 'category'">

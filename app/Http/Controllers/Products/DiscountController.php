@@ -22,7 +22,8 @@ class DiscountController extends Controller
             ->paginate();
 
         return Inertia::render('Discounts/Index', [
-            'items' => DiscountResource::collection($data)
+            'items' => DiscountResource::collection($data),
+            'isGlobalView' => !$domainSlug,
         ]);
     }
 

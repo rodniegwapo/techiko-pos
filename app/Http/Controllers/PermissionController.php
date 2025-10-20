@@ -45,6 +45,7 @@ class PermissionController extends Controller
             'canCreate' => $currentUser->isSuperUser(),
             'canEdit' => $currentUser->isSuperUser(),
             'canDelete' => $currentUser->isSuperUser(),
+            'isGlobalView' => true,
         ]);
     }
 
