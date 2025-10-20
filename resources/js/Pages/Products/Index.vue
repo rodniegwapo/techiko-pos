@@ -58,7 +58,7 @@ const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
       ref: category,
       getLabel: toLabel(
         computed(() =>
-          page.props.categories.map((item) => ({
+          (page.props?.categories ?? []).map((item) => ({
             label: item.name,
             value: item.name,
           }))
@@ -71,7 +71,7 @@ const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
       ref: sold_type,
       getLabel: toLabel(
         computed(() =>
-          page.props.sold_by_types.map((item) => ({
+          (page.props?.sold_by_types ?? []).map((item) => ({
             label: item.name,
             value: item.name,
           }))
@@ -89,7 +89,7 @@ const filtersConfig = [
     key: "category",
     label: "Category",
     type: "select",
-    options: page.props?.categories.map((item) => ({
+    options: (page.props?.categories ?? []).map((item) => ({
       label: item.name,
       value: item.name,
     })),
@@ -98,7 +98,7 @@ const filtersConfig = [
     key: "sold_type",
     label: "Sold Type",
     type: "select",
-    options: page.props.sold_by_types.map((item) => ({
+    options: (page.props?.sold_by_types ?? []).map((item) => ({
       label: item.name,
       value: item.name,
     })),

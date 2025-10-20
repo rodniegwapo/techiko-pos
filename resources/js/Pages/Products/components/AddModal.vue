@@ -22,15 +22,17 @@ const props = defineProps({
 });
 
 const categoriesOption = computed(() => {
-  const options = page?.props.categories.map((item) => {
-    return { label: item.name, value: item.id };
-  });
-
-  return options;
+  const list = Array.isArray(page?.props?.categories)
+    ? page.props.categories
+    : [];
+  return list.map((item) => ({ label: item.name, value: item.id }));
 });
 
 const soltTypeOptions = computed(() => {
-  return page?.props.sold_by_types.map((item) => item.name);
+  const list = Array.isArray(page?.props?.sold_by_types)
+    ? page.props.sold_by_types
+    : [];
+  return list.map((item) => item.name);
 });
 
 const formFields = [

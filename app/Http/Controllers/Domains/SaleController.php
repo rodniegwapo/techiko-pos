@@ -49,9 +49,7 @@ class SaleController extends Controller
             ->when($domain, function ($query) use ($domain) {
                 return $query->where('domain', $domain->name_slug);
             })
-            ->when($request->search, function ($query, $search) {
-                return $query->where('name', 'like', "%{$search}%");
-            })
+            ->when($request->search, fn($q, $s) => $q->search($s))
             ->when($request->category, function ($query, $category) {
                 return $query->whereHas('category', function ($q) use ($category) {
                     $q->where('name', $category);

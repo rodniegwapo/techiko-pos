@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\InventoryMovementResource;
 use App\Http\Resources\ProductInventoryResource;
+use App\Models\Domain;
 use App\Models\Product\Product;
 use App\Models\InventoryLocation;
 use App\Models\ProductInventory;
@@ -25,30 +26,45 @@ class InventoryController extends Controller
     /**
      * Display inventory overview
      */
-    public function index(Request $request)
+    public function index(Request $request, Domain $domain = null)
     {
+        $domainSlug = $domain?->name_slug;
+        $isDomainRoute = (bool) $domain;
+
         $location = null;
         if ($request->location_id) {
-            $location = InventoryLocation::findOrFail($request->location_id);
+            $location = InventoryLocation::when($domainSlug, fn($q) => $q->forDomain($domainSlug))
+                ->findOrFail($request->location_id);
         }
 
-        $report = $this->inventoryService->getInventoryReport($location);
+        $report = $this->inventoryService->getInventoryReport($location, $domainSlug);
 
         return Inertia::render('Inventory/Index', [
             'report' => $report,
-            'locations' => InventoryLocation::active()->get(),
+            'locations' => InventoryLocation::active()
+                ->when($domainSlug, fn($q) => $q->forDomain($domainSlug))
+                ->get(),
             'currentLocation' => $location,
+            'currentDomain' => $domain,
+            'isGlobalView' => ! $isDomainRoute,
         ]);
     }
 
     /**
      * Display inventory levels for products
      */
-    public function products(Request $request)
+    public function products(Request $request, Domain $domain = null)
     {
+        $domainSlug = $domain?->name_slug;
+        $isDomainRoute = (bool) $domain;
+
         $location = $request->location_id 
-            ? InventoryLocation::findOrFail($request->location_id)
-            : InventoryLocation::getDefault();
+            ? InventoryLocation::when($domainSlug, fn($q) => $q->forDomain($domainSlug))->findOrFail($request->location_id)
+            : (function () use ($domainSlug) {
+                $q = InventoryLocation::active();
+                if ($domainSlug) $q->forDomain($domainSlug);
+                return $q->first() ?? InventoryLocation::getDefault();
+            })();
 
         $query = ProductInventory::with(['product', 'location'])
             ->where('location_id', $location->id);
@@ -112,20 +128,28 @@ class InventoryController extends Controller
 
         return Inertia::render('Inventory/Products', [
             'inventories' => ProductInventoryResource::collection($inventories),
-            'locations' => InventoryLocation::active()->get(),
+            'locations' => InventoryLocation::active()->when($domainSlug, fn($q) => $q->forDomain($domainSlug))->get(),
             'currentLocation' => $location,
             'categories' => \App\Models\Category::all(),
             'filters' => $request->only(['search', 'stock_status', 'category_id']),
+            'currentDomain' => $domain,
+            'isGlobalView' => ! $isDomainRoute,
         ]);
     }
 
     /**
      * Display inventory movements/history
      */
-    public function movements(Request $request)
+    public function movements(Request $request, Domain $domain = null)
     {
         try {
+            $domainSlug = $domain?->name_slug;
+            $isDomainRoute = (bool) $domain;
+
             $query = InventoryMovement::with(['product', 'location', 'user'])
+                ->when($domainSlug, function ($q) use ($domainSlug) {
+                    return $q->whereHas('location', fn($lq) => $lq->forDomain($domainSlug));
+                })
                 ->orderBy('created_at', 'desc');
 
             // Apply filters
@@ -157,7 +181,9 @@ class InventoryController extends Controller
 
         return Inertia::render('Inventory/Movements', [
             'movements' => InventoryMovementResource::collection($movements),
-            'locations' => InventoryLocation::active()->get(),
+            'locations' => InventoryLocation::active()
+                ->when($domainSlug, fn($q) => $q->forDomain($domainSlug))
+                ->get(),
             'products' => Product::select('id', 'name', 'SKU')->get(),
             'movementTypes' => [
                 'sale' => 'Sale',
@@ -172,6 +198,8 @@ class InventoryController extends Controller
                 'promotion' => 'Promotional Giveaway',
             ],
             'filters' => $request->only(['search', 'location_id', 'product_id', 'movement_type', 'date_from', 'date_to']),
+            'currentDomain' => $domain,
+            'isGlobalView' => ! $isDomainRoute,
         ]);
         } catch (\Exception $e) {
         }
@@ -255,10 +283,11 @@ class InventoryController extends Controller
     /**
      * Get low stock products
      */
-    public function lowStock(Request $request)
+    public function lowStock(Request $request, Domain $domain = null)
     {
+        $domainSlug = $domain?->name_slug;
         $location = $request->location_id 
-            ? InventoryLocation::findOrFail($request->location_id)
+            ? InventoryLocation::when($domainSlug, fn($q) => $q->forDomain($domainSlug))->findOrFail($request->location_id)
             : null;
 
         $lowStockProducts = $this->inventoryService->getLowStockProducts($location);
@@ -284,11 +313,16 @@ class InventoryController extends Controller
     /**
      * Get inventory valuation report
      */
-    public function valuation(Request $request)
+    public function valuation(Request $request, Domain $domain = null)
     {
+        $domainSlug = $domain?->name_slug;
         $location = $request->location_id 
-            ? InventoryLocation::findOrFail($request->location_id)
-            : InventoryLocation::getDefault();
+            ? InventoryLocation::when($domainSlug, fn($q) => $q->forDomain($domainSlug))->findOrFail($request->location_id)
+            : (function () use ($domainSlug) {
+                $q = InventoryLocation::active();
+                if ($domainSlug) $q->forDomain($domainSlug);
+                return $q->first() ?? InventoryLocation::getDefault();
+            })();
 
         $inventories = ProductInventory::with('product')
             ->where('location_id', $location->id)

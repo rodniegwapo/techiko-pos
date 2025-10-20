@@ -26,16 +26,33 @@ class UserPermissionCheckMiddleware
             return $next($request);
         }
 
-        // Temporarily bypass permission check for domain routes
+        // Route name
         $routeName = $request->route()?->getName();
+
+        // Domain routes: allow if user belongs to the domain or has explicit permission
         if (str_starts_with($routeName, 'domains.')) {
-            return $next($request);
+            // Route domain slug from {domain:name_slug}
+            $routeDomainSlug = $request->route('domain');
+
+            // Support both string column and relation exposure
+            $userDomainSlug = $user->domain ?? ($user->domain?->name_slug ?? null);
+
+            if ($routeDomainSlug && $userDomainSlug && $routeDomainSlug === $userDomainSlug) {
+                return $next($request);
+            }
+
+            // Fallback: explicit permission to named route
+            $permissions = $user->getAllPermissions();
+            $hasPermission = collect($permissions)->contains('route_name', $routeName);
+            if ($hasPermission) {
+                return $next($request);
+            }
+
+            return $this->unauthorizedResponse($request);
         }
 
-        // Retrieve permissions once
+        // Non-domain routes: require explicit permission by route name
         $permissions = $user->getAllPermissions();
-
-        // Try to match route name
         $hasPermission = collect($permissions)->contains('route_name', $routeName);
 
 

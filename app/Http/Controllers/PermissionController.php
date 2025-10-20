@@ -25,9 +25,7 @@ class PermissionController extends Controller
         // Get permissions with usage count and module relationship
         $permissions = Permission::with(['module'])
             ->withCount('roles')
-            ->when($request->search, function ($query, $search) {
-                return $query->where('name', 'like', "%{$search}%");
-            })
+            ->when($request->search, fn($q, $s) => $q->search($s))
             ->when($request->module, function ($query, $module) {
                 return $query->whereHas('module', function ($q) use ($module) {
                     $q->where('name', $module);

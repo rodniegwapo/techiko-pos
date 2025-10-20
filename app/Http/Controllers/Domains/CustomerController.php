@@ -21,9 +21,8 @@ class CustomerController extends Controller
                 return $query->where('domain', $domain->name_slug);
             })
             ->when($request->search, function ($query, $search) {
-                return $query->where('name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%")
-                    ->orWhere('phone', 'like', "%{$search}%");
+                // Use Searchable trait on Customer: supports name, email, phone, etc.
+                return $query->search($search);
             })
             ->when($request->loyalty_tier, function ($query, $tier) {
                 return $query->whereHas('loyaltyTier', function ($q) use ($tier) {

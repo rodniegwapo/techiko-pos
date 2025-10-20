@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Traits\Searchable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 use Carbon\Carbon;
 
 class Domain extends Model
@@ -37,6 +38,27 @@ class Domain extends Model
         'language_code' => 'en',
         'is_active' => true,
     ];
+
+    /**
+     * Mutator: ensure human-readable name is saved and keep name_slug in sync when appropriate.
+     */
+    public function setNameAttribute($value)
+    {
+        $this->attributes['name'] = $value;
+
+        // If slug is empty (new record) keep it in sync with name
+        if (! $this->exists || empty($this->attributes['name_slug'])) {
+            $this->attributes['name_slug'] = Str::slug($value);
+        }
+    }
+
+    /**
+     * Mutator: normalize slug if explicitly provided (e.g., edited in UI).
+     */
+    public function setNameSlugAttribute($value)
+    {
+        $this->attributes['name_slug'] = Str::slug($value ?: ($this->attributes['name'] ?? ''));
+    }
 
     /**
      * Get the route key for the model.
