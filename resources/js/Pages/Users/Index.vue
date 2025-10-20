@@ -231,6 +231,7 @@ const getRoleColorHex = (level) => {
                     :loading="spinning"
                     :pagination="pagination"
                     :hierarchy="hierarchy"
+                    :is-global-view="page.props.isGlobalView"
                     @change="handleTableChange"
                     @edit="handleEditUser"
                     @view="handleViewUser"

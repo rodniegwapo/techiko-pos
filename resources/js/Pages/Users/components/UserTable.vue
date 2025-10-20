@@ -24,6 +24,13 @@
         </div>
       </template>
 
+      <template v-if="column.key === 'domain'">
+        <div class="flex items-center justify-center">
+          <IconWorld class="mr-1" size="16" />
+          <span class="text-sm font-medium">{{ (record.data || record).domain || 'N/A' }}</span>
+        </div>
+      </template>
+
       <template v-if="column.key === 'roles'">
         <div class="flex flex-wrap gap-1">
           <a-tag
@@ -111,7 +118,7 @@
 
 <script setup>
 import { computed } from "vue";
-import { IconEye, IconEdit, IconTrash, IconCrown } from "@tabler/icons-vue";
+import { IconEye, IconEdit, IconTrash, IconCrown, IconWorld } from "@tabler/icons-vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { Modal, notification } from "ant-design-vue";
 import { usePage } from "@inertiajs/vue3";
@@ -142,50 +149,70 @@ const props = defineProps({
     type: Object,
     default: () => ({}),
   },
+  isGlobalView: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 // Emits
 const emit = defineEmits(['change', 'edit', 'view']);
 
 // Table columns
-const columns = [
-  {
-    title: "User",
-    dataIndex: "name",
-    key: "name",
-    width: "30%",
-  },
-  {
-    title: "Role(s)",
-    key: "roles",
-    width: "20%",
-  },
-  {
-    title: "Status",
-    key: "status",
-    align: "center",
-    width: "15%",
-  },
-  {
-    title: "Created",
-    dataIndex: "created_at",
-    key: "created_at",
-    align: "center",
-    width: "15%",
-  },
-  {
-    title: "Hierarchy",
-    key: "hierarchy",
-    align: "center",
-    width: "20%",
-  },
-  {
+const columns = computed(() => {
+  const baseColumns = [
+    {
+      title: "User",
+      dataIndex: "name",
+      key: "name",
+      width: "30%",
+    },
+    {
+      title: "Role(s)",
+      key: "roles",
+      width: "20%",
+    },
+    {
+      title: "Status",
+      key: "status",
+      align: "center",
+      width: "15%",
+    },
+    {
+      title: "Created",
+      dataIndex: "created_at",
+      key: "created_at",
+      align: "center",
+      width: "15%",
+    },
+    {
+      title: "Hierarchy",
+      key: "hierarchy",
+      align: "center",
+      width: "20%",
+    },
+  ];
+
+  // Add domain column for global view
+  if (props.isGlobalView) {
+    baseColumns.splice(2, 0, {
+      title: "Domain",
+      dataIndex: "domain",
+      key: "domain",
+      align: "center",
+      width: "15%",
+    });
+  }
+
+  baseColumns.push({
     title: "Actions",
     key: "actions",
     align: "center",
     width: "1%",
-  },
-];
+  });
+
+  return baseColumns;
+});
 
 // Current user
 const currentUser = computed(() => page.props.auth.user?.data);

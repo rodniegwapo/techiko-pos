@@ -1,5 +1,5 @@
 <script setup>
-import { Head } from "@inertiajs/vue3";
+import { Head, usePage } from "@inertiajs/vue3";
 import { useTable } from "@/Composables/useTable";
 import ContentHeader from "@/Components/ContentHeader.vue";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
@@ -15,6 +15,7 @@ import { watchDebounced } from "@vueuse/core";
 import { router } from "@inertiajs/vue3";
 import { useHelpers } from "@/Composables/useHelpers";
 
+const page = usePage();
 const { openModal, isEdit } = useGlobalVariables();
 const { showModal } = useHelpers();
 
@@ -74,6 +75,7 @@ const { pagination, handleTableChange ,spinning} = useTable("items", tableFilter
         <CategoryTable
           :categories="items.data"
           :pagination="pagination"
+          :is-global-view="page.props.isGlobalView"
           @handle-table-change="handleTableChange"
         />
       </template>

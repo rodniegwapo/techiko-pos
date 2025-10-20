@@ -21,6 +21,7 @@ class CategoryController extends Controller
 
         return inertia('Categories/Index', [
             'items' => CategoryResource::collection($category),
+            'isGlobalView' => true,
         ]);
     }
 

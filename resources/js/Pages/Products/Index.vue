@@ -154,6 +154,7 @@ const { pagination, handleTableChange } = useTable("items", tableFilters);
         <ProductTable
           @handle-table-change="handleTableChange"
           :pagination="pagination"
+          :is-global-view="page.props.isGlobalView"
         />
       </template>
     </ContentLayout>

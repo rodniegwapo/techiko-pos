@@ -46,6 +46,7 @@ class InventoryLocationController extends Controller
             'locations' => InventoryLocationResource::collection($locations),
             'filters' => $request->only(['search', 'type', 'status']),
             'locationTypes' => $this->getLocationTypes(),
+            'isGlobalView' => true,
         ]);
     }
 

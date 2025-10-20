@@ -17,7 +17,8 @@ class CustomerController extends Controller
             ->paginate(15);
 
         return Inertia::render('Customers/Index', [
-            'items' => CustomerResource::collection($customers)
+            'items' => CustomerResource::collection($customers),
+            'isGlobalView' => true,
         ]);
     }
 

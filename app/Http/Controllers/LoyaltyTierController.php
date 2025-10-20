@@ -38,7 +38,8 @@ class LoyaltyTierController extends Controller
 
         // Return Inertia render for web requests
         return Inertia::render('LoyaltyTiers/Index', [
-            'items' => LoyaltyTierResource::collection($tiers)
+            'items' => LoyaltyTierResource::collection($tiers),
+            'isGlobalView' => true,
         ]);
     }
 
