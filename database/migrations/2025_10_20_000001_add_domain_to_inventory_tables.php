@@ -26,6 +26,13 @@ return new class extends Migration
                 $table->string('domain')->nullable()->index()->after('id');
             });
         }
+
+        // Add domain to mandatory_discounts if missing
+        if (Schema::hasTable('mandatory_discounts') && !Schema::hasColumn('mandatory_discounts', 'domain')) {
+            Schema::table('mandatory_discounts', function (Blueprint $table) {
+                $table->string('domain')->nullable()->index()->after('id');
+            });
+        }
     }
 
     public function down(): void
@@ -44,6 +51,12 @@ return new class extends Migration
 
         if (Schema::hasColumn('inventory_movements', 'domain')) {
             Schema::table('inventory_movements', function (Blueprint $table) {
+                $table->dropColumn('domain');
+            });
+        }
+
+        if (Schema::hasColumn('mandatory_discounts', 'domain')) {
+            Schema::table('mandatory_discounts', function (Blueprint $table) {
                 $table->dropColumn('domain');
             });
         }

@@ -46,10 +46,12 @@ return new class extends Migration
             'inventory_transfer_recommendations'
         ];
         
-        foreach ($tables as $table) {
-            Schema::table($table, function (Blueprint $table) {
-                $table->dropColumn('domain');
-            });
+        foreach ($tables as $tbl) {
+            if (Schema::hasColumn($tbl, 'domain')) {
+                Schema::table($tbl, function (Blueprint $table) {
+                    $table->dropColumn('domain');
+                });
+            }
         }
     }
 };

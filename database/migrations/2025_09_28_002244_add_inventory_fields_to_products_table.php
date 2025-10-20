@@ -40,9 +40,10 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('products', function (Blueprint $table) {
-            $table->dropIndex(['products_stock_status_index']);
-            $table->dropIndex(['products_track_inventory_index']);
-            $table->dropIndex(['products_stock_status_track_inventory_index']);
+            // Drop by index names (avoid Laravel auto-adding _index twice)
+            $table->dropIndex('products_stock_status_index');
+            $table->dropIndex('products_track_inventory_index');
+            $table->dropIndex('products_stock_status_track_inventory_index');
             
             $table->dropColumn([
                 'track_inventory',

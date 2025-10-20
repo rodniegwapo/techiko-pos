@@ -68,27 +68,37 @@ return new class extends Migration
         $tables = ['categories', 'discounts', 'mandatory_discounts'];
         
         foreach ($tables as $table) {
-            // Step 1: Add domain_id column back
-            Schema::table($table, function (Blueprint $table) {
-                $table->foreignId('domain_id')->nullable()->after('domain');
-            });
+            // Only re-add domain_id if it does NOT already exist
+            if (!Schema::hasColumn($table, 'domain_id')) {
+                Schema::table($table, function (Blueprint $t) use ($table) {
+                    if (Schema::hasColumn($table, 'domain')) {
+                        $t->foreignId('domain_id')->nullable()->after('domain');
+                    } else {
+                        $t->foreignId('domain_id')->nullable()->after('id');
+                    }
+                });
+
+                // Populate domain_id from domain if both columns are present
+                if (Schema::hasColumn($table, 'domain')) {
+                    DB::statement("
+                        UPDATE {$table} t 
+                        JOIN domains d ON t.domain = d.name_slug 
+                        SET t.domain_id = d.id
+                    ");
+                }
+
+                // Add foreign key constraint
+                Schema::table($table, function (Blueprint $t) {
+                    $t->foreign('domain_id')->references('id')->on('domains')->onDelete('cascade');
+                });
+            }
             
-            // Step 2: Populate domain_id from domain
-            DB::statement("
-                UPDATE {$table} t 
-                JOIN domains d ON t.domain = d.name_slug 
-                SET t.domain_id = d.id
-            ");
-            
-            // Step 3: Add foreign key constraint
-            Schema::table($table, function (Blueprint $table) {
-                $table->foreign('domain_id')->references('id')->on('domains')->onDelete('cascade');
-            });
-            
-            // Step 4: Drop domain column
-            Schema::table($table, function (Blueprint $table) {
-                $table->dropColumn('domain');
-            });
+            // Step 4: Drop domain column if it exists
+            if (Schema::hasColumn($table, 'domain')) {
+                Schema::table($table, function (Blueprint $t) {
+                    $t->dropColumn('domain');
+                });
+            }
         }
     }
 };

@@ -31,7 +31,8 @@ class ProductController extends Controller
         $products = $query->latest()->paginate(15);
 
         return Inertia::render('Products/Index', [
-            'products' => ProductResource::collection($products),
+            // Frontend expects `items` with a paginated resource
+            'items' => ProductResource::collection($products),
             'currentDomain' => $domain,
             'isGlobalView' => !$domain,
         ]);

@@ -11,9 +11,14 @@ class MandatoryDiscountController extends Controller
 {
     public function index(Request $request)
     {
-        $data = MandatoryDiscount::query()->when($request->input('search'), function ($query, $search) {
-            return $query->search($search);
-        })->paginate();
+        $domainSlug = $request->route('domain');
+
+        $data = MandatoryDiscount::query()
+            ->when($domainSlug, fn($q) => $q->where('domain', $domainSlug))
+            ->when($request->input('search'), function ($query, $search) {
+                return $query->search($search);
+            })
+            ->paginate();
 
         return Inertia::render('MandatoryDiscounts/Index', [
             'items' => MandatoryDiscountResource::collection($data)
@@ -23,6 +28,9 @@ class MandatoryDiscountController extends Controller
     public function store(Request $request)
     {
         $data = $this->validatedData($request);
+        if ($slug = $request->route('domain')) {
+            $data['domain'] = $slug;
+        }
 
         MandatoryDiscount::create($data);
 
@@ -32,6 +40,9 @@ class MandatoryDiscountController extends Controller
     public function update(Request $request, MandatoryDiscount $mandatoryDiscount)
     {
         $data = $this->validatedData($request);
+        if ($slug = $request->route('domain')) {
+            $data['domain'] = $slug;
+        }
 
         $mandatoryDiscount->update($data);
 
