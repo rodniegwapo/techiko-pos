@@ -368,12 +368,7 @@ class StockAdjustmentController extends Controller
             }])->where('track_inventory', true);
 
             if (! empty($validated['search'])) {
-                $search = $validated['search'];
-                $query->where(function ($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
-                        ->orWhere('SKU', 'like', "%{$search}%")
-                        ->orWhere('barcode', 'like', "%{$search}%");
-                });
+                $query->search($validated['search']);
             }
 
             $products = $query->limit(50)->get()->map(function ($product) {

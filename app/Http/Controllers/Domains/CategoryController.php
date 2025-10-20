@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Domains;
 use App\Http\Controllers\Controller;
 use App\Models\Domain;
 use App\Models\Category;
+use App\Http\Resources\CategoryResource;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -17,17 +18,19 @@ class CategoryController extends Controller
     {
         $query = Category::query()
             ->withCount('products')
-            ->when($domain, function ($query) use ($domain) {
-                return $query->where('domain', $domain->name_slug);
+            // Filter by current domain if present
+            ->when($domain, function ($q) use ($domain) {
+                return $q->forDomain($domain->name_slug);
             })
-            ->when($request->search, function ($query, $search) {
-                return $query->where('name', 'like', "%{$search}%");
+            // Use Searchable trait on Category
+            ->when($request->input('search'), function ($q, $search) {
+                return $q->search($search);
             });
 
-        $categories = $query->latest()->paginate(15);
+        $items = $query->latest()->paginate($request?->data['per_page'] ?? 15);
 
         return Inertia::render('Categories/Index', [
-            'categories' => $categories,
+            'items' => CategoryResource::collection($items),
             'currentDomain' => $domain,
             'isGlobalView' => !$domain,
         ]);

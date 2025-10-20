@@ -346,9 +346,15 @@ class InventoryService
     /**
      * Get inventory report data
      */
-    public function getInventoryReport(InventoryLocation $location = null): array
+    public function getInventoryReport(InventoryLocation $location = null, string $domain = null): array
     {
-        $location = $location ?? InventoryLocation::getDefault();
+        if (!$location) {
+            $locationQuery = InventoryLocation::active();
+            if ($domain) {
+                $locationQuery->forDomain($domain);
+            }
+            $location = $locationQuery->first() ?? InventoryLocation::getDefault();
+        }
 
         $totalProducts = Product::tracked()->count();
         $inStockProducts = Product::inStock($location)->count();

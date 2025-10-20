@@ -30,7 +30,7 @@ const category = ref();
 const spinning = ref(false);
 
 // Get order ID from useOrders composable
-const { orderId } = useOrders();
+const { orderId, createDraft } = useOrders();
 
 // Customer state management
 const selectedCustomer = ref(null);
@@ -40,16 +40,26 @@ const handleCustomerChanged = async (customer) => {
     selectedCustomer.value = customer;
     console.log("Customer changed:", customer);
 
-    // Call API to assign customer to sale
-    if (orderId.value) {
-        try {
-            const response = await axios.post(
-                `/api/sales/${orderId.value}/assign-customer`,
-                {
+    // Ensure we have a draft sale before assigning
+    try {
+        if (!orderId.value) {
+            await createDraft();
+        }
+        await axios.post(`/api/sales/${orderId.value}/assign-customer`, {
+            customer_id: customer?.id || null,
+        });
+    } catch (error) {
+        // If the draft might have expired, try once to recreate and retry
+        if (error?.response?.status === 404) {
+            try {
+                await createDraft();
+                await axios.post(`/api/sales/${orderId.value}/assign-customer`, {
                     customer_id: customer?.id || null,
-                }
-            );
-        } catch (error) {
+                });
+            } catch (e) {
+                console.error("Error assigning customer to sale:", e);
+            }
+        } else {
             console.error("Error assigning customer to sale:", error);
         }
     }
@@ -63,7 +73,7 @@ const filtersConfig = [
         key: "category",
         label: "Category",
         type: "select",
-        options: page.props?.categories.map((item) => ({
+        options: (page.props?.categories ?? []).map((item) => ({
             label: item.name,
             value: item.name,
         })),
@@ -95,7 +105,7 @@ const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
             ref: category,
             getLabel: toLabel(
                 computed(() =>
-                    page.props.categories.map((item) => ({
+                    (page.props?.categories ?? []).map((item) => ({
                         label: item.name,
                         value: item.name,
                     }))

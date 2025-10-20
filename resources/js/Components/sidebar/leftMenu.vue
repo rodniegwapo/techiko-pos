@@ -58,6 +58,9 @@ const getCurrentDomainFromUrl = () => {
     return domainMatch ? domainMatch[1] : null;
 };
 
+// Whether current URL is inside a domain context
+const isInDomainContext = computed(() => !!getCurrentDomainFromUrl());
+
 // Helper function to get dashboard tag text
 const getDashboardTagText = () => {
     const currentDomainSlug = getCurrentDomainFromUrl();
@@ -152,6 +155,7 @@ const menuItems = [
         routeName: "domains.index",
         path: "/domains",
         superUserOnly: true,
+        globalOnly: true,
     },
     {
         key: "products",
@@ -269,6 +273,7 @@ const menuItems = [
         routeName: "permissions.index",
         path: "/permissions",
         superUserOnly: true,
+        globalOnly: true,
     },
 ];
 
@@ -288,6 +293,11 @@ const menus = computed(() => {
                     return false;
                 }
                 
+                // Hide global-only menus when browsing inside a domain
+                if (isInDomainContext.value && item.globalOnly) {
+                    return false;
+                }
+
                 // Check if item is super user only
                 if (item.superUserOnly && !isSuperUser.value) {
                     return false;
