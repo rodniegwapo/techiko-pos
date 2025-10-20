@@ -12,16 +12,17 @@ class LoyaltyController extends Controller
 {
     public function index()
     {
-        return Inertia::render('Loyalty/Index');
+        return Inertia::render('Loyalty/Index', [
+            'currentDomain' => null,
+            'isGlobalView' => true,
+        ]);
     }
 
     public function stats()
     {
         $stats = [
             'total_customers' => Customer::count(),
-            'loyal_customers' => Customer::whereNotNull('loyalty_points')
-                ->where('loyalty_points', '>', 0)
-                ->count(),
+            'loyal_customers' => Customer::whereNotNull('loyalty_points')->where('loyalty_points', '>', 0)->count(),
             'total_points' => Customer::sum('loyalty_points'),
             'loyalty_revenue' => Customer::sum('lifetime_spent')
         ];
@@ -33,22 +34,19 @@ class LoyaltyController extends Controller
     {
         $query = Customer::query();
 
-        // Search filter
         if ($request->filled('search')) {
             $query->search($request->search);
         }
 
-        // Tier filter
         if ($request->filled('tier')) {
             $query->where('tier', $request->tier);
         }
 
-        // Add pagination support
         $customers = $query->paginate($request->get('per_page', 10));
 
         $data = $customers->getCollection()->map(function ($customer) {
             $tierInfo = $customer->getTierInfo();
-            
+
             return [
                 'id' => $customer->id,
                 'name' => $customer->name,
@@ -95,7 +93,7 @@ class LoyaltyController extends Controller
 
         $tierDistribution = $tierStats->map(function ($stat) use ($totalCustomers, $tierColors) {
             $percentage = $totalCustomers > 0 ? round(($stat->count / $totalCustomers) * 100, 1) : 0;
-            
+
             return [
                 'tier' => $stat->tier,
                 'name' => ucfirst($stat->tier),
@@ -114,18 +112,18 @@ class LoyaltyController extends Controller
         $loyaltyMemberSales = Sale::whereNotNull('customer_id')
             ->where('payment_status', 'paid')
             ->sum('grand_total') ?? 0;
-            
+
         $nonMemberSales = Sale::whereNull('customer_id')
             ->where('payment_status', 'paid')
             ->sum('grand_total') ?? 0;
 
         $totalSales = $loyaltyMemberSales + $nonMemberSales;
-        
+
         // Average transaction amounts
         $avgMemberTransaction = Sale::whereNotNull('customer_id')
             ->where('payment_status', 'paid')
             ->avg('grand_total') ?? 0;
-            
+
         $avgNonMemberTransaction = Sale::whereNull('customer_id')
             ->where('payment_status', 'paid')
             ->avg('grand_total') ?? 0;
@@ -139,9 +137,9 @@ class LoyaltyController extends Controller
             ->get()
             ->map(function ($sale) {
                 if (!$sale->customer) return null;
-                
+
                 $pointsEarned = $sale->customer->calculatePointsForPurchase($sale->grand_total ?? 0);
-                
+
                 return [
                     'id' => $sale->id,
                     'customer_name' => $sale->customer->name,
@@ -182,7 +180,7 @@ class LoyaltyController extends Controller
 
         DB::transaction(function () use ($customer, $validated) {
             $currentPoints = $customer->loyalty_points ?? 0;
-            
+
             switch ($validated['type']) {
                 case 'add':
                     $newPoints = $currentPoints + $validated['amount'];

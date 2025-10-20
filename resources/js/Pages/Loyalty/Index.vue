@@ -205,7 +205,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from "vue";
 import { Head } from "@inertiajs/vue3";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
@@ -231,10 +231,24 @@ const stats = ref({});
 const tierStats = ref([]);
 const recentActivity = ref([]);
 
+// Detect if we're in a domain context
+const isDomainContext = computed(() => {
+  const match = window.location.pathname.match(/\/domains\/([^/]+)/);
+  return match ? match[1] : null;
+});
+
+// Build API URLs based on context
+const getApiUrl = (endpoint) => {
+  if (isDomainContext.value) {
+    return `/domains/${isDomainContext.value}/loyalty/${endpoint}`;
+  }
+  return `/api/loyalty/${endpoint}`;
+};
+
 // Methods
 const loadStats = async () => {
   try {
-    const response = await axios.get("/api/loyalty/stats");
+    const response = await axios.get(getApiUrl("stats"));
     stats.value = response.data;
   } catch (error) {
     console.error("Failed to load stats:", error);
@@ -245,7 +259,7 @@ const loadStats = async () => {
 
 const loadAnalytics = async () => {
   try {
-    const response = await axios.get("/api/loyalty/analytics");
+    const response = await axios.get(getApiUrl("analytics"));
     tierStats.value = response.data.tier_distribution || [];
     recentActivity.value = response.data.recent_activity || [];
   } catch (error) {

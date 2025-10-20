@@ -1,6 +1,6 @@
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from "vue";
 import { notification } from "ant-design-vue";
 import { watchDebounced } from "@vueuse/core";
 import {
@@ -66,6 +66,20 @@ const customerColumns = [
   { title: "Actions", key: "actions", width: "15%", align: "center" },
 ];
 
+// Detect if we're in a domain context
+const isDomainContext = computed(() => {
+  const match = window.location.pathname.match(/\/domains\/([^/]+)/);
+  return match ? match[1] : null;
+});
+
+// Build API URLs based on context
+const getApiUrl = (endpoint) => {
+  if (isDomainContext.value) {
+    return `/domains/${isDomainContext.value}/loyalty/${endpoint}`;
+  }
+  return `/api/${endpoint}`;
+};
+
 // Methods
 const loadCustomers = async (page = 1) => {
   loading.value = true;
@@ -76,7 +90,7 @@ const loadCustomers = async (page = 1) => {
     params.append("page", page);
     params.append("per_page", pagination.value.per_page);
 
-    const response = await axios.get(`/api/customers?${params}`);
+    const response = await axios.get(`${getApiUrl("customers")}?${params}`);
     customers.value = response.data.data.map((customer) => {
       const tierInfo = customer.tier_info || getTierInfo(customer.tier);
       return {
@@ -84,7 +98,7 @@ const loadCustomers = async (page = 1) => {
         tier_info: tierInfo,
       };
     });
-    pagination.value = response.data.meta;
+    pagination.value = response.data.pagination || response.data.meta;
   } catch (error) {
     console.error("Failed to load customers:", error);
     notification.error({
@@ -133,7 +147,7 @@ const handlePointsAdjustment = async (adjustmentData) => {
   adjustingPoints.value = true;
   try {
     await axios.post(
-      `/api/loyalty/customers/${selectedCustomer.value.id}/adjust-points`,
+      `${getApiUrl("customers")}/${selectedCustomer.value.id}/adjust-points`,
       adjustmentData
     );
 

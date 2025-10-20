@@ -27,6 +27,7 @@ class DatabaseSeeder extends Seeder
             DiscountSeeder::class,
             MandatoryDiscountSeeder::class,
             TierSeeder::class,
+            LoyaltyProgramSeeder::class,
         ]);
     }
 }

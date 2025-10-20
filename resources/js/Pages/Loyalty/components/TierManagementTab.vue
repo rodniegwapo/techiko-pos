@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from "vue";
 import { notification, Modal } from "ant-design-vue";
 import { watchDebounced } from "@vueuse/core";
 import {
@@ -57,6 +57,20 @@ const tierColumns = [
   { title: "Actions", key: "actions", align: "center", width: "120px" },
 ];
 
+// Detect if we're in a domain context
+const isDomainContext = computed(() => {
+  const match = window.location.pathname.match(/\/domains\/([^/]+)/);
+  return match ? match[1] : null;
+});
+
+// Build API URLs based on context
+const getApiUrl = (endpoint) => {
+  if (isDomainContext.value) {
+    return `/domains/${isDomainContext.value}/loyalty/${endpoint}`;
+  }
+  return `/api/loyalty/${endpoint}`;
+};
+
 // Load tiers with search and filter
 const loadTiers = async (page = 1) => {
   loading.value = true;
@@ -67,7 +81,7 @@ const loadTiers = async (page = 1) => {
     params.append("page", page);
     params.append("per_page", pagination.value.per_page);
 
-    const response = await axios.get(`/api/loyalty/tiers?${params}`);
+    const response = await axios.get(`${getApiUrl("tiers")}?${params}`);
     tiers.value = response.data.data;
     pagination.value = response.data.meta;
   } catch (error) {
@@ -115,7 +129,7 @@ const deleteTier = (tier) => {
     onOk: async () => {
       try {
         console.log(`Deleting tier ID: ${tier.id}`);
-        const response = await axios.delete(`/api/loyalty/tiers/${tier.id}`);
+        const response = await axios.delete(`${getApiUrl("tiers")}/${tier.id}`);
         console.log("Delete response:", response.data);
 
         notification.success({
@@ -154,7 +168,7 @@ const toggleTierStatus = async (tier, checked) => {
       tiers.value[tierIndex].is_active = checked;
     }
 
-    await axios.put(`/api/loyalty/tiers/${tier.id}`, {
+    await axios.put(`${getApiUrl("tiers")}/${tier.id}`, {
       display_name: tier.display_name,
       multiplier: tier.multiplier,
       spending_threshold: tier.spending_threshold,
@@ -202,7 +216,7 @@ const saveTier = async (tierData) => {
       // Update existing tier
       console.log(`Updating tier ID: ${editingTier.value.id}`);
       response = await axios.put(
-        `/api/loyalty/tiers/${editingTier.value.id}`,
+        `${getApiUrl("tiers")}/${editingTier.value.id}`,
         tierData
       );
       notification.success({
@@ -212,7 +226,7 @@ const saveTier = async (tierData) => {
     } else {
       // Create new tier
       console.log("Creating new tier");
-      response = await axios.post("/api/loyalty/tiers", tierData);
+      response = await axios.post(getApiUrl("tiers"), tierData);
       notification.success({
         message: "Tier Created",
         description: `${tierData.display_name} tier has been created successfully`,

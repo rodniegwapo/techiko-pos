@@ -36,7 +36,20 @@ Route::prefix('domains/{domain:name_slug}')
             ->names('mandatory-discounts');
 
         // Loyalty Program (Organization-specific)
-        Route::get('/loyalty', [\App\Http\Controllers\LoyaltyController::class, 'index'])->name('loyalty.index');
+        Route::get('/loyalty', [\App\Http\Controllers\Domains\LoyaltyController::class, 'index'])->name('loyalty.index');
+        Route::get('/loyalty/stats', [\App\Http\Controllers\Domains\LoyaltyController::class, 'stats'])->name('loyalty.stats');
+        Route::get('/loyalty/customers', [\App\Http\Controllers\Domains\LoyaltyController::class, 'customers'])->name('loyalty.customers');
+        Route::get('/loyalty/analytics', [\App\Http\Controllers\Domains\LoyaltyController::class, 'analytics'])->name('loyalty.analytics');
+        Route::post('/loyalty/customers/{customer}/adjust-points', [\App\Http\Controllers\Domains\LoyaltyController::class, 'adjustPoints'])->name('loyalty.adjust-points');
+        
+        // Tier Management (Organization-specific)
+        Route::apiResource('loyalty/tiers', \App\Http\Controllers\Domains\LoyaltyTierController::class)->names([
+            'index'   => 'loyalty.tiers.index',
+            'store'   => 'loyalty.tiers.store',
+            'show'    => 'loyalty.tiers.show',
+            'update'  => 'loyalty.tiers.update',
+            'destroy' => 'loyalty.tiers.destroy',
+        ]);
 
         // Customers (Organization-specific)
         Route::resource('customers', \App\Http\Controllers\Domains\CustomerController::class)
