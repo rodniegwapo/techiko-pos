@@ -16,7 +16,6 @@ class CustomerController extends Controller
     public function index(Request $request, Domain $domain = null)
     {
         $query = Customer::query()
-            ->with(['loyaltyTier'])
             ->when($domain, function ($query) use ($domain) {
                 return $query->where('domain', $domain->name_slug);
             })
@@ -25,9 +24,7 @@ class CustomerController extends Controller
                 return $query->search($search);
             })
             ->when($request->loyalty_tier, function ($query, $tier) {
-                return $query->whereHas('loyaltyTier', function ($q) use ($tier) {
-                    $q->where('name', $tier);
-                });
+                return $query->where('tier', $tier);
             });
 
         $customers = $query->latest()->paginate(15);
@@ -61,7 +58,7 @@ class CustomerController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Customer created successfully',
-            'customer' => $customer->load('loyaltyTier')
+            'customer' => $customer
         ], 201);
     }
 
@@ -89,7 +86,7 @@ class CustomerController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Customer updated successfully',
-            'customer' => $customer->load('loyaltyTier')
+            'customer' => $customer
         ]);
     }
 
