@@ -45,7 +45,8 @@ class ProductFactory extends Factory
         $type = $this->faker->randomElement(['image', 'color', null]);
 
         return [
-            'name' => $this->faker->unique()->randomElement($products),
+            // Use clear English names; allow duplicates across domains
+            'name' => $this->faker->randomElement($products),
             'sold_type' => $this->faker->randomElement(['piece', 'box', 'pack']),
             'price' => $this->faker->numberBetween(100, 50000),
             'cost' => $this->faker->numberBetween(50, 40000),

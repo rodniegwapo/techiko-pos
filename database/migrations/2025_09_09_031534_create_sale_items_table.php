@@ -29,6 +29,10 @@ return new class extends Migration
      */
     public function down(): void
     {
+        // Drop dependent pivot first to satisfy FK constraints
+        Schema::disableForeignKeyConstraints();
+        Schema::dropIfExists('discount_sale_item');
         Schema::dropIfExists('sale_items');
+        Schema::enableForeignKeyConstraints();
     }
 };

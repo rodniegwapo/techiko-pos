@@ -34,9 +34,23 @@ class CategoryFactory extends Factory
             'Garden',
         ];
 
+        $englishDescriptions = [
+            'Electronics and gadgets',
+            'Clothing and apparel',
+            'Daily grocery items',
+            'Home and living essentials',
+            'Sports and outdoor gear',
+            'Beauty and health products',
+            'Office and school supplies',
+            'Automotive parts and accessories',
+            'Books and media',
+            'Garden and outdoor tools',
+        ];
+
         return [
-            'name' => $this->faker->unique()->randomElement($categories),
-            'description' => $this->faker->sentence(), // still generates English
+            // Use clear English category names; allow duplicates across domains
+            'name' => $this->faker->randomElement($categories),
+            'description' => $this->faker->randomElement($englishDescriptions),
         ];
     }
 }

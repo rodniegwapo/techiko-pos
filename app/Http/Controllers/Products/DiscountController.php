@@ -12,9 +12,14 @@ class DiscountController extends Controller
 {
     public function index(Request $request)
     {
-        $data = Discount::query()->when($request->input('search'), function ($query, $search) {
-            return $query->search($search);
-        })->paginate();
+        $domainSlug = $request->route('domain');
+
+        $data = Discount::query()
+            ->when($domainSlug, fn($q) => $q->forDomain($domainSlug))
+            ->when($request->input('search'), function ($query, $search) {
+                return $query->search($search);
+            })
+            ->paginate();
 
         return Inertia::render('Discounts/Index', [
             'items' => DiscountResource::collection($data)
@@ -24,6 +29,10 @@ class DiscountController extends Controller
     public function store(Request $request)
     {
         $data = $this->validatedData($request);
+        // If called under domains.* route, persist domain slug
+        if ($slug = $request->route('domain')) {
+            $data['domain'] = $slug;
+        }
 
         Discount::create($data);
 
@@ -33,6 +42,9 @@ class DiscountController extends Controller
     public function update(Request $request, Discount $discount)
     {
         $data = $this->validatedData($request);
+        if ($slug = $request->route('domain')) {
+            $data['domain'] = $slug;
+        }
 
         $discount->update($data);
 

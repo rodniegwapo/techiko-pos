@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use App\Models\Domain;
 
 class DiscountSeeder extends Seeder
 {
@@ -13,7 +14,9 @@ class DiscountSeeder extends Seeder
      */
     public function run(): void
     {
-        DB::table('discounts')->insert([
+        $domains = Domain::pluck('name_slug')->all();
+
+        $base = [
             // 🔹 Mandatory Discounts
             [
                 'name' => 'Value Added Tax (VAT) 12%',
@@ -25,8 +28,6 @@ class DiscountSeeder extends Seeder
                 'end_date' => null, // no expiry
                 'is_active' => true,
                 'is_mandatory' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
             ],
             [
                 'name' => 'Senior Citizen Discount - 20%',
@@ -38,8 +39,6 @@ class DiscountSeeder extends Seeder
                 'end_date' => null,
                 'is_active' => true,
                 'is_mandatory' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
             ],
             [
                 'name' => 'PWD Discount - 20%',
@@ -51,8 +50,6 @@ class DiscountSeeder extends Seeder
                 'end_date' => null,
                 'is_active' => true,
                 'is_mandatory' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
             ],
 
             // 🔹 Regular Discounts
@@ -66,8 +63,6 @@ class DiscountSeeder extends Seeder
                 'end_date' => Carbon::now()->addMonth(),
                 'is_active' => true,
                 'is_mandatory' => false,
-                'created_at' => now(),
-                'updated_at' => now(),
             ],
             [
                 'name' => '₱100 Off Product',
@@ -79,8 +74,6 @@ class DiscountSeeder extends Seeder
                 'end_date' => Carbon::now()->addWeeks(2),
                 'is_active' => true,
                 'is_mandatory' => false,
-                'created_at' => now(),
-                'updated_at' => now(),
             ],
             [
                 'name' => '15% Off Category',
@@ -92,8 +85,6 @@ class DiscountSeeder extends Seeder
                 'end_date' => Carbon::now()->addDays(10),
                 'is_active' => true,
                 'is_mandatory' => false,
-                'created_at' => now(),
-                'updated_at' => now(),
             ],
 
             // 🔹 Storewide Sale
@@ -107,8 +98,6 @@ class DiscountSeeder extends Seeder
                 'end_date' => Carbon::now()->addDays(3),
                 'is_active' => true,
                 'is_mandatory' => false,
-                'created_at' => now(),
-                'updated_at' => now(),
             ],
 
             // 🔹 Holiday Promotions
@@ -248,6 +237,19 @@ class DiscountSeeder extends Seeder
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
-        ]);
+        ];
+
+        // Insert per domain
+        foreach ($domains as $slug) {
+            $rows = array_map(function ($d) use ($slug) {
+                return array_merge($d, [
+                    'domain' => $slug,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }, $base);
+
+            DB::table('discounts')->insert($rows);
+        }
     }
 }

@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Enums\Role;
+use App\Models\Domain;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -29,6 +30,13 @@ class UserSeeder extends Seeder
                 'is_super_user' => true,
             ]
         );
+
+        // Load domain slugs for assignment
+        $domainSlugs = Domain::pluck('name_slug')->all();
+        $pickDomain = function (int $i) use ($domainSlugs) {
+            $count = max(count($domainSlugs), 1);
+            return $domainSlugs[ $i % $count ] ?? null;
+        };
 
         // Users mapped to their roles - Expanded for cascading hierarchy
         $users = [
@@ -131,6 +139,7 @@ class UserSeeder extends Seeder
             ],
         ];
 
+        $i = 0;
         foreach ($users as $data) {
             $user = User::updateOrCreate(
                 ['email' => $data['email']],
@@ -138,6 +147,7 @@ class UserSeeder extends Seeder
                     'name' => $data['name'],
                     'password' => Hash::make($data['password']),
                     'is_super_user' => false,
+                    'domain' => $pickDomain($i++),
                 ]
             );
 

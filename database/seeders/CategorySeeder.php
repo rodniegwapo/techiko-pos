@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Category;
+use App\Models\Domain;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -14,6 +15,11 @@ class CategorySeeder extends Seeder
      */
     public function run(): void
     {
-      Category::factory()->count(10)->create();
+        $domains = Domain::pluck('name_slug')->all();
+        foreach ($domains as $slug) {
+            Category::factory()->count(5)->create([
+                'domain' => $slug,
+            ]);
+        }
     }
 }
