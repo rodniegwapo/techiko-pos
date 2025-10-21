@@ -40,23 +40,41 @@ class DiscountController extends Controller
         return redirect()->back();
     }
 
-    public function update(Request $request, Discount $discount)
+    public function update(Request $request, $domain, $discount)
     {
         $data = $this->validatedData($request);
         if ($slug = $request->route('domain')) {
             $data['domain'] = $slug;
         }
 
-        $discount->update($data);
+        // Manually resolve the discount model
+        $discountModel = Discount::find($discount);
+        if (!$discountModel) {
+            return redirect()->back()->with('error', 'Discount not found');
+        }
 
-        redirect()->back();
+        $discountModel->update($data);
+
+        return redirect()->back()->with('success', 'Discount updated successfully');
     }
 
-    public function destroy(Request $request, Discount $discount)
+    public function destroy(Request $request, $domain, $discount)
     {
-        $discount->delete();
+        logger('DiscountController destroy called');
+        logger('Request route parameters:', $request->route()->parameters());
+        logger('Domain parameter:', ['domain' => $domain]);
+        logger('Discount parameter type:', ['type' => gettype($discount)]);
+        logger('Discount parameter value:', ['value' => $discount]);
+        
+        // Manually resolve the discount model
+        $discountModel = Discount::find($discount);
+        if (!$discountModel) {
+            return redirect()->back()->with('error', 'Discount not found');
+        }
+        
+        $discountModel->delete();
 
-        return  redirect()->back();
+        return redirect()->back()->with('success', 'Discount deleted successfully');
     }
 
     private function validatedData(Request $request)

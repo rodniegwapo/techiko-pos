@@ -8,11 +8,13 @@ import { useTable } from "@/Composables/useTable";
 import { usePage } from "@inertiajs/vue3";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useHelpers } from "@/Composables/useHelpers";
+import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 
 const { spinning } = useTable();
 const page = usePage();
 const { formData, openModal, isEdit } = useGlobalVariables();
 const { inertiaProgressLifecyle } = useHelpers();
+const { getRoute } = useDomainRoutes();
 
 const props = defineProps({
   visible: {
@@ -35,7 +37,7 @@ const soltTypeOptions = computed(() => {
   return list.map((item) => item.name);
 });
 
-const formFields = [
+const formFields = computed(() => [
   { key: "name", label: "Product Name", type: "text" },
   {
     key: "category_id",
@@ -64,18 +66,19 @@ const formFields = [
     label: "Representation",
     type: "text",
   },
-];
+]);
 
 const errors = ref({});
 const handleSave = () => {
   formData.value.category_id = formData.value?.category_id?.value;
-  router.post(route("products.store"), formData.value, inertiaProgressLifecyle);
+  router.post(getRoute("products.store"), formData.value, inertiaProgressLifecyle);
 };
 
 const handleUpdate = () => {
+  formData.value.category_id = formData.value?.category_id?.value;
   router.put(
-    route("products.update", {
-      id: formData.value.id,
+    getRoute("products.update", {
+      product: formData.value.id,
     }),
     formData.value,
     inertiaProgressLifecyle

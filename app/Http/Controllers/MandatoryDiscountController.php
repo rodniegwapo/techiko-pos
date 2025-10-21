@@ -38,23 +38,35 @@ class MandatoryDiscountController extends Controller
         return redirect()->back();
     }
 
-    public function update(Request $request, MandatoryDiscount $mandatoryDiscount)
+    public function update(Request $request, $domain, $mandatoryDiscount)
     {
         $data = $this->validatedData($request);
         if ($slug = $request->route('domain')) {
             $data['domain'] = $slug;
         }
 
-        $mandatoryDiscount->update($data);
+        // Manually resolve the mandatory discount model
+        $mandatoryDiscountModel = MandatoryDiscount::find($mandatoryDiscount);
+        if (!$mandatoryDiscountModel) {
+            return redirect()->back()->with('error', 'Mandatory discount not found');
+        }
 
-        return redirect()->back();
+        $mandatoryDiscountModel->update($data);
+
+        return redirect()->back()->with('success', 'Mandatory discount updated successfully');
     }
 
-    public function destroy(Request $request, MandatoryDiscount $mandatoryDiscount)
+    public function destroy(Request $request, $domain, $mandatoryDiscount)
     {
-        $mandatoryDiscount->delete();
+        // Manually resolve the mandatory discount model
+        $mandatoryDiscountModel = MandatoryDiscount::find($mandatoryDiscount);
+        if (!$mandatoryDiscountModel) {
+            return redirect()->back()->with('error', 'Mandatory discount not found');
+        }
 
-        return redirect()->back();
+        $mandatoryDiscountModel->delete();
+
+        return redirect()->back()->with('success', 'Mandatory discount deleted successfully');
     }
 
     private function validatedData(Request $request)

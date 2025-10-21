@@ -17,10 +17,12 @@ import {
 import { router, usePage } from "@inertiajs/vue3";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
+import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 
 const page = usePage();
 const { hasPermission } = usePermissionsV2();
 const { selectedKeys, openKeys } = useGlobalVariables();
+const { getRoute } = useDomainRoutes();
 
 // Ensure selectedKeys and openKeys are arrays
 if (!Array.isArray(selectedKeys.value)) {
@@ -79,56 +81,7 @@ const getDashboardTagText = () => {
     }
 };
 
-// Helper function to generate routes based on user type and current context
-const getRoute = (routeName, params = {}) => {
-    try {
-        if (typeof window.route !== 'function') {
-            console.warn('window.route is not a function');
-            return "#";
-        }
-        
-        // Check if we're currently in a domain context
-        const currentDomainSlug = getCurrentDomainFromUrl();
-        const isInDomainContext = currentDomainSlug !== null;
-        
-        console.log('Route generation debug:', {
-            routeName,
-            currentDomainSlug,
-            isInDomainContext,
-            isSuperUser: isSuperUser.value,
-            currentDomain: currentDomain.value
-        });
-        
-        // Super users can access both global and domain-specific routes
-        if (isSuperUser.value) {
-            // If we're in a domain context, maintain it
-            if (isInDomainContext) {
-                const domainRouteName = `domains.${routeName}`;
-                const result = window.route(domainRouteName, { domain: currentDomainSlug, ...params });
-                console.log('Generated domain route:', domainRouteName, '→', result);
-                return result;
-            }
-            // Otherwise use global route
-            const result = window.route(routeName, params);
-            console.log('Generated global route:', routeName, '→', result);
-            return result;
-        } 
-        // Regular users should use domain-specific routes
-        else if (currentDomain.value || isInDomainContext) {
-            const domainSlug = currentDomainSlug || currentDomain.value?.name_slug;
-            const domainRouteName = `domains.${routeName}`;
-            const result = window.route(domainRouteName, { domain: domainSlug, ...params });
-            console.log('Generated domain route for regular user:', domainRouteName, '→', result);
-            return result;
-        }
-        
-        console.warn('No route generated for:', routeName);
-        return "#";
-    } catch (error) {
-        console.warn('Route generation error:', error, 'for route:', routeName);
-        return "#";
-    }
-};
+// Using getRoute from useDomainRoutes composable
 
 // ===================================
 // MENU ITEMS DEFINITION

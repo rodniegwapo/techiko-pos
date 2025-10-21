@@ -4,10 +4,12 @@ import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { IconTrash, IconEdit, IconWorld } from "@tabler/icons-vue";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
+import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 
 const emit = defineEmits(["handleTableChange"]);
 const { confirmDelete } = useHelpers();
 const { formData, openModal, isEdit,spinning } = useGlobalVariables();
+const { getRoute } = useDomainRoutes();
 
 const props = defineProps({
   categories: { type: Object, required: true },
@@ -48,7 +50,7 @@ const handleTableChange = (event) => {
 const handleDeleteCategory = (record) => {
   confirmDelete(
     "categories.destroy",
-    { id: record.id },
+    { category: record.id },
     "Do you want to delete this item ?"
   );
 };
