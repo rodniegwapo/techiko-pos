@@ -25,20 +25,20 @@ class DashboardController extends Controller
         $this->inventoryAnalyticsService = $inventoryAnalyticsService;
     }
 
-    public function index(Request $request)
+    public function index(Request $request, $domain = null)
     {
         $location = $request->location_id
             ? InventoryLocation::findOrFail($request->location_id)
             : InventoryLocation::getDefault();
 
         $stats = [
-            'kpis' => $this->getKPIs($location),
-            'sales_analytics' => $this->getSalesAnalytics(),
-            'inventory_alerts' => $this->getInventoryAlerts($location),
-            'customer_insights' => $this->getCustomerInsights(),
-            'recent_transactions' => $this->getRecentTransactions(),
-            'top_products' => $this->getTopProducts($location),
-            'operational_status' => $this->getOperationalStatus(),
+            'kpis' => $this->getKPIs($location, $domain),
+            'sales_analytics' => $this->getSalesAnalytics($domain),
+            'inventory_alerts' => $this->getInventoryAlerts($location, $domain),
+            'customer_insights' => $this->getCustomerInsights($domain),
+            'recent_transactions' => $this->getRecentTransactions($domain),
+            'top_products' => $this->getTopProducts($location, $domain),
+            'operational_status' => $this->getOperationalStatus($domain),
         ];
 
         return Inertia::render('Dashboard/Index', [
@@ -49,7 +49,7 @@ class DashboardController extends Controller
         ]);
     }
 
-    private function getKPIs($location)
+    private function getKPIs($location, $domain = null)
     {
         $today = now()->startOfDay();
         $yesterday = now()->subDay()->startOfDay();
@@ -58,12 +58,18 @@ class DashboardController extends Controller
         $thisMonth = now()->startOfMonth();
         $lastMonth = now()->subMonth()->startOfMonth();
 
+        // Build base query with domain filtering
+        $salesQuery = Sale::where('payment_status', 'paid');
+        if ($domain) {
+            $salesQuery->where('domain', $domain);
+        }
+
         // Today's Sales
-        $todaySales = Sale::where('payment_status', 'paid')
+        $todaySales = (clone $salesQuery)
             ->whereDate('created_at', $today)
             ->sum('grand_total') ?? 0;
 
-        $yesterdaySales = Sale::where('payment_status', 'paid')
+        $yesterdaySales = (clone $salesQuery)
             ->whereDate('created_at', $yesterday)
             ->sum('grand_total') ?? 0;
 
@@ -72,11 +78,11 @@ class DashboardController extends Controller
             : 0;
 
         // Total Revenue (This Week)
-        $thisWeekRevenue = Sale::where('payment_status', 'paid')
+        $thisWeekRevenue = (clone $salesQuery)
             ->where('created_at', '>=', $thisWeek)
             ->sum('grand_total') ?? 0;
 
-        $lastWeekRevenue = Sale::where('payment_status', 'paid')
+        $lastWeekRevenue = (clone $salesQuery)
             ->where('created_at', '>=', $lastWeek)
             ->where('created_at', '<', $thisWeek)
             ->sum('grand_total') ?? 0;
@@ -86,8 +92,13 @@ class DashboardController extends Controller
             : 0;
 
         // Active Orders (Pending Sales) - Compare with yesterday
-        $activeOrders = Sale::where('payment_status', 'pending')->count();
-        $yesterdayActiveOrders = Sale::where('payment_status', 'pending')
+        $pendingQuery = Sale::where('payment_status', 'pending');
+        if ($domain) {
+            $pendingQuery->where('domain', $domain);
+        }
+
+        $activeOrders = (clone $pendingQuery)->count();
+        $yesterdayActiveOrders = (clone $pendingQuery)
             ->whereDate('created_at', $yesterday)
             ->count();
 
@@ -96,7 +107,13 @@ class DashboardController extends Controller
             : ($activeOrders > 0 ? 100 : 0);
 
         // Inventory Value - Compare with last month
-        $inventoryValue = $location ? $location->getTotalInventoryValue() : 0;
+        if ($domain) {
+            // Domain-specific view: use the provided location
+            $inventoryValue = $location ? $location->getTotalInventoryValue() : 0;
+        } else {
+            // Global view: sum inventory from ALL locations across ALL domains
+            $inventoryValue = \App\Models\ProductInventory::sum('total_value');
+        }
         
         // Calculate inventory value for last month (simplified - you might want to store historical data)
         $lastMonthInventoryValue = $inventoryValue * 0.98; // Simulate 2% decrease for demo
@@ -136,28 +153,42 @@ class DashboardController extends Controller
         ];
     }
 
-    private function getSalesAnalytics()
+    private function getSalesAnalytics($domain = null)
     {
         // Last 7 days sales data
         $salesData = [];
         for ($i = 6; $i >= 0; $i--) {
             $date = now()->subDays($i)->startOfDay();
-            $sales = Sale::where('payment_status', 'paid')
-                ->whereDate('created_at', $date)
-                ->sum('grand_total') ?? 0;
+            
+            $salesQuery = Sale::where('payment_status', 'paid')
+                ->whereDate('created_at', $date);
+            if ($domain) {
+                $salesQuery->where('domain', $domain);
+            }
+            
+            $sales = $salesQuery->sum('grand_total') ?? 0;
+
+            $transactionQuery = Sale::where('payment_status', 'paid')
+                ->whereDate('created_at', $date);
+            if ($domain) {
+                $transactionQuery->where('domain', $domain);
+            }
 
             $salesData[] = [
                 'date' => $date->format('M d'),
                 'sales' => $sales,
-                'transactions' => Sale::where('payment_status', 'paid')
-                    ->whereDate('created_at', $date)
-                    ->count()
+                'transactions' => $transactionQuery->count()
             ];
         }
 
         // Payment methods distribution
-        $paymentMethods = Sale::where('payment_status', 'paid')
-            ->where('created_at', '>=', now()->subDays(7))
+        $paymentMethodsQuery = Sale::where('payment_status', 'paid')
+            ->where('created_at', '>=', now()->subDays(7));
+        if ($domain) {
+            $paymentMethodsQuery->where('domain', $domain);
+        }
+        
+        $paymentMethods = $paymentMethodsQuery
             ->select('payment_method', DB::raw('SUM(grand_total) as total'))
             ->groupBy('payment_method')
             ->get()
@@ -175,50 +206,88 @@ class DashboardController extends Controller
         ];
     }
 
-    private function getInventoryAlerts($location)
+    private function getInventoryAlerts($location, $domain = null)
     {
-        $inventoryReport = $this->inventoryService->getInventoryReport($location);
+        if ($domain) {
+            // Domain-specific view: use the provided location
+            $inventoryReport = $this->inventoryService->getInventoryReport($location);
 
-        // Low stock products with proper inventory data
-        $lowStockProducts = $inventoryReport['low_stock_products'] ?? [];
-        
-        // Transform low stock products to include current stock info
-        $lowStockProducts = $lowStockProducts->map(function ($product) {
-            return [
-                'id' => $product->id,
-                'name' => $product->name,
-                'SKU' => $product->SKU,
-                'current_stock' => $product->current_stock,
-                'min_stock_level' => $product->min_stock_level,
-            ];
-        });
+            // Low stock products with proper inventory data
+            $lowStockProducts = $inventoryReport['low_stock_products'] ?? [];
+            
+            // Transform low stock products to include current stock info
+            $lowStockProducts = $lowStockProducts->map(function ($product) {
+                return [
+                    'id' => $product->id,
+                    'name' => $product->name,
+                    'SKU' => $product->SKU,
+                    'current_stock' => $product->current_stock,
+                    'min_stock_level' => $product->min_stock_level,
+                ];
+            });
 
-        // Out of stock products with proper inventory data
-        $outOfStockProducts = Product::outOfStock($location)
-            ->with(['inventories' => function ($query) use ($location) {
-                if ($location) {
-                    $query->where('location_id', $location->id);
-                }
+            // Out of stock products with proper inventory data
+            $outOfStockQuery = Product::outOfStock($location)
+                ->with(['inventories' => function ($query) use ($location) {
+                    if ($location) {
+                        $query->where('location_id', $location->id);
+                    }
+                }])
+                ->where('domain', $domain);
+            
+            $outOfStockProducts = $outOfStockQuery
+                ->limit(5)
+                ->get()
+                ->map(function ($product) use ($location) {
+                    $inventory = $product->inventories->where('location_id', $location->id ?? null)->first();
+                    return [
+                        'id' => $product->id,
+                        'name' => $product->name,
+                        'SKU' => $product->SKU,
+                        'current_stock' => $inventory ? $inventory->quantity_available : 0,
+                        'min_stock_level' => $inventory ? $inventory->getEffectiveReorderLevel() : $product->reorder_level,
+                    ];
+                });
+
+            // Recent stock movements
+            $recentMovementsQuery = InventoryMovement::with(['product', 'user'])
+                ->where('location_id', $location->id ?? null)
+                ->where('domain', $domain);
+            
+            $recentMovements = $recentMovementsQuery
+                ->latest()
+                ->limit(5)
+                ->get();
+        } else {
+            // Global view: show inventory alerts from ALL domains
+            $lowStockProducts = collect();
+            
+            // Get out of stock products from all domains
+            $outOfStockProducts = Product::whereHas('inventories', function ($query) {
+                $query->where('quantity_available', '<=', 0);
+            })
+            ->with(['inventories' => function ($query) {
+                $query->where('quantity_available', '<=', 0);
             }])
             ->limit(5)
             ->get()
-            ->map(function ($product) use ($location) {
-                $inventory = $product->inventories->where('location_id', $location->id ?? null)->first();
+            ->map(function ($product) {
+                $inventory = $product->inventories->where('quantity_available', '<=', 0)->first();
                 return [
                     'id' => $product->id,
                     'name' => $product->name,
                     'SKU' => $product->SKU,
                     'current_stock' => $inventory ? $inventory->quantity_available : 0,
-                    'min_stock_level' => $inventory ? $inventory->getEffectiveReorderLevel() : $product->reorder_level,
+                    'min_stock_level' => $product->reorder_level,
                 ];
             });
 
-        // Recent stock movements
-        $recentMovements = InventoryMovement::with(['product', 'user'])
-            ->where('location_id', $location->id ?? null)
-            ->latest()
-            ->limit(5)
-            ->get();
+            // Recent stock movements from all domains
+            $recentMovements = InventoryMovement::with(['product', 'user'])
+                ->latest()
+                ->limit(5)
+                ->get();
+        }
 
         return [
             'low_stock_count' => count($lowStockProducts),
@@ -229,14 +298,34 @@ class DashboardController extends Controller
         ];
     }
 
-    private function getCustomerInsights()
+    private function getCustomerInsights($domain = null)
     {
-        $totalCustomers = Customer::count();
-        $loyaltyMembers = Customer::whereNotNull('loyalty_points')->count();
-        $newCustomersToday = Customer::whereDate('created_at', now()->startOfDay())->count();
+        $customerQuery = Customer::query();
+        if ($domain) {
+            $customerQuery->where('domain', $domain);
+        }
+        
+        $totalCustomers = $customerQuery->count();
+        
+        $loyaltyQuery = Customer::whereNotNull('loyalty_points');
+        if ($domain) {
+            $loyaltyQuery->where('domain', $domain);
+        }
+        $loyaltyMembers = $loyaltyQuery->count();
+        
+        $newCustomersQuery = Customer::whereDate('created_at', now()->startOfDay());
+        if ($domain) {
+            $newCustomersQuery->where('domain', $domain);
+        }
+        $newCustomersToday = $newCustomersQuery->count();
 
         // Customer tier distribution
-        $tierDistribution = DB::table('customers')
+        $tierDistributionQuery = DB::table('customers');
+        if ($domain) {
+            $tierDistributionQuery->where('domain', $domain);
+        }
+        
+        $tierDistribution = $tierDistributionQuery
             ->select(
                 DB::raw('COALESCE(tier, "bronze") as tier'),
                 DB::raw('COUNT(*) as count')
@@ -259,10 +348,16 @@ class DashboardController extends Controller
         ];
     }
 
-    private function getRecentTransactions()
+    private function getRecentTransactions($domain = null)
     {
-        return Sale::with(['customer', 'saleItems.product'])
-            ->where('payment_status', 'paid')
+        $transactionsQuery = Sale::with(['customer', 'saleItems.product'])
+            ->where('payment_status', 'paid');
+        
+        if ($domain) {
+            $transactionsQuery->where('domain', $domain);
+        }
+        
+        return $transactionsQuery
             ->latest()
             ->limit(10)
             ->get()
@@ -279,11 +374,21 @@ class DashboardController extends Controller
             });
     }
 
-    private function getTopProducts($location)
+    private function getTopProducts($location, $domain = null)
     {
-        return InventoryMovement::where('movement_type', 'sale')
-            ->where('location_id', $location->id ?? null)
-            ->where('created_at', '>=', now()->subDays(7))
+        $topProductsQuery = InventoryMovement::where('movement_type', 'sale')
+            ->where('created_at', '>=', now()->subDays(7));
+        
+        if ($domain) {
+            // Domain-specific view: filter by location and domain
+            $topProductsQuery->where('location_id', $location->id ?? null)
+                           ->where('domain', $domain);
+        } else {
+            // Global view: show top products from ALL domains (no location filter)
+            // Keep domain filtering for now, but could be removed to show cross-domain products
+        }
+        
+        return $topProductsQuery
             ->select('product_id', DB::raw('SUM(ABS(quantity_change)) as total_sold'))
             ->groupBy('product_id')
             ->orderBy('total_sold', 'desc')
@@ -298,7 +403,7 @@ class DashboardController extends Controller
             });
     }
 
-    private function getOperationalStatus()
+    private function getOperationalStatus($domain = null)
     {
         // Try to get active users from sessions table, fallback to 1 if table doesn't exist
         try {
@@ -309,9 +414,14 @@ class DashboardController extends Controller
             $activeUsers = 1; // Fallback value
         }
 
-        $voidsToday = Sale::where('payment_status', 'voided')
-            ->whereDate('created_at', now()->startOfDay())
-            ->count();
+        $voidsQuery = Sale::where('payment_status', 'voided')
+            ->whereDate('created_at', now()->startOfDay());
+        
+        if ($domain) {
+            $voidsQuery->where('domain', $domain);
+        }
+        
+        $voidsToday = $voidsQuery->count();
 
         return [
             'active_users' => $activeUsers,

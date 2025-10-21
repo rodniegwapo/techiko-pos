@@ -20,6 +20,7 @@ class MandatoryDiscountResource extends JsonResource
             'type' => $this->type,
             'value' => $this->value,
             'is_active' => $this->is_active,
+            'domain' => $this->domain,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

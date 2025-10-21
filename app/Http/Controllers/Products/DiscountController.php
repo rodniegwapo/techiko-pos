@@ -16,6 +16,7 @@ class DiscountController extends Controller
 
         $data = Discount::query()
             ->when($domainSlug, fn($q) => $q->forDomain($domainSlug))
+            ->when($request->input('domain'), fn($q, $domain) => $q->where('domain', $domain))
             ->when($request->input('search'), function ($query, $search) {
                 return $query->search($search);
             })
@@ -24,6 +25,7 @@ class DiscountController extends Controller
         return Inertia::render('Discounts/Index', [
             'items' => DiscountResource::collection($data),
             'isGlobalView' => !$domainSlug,
+            'domains' => !$domainSlug ? \App\Models\Domain::all() : [],
         ]);
     }
 

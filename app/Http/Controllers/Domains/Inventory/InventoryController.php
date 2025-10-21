@@ -135,12 +135,18 @@ class InventoryController extends Controller
             $query->whereDate('created_at', '<=', $request->date_to);
         }
 
+        // Domain filtering - filter by product domain instead of location domain
+        if ($request->domain) {
+            $query->whereHas('product', fn($pq) => $pq->where('domain', $request->domain));
+        }
+
         $movements = $query->paginate($request->per_page ?? 50);
 
         return Inertia::render('Inventory/Movements', [
             'movements' => InventoryMovementResource::collection($movements),
             'locations' => InventoryLocation::active()->forDomain($slug)->get(),
             'products' => Product::select('id', 'name', 'SKU')->get(),
+            'domains' => Domain::select('id', 'name', 'name_slug')->get(),
             'movementTypes' => [
                 'sale' => 'Sale',
                 'purchase' => 'Purchase',
@@ -153,7 +159,7 @@ class InventoryController extends Controller
                 'expired' => 'Expired Products',
                 'promotion' => 'Promotional Giveaway',
             ],
-            'filters' => $request->only(['search', 'location_id', 'product_id', 'movement_type', 'date_from', 'date_to']),
+            'filters' => $request->only(['search', 'location_id', 'product_id', 'movement_type', 'date_from', 'date_to', 'domain']),
             'currentDomain' => $domain,
             'isGlobalView' => false,
         ]);
