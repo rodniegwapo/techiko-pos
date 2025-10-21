@@ -74,6 +74,7 @@ class StockAdjustmentSeeder extends Seeder
                 $adjustment = StockAdjustment::create([
                     'adjustment_number' => 'ADJ-' . now()->format('Y') . '-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT) . '-' . uniqid(),
                     'location_id' => $location->id,
+                    'domain' => $location->domain,
                     'type' => $this->mapAdjustmentType($type),
                     'reason' => $this->mapAdjustmentReason($type),
                     'description' => $this->generateAdjustmentNotes($type),

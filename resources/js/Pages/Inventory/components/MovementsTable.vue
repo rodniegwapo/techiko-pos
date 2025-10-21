@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from "vue";
-import { IconArrowUp, IconArrowDown, IconEye } from "@tabler/icons-vue";
+import { IconArrowUp, IconArrowDown, IconEye, IconWorld } from "@tabler/icons-vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { useHelpers } from "@/Composables/useHelpers";
 
@@ -21,42 +21,61 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  isGlobalView: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 // Simplified columns - only essential information
-const columns = [
-  {
-    title: "Date & Time",
-    dataIndex: "date",
-    key: "date",
-    align: "left",
-  },
-  {
-    title: "Product",
-    dataIndex: "product",
-    key: "product",
-    align: "left",
-  },
-  {
-    title: "Type",
-    dataIndex: "type",
-    key: "type",
-    align: "left",
-  },
-  {
-    title: "Quantity",
-    dataIndex: "quantity",
-    key: "quantity",
-    align: "left",
-  },
-  {
-    title: "Location",
-    dataIndex: "location",
-    key: "location",
-    align: "left",
-  },
-  { title: "Actions", key: "actions", align: "center", width: "1%" },
-];
+const columns = computed(() => {
+  const baseColumns = [
+    {
+      title: "Date & Time",
+      dataIndex: "date",
+      key: "date",
+      align: "left",
+    },
+    {
+      title: "Product",
+      dataIndex: "product",
+      key: "product",
+      align: "left",
+    },
+    {
+      title: "Type",
+      dataIndex: "type",
+      key: "type",
+      align: "left",
+    },
+    {
+      title: "Quantity",
+      dataIndex: "quantity",
+      key: "quantity",
+      align: "left",
+    },
+    {
+      title: "Location",
+      dataIndex: "location",
+      key: "location",
+      align: "left",
+    },
+  ];
+
+  // Add domain column for global view
+  if (props.isGlobalView) {
+    baseColumns.splice(2, 0, {
+      title: "Domain",
+      dataIndex: "domain",
+      key: "domain",
+      align: "left",
+    });
+  }
+
+  baseColumns.push({ title: "Actions", key: "actions", align: "center", width: "1%" });
+  
+  return baseColumns;
+});
 
 const getMovementTypeColor = (type) => {
   const colors = {
@@ -98,6 +117,7 @@ const dataSource = computed(() => {
       product: movement.product,
       location: movement.location,
       type: movement.movement_type,
+      domain: movement.domain,
       quantity_change: movement.quantity_change,
       quantity_before: movement.quantity_before,
       quantity_after: movement.quantity_after,
@@ -142,6 +162,14 @@ const dataSource = computed(() => {
           <p v-if="record.batch_number" class="text-xs text-blue-600">
             Batch: {{ record.batch_number }}
           </p>
+        </div>
+      </template>
+
+      <!-- Domain Column -->
+      <template v-else-if="column.key === 'domain'">
+        <div class="flex items-center justify-center">
+          <IconWorld class="mr-1" size="16" />
+          <span class="text-sm font-medium">{{ record.domain || 'N/A' }}</span>
         </div>
       </template>
 

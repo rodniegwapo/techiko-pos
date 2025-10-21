@@ -77,6 +77,7 @@ class InventoryMovementSeeder extends Seeder
                     InventoryMovement::create([
                         'product_id' => $product->id,
                         'location_id' => $location->id,
+                        'domain' => $location->domain,
                         'user_id' => $users->random()->id,
                         'movement_type' => 'sale',
                         'quantity_before' => rand(10, 100), // Will be updated by actual inventory
@@ -84,8 +85,8 @@ class InventoryMovementSeeder extends Seeder
                         'quantity_after' => rand(5, 95), // Will be updated by actual inventory
                         'unit_cost' => $unitCost,
                         'total_cost' => $quantitySold * $unitCost,
-                        'reference_type' => 'Sale',
-                        'reference_id' => rand(1, 1000), // Mock sale ID
+                        'reference_type' => null,
+                        'reference_id' => null,
                         'notes' => 'Sale transaction #' . rand(1000, 9999),
                         'reason' => 'Customer purchase',
                         'batch_number' => 'SALE-' . rand(10000, 99999),
@@ -134,6 +135,7 @@ class InventoryMovementSeeder extends Seeder
                     InventoryMovement::create([
                         'product_id' => $product->id,
                         'location_id' => $location->id,
+                        'domain' => $location->domain,
                         'user_id' => $users->random()->id,
                         'movement_type' => 'purchase',
                         'quantity_before' => rand(50, 300),
@@ -141,8 +143,8 @@ class InventoryMovementSeeder extends Seeder
                         'quantity_after' => rand(70, 500),
                         'unit_cost' => $unitCost,
                         'total_cost' => $quantityReceived * $unitCost,
-                        'reference_type' => 'Purchase',
-                        'reference_id' => rand(1, 100), // Mock purchase ID
+                        'reference_type' => null,
+                        'reference_id' => null,
                         'notes' => 'Purchase order #PO-' . rand(1000, 9999),
                         'reason' => 'Stock replenishment',
                         'batch_number' => 'PURCHASE-' . rand(10000, 99999),
@@ -194,6 +196,7 @@ class InventoryMovementSeeder extends Seeder
                 InventoryMovement::create([
                     'product_id' => $product->id,
                     'location_id' => $fromLocation->id,
+                    'domain' => $fromLocation->domain,
                     'user_id' => $users->random()->id,
                     'movement_type' => 'transfer_out',
                     'quantity_before' => rand(100, 500),
@@ -201,8 +204,8 @@ class InventoryMovementSeeder extends Seeder
                     'quantity_after' => rand(50, 450),
                     'unit_cost' => $product->cost ?? rand(50, 500),
                     'total_cost' => $transferQuantity * ($product->cost ?? rand(50, 500)),
-                    'reference_type' => 'InventoryTransfer',
-                    'reference_id' => rand(1, 50), // Mock transfer ID
+                    'reference_type' => null,
+                    'reference_id' => null,
                     'notes' => "Transfer to {$toLocation->name}",
                     'reason' => 'Stock redistribution',
                     'batch_number' => 'TRANSFER-OUT-' . rand(10000, 99999),
@@ -214,6 +217,7 @@ class InventoryMovementSeeder extends Seeder
                 InventoryMovement::create([
                     'product_id' => $product->id,
                     'location_id' => $toLocation->id,
+                    'domain' => $toLocation->domain,
                     'user_id' => $users->random()->id,
                     'movement_type' => 'transfer_in',
                     'quantity_before' => rand(5, 50),
@@ -221,8 +225,8 @@ class InventoryMovementSeeder extends Seeder
                     'quantity_after' => rand(15, 100),
                     'unit_cost' => $product->cost ?? rand(50, 500),
                     'total_cost' => $transferQuantity * ($product->cost ?? rand(50, 500)),
-                    'reference_type' => 'InventoryTransfer',
-                    'reference_id' => rand(1, 50), // Mock transfer ID
+                    'reference_type' => null,
+                    'reference_id' => null,
                     'notes' => "Transfer from {$fromLocation->name}",
                     'reason' => 'Stock redistribution',
                     'batch_number' => 'TRANSFER-IN-' . rand(10000, 99999),
@@ -283,6 +287,7 @@ class InventoryMovementSeeder extends Seeder
                     InventoryMovement::create([
                         'product_id' => $product->id,
                         'location_id' => $location->id,
+                        'domain' => $location->domain,
                         'user_id' => $users->random()->id,
                         'movement_type' => 'adjustment',
                         'quantity_before' => rand(10, 100),
@@ -290,8 +295,8 @@ class InventoryMovementSeeder extends Seeder
                         'quantity_after' => rand(5, 105),
                         'unit_cost' => $product->cost ?? rand(50, 500),
                         'total_cost' => abs($quantityChange) * ($product->cost ?? rand(50, 500)),
-                        'reference_type' => 'StockAdjustment',
-                        'reference_id' => rand(1, 20), // Mock adjustment ID
+                        'reference_type' => null,
+                        'reference_id' => null,
                         'notes' => $adjustmentReasons[$reason],
                         'reason' => ucfirst($reason),
                         'batch_number' => 'ADJ-' . rand(10000, 99999),
@@ -340,6 +345,7 @@ class InventoryMovementSeeder extends Seeder
                     InventoryMovement::create([
                         'product_id' => $product->id,
                         'location_id' => $location->id,
+                        'domain' => $location->domain,
                         'user_id' => $users->random()->id,
                         'movement_type' => 'return',
                         'quantity_before' => rand(10, 50),
@@ -347,8 +353,8 @@ class InventoryMovementSeeder extends Seeder
                         'quantity_after' => rand(11, 53),
                         'unit_cost' => $unitCost,
                         'total_cost' => $returnQuantity * $unitCost,
-                        'reference_type' => 'CustomerReturn',
-                        'reference_id' => rand(1, 30), // Mock return ID
+                        'reference_type' => null,
+                        'reference_id' => null,
                         'notes' => 'Customer return - ' . ['defective', 'wrong item', 'changed mind'][rand(0, 2)],
                         'reason' => 'Customer return',
                         'batch_number' => 'RETURN-' . rand(10000, 99999),

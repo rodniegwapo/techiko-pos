@@ -96,6 +96,11 @@ class InventoryController extends Controller
             });
         }
 
+        // Domain filtering for global views
+        if ($request->domain && !$isDomainRoute) {
+            $query->whereHas('location', fn($lq) => $lq->forDomain($request->domain));
+        }
+
         $inventories = $query->orderBy('quantity_available', 'asc')
             ->paginate($request->per_page ?? 20);
 
@@ -131,7 +136,8 @@ class InventoryController extends Controller
             'locations' => InventoryLocation::active()->when($domainSlug, fn($q) => $q->forDomain($domainSlug))->get(),
             'currentLocation' => $location,
             'categories' => \App\Models\Category::all(),
-            'filters' => $request->only(['search', 'stock_status', 'category_id']),
+            'domains' => $isDomainRoute ? [] : Domain::select('id', 'name', 'name_slug')->get(),
+            'filters' => $request->only(['search', 'stock_status', 'category_id', 'domain']),
             'currentDomain' => $domain,
             'isGlobalView' => ! $isDomainRoute,
         ]);
@@ -177,6 +183,11 @@ class InventoryController extends Controller
             $query->whereDate('created_at', '<=', $request->date_to);
         }
 
+        // Domain filtering for global views
+        if ($request->domain && !$isDomainRoute) {
+            $query->whereHas('location', fn($lq) => $lq->forDomain($request->domain));
+        }
+
         $movements = $query->paginate($request->per_page ?? 50);
 
         return Inertia::render('Inventory/Movements', [
@@ -185,6 +196,7 @@ class InventoryController extends Controller
                 ->when($domainSlug, fn($q) => $q->forDomain($domainSlug))
                 ->get(),
             'products' => Product::select('id', 'name', 'SKU')->get(),
+            'domains' => $isDomainRoute ? [] : Domain::select('id', 'name', 'name_slug')->get(),
             'movementTypes' => [
                 'sale' => 'Sale',
                 'purchase' => 'Purchase',
@@ -197,7 +209,7 @@ class InventoryController extends Controller
                 'expired' => 'Expired Products',
                 'promotion' => 'Promotional Giveaway',
             ],
-            'filters' => $request->only(['search', 'location_id', 'product_id', 'movement_type', 'date_from', 'date_to']),
+            'filters' => $request->only(['search', 'location_id', 'product_id', 'movement_type', 'date_from', 'date_to', 'domain']),
             'currentDomain' => $domain,
             'isGlobalView' => ! $isDomainRoute,
         ]);
