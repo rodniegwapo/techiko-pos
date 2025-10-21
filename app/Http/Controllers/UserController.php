@@ -23,7 +23,7 @@ class UserController extends Controller
     public function index(Request $request)
     {
         $currentUser = auth()->user();
-        
+
         // Global users (super users only)
         $users = $this->userService->getFilteredUsers($request, $currentUser);
         $roles = $this->userService->getManageableRoles($currentUser);
@@ -105,7 +105,7 @@ class UserController extends Controller
     public function show(User $user)
     {
         $user->load(['roles', 'supervisor', 'subordinates']);
-        
+
         return Inertia::render('Users/Show', [
             'user' => $user,
         ]);
@@ -120,7 +120,7 @@ class UserController extends Controller
 
         try {
             $result = $this->userService->toggleUserStatus($user, $currentUser);
-            
+
             return response()->json([
                 'success' => true,
                 'message' => "User {$result['action']} successfully",
@@ -166,7 +166,7 @@ class UserController extends Controller
         $user->load(['roles']);
         $currentUser = auth()->user();
         $roles = $this->userService->getManageableRoles($currentUser);
-        
+
         return Inertia::render('Users/Edit', [
             'user' => $user,
             'roles' => $roles,
