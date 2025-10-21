@@ -32,6 +32,9 @@ class InventoryLocationController extends Controller
                 }
                 return $query;
             })
+            ->when($request->input('domain'), function ($query, $domain) {
+                return $query->where('domain', $domain);
+            })
             ->orderBy('is_default', 'desc')
             ->orderBy('name');
 
@@ -44,8 +47,9 @@ class InventoryLocationController extends Controller
 
         return Inertia::render('Inventory/Locations/Index', [
             'locations' => InventoryLocationResource::collection($locations),
-            'filters' => $request->only(['search', 'type', 'status']),
+            'filters' => $request->only(['search', 'type', 'status', 'domain']),
             'locationTypes' => $this->getLocationTypes(),
+            'domains' => \App\Models\Domain::select('id', 'name', 'name_slug')->get(),
             'isGlobalView' => true,
         ]);
     }

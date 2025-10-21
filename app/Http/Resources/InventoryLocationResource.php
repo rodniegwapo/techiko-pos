@@ -20,6 +20,7 @@ class InventoryLocationResource extends JsonResource
             'code' => $this->code,
             'type' => $this->type,
             'type_label' => ucfirst($this->type),
+            'domain' => $this->domain,
             'address' => $this->address,
             'contact_person' => $this->contact_person,
             'phone' => $this->phone,

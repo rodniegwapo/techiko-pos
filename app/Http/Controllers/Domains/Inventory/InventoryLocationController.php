@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Domains\Inventory;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\InventoryLocationResource;
 use App\Models\Domain;
 use App\Models\InventoryLocation;
 use Illuminate\Http\Request;
@@ -25,7 +26,7 @@ class InventoryLocationController extends Controller
         ];
 
         return inertia('Inventory/Locations/Index', [
-            'locations' => $items,
+            'locations' => InventoryLocationResource::collection($items),
             'filters' => $request->only(['search', 'type', 'status']),
             'locationTypes' => $locationTypes,
             'currentDomain' => $domain,
