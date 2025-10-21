@@ -33,11 +33,14 @@ const props = defineProps({
     items: Object,
     roles: Array,
     hierarchy: Object,
+    domains: Array,
+    isGlobalView: Boolean,
 });
 
 // Filter state
 const search = ref("");
 const role = ref(null);
+const domain = ref(null);
 
 // Modal state
 const selectedUser = ref(null);
@@ -54,6 +57,7 @@ const getItems = () => {
             page: 1,
             search: search.value || undefined,
             role: role.value || undefined,
+            domain: domain.value || undefined,
         },
         onStart: () => (spinning.value = true),
         onFinish: () => (spinning.value = false),
@@ -61,6 +65,14 @@ const getItems = () => {
 };
 
 watchDebounced(search, getItems, { debounce: 300 });
+
+// Domain options
+const domainOptions = computed(() => 
+  (props.domains || []).map(domain => ({ 
+    label: domain.name, 
+    value: domain.name_slug 
+  }))
+);
 
 // Filters setup
 const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
@@ -79,24 +91,53 @@ const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
                 )
             ),
         },
+        ...(props.isGlobalView ? [{
+            label: "Domain",
+            key: "domain",
+            ref: domain,
+            getLabel: toLabel(computed(() => domainOptions.value)),
+        }] : []),
     ],
 });
 
 // FilterDropdown configuration
-const filtersConfig = [
-    {
-        key: "role",
-        label: "Role",
-        type: "select",
-        options: props.roles.map((r) => ({
-            label: r.name,
-            value: r.name,
-        })),
-    },
-];
+const filtersConfig = computed(() => {
+    const baseConfig = [
+        {
+            key: "role",
+            label: "Role",
+            type: "select",
+            options: props.roles.map((r) => ({
+                label: r.name,
+                value: r.name,
+            })),
+        },
+    ];
+
+    // Add domain filter if in global view
+    if (props.isGlobalView) {
+        baseConfig.push({
+            key: "domain",
+            label: "Domain",
+            type: "select",
+            options: domainOptions.value,
+        });
+    }
+
+    return baseConfig;
+});
 
 // Table composable
-const tableFilters = { search, role };
+const tableFilters = computed(() => {
+    const baseFilters = { search, role };
+    
+    // Add domain filter if in global view
+    if (props.isGlobalView) {
+        baseFilters.domain = domain;
+    }
+    
+    return baseFilters;
+});
 const { pagination, handleTableChange } = useTable("items", tableFilters);
 
 // Methods

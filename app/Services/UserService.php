@@ -35,6 +35,11 @@ class UserService
             });
         }
 
+        // Apply domain filter (for super users in global view)
+        if ($request->input('domain')) {
+            $query->where('domain', $request->input('domain'));
+        }
+
         // Apply hierarchy-based filtering
         $query = $this->applyHierarchyFiltering($query, $currentUser);
 
