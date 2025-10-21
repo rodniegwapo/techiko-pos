@@ -66,7 +66,7 @@ class InventoryController extends Controller
                 return $q->first() ?? InventoryLocation::getDefault();
             })();
 
-        $query = ProductInventory::with(['product', 'location'])
+        $query = ProductInventory::with(['product', 'location', 'product.category'])
             ->where('location_id', $location->id);
 
         // Apply filters
@@ -96,9 +96,9 @@ class InventoryController extends Controller
             });
         }
 
-        // Domain filtering for global views
+        // Domain filtering for global views - use product domain instead of location domain
         if ($request->domain && !$isDomainRoute) {
-            $query->whereHas('location', fn($lq) => $lq->forDomain($request->domain));
+            $query->whereHas('product', fn($pq) => $pq->where('domain', $request->domain));
         }
 
         $inventories = $query->orderBy('quantity_available', 'asc')
@@ -183,9 +183,9 @@ class InventoryController extends Controller
             $query->whereDate('created_at', '<=', $request->date_to);
         }
 
-        // Domain filtering for global views
+        // Domain filtering for global views - use product domain instead of location domain
         if ($request->domain && !$isDomainRoute) {
-            $query->whereHas('location', fn($lq) => $lq->forDomain($request->domain));
+            $query->whereHas('product', fn($pq) => $pq->where('domain', $request->domain));
         }
 
         $movements = $query->paginate($request->per_page ?? 50);

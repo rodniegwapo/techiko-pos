@@ -15,6 +15,7 @@ class MandatoryDiscountController extends Controller
 
         $data = MandatoryDiscount::query()
             ->when($domainSlug, fn($q) => $q->where('domain', $domainSlug))
+            ->when($request->input('domain'), fn($q, $domain) => $q->where('domain', $domain))
             ->when($request->input('search'), function ($query, $search) {
                 return $query->search($search);
             })
@@ -23,6 +24,7 @@ class MandatoryDiscountController extends Controller
         return Inertia::render('MandatoryDiscounts/Index', [
             'items' => MandatoryDiscountResource::collection($data),
             'isGlobalView' => !$domainSlug,
+            'domains' => !$domainSlug ? \App\Models\Domain::all() : [],
         ]);
     }
 

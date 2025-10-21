@@ -1,10 +1,12 @@
 <script setup>
+import { computed } from "vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import {
   IconTrash,
   IconEdit,
   IconCurrencyPeso,
   IconEye,
+  IconWorld,
 } from "@tabler/icons-vue";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
@@ -19,35 +21,51 @@ const { getRoute } = useDomainRoutes();
 const props = defineProps({
   products: { type: Object, required: true },
   pagination: { type: Object, required: false, default: () => ({}) },
+  isGlobalView: { type: Boolean, default: false },
 });
 
-const columns = [
-  {
-    title: "Discount Name",
-    dataIndex: "name",
-    key: "name",
-    align: "left",
-  },
-  {
-    title: "Type",
-    dataIndex: "type",
-    key: "type",
-    align: "left",
-  },
-  {
-    title: "Value",
-    dataIndex: "value",
-    key: "value",
-    align: "left",
-  },
-  {
-    title: "Status",
-    dataIndex: "is_active",
-    key: "is_active",
-    align: "center",
-  },
-  { title: "Action", key: "action", align: "center", width: "1%" },
-];
+const columns = computed(() => {
+  const baseColumns = [
+    {
+      title: "Discount Name",
+      dataIndex: "name",
+      key: "name",
+      align: "left",
+    },
+    {
+      title: "Type",
+      dataIndex: "type",
+      key: "type",
+      align: "left",
+    },
+    {
+      title: "Value",
+      dataIndex: "value",
+      key: "value",
+      align: "left",
+    },
+    {
+      title: "Status",
+      dataIndex: "is_active",
+      key: "is_active",
+      align: "center",
+    },
+  ];
+
+  // Add domain column if in global view
+  if (props.isGlobalView) {
+    baseColumns.splice(1, 0, {
+      title: "Domain",
+      dataIndex: "domain",
+      key: "domain",
+      align: "left",
+    });
+  }
+
+  baseColumns.push({ title: "Action", key: "action", align: "center", width: "1%" });
+  
+  return baseColumns;
+});
 
 const handleTableChange = (event) => {
   emit("handleTableChange", event);
@@ -88,6 +106,13 @@ const handleViewDetail = (record) => {
     :loading="spinning"
   >
     <template #bodyCell="{ index, column, record }">
+      <template v-if="column.key == 'domain'">
+        <div class="flex items-center gap-2">
+          <IconWorld size="16" class="text-blue-500" />
+          <span class="text-sm font-medium">{{ record.domain || 'N/A' }}</span>
+        </div>
+      </template>
+
       <template v-if="column.key == 'type'">
         <a-tag class="w-fit" :color="record.type === 'percentage' ? 'blue' : 'green'">
           {{ record.type === 'percentage' ? 'Percentage' : 'Amount' }}

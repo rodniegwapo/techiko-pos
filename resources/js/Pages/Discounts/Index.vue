@@ -23,6 +23,10 @@ const page = usePage();
 
 // Search input
 const search = ref("");
+const domain = ref(null);
+
+// Check if this is a global view
+const isGlobalView = computed(() => page.props.isGlobalView || false);
 
 // Fetch items
 const getItems = () => {
@@ -31,6 +35,7 @@ const getItems = () => {
     preserveScroll: true,
     data: {
       search: search.value || undefined,
+      domain: domain.value || undefined,
     },
     onStart: () => (spinning.value = true),
     onFinish: () => (spinning.value = false),
@@ -41,11 +46,20 @@ const getItems = () => {
 watchDebounced(search, getItems, { debounce: 300 });
 
 // Table change handler
-const tableFilters = { search };
+const tableFilters = { search, domain };
 const { pagination, handleTableChange, spinning } = useTable(
   "items",
   tableFilters
 );
+
+// Domain options for filtering
+const domainOptions = computed(() => {
+  if (!page.props.domains) return [];
+  return page.props.domains.map(domain => ({
+    label: domain.name,
+    value: domain.name_slug
+  }));
+});
 
 const discountDetail = ref({});
 </script>
@@ -63,6 +77,22 @@ const discountDetail = ref({});
           placeholder="Search discount"
           class="min-w-[100px] max-w-[300px]"
         />
+        <a-select
+          v-if="isGlobalView"
+          v-model:value="domain"
+          placeholder="Filter by domain"
+          allow-clear
+          class="min-w-[150px] max-w-[200px]"
+          @change="getItems"
+        >
+          <a-select-option
+            v-for="option in domainOptions"
+            :key="option.value"
+            :value="option.value"
+          >
+            {{ option.label }}
+          </a-select-option>
+        </a-select>
         <a-button
           @click="showModal"
           type="primary"
@@ -80,6 +110,7 @@ const discountDetail = ref({});
         <DiscountTable
           :products="page.props.items.data"
           :pagination="pagination"
+          :is-global-view="isGlobalView"
           @handle-table-change="handleTableChange"
           @selectedDiscount="(data) => (discountDetail = data)"
         />

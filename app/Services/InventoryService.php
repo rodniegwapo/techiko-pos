@@ -321,16 +321,22 @@ class InventoryService
     /**
      * Get low stock products
      */
-    public function getLowStockProducts(InventoryLocation $location = null): \Illuminate\Database\Eloquent\Collection
+    public function getLowStockProducts(InventoryLocation $location = null, string $domain = null): \Illuminate\Database\Eloquent\Collection
     {
-        $products = Product::tracked()
+        $query = Product::tracked()
             ->lowStock($location)
             ->with(['inventories' => function ($query) use ($location) {
                 if ($location) {
                     $query->where('location_id', $location->id);
                 }
-            }])
-            ->get();
+            }]);
+
+        // Filter by domain if provided
+        if ($domain) {
+            $query->forDomain($domain);
+        }
+
+        $products = $query->get();
 
         // Transform the collection to include formatted data
         $products->transform(function ($product) use ($location) {
@@ -356,14 +362,20 @@ class InventoryService
             $location = $locationQuery->first() ?? InventoryLocation::getDefault();
         }
 
-        $totalProducts = Product::tracked()->count();
-        $inStockProducts = Product::inStock($location)->count();
-        $lowStockProducts = Product::lowStock($location)->count();
-        $outOfStockProducts = Product::outOfStock($location)->count();
+        // Filter products by domain if provided
+        $productQuery = Product::tracked();
+        if ($domain) {
+            $productQuery->forDomain($domain);
+        }
+
+        $totalProducts = $productQuery->count();
+        $inStockProducts = $productQuery->inStock($location)->count();
+        $lowStockProducts = $productQuery->lowStock($location)->count();
+        $outOfStockProducts = $productQuery->outOfStock($location)->count();
         $totalInventoryValue = $location->getTotalInventoryValue();
 
         // Get category stock data
-        $categoryStockData = $this->getCategoryStockData($location);
+        $categoryStockData = $this->getCategoryStockData($location, $domain);
 
         return [
             'location' => $location,
@@ -374,7 +386,7 @@ class InventoryService
                 'out_of_stock_products' => $outOfStockProducts,
                 'total_inventory_value' => $totalInventoryValue,
             ],
-            'low_stock_products' => $this->getLowStockProducts($location),
+            'low_stock_products' => $this->getLowStockProducts($location, $domain),
             'category_stock_data' => $categoryStockData,
         ];
     }
@@ -382,7 +394,7 @@ class InventoryService
     /**
      * Get category stock data for chart
      */
-    public function getCategoryStockData(InventoryLocation $location = null): array
+    public function getCategoryStockData(InventoryLocation $location = null, string $domain = null): array
     {
         $query = Product::tracked()
             ->with(['category', 'inventories' => function ($q) use ($location) {
@@ -390,6 +402,11 @@ class InventoryService
                     $q->where('location_id', $location->id);
                 }
             }]);
+
+        // Filter by domain if provided
+        if ($domain) {
+            $query->forDomain($domain);
+        }
 
         $products = $query->get();
 
