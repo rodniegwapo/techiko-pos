@@ -14,6 +14,7 @@ import {
   IconBuildingWarehouse,
   IconTruck,
   IconUser,
+  IconWorld,
 } from "@tabler/icons-vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { watchDebounced } from "@vueuse/core";
@@ -36,12 +37,15 @@ const { spinning } = useGlobalVariables();
 const search = ref("");
 const type = ref(null);
 const status = ref(null);
+const domain = ref(null);
 
 // Props from backend
 const props = defineProps({
   locations: Object,
   filters: Object,
   locationTypes: Array,
+  domains: Array,
+  isGlobalView: Boolean,
 });
 
 // Initialize filters from backend
@@ -50,6 +54,7 @@ onMounted(() => {
     search.value = props.filters.search || "";
     type.value = props.filters.type || null;
     status.value = props.filters.status || null;
+    domain.value = props.filters.domain || null;
   }
 });
 
@@ -62,6 +67,7 @@ const getItems = () => {
       search: search.value || undefined,
       type: type.value || undefined,
       status: status.value || undefined,
+      domain: domain.value || undefined,
     },
     onStart: () => (spinning.value = true),
     onFinish: () => (spinning.value = false),
@@ -76,6 +82,13 @@ const statusOptions = computed(() => [
   { label: "Active", value: "active" },
   { label: "Inactive", value: "inactive" },
 ]);
+
+const domainOptions = computed(() => 
+  (props.domains || []).map(domain => ({ 
+    label: domain.name, 
+    value: domain.name_slug 
+  }))
+);
 
 // Filter management
 const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
@@ -93,27 +106,56 @@ const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
       ref: status,
       getLabel: toLabel(computed(() => statusOptions.value)),
     },
+    ...(props.isGlobalView ? [{
+      label: "Domain",
+      key: "domain",
+      ref: domain,
+      getLabel: toLabel(computed(() => domainOptions.value)),
+    }] : []),
   ],
 });
 
 // FilterDropdown configuration
-const filtersConfig = [
-  {
-    key: "type",
-    label: "Type",
-    type: "select",
-    options: props.locationTypes,
-  },
-  {
-    key: "status",
-    label: "Status",
-    type: "select",
-    options: statusOptions.value,
-  },
-];
+const filtersConfig = computed(() => {
+  const baseConfig = [
+    {
+      key: "type",
+      label: "Type",
+      type: "select",
+      options: props.locationTypes,
+    },
+    {
+      key: "status",
+      label: "Status",
+      type: "select",
+      options: statusOptions.value,
+    },
+  ];
+
+  // Add domain filter if in global view
+  if (props.isGlobalView) {
+    baseConfig.push({
+      key: "domain",
+      label: "Domain",
+      type: "select",
+      options: domainOptions.value,
+    });
+  }
+
+  return baseConfig;
+});
 
 // Group filters in one object
-const tableFilters = { search, type, status };
+const tableFilters = computed(() => {
+  const baseFilters = { search, type, status };
+  
+  // Add domain filter if in global view
+  if (props.isGlobalView) {
+    baseFilters.domain = domain;
+  }
+  
+  return baseFilters;
+});
 
 // Table management
 const { pagination, handleTableChange } = useTable("locations", tableFilters);
@@ -188,15 +230,30 @@ const getTypeIcon = (type) => {
 };
 
 // Table columns - simplified like InventoryProductTable
-const columns = [
-  { title: "Location", dataIndex: "name", key: "name", align: "left" },
-  { title: "Type", dataIndex: "type", key: "type", align: "left" },
-  { title: "Address", dataIndex: "address", key: "address", align: "left" },
-  { title: "Contact", key: "contact", align: "left" },
-  { title: "Products", key: "products", align: "left" },
-  { title: "Status", key: "status", align: "left" },
-  { title: "Actions", key: "actions", align: "center", width: "1%" },
-];
+const columns = computed(() => {
+  const baseColumns = [
+    { title: "Location", dataIndex: "name", key: "name", align: "left" },
+    { title: "Type", dataIndex: "type", key: "type", align: "left" },
+    { title: "Address", dataIndex: "address", key: "address", align: "left" },
+    { title: "Contact", key: "contact", align: "left" },
+    { title: "Products", key: "products", align: "left" },
+    { title: "Status", key: "status", align: "left" },
+  ];
+
+  // Add domain column if in global view
+  if (props.isGlobalView) {
+    baseColumns.splice(1, 0, {
+      title: "Domain",
+      dataIndex: "domain",
+      key: "domain",
+      align: "left",
+    });
+  }
+
+  baseColumns.push({ title: "Actions", key: "actions", align: "center", width: "1%" });
+  
+  return baseColumns;
+});
 </script>
 
 <template>
@@ -279,6 +336,14 @@ const columns = [
                     >
                   </div>
                 </div>
+              </div>
+            </template>
+
+            <!-- Domain column -->
+            <template v-else-if="column.key === 'domain'">
+              <div class="flex items-center gap-2">
+                <IconWorld size="16" class="text-blue-500" />
+                <span class="text-sm font-medium">{{ record.domain || 'N/A' }}</span>
               </div>
             </template>
 
