@@ -8,6 +8,7 @@ import {
   IconSend,
   IconTrash,
   IconFileText,
+  IconWorld,
 } from "@tabler/icons-vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { useHelpers } from "@/Composables/useHelpers";
@@ -31,48 +32,67 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  isGlobalView: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 // Simplified columns - only essential information
-const columns = [
-  {
-    title: "Adjustment #",
-    dataIndex: "number",
-    key: "number",
-    align: "left",
-  },
-  {
-    title: "Location",
-    dataIndex: "location",
-    key: "location",
-    align: "left",
-  },
-  {
-    title: "Reason",
-    dataIndex: "reason",
-    key: "reason",
-    align: "left",
-  },
-  {
-    title: "Status",
-    dataIndex: "status",
-    key: "status",
-    align: "left",
-  },
-  {
-    title: "Items",
-    dataIndex: "items",
-    key: "items",
-    align: "left",
-  },
-  {
-    title: "Value",
-    dataIndex: "value",
-    key: "value",
-    align: "left",
-  },
-  { title: "Actions", key: "actions", align: "center", width: "1%" },
-];
+const columns = computed(() => {
+  const baseColumns = [
+    {
+      title: "Adjustment #",
+      dataIndex: "number",
+      key: "number",
+      align: "left",
+    },
+    {
+      title: "Location",
+      dataIndex: "location",
+      key: "location",
+      align: "left",
+    },
+    {
+      title: "Reason",
+      dataIndex: "reason",
+      key: "reason",
+      align: "left",
+    },
+    {
+      title: "Status",
+      dataIndex: "status",
+      key: "status",
+      align: "left",
+    },
+    {
+      title: "Items",
+      dataIndex: "items",
+      key: "items",
+      align: "left",
+    },
+    {
+      title: "Value",
+      dataIndex: "value",
+      key: "value",
+      align: "left",
+    },
+  ];
+
+  // Add domain column for global view
+  if (props.isGlobalView) {
+    baseColumns.splice(2, 0, {
+      title: "Domain",
+      dataIndex: "domain",
+      key: "domain",
+      align: "left",
+    });
+  }
+
+  baseColumns.push({ title: "Actions", key: "actions", align: "center", width: "1%" });
+  
+  return baseColumns;
+});
 
 const getStatusColor = (status) => {
   const colors = {
@@ -203,6 +223,7 @@ const dataSource = computed(() => {
       type: adjustment.type,
       reason: adjustment.reason,
       status: adjustment.status,
+      domain: adjustment.domain,
       value_change: adjustment.total_value_change,
       created_by: adjustment.created_by,
       approved_by: adjustment.approved_by,
@@ -250,6 +271,14 @@ const dataSource = computed(() => {
             {{ record.location?.name || "Unknown" }}
           </p>
        
+      </template>
+
+      <!-- Domain Column -->
+      <template v-else-if="column.key === 'domain'">
+        <div class="flex items-center justify-center">
+          <IconWorld class="mr-1" size="16" />
+          <span class="text-sm font-medium">{{ record.domain || 'N/A' }}</span>
+        </div>
       </template>
 
       <!-- Reason Column -->

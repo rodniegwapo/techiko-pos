@@ -42,6 +42,9 @@ class StockAdjustmentController extends Controller
             ->when($request->input('date_to'), function ($query, $dateTo) {
                 return $query->whereDate('created_at', '<=', $dateTo);
             })
+            ->when($request->input('domain'), function ($query, $domain) {
+                return $query->whereHas('location', fn($lq) => $lq->forDomain($domain));
+            })
             ->orderBy('created_at', 'desc');
 
         $adjustments = $query->paginate($request->per_page ?? 20);
@@ -49,6 +52,7 @@ class StockAdjustmentController extends Controller
         return Inertia::render('Inventory/StockAdjustments/Index', [
             'adjustments' => StockAdjustmentResource::collection($adjustments),
             'locations' => InventoryLocation::active()->get(),
+            'domains' => \App\Models\Domain::select('id', 'name', 'name_slug')->get(),
             'statuses' => [
                 'draft' => 'Draft',
                 'pending_approval' => 'Pending Approval',
@@ -66,7 +70,7 @@ class StockAdjustmentController extends Controller
                 'sample' => 'Sample',
                 'other' => 'Other',
             ],
-            'filters' => $request->only(['search', 'status', 'location_id', 'date_from', 'date_to']),
+            'filters' => $request->only(['search', 'status', 'location_id', 'date_from', 'date_to', 'domain']),
             'isGlobalView' => true,
         ]);
     }

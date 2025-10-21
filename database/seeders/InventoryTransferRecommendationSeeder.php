@@ -89,6 +89,7 @@ class InventoryTransferRecommendationSeeder extends Seeder
                         'product_id' => $product->id,
                         'from_location_id' => $warehouse->id,
                         'to_location_id' => $store->id,
+                        'domain' => $store->domain,
                         'recommended_quantity' => $recommendedQuantity,
                         'current_stock_from' => $warehouseInventory->quantity_available,
                         'current_stock_to' => $storeInventory->quantity_available,

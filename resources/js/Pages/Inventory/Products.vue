@@ -26,6 +26,7 @@ const { spinning } = useGlobalVariables();
 const search = ref("");
 const stock_status = ref(null);
 const location_id = ref(null);
+const domain = ref(null);
 
 // Props from backend
 const props = defineProps({
@@ -33,6 +34,7 @@ const props = defineProps({
   locations: Array,
   currentLocation: Object,
   categories: Array,
+  domains: Array,
   filters: Object,
 });
 
@@ -41,6 +43,7 @@ onMounted(() => {
   if (props.filters) {
     search.value = props.filters.search || "";
     stock_status.value = props.filters.stock_status || null;
+    domain.value = props.filters.domain || null;
   }
   location_id.value = props.currentLocation?.id || null;
 });
@@ -54,6 +57,7 @@ const getItems = () => {
       search: search.value || undefined,
       stock_status: stock_status.value || undefined,
       location_id: location_id.value || undefined,
+      domain: domain.value || undefined,
     },
     onStart: () => (spinning.value = true),
     onFinish: () => (spinning.value = false),
@@ -70,6 +74,13 @@ const stockStatusOptions = computed(() => [
   { label: "Out of Stock", value: "out_of_stock" },
 ]);
 
+const domainOptions = computed(() => 
+  (props.domains || []).map(domain => ({ 
+    label: domain.name, 
+    value: domain.name_slug 
+  }))
+);
+
 // Remove unused computed properties since we're using single filter approach
 
 // Filter management
@@ -82,6 +93,12 @@ const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
       ref: stock_status,
       getLabel: toLabel(computed(() => stockStatusOptions.value)),
     },
+    ...(page.props.isGlobalView ? [{
+      label: "Domain",
+      key: "domain",
+      ref: domain,
+      getLabel: toLabel(computed(() => domainOptions.value)),
+    }] : []),
   ],
 });
 
@@ -93,10 +110,16 @@ const filtersConfig = [
     type: "select",
     options: stockStatusOptions.value,
   },
+  ...(page.props.isGlobalView ? [{
+    key: "domain",
+    label: "Domain",
+    type: "select",
+    options: domainOptions.value,
+  }] : []),
 ];
 
 // Group filters in one object
-const tableFilters = { search, stock_status };
+const tableFilters = { search, stock_status, domain };
 
 // Table management
 const { pagination, handleTableChange } = useTable("inventories", tableFilters);
@@ -235,6 +258,7 @@ const handleTransferStock = (inventory) => {
           :inventories="inventories"
           :pagination="pagination"
           :loading="spinning"
+          :is-global-view="page.props.isGlobalView"
           @handle-table-change="handleTableChange"
           @show-details="showProductDetails"
           @transfer-stock="handleTransferStock"

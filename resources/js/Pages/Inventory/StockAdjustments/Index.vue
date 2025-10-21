@@ -23,6 +23,7 @@ const { spinning } = useGlobalVariables();
 
 const search = ref("");
 const status = ref(null);
+const domain = ref(null);
 
 // Props from backend
 const props = defineProps({
@@ -30,6 +31,7 @@ const props = defineProps({
   locations: Array,
   statuses: Object,
   reasons: Object,
+  domains: Array,
   filters: Object,
 });
 
@@ -38,6 +40,7 @@ onMounted(() => {
   if (props.filters) {
     search.value = props.filters.search || "";
     status.value = props.filters.status || null;
+    domain.value = props.filters.domain || null;
   }
 });
 
@@ -49,6 +52,7 @@ const getItems = () => {
     data: {
       search: search.value || undefined,
       status: status.value || undefined,
+      domain: domain.value || undefined,
     },
     onStart: () => (spinning.value = true),
     onFinish: () => (spinning.value = false),
@@ -66,6 +70,13 @@ const statusOptions = computed(() =>
   }))
 );
 
+const domainOptions = computed(() => 
+  (props.domains || []).map(domain => ({ 
+    label: domain.name, 
+    value: domain.name_slug 
+  }))
+);
+
 // Filter management
 const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
   getItems,
@@ -76,6 +87,12 @@ const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
       ref: status,
       getLabel: toLabel(computed(() => statusOptions.value)),
     },
+    ...(page.props.isGlobalView ? [{
+      label: "Domain",
+      key: "domain",
+      ref: domain,
+      getLabel: toLabel(computed(() => domainOptions.value)),
+    }] : []),
   ],
 });
 
@@ -87,10 +104,16 @@ const filtersConfig = [
     type: "select",
     options: statusOptions.value,
   },
+  ...(page.props.isGlobalView ? [{
+    key: "domain",
+    label: "Domain",
+    type: "select",
+    options: domainOptions.value,
+  }] : []),
 ];
 
 // Group filters in one object
-const tableFilters = { search, status };
+const tableFilters = { search, status, domain };
 
 // Table management
 const { pagination, handleTableChange } = useTable("adjustments", tableFilters);
@@ -177,6 +200,7 @@ const showAdjustmentDetails = (adjustment) => {
           :adjustments="adjustments"
           :pagination="pagination"
           :loading="spinning"
+          :is-global-view="page.props.isGlobalView"
           @handle-table-change="handleTableChange"
           @show-details="showAdjustmentDetails"
           @refresh="getItems"
