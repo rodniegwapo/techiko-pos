@@ -58,7 +58,7 @@ class InventoryController extends Controller
         $domainSlug = $domain?->name_slug;
         $isDomainRoute = (bool) $domain;
 
-        $location = $request->location_id 
+        $location = $request->location_id
             ? InventoryLocation::when($domainSlug, fn($q) => $q->forDomain($domainSlug))->findOrFail($request->location_id)
             : (function () use ($domainSlug) {
                 $q = InventoryLocation::active();
@@ -111,7 +111,7 @@ class InventoryController extends Controller
             foreach ($inventoryData as $inventory) {
                 $inventory->location_stock_status = $inventory->getStockStatus();
             }
-            
+
             return response()->json([
                 'success' => true,
                 'data' => $inventoryData,
@@ -154,7 +154,7 @@ class InventoryController extends Controller
 
             $query = InventoryMovement::with(['product', 'location', 'user'])
                 ->when($domainSlug, function ($q) use ($domainSlug) {
-                    return $q->whereHas('location', fn($lq) => $lq->forDomain($domainSlug));
+                    return $q->where('domain', $domainSlug);
                 })
                 ->orderBy('created_at', 'desc');
 
@@ -163,57 +163,58 @@ class InventoryController extends Controller
                 $query->search($request->search);
             }
 
-        if ($request->location_id) {
-            $query->where('location_id', $request->location_id);
-        }
+            if ($request->location_id) {
+                $query->where('location_id', $request->location_id);
+            }
 
-        if ($request->product_id) {
-            $query->where('product_id', $request->product_id);
-        }
+            if ($request->product_id) {
+                $query->where('product_id', $request->product_id);
+            }
 
-        if ($request->movement_type) {
-            $query->where('movement_type', $request->movement_type);
-        }
+            if ($request->movement_type) {
+                $query->where('movement_type', $request->movement_type);
+            }
 
-        if ($request->date_from) {
-            $query->whereDate('created_at', '>=', $request->date_from);
-        }
+            if ($request->date_from) {
+                $query->whereDate('created_at', '>=', $request->date_from);
+            }
 
-        if ($request->date_to) {
-            $query->whereDate('created_at', '<=', $request->date_to);
-        }
+            if ($request->date_to) {
+                $query->whereDate('created_at', '<=', $request->date_to);
+            }
 
-        // Domain filtering for global views - use product domain instead of location domain
-        if ($request->domain && !$isDomainRoute) {
-            $query->whereHas('product', fn($pq) => $pq->where('domain', $request->domain));
-        }
+            // Domain filtering for global views - use movement domain directly
+            if ($request->domain && !$isDomainRoute) {
+                $query->where('domain', $request->domain);
+            }
 
-        $movements = $query->paginate($request->per_page ?? 50);
+            $movements = $query->paginate($request->per_page ?? 50);
 
-        return Inertia::render('Inventory/Movements', [
-            'movements' => InventoryMovementResource::collection($movements),
-            'locations' => InventoryLocation::active()
-                ->when($domainSlug, fn($q) => $q->forDomain($domainSlug))
-                ->get(),
-            'products' => Product::select('id', 'name', 'SKU')->get(),
-            'domains' => $isDomainRoute ? [] : Domain::select('id', 'name', 'name_slug')->get(),
-            'movementTypes' => [
-                'sale' => 'Sale',
-                'purchase' => 'Purchase',
-                'adjustment' => 'Stock Adjustment',
-                'transfer_in' => 'Transfer In',
-                'transfer_out' => 'Transfer Out',
-                'return' => 'Customer Return',
-                'damage' => 'Damaged Goods',
-                'theft' => 'Theft/Loss',
-                'expired' => 'Expired Products',
-                'promotion' => 'Promotional Giveaway',
-            ],
-            'filters' => $request->only(['search', 'location_id', 'product_id', 'movement_type', 'date_from', 'date_to', 'domain']),
-            'currentDomain' => $domain,
-            'isGlobalView' => ! $isDomainRoute,
-        ]);
+            return Inertia::render('Inventory/Movements', [
+                'movements' => InventoryMovementResource::collection($movements),
+                'locations' => InventoryLocation::active()
+                    ->when($domainSlug, fn($q) => $q->forDomain($domainSlug))
+                    ->get(),
+                'products' => Product::select('id', 'name', 'SKU')->get(),
+                'domains' => $isDomainRoute ? [] : Domain::select('id', 'name', 'name_slug')->get(),
+                'movementTypes' => [
+                    'sale' => 'Sale',
+                    'purchase' => 'Purchase',
+                    'adjustment' => 'Stock Adjustment',
+                    'transfer_in' => 'Transfer In',
+                    'transfer_out' => 'Transfer Out',
+                    'return' => 'Customer Return',
+                    'damage' => 'Damaged Goods',
+                    'theft' => 'Theft/Loss',
+                    'expired' => 'Expired Products',
+                    'promotion' => 'Promotional Giveaway',
+                ],
+                'filters' => $request->only(['search', 'location_id', 'product_id', 'movement_type', 'date_from', 'date_to', 'domain']),
+                'currentDomain' => $domain,
+                'isGlobalView' => ! $isDomainRoute,
+            ]);
         } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Failed to load movements: ' . $e->getMessage());
         }
     }
 
@@ -298,7 +299,7 @@ class InventoryController extends Controller
     public function lowStock(Request $request, Domain $domain = null)
     {
         $domainSlug = $domain?->name_slug;
-        $location = $request->location_id 
+        $location = $request->location_id
             ? InventoryLocation::when($domainSlug, fn($q) => $q->forDomain($domainSlug))->findOrFail($request->location_id)
             : null;
 
@@ -306,7 +307,7 @@ class InventoryController extends Controller
 
         return response()->json([
             'products' => $lowStockProducts->map(function ($product) use ($location) {
-                $inventory = $location 
+                $inventory = $location
                     ? $product->inventoryAt($location)
                     : $product->defaultInventory();
 
@@ -328,7 +329,7 @@ class InventoryController extends Controller
     public function valuation(Request $request, Domain $domain = null)
     {
         $domainSlug = $domain?->name_slug;
-        $location = $request->location_id 
+        $location = $request->location_id
             ? InventoryLocation::when($domainSlug, fn($q) => $q->forDomain($domainSlug))->findOrFail($request->location_id)
             : (function () use ($domainSlug) {
                 $q = InventoryLocation::active();
@@ -374,7 +375,7 @@ class InventoryController extends Controller
     public function getLocationSummary(Request $request, $locationId)
     {
         $location = InventoryLocation::findOrFail($locationId);
-        
+
         $summary = [
             'id' => $location->id,
             'name' => $location->name,
@@ -390,7 +391,7 @@ class InventoryController extends Controller
             'total_inventory_value' => ProductInventory::where('location_id', $location->id)
                 ->sum('total_value'),
         ];
-        
+
         return response()->json($summary);
     }
 
@@ -406,7 +407,7 @@ class InventoryController extends Controller
             return response()->json([]);
         }
 
-        $location = $locationId 
+        $location = $locationId
             ? InventoryLocation::findOrFail($locationId)
             : InventoryLocation::getDefault();
 
