@@ -4,6 +4,7 @@ import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { IconTrash, IconEdit, IconCurrencyPeso, IconWorld } from "@tabler/icons-vue";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
+import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 
 import { usePage } from "@inertiajs/vue3";
 
@@ -11,6 +12,7 @@ const page = usePage();
 
 const { confirmDelete } = useHelpers();
 const { formData, openModal, isEdit, spinning } = useGlobalVariables();
+const { getRoute } = useDomainRoutes();
 
 defineEmits(["handleTableChange"]);
 
@@ -63,14 +65,26 @@ const columns = computed(() => {
 const handleDeleteCategory = (record) => {
   confirmDelete(
     "products.destroy",
-    { id: record.id },
+    { product: record.id },
     "Do you want to delete this item ?"
   );
 };
 
 const handleClickEdit = (record) => {
   openModal.value = true;
-  formData.value = record;
+  
+  // Transform the record data for the form
+  const transformedData = { ...record };
+  
+  // Convert category_id to the format expected by the select component
+  if (record.category_id) {
+    transformedData.category_id = {
+      value: record.category_id,
+      label: record.category?.name || `Category ${record.category_id}`
+    };
+  }
+  
+  formData.value = transformedData;
   isEdit.value = true;
 };
 </script>

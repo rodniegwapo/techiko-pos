@@ -173,6 +173,18 @@ const handleDelete = (domain) => {
     ) {
         router.delete(route("domains.destroy", domain.id), {
             onStart: () => (spinning.value = true),
+            onSuccess: () => {
+                notification.success({
+                    message: 'Success',
+                    description: 'Domain deleted successfully!',
+                });
+            },
+            onError: (errors) => {
+                notification.error({
+                    message: 'Error',
+                    description: 'Failed to delete domain.',
+                });
+            },
             onFinish: () => (spinning.value = false),
         });
     }

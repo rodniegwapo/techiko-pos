@@ -8,12 +8,14 @@ import {
 } from "@tabler/icons-vue";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
+import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import dayjs from "dayjs";
 
 const emit = defineEmits(["handleTableChange", "selectedDiscount"]);
 const { confirmDelete, formattedTotal, formattedPercent } = useHelpers();
 const { formData, openModal, isEdit, spinning, openViewModal } =
   useGlobalVariables();
+const { getRoute } = useDomainRoutes();
 
 const props = defineProps({
   products: { type: Object, required: true },
@@ -62,7 +64,7 @@ const handleTableChange = (event) => {
 const handleDelete = (record) => {
   confirmDelete(
     "products.discounts.destroy",
-    { id: record.id },
+    { discount: record.id },
     "Do you want to delete this item ?"
   );
 };

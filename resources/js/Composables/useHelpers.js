@@ -4,6 +4,7 @@ import { ExclamationCircleOutlined } from "@ant-design/icons-vue";
 import { router } from "@inertiajs/vue3";
 import { useGlobalVariables } from "./useGlobalVariable";
 import { useEmits } from "./useEmits";
+import { useDomainRoutes } from "./useDomainRoutes";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
@@ -22,6 +23,7 @@ dayjs.extend(isocalendar);
 
 const { formData, spinning, errors, openModal, isEdit } = useGlobalVariables();
 const { emitClose } = useEmits();
+const { getRoute } = useDomainRoutes();
 
 export function useHelpers() {
     const showModal = (modalName) => {
@@ -31,16 +33,39 @@ export function useHelpers() {
     };
 
     const inertiaProgressLifecyle = {
-        onSuccess: () => {
+        onSuccess: (page) => {
+            // Check if there's an error message first
+            if (page?.props?.flash?.error) {
+                notification.error({
+                    message: "Error",
+                    description: page.props.flash.error,
+                });
+                return;
+            }
+            
             openModal.value = false;
             formData.value = {};
             errors.value = {};
+            
+            // Show success notification - check multiple possible locations for flash message
+            const successMessage = page?.props?.flash?.success || 
+                                 page?.props?.success || 
+                                 'Operation completed successfully';
+            
+            notification.success({
+                message: "Success",
+                description: successMessage,
+            });
         },
         onStart: () => {
             spinning.value = true;
         },
         onError: (error) => {
             errors.value = error;
+            notification.error({
+                message: "Error",
+                description: "Operation failed. Please try again.",
+            });
         },
         onFinish: () => {
             spinning.value = false;
@@ -61,12 +86,66 @@ export function useHelpers() {
                 cancelText: "Cancel",
                 onOk: () => {
                     return new Promise((innerResolve, innerReject) => {
-                        router.delete(route(routeName, params), {
+                        const routeUrl = getRoute(routeName, params);
+                        
+                        // Check if the route URL is valid
+                        if (routeUrl === '#' || !routeUrl || routeUrl.includes('#')) {
+                            console.error('Invalid route URL generated:', routeUrl);
+                            notification.error({
+                                message: "Error",
+                                description: "Invalid route generated. Please try again.",
+                            });
+                            reject(new Error('Invalid route'));
+                            innerReject();
+                            return;
+                        }
+                        
+                        router.delete(routeUrl, {
                             onSuccess: (page) => {
+                                // Check if the backend returned an error message (redirect with error)
+                                if (page.props?.flash?.error) {
+                                    notification.error({
+                                        message: "Cannot Delete",
+                                        description: page.props.flash.error,
+                                    });
+                                    reject(new Error(page.props.flash.error));
+                                    innerReject();
+                                    return;
+                                }
+                                
+                                // Check if the backend actually returned a success message
+                                if (page.props?.flash?.success) {
+                                    notification.success({
+                                        message: "Success",
+                                        description: page.props.flash.success,
+                                    });
+                                } else {
+                                    notification.success({
+                                        message: "Success",
+                                        description: "Item deleted successfully!",
+                                    });
+                                }
                                 resolve(page);
                                 innerResolve();
                             },
                             onError: (errors) => {
+                                let errorMessage = "Failed to delete item.";
+                                
+                                // Check if there's a specific error message from the backend
+                                if (errors && typeof errors === 'object') {
+                                    if (errors.message) {
+                                        errorMessage = errors.message;
+                                    } else if (errors.error) {
+                                        errorMessage = errors.error;
+                                    } else if (Array.isArray(errors) && errors.length > 0) {
+                                        errorMessage = errors[0];
+                                    }
+                                }
+                                
+                                notification.error({
+                                    message: "Error",
+                                    description: errorMessage,
+                                });
                                 reject(errors);
                                 innerReject();
                             },

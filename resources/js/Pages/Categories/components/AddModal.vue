@@ -8,11 +8,13 @@ import { useTable } from "@/Composables/useTable";
 import { usePage } from "@inertiajs/vue3";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useHelpers } from "@/Composables/useHelpers";
+import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 
 const { spinning } = useTable();
 const page = usePage();
 const { formData, openModal, isEdit } = useGlobalVariables();
 const { inertiaProgressLifecyle } = useHelpers();
+const { getRoute } = useDomainRoutes();
 
 const props = defineProps({
   visible: {
@@ -31,7 +33,7 @@ const formFields = [
 const errors = ref({});
 const handleSave = () => {
   router.post(
-    route("categories.store"),
+    getRoute("categories.store"),
     formData.value,
     inertiaProgressLifecyle
   );
@@ -39,8 +41,8 @@ const handleSave = () => {
 
 const handleUpdate = () => {
   router.put(
-    route("categories.update", {
-      id: formData.value.id,
+    getRoute("categories.update", {
+      category: formData.value.id,
     }),
     formData.value,
     inertiaProgressLifecyle

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\ProductResource;
 use App\Models\Domain;
 use App\Models\Product\Product;
+use App\Models\Category;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -30,9 +31,21 @@ class ProductController extends Controller
 
         $products = $query->latest()->paginate(15);
 
+        // Get categories for the domain
+        $categories = Category::query()
+            ->when($domain, function ($query) use ($domain) {
+                return $query->where('domain', $domain->name_slug);
+            })
+            ->get();
+
+        // Get sold types
+        $soldByTypes = \App\Models\Product\ProductSoldType::all();
+
         return Inertia::render('Products/Index', [
             // Frontend expects `items` with a paginated resource
             'items' => ProductResource::collection($products),
+            'categories' => $categories,
+            'sold_by_types' => $soldByTypes,
             'currentDomain' => $domain,
             'isGlobalView' => !$domain,
         ]);
@@ -46,6 +59,7 @@ class ProductController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'sold_type' => 'required|string|max:255',
             'price' => 'required|numeric|min:0',
             'cost' => 'nullable|numeric|min:0',
             'category_id' => 'required|exists:categories,id',
@@ -61,11 +75,7 @@ class ProductController extends Controller
         }
         $product = Product::create($validated);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Product created successfully',
-            'product' => new ProductResource($product->load('category'))
-        ], 201);
+        return redirect()->back()->with('success', 'Product created successfully');
     }
 
     /**
@@ -81,6 +91,7 @@ class ProductController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'sold_type' => 'required|string|max:255',
             'price' => 'required|numeric|min:0',
             'cost' => 'nullable|numeric|min:0',
             'category_id' => 'required|exists:categories,id',
@@ -93,11 +104,7 @@ class ProductController extends Controller
 
         $product->update($validated);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Product updated successfully',
-            'product' => new ProductResource($product->load('category'))
-        ]);
+        return redirect()->back()->with('success', 'Product updated successfully');
     }
 
     /**
@@ -112,9 +119,6 @@ class ProductController extends Controller
 
         $product->delete();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Product deleted successfully'
-        ]);
+        return redirect()->back()->with('success', 'Product deleted successfully');
     }
 }

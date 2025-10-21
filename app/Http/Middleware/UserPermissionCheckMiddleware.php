@@ -37,6 +37,15 @@ class UserPermissionCheckMiddleware
             // Support both string column and relation exposure
             $userDomainSlug = $user->domain ?? ($user->domain?->name_slug ?? null);
 
+            // Debug logging
+            \Log::info('Domain permission check', [
+                'route_name' => $routeName,
+                'route_domain_slug' => $routeDomainSlug,
+                'user_domain_slug' => $userDomainSlug,
+                'user_id' => $user->id,
+                'user_domain' => $user->domain,
+            ]);
+
             if ($routeDomainSlug && $userDomainSlug && $routeDomainSlug === $userDomainSlug) {
                 return $next($request);
             }

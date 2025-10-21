@@ -8,11 +8,13 @@ import {
 } from "@tabler/icons-vue";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
+import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 
 const emit = defineEmits(["handleTableChange", "selectedMandatoryDiscount"]);
 const { confirmDelete, formattedTotal, formattedPercent } = useHelpers();
 const { formData, openModal, isEdit, spinning, openViewModal } =
   useGlobalVariables();
+const { getRoute } = useDomainRoutes();
 
 const props = defineProps({
   products: { type: Object, required: true },

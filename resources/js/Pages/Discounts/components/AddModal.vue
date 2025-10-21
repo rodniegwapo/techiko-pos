@@ -8,12 +8,14 @@ import { useTable } from "@/Composables/useTable";
 import { usePage } from "@inertiajs/vue3";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useHelpers } from "@/Composables/useHelpers";
+import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import dayjs from "dayjs";
 
 const { spinning } = useTable();
 const page = usePage();
 const { formData, openModal, isEdit } = useGlobalVariables();
 const { inertiaProgressLifecyle } = useHelpers();
+const { getRoute } = useDomainRoutes();
 
 const props = defineProps({
   visible: {
@@ -36,7 +38,9 @@ const formFields = [
       {
         label: "Percentage",
         value: "percentage",
-        lable: "Amount",
+      },
+      {
+        label: "Amount",
         value: "amount",
       },
     ],
@@ -76,13 +80,14 @@ const errors = ref({});
 const handleSave = () => {
   const payload = {
     ...formData.value,
-    scope: formData.value?.scope?.value,
+    type: formData.value?.type?.value || formData.value.type,
+    scope: formData.value?.scope?.value || formData.value.scope,
     start_date: dayjs(formData.value.start_date).format("YYYY-MM-DD hh:mm:ss"),
     end_date: dayjs(formData.value?.end_date).format("YYYY-MM-DD hh:mm:ss"),
   };
 
   router.post(
-    route("products.discounts.store"),
+    getRoute("products.discounts.store"),
     payload,
     inertiaProgressLifecyle
   );
@@ -91,13 +96,15 @@ const handleSave = () => {
 const handleUpdate = () => {
   const payload = {
     ...formData.value,
+    type: formData.value?.type?.value || formData.value.type,
+    scope: formData.value?.scope?.value || formData.value.scope,
     start_date: dayjs(formData.value.start_date).format("YYYY-MM-DD hh:mm:ss"),
     end_date: dayjs(formData.value?.end_date).format("YYYY-MM-DD hh:mm:ss"),
   };
 
   router.put(
-    route("products.discounts.update", {
-      id: formData.value.id,
+    getRoute("products.discounts.update", {
+      discount: formData.value.id,
     }),
     payload,
     inertiaProgressLifecyle

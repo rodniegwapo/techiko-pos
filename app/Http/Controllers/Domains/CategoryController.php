@@ -51,11 +51,7 @@ class CategoryController extends Controller
         }
         $category = Category::create($validated);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Category created successfully',
-            'category' => $category
-        ], 201);
+        return redirect()->back()->with('success', 'Category created successfully');
     }
 
     /**
@@ -75,17 +71,13 @@ class CategoryController extends Controller
 
         $category->update($validated);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Category updated successfully',
-            'category' => $category
-        ]);
+        return redirect()->back()->with('success', 'Category updated successfully');
     }
 
     /**
      * Remove the specified category from the domain.
      */
-    public function destroy(Domain $domain, Category $category)
+    public function destroy(Request $request, Domain $domain, Category $category)
     {
         // Ensure category belongs to this domain
         if ($category->domain !== $domain->name_slug) {
@@ -93,18 +85,17 @@ class CategoryController extends Controller
         }
 
         // Check if category has products
-        if ($category->products()->count() > 0) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Cannot delete category with existing products'
-            ], 422);
+        $productCount = \App\Models\Product\Product::where('category_id', $category->id)->count();
+        
+        if ($productCount > 0) {
+            return redirect()->back()->with('error', "Cannot delete category with {$productCount} existing products. Please move or delete the products first.");
         }
 
-        $category->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Category deleted successfully'
-        ]);
+        try {
+            $category->delete();
+            return redirect()->back()->with('success', 'Category deleted successfully');
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Failed to delete category: ' . $e->getMessage());
+        }
     }
 }
