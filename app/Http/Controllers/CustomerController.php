@@ -19,6 +19,7 @@ class CustomerController extends Controller
         return Inertia::render('Customers/Index', [
             'items' => CustomerResource::collection($customers),
             'isGlobalView' => true,
+            'domains' => \App\Models\Domain::select('id', 'name', 'name_slug')->get(),
         ]);
     }
 
@@ -111,14 +112,21 @@ class CustomerController extends Controller
      */
     private function validateCustomer(Request $request, $ignoreId = null)
     {
-        return $request->validate([
+        $rules = [
             'name' => 'required|string|max:255',
             'phone' => 'nullable|string|max:20',
             'email' => 'nullable|email|unique:customers,email' . ($ignoreId ? ",$ignoreId" : ''),
             'address' => 'nullable|string|max:500',
             'date_of_birth' => 'nullable|date',
             'enroll_in_loyalty' => 'boolean'
-        ]);
+        ];
+
+        // Add domain validation for global view
+        if ($request->has('domain') && $request->domain) {
+            $rules['domain'] = 'required|string|exists:domains,name_slug';
+        }
+
+        return $request->validate($rules);
     }
 
     /**

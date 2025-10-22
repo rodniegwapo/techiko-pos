@@ -21,38 +21,60 @@ const props = defineProps({
   },
 });
 
-const formFields = [
-  {
-    key: "name",
-    label: "Discount Name",
-    type: "text",
-    placeholder: "e.g., Senior Citizen, PWD, Student",
-  },
-  {
-    key: "type",
-    label: "Discount Type",
-    type: "select",
-    options: [
-      { label: "Percentage", value: "percentage" },
-      { label: "Amount", value: "amount" },
-    ],
-  },
-  {
-    key: "value",
-    label: "Discount Value",
-    type: "number",
-    placeholder: "Enter discount value (e.g., 20 for 20% or 100 for ₱100)",
-  },
-  {
-    key: "is_active",
-    label: "Status",
-    type: "select",
-    options: [
-      { label: "Active", value: true },
-      { label: "Inactive", value: false },
-    ],
-  },
-];
+const domainOptions = computed(() => {
+  const list = Array.isArray(page?.props?.domains)
+    ? page.props.domains
+    : [];
+  return list.map((item) => ({ label: item.name, value: item.name_slug }));
+});
+
+const formFields = computed(() => {
+  const baseFields = [
+    {
+      key: "name",
+      label: "Discount Name",
+      type: "text",
+      placeholder: "e.g., Senior Citizen, PWD, Student",
+    },
+    {
+      key: "type",
+      label: "Discount Type",
+      type: "select",
+      options: [
+        { label: "Percentage", value: "percentage" },
+        { label: "Amount", value: "amount" },
+      ],
+    },
+    {
+      key: "value",
+      label: "Discount Value",
+      type: "number",
+      placeholder: "Enter discount value (e.g., 20 for 20% or 100 for ₱100)",
+    },
+    {
+      key: "is_active",
+      label: "Status",
+      type: "select",
+      options: [
+        { label: "Active", value: true },
+        { label: "Inactive", value: false },
+      ],
+    },
+  ];
+
+  // Add domain field for global view
+  if (page.props.isGlobalView) {
+    baseFields.splice(1, 0, {
+      key: "domain",
+      label: "Domain",
+      type: "select",
+      options: domainOptions.value,
+      required: true
+    });
+  }
+
+  return baseFields;
+});
 
 const errors = ref({});
 

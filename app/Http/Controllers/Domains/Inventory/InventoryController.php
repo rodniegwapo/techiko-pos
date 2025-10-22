@@ -208,6 +208,7 @@ class InventoryController extends Controller
                 'average_cost' => $inventory->average_cost,
                 'total_value' => $inventory->total_value,
                 'last_movement_at' => $inventory->last_movement_at,
+                'domain' => $inventory->location->domain ?? 'N/A',
             ];
         });
 
@@ -220,6 +221,7 @@ class InventoryController extends Controller
             ],
             'items' => $valuationData,
             'locations' => InventoryLocation::active()->forDomain($slug)->get(),
+            'filters' => $request->only(['location_id']),
         ]);
     }
 

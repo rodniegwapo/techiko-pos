@@ -71,6 +71,15 @@
                 </a-form-item>
             </div>
 
+            <!-- Domain field for global view -->
+            <a-form-item v-if="page.props.isGlobalView" label="Domain" name="domain">
+                <a-select
+                    v-model:value="form.domain"
+                    placeholder="Select domain"
+                    :options="domainOptions"
+                />
+            </a-form-item>
+
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <a-form-item label="Password" name="password">
                     <a-input-password
@@ -151,6 +160,14 @@ import axios from "axios";
 
 const page = usePage();
 
+// Domain options
+const domainOptions = computed(() => {
+    const list = Array.isArray(page?.props?.domains)
+        ? page.props.domains
+        : [];
+    return list.map((item) => ({ label: item.name, value: item.name_slug }));
+});
+
 // Props
 const props = defineProps({
     visible: {
@@ -186,6 +203,7 @@ const form = reactive({
     password_confirmation: "",
     role_id: null,
     supervisor_id: null,
+    domain: page.props.isGlobalView ? null : (page.props.currentDomain?.name_slug || null),
 });
 
 // Current user
@@ -420,6 +438,7 @@ const handleSave = async () => {
             email: form.email,
             role_id: form.role_id,
             supervisor_id: form.supervisor_id,
+            domain: form.domain || undefined,
         };
 
         // Only include password if it's provided

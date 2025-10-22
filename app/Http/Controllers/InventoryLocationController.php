@@ -61,6 +61,8 @@ class InventoryLocationController extends Controller
     {
         return Inertia::render('Inventory/Locations/Create', [
             'locationTypes' => $this->getLocationTypes(),
+            'domains' => \App\Models\Domain::select('id', 'name', 'name_slug')->get(),
+            'isGlobalView' => true,
         ]);
     }
 

@@ -43,6 +43,7 @@ class ProductController extends Controller
             'categories' => Category::all(),
             'sold_by_types' => ProductSoldType::all(),
             'isGlobalView' => true,
+            'domains' => \App\Models\Domain::select('id', 'name', 'name_slug')->get(),
         ]);
     }
 
@@ -73,7 +74,7 @@ class ProductController extends Controller
 
     private function validatedData(Request $request)
     {
-        return $request->validate([
+        $rules = [
             'name' => ['required', 'string', 'max:255'],
             'sold_type' => ['required', 'exists:product_sold_types,name'], // must exist in table
             'price' => ['required', 'integer', 'min:0'],
@@ -83,6 +84,13 @@ class ProductController extends Controller
             'representation_type' => ['nullable', 'string', 'in:image,color,text'],
             'representation' => ['nullable', 'string'],
             'category_id' => ['nullable', 'exists:categories,id'],
-        ]);
+        ];
+
+        // Add domain validation for global view
+        if ($request->has('domain') && $request->domain) {
+            $rules['domain'] = ['required', 'string', 'exists:domains,name_slug'];
+        }
+
+        return $request->validate($rules);
     }
 }

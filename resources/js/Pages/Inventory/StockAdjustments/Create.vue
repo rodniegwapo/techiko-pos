@@ -1,6 +1,6 @@
 <script setup>
 import { ref, reactive, computed, watch } from "vue";
-import { router, Head } from "@inertiajs/vue3";
+import { router, Head, usePage } from "@inertiajs/vue3";
 import {
   PlusOutlined,
   MinusOutlined,
@@ -19,10 +19,12 @@ import ContentHeader from "@/Components/ContentHeader.vue";
 import ContentLayout from "@/Components/ContentLayout.vue";
 
 const { spinning } = useGlobalVariables();
+const page = usePage();
 
 const props = defineProps({
   locations: Array,
   reasons: Object,
+  domains: Array,
 });
 
 // Form state
@@ -32,6 +34,7 @@ const form = reactive({
   reason: null,
   description: "",
   items: [],
+  domain: page.props.isGlobalView ? null : (page.props.currentDomain?.name_slug || null),
 });
 
 const loading = ref(false);
@@ -175,6 +178,13 @@ const reasonOptions = computed(() =>
   }))
 );
 
+const domainOptions = computed(() => 
+  (props.domains || []).map(domain => ({ 
+    label: domain.name, 
+    value: domain.name_slug 
+  }))
+);
+
 // Submit form
 const handleSubmit = async () => {
   if (!form.location_id) {
@@ -222,6 +232,7 @@ const handleSubmit = async () => {
       type: form.type,
       reason: form.reason,
       description: form.description,
+      domain: form.domain || undefined,
       items: form.items.map((item) => ({
         product_id: item.product_id,
         actual_quantity: item.actual_quantity,
@@ -373,6 +384,27 @@ const handleCancel = () => {
                 :value="option.value"
               >
                 {{ option.label }}
+              </a-select-option>
+            </a-select>
+          </div>
+
+          <!-- Domain field for global view -->
+          <div v-if="page.props.isGlobalView" class="md:col-span-2">
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              Domain *
+            </label>
+            <a-select
+              v-model:value="form.domain"
+              placeholder="Select domain"
+              class="w-full"
+              :disabled="loading"
+            >
+              <a-select-option
+                v-for="domain in domainOptions"
+                :key="domain.value"
+                :value="domain.value"
+              >
+                {{ domain.label }}
               </a-select-option>
             </a-select>
           </div>

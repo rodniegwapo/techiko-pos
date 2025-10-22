@@ -1,5 +1,5 @@
 <script setup>
-import { ref, toRefs } from "vue";
+import { ref, toRefs, computed } from "vue";
 import VerticalForm from "@/components/Forms/VerticalForm.vue";
 import PrimaryButton from "@/Components/PrimaryButton.vue";
 import { useEmits } from "@/Composables/useEmits";
@@ -25,10 +25,32 @@ const props = defineProps({
 
 const { emitClose, emitEvent } = useEmits();
 
-const formFields = [
-  { key: "name", label: "Name", type: "text" },
-  { key: "description", label: "Description", type: "textarea", rows: 4 },
-];
+const domainOptions = computed(() => {
+  const list = Array.isArray(page?.props?.domains)
+    ? page.props.domains
+    : [];
+  return list.map((item) => ({ label: item.name, value: item.name_slug }));
+});
+
+const formFields = computed(() => {
+  const baseFields = [
+    { key: "name", label: "Name", type: "text" },
+    { key: "description", label: "Description", type: "textarea", rows: 4 },
+  ];
+
+  // Add domain field for global view
+  if (page.props.isGlobalView) {
+    baseFields.splice(1, 0, {
+      key: "domain",
+      label: "Domain",
+      type: "select",
+      options: domainOptions.value,
+      required: true
+    });
+  }
+
+  return baseFields;
+});
 
 const errors = ref({});
 const handleSave = () => {
