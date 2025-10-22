@@ -107,7 +107,7 @@ const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
             ref: status,
             getLabel: toLabel(computed(() => statusOptions.value)),
         },
-        ...(props.isGlobalView
+        ...(page.props.auth?.user?.data?.is_super_user
             ? [
                   {
                       label: "Domain",
@@ -137,8 +137,8 @@ const filtersConfig = computed(() => {
         },
     ];
 
-    // Add domain filter if in global view
-    if (props.isGlobalView) {
+    // Add domain filter for super users only
+    if (page.props.auth?.user?.data?.is_super_user) {
         baseConfig.push({
             key: "domain",
             label: "Domain",
@@ -154,8 +154,8 @@ const filtersConfig = computed(() => {
 const tableFilters = computed(() => {
     const baseFilters = { search, type, status };
 
-    // Add domain filter if in global view
-    if (props.isGlobalView) {
+    // Add domain filter for super users only
+    if (page.props.auth?.user?.data?.is_super_user) {
         baseFilters.domain = domain;
     }
 
@@ -250,8 +250,8 @@ const columns = computed(() => {
         { title: "Status", key: "status", align: "left" },
     ];
 
-    // Add domain column if in global view
-    if (props.isGlobalView) {
+    // Add domain column for super users only
+    if (page.props.auth?.user?.data?.is_super_user) {
         baseColumns.splice(1, 0, {
             title: "Domain",
             dataIndex: "domain",

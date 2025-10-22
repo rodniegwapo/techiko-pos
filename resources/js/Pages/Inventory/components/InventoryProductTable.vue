@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from "vue";
+import { usePage } from "@inertiajs/vue3";
 import {
     IconCircleCheck,
     IconAlertTriangle,
@@ -13,6 +14,7 @@ import { useHelpers } from "@/Composables/useHelpers";
 import { router } from "@inertiajs/vue3";
 
 const { formatCurrency, formatDate } = useHelpers();
+const page = usePage();
 
 const emit = defineEmits(["handleTableChange", "showDetails", "transferStock"]);
 
@@ -49,8 +51,8 @@ const columns = computed(() => {
         { title: "Value", dataIndex: "value", key: "value", align: "left" },
     ];
 
-    // Add domain column for global view
-    if (props.isGlobalView) {
+    // Add domain column for super users only
+    if (page.props.auth?.user?.data?.is_super_user) {
         baseColumns.splice(1, 0, {
             title: "Domain",
             dataIndex: "domain",
