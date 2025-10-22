@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { usePage, router, Head } from "@inertiajs/vue3";
 import {
   DollarOutlined,
@@ -22,6 +22,7 @@ const page = usePage();
 const { spinning } = useGlobalVariables();
 
 const selectedLocation = ref(null);
+const selectedDomain = ref(null);
 
 // Props from backend
 const props = defineProps({
@@ -30,6 +31,7 @@ const props = defineProps({
   items: Array,
   locations: Array,
   filters: Object,
+  domains: Array,
 });
 
 // Initialize filters from backend
@@ -37,6 +39,7 @@ onMounted(() => {
   if (props.filters) {
     selectedLocation.value =
       props.filters.location_id || props.location?.id || null;
+    selectedDomain.value = props.filters.domain || null;
   }
 });
 
@@ -52,27 +55,125 @@ const getItems = () => {
     preserveScroll: true,
     data: {
       location_id: selectedLocation.value || undefined,
+      domain: selectedDomain.value || undefined,
     },
     onStart: () => (spinning.value = true),
     onFinish: () => (spinning.value = false),
   });
 };
 
+// Watch domain changes to update locations
+watch(selectedDomain, (newDomain) => {
+  if (newDomain) {
+    // Clear location selection when domain changes
+    selectedLocation.value = null;
+    // Fetch items to update the report
+    getItems();
+  }
+});
+
 // Watch search with debounce
 
-// Filter options
-const locationOptions = computed(
-  () =>
-    props.locations?.map((loc) => ({
+// Filter options - Location options should be filtered by selected domain
+const locationOptions = computed(() => {
+  if (!page.props.isGlobalView || !selectedDomain.value) {
+    return props.locations?.map((loc) => ({
       label: loc.name,
       value: loc.id,
-    })) || []
+    })) || [];
+  }
+  
+  // Filter locations by selected domain
+  return props.locations
+    ?.filter(loc => loc.domain === selectedDomain.value)
+    ?.map((loc) => ({
+      label: loc.name,
+      value: loc.id,
+    })) || [];
+});
+
+const domainOptions = computed(() => 
+  (props.domains || []).map(domain => ({ 
+    label: domain.name, 
+    value: domain.name_slug 
+  }))
 );
 
-// Filter management
+// Table columns with conditional domain column
+const tableColumns = computed(() => {
+  const baseColumns = [
+    {
+      title: 'Product Name',
+      dataIndex: 'product_name',
+      key: 'product_name',
+      align: 'left',
+      sorter: (a, b) => a.product_name.localeCompare(b.product_name),
+    },
+    {
+      title: 'SKU',
+      dataIndex: 'sku',
+      key: 'sku',
+    },
+    {
+      title: 'Quantity',
+      dataIndex: 'quantity_on_hand',
+      key: 'quantity_on_hand',
+      width: 100,
+      align: 'left',
+      sorter: (a, b) => a.quantity_on_hand - b.quantity_on_hand,
+    },
+    {
+      title: 'Average Cost',
+      dataIndex: 'average_cost',
+      key: 'average_cost',
+      align: 'left',
+      customRender: ({ text }) => `₱${parseFloat(text).toFixed(2)}`,
+      sorter: (a, b) => a.average_cost - b.average_cost,
+    },
+    {
+      title: 'Total Value',
+      dataIndex: 'total_value',
+      key: 'total_value',
+      align: 'left',
+      customRender: ({ text }) =>
+        `₱${parseFloat(text).toLocaleString('en-US', {
+          minimumFractionDigits: 2,
+        })}`,
+      sorter: (a, b) => a.total_value - b.total_value,
+    },
+    {
+      title: 'Last Movement',
+      dataIndex: 'last_movement_at',
+      key: 'last_movement_at',
+      customRender: ({ text }) =>
+        text ? new Date(text).toLocaleDateString() : 'N/A',
+    },
+  ];
+
+  // Add domain column for global view
+  if (page.props.isGlobalView) {
+    baseColumns.splice(2, 0, {
+      title: 'Domain',
+      dataIndex: 'domain',
+      key: 'domain',
+      align: 'left',
+      sorter: (a, b) => a.domain.localeCompare(b.domain),
+    });
+  }
+
+  return baseColumns;
+});
+
+// Filter management - Domain first, then Location
 const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
   getItems,
   configs: [
+    ...(page.props.isGlobalView ? [{
+      label: "Domain",
+      key: "domain",
+      ref: selectedDomain,
+      getLabel: toLabel(computed(() => domainOptions.value)),
+    }] : []),
     {
       label: "Location",
       key: "location_id",
@@ -82,8 +183,14 @@ const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
   ],
 });
 
-// FilterDropdown configuration
+// FilterDropdown configuration - Domain first
 const filtersConfig = [
+  ...(page.props.isGlobalView ? [{
+    key: "domain",
+    label: "Domain",
+    type: "select",
+    options: domainOptions.value,
+  }] : []),
   {
     key: "location_id",
     label: "Location",
@@ -221,57 +328,7 @@ const printValuation = () => {
             </template>
 
             <a-table
-              :columns="[
-                {
-                  title: 'Product Name',
-                  dataIndex: 'product_name',
-                  key: 'product_name',
-                  align: 'left',
-                  sorter: (a, b) =>
-                    a.product_name.localeCompare(b.product_name),
-                },
-                {
-                  title: 'SKU',
-                  dataIndex: 'sku',
-                  key: 'sku',
-                },
-                {
-                  title: 'Quantity',
-                  dataIndex: 'quantity_on_hand',
-                  key: 'quantity_on_hand',
-                  width: 100,
-                  align: 'left',
-                  sorter: (a, b) => a.quantity_on_hand - b.quantity_on_hand,
-                },
-                {
-                  title: 'Average Cost',
-                  dataIndex: 'average_cost',
-                  key: 'average_cost',
-
-                  align: 'left',
-                  customRender: ({ text }) => `₱${parseFloat(text).toFixed(2)}`,
-                  sorter: (a, b) => a.average_cost - b.average_cost,
-                },
-                {
-                  title: 'Total Value',
-                  dataIndex: 'total_value',
-                  key: 'total_value',
-                  align: 'left',
-                  customRender: ({ text }) =>
-                    `₱${parseFloat(text).toLocaleString('en-US', {
-                      minimumFractionDigits: 2,
-                    })}`,
-                  sorter: (a, b) => a.total_value - b.total_value,
-                },
-                {
-                  title: 'Last Movement',
-                  dataIndex: 'last_movement_at',
-                  key: 'last_movement_at',
-
-                  customRender: ({ text }) =>
-                    text ? new Date(text).toLocaleDateString() : 'N/A',
-                },
-              ]"
+              :columns="tableColumns"
               :data-source="items"
               :pagination="{
                 pageSize: 50,

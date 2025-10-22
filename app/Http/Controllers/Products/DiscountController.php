@@ -81,7 +81,7 @@ class DiscountController extends Controller
 
     private function validatedData(Request $request)
     {
-        return $request->validate([
+        $rules = [
             'name' => 'string|max:200|required',
             'type' => 'string|in:amount,percentage|required',
             'value' => 'numeric|required',
@@ -89,6 +89,13 @@ class DiscountController extends Controller
             'scope' => 'string|in:order,product|required',
             'start_date' => 'date|required',
             'end_date' => 'date|required|after:start_date'
-        ]);
+        ];
+
+        // Add domain validation for global view
+        if ($request->has('domain') && $request->domain) {
+            $rules['domain'] = 'required|string|exists:domains,name_slug';
+        }
+
+        return $request->validate($rules);
     }
 }

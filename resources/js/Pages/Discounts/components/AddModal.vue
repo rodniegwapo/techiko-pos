@@ -24,57 +24,79 @@ const props = defineProps({
   },
 });
 
-const formFields = [
-  {
-    key: "name",
-    label: "Discount Name",
-    type: "text",
-  },
-  {
-    key: "type",
-    label: "Discount Type",
-    type: "radio",
-    options: [
-      {
-        label: "Percentage",
-        value: "percentage",
-      },
-      {
-        label: "Amount",
-        value: "amount",
-      },
-    ],
-  },
-  {
-    key: "value",
-    label: "Discount Value",
-    type: "number",
-  },
-  {
-    key: "min_order_amount",
-    label: "Minimum Order Amount",
-    type: "number",
-  },
-  {
-    key: "scope",
-    label: "Scope",
-    type: "select",
-    options: [
-      { label: "Order", value: "order" },
-      { label: "Product", value: "product" },
-    ],
-  },
-  {
-    key: "start_date",
-    label: "Start Date",
-    type: "datetime",
-  },
-  {
-    key: "end_date",
-    label: "End Date",
-    type: "datetime",
-  },
-];
+const domainOptions = computed(() => {
+  const list = Array.isArray(page?.props?.domains)
+    ? page.props.domains
+    : [];
+  return list.map((item) => ({ label: item.name, value: item.name_slug }));
+});
+
+const formFields = computed(() => {
+  const baseFields = [
+    {
+      key: "name",
+      label: "Discount Name",
+      type: "text",
+    },
+    {
+      key: "type",
+      label: "Discount Type",
+      type: "radio",
+      options: [
+        {
+          label: "Percentage",
+          value: "percentage",
+        },
+        {
+          label: "Amount",
+          value: "amount",
+        },
+      ],
+    },
+    {
+      key: "value",
+      label: "Discount Value",
+      type: "number",
+    },
+    {
+      key: "min_order_amount",
+      label: "Minimum Order Amount",
+      type: "number",
+    },
+    {
+      key: "scope",
+      label: "Scope",
+      type: "select",
+      options: [
+        { label: "Order", value: "order" },
+        { label: "Product", value: "product" },
+      ],
+    },
+    {
+      key: "start_date",
+      label: "Start Date",
+      type: "datetime",
+    },
+    {
+      key: "end_date",
+      label: "End Date",
+      type: "datetime",
+    },
+  ];
+
+  // Add domain field for global view
+  if (page.props.isGlobalView) {
+    baseFields.splice(1, 0, {
+      key: "domain",
+      label: "Domain",
+      type: "select",
+      options: domainOptions.value,
+      required: true
+    });
+  }
+
+  return baseFields;
+});
 
 const errors = ref({});
 const handleSave = () => {

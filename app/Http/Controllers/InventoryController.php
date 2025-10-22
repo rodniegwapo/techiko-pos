@@ -223,7 +223,7 @@ class InventoryController extends Controller
      */
     public function receive(Request $request)
     {
-        $validated = $request->validate([
+        $rules = [
             'location_id' => 'required|exists:inventory_locations,id',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
@@ -234,7 +234,14 @@ class InventoryController extends Controller
             'items.*.notes' => 'nullable|string|max:500',
             'reference_type' => 'nullable|string',
             'reference_id' => 'nullable|integer',
-        ]);
+        ];
+
+        // Add domain validation for global view
+        if ($request->has('domain') && $request->domain) {
+            $rules['domain'] = 'required|string|exists:domains,name_slug';
+        }
+
+        $validated = $request->validate($rules);
 
         try {
             $this->inventoryService->receiveInventory(
@@ -262,13 +269,20 @@ class InventoryController extends Controller
      */
     public function transfer(Request $request)
     {
-        $validated = $request->validate([
+        $rules = [
             'product_id' => 'required|exists:products,id',
             'from_location_id' => 'required|exists:inventory_locations,id',
             'to_location_id' => 'required|exists:inventory_locations,id|different:from_location_id',
             'quantity' => 'required|integer|min:1',
             'notes' => 'nullable|string|max:500',
-        ]);
+        ];
+
+        // Add domain validation for global view
+        if ($request->has('domain') && $request->domain) {
+            $rules['domain'] = 'required|string|exists:domains,name_slug';
+        }
+
+        $validated = $request->validate($rules);
 
         try {
             $product = Product::findOrFail($validated['product_id']);
@@ -329,18 +343,32 @@ class InventoryController extends Controller
     public function valuation(Request $request, Domain $domain = null)
     {
         $domainSlug = $domain?->name_slug;
+        
+        // Handle domain filter from request (for global view)
+        $filterDomainSlug = $request->domain;
+        
+        // Determine which domain to use
+        $effectiveDomainSlug = $domainSlug ?? $filterDomainSlug;
+        
         $location = $request->location_id
-            ? InventoryLocation::when($domainSlug, fn($q) => $q->forDomain($domainSlug))->findOrFail($request->location_id)
-            : (function () use ($domainSlug) {
+            ? InventoryLocation::when($effectiveDomainSlug, fn($q) => $q->forDomain($effectiveDomainSlug))->findOrFail($request->location_id)
+            : (function () use ($effectiveDomainSlug) {
                 $q = InventoryLocation::active();
-                if ($domainSlug) $q->forDomain($domainSlug);
+                if ($effectiveDomainSlug) $q->forDomain($effectiveDomainSlug);
                 return $q->first() ?? InventoryLocation::getDefault();
             })();
 
-        $inventories = ProductInventory::with('product')
+        $inventories = ProductInventory::with(['product', 'location'])
             ->where('location_id', $location->id)
             ->where('quantity_on_hand', '>', 0)
             ->get();
+
+        // If domain filter is applied, filter inventories by domain
+        if ($filterDomainSlug && !$domainSlug) {
+            $inventories = $inventories->filter(function ($inventory) use ($filterDomainSlug) {
+                return $inventory->location->domain === $filterDomainSlug;
+            });
+        }
 
         $totalValue = $inventories->sum('total_value');
         $totalQuantity = $inventories->sum('quantity_on_hand');
@@ -354,8 +382,21 @@ class InventoryController extends Controller
                 'average_cost' => $inventory->average_cost,
                 'total_value' => $inventory->total_value,
                 'last_movement_at' => $inventory->last_movement_at,
+                'domain' => $inventory->location->domain ?? 'N/A',
             ];
         });
+
+        // Get locations based on domain filter
+        $locations = InventoryLocation::active()
+            ->when($effectiveDomainSlug, fn($q) => $q->forDomain($effectiveDomainSlug))
+            ->get();
+
+        // If domain filter is applied, only show locations from that domain
+        if ($filterDomainSlug && !$domainSlug) {
+            $locations = $locations->filter(function ($location) use ($filterDomainSlug) {
+                return $location->domain === $filterDomainSlug;
+            });
+        }
 
         return Inertia::render('Inventory/Valuation', [
             'location' => $location,
@@ -365,7 +406,32 @@ class InventoryController extends Controller
                 'total_products' => $inventories->count(),
             ],
             'items' => $valuationData,
-            'locations' => InventoryLocation::active()->get(),
+            'locations' => $locations,
+            'domains' => \App\Models\Domain::select('id', 'name', 'name_slug')->get(),
+            'isGlobalView' => !$domain,
+            'filters' => $request->only(['location_id', 'domain']),
+        ]);
+    }
+
+    /**
+     * Get locations by domain for dynamic loading
+     */
+    public function getLocationsByDomain(Request $request)
+    {
+        $domainSlug = $request->domain;
+        
+        $locations = InventoryLocation::active()
+            ->when($domainSlug, fn($q) => $q->forDomain($domainSlug))
+            ->get();
+        
+        return response()->json([
+            'locations' => $locations->map(function ($location) {
+                return [
+                    'id' => $location->id,
+                    'name' => $location->name,
+                    'domain' => $location->domain,
+                ];
+            })
         ]);
     }
 

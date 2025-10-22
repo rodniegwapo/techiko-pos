@@ -173,12 +173,19 @@ class UserService
     {
         $availableRoles = $this->getAvailableRolesForCreation($currentUser);
 
-        $user = User::create([
+        $userData = [
             'name' => $data['name'],
             'email' => $data['email'],
             'password' => Hash::make($data['password']),
             'supervisor_id' => $data['supervisor_id'] ?? null,
-        ]);
+        ];
+
+        // Add domain if provided (for global view)
+        if (isset($data['domain']) && $data['domain']) {
+            $userData['domain'] = $data['domain'];
+        }
+
+        $user = User::create($userData);
 
         // Assign role with correct guard
         $role = Role::findById($data['role_id'], 'web');
@@ -202,6 +209,11 @@ class UserService
                 'email' => $data['email'],
                 'supervisor_id' => $data['supervisor_id'] ?? null,
             ];
+
+            // Add domain if provided (for global view)
+            if (isset($data['domain']) && $data['domain']) {
+                $updateData['domain'] = $data['domain'];
+            }
 
             if (!empty($data['password'])) {
                 $updateData['password'] = Hash::make($data['password']);
@@ -265,7 +277,7 @@ class UserService
     {
         $availableRoles = $this->getAvailableRolesForCreation($currentUser);
 
-        return [
+        $rules = [
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:8|confirmed',
@@ -276,6 +288,13 @@ class UserService
             }],
             'supervisor_id' => 'nullable|exists:users,id'
         ];
+
+        // Add domain validation for global view
+        if (request()->has('domain') && request()->domain) {
+            $rules['domain'] = 'required|string|exists:domains,name_slug';
+        }
+
+        return $rules;
     }
 
     /**
@@ -292,7 +311,7 @@ class UserService
                 })
                 ->pluck('id');
 
-            return [
+            $rules = [
                 'name' => 'required|string|max:255',
                 'email' => ['required', 'email', Rule::unique('users')->ignore($targetUser->id)],
                 'password' => 'nullable|string|min:8|confirmed',
@@ -303,6 +322,13 @@ class UserService
                 }],
                 'supervisor_id' => 'nullable|exists:users,id'
             ];
+
+            // Add domain validation for global view
+            if (request()->has('domain') && request()->domain) {
+                $rules['domain'] = 'required|string|exists:domains,name_slug';
+            }
+
+            return $rules;
         }
 
         return [

@@ -37,36 +37,58 @@ const soltTypeOptions = computed(() => {
   return list.map((item) => item.name);
 });
 
-const formFields = computed(() => [
-  { key: "name", label: "Product Name", type: "text" },
-  {
-    key: "category_id",
-    label: "Category",
-    type: "select",
-    options: categoriesOption.value,
-  },
-  { key: "cost", label: "Cost", type: "number" },
-  { key: "price", label: "Price", type: "number" },
-  { key: "SKU", label: "SKU", type: "text" },
-  { key: "barcode", label: "Barcode", type: "text" },
-  {
-    key: "sold_type",
-    label: "Sold Type",
-    type: "radio",
-    options: soltTypeOptions.value,
-  },
-  {
-    key: "representation_type",
-    label: "Representation Type",
-    type: "select",
-    options: ["color"],
-  },
-  {
-    key: "representation",
-    label: "Representation",
-    type: "text",
-  },
-]);
+const domainOptions = computed(() => {
+  const list = Array.isArray(page?.props?.domains)
+    ? page.props.domains
+    : [];
+  return list.map((item) => ({ label: item.name, value: item.name_slug }));
+});
+
+const formFields = computed(() => {
+  const baseFields = [
+    { key: "name", label: "Product Name", type: "text" },
+    {
+      key: "category_id",
+      label: "Category",
+      type: "select",
+      options: categoriesOption.value,
+    },
+    { key: "cost", label: "Cost", type: "number" },
+    { key: "price", label: "Price", type: "number" },
+    { key: "SKU", label: "SKU", type: "text" },
+    { key: "barcode", label: "Barcode", type: "text" },
+    {
+      key: "sold_type",
+      label: "Sold Type",
+      type: "radio",
+      options: soltTypeOptions.value,
+    },
+    {
+      key: "representation_type",
+      label: "Representation Type",
+      type: "select",
+      options: ["color"],
+    },
+    {
+      key: "representation",
+      label: "Representation",
+      type: "text",
+    },
+  ];
+
+  // Add domain field for global view
+  if (page.props.isGlobalView) {
+    baseFields.splice(1, 0, {
+      key: "domain",
+      label: "Domain",
+      type: "select",
+      options: domainOptions.value,
+      required: true
+    });
+  }
+
+  return baseFields;
+});
 
 const errors = ref({});
 const handleSave = () => {

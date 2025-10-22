@@ -150,6 +150,7 @@ Route::middleware(['auth:sanctum', 'user.permission'])->group(function () {
         Route::get('/search/movements', [InventoryController::class, 'searchMovements'])->name('search.movements');
 
         // Locations
+        Route::get('/locations/by-domain', [InventoryController::class, 'getLocationsByDomain'])->name('locations.by-domain');
         Route::get('/locations/{location}/summary', [InventoryController::class, 'getLocationSummary'])->name('locations.summary');
         Route::apiResource('locations', InventoryLocationController::class)->names([
             'index'   => 'locations.index',

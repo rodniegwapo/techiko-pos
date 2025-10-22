@@ -48,6 +48,15 @@
         </a-form-item>
       </div>
 
+      <!-- Domain field for global view -->
+      <a-form-item v-if="page.props.isGlobalView" label="Domain" name="domain">
+        <a-select
+          v-model:value="form.domain"
+          placeholder="Select domain"
+          :options="domainOptions"
+        />
+      </a-form-item>
+
       <a-form-item
         label="Address"
         name="address"
@@ -122,6 +131,17 @@ import { notification } from "ant-design-vue";
 import { GiftOutlined, CheckCircleOutlined } from "@ant-design/icons-vue";
 import axios from "axios";
 import dayjs from "dayjs";
+import { usePage } from "@inertiajs/vue3";
+
+const page = usePage();
+
+// Domain options
+const domainOptions = computed(() => {
+  const list = Array.isArray(page?.props?.domains)
+    ? page.props.domains
+    : [];
+  return list.map((item) => ({ label: item.name, value: item.name_slug }));
+});
 
 // Props
 const props = defineProps({
@@ -154,6 +174,7 @@ const form = reactive({
   address: "",
   date_of_birth: null,
   enroll_in_loyalty: false,
+  domain: page.props.isGlobalView ? null : (page.props.currentDomain?.name_slug || null),
 });
 
 // Form validation rules
@@ -208,6 +229,7 @@ const handleSave = async () => {
       address: form.address || null,
       date_of_birth: form.date_of_birth ? form.date_of_birth.format("YYYY-MM-DD") : null,
       enroll_in_loyalty: form.enroll_in_loyalty,
+      domain: form.domain || undefined,
     };
 
     console.log("Saving customer data:", customerData);

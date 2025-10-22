@@ -1,6 +1,6 @@
 <script setup>
-import { reactive, ref } from "vue";
-import { router, Head } from "@inertiajs/vue3";
+import { reactive, ref, computed } from "vue";
+import { router, Head, usePage } from "@inertiajs/vue3";
 import { SaveOutlined, ArrowLeftOutlined } from "@ant-design/icons-vue";
 import {
   IconBuilding,
@@ -13,8 +13,11 @@ import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
 import ContentLayout from "@/Components/ContentLayout.vue";
 
+const page = usePage();
+
 const props = defineProps({
   locationTypes: Array,
+  domains: Array,
 });
 
 // Form state
@@ -29,6 +32,7 @@ const form = reactive({
   is_active: true,
   is_default: false,
   notes: "",
+  domain: page.props.isGlobalView ? null : (page.props.currentDomain?.name_slug || null),
 });
 
 const loading = ref(false);
@@ -81,6 +85,14 @@ const generateCode = () => {
       .substring(0, 10);
   }
 };
+
+// Domain options computed
+const domainOptions = computed(() => 
+  (props.domains || []).map(domain => ({ 
+    label: domain.name, 
+    value: domain.name_slug 
+  }))
+);
 </script>
 
 <template>
@@ -160,6 +172,22 @@ const generateCode = () => {
                   placeholder="Enter full address"
                   :rows="3"
                 />
+              </a-form-item>
+
+              <!-- Domain field for global view -->
+              <a-form-item v-if="page.props.isGlobalView" label="Domain" required>
+                <a-select
+                  v-model:value="form.domain"
+                  placeholder="Select domain"
+                >
+                  <a-select-option
+                    v-for="domain in domainOptions"
+                    :key="domain.value"
+                    :value="domain.value"
+                  >
+                    {{ domain.label }}
+                  </a-select-option>
+                </a-select>
               </a-form-item>
             </a-card>
 

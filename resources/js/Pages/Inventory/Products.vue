@@ -271,6 +271,7 @@ const handleTransferStock = (inventory) => {
       v-model:visible="receiveModalVisible"
       :locations="locations"
       :current-location="currentLocation"
+      :domains="page.props.domains"
       @success="getItems"
     />
 
@@ -279,6 +280,7 @@ const handleTransferStock = (inventory) => {
       :locations="locations"
       :current-location="currentLocation"
       :selected-product="selectedProduct"
+      :domains="page.props.domains"
       @success="getItems"
     />
     

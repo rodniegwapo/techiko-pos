@@ -22,6 +22,7 @@ class CategoryController extends Controller
         return inertia('Categories/Index', [
             'items' => CategoryResource::collection($category),
             'isGlobalView' => true,
+            'domains' => \App\Models\Domain::select('id', 'name', 'name_slug')->get(),
         ]);
     }
 
@@ -52,9 +53,16 @@ class CategoryController extends Controller
 
     private function validatedData(Request $request)
     {
-        return $request->validate([
+        $rules = [
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-        ]);
+        ];
+
+        // Add domain validation for global view
+        if ($request->has('domain') && $request->domain) {
+            $rules['domain'] = 'required|string|exists:domains,name_slug';
+        }
+
+        return $request->validate($rules);
     }
 }

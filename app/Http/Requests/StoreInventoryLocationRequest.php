@@ -22,7 +22,7 @@ class StoreInventoryLocationRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
+        $rules = [
             'name' => ['required', 'string', 'max:255'],
             'code' => ['required', 'string', 'max:10', 'unique:inventory_locations,code'],
             'type' => ['required', Rule::in(['store', 'warehouse', 'supplier', 'customer'])],
@@ -34,6 +34,13 @@ class StoreInventoryLocationRequest extends FormRequest
             'is_default' => ['boolean'],
             'notes' => ['nullable', 'string', 'max:1000'],
         ];
+
+        // Add domain validation for global view
+        if ($this->has('domain') && $this->domain) {
+            $rules['domain'] = ['required', 'string', 'exists:domains,name_slug'];
+        }
+
+        return $rules;
     }
 
     /**
@@ -52,6 +59,7 @@ class StoreInventoryLocationRequest extends FormRequest
             'is_active' => 'active status',
             'is_default' => 'default status',
             'notes' => 'notes',
+            'domain' => 'domain',
         ];
     }
 
@@ -67,6 +75,8 @@ class StoreInventoryLocationRequest extends FormRequest
             'type.required' => 'Please select a location type.',
             'type.in' => 'The selected location type is invalid.',
             'email.email' => 'Please enter a valid email address.',
+            'domain.required' => 'Please select a domain.',
+            'domain.exists' => 'The selected domain is invalid.',
         ];
     }
 

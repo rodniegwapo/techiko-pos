@@ -33,6 +33,7 @@ class UserController extends Controller
             'roles' => $roles,
             'hierarchy' => UserHierarchyService::getRoleHierarchy(),
             'isGlobalView' => true,
+            'domains' => \App\Models\Domain::select('id', 'name', 'name_slug')->get(),
         ]);
     }
 

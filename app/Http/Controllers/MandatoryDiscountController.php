@@ -73,11 +73,18 @@ class MandatoryDiscountController extends Controller
 
     private function validatedData(Request $request)
     {
-        return $request->validate([
+        $rules = [
             'name' => 'string|max:200|required',
             'type' => 'string|in:amount,percentage|required',
             'value' => 'numeric|required|min:0',
             'is_active' => 'boolean'
-        ]);
+        ];
+
+        // Add domain validation for global view
+        if ($request->has('domain') && $request->domain) {
+            $rules['domain'] = 'required|string|exists:domains,name_slug';
+        }
+
+        return $request->validate($rules);
     }
 }

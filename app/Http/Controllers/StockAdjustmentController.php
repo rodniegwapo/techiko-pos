@@ -93,6 +93,8 @@ class StockAdjustmentController extends Controller
                 'sample' => 'Sample',
                 'other' => 'Other',
             ],
+            'domains' => \App\Models\Domain::select('id', 'name', 'name_slug')->get(),
+            'isGlobalView' => true,
         ]);
     }
 
@@ -101,7 +103,7 @@ class StockAdjustmentController extends Controller
      */
     public function store(Request $request)
     {
-        $validated = $request->validate([
+        $rules = [
             'location_id' => 'required|exists:inventory_locations,id',
             'type' => 'required|in:increase,decrease,recount',
             'reason' => 'required|in:physical_count,damaged_goods,expired_goods,theft_loss,supplier_error,system_error,promotion,sample,other',
@@ -113,7 +115,14 @@ class StockAdjustmentController extends Controller
             'items.*.batch_number' => 'nullable|string|max:255',
             'items.*.expiry_date' => 'nullable|date',
             'items.*.notes' => 'nullable|string|max:500',
-        ]);
+        ];
+
+        // Add domain validation for global view
+        if ($request->has('domain') && $request->domain) {
+            $rules['domain'] = 'required|string|exists:domains,name_slug';
+        }
+
+        $validated = $request->validate($rules);
 
         try {
             $adjustment = $this->inventoryService->createStockAdjustment(

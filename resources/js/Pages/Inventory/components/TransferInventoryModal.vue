@@ -5,6 +5,9 @@ import { SearchOutlined, SwapOutlined, ShoppingCartOutlined, WarningOutlined } f
 import { notification } from "ant-design-vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import axios from "axios";
+import { usePage } from "@inertiajs/vue3";
+
+const page = usePage();
 
 const { openModal } = useGlobalVariables();
 
@@ -15,6 +18,7 @@ const props = defineProps({
   currentLocation: Object,
   visible: Boolean,
   selectedProduct: Object,
+  domains: Array,
 });
 
 const { visible } = toRefs(props);
@@ -26,6 +30,7 @@ const form = reactive({
   to_location_id: null,
   quantity: 1,
   notes: "",
+  domain: page.props.isGlobalView ? null : (page.props.currentDomain?.name_slug || null),
 });
 
 const loading = ref(false);
@@ -37,6 +42,14 @@ const availableStock = ref(0);
 const fromStore = ref(null);
 const toStore = ref(null);
 const storeLoading = ref(false);
+
+// Domain options
+const domainOptions = computed(() => {
+  const list = Array.isArray(props.domains)
+    ? props.domains
+    : [];
+  return list.map((item) => ({ label: item.name, value: item.name_slug }));
+});
 
 // Initialize form
 const initializeForm = () => {
@@ -565,6 +578,27 @@ watch(
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- Domain field for global view -->
+      <div v-if="page.props.isGlobalView">
+        <label class="block text-sm font-medium text-gray-700 mb-2">
+          Domain *
+        </label>
+        <a-select
+          v-model:value="form.domain"
+          placeholder="Select domain"
+          class="w-full"
+          :disabled="loading"
+        >
+          <a-select-option
+            v-for="domain in domainOptions"
+            :key="domain.value"
+            :value="domain.value"
+          >
+            {{ domain.label }}
+          </a-select-option>
+        </a-select>
       </div>
 
       <!-- Transfer Arrow -->

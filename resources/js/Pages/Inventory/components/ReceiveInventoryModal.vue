@@ -4,6 +4,9 @@ import { router } from "@inertiajs/vue3";
 import { IconPlus, IconTrash, IconSearch, IconShoppingCart, IconAlertTriangle, IconX } from "@tabler/icons-vue";
 import { notification } from "ant-design-vue";
 import axios from "axios";
+import { usePage } from "@inertiajs/vue3";
+
+const page = usePage();
 
 const emit = defineEmits(["success", "update:visible"]);
 
@@ -11,6 +14,7 @@ const props = defineProps({
   locations: Array,
   currentLocation: Object,
   visible: Boolean,
+  domains: Array,
 });
 
 const { visible } = toRefs(props);
@@ -20,6 +24,7 @@ const form = reactive({
   items: [],
   reference_type: null,
   reference_id: null,
+  domain: page.props.isGlobalView ? null : (page.props.currentDomain?.name_slug || null),
 });
 
 const loading = ref(false);
@@ -28,6 +33,14 @@ const searchResults = ref([]);
 const searchLoading = ref(false);
 const selectedStore = ref(null);
 const storeLoading = ref(false);
+
+// Domain options
+const domainOptions = computed(() => {
+  const list = Array.isArray(props.domains)
+    ? props.domains
+    : [];
+  return list.map((item) => ({ label: item.name, value: item.name_slug }));
+});
 
 // Load store summary when location changes
 const loadStoreItemCount = async (locationId) => {
@@ -268,6 +281,27 @@ watch(
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- Domain field for global view -->
+      <div v-if="page.props.isGlobalView">
+        <label class="block text-sm font-medium text-gray-700 mb-2">
+          Domain *
+        </label>
+        <a-select
+          v-model:value="form.domain"
+          placeholder="Select domain"
+          class="w-full"
+          :disabled="loading"
+        >
+          <a-select-option
+            v-for="domain in domainOptions"
+            :key="domain.value"
+            :value="domain.value"
+          >
+            {{ domain.label }}
+          </a-select-option>
+        </a-select>
       </div>
 
       <!-- Reference Information -->
