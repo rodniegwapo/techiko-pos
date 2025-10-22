@@ -32,21 +32,16 @@ class UserPermissionCheckMiddleware
         // Domain routes: allow if user belongs to the domain or has explicit permission
         if (str_starts_with($routeName, 'domains.')) {
             // Route domain slug from {domain:name_slug}
-            $routeDomainSlug = $request->route('domain');
+            $routeDomain = $request->route('domain');
 
-            // Support both string column and relation exposure
-            $userDomainSlug = $user->domain ?? ($user->domain?->name_slug ?? null);
+            // Extract domain slug - handle both string and model
+            $routeDomainSlug = is_string($routeDomain) ? $routeDomain : $routeDomain->name_slug;
 
-            // Debug logging
-            \Log::info('Domain permission check', [
-                'route_name' => $routeName,
-                'route_domain_slug' => $routeDomainSlug,
-                'user_domain_slug' => $userDomainSlug,
-                'user_id' => $user->id,
-                'user_domain' => $user->domain,
-            ]);
+            // Get user's domain (string column)
+            $userDomainSlug = $user->domain;
 
             if ($routeDomainSlug && $userDomainSlug && $routeDomainSlug === $userDomainSlug) {
+
                 return $next($request);
             }
 
@@ -54,6 +49,7 @@ class UserPermissionCheckMiddleware
             $permissions = $user->getAllPermissions();
             $hasPermission = collect($permissions)->contains('route_name', $routeName);
             if ($hasPermission) {
+
                 return $next($request);
             }
 

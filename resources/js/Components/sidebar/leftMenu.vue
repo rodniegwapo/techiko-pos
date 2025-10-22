@@ -93,6 +93,7 @@ const menuItems = [
         icon: IconDashboard,
         routeName: "dashboard",
         path: "/dashboard",
+        // Dashboard should be available in both global and domain contexts
     },
     {
         key: "sales",
@@ -265,7 +266,13 @@ const menus = computed(() => {
                 
                 // Check permission for items with routeName
                 if (item.routeName && !hasPermission(item.routeName)) {
-                    return false;
+                    // Special case: Dashboard should always be available if user can access the current context
+                    if (item.key === 'dashboard') {
+                        // Dashboard is always available if user is authenticated
+                        console.log('Dashboard menu item - allowing access');
+                    } else {
+                        return false;
+                    }
                 }
                 
                 return true;
@@ -330,6 +337,21 @@ const handleClick = (menu) => {
 // ===================
 const initializeMenuState = () => {
     const currentPath = window.location.pathname;
+    const currentDomainSlug = getCurrentDomainFromUrl();
+    
+    console.log('Initializing menu state:', {
+        currentPath,
+        currentDomainSlug,
+        isInDomainContext: isInDomainContext.value
+    });
+    
+    // Special handling for dashboard routes
+    if (currentPath.includes('/dashboard')) {
+        console.log('Dashboard route detected - setting dashboard as active');
+        selectedKeys.value = ['dashboard'];
+        openKeys.value = [];
+        return;
+    }
     
     // Find matching menu item
     const findMatchingMenu = (items, parentKey = null) => {
@@ -340,7 +362,16 @@ const initializeMenuState = () => {
                     return childMatch;
                 }
             } else {
+                // Generate route path for this item
                 const routePath = getRoute(item.routeName);
+                console.log('Checking menu item:', {
+                    key: item.key,
+                    routeName: item.routeName,
+                    generatedPath: routePath,
+                    currentPath,
+                    matches: routePath === currentPath
+                });
+                
                 if (routePath && routePath === currentPath) {
                     return { item, parentKey };
                 }
@@ -351,9 +382,17 @@ const initializeMenuState = () => {
     
     const match = findMatchingMenu(safeMenus.value);
     if (match) {
+        console.log('Found matching menu item:', match.item.key);
         selectedKeys.value = [match.item.key];
         if (match.parentKey) {
             openKeys.value = [match.parentKey];
+        }
+    } else {
+        console.log('No matching menu item found for path:', currentPath);
+        // Fallback: if we're on a dashboard route, select dashboard
+        if (currentPath.includes('/dashboard')) {
+            selectedKeys.value = ['dashboard'];
+            openKeys.value = [];
         }
     }
 };
