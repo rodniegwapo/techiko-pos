@@ -258,38 +258,37 @@ const getRoleIcon = (roleName) => {
         </div>
       </div>
     </div>
-  </AuthenticatedLayout>
-</template>
 
-<template #modals>
-  <a-modal
-    v-model:open="showAssignModal"
-    :title="assignLabel"
-    :footer="null"
-    @cancel="() => { showAssignModal = false }"
-  >
-    <div v-if="loadingSupervisors" class="py-6 text-center">
-      <a-spin />
-    </div>
-    <div v-else>
-      <div v-if="availableSupervisors.length === 0" class="text-gray-500 py-4">
-        No eligible users found for this assignment.
+    <!-- Modals -->
+    <a-modal
+      v-model:open="showAssignModal"
+      :title="assignLabel"
+      :footer="null"
+      @cancel="() => { showAssignModal = false }"
+    >
+      <div v-if="loadingSupervisors" class="py-6 text-center">
+        <a-spin />
       </div>
-      <div v-else class="space-y-2 max-h-80 overflow-auto">
-        <div
-          v-for="s in availableSupervisors"
-          :key="s.id"
-          class="flex items-center justify-between p-3 border rounded"
-        >
-          <div>
-            <div class="font-medium">{{ s.name }}</div>
-            <div class="text-xs text-gray-500">{{ s.email }}</div>
+      <div v-else>
+        <div v-if="availableSupervisors.length === 0" class="text-gray-500 py-4">
+          No eligible users found for this assignment.
+        </div>
+        <div v-else class="space-y-2 max-h-80 overflow-auto">
+          <div
+            v-for="s in availableSupervisors"
+            :key="s.id"
+            class="flex items-center justify-between p-3 border rounded"
+          >
+            <div>
+              <div class="font-medium">{{ s.name }}</div>
+              <div class="text-xs text-gray-500">{{ s.email }}</div>
+            </div>
+            <a-button size="small" type="primary" :loading="assigning" @click="assignSupervisor(s.id)">
+              Assign
+            </a-button>
           </div>
-          <a-button size="small" type="primary" :loading="assigning" @click="assignSupervisor(s.id)">
-            Assign
-          </a-button>
         </div>
       </div>
-    </div>
-  </a-modal>
+    </a-modal>
+  </AuthenticatedLayout>
 </template>

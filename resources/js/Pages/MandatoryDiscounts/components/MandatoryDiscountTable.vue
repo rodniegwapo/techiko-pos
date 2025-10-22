@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from "vue";
+import { usePage } from "@inertiajs/vue3";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import {
   IconTrash,
@@ -17,6 +18,7 @@ const { confirmDelete, formattedTotal, formattedPercent } = useHelpers();
 const { formData, openModal, isEdit, spinning, openViewModal } =
   useGlobalVariables();
 const { getRoute } = useDomainRoutes();
+const page = usePage();
 
 const props = defineProps({
   products: { type: Object, required: true },
@@ -52,8 +54,8 @@ const columns = computed(() => {
     },
   ];
 
-  // Add domain column if in global view
-  if (props.isGlobalView) {
+  // Add domain column for super users only
+  if (page.props.auth?.user?.data?.is_super_user) {
     baseColumns.splice(1, 0, {
       title: "Domain",
       dataIndex: "domain",

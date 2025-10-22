@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from "vue";
+import { usePage } from "@inertiajs/vue3";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { IconTrash, IconEdit, IconWorld } from "@tabler/icons-vue";
 import { useHelpers } from "@/Composables/useHelpers";
@@ -10,6 +11,7 @@ const emit = defineEmits(["handleTableChange"]);
 const { confirmDelete } = useHelpers();
 const { formData, openModal, isEdit,spinning } = useGlobalVariables();
 const { getRoute } = useDomainRoutes();
+const page = usePage();
 
 const props = defineProps({
   categories: { type: Object, required: true },
@@ -28,8 +30,8 @@ const columns = computed(() => {
     },
   ];
 
-  // Add domain column for global view
-  if (props.isGlobalView) {
+  // Add domain column for super users only
+  if (page.props.auth?.user?.data?.is_super_user) {
     baseColumns.splice(1, 0, {
       title: "Domain",
       dataIndex: "domain",

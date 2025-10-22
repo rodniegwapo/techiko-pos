@@ -37,8 +37,8 @@ const columns = [
     key: "created_at",
     align: "left",
   },
-  // Add domain column for global view
-  ...(page.props.isGlobalView ? [{
+  // Add domain column for super users only
+  ...(page.props.auth?.user?.data?.is_super_user ? [{
     title: "Domain",
     dataIndex: "domain",
     key: "domain",
