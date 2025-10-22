@@ -26,21 +26,22 @@ class UserPermissionCheckMiddleware
             return $next($request);
         }
 
-        // Get domain (likely from route model binding)
-        $domain = data_get($request, 'domain');
-
-        // Ensure domain exists
-        if (!data_get($domain, 'name_slug')) {
-            return $this->unauthorizedResponse($request);
-        }
-
-        // Ensure domain matches user's assigned domain (unless super user)
-        if (data_get($domain, 'name_slug') !== $user->domain && !$user->isSuperUser()) {
-            return $this->unauthorizedResponse($request);
-        }
-
         // Route name for permission checking
         $routeName = $request->route()?->getName();
+
+        // Domain validation for domain routes
+        if (str_starts_with($routeName, 'domains.')) {
+            // Get domain from route parameter (not from route name)
+            $routeDomain = $request->route('domain');
+            
+            // Extract domain slug from route parameter (handle both string and model)
+            $routeDomainSlug = is_string($routeDomain) ? $routeDomain : $routeDomain->name_slug;
+            
+            // Check if user belongs to this domain
+            if ($user->domain !== $routeDomainSlug) {
+                return $this->unauthorizedResponse($request);
+            }
+        }
 
         // Check route permission
         if (!$this->hasRoutePermission($user, $routeName)) {
@@ -62,7 +63,6 @@ class UserPermissionCheckMiddleware
 
         // Normalize domain routes to base routes for permission matching
         $permissionRoute = $this->normalizeRouteForPermission($routeName);
-
         $permissions = $user->getAllPermissions();
 
         return $permissions->contains('route_name', $permissionRoute);
