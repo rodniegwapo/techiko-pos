@@ -35,17 +35,17 @@ class AuthenticatedSessionController extends Controller
         $request->session()->regenerate();
 
         $user = auth()->user();
-        
+
         // Super users always go to global dashboard, regardless of domain
         if ($user->isSuperUser()) {
             return redirect()->intended(RouteServiceProvider::HOME);
         }
-        
+
         // Regular users with domain go to domain-specific dashboard
         if ($user->domain) {
             return redirect()->route('domains.dashboard', ['domain' => $user->domain]);
         }
-        
+
         // Users without domain go to global dashboard
         return redirect()->intended(RouteServiceProvider::HOME);
     }

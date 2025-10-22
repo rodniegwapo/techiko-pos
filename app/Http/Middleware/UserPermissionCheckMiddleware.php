@@ -26,42 +26,24 @@ class UserPermissionCheckMiddleware
             return $next($request);
         }
 
-        // Route name
-        $routeName = $request->route()?->getName();
+        // Get domain (likely from route model binding)
+        $domain = data_get($request, 'domain');
 
-        // Domain routes: allow if user belongs to the domain or has explicit permission
-        if (str_starts_with($routeName, 'domains.')) {
-            // Route domain slug from {domain:name_slug}
-            $routeDomain = $request->route('domain');
-
-            // Extract domain slug - handle both string and model
-            $routeDomainSlug = is_string($routeDomain) ? $routeDomain : $routeDomain->name_slug;
-
-            // Get user's domain (string column)
-            $userDomainSlug = $user->domain;
-
-            if ($routeDomainSlug && $userDomainSlug && $routeDomainSlug === $userDomainSlug) {
-
-                return $next($request);
-            }
-
-            // Fallback: explicit permission to named route
-            $permissions = $user->getAllPermissions();
-            $hasPermission = collect($permissions)->contains('route_name', $routeName);
-            if ($hasPermission) {
-
-                return $next($request);
-            }
-
+        // Ensure domain exists
+        if (!data_get($domain, 'name_slug')) {
             return $this->unauthorizedResponse($request);
         }
 
-        // Non-domain routes: require explicit permission by route name
-        $permissions = $user->getAllPermissions();
-        $hasPermission = collect($permissions)->contains('route_name', $routeName);
+        // Ensure domain matches user's assigned domain (unless super user)
+        if (data_get($domain, 'name_slug') !== $user->domain && !$user->isSuperUser()) {
+            return $this->unauthorizedResponse($request);
+        }
 
+        // Route name for permission checking
+        $routeName = $request->route()?->getName();
 
-        if (!$hasPermission) {
+        // Check route permission
+        if (!$this->hasRoutePermission($user, $routeName)) {
             return $this->unauthorizedResponse($request);
         }
 
@@ -69,11 +51,47 @@ class UserPermissionCheckMiddleware
     }
 
     /**
+     * Check if user has permission for the given route using route normalization.
+     */
+    private function hasRoutePermission($user, $routeName): bool
+    {
+        // Super users always have access
+        if (method_exists($user, 'isSuperUser') && $user->isSuperUser()) {
+            return true;
+        }
+
+        // Normalize domain routes to base routes for permission matching
+        $permissionRoute = $this->normalizeRouteForPermission($routeName);
+
+        $permissions = $user->getAllPermissions();
+
+        return $permissions->contains('route_name', $permissionRoute);
+    }
+
+    /**
+     * Normalize route names for permission matching.
+     * Converts domain routes to base routes for consistent permission checking.
+     */
+    private function normalizeRouteForPermission(?string $routeName): string
+    {
+        if (!$routeName) {
+            return '';
+        }
+
+        // Convert 'domains.products.index' → 'products.index'
+        if (str_starts_with($routeName, 'domains.')) {
+            return str_replace('domains.', '', $routeName);
+        }
+
+        return $routeName;
+    }
+
+    /**
      * Handle unauthorized access.
      */
     private function unauthorizedResponse(Request $request): Response
     {
-        // API request → JSON error
+        // API request → JSON response
         if ($request->expectsJson()) {
             return response()->json([
                 'message' => 'You do not have permission to access this resource.',
@@ -81,7 +99,7 @@ class UserPermissionCheckMiddleware
             ], 403);
         }
 
-        // Web request → redirect back with flash message
+        // Web request → redirect with flash message
         return redirect()
             ->back()
             ->with('error', 'You do not have permission to access this page.');
