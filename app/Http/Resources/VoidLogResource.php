@@ -14,6 +14,11 @@ class VoidLogResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        return parent::toArray($request);
+        $data = parent::toArray($request);
+        
+        // Add domain information from the sale relationship
+        $data['domain'] = $this->saleItem?->sale?->domain ?? 'N/A';
+        
+        return $data;
     }
 }

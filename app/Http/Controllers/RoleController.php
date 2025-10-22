@@ -23,6 +23,11 @@ class RoleController extends Controller
     {
         $currentUser = auth()->user();
 
+        // Ensure this is only accessible in global context
+        if ($request->route('domain')) {
+            abort(403, 'Roles are only manageable in global context');
+        }
+
         // Get roles with permissions (exclude super admin)
         $roles = Role::with('permissions')
             ->where('name', '!=', 'super admin')
@@ -39,7 +44,7 @@ class RoleController extends Controller
             'canCreate' => $currentUser->isSuperUser() || $currentUser->hasAnyPermission(['roles.create', 'roles.store']),
             'canEdit' => $currentUser->isSuperUser() || $currentUser->hasAnyPermission(['roles.edit', 'roles.update']),
             'canDelete' => $currentUser->isSuperUser() || $currentUser->can('roles.destroy'),
-            'isGlobalView' => true,
+            'isGlobalView' => true, // Always true for global roles
         ]);
     }
 

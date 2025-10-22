@@ -20,7 +20,8 @@ class VoidLogController extends Controller
         })->with([
             'approver:id,name', 
             'user:id,name',    
-            'saleItem.product:id,name' 
+            'saleItem.product:id,name',
+            'saleItem.sale:id,domain' 
         ])
 
             ->paginate($request?->data['per_page'] ?? 10);
