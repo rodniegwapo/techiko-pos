@@ -61,10 +61,7 @@ Route::prefix('domains/{domain:name_slug}')
             ->only(['index', 'store', 'update', 'destroy'])
             ->names('users');
 
-        // Roles (Organization-specific)
-        Route::resource('roles', \App\Http\Controllers\Domains\RoleController::class)
-            ->only(['index', 'store', 'update', 'destroy'])
-            ->names('roles');
+        // Roles removed - Roles are now global-only
 
         // Void Logs (Organization-specific)
         Route::get('/void-logs', [\App\Http\Controllers\VoidLogController::class, 'index'])->name('voids.index');

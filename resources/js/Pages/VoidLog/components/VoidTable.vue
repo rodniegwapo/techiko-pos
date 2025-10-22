@@ -37,6 +37,14 @@ const columns = [
     key: "created_at",
     align: "left",
   },
+  // Add domain column for global view
+  ...(page.props.isGlobalView ? [{
+    title: "Domain",
+    dataIndex: "domain",
+    key: "domain",
+    align: "left",
+    sorter: (a, b) => (a.domain || '').localeCompare(b.domain || ''),
+  }] : []),
 ];
 </script>
 
@@ -67,6 +75,9 @@ const columns = [
       </template>
       <template v-if="column.key == 'created_at'">
         {{ dayjs(record.created_at).format('dddd, MMMM D, YYYY HH:mm:ss') }}
+      </template>
+      <template v-if="column.key == 'domain'">
+        {{ record?.domain || 'N/A' }}
       </template>
     </template>
   </a-table>

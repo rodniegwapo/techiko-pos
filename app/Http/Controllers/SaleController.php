@@ -30,31 +30,8 @@ class SaleController extends Controller
 
     public function index(Request $request)
     {
-        // Check if this is a domain-specific route
-        $domain = $request->route('domain');
-        $isDomainRoute = $request->route()->named('domains.*');
-        
-        // Get data based on route type
-        if ($isDomainRoute && $domain) {
-            // Organization-specific data
-            $categories = Category::where('domain', $domain)->get();
-            $discounts = Discount::where('domain', $domain)->get();
-            $mandatoryDiscounts = \App\Models\MandatoryDiscount::where('domain', $domain)
-                ->where('is_active', true)->get();
-        } else {
-            // Global data (super users)
-            $categories = Category::all();
-            $discounts = Discount::all();
-            $mandatoryDiscounts = \App\Models\MandatoryDiscount::where('is_active', true)->get();
-        }
-
-        return Inertia::render('Sales/Index', [
-            'categories' => $categories,
-            'discounts' => $discounts,
-            'mandatoryDiscounts' => $mandatoryDiscounts,
-            'isGlobalView' => !$isDomainRoute,
-            'currentDomain' => $domain,
-        ]);
+        // Sales are now domain-only - redirect to domain selection or show error
+        abort(403, 'Sales are only available within a domain context. Please select a domain first.');
     }
 
     public function products(Request $request)

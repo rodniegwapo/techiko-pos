@@ -100,6 +100,7 @@ const menuItems = [
         icon: IconHeartHandshake,
         routeName: "sales.index",
         path: "/sales",
+        domainOnly: true, // Sales are now domain-only
     },
     {
         key: "domains",
@@ -218,6 +219,7 @@ const menuItems = [
         icon: IconUserCheck,
         routeName: "roles.index",
         path: "/roles",
+        globalOnly: true, // Roles are now global-only
     },
     {
         key: "permissions",
@@ -248,6 +250,11 @@ const menus = computed(() => {
                 
                 // Hide global-only menus when browsing inside a domain
                 if (isInDomainContext.value && item.globalOnly) {
+                    return false;
+                }
+
+                // Hide domain-only menus when browsing in global context
+                if (!isInDomainContext.value && item.domainOnly) {
                     return false;
                 }
 

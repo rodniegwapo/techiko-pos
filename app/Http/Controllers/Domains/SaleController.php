@@ -15,27 +15,25 @@ class SaleController extends Controller
     /**
      * Display the sales page for the domain.
      */
-    public function index(Request $request, Domain $domain = null)
+    public function index(Request $request, Domain $domain)
     {
-        // Get domain-specific data (if domain exists)
-        if ($domain) {
-            $categories = Category::where('domain', $domain->name_slug)->get();
-            $discounts = Discount::where('domain', $domain->name_slug)->get();
-            $mandatoryDiscounts = MandatoryDiscount::where('domain', $domain->name_slug)
-                ->where('is_active', true)->get();
-        } else {
-            // Fallback to global data if no domain
-            $categories = Category::all();
-            $discounts = Discount::all();
-            $mandatoryDiscounts = MandatoryDiscount::where('is_active', true)->get();
+        // Ensure domain is required for sales
+        if (!$domain) {
+            abort(403, 'Domain is required for sales');
         }
+
+        // Get domain-specific data
+        $categories = Category::where('domain', $domain->name_slug)->get();
+        $discounts = Discount::where('domain', $domain->name_slug)->get();
+        $mandatoryDiscounts = MandatoryDiscount::where('domain', $domain->name_slug)
+            ->where('is_active', true)->get();
 
         return Inertia::render('Sales/Index', [
             'categories' => $categories,
             'discounts' => $discounts,
             'mandatoryDiscounts' => $mandatoryDiscounts,
             'currentDomain' => $domain,
-            'isGlobalView' => !$domain,
+            'isGlobalView' => false, // Always false for domain sales
         ]);
     }
 
