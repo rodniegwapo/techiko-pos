@@ -18,35 +18,47 @@ export function useDomainRoutes() {
     const getRoute = (routeName, params = {}) => {
         try {
             if (typeof window.route !== 'function') {
-                console.error('window.route is not available');
+                console.warn('window.route is not a function');
                 return "#";
             }
             
             const currentDomainSlug = getCurrentDomainFromUrl();
             
+            console.log('Generating route:', {
+                routeName,
+                currentDomainSlug,
+                isInDomainContext: isInDomainContext.value,
+                isSuperUser: isSuperUser.value,
+                currentDomain: currentDomain.value
+            });
+            
             // Super users can access both global and domain-specific routes
             if (isSuperUser.value) {
                 // If we're in a domain context, maintain it
-                if (isInDomainContext.value && currentDomainSlug) {
+                if (isInDomainContext.value) {
                     const domainRouteName = `domains.${routeName}`;
-                    return window.route(domainRouteName, { domain: currentDomainSlug, ...params });
+                    const route = window.route(domainRouteName, { domain: currentDomainSlug, ...params });
+                    console.log('Super user in domain context:', { domainRouteName, route });
+                    return route;
                 }
                 // Otherwise use global route
-                return window.route(routeName, params);
+                const route = window.route(routeName, params);
+                console.log('Super user in global context:', { routeName, route });
+                return route;
             } 
             // Regular users should use domain-specific routes
             else if (currentDomain.value || isInDomainContext.value) {
                 const domainSlug = currentDomainSlug || currentDomain.value?.name_slug;
-                if (domainSlug) {
-                    const domainRouteName = `domains.${routeName}`;
-                    return window.route(domainRouteName, { domain: domainSlug, ...params });
-                }
+                const domainRouteName = `domains.${routeName}`;
+                const route = window.route(domainRouteName, { domain: domainSlug, ...params });
+                console.log('Regular user in domain context:', { domainRouteName, domainSlug, route });
+                return route;
             }
             
-            // Fallback to global route
-            return window.route(routeName, params);
+            console.warn('No route generated for:', routeName);
+            return "#";
         } catch (error) {
-            console.error('Route generation error:', error, 'for route:', routeName);
+            console.warn('Route generation error:', error, 'for route:', routeName);
             return "#";
         }
     };
