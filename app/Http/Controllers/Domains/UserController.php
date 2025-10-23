@@ -126,4 +126,109 @@ class UserController extends Controller
             'message' => 'User deleted successfully'
         ]);
     }
+
+    /**
+     * Display user hierarchy for the domain.
+     */
+    public function hierarchy(Request $request, Domain $domain = null)
+    {
+        $currentUser = auth()->user();
+        
+        // For domain context, show all users in the domain
+        if ($domain) {
+            $users = User::with(['roles', 'supervisor', 'subordinates'])
+                ->where('domain', $domain->name_slug)
+                ->orderBy('name')
+                ->get()
+                ->toArray();
+        } else {
+            // For global context, use the hierarchy-based approach
+            $users = $this->userService->getHierarchyUsers($currentUser);
+        }
+        
+        $hierarchy = UserHierarchyService::getRoleHierarchy();
+
+        return Inertia::render('Users/Hierarchy', [
+            'users' => $users,
+            'hierarchy' => $hierarchy,
+            'currentDomain' => $domain,
+            'isGlobalView' => !$domain,
+        ]);
+    }
+
+    /**
+     * Auto-assign supervisors for the domain.
+     */
+    public function autoAssignSupervisors(Request $request, Domain $domain = null)
+    {
+        $currentUser = auth()->user();
+
+        // Only super users, super admin and admin can auto-assign
+        if (!$currentUser->isSuperUser() && !$currentUser->hasRole(['super admin', 'admin'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only administrators can perform auto-assignment.'
+            ], 403);
+        }
+
+        // Get users filtered by domain for auto-assignment
+        $users = User::whereNull('supervisor_id')
+            ->where('is_super_user', false)
+            ->when($domain, function ($query) use ($domain) {
+                return $query->where('domain', $domain->name_slug);
+            })
+            ->with('roles')
+            ->get();
+
+        $results = [
+            'assigned' => 0,
+            'skipped' => 0,
+            'errors' => 0,
+            'details' => []
+        ];
+
+        foreach ($users as $user) {
+            try {
+                $userRole = $user->roles()->orderBy('level')->first();
+                $userRoleName = $userRole ? $userRole->name : 'No Role';
+                
+                $bestSupervisor = UserHierarchyService::getBestSupervisor($user);
+                
+                // Special case: If user is admin (level 2) and no supervisor found in domain, 
+                // assign to Super Admin (super users can supervise across domains)
+                if (!$bestSupervisor && $userRole && $userRole->level === 2) {
+                    $superAdmin = User::where('is_super_user', true)->first();
+                    if ($superAdmin) {
+                        $bestSupervisor = $superAdmin;
+                    }
+                }
+                
+                if ($bestSupervisor && $bestSupervisor->id !== $user->id) {
+                    $supervisorRole = $bestSupervisor->roles()->orderBy('level')->first();
+                    $supervisorRoleName = $supervisorRole ? $supervisorRole->name : ($bestSupervisor->is_super_user ? 'Super User' : 'No Role');
+                    
+                    $user->update(['supervisor_id' => $bestSupervisor->id]);
+                    $results['assigned']++;
+                    $results['details'][] = "✅ Assigned {$user->name} ({$userRoleName}) to {$bestSupervisor->name} ({$supervisorRoleName})";
+                } else {
+                    $results['skipped']++;
+                    if ($user->isSuperUser()) {
+                        $results['details'][] = "⏭️ Skipped {$user->name} - Super users don't need supervisors";
+                    } else {
+                        $results['details'][] = "⚠️ No suitable supervisor found for {$user->name} ({$userRoleName}) - Check role hierarchy";
+                    }
+                }
+            } catch (\Exception $e) {
+                $results['errors']++;
+                $results['details'][] = "❌ Error assigning supervisor for {$user->name}: " . $e->getMessage();
+            }
+        }
+
+        $message = "Auto-assignment completed: ";
+        $message .= "{$results['assigned']} assigned, ";
+        $message .= "{$results['skipped']} skipped, ";
+        $message .= "{$results['errors']} errors.";
+
+        return redirect()->back()->with('success', $message);
+    }
 }

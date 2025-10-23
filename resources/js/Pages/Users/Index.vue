@@ -8,6 +8,7 @@ import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useFilters, toLabel } from "@/Composables/useFilters";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
+import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
@@ -23,6 +24,7 @@ const page = usePage();
 const { openModal, isEdit, spinning } = useGlobalVariables();
 const { showModal } = useHelpers();
 const { hasPermission } = usePermissionsV2();
+const { getRoute } = useDomainRoutes();
 
 // Use permission composable
 const isSuperUser = computed(
@@ -239,7 +241,7 @@ const getRoleColorHex = (level) => {
 
                 <a-button
                     v-if="hasPermission('users.hierarchy')"
-                    @click="router.visit(route('users.hierarchy'))"
+                    @click="router.visit(getRoute('users.hierarchy'))"
                     type="default"
                     class="bg-white border flex items-center border-purple-500 text-purple-500"
                 >

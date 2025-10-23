@@ -200,7 +200,9 @@ class UserHierarchyService
 
         return User::whereHas('roles', function ($query) use ($supervisorRoles) {
             $query->whereIn('name', $supervisorRoles);
-        })->with('roles')->select('id', 'name', 'email')->get();
+        })
+        ->where('domain', $user->domain) // Only show supervisors from the same domain
+        ->with('roles')->select('id', 'name', 'email')->get();
     }
 
     /**
@@ -220,7 +222,9 @@ class UserHierarchyService
 
         return User::whereHas('roles', function ($query) use ($supervisableRoles) {
             $query->whereIn('name', $supervisableRoles);
-        })->select('id', 'name', 'email')->get();
+        })
+        ->where('domain', $supervisor->domain) // Only show users from the same domain
+        ->select('id', 'name', 'email')->get();
     }
 
     /**
@@ -272,11 +276,13 @@ class UserHierarchyService
 
         // Find users with that role who don't have too many subordinates
         // Prioritize users with fewer subordinates for load balancing
+        // Only look for supervisors within the same domain
         return User::whereHas('roles', function ($query) use ($supervisorRole) {
             $query->where('name', $supervisorRole->name);
         })
         ->where('id', '!=', $user->id) // Don't assign user as their own supervisor
         ->where('is_super_user', false) // Don't assign super users as supervisors
+        ->where('domain', $user->domain) // Only assign supervisors from the same domain
         ->withCount('subordinates')
         ->orderBy('subordinates_count', 'asc')
         ->first();
@@ -307,7 +313,8 @@ class UserHierarchyService
                 
                 $bestSupervisor = static::getBestSupervisor($user);
                 
-                // Special case: If user is admin (level 2) and no supervisor found, assign to Super Admin
+                // Special case: If user is admin (level 2) and no supervisor found in domain, 
+                // assign to Super Admin (super users can supervise across domains)
                 if (!$bestSupervisor && $userRole && $userRole->level === 2) {
                     $superAdmin = User::where('is_super_user', true)->first();
                     if ($superAdmin) {
