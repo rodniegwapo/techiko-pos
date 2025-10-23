@@ -60,6 +60,12 @@ Route::prefix('domains/{domain:name_slug}')
         Route::resource('users', \App\Http\Controllers\Domains\UserController::class)
             ->only(['index', 'store', 'update', 'destroy'])
             ->names('users');
+        
+        // User Hierarchy (Organization-specific)
+        Route::get('/users/hierarchy', [\App\Http\Controllers\Domains\UserController::class, 'hierarchy'])->name('users.hierarchy');
+        
+        // Auto-assign supervisors (Organization-specific)
+        Route::post('/supervisors/auto-assign', [\App\Http\Controllers\Domains\UserController::class, 'autoAssignSupervisors'])->name('supervisors.auto-assign');
 
         // Roles removed - Roles are now global-only
 

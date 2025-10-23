@@ -14,6 +14,7 @@ import {
 import { ArrowLeftOutlined } from "@ant-design/icons-vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
+import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import * as d3 from "d3";
 import { OrgChart } from "d3-org-chart";
 
@@ -21,6 +22,7 @@ import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
 
 const { spinning } = useGlobalVariables();
+const { getRoute } = useDomainRoutes();
 const isSuperUser = computed(
     () => usePage().props.auth?.user?.data?.is_super_user || false
 );
@@ -313,13 +315,13 @@ const usersWithoutSupervisors = computed(() => {
     });
 });
 
-const handleBackToUsers = () => router.visit(route("users.index"));
+const handleBackToUsers = () => router.visit(getRoute("users.index"));
 
 const autoAssignSupervisors = async () => {
     autoAssignLoading.value = true;
     try {
         await router.post(
-            route("supervisors.auto-assign"),
+            getRoute("supervisors.auto-assign"),
             {},
             {
                 onSuccess: (page) => {

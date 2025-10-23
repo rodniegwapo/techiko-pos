@@ -53,7 +53,7 @@ class UserService
     {
         // Super users can see everyone across all domains
         if ($currentUser->isSuperUser()) {
-            return User::with(['roles', 'supervisor', 'subordinates', 'domain'])
+            return User::with(['roles', 'supervisor', 'subordinates'])
                 ->orderBy('name')
                 ->get()
                 ->toArray();
@@ -63,11 +63,11 @@ class UserService
         $hierarchyUsers = collect();
         
         // Add the current user
-        $hierarchyUsers->push($currentUser->load(['roles', 'supervisor', 'subordinates', 'domain']));
+        $hierarchyUsers->push($currentUser->load(['roles', 'supervisor', 'subordinates']));
         
         // Add supervisor chain (up the hierarchy) - only one level up
         if ($currentUser->supervisor) {
-            $supervisor = $currentUser->supervisor->load(['roles', 'supervisor', 'subordinates', 'domain']);
+            $supervisor = $currentUser->supervisor->load(['roles', 'supervisor', 'subordinates']);
             $hierarchyUsers->push($supervisor);
         }
         
@@ -107,7 +107,7 @@ class UserService
     private function addAllSubordinates(User $user, $collection)
     {
         foreach ($user->subordinates as $subordinate) {
-            $subordinate->load(['roles', 'supervisor', 'subordinates', 'domain']);
+            $subordinate->load(['roles', 'supervisor', 'subordinates']);
             $collection->push($subordinate);
             $this->addAllSubordinates($subordinate, $collection);
         }
