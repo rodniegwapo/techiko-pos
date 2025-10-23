@@ -44,6 +44,20 @@
                 </a-form-item>
             </div>
 
+            <!-- Domain field for global view or super users -->
+            <a-form-item
+                v-if="page.props.isGlobalView || currentUser.is_super_user"
+                label="Domain"
+                name="domain"
+            >
+                <a-select
+                    v-model:value="form.domain"
+                    placeholder="Select domain"
+                    :options="domainOptions"
+                    @change="onDomainChange"
+                />
+            </a-form-item>
+
             <!-- Dynamic Supervisor Assignment -->
             <div v-if="selectedRole && assignLabel" class="mt-4">
                 <a-form-item :label="assignLabel" name="supervisor_id">
@@ -70,19 +84,6 @@
                     </a-select>
                 </a-form-item>
             </div>
-
-            <!-- Domain field for global view -->
-            <a-form-item
-                v-if="page.props.isGlobalView"
-                label="Domain"
-                name="domain"
-            >
-                <a-select
-                    v-model:value="form.domain"
-                    placeholder="Select domain"
-                    :options="domainOptions"
-                />
-            </a-form-item>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <a-form-item label="Password" name="password">
@@ -304,11 +305,13 @@ watch(
                 password_confirmation: "",
                 role_id: userData.roles?.[0]?.id || null,
                 supervisor_id: userData.supervisor_id || null,
+                domain: userData.domain || null,
             });
 
             console.log("Form assigned for edit:", form);
             console.log("User supervisor_id:", userData.supervisor_id);
             console.log("User supervisor:", userData.supervisor);
+            console.log("User domain:", userData.domain);
             console.log("assignLabel:", assignLabel.value);
 
             // Fetch available supervisors for the current role when editing
@@ -370,10 +373,30 @@ watch(
     }
 );
 
+// Watch for domain changes to refresh supervisor options
+watch(
+    () => form.domain,
+    (newDomain, oldDomain) => {
+        console.log("Domain changed from", oldDomain, "to", newDomain);
+        if (newDomain && form.role_id && assignLabel.value) {
+            console.log("Domain changed, refreshing supervisors for domain:", newDomain);
+            fetchAvailableSupervisors();
+        }
+    }
+);
+
 // Methods
 const onRoleChange = () => {
     // Reset supervisor when role changes
     form.supervisor_id = null;
+};
+
+const onDomainChange = () => {
+    console.log("Domain change handler triggered, new domain:", form.domain);
+    // Reset supervisor when domain changes
+    form.supervisor_id = null;
+    // Clear available supervisors to force refresh
+    availableSupervisors.value = [];
 };
 
 const fetchAvailableSupervisors = async () => {
