@@ -66,6 +66,13 @@ Route::prefix('domains/{domain:name_slug}')
         
         // Auto-assign supervisors (Organization-specific)
         Route::post('/supervisors/auto-assign', [\App\Http\Controllers\Domains\UserController::class, 'autoAssignSupervisors'])->name('supervisors.auto-assign');
+        
+        // Available supervisors (Organization-specific)
+        Route::get('/supervisors/available', [\App\Http\Controllers\Domains\UserController::class, 'availableSupervisors'])->name('supervisors.available');
+        Route::get('/supervisors/available/{user}', [\App\Http\Controllers\Domains\UserController::class, 'availableSupervisorsForUser'])->name('supervisors.available-for-user');
+        
+        // Assign supervisor (Organization-specific)
+        Route::post('/users/{user}/assign-supervisor', [\App\Http\Controllers\Domains\UserController::class, 'assignSupervisor'])->name('users.assign-supervisor');
 
         // Roles removed - Roles are now global-only
 
