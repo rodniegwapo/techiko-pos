@@ -231,4 +231,146 @@ class UserController extends Controller
 
         return redirect()->back()->with('success', $message);
     }
+
+    /**
+     * Get available supervisors for the domain.
+     */
+    public function availableSupervisors(Request $request, Domain $domain, User $user = null)
+    {
+        $currentUser = auth()->user();
+        $isSuperUser = $currentUser->is_super_user;
+        
+        if ($user) {
+            // Ensure user belongs to this domain (unless current user is super user)
+            if (!$isSuperUser && $user->domain !== $domain->name_slug) {
+                abort(403, 'User does not belong to this domain');
+            }
+            
+            // Get supervisors that can supervise this specific user
+            $supervisors = UserHierarchyService::getAssignableSupervisors($user);
+            
+            // Filter by domain only if current user is not super user
+            if (!$isSuperUser) {
+                $supervisors = $supervisors->filter(function($supervisor) use ($domain) {
+                    return $supervisor['domain'] === $domain->name_slug;
+                });
+            }
+        } else {
+            // Check if role parameter is provided for role-based supervisor fetching
+            if ($request->has('role')) {
+                $roleName = $request->input('role');
+                $role = \Spatie\Permission\Models\Role::where('name', $roleName)->first();
+
+                if ($role) {
+                    // If cascading mode is requested, only return immediate next level (role.level - 1)
+                    $isCascading = $request->boolean('cascading', false) || $request->boolean('next', false);
+                    if ($isCascading) {
+                        $nextLevel = max(1, ($role->level ?? 0) - 1);
+                        $query = User::whereHas('roles', function ($q) use ($nextLevel) {
+                            $q->where('level', $nextLevel);
+                        });
+                        
+                        // Only filter by domain if not super user
+                        if (!$isSuperUser) {
+                            $query->where('domain', $domain->name_slug);
+                        }
+                        
+                        $supervisors = $query->with('roles')
+                            ->select('id', 'name', 'email')
+                            ->get();
+                    } else {
+                        // Create a temporary user with the specified role to get available supervisors
+                        $tempUser = new User();
+                        $tempUser->id = 'temp';
+                        $tempUser->domain = $domain->name_slug;
+                        $tempUser->setRelation('roles', collect([$role]));
+                        $supervisors = UserHierarchyService::getAssignableSupervisors($tempUser);
+                        
+                        // Filter by domain only if current user is not super user
+                        if (!$isSuperUser) {
+                            $supervisors = $supervisors->filter(function($supervisor) use ($domain) {
+                                return $supervisor['domain'] === $domain->name_slug;
+                            });
+                        }
+                    }
+                } else {
+                    $supervisors = collect([]);
+                }
+            } else {
+                // Get all users that can be supervisors (have lower level roles)
+                $supervisors = UserHierarchyService::getSupervisableUsers($currentUser);
+                
+                // Filter by domain only if current user is not super user
+                if (!$isSuperUser) {
+                    $supervisors = $supervisors->filter(function($supervisor) use ($domain) {
+                        return $supervisor['domain'] === $domain->name_slug;
+                    });
+                }
+            }
+        }
+
+        return response()->json([
+            'supervisors' => $supervisors
+        ]);
+    }
+
+    /**
+     * Get available supervisors for a specific user in the domain.
+     */
+    public function availableSupervisorsForUser(Request $request, Domain $domain, User $user)
+    {
+        // Ensure user belongs to this domain
+        if ($user->domain !== $domain->name_slug) {
+            abort(403, 'User does not belong to this domain');
+        }
+        
+        // Get supervisors that can supervise this user, filtered by domain
+        $supervisors = UserHierarchyService::getAssignableSupervisors($user);
+        
+        // Filter by domain if not super user
+        $currentUser = auth()->user();
+        if (!$currentUser->is_super_user) {
+            $supervisors = $supervisors->filter(function($supervisor) use ($domain) {
+                return $supervisor['domain'] === $domain->name_slug;
+            });
+        }
+        
+        return response()->json(['supervisors' => $supervisors]);
+    }
+
+    /**
+     * Assign a supervisor to a user in the domain.
+     */
+    public function assignSupervisor(Request $request, Domain $domain, User $user)
+    {
+        $request->validate([
+            'supervisor_id' => 'required|exists:users,id'
+        ]);
+
+        // Check if user belongs to domain
+        if ($user->domain !== $domain->name_slug) {
+            abort(403, 'User does not belong to this domain');
+        }
+
+        $supervisor = User::findOrFail($request->supervisor_id);
+        
+        // Check if supervisor belongs to same domain (unless current user is super user)
+        $currentUser = auth()->user();
+        if (!$currentUser->is_super_user && $supervisor->domain !== $domain->name_slug) {
+            abort(403, 'Supervisor must be from the same domain');
+        }
+
+        // Check if supervisor can supervise this user
+        $assignableSupervisors = UserHierarchyService::getAssignableSupervisors($user);
+        if (!$assignableSupervisors->contains('id', $supervisor->id)) {
+            abort(403, 'This supervisor cannot supervise this user');
+        }
+
+        $user->update(['supervisor_id' => $supervisor->id]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Supervisor assigned successfully'
+        ]);
+    }
 }

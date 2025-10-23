@@ -72,7 +72,11 @@
             </div>
 
             <!-- Domain field for global view -->
-            <a-form-item v-if="page.props.isGlobalView" label="Domain" name="domain">
+            <a-form-item
+                v-if="page.props.isGlobalView"
+                label="Domain"
+                name="domain"
+            >
                 <a-select
                     v-model:value="form.domain"
                     placeholder="Select domain"
@@ -157,14 +161,14 @@ import { notification } from "ant-design-vue";
 import { SafetyCertificateOutlined } from "@ant-design/icons-vue";
 import { usePage } from "@inertiajs/vue3";
 import axios from "axios";
+import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 
 const page = usePage();
+const { getRoute } = useDomainRoutes();
 
 // Domain options
 const domainOptions = computed(() => {
-    const list = Array.isArray(page?.props?.domains)
-        ? page.props.domains
-        : [];
+    const list = Array.isArray(page?.props?.domains) ? page.props.domains : [];
     return list.map((item) => ({ label: item.name, value: item.name_slug }));
 });
 
@@ -203,7 +207,9 @@ const form = reactive({
     password_confirmation: "",
     role_id: null,
     supervisor_id: null,
-    domain: page.props.isGlobalView ? null : (page.props.currentDomain?.name_slug || null),
+    domain: page.props.isGlobalView
+        ? null
+        : page.props.currentDomain?.name_slug || null,
 });
 
 // Current user
@@ -286,11 +292,11 @@ watch(
     () => props.user,
     async (newUser) => {
         console.log("User prop changed:", newUser, "isEdit:", props.isEdit);
-        
+
         if (newUser && props.isEdit) {
             // Handle data wrapping from resources
             const userData = newUser.data || newUser;
-            
+
             Object.assign(form, {
                 name: userData.name || "",
                 email: userData.email || "",
@@ -299,12 +305,12 @@ watch(
                 role_id: userData.roles?.[0]?.id || null,
                 supervisor_id: userData.supervisor_id || null,
             });
-            
+
             console.log("Form assigned for edit:", form);
             console.log("User supervisor_id:", userData.supervisor_id);
             console.log("User supervisor:", userData.supervisor);
             console.log("assignLabel:", assignLabel.value);
-            
+
             // Fetch available supervisors for the current role when editing
             if (form.role_id && assignLabel.value) {
                 console.log("Fetching supervisors for edit mode");
@@ -330,12 +336,19 @@ watch(
 watch(
     () => props.visible,
     async (isVisible) => {
-        console.log("Modal visibility changed:", isVisible, "isEdit:", props.isEdit, "user:", props.user);
-        
+        console.log(
+            "Modal visibility changed:",
+            isVisible,
+            "isEdit:",
+            props.isEdit,
+            "user:",
+            props.user
+        );
+
         if (isVisible && props.isEdit && props.user) {
             const userData = props.user.data || props.user;
             console.log("Modal opened for edit, user data:", userData);
-            
+
             if (form.role_id && assignLabel.value) {
                 console.log("Fetching supervisors for modal edit");
                 await fetchAvailableSupervisors();
@@ -371,10 +384,10 @@ const fetchAvailableSupervisors = async () => {
 
     console.log("Fetching supervisors for role:", selectedRole.value.name);
     loadingSupervisors.value = true;
-    
+
     try {
-        // Use the cascading assignment logic to get available supervisors
-        const response = await axios.get("/supervisors/available", {
+        // Use the domain-aware route to get available supervisors
+        const response = await axios.get(getRoute('supervisors.available'), {
             params: { role: selectedRole.value.name, cascading: true },
         });
 
@@ -390,7 +403,10 @@ const fetchAvailableSupervisors = async () => {
                     role: user.roles?.[0]?.name || "No Role",
                 })
             );
-            console.log("availableSupervisors mapped:", availableSupervisors.value);
+            console.log(
+                "availableSupervisors mapped:",
+                availableSupervisors.value
+            );
         } else {
             console.log("No supervisors found in response");
             availableSupervisors.value = [];
@@ -450,15 +466,15 @@ const handleSave = async () => {
         console.log("Saving user data:", userData);
 
         if (props.isEdit && props.user) {
-            // Update existing user
-            await axios.put(`/api/users/${props.user.id}`, userData);
+            // Update existing user using domain route
+            await axios.put(getRoute('users.update', { user: props.user.id }), userData);
             notification.success({
                 message: "User Updated",
                 description: `${userData.name} has been updated successfully`,
             });
         } else {
-            // Create new user
-            await axios.post("/api/users", userData);
+            // Create new user using domain route
+            await axios.post(getRoute('users.store'), userData);
             notification.success({
                 message: "User Created",
                 description: `${userData.name} has been created successfully`,
