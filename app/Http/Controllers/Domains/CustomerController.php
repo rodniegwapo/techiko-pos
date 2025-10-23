@@ -30,7 +30,7 @@ class CustomerController extends Controller
         $customers = $query->latest()->paginate(15);
 
         return Inertia::render('Customers/Index', [
-            'customers' => $customers,
+            'items' => $customers,
             'currentDomain' => $domain,
             'isGlobalView' => !$domain,
         ]);
@@ -55,11 +55,7 @@ class CustomerController extends Controller
         }
         $customer = Customer::create($validated);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Customer created successfully',
-            'customer' => $customer
-        ], 201);
+        return redirect()->back()->with('success', 'Customer created successfully');
     }
 
     /**

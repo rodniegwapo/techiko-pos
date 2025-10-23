@@ -129,11 +129,13 @@
 import { ref, watch, reactive, computed } from "vue";
 import { notification } from "ant-design-vue";
 import { GiftOutlined, CheckCircleOutlined } from "@ant-design/icons-vue";
-import axios from "axios";
+import { router } from "@inertiajs/vue3";
 import dayjs from "dayjs";
 import { usePage } from "@inertiajs/vue3";
+import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 
 const page = usePage();
+const { getRoute } = useDomainRoutes();
 
 // Domain options
 const domainOptions = computed(() => {
@@ -235,39 +237,64 @@ const handleSave = async () => {
     console.log("Saving customer data:", customerData);
 
     if (props.isEdit && props.customer) {
-      // Update existing customer
-      await axios.put(`/api/customers/${props.customer.id}`, customerData);
-      notification.success({
-        message: "Customer Updated",
-        description: `${customerData.name} has been updated successfully`,
+      // Update existing customer using domain route
+      router.put(getRoute("customers.update", { customer: props.customer.id }), customerData, {
+        onSuccess: () => {
+          notification.success({
+            message: "Customer Updated",
+            description: `${customerData.name} has been updated successfully`,
+          });
+          emit("saved");
+        },
+        onError: (errors) => {
+          console.error("Update customer error:", errors);
+          let errorMessage = "Failed to update customer";
+          if (errors && typeof errors === 'object') {
+            const firstError = Object.values(errors)[0];
+            errorMessage = Array.isArray(firstError) ? firstError[0] : firstError;
+          }
+          notification.error({
+            message: "Update Failed",
+            description: errorMessage,
+          });
+        },
+        onFinish: () => {
+          saving.value = false;
+        }
       });
     } else {
-      // Create new customer
-      await axios.post("/api/customers", customerData);
-      notification.success({
-        message: "Customer Created",
-        description: `${customerData.name} has been added successfully`,
+      // Create new customer using domain route
+      router.post(getRoute("customers.store"), customerData, {
+        onSuccess: () => {
+          notification.success({
+            message: "Customer Created",
+            description: `${customerData.name} has been added successfully`,
+          });
+          emit("saved");
+        },
+        onError: (errors) => {
+          console.error("Create customer error:", errors);
+          let errorMessage = "Failed to create customer";
+          if (errors && typeof errors === 'object') {
+            const firstError = Object.values(errors)[0];
+            errorMessage = Array.isArray(firstError) ? firstError[0] : firstError;
+          }
+          notification.error({
+            message: "Creation Failed",
+            description: errorMessage,
+          });
+        },
+        onFinish: () => {
+          saving.value = false;
+        }
       });
     }
-
-    emit("saved");
   } catch (error) {
     console.error("Save customer error:", error);
-
-    let errorMessage = "Failed to save customer";
-    if (error.response?.data?.errors) {
-      const errors = error.response.data.errors;
-      const firstError = Object.values(errors)[0];
-      errorMessage = Array.isArray(firstError) ? firstError[0] : firstError;
-    } else if (error.response?.data?.message) {
-      errorMessage = error.response.data.message;
-    }
-
     notification.error({
       message: "Save Failed",
-      description: errorMessage,
+      description: "Please check your input and try again",
     });
-  } finally {
     saving.value = false;
   }
 };
