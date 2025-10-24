@@ -43,6 +43,7 @@ const props = defineProps({
 const search = ref("");
 const role = ref(null);
 const domain = ref(null);
+const status = ref(null);
 
 // Modal state
 const selectedUser = ref(null);
@@ -60,6 +61,7 @@ const getItems = () => {
             search: search.value || undefined,
             role: role.value || undefined,
             domain: domain.value || undefined,
+            status: status.value || undefined,
         },
         onStart: () => (spinning.value = true),
         onFinish: () => (spinning.value = false),
@@ -93,6 +95,17 @@ const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
                 )
             ),
         },
+        {
+            label: "Status",
+            key: "status",
+            ref: status,
+            getLabel: toLabel(
+                computed(() => [
+                    { label: "Active", value: "active" },
+                    { label: "Inactive", value: "inactive" },
+                ])
+            ),
+        },
         ...(props.isGlobalView ? [{
             label: "Domain",
             key: "domain",
@@ -114,6 +127,15 @@ const filtersConfig = computed(() => {
                 value: r.name,
             })),
         },
+        {
+            key: "status",
+            label: "Status",
+            type: "select",
+            options: [
+                { label: "Active", value: "active" },
+                { label: "Inactive", value: "inactive" },
+            ],
+        },
     ];
 
     // Add domain filter if in global view
@@ -131,7 +153,7 @@ const filtersConfig = computed(() => {
 
 // Table composable
 const tableFilters = computed(() => {
-    const baseFilters = { search, role };
+    const baseFilters = { search, role, status };
     
     // Add domain filter if in global view
     if (props.isGlobalView) {
