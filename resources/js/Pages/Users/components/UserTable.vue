@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import {
     IconEye,
     IconEdit,
@@ -275,6 +275,60 @@ const getSubordinatesCount = (user) => {
     // For now, return 0 as we don't have this data
     return 0;
 };
+
+// Status toggle functionality
+const statusLoading = ref({});
+
+const canToggleStatus = (user) => {
+    const userData = user.data || user;
+    
+    // Cannot toggle your own status
+    if (userData.id === currentUser.value.id) {
+        return false;
+    }
+    
+    // Super user can toggle anyone
+    if (isSuperUser.value) {
+        return true;
+    }
+    
+    // Users with manage permissions can toggle
+    if (!hasPermission("users.update")) {
+        return false;
+    }
+    
+    // Cannot toggle super users unless you're a super user
+    if (userData.is_super_user && !currentUser.value.is_super_user) {
+        return false;
+    }
+    
+    return true;
+};
+
+const handleStatusToggle = async (user) => {
+    const userData = user.data || user;
+    statusLoading.value[userData.id] = true;
+    
+    try {
+        const response = await axios.patch(`/api/users/${userData.id}/toggle-status`);
+        
+        notification.success({
+            message: "Status Updated",
+            description: response.data.message,
+        });
+        
+        // Refresh the page data
+        window.location.reload();
+    } catch (error) {
+        console.error("Toggle status error:", error);
+        notification.error({
+            message: "Status Update Failed",
+            description: error.response?.data?.message || "Failed to update user status",
+        });
+    } finally {
+        statusLoading.value[userData.id] = false;
+    }
+};
 </script>
 
 <template>
@@ -337,18 +391,18 @@ const getSubordinatesCount = (user) => {
             </template>
 
             <template v-if="column.key === 'status'">
-                <a-badge
-                    :status="
-                        (record.data || record).email_verified_at
-                            ? 'success'
-                            : 'warning'
-                    "
-                    :text="
-                        (record.data || record).email_verified_at
-                            ? 'Active'
-                            : 'Pending'
-                    "
-                />
+                <div class="flex items-center gap-2">
+                    <a-switch
+                        :checked="(record.data || record).status === 'active'"
+                        :disabled="!canToggleStatus(record)"
+                        @change="handleStatusToggle(record)"
+                        :loading="statusLoading[(record.data || record).id]"
+                    />
+                    <a-badge
+                        :status="(record.data || record).status === 'active' ? 'success' : 'error'"
+                        :text="(record.data || record).status === 'active' ? 'Active' : 'Inactive'"
+                    />
+                </div>
             </template>
 
             <template v-if="column.key === 'created_at'">
