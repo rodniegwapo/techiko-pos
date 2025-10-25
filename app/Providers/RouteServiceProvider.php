@@ -28,6 +28,21 @@ class RouteServiceProvider extends ServiceProvider
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
         });
 
+        // Configure route model binding for domain-scoped models
+        Route::bind('sale', function ($value, $route) {
+            $domain = $route->parameter('domain');
+            
+            // If we're in a domain context, scope by domain
+            if ($domain) {
+                return \App\Models\Sale::where('id', $value)
+                    ->where('domain', $domain)
+                    ->firstOrFail();
+            }
+            
+            // Otherwise, use default binding
+            return \App\Models\Sale::findOrFail($value);
+        });
+
         $this->routes(function () {
             Route::middleware('api')
                 ->prefix('api')

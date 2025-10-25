@@ -22,15 +22,17 @@ import { usePage, router, Head } from "@inertiajs/vue3";
 import { useFilters, toLabel } from "@/Composables/useFilters";
 import { watchDebounced } from "@vueuse/core";
 import { useOrders } from "@/Composables/useOrderV2";
+import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 
 const page = usePage();
+const { getRoute } = useDomainRoutes();
 
 const search = ref("");
 const category = ref();
 const spinning = ref(false);
 
-// Get order ID from useOrders composable
-const { orderId, createDraft } = useOrders();
+// Get order functions from useOrders composable
+const { orderId, createDraft, loadCartState, loadCurrentPendingSale, isLoadingCart } = useOrders();
 
 // Customer state management
 const selectedCustomer = ref(null);
@@ -40,28 +42,35 @@ const handleCustomerChanged = async (customer) => {
     selectedCustomer.value = customer;
     console.log("Customer changed:", customer);
 
-    // Ensure we have a draft sale before assigning
-    try {
-        if (!orderId.value) {
-            await createDraft();
-        }
-        await axios.post(`/api/sales/${orderId.value}/assign-customer`, {
-            customer_id: customer?.id || null,
-        });
-    } catch (error) {
-        // If the draft might have expired, try once to recreate and retry
-        if (error?.response?.status === 404) {
-            try {
+    // Only load pending sale when customer is selected
+    if (customer) {
+        try {
+            console.log('Customer selected, loading pending sale...');
+            await loadCurrentPendingSale();
+            
+            // If no pending sale found, create a new draft
+            if (!orderId.value) {
+                console.log('No pending sale found, creating new draft...');
                 await createDraft();
-                await axios.post(`/api/sales/${orderId.value}/assign-customer`, {
-                    customer_id: customer?.id || null,
-                });
-            } catch (e) {
-                console.error("Error assigning customer to sale:", e);
             }
-        } else {
-            console.error("Error assigning customer to sale:", error);
+            
+            console.log('Assigning customer to sale:', { orderId: orderId.value, customer: customer?.id });
+            
+            if (!orderId.value) {
+                console.error('OrderId is null or undefined after createDraft!');
+                throw new Error('No order ID available');
+            }
+            
+            const route = getRoute("sales.sales.assignCustomer", { sale: orderId.value });
+            console.log('Generated route:', route);
+            await axios.post(route, {
+                customer_id: customer?.id || null,
+            });
+        } catch (error) {
+            console.error("Error handling customer selection:", error);
         }
+    } else {
+        console.log('Customer deselected - keeping current order state');
     }
 };
 
@@ -83,13 +92,17 @@ const filtersConfig = [
 const products = ref([]);
 const loading = ref(false);
 onMounted(async () => {
+    // Don't load any pending sale automatically
+    console.log('Sales page loaded - waiting for customer selection');
+    
     getProducts();
+    // Remove automatic loading - only load when customer is selected
 });
 
 const getProducts = async () => {
     loading.value = true;
     const items = await axios.get(
-        route("sales.products", {
+        getRoute("sales.products", {
             category: category.value,
             search: search.value,
         })
@@ -150,7 +163,10 @@ watchDebounced(search, getProducts, { debounce: 300 });
                 <ProductTable :products="products" :loading="loading" />
             </template>
             <template #right-side-content>
-                <customer-order @customer-changed="handleCustomerChanged" />
+                <customer-order 
+                    @customer-changed="handleCustomerChanged" 
+                    :loading="isLoadingCart"
+                />
             </template>
         </ContentLayoutV2>
         <template #content-footer>

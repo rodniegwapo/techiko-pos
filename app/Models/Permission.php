@@ -4,11 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Traits\Searchable;
 use Spatie\Permission\Models\Permission as SpatiePermission;
 
 class Permission extends SpatiePermission
 {
-    use HasFactory;
+    use HasFactory, Searchable;
 
     protected $guarded = [
         'id',
@@ -19,6 +20,13 @@ class Permission extends SpatiePermission
     protected $casts = [
         'is_active' => 'boolean',
     ];
+
+    protected $searchable = [
+        'name',
+        'route_name',
+        'action',
+    ];
+
 
     /**
      * Get the module that owns the permission

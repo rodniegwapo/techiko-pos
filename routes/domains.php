@@ -12,6 +12,50 @@ Route::prefix('domains/{domain:name_slug}')
         // Sales (Organization-specific)
         Route::get('/sales', [\App\Http\Controllers\Domains\SaleController::class, 'index'])->name('sales.index');
         Route::get('/sales/products', [\App\Http\Controllers\Domains\SaleController::class, 'products'])->name('sales.products');
+        Route::get('/sales/current-pending', [\App\Http\Controllers\SaleController::class, 'getCurrentPendingSale'])->name('sales.current-pending');
+        
+        // User-specific sales routes (handles "no sales id yet" case)
+        Route::prefix('users/{user}')->name('users.')->group(function () {
+            // Create new sale for user (when no sales id yet)
+            Route::post('/sales', [\App\Http\Controllers\SaleController::class, 'createSaleForUser'])->name('sales.create');
+            
+            // Add item to user's latest pending sale (auto-finds or creates)
+            Route::post('/sales/cart/add', [\App\Http\Controllers\SaleController::class, 'addItemToUserCart'])->name('sales.cart.add');
+            
+            // Get user's current pending sale
+            Route::get('/sales/current-pending', [\App\Http\Controllers\SaleController::class, 'getUserPendingSale'])->name('sales.current-pending');
+            
+            // Other cart operations for user's latest sale
+            Route::patch('/sales/cart/update-quantity', [\App\Http\Controllers\SaleController::class, 'updateUserCartQuantity'])->name('sales.cart.update-quantity');
+            Route::delete('/sales/cart/remove', [\App\Http\Controllers\SaleController::class, 'removeFromUserCart'])->name('sales.cart.remove');
+            Route::get('/sales/cart/state', [\App\Http\Controllers\SaleController::class, 'getUserCartState'])->name('sales.cart.state');
+        });
+        
+        // Sales API routes (Organization-specific)
+        Route::prefix('sales')->name('sales.')->group(function () {
+            Route::post('/draft', [\App\Http\Controllers\SaleController::class, 'storeDraft'])->name('drafts.store');
+            Route::get('/oversell-statistics', [\App\Http\Controllers\SaleController::class, 'getOversellStatistics'])->name('oversell.statistics');
+
+            // Scoped bindings
+            Route::scopeBindings()->group(function () {
+                Route::post('/{sale}/sales-items/void', [\App\Http\Controllers\SaleController::class, 'voidItem'])->name('items.void');
+                Route::post('/{sale}/payments', [\App\Http\Controllers\SaleController::class, 'proceedPayment'])->name('payment.store');
+                // Cart management - database-driven
+                Route::post('/{sale}/cart/add', [\App\Http\Controllers\SaleController::class, 'addItemToCart'])->name('cart.add');
+                Route::delete('/{sale}/cart/remove', [\App\Http\Controllers\SaleController::class, 'removeItemFromCart'])->name('cart.remove');
+                Route::patch('/{sale}/cart/update-quantity', [\App\Http\Controllers\SaleController::class, 'updateItemQuantity'])->name('cart.update-quantity');
+                Route::get('/{sale}/cart/state', [\App\Http\Controllers\SaleController::class, 'getCartState'])->name('cart.state');
+                
+                // Discounts - database-driven
+                Route::get('/discounts/current', [\App\Http\Controllers\SaleController::class, 'getCurrentDiscounts'])->name('discounts.current');
+                Route::get('/{sale}/discounts', [\App\Http\Controllers\SaleController::class, 'getSaleDiscounts'])->name('discounts.sale');
+                Route::patch('/{sale}/discounts', [\App\Http\Controllers\SaleController::class, 'updateSaleDiscounts'])->name('discounts.update');
+                Route::get('/{sale}/find-sale-item', [\App\Http\Controllers\SaleController::class, 'findSaleItem'])->name('find-sale-item');
+                Route::post('/{sale}/assign-customer', [\App\Http\Controllers\SaleController::class, 'assignCustomer'])->name('sales.assignCustomer');
+                Route::post('/{sale}/process-loyalty', [\App\Http\Controllers\SaleController::class, 'processLoyalty'])->name('sales.processLoyalty');
+                Route::post('/{sale}/test-order-event', [\App\Http\Controllers\SaleController::class, 'testOrderEvent'])->name('sales.testOrderEvent');
+            });
+        });
 
         // Products (Organization-specific)
         Route::resource('products', \App\Http\Controllers\Domains\ProductController::class)

@@ -25,6 +25,7 @@ class SaleService
     {
         $sale = Sale::create([
             'user_id' => $user->id,
+            'domain' => $user->domain ?? 'default',
             'payment_status' => 'pending',
             'invoice_number' => Str::random(10),
             'transaction_date' => now(),
@@ -228,5 +229,123 @@ class SaleService
         })->toArray();
 
         return $this->inventoryService->checkStockAvailability($inventoryItems, $location);
+    }
+
+    public function validateNewItemStockAvailability(array $newItem, InventoryLocation $location = null): array
+    {
+        return $this->inventoryService->checkStockAvailability([$newItem], $location);
+    }
+
+    /**
+     * Handle overselling situations by creating automatic stock adjustments
+     */
+    public function handleOverselling(Sale $sale)
+    {
+        $oversoldItems = [];
+        
+        foreach ($sale->saleItems as $saleItem) {
+            // Get current stock from ProductInventory model
+            $productInventory = \App\Models\ProductInventory::where('product_id', $saleItem->product_id)->first();
+            $currentStock = $productInventory ? $productInventory->quantity_on_hand : 0;
+            
+            // If stock is negative, we have an oversell situation
+            if ($currentStock < 0) {
+                $oversoldItems[] = [
+                    'product_id' => $saleItem->product_id,
+                    'system_quantity' => 0, // System showed 0 or positive
+                    'actual_quantity' => abs($currentStock), // What was actually sold
+                    'adjustment_quantity' => abs($currentStock), // Positive adjustment
+                    'unit_cost' => $saleItem->unit_price,
+                    'reason' => 'oversell_found',
+                    'notes' => "Oversold during sale #{$sale->invoice_number} - Customer purchased {$saleItem->quantity} units"
+                ];
+            }
+        }
+        
+        if (!empty($oversoldItems)) {
+            $this->createOversellAdjustment($sale, $oversoldItems);
+        }
+        
+        return $oversoldItems;
+    }
+
+    /**
+     * Create automatic stock adjustment for overselling situations
+     */
+    private function createOversellAdjustment(Sale $sale, array $oversoldItems)
+    {
+        $adjustment = \App\Models\StockAdjustment::create([
+            'adjustment_number' => \App\Models\StockAdjustment::generateAdjustmentNumber(),
+            'reason' => 'oversell_found',
+            'description' => "Automatic adjustment for overselling in sale #{$sale->invoice_number}",
+            'status' => 'approved', // Auto-approve oversell adjustments
+            'created_by' => $sale->user_id,
+            'approved_by' => $sale->user_id,
+            'approved_at' => now(),
+            'location_id' => $sale->location_id ?? 1, // Default location
+            'domain' => $sale->user->domain ?? 'default'
+        ]);
+        
+        // Create adjustment items
+        foreach ($oversoldItems as $item) {
+            $adjustment->items()->create($item);
+        }
+        
+        // Process the adjustment to update inventory
+        $adjustment->processAdjustmentItems();
+        
+        // Log the oversell for management review
+        \Log::info('Oversell detected and adjusted', [
+            'sale_id' => $sale->id,
+            'invoice_number' => $sale->invoice_number,
+            'adjustment_id' => $adjustment->id,
+            'oversold_items' => count($oversoldItems)
+        ]);
+        
+        return $adjustment;
+    }
+
+    /**
+     * Get oversell statistics for management reporting
+     */
+    public function getOversellStatistics($startDate = null, $endDate = null, $domain = null)
+    {
+        $query = \App\Models\StockAdjustment::where('reason', 'oversell_found');
+        
+        if ($startDate) {
+            $query->where('created_at', '>=', $startDate);
+        }
+        
+        if ($endDate) {
+            $query->where('created_at', '<=', $endDate);
+        }
+        
+        if ($domain) {
+            $query->where('domain', $domain);
+        }
+        
+        $adjustments = $query->with('items.product')->get();
+        
+        $statistics = [
+            'total_oversells' => $adjustments->count(),
+            'total_items_oversold' => $adjustments->sum(function($adj) {
+                return $adj->items->sum('adjustment_quantity');
+            }),
+            'total_value_oversold' => $adjustments->sum('total_value_change'),
+            'products_affected' => $adjustments->flatMap(function($adj) {
+                return $adj->items->pluck('product.name');
+            })->unique()->count(),
+            'recent_oversells' => $adjustments->take(10)->map(function($adj) {
+                return [
+                    'adjustment_number' => $adj->adjustment_number,
+                    'created_at' => $adj->created_at,
+                    'description' => $adj->description,
+                    'items_count' => $adj->items->count(),
+                    'total_value' => $adj->total_value_change
+                ];
+            })
+        ];
+        
+        return $statistics;
     }
 }

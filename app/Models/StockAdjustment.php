@@ -245,6 +245,7 @@ class StockAdjustment extends Model
             'system_error' => 'System Error',
             'promotion' => 'Promotion',
             'sample' => 'Sample',
+            'oversell_found' => 'Oversell Found',
             'other' => 'Other',
             default => ucfirst(str_replace('_', ' ', $this->reason))
         };
