@@ -62,9 +62,9 @@ const submit = () => {
                     <!-- Logo -->
                     <div class="flex items-start mb-8">
                         <div
-                            class="w-16 h-16 bg-white rounded-lg flex items-center justify-center mr-2 shadow-lg"
+                            class="w-14 h-14 bg-white rounded-lg flex items-center justify-center mr-2 shadow-lg"
                         >
-                            <ApplicationLogo class="w-10 h-10" />
+                            <ApplicationLogo class="w-8 h-8" />
                         </div>
                         <div>
                             <div class="text-3xl font-bold text-white">
