@@ -398,7 +398,7 @@ class SaleController extends Controller
     /**
      * Get sale-specific discount state
      */
-    public function getSaleDiscounts(Sale $sale)
+    public function getSaleDiscounts(Request $request, Domain $domain, Sale $sale)
     {
         $sale->load(['saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount']);
 
@@ -425,7 +425,7 @@ class SaleController extends Controller
     /**
      * Update sale discounts
      */
-    public function updateSaleDiscounts(Request $request, Sale $sale)
+    public function updateSaleDiscounts(Request $request, Domain $domain, Sale $sale)
     {
         $validated = $request->validate([
             'regular_discount_ids' => 'array',
@@ -455,6 +455,27 @@ class SaleController extends Controller
         }
     }
 
+    /**
+     * Remove all discounts from a sale
+     */
+    public function removeSaleDiscounts(Request $request, Sale $sale)
+    {
+        try {
+            $saleDiscountService = app(\App\Services\SaleDiscountService::class);
+            $sale = $saleDiscountService->removeOrderDiscounts($sale);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'All discounts removed successfully',
+                'sale' => $sale->load(['saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount'])
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
 
     public function voidItem(Request $request, Sale $sale)
     {
@@ -616,14 +637,18 @@ class SaleController extends Controller
             ->pending()
             ->where('user_id', $userId)
             ->orderBy('created_at', 'desc')
-            ->with(['saleItems.product', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount'])
+            ->with(['saleItems.product', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount', 'saleItems.discounts'])
             ->first();
 
+
+
+        logger($sale);
+        return [];
         // Always return success, even if no sale found
         return response()->json([
             'success' => true,
             'sale' => $sale,
-            'items' => $sale ? $sale->saleItems : [],
+
             'discounts' => $sale ? $sale->saleDiscounts : [],
             'totals' => $sale ? [
                 'subtotal' => $sale->total_amount,

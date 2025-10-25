@@ -17,18 +17,8 @@ class DiscountSeeder extends Seeder
         $domains = Domain::pluck('name_slug')->all();
 
         $base = [
-            // 🔹 Mandatory Discounts
-            [
-                'name' => 'Value Added Tax (VAT) 12%',
-                'type' => 'percent',
-                'scope' => 'order',
-                'value' => 12.00,
-                'min_order_amount' => null,
-                'start_date' => Carbon::now(),
-                'end_date' => null, // no expiry
-                'is_active' => true,
-                'is_mandatory' => true,
-            ],
+            // 🔹 Mandatory Discounts (Note: VAT is a tax, not a discount)
+            // VAT should be handled separately as a tax, not as a discount
             [
                 'name' => 'Senior Citizen Discount - 20%',
                 'type' => 'percent',

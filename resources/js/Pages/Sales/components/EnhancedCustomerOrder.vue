@@ -45,36 +45,23 @@
 
 <script setup>
 import { ref } from "vue";
-import { useOrders } from "@/Composables/useOrderV2";
+// Removed useOrderV2 import - using direct props instead
 import TransactionControls from "@/Components/POS/TransactionControls.vue";
 import OfflineIndicator from "@/Components/POS/OfflineIndicator.vue";
 import HeldTransactionsModal from "@/Components/POS/HeldTransactionsModal.vue";
 
-// Enhanced useOrders with new features
-const {
-  orders,
-  orderId,
-  orderDiscountAmount,
-  orderDiscountId,
-  handleAddOrder,
-  handleSubtractOrder,
-  removeOrder,
-  createDraft,
-  finalizeOrder,
-  totalAmount,
-  formattedTotal,
-  
-  // Enhanced features
-  timeout,
-  offline,
-  hold,
-  holdCurrentTransaction,
-  recallHeldTransaction,
-  isOffline,
-  offlineQueue,
-  heldTransactions,
-  lastActivity,
-} = useOrders();
+// Enhanced useOrders with new features - DISABLED (useOrderV2 removed)
+// TODO: Refactor to use direct props and API calls
+const orders = ref([]);
+const orderId = ref(null);
+const orderDiscountAmount = ref(0);
+const orderDiscountId = ref('');
+const totalAmount = ref(0);
+const formattedTotal = ref('₱0.00');
+const isOffline = ref(false);
+const offlineQueue = ref([]);
+const heldTransactions = ref([]);
+const lastActivity = ref(null);
 
 // Modal states
 const showHeldTransactionsModal = ref(false);

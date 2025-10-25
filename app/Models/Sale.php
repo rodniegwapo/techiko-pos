@@ -114,10 +114,13 @@ class Sale extends Model
         throw_if($discount->end_date && now()->gt($discount->end_date), \InvalidArgumentException::class, 'Discount has expired.');
         throw_if($discount->min_order_amount && $this->total_amount < $discount->min_order_amount, \InvalidArgumentException::class, 'Order amount does not meet minimum requirement.');
 
-        // calculate amount
-        $amount = $discount->type === 'percentage'
-            ? round(($discount->value / 100) * $this->total_amount, 2)
-            : (float) $discount->value;
+        // calculate amount - handle both 'percent' and 'percentage' types
+        if ($discount->type === 'percentage' || $discount->type === 'percent') {
+            $amount = round(($discount->value / 100) * $this->total_amount, 2);
+        } else {
+            // Fixed amount discount
+            $amount = (float) $discount->value;
+        }
 
         $amount = min(max($amount, 0), $this->total_amount);
 
@@ -133,10 +136,13 @@ class Sale extends Model
         // validate
         throw_if(! $mandatoryDiscount->is_active, \InvalidArgumentException::class, 'Mandatory discount is not active.');
 
-        // calculate amount
-        $amount = $mandatoryDiscount->type === 'percentage'
-            ? round(($mandatoryDiscount->value / 100) * $this->total_amount, 2)
-            : (float) $mandatoryDiscount->value;
+        // calculate amount - handle both 'percent' and 'percentage' types
+        if ($mandatoryDiscount->type === 'percentage' || $mandatoryDiscount->type === 'percent') {
+            $amount = round(($mandatoryDiscount->value / 100) * $this->total_amount, 2);
+        } else {
+            // Fixed amount discount
+            $amount = (float) $mandatoryDiscount->value;
+        }
 
         $amount = min(max($amount, 0), $this->total_amount);
 

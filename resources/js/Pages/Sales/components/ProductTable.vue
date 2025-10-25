@@ -1,7 +1,8 @@
 <script setup>
 import { PlusSquareOutlined } from "@ant-design/icons-vue";
 import { ref, inject } from "vue";
-import { useOrders } from "@/Composables/useOrderV2";
+import { useDomainRoutes } from "@/Composables/useDomainRoutes";
+import axios from "axios";
 
 const props = defineProps({
   products: {
@@ -12,14 +13,31 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  orders: {
+    type: Array,
+    default: () => []
+  },
+  orderId: {
+    type: [String, Number],
+    default: null
+  }
 });
 
-const { orders, handleAddOrder } = useOrders();
+const { getRoute } = useDomainRoutes();
 
-// Handle adding items to cart with proper async handling
+// Handle adding items to cart with direct API call
 const addToCart = async (product) => {
   try {
-    await handleAddOrder(product);
+    if (!props.orderId) {
+      console.error('No active order - cannot add item to cart');
+      return;
+    }
+
+    const route = getRoute('cart.add', { sale: props.orderId });
+    await axios.post(route, {
+      product_id: product.id,
+      quantity: 1
+    });
   } catch (error) {
     console.error('Failed to add item to cart:', error);
   }

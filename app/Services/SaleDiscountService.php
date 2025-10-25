@@ -230,9 +230,12 @@ class SaleDiscountService
         $subtotal = $activeItems->sum(function ($item) {
             $lineSubtotal = $item->unit_price * $item->quantity;
             $lineDiscount = $item->discount ?? 0;
-            $result = max(0, $lineSubtotal - $lineDiscount);
             
-            Log::info("Item ID {$item->id}: unit_price={$item->unit_price}, quantity={$item->quantity}, discount={$lineDiscount}, result={$result}");
+            // For order-level discount calculations, use gross subtotal (before item discounts)
+            // Item-level discounts are handled separately in the final total calculation
+            $result = $lineSubtotal;
+            
+            Log::info("Item ID {$item->id}: unit_price={$item->unit_price}, quantity={$item->quantity}, item_discount={$lineDiscount}, gross_subtotal={$result}");
             
             return $result;
         });

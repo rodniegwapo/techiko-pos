@@ -1,25 +1,97 @@
 <script setup>
 import VerticalForm from "@/Components/Forms/VerticalForm.vue";
 import PrimaryButton from "@/Components/PrimaryButton.vue";
-import { ref, toRefs } from "vue";
+import { ref, toRefs, watch, computed } from "vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { usePage } from "@inertiajs/vue3";
-import { useOrders } from "@/Composables/useOrderV2";
+import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import axios from "axios";
 import dayjs from "dayjs";
 
 const emit = defineEmits(["close"]);
 const { formData, errors } = useGlobalVariables();
 const page = usePage();
-const { orderId, orders, applyDiscountToLine } = useOrders();
+const { getRoute } = useDomainRoutes();
 
+// Props for direct data passing
 const props = defineProps({
   openModal: Boolean,
   product: { type: Object, default: () => ({}) },
+  orderId: { type: [String, Number], default: null },
+  orders: { type: Array, default: () => [] },
+  discountOptions: { type: Object, default: () => ({}) }
 });
-const { openModal, product } = toRefs(props);
+
+// Use consolidated discount data
+const discounts = computed(() => {
+  console.log('ApplyProductDiscountModal - discountOptions:', props.discountOptions);
+  console.log('ApplyProductDiscountModal - product_discount_options:', props.discountOptions?.product_discount_options);
+  return props.discountOptions?.product_discount_options || [];
+});
+
+const { openModal, product, orderId, orders } = toRefs(props);
 
 const loading = ref(false);
+
+// Direct discount application function
+const applyDiscountToLine = (productId, discount) => {
+  if (!discount) return;
+  
+  const product = orders.value.find(order => order.id === productId);
+  if (!product) return;
+  
+  const discountValue = discount.type === 'percentage' ? discount.value : discount.value;
+  let discountAmount = discount.type === 'percentage' 
+    ? (product.price * product.quantity * discountValue / 100)
+    : discountValue;
+  
+  const lineSubtotal = product.price * product.quantity;
+  discountAmount = Math.min(discountAmount, lineSubtotal);
+  
+  return {
+    ...product,
+    discount_id: discount.id,
+    discount_type: discount.type,
+    discount: discountValue,
+    discount_amount: discountAmount,
+    subtotal: lineSubtotal - discountAmount,
+  };
+};
+
+// Load current product discount when modal opens
+watch(openModal, async (isOpen) => {
+  if (isOpen && product.value && orderId.value) {
+    console.log('Product discount modal opened, loading current discount for product:', product.value.id);
+    
+    try {
+      // Find the current product in the orders array to get existing discount
+      const currentProduct = orders.value.find(order => order.id === product.value.id);
+      
+      if (currentProduct && (currentProduct.discount_id || currentProduct.discount_amount > 0)) {
+        console.log('Found existing product discount:', {
+          discount_id: currentProduct.discount_id,
+          discount_type: currentProduct.discount_type,
+          discount_amount: currentProduct.discount_amount,
+          discount: currentProduct.discount
+        });
+        
+        // Pre-populate the form with current discount data
+        if (currentProduct.discount_id) {
+          formData.value.discount = {
+            value: currentProduct.discount_id,
+            label: `${currentProduct.discount_type} - ${currentProduct.discount_amount}`
+          };
+        }
+      } else {
+        console.log('No existing discount found for this product');
+        // Clear any previous discount selection
+        formData.value.discount = null;
+      }
+    } catch (error) {
+      console.error('Failed to load current product discount:', error);
+    }
+  }
+});
 
 // Removed ensureSaleItemExists - no longer needed with database-driven approach
 
@@ -51,7 +123,7 @@ const handleSave = async () => {
     }
 
     // selected discount
-    const selectedDiscount = page.props.discounts.find(
+    const selectedDiscount = discounts.value.find(
       (d) => d.id === formData.value.discount.value
     );
     if (!selectedDiscount) return emit("close");
@@ -220,7 +292,7 @@ const formFields = [
     label: "Select Discount",
     type: "select",
     isAllowClear: false,
-    options: page.props.discounts
+    options: discounts.value
       .filter(
         (item) =>
           item.scope == "product" &&
