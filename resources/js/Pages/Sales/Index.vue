@@ -75,7 +75,7 @@ const loadCurrentPendingSale = async () => {
             
             // Transform database response to match frontend expectations
             orders.value = transformCartItems(items);
-            orderDiscountAmount.value = totals?.discount_amount || 0;
+            orderDiscountAmount.value = parseFloat(totals?.discount_amount) || 0;
             orderDiscountId.value = discounts?.map(d => d.discount_id).join(',') || '';
             
             console.log('User pending sale loaded:', { sale, items, totals });
@@ -301,12 +301,14 @@ watchDebounced(search, getProducts, { debounce: 300 });
                     :loading="loading"
                     :orders="orders"
                     :orderId="orderId"
+                    @cart-updated="loadCurrentPendingSale"
                 />
             </template>
             <template #right-side-content>
                 <customer-order 
                     @customer-changed="handleCustomerChanged" 
                     @discount-applied="loadCurrentPendingSale"
+                    @cart-updated="loadCurrentPendingSale"
                     :loading="isLoadingCart"
                     :orders="orders"
                     :orderId="orderId"
@@ -326,6 +328,7 @@ watchDebounced(search, getProducts, { debounce: 300 });
                 :orderId="orderId"
                 :discountOptions="discountOptions"
                 @discount-applied="loadCurrentPendingSale"
+                @cart-updated="loadCurrentPendingSale"
             />
         </template>
     </AuthenticatedLayout>
