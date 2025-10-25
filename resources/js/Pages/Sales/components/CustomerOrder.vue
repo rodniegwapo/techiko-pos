@@ -66,11 +66,15 @@ const handleAddOrder = async (product) => {
     }
 
     try {
-        const route = getRoute("cart.add", { sale: orderId.value });
+        const userId = page.props.auth.user.data.id;
+        const route = getRoute("users.sales.cart.add", { user: userId });
         await axios.post(route, {
             product_id: product.id,
             quantity: 1,
         });
+        
+        // Emit event to parent to refresh cart data
+        emit('cart-updated');
     } catch (error) {
         console.error("Failed to add item:", error);
     }
@@ -83,11 +87,15 @@ const handleSubtractOrder = async (product) => {
     }
 
     try {
-        const route = getRoute("cart.update-quantity", { sale: orderId.value });
+        const userId = page.props.auth.user.data.id;
+        const route = getRoute("users.sales.cart.update-quantity", { user: userId });
         await axios.patch(route, {
             product_id: product.id,
             quantity: Math.max(0, product.quantity - 1),
         });
+        
+        // Emit event to parent to refresh cart data
+        emit('cart-updated');
     } catch (error) {
         console.error("Failed to subtract item:", error);
     }
@@ -100,10 +108,14 @@ const removeOrder = async (product) => {
     }
 
     try {
-        const route = getRoute("cart.remove", { sale: orderId.value });
+        const userId = page.props.auth.user.data.id;
+        const route = getRoute("users.sales.cart.remove", { user: userId });
         await axios.delete(route, {
             data: { product_id: product.id },
         });
+        
+        // Emit event to parent to refresh cart data
+        emit('cart-updated');
     } catch (error) {
         console.error("Failed to remove item:", error);
     }
@@ -120,7 +132,7 @@ const finalizeOrder = async () => {
 
     try {
         const response = await axios.post(
-            getRoute("sales.finalize", { sale: orderId.value })
+            getRoute("payment.store", { sale: orderId.value })
         );
         notification.success({
             message: "Order finalized successfully",
@@ -407,7 +419,7 @@ const handleAddCustomer = async () => {
 };
 
 // Emit customer changes to parent
-const emit = defineEmits(["customerChanged", "discount-applied"]);
+const emit = defineEmits(["customerChanged", "discount-applied", "cart-updated"]);
 
 // Watch for customer changes and emit to parent
 watch(

@@ -141,9 +141,12 @@ class SaleController extends Controller
     {
         $validated = $request->validate([
             'product_id' => 'required|exists:products,id',
-            'quantity' => 'required|integer|min:1',
-            'unit_price' => 'required|numeric|min:0'
+            'quantity' => 'required|integer|min:1'
         ]);
+
+        // Fetch product price from database for security and data integrity
+        $product = Product::findOrFail($validated['product_id']);
+        $unitPrice = $product->price;
 
         // Find existing item or create new one
         $saleItem = $sale->saleItems()->where('product_id', $validated['product_id'])->first();
@@ -156,7 +159,7 @@ class SaleController extends Controller
             $saleItem = $sale->saleItems()->create([
                 'product_id' => $validated['product_id'],
                 'quantity' => $validated['quantity'],
-                'unit_price' => $validated['unit_price']
+                'unit_price' => $unitPrice
             ]);
         }
 
@@ -524,9 +527,12 @@ class SaleController extends Controller
         // Now add item to the sale
         $validated = $request->validate([
             'product_id' => 'required|exists:products,id',
-            'quantity' => 'required|integer|min:1',
-            'unit_price' => 'required|numeric|min:0'
+            'quantity' => 'required|integer|min:1'
         ]);
+
+        // Fetch product price from database for security and data integrity
+        $product = Product::findOrFail($validated['product_id']);
+        $unitPrice = $product->price;
 
         // Add item to cart logic here...
         $saleItem = $sale->saleItems()->where('product_id', $validated['product_id'])->first();
@@ -537,7 +543,7 @@ class SaleController extends Controller
             $saleItem = $sale->saleItems()->create([
                 'product_id' => $validated['product_id'],
                 'quantity' => $validated['quantity'],
-                'unit_price' => $validated['unit_price']
+                'unit_price' => $unitPrice
             ]);
         }
 
