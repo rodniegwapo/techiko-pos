@@ -569,7 +569,7 @@ class SaleController extends Controller
             ->pending()
             ->where('user_id', $userId)
             ->orderBy('created_at', 'desc')
-            ->with(['saleItems.product', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount'])
+            ->with(['saleItems.product', 'saleItems.discounts', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount'])
             ->first();
 
         // Get all available discount options
@@ -597,10 +597,28 @@ class SaleController extends Controller
             ->where('domain', $domain->name_slug)
             ->get();
 
+        // Transform sale items to include discount information
+        $transformedItems = [];
+        if ($sale && $sale->saleItems) {
+            foreach ($sale->saleItems as $item) {
+                $itemData = $item->toArray();
+                
+                // Add discount information if item has discounts
+                if ($item->discounts && $item->discounts->count() > 0) {
+                    $discount = $item->discounts->first(); // Get the first discount
+                    $itemData['discount_id'] = $discount->id;
+                    $itemData['discount_type'] = $discount->type;
+                    $itemData['discount_amount'] = $discount->value;
+                }
+                
+                $transformedItems[] = $itemData;
+            }
+        }
+
         return response()->json([
             'success' => true,
             'sale' => $sale,
-            'items' => $sale ? $sale->saleItems : [],
+            'items' => $transformedItems,
             'discounts' => $sale ? $sale->saleDiscounts : [],
             'totals' => $sale ? [
                 'subtotal' => $sale->total_amount,
@@ -719,7 +737,7 @@ class SaleController extends Controller
             ->pending()
             ->where('user_id', $userId)
             ->orderBy('created_at', 'desc')
-            ->with(['saleItems.product', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount'])
+            ->with(['saleItems.product', 'saleItems.discounts', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount'])
             ->first();
 
         if (!$sale) {

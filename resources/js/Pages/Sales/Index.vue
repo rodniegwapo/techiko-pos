@@ -150,6 +150,7 @@ const transformCartItems = (items) => {
             discount_type: item.discount_type,
             discount: item.discount,
             discount_amount: item.discount_amount,
+            discounts: item.discounts || [], // Include the discounts relationship
         };
     });
 };
@@ -305,6 +306,7 @@ watchDebounced(search, getProducts, { debounce: 300 });
             <template #right-side-content>
                 <customer-order 
                     @customer-changed="handleCustomerChanged" 
+                    @discount-applied="loadCurrentPendingSale"
                     :loading="isLoadingCart"
                     :orders="orders"
                     :orderId="orderId"

@@ -49,6 +49,10 @@ Route::prefix('domains/{domain:name_slug}')
                 Route::get('/{sale}/discounts', [\App\Http\Controllers\Domains\SaleDiscountController::class, 'getSaleDiscounts'])->name('discounts.sale');
                 Route::patch('/{sale}/discounts', [\App\Http\Controllers\Domains\SaleDiscountController::class, 'updateSaleDiscounts'])->name('discounts.update');
                 Route::delete('/{sale}/discounts', [\App\Http\Controllers\Domains\SaleDiscountController::class, 'removeSaleDiscounts'])->name('discounts.remove');
+                
+                // Item-level discounts
+                Route::post('/{sale}/items/{saleItem}/discounts', [\App\Http\Controllers\Domains\SaleDiscountController::class, 'applyItemDiscount'])->name('items.discount.apply');
+                Route::delete('/{sale}/items/{saleItem}/discounts', [\App\Http\Controllers\Domains\SaleDiscountController::class, 'removeItemDiscount'])->name('items.discount.remove');
                 Route::get('/{sale}/find-sale-item', [\App\Http\Controllers\Domains\SaleController::class, 'findSaleItem'])->name('find-sale-item');
                 Route::post('/{sale}/assign-customer', [\App\Http\Controllers\Domains\SaleController::class, 'assignCustomer'])->name('sales.assignCustomer');
                 Route::post('/{sale}/process-loyalty', [\App\Http\Controllers\Domains\SaleController::class, 'processLoyalty'])->name('sales.processLoyalty');

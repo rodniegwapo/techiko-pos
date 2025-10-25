@@ -8,7 +8,7 @@ import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import axios from "axios";
 import dayjs from "dayjs";
 
-const emit = defineEmits(["close"]);
+const emit = defineEmits(["close", "discount-applied"]);
 const { formData, errors } = useGlobalVariables();
 const page = usePage();
 const { getRoute } = useDomainRoutes();
@@ -26,7 +26,9 @@ const props = defineProps({
 const discounts = computed(() => {
   console.log('ApplyProductDiscountModal - discountOptions:', props.discountOptions);
   console.log('ApplyProductDiscountModal - product_discount_options:', props.discountOptions?.product_discount_options);
-  return props.discountOptions?.product_discount_options || [];
+  const productDiscounts = props.discountOptions?.product_discount_options || [];
+  console.log('ApplyProductDiscountModal - filtered product discounts:', productDiscounts);
+  return productDiscounts;
 });
 
 const { openModal, product, orderId, orders } = toRefs(props);
@@ -102,10 +104,12 @@ const handleSave = async () => {
     loading.value = true;
 
     // fetch sale item (data is already in database via user-specific routes)
-    const { data: saleItem } = await axios.get(
-      route("sales.find-sale-item", { sale: orderId.value }),
-      { params: { product_id: product.value.id } }
-    );
+    const { currentDomain, getCurrentDomainFromUrl } = useDomainRoutes();
+    const domain = currentDomain.value?.name_slug || getCurrentDomainFromUrl();
+    const findSaleItemRoute = `/domains/${domain}/sales/${orderId.value}/find-sale-item`;
+    const { data: saleItem } = await axios.get(findSaleItemRoute, {
+      params: { product_id: product.value.id }
+    });
 
     // Check if sale item exists
     if (!saleItem || !saleItem.id) {
@@ -129,13 +133,10 @@ const handleSave = async () => {
     if (!selectedDiscount) return emit("close");
 
     // backend apply
-    const { data: response } = await axios.post(
-      route("sales.items.discount.apply", {
-        sale: orderId.value,
-        saleItem: saleItem.id,
-      }),
-      { discount_id: selectedDiscount.id }
-    );
+    const applyDiscountRoute = `/domains/${domain}/sales/${orderId.value}/items/${saleItem.id}/discounts`;
+    const { data: response } = await axios.post(applyDiscountRoute, {
+      discount_id: selectedDiscount.id
+    });
 
     // update local state with backend response data
     const idx = orders.value.findIndex((item) => item.id == product.value.id);
@@ -162,6 +163,8 @@ const handleSave = async () => {
       duration: 3,
     });
 
+    // Emit event to refresh data
+    emit("discount-applied");
     emit("close");
   } catch (e) {
     console.error("Error applying discount:", e);
@@ -185,10 +188,12 @@ const handleClearDiscount = async () => {
     discountLoading.value = true;
 
     // fetch sale item
-    const { data: saleItem } = await axios.get(
-      route("sales.find-sale-item", { sale: orderId.value }),
-      { params: { product_id: product.value.id } }
-    );
+    const { currentDomain, getCurrentDomainFromUrl } = useDomainRoutes();
+    const domain = currentDomain.value?.name_slug || getCurrentDomainFromUrl();
+    const findSaleItemRoute = `/domains/${domain}/sales/${orderId.value}/find-sale-item`;
+    const { data: saleItem } = await axios.get(findSaleItemRoute, {
+      params: { product_id: product.value.id }
+    });
 
     console.log("slea item", saleItem);
     // Check if sale item exists
@@ -239,13 +244,10 @@ const handleClearDiscount = async () => {
     }
 
     // backend remove
-    const { data: response } = await axios.delete(
-      route("sales.items.discount.remove", {
-        sale: orderId.value,
-        saleItem: saleItem.id,
-        discount: discountToRemove.id,
-      })
-    );
+    const removeDiscountRoute = `/domains/${domain}/sales/${orderId.value}/items/${saleItem.id}/discounts`;
+    const { data: response } = await axios.delete(removeDiscountRoute, {
+      data: { discount_id: discountToRemove.id }
+    });
 
     // update local state with backend response data (reset)
     const idx = orders.value.findIndex((item) => item.id == product.value.id);
@@ -268,6 +270,8 @@ const handleClearDiscount = async () => {
       duration: 3,
     });
 
+    // Emit event to refresh data
+    emit("discount-applied");
     emit("close");
   } catch (e) {
     console.error("Error clearing discount:", e);
@@ -286,26 +290,55 @@ const handleClearDiscount = async () => {
   }
 };
 
-const formFields = [
-  {
-    key: "discount",
-    label: "Select Discount",
-    type: "select",
-    isAllowClear: false,
-    options: discounts.value
-      .filter(
-        (item) =>
-          item.scope == "product" &&
-          dayjs(item.start_date).isBefore(dayjs()) &&
-          item.is_active
-      )
-      .map((item) => ({
-        label: item.name,
-        value: item.id,
-        amount: item.value,
-      })),
-  },
-];
+const formFields = computed(() => {
+  const filteredDiscounts = discounts.value.filter(
+    (item) => {
+      const isProductScope = item.scope == "product";
+      const isActive = item.is_active;
+      
+      // Check start date - discount should be active if no start date or start date is today or earlier
+      const startDateValid = !item.start_date || 
+        dayjs(item.start_date).isBefore(dayjs()) || 
+        dayjs(item.start_date).isSame(dayjs(), 'day');
+      
+      // Check end date - discount should be active if no end date or end date is today or later
+      const endDateValid = !item.end_date || 
+        dayjs(item.end_date).isAfter(dayjs()) || 
+        dayjs(item.end_date).isSame(dayjs(), 'day');
+      
+      console.log(`Discount ${item.name}:`, {
+        isProductScope,
+        isActive,
+        startDateValid,
+        endDateValid,
+        start_date: item.start_date,
+        end_date: item.end_date
+      });
+      
+      return isProductScope && isActive && startDateValid && endDateValid;
+    }
+  );
+  
+  console.log('ApplyProductDiscountModal - filtered discounts for form:', filteredDiscounts);
+  
+  const options = filteredDiscounts.map((item) => ({
+    label: `${item.name} (${item.type === 'percentage' || item.type === 'percent' ? parseFloat(item.value) + '%' : '₱' + parseFloat(item.value).toFixed(2)})`,
+    value: item.id,
+    amount: item.value,
+  }));
+  
+  console.log('ApplyProductDiscountModal - form options:', options);
+  
+  return [
+    {
+      key: "discount",
+      label: "Select Discount",
+      type: "select",
+      isAllowClear: false,
+      options: options,
+    },
+  ];
+});
 </script>
 <template>
   <a-modal

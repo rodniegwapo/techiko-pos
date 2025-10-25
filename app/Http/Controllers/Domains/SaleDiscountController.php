@@ -159,4 +159,62 @@ class SaleDiscountController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Apply item-level discount
+     */
+    public function applyItemDiscount(Request $request, Domain $domain, Sale $sale, $saleItem)
+    {
+        $validated = $request->validate([
+            'discount_id' => 'required|integer|exists:discounts,id',
+        ]);
+
+        try {
+            $saleItem = $sale->saleItems()->findOrFail($saleItem);
+            $saleDiscountService = app(\App\Services\SaleDiscountService::class);
+            
+            $result = $saleDiscountService->applyItemDiscount($sale, $saleItem, $validated['discount_id']);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Item discount applied successfully',
+                'item' => $result['item'],
+                'sale' => $result['sale']
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to apply item discount: ' . $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
+     * Remove item-level discount
+     */
+    public function removeItemDiscount(Request $request, Domain $domain, Sale $sale, $saleItem)
+    {
+        $validated = $request->validate([
+            'discount_id' => 'required|integer|exists:discounts,id',
+        ]);
+
+        try {
+            $saleItem = $sale->saleItems()->findOrFail($saleItem);
+            $saleDiscountService = app(\App\Services\SaleDiscountService::class);
+            
+            $result = $saleDiscountService->removeItemDiscount($sale, $saleItem, $validated['discount_id']);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Item discount removed successfully',
+                'item' => $result['item'],
+                'sale' => $result['sale']
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to remove item discount: ' . $e->getMessage()
+            ], 400);
+        }
+    }
 }
