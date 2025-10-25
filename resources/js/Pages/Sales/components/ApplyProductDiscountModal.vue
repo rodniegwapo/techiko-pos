@@ -21,25 +21,7 @@ const { openModal, product } = toRefs(props);
 
 const loading = ref(false);
 
-/** 🔹 Ensure sale item exists in database before applying discount */
-const ensureSaleItemExists = async () => {
-  try {
-    // Force sync the current draft immediately to ensure sale items exist in database
-    await axios.post(`/api/sales/${orderId.value}/sync-immediate`, {
-      items: orders.value.map((item) => ({
-        id: item.id,
-        quantity: item.quantity,
-        price: item.price,
-        discount_id: item.discount_id || null,
-        discount_amount: item.discount_amount || 0,
-        subtotal: item.subtotal,
-      })),
-    });
-  } catch (error) {
-    console.error("Error syncing draft:", error);
-    throw new Error("Failed to sync draft. Please try again.");
-  }
-};
+// Removed ensureSaleItemExists - no longer needed with database-driven approach
 
 /** 🔹 Apply discount */
 const handleSave = async () => {
@@ -47,10 +29,7 @@ const handleSave = async () => {
     if (!formData.value?.discount?.value) return emit("close");
     loading.value = true;
 
-    // First, ensure the draft is synced to database
-    await ensureSaleItemExists();
-
-    // fetch sale item
+    // fetch sale item (data is already in database via user-specific routes)
     const { data: saleItem } = await axios.get(
       route("sales.find-sale-item", { sale: orderId.value }),
       { params: { product_id: product.value.id } }
