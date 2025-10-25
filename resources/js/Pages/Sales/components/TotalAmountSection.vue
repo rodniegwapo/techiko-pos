@@ -4,6 +4,7 @@ import ApplyOrderDiscountModal from "./ApplyOrderDiscountModal.vue";
 import { IconDiscount, IconArrowRightToArc } from "@tabler/icons-vue";
 import { useOrders } from "@/Composables/useOrderV2";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
+import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { ref, computed, createVNode } from "vue";
 import { Modal, notification } from "ant-design-vue";
 import { ExclamationCircleOutlined } from "@ant-design/icons-vue";
@@ -11,6 +12,7 @@ import axios from "axios";
 import { usePage } from "@inertiajs/vue3";
 
 const { formData, errors } = useGlobalVariables();
+const { getRoute } = useDomainRoutes();
 const page = usePage();
 const {
   orders,
@@ -34,48 +36,47 @@ const amountReceived = ref(0);
 
 const openOrderDicountModal = ref(false);
 
-const showDiscountOrder = () => {
+const showDiscountOrder = async () => {
   // Check if there's an active order/draft OR if there are items in the cart
   // (orderId might be null briefly while draft is being created)
   if (!orderId.value && orders.value.length === 0) return;
   
-  // Get stored regular and mandatory discount IDs
-  const regularDiscountIds = localStorage.getItem("regular_discount_ids") || "";
-  const mandatoryDiscountIds = localStorage.getItem("mandatory_discount_ids") || "";
-  
-  // Convert stored IDs back to option objects for the select components
-  const regularDiscountOptions = regularDiscountIds 
-    ? regularDiscountIds.split(",")
-        .map(id => Number(id))
-        .filter(id => id)
-        .map(id => {
-          // Find the matching option from available discounts
-          const discount = (page.props.discounts || []).find(d => d.id === id);
-          return discount ? {
-            label: `${discount.name} (${discount.type === 'percentage' ? discount.value + '%' : '₱' + discount.value})`,
-            value: discount.id,
-            amount: discount.value,
-            type: discount.type,
-          } : null;
-        })
-        .filter(Boolean)
-    : [];
-  
-  const mandatoryDiscountId = mandatoryDiscountIds 
-    ? Number(mandatoryDiscountIds.split(",")[0])
-    : null;
-    
-  const mandatoryDiscountOption = mandatoryDiscountId 
-    ? (() => {
-        const discount = (page.props.mandatoryDiscounts || []).find(d => d.id === mandatoryDiscountId);
-        return discount ? {
-          label: `${discount.name} (${discount.type === 'percentage' ? discount.value + '%' : '₱' + discount.value})`,
-          value: discount.id,
-          amount: discount.value,
-          type: discount.type,
-        } : null;
-      })()
-    : null;
+  // Load current discounts from database instead of localStorage
+  try {
+    const response = await axios.get(getRoute('sales.discounts.current'));
+    const { regular_discounts, mandatory_discounts } = response.data;
+
+    // Convert database discounts to option objects for the select components
+    const regularDiscountOptions = regular_discounts.map((discount) => ({
+      label: `${discount.name} (${
+        discount.type === "percentage"
+          ? discount.value + "%"
+          : "₱" + discount.value
+      })`,
+      value: discount.id,
+      amount: discount.value,
+      type: discount.type,
+    }));
+
+    // Get the first active mandatory discount
+    const mandatoryDiscountOption = mandatory_discounts.length > 0 ? {
+      label: `${mandatory_discounts[0].name} (${
+        mandatory_discounts[0].type === "percentage"
+          ? mandatory_discounts[0].value + "%"
+          : "₱" + mandatory_discounts[0].value
+      })`,
+      value: mandatory_discounts[0].id,
+      amount: mandatory_discounts[0].value,
+      type: mandatory_discounts[0].type,
+    } : null;
+  } catch (error) {
+    console.error('Failed to load discounts:', error);
+    notification.error({
+      message: 'Error',
+      description: 'Failed to load discount options'
+    });
+    return;
+  }
   
   formData.value = {
     orderDiscount: regularDiscountOptions,
@@ -122,7 +123,7 @@ const handleProceedPayment = async () => {
     
     // Single API call to process payment and loyalty together
     const response = await axios.post(
-      route("sales.payment.store", {
+      getRoute("sales.payment.store", {
         sale: orderId.value,
       }),
       {

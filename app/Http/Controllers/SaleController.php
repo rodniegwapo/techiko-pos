@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Resources\ProductResource;
 use App\Models\Category;
 use App\Models\Customer;
+use App\Models\Domain;
 use App\Models\Product\Discount;
 use App\Models\Product\Product;
 use App\Models\Sale;
@@ -38,11 +39,11 @@ class SaleController extends Controller
     {
         $domain = $request->route('domain');
         $isDomainRoute = $request->route()->named('domains.*');
-        
+
         $query = Product::query()
-            ->when($request->input('search'), fn ($q, $search) => $q->search($search))
+            ->when($request->input('search'), fn($q, $search) => $q->search($search))
             ->when($request->input('category'), function ($q, $category) {
-                $q->whereHas('category', fn ($q) => $q->where('name', $category));
+                $q->whereHas('category', fn($q) => $q->where('name', $category));
             })
             ->with('category');
 
@@ -56,55 +57,58 @@ class SaleController extends Controller
 
         $products = $query->when(
             ! $request->input('search') && ! $request->input('category'),
-            fn ($q) => $q->limit(30)
+            fn($q) => $q->limit(30)
         )->get();
 
         return ProductResource::collection($products);
     }
 
-    public function proceedPayment(Request $request, Sale $sale)
+    public function proceedPayment(Request $request, Domain $domain, Sale $sale)
     {
+
         $validated = $request->validate([
             'customer_id' => 'nullable|exists:customers,id',
             'sale_amount' => 'nullable|numeric|min:0',
             'payment_method' => 'required|string'
         ]);
-        
+
         $loyaltyResults = null;
-        
+
         try {
-            // Check inventory availability before processing payment
-            $unavailableItems = $this->saleService->validateStockAvailability($sale);
-            
-            if (!empty($unavailableItems)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Some items are not available in sufficient quantities',
-                    'unavailable_items' => $unavailableItems
-                ], 400);
-            }
+            // Note: Inventory validation removed to allow overselling
+            // Overselling will be tracked and reconciled automatically via StockAdjustment
 
             // Use database transaction to ensure data consistency
             DB::transaction(function () use ($sale, $validated, &$loyaltyResults) {
                 // 1. Complete sale and process inventory
                 $this->saleService->completeSale($sale, auth()->user());
-                
-                // 2. Update payment details
+
+                // 2. Handle overselling situations (create automatic stock adjustments)
+                $oversoldItems = $this->saleService->handleOverselling($sale);
+                if (!empty($oversoldItems)) {
+                    \Log::info('Oversell detected during sale completion', [
+                        'sale_id' => $sale->id,
+                        'invoice_number' => $sale->invoice_number,
+                        'oversold_count' => count($oversoldItems)
+                    ]);
+                }
+
+                // 3. Update payment details
                 $sale->update([
                     'grand_total' => $sale->total_amount,
                     'payment_method' => $validated['payment_method']
                 ]);
-                
-                // 3. Process loyalty if customer is provided
+
+                // 4. Process loyalty if customer is provided
                 if ($validated['customer_id']) {
                     $customer = Customer::findOrFail($validated['customer_id']);
-                    
+
                     // Link customer to sale and trigger order update event
                     $sale->updateCustomer($customer->id);
-                    
+
                     // Process loyalty rewards
                     $loyaltyResults = $customer->processLoyaltyForSale($validated['sale_amount'] ?? $sale->total_amount);
-                    
+
                     \Log::info('Loyalty processed for sale', [
                         'sale_id' => $sale->id,
                         'customer_id' => $customer->id,
@@ -119,16 +123,16 @@ class SaleController extends Controller
                 'error' => $e->getMessage(),
                 'customer_id' => $validated['customer_id'] ?? null
             ]);
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Payment processing failed: ' . $e->getMessage()
             ], 500);
         }
-        
+
         // Trigger payment completed event to clear the order view
         event(new \App\Events\PaymentCompleted($sale));
-        
+
         // Return response with loyalty results
         return response()->json([
             'success' => true,
@@ -140,23 +144,317 @@ class SaleController extends Controller
     public function storeDraft(Request $request)
     {
         $order = $this->saleService->storeDraft($request->user());
-        
+
         return response()->json(['order' => $order]);
     }
 
-    public function syncDraft(Request $request, Sale $sale)
+    /**
+     * Add item to cart
+     */
+    public function addItemToCart(Request $request, $saleId = null)
     {
-        $this->saleService->syncDraft($sale, $request->items);
+        // Handle both route model binding and manual ID resolution
+        if ($saleId instanceof Sale) {
+            $sale = $saleId;
+        } else {
+            $saleId = $saleId ?? $request->route('sale');
+            $domain = $request->route('domain');
 
-        return response()->json(['message' => 'Sale draft is syncing...']);
+            // If we're in a domain context, scope by domain
+            if ($domain) {
+                $sale = Sale::where('id', $saleId)
+                    ->where('domain', $domain)
+                    ->firstOrFail();
+            } else {
+                $sale = Sale::findOrFail($saleId);
+            }
+        }
+
+        // Ensure the sale belongs to the current domain if in domain context
+        $domain = $request->route('domain');
+        if ($domain && $sale->domain !== $domain) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Sale not found in this domain'
+            ], 404);
+        }
+
+        $validated = $request->validate([
+            'product_id' => 'required|exists:products,id',
+            'quantity' => 'required|integer|min:1',
+            'unit_price' => 'required|numeric|min:0'
+        ]);
+
+        // Note: Inventory validation removed to allow overselling
+        // Overselling will be tracked and reconciled automatically via StockAdjustment
+
+        // Find existing item or create new one
+        $saleItem = $sale->saleItems()->where('product_id', $validated['product_id'])->first();
+
+        if ($saleItem) {
+            // Item exists - increment quantity
+            $saleItem->increment('quantity', $validated['quantity']);
+        } else {
+            // Item doesn't exist - create new one
+            $saleItem = $sale->saleItems()->create([
+                'product_id' => $validated['product_id'],
+                'quantity' => $validated['quantity'],
+                'unit_price' => $validated['unit_price']
+            ]);
+        }
+
+        $sale->recalcTotals();
+
+        // Load the product relationship for the saleItem
+        $saleItem->load('product');
+
+        // Refresh the sale with all relationships
+        $sale->load(['saleItems.product', 'saleDiscounts']);
+
+        return response()->json([
+            'success' => true,
+            'item' => $saleItem,
+            'sale' => $sale,
+            'items' => $sale->saleItems,
+            'discounts' => $sale->saleDiscounts,
+            'totals' => [
+                'subtotal' => $sale->total_amount,
+                'discount_amount' => $sale->discount_amount,
+                'grand_total' => $sale->grand_total
+            ]
+        ]);
     }
 
-    public function syncDraftImmediate(Request $request, Sale $sale)
+    /**
+     * Remove item from cart
+     */
+    public function removeItemFromCart(Request $request, $saleId = null)
     {
-        $this->saleService->syncDraftImmediate($sale, $request->items);
+        // Handle both route model binding and manual ID resolution
+        if ($saleId instanceof Sale) {
+            $sale = $saleId;
+        } else {
+            $saleId = $saleId ?? $request->route('sale');
+            $domain = $request->route('domain');
 
-        return response()->json(['message' => 'Sale draft synced successfully']);
+            // If we're in a domain context, scope by domain
+            if ($domain) {
+                $sale = Sale::where('id', $saleId)
+                    ->where('domain', $domain)
+                    ->firstOrFail();
+            } else {
+                $sale = Sale::findOrFail($saleId);
+            }
+        }
+
+        $validated = $request->validate([
+            'product_id' => 'required|exists:products,id'
+        ]);
+
+        $sale->saleItems()->where('product_id', $validated['product_id'])->delete();
+        $sale->recalcTotals();
+
+        // Refresh the sale with all relationships
+        $sale->load(['saleItems.product', 'saleDiscounts']);
+
+        return response()->json([
+            'success' => true,
+            'sale' => $sale,
+            'items' => $sale->saleItems,
+            'discounts' => $sale->saleDiscounts,
+            'totals' => [
+                'subtotal' => $sale->total_amount,
+                'discount_amount' => $sale->discount_amount,
+                'grand_total' => $sale->grand_total
+            ]
+        ]);
     }
+
+    /**
+     * Update item quantity in cart
+     */
+    public function updateItemQuantity(Request $request, $saleId = null)
+    {
+        // Handle both route model binding and manual ID resolution
+        if ($saleId instanceof Sale) {
+            $sale = $saleId;
+        } else {
+            $saleId = $saleId ?? $request->route('sale');
+            $domain = $request->route('domain');
+
+            // If we're in a domain context, scope by domain
+            if ($domain) {
+                $sale = Sale::where('id', $saleId)
+                    ->where('domain', $domain)
+                    ->firstOrFail();
+            } else {
+                $sale = Sale::findOrFail($saleId);
+            }
+        }
+
+        $validated = $request->validate([
+            'product_id' => 'required|exists:products,id',
+            'quantity' => 'required|integer|min:1'
+        ]);
+
+        $saleItem = $sale->saleItems()
+            ->where('product_id', $validated['product_id'])
+            ->firstOrFail();
+
+        $saleItem->update(['quantity' => $validated['quantity']]);
+        $sale->recalcTotals();
+
+        // Load the product relationship for the saleItem
+        $saleItem->load('product');
+
+        // Refresh the sale with all relationships
+        $sale->load(['saleItems.product', 'saleDiscounts']);
+
+        return response()->json([
+            'success' => true,
+            'item' => $saleItem,
+            'sale' => $sale,
+            'items' => $sale->saleItems,
+            'discounts' => $sale->saleDiscounts,
+            'totals' => [
+                'subtotal' => $sale->total_amount,
+                'discount_amount' => $sale->discount_amount,
+                'grand_total' => $sale->grand_total
+            ]
+        ]);
+    }
+
+    /**
+     * Get current cart state
+     */
+    public function getCartState(Request $request, $saleId = null)
+    {
+        // Handle both route model binding and manual ID resolution
+        if ($saleId instanceof Sale) {
+            $sale = $saleId;
+        } else {
+            $saleId = $saleId ?? $request->route('sale');
+            $domain = $request->route('domain');
+
+            // If we're in a domain context, scope by domain
+            if ($domain) {
+                $sale = Sale::where('id', $saleId)
+                    ->where('domain', $domain)
+                    ->firstOrFail();
+            } else {
+                $sale = Sale::findOrFail($saleId);
+            }
+        }
+
+        $sale->load(['saleItems.product', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount']);
+
+        return response()->json([
+            'success' => true,
+            'sale' => $sale,
+            'items' => $sale->saleItems,
+            'discounts' => $sale->saleDiscounts,
+            'totals' => [
+                'subtotal' => $sale->total_amount,
+                'discount_amount' => $sale->discount_amount,
+                'grand_total' => $sale->grand_total
+            ]
+        ]);
+    }
+
+    /**
+     * Get current active discounts from database
+     */
+    public function getCurrentDiscounts(Request $request)
+    {
+        $domain = $request->route('domain');
+
+        // Get active regular discounts
+        $regularDiscounts = Discount::where('is_active', true)
+            ->where('scope', 'order')
+            ->where('start_date', '<=', now())
+            ->where(function ($query) {
+                $query->whereNull('end_date')
+                    ->orWhere('end_date', '>=', now());
+            })
+            ->when($domain, function ($query, $domain) {
+                $query->where('domain', $domain);
+            })
+            ->get();
+
+        // Get active mandatory discounts
+        $mandatoryDiscounts = \App\Models\MandatoryDiscount::where('is_active', true)
+            ->when($domain, function ($query, $domain) {
+                $query->where('domain', $domain);
+            })
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'regular_discounts' => $regularDiscounts,
+            'mandatory_discounts' => $mandatoryDiscounts
+        ]);
+    }
+
+    /**
+     * Get sale-specific discount state
+     */
+    public function getSaleDiscounts(Sale $sale)
+    {
+        $sale->load(['saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount']);
+
+        $regularDiscounts = $sale->saleDiscounts()
+            ->where('discount_type', 'regular')
+            ->with('discount')
+            ->get()
+            ->pluck('discount');
+
+        $mandatoryDiscounts = $sale->saleDiscounts()
+            ->where('discount_type', 'mandatory')
+            ->with('mandatoryDiscount')
+            ->get()
+            ->pluck('mandatoryDiscount');
+
+        return response()->json([
+            'success' => true,
+            'regular_discounts' => $regularDiscounts,
+            'mandatory_discounts' => $mandatoryDiscounts,
+            'total_discount_amount' => $sale->discount_amount
+        ]);
+    }
+
+    /**
+     * Update sale discounts
+     */
+    public function updateSaleDiscounts(Request $request, Sale $sale)
+    {
+        $validated = $request->validate([
+            'regular_discount_ids' => 'array',
+            'regular_discount_ids.*' => 'exists:discounts,id',
+            'mandatory_discount_ids' => 'array',
+            'mandatory_discount_ids.*' => 'exists:mandatory_discounts,id'
+        ]);
+
+        try {
+            $saleDiscountService = app(\App\Services\SaleDiscountService::class);
+            $result = $saleDiscountService->applyOrderDiscounts(
+                $sale,
+                $validated['regular_discount_ids'] ?? [],
+                $validated['mandatory_discount_ids'] ?? []
+            );
+
+            return response()->json([
+                'success' => true,
+                'sale' => $result['sale'],
+                'discounts' => $result['sale_discounts']
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
 
     public function voidItem(Request $request, Sale $sale)
     {
@@ -182,25 +480,42 @@ class SaleController extends Controller
             ->first();
     }
 
-    public function assignCustomer(Request $request, Sale $sale)
+    public function assignCustomer(Request $request, $saleId = null)
     {
+        // Handle both route model binding and manual ID resolution
+        if ($saleId instanceof Sale) {
+            $sale = $saleId;
+        } else {
+            $saleId = $saleId ?? $request->route('sale');
+            $domain = $request->route('domain');
+
+            // If we're in a domain context, scope by domain
+            if ($domain) {
+                $sale = Sale::where('id', $saleId)
+                    ->where('domain', $domain)
+                    ->firstOrFail();
+            } else {
+                $sale = Sale::findOrFail($saleId);
+            }
+        }
+
         $validated = $request->validate([
             'customer_id' => 'nullable|exists:customers,id'
         ]);
-        
+
         \Log::info("SaleController::assignCustomer called", [
             'sale_id' => $sale->id,
             'customer_id' => $validated['customer_id']
         ]);
-        
+
         // Update sale with customer and trigger customer update event
         $sale->updateCustomer($validated['customer_id']);
-        
+
         $response = [
             'success' => true,
             'message' => $validated['customer_id'] ? 'Customer assigned successfully' : 'Customer removed successfully'
         ];
-        
+
         // If customer is assigned, include customer data in response
         if ($validated['customer_id']) {
             $customer = \App\Models\Customer::findOrFail($validated['customer_id']);
@@ -214,7 +529,7 @@ class SaleController extends Controller
                 'membership_number' => $customer->membership_number,
             ];
         }
-        
+
         return response()->json($response);
     }
 
@@ -223,10 +538,10 @@ class SaleController extends Controller
         \Log::info("Testing CustomerUpdated event", [
             'sale_id' => $sale->id
         ]);
-        
+
         // Manually trigger the CustomerUpdated event
         event(new \App\Events\CustomerUpdated($sale));
-        
+
         return response()->json([
             'success' => true,
             'message' => 'CustomerUpdated event triggered for testing'
@@ -239,20 +554,20 @@ class SaleController extends Controller
         if ($sale->payment_status !== 'paid') {
             return response()->json(['error' => 'Sale not completed'], 400);
         }
-        
+
         $validated = $request->validate([
             'customer_id' => 'required|exists:customers,id',
             'sale_amount' => 'required|numeric|min:0'
         ]);
-        
+
         $customer = Customer::findOrFail($validated['customer_id']);
-        
+
         // Update sale with customer and trigger order update event
         $sale->updateCustomer($customer->id);
-        
+
         // Process loyalty rewards
         $results = $customer->processLoyaltyForSale($validated['sale_amount']);
-        
+
         // Return results in the format expected by frontend
         return response()->json(array_merge([
             'success' => true,
@@ -272,7 +587,7 @@ class SaleController extends Controller
         \Log::info("Testing OrderUpdated event", [
             'sale_id' => $sale->id
         ]);
-        
+
         // Manually trigger the OrderUpdated event
         event(new \App\Events\OrderUpdated($sale->fresh([
             'saleItems.product',
@@ -280,11 +595,324 @@ class SaleController extends Controller
             'saleItems.discounts',
             'customer'
         ])));
-        
+
         return response()->json([
             'success' => true,
             'message' => 'OrderUpdated event triggered for testing',
             'sale_id' => $sale->id
+        ]);
+    }
+
+    /**
+     * Get current user's latest pending sale in the current domain
+     */
+    public function getCurrentPendingSale(Request $request)
+    {
+        $domain = $request->route('domain');
+        $userId = auth()->id();
+
+        // Get the latest pending sale for this user in this domain
+        $sale = Sale::forDomain($domain)
+            ->pending()
+            ->where('user_id', $userId)
+            ->orderBy('created_at', 'desc')
+            ->with(['saleItems.product', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount'])
+            ->first();
+
+        // Always return success, even if no sale found
+        return response()->json([
+            'success' => true,
+            'sale' => $sale,
+            'items' => $sale ? $sale->saleItems : [],
+            'discounts' => $sale ? $sale->saleDiscounts : [],
+            'totals' => $sale ? [
+                'subtotal' => $sale->total_amount,
+                'discount_amount' => $sale->discount_amount,
+                'grand_total' => $sale->grand_total
+            ] : [
+                'subtotal' => 0,
+                'discount_amount' => 0,
+                'grand_total' => 0
+            ]
+        ]);
+    }
+
+    /**
+     * Create a new sale for a specific user
+     */
+    public function createSaleForUser(Request $request, $userId)
+    {
+        $domain = $request->route('domain');
+        // Explicitly get the 'user' parameter from the route
+        $userId = $request->route('user');
+        // Verify the user exists and is accessible
+        $user = \App\Models\User::findOrFail($userId);
+
+        // Create new sale for this user
+        $sale = $this->saleService->storeDraft($user);
+
+        return response()->json([
+            'success' => true,
+            'sale' => $sale,
+            'message' => 'Sale created for user'
+        ]);
+    }
+
+    /**
+     * Add item to user's latest pending sale (auto-finds or creates)
+     */
+    public function addItemToUserCart(Request $request, $userId)
+    {
+        $domain = $request->route('domain');
+
+        // Explicitly get the 'user' parameter from the route to avoid parameter binding issues
+        $userId = $request->route('user');
+
+        // Debug: Log the received parameters
+        \Log::info('addItemToUserCart called', [
+            'original_userId' => $userId,
+            'route_user_param' => $request->route('user'),
+            'domain' => $domain,
+            'route_parameters' => $request->route()->parameters(),
+            'all_parameters' => $request->all()
+        ]);
+
+        $user = \App\Models\User::findOrFail($userId);
+
+        // Get or create latest pending sale for this user
+        $sale = Sale::forDomain($domain)
+            ->pending()
+            ->where('user_id', $userId)
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        // If no pending sale exists, create one
+        if (!$sale) {
+            $sale = $this->saleService->storeDraft($user);
+        }
+
+        // Now add item to the sale
+        $validated = $request->validate([
+            'product_id' => 'required|exists:products,id',
+            'quantity' => 'required|integer|min:1',
+            'unit_price' => 'required|numeric|min:0'
+        ]);
+
+        // Add item to cart logic here...
+        $saleItem = $sale->saleItems()->where('product_id', $validated['product_id'])->first();
+
+        if ($saleItem) {
+            $saleItem->increment('quantity', $validated['quantity']);
+        } else {
+            $saleItem = $sale->saleItems()->create([
+                'product_id' => $validated['product_id'],
+                'quantity' => $validated['quantity'],
+                'unit_price' => $validated['unit_price']
+            ]);
+        }
+
+        $sale->recalcTotals();
+        $sale->load(['saleItems.product', 'saleDiscounts']);
+
+        return response()->json([
+            'success' => true,
+            'sale' => $sale,
+            'items' => $sale->saleItems,
+            'discounts' => $sale->saleDiscounts,
+            'totals' => [
+                'subtotal' => $sale->total_amount,
+                'discount_amount' => $sale->discount_amount,
+                'grand_total' => $sale->grand_total
+            ]
+        ]);
+    }
+
+    /**
+     * Get user's current pending sale
+     */
+    public function getUserPendingSale(Request $request, $userId)
+    {
+        $domain = $request->route('domain');
+        // Explicitly get the 'user' parameter from the route
+        $userId = $request->route('user');
+
+        $sale = Sale::forDomain($domain)
+            ->pending()
+            ->where('user_id', $userId)
+            ->orderBy('created_at', 'desc')
+            ->with(['saleItems.product', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount'])
+            ->first();
+
+        return response()->json([
+            'success' => true,
+            'sale' => $sale,
+            'items' => $sale ? $sale->saleItems : [],
+            'discounts' => $sale ? $sale->saleDiscounts : [],
+            'totals' => $sale ? [
+                'subtotal' => $sale->total_amount,
+                'discount_amount' => $sale->discount_amount,
+                'grand_total' => $sale->grand_total
+            ] : [
+                'subtotal' => 0,
+                'discount_amount' => 0,
+                'grand_total' => 0
+            ]
+        ]);
+    }
+
+    /**
+     * Update user cart quantity
+     */
+    public function updateUserCartQuantity(Request $request, $userId)
+    {
+        $domain = $request->route('domain');
+        // Explicitly get the 'user' parameter from the route
+        $userId = $request->route('user');
+
+        // Get user's latest pending sale
+        $sale = Sale::forDomain($domain)
+            ->pending()
+            ->where('user_id', $userId)
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        if (!$sale) {
+            return response()->json(['success' => false, 'message' => 'No pending sale found'], 404);
+        }
+
+        $validated = $request->validate([
+            'product_id' => 'required|exists:products,id',
+            'quantity' => 'required|integer|min:1'
+        ]);
+
+        $saleItem = $sale->saleItems()
+            ->where('product_id', $validated['product_id'])
+            ->firstOrFail();
+
+        $saleItem->update(['quantity' => $validated['quantity']]);
+        $sale->recalcTotals();
+
+        $sale->load(['saleItems.product', 'saleDiscounts']);
+
+        return response()->json([
+            'success' => true,
+            'sale' => $sale,
+            'items' => $sale->saleItems,
+            'discounts' => $sale->saleDiscounts,
+            'totals' => [
+                'subtotal' => $sale->total_amount,
+                'discount_amount' => $sale->discount_amount,
+                'grand_total' => $sale->grand_total
+            ]
+        ]);
+    }
+
+    /**
+     * Remove item from user cart
+     */
+    public function removeFromUserCart(Request $request, $userId)
+    {
+        $domain = $request->route('domain');
+        // Explicitly get the 'user' parameter from the route
+        $userId = $request->route('user');
+
+        // Get user's latest pending sale
+        $sale = Sale::forDomain($domain)
+            ->pending()
+            ->where('user_id', $userId)
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        if (!$sale) {
+            return response()->json(['success' => false, 'message' => 'No pending sale found'], 404);
+        }
+
+        $validated = $request->validate([
+            'product_id' => 'required|exists:products,id'
+        ]);
+
+        $sale->saleItems()->where('product_id', $validated['product_id'])->delete();
+        $sale->recalcTotals();
+
+        $sale->load(['saleItems.product', 'saleDiscounts']);
+
+        return response()->json([
+            'success' => true,
+            'sale' => $sale,
+            'items' => $sale->saleItems,
+            'discounts' => $sale->saleDiscounts,
+            'totals' => [
+                'subtotal' => $sale->total_amount,
+                'discount_amount' => $sale->discount_amount,
+                'grand_total' => $sale->grand_total
+            ]
+        ]);
+    }
+
+    /**
+     * Get user cart state
+     */
+    public function getUserCartState(Request $request, $userId)
+    {
+        $domain = $request->route('domain');
+        // Explicitly get the 'user' parameter from the route
+        $userId = $request->route('user');
+
+        // Get user's latest pending sale
+        $sale = Sale::forDomain($domain)
+            ->pending()
+            ->where('user_id', $userId)
+            ->orderBy('created_at', 'desc')
+            ->with(['saleItems.product', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount'])
+            ->first();
+
+        if (!$sale) {
+            return response()->json([
+                'success' => true,
+                'sale' => null,
+                'items' => [],
+                'discounts' => [],
+                'totals' => [
+                    'subtotal' => 0,
+                    'discount_amount' => 0,
+                    'grand_total' => 0
+                ]
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'sale' => $sale,
+            'items' => $sale->saleItems,
+            'discounts' => $sale->saleDiscounts,
+            'totals' => [
+                'subtotal' => $sale->total_amount,
+                'discount_amount' => $sale->discount_amount,
+                'grand_total' => $sale->grand_total
+            ]
+        ]);
+    }
+
+    /**
+     * Get oversell statistics for management reporting
+     */
+    public function getOversellStatistics(Request $request)
+    {
+        $validated = $request->validate([
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
+            'domain' => 'nullable|string'
+        ]);
+
+        $statistics = $this->saleService->getOversellStatistics(
+            $validated['start_date'] ?? null,
+            $validated['end_date'] ?? null,
+            $validated['domain'] ?? null
+        );
+
+        return response()->json([
+            'success' => true,
+            'statistics' => $statistics
         ]);
     }
 }

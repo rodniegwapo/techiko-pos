@@ -37,6 +37,14 @@ export function useDomainRoutes() {
                 // If we're in a domain context, maintain it
                 if (isInDomainContext.value) {
                     const domainRouteName = `domains.${routeName}`;
+                    
+                    // For user-specific routes, ensure we have the user parameter
+                    if (routeName.startsWith('users.') && params.user) {
+                        const route = window.route(domainRouteName, { domain: currentDomainSlug, user: params.user, ...params });
+                        console.log('Super user user-specific route in domain context:', { domainRouteName, domainSlug: currentDomainSlug, userId: params.user, route });
+                        return route;
+                    }
+                    
                     const route = window.route(domainRouteName, { domain: currentDomainSlug, ...params });
                     console.log('Super user in domain context:', { domainRouteName, route });
                     return route;
@@ -50,6 +58,15 @@ export function useDomainRoutes() {
             else if (currentDomain.value || isInDomainContext.value) {
                 const domainSlug = currentDomainSlug || currentDomain.value?.name_slug;
                 const domainRouteName = `domains.${routeName}`;
+                
+                // For user-specific routes, ensure we have the user parameter
+                if (routeName.startsWith('users.') && params.user) {
+                    console.log('Processing user-specific route:', { routeName, params, domainSlug });
+                    const route = window.route(domainRouteName, { domain: domainSlug, user: params.user, ...params });
+                    console.log('User-specific route in domain context:', { domainRouteName, domainSlug, userId: params.user, route });
+                    return route;
+                }
+                
                 const route = window.route(domainRouteName, { domain: domainSlug, ...params });
                 console.log('Regular user in domain context:', { domainRouteName, domainSlug, route });
                 return route;

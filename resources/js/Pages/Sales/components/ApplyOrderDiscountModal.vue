@@ -5,12 +5,14 @@ import { computed, onMounted, ref, toRefs, watch } from "vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { usePage } from "@inertiajs/vue3";
 import { useOrders } from "@/Composables/useOrderV2";
+import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import axios from "axios";
 import dayjs from "dayjs";
 import { notification } from "ant-design-vue";
 
 const emit = defineEmits(["close"]);
 const { formData, errors } = useGlobalVariables();
+const { getRoute } = useDomainRoutes();
 const page = usePage();
 const {
   orderId,
@@ -68,8 +70,8 @@ const handleSave = async () => {
       mandatory_discount_ids: selectedMandatoryIds,
     };
     loading.value = true;
-    const { data: sale } = await axios.post(
-      route("sales.discounts.order.apply", {
+    const { data: sale } = await axios.patch(
+      getRoute("sales.discounts.update", {
         sale: orderId.value,
       }),
       payload
@@ -77,23 +79,13 @@ const handleSave = async () => {
 
     const { sale_discounts } = sale;
     
-    // Separate regular and mandatory discount IDs
+    // Update local state with database response
     const regularDiscounts = sale_discounts.filter(item => item.discount_type === 'regular');
     const mandatoryDiscounts = sale_discounts.filter(item => item.discount_type === 'mandatory');
     
-    const regularDiscountIds = regularDiscounts.map(item => item.discount_id).join(",");
-    const mandatoryDiscountIds = mandatoryDiscounts.map(item => item.discount_id).join(",");
-    
-    // Store separately for proper retrieval
-    localStorage.setItem("order_discount_amount", sale?.sale?.discount_amount ?? 0);
-    localStorage.setItem("regular_discount_ids", regularDiscountIds);
-    localStorage.setItem("mandatory_discount_ids", mandatoryDiscountIds);
-    
-    // Keep the old format for backward compatibility
-    const allDiscountIds = sale_discounts.map(item => item.discount_id).join(",");
-    localStorage.setItem("order_discount_ids", allDiscountIds);
-
+    // Update local state instead of localStorage
     orderDiscountAmount.value = sale?.sale?.discount_amount ?? 0;
+    const allDiscountIds = sale_discounts.map(item => item.discount_id).join(",");
     orderDiscountId.value = allDiscountIds;
     formData.value = {};
 
@@ -179,10 +171,7 @@ const handleClearDiscount = async () => {
       })
     );
 
-    localStorage.removeItem("order_discount_amount");
-    localStorage.removeItem("order_discount_ids");
-    localStorage.removeItem("regular_discount_ids");
-    localStorage.removeItem("mandatory_discount_ids");
+    // Update local state instead of localStorage
     orderDiscountAmount.value = 0;
     orderDiscountId.value = '';
 

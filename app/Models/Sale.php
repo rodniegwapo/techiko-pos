@@ -25,6 +25,11 @@ class Sale extends Model
         return $query->where('domain', $domain);
     }
 
+    // Add scope for pending sales
+    public function scopePending($query) {
+        return $query->where('payment_status', 'pending');
+    }
+
     public function saleItems()
     {
         return $this->hasMany(SaleItem::class);
@@ -38,6 +43,11 @@ class Sale extends Model
     public function customer()
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
     }
 
     public function recalcTotals(): void

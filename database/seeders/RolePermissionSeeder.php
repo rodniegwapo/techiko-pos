@@ -51,8 +51,6 @@ class RolePermissionSeeder extends Seeder
             'sales.drafts.store',
             'sales.items.void',
             'sales.payment.store',
-            'sales.sales.syncDraft',
-            'sales.sales.syncDraftImmediate',
             'sales.find-sale-item',
             'sales.sales.assignCustomer',
             'sales.sales.processLoyalty',
@@ -60,6 +58,28 @@ class RolePermissionSeeder extends Seeder
             'sales.discounts.order.remove',
             'sales.items.discount.apply',
             'sales.items.discount.remove',
+            
+            // Cart Management - Database-driven
+            'sales.cart.add',
+            'sales.cart.remove',
+            'sales.cart.update-quantity',
+            'sales.cart.state',
+            
+            // Discount Management - Database-driven
+            'sales.discounts.current',
+            'sales.discounts.sale',
+            'sales.discounts.update',
+            
+            // Current Pending Sale
+            'sales.current-pending',
+            
+            // User-specific sales routes
+            'users.sales.create',
+            'users.sales.cart.add',
+            'users.sales.current-pending',
+            'users.sales.cart.update-quantity',
+            'users.sales.cart.remove',
+            'users.sales.cart.state',
             
             // Products
             'products.index',
@@ -203,6 +223,17 @@ class RolePermissionSeeder extends Seeder
             
             // Customer Order
             'customer-order',
+            
+            // Cart Management - Database-driven
+            'sales.cart.add',
+            'sales.cart.remove',
+            'sales.cart.update-quantity',
+            'sales.cart.state',
+            
+            // Discount Management - Database-driven
+            'sales.discounts.current',
+            'sales.discounts.sale',
+            'sales.discounts.update',
         ];
 
         // Get all permission modules
@@ -281,8 +312,6 @@ class RolePermissionSeeder extends Seeder
             'sales.drafts.store',
             'sales.items.void',
             'sales.payment.store',
-            'sales.sales.syncDraft',
-            'sales.sales.syncDraftImmediate',
             'sales.find-sale-item',
             'sales.sales.assignCustomer',
             'sales.sales.processLoyalty',
@@ -290,6 +319,28 @@ class RolePermissionSeeder extends Seeder
             'sales.discounts.order.remove',
             'sales.items.discount.apply',
             'sales.items.discount.remove',
+            
+            // Cart Management - Database-driven
+            'sales.cart.add',
+            'sales.cart.remove',
+            'sales.cart.update-quantity',
+            'sales.cart.state',
+            
+            // Discount Management - Database-driven
+            'sales.discounts.current',
+            'sales.discounts.sale',
+            'sales.discounts.update',
+            
+            // Current Pending Sale
+            'sales.current-pending',
+            
+            // User-specific sales routes
+            'users.sales.create',
+            'users.sales.cart.add',
+            'users.sales.current-pending',
+            'users.sales.cart.update-quantity',
+            'users.sales.cart.remove',
+            'users.sales.cart.state',
             
             // Products
             'products.index',
@@ -427,8 +478,6 @@ class RolePermissionSeeder extends Seeder
             'sales.drafts.store',
             'sales.items.void',
             'sales.payment.store',
-            'sales.sales.syncDraft',
-            'sales.sales.syncDraftImmediate',
             'sales.find-sale-item',
             'sales.sales.assignCustomer',
             'sales.sales.processLoyalty',
@@ -436,6 +485,28 @@ class RolePermissionSeeder extends Seeder
             'sales.discounts.order.remove',
             'sales.items.discount.apply',
             'sales.items.discount.remove',
+            
+            // Cart Management - Database-driven
+            'sales.cart.add',
+            'sales.cart.remove',
+            'sales.cart.update-quantity',
+            'sales.cart.state',
+            
+            // Discount Management - Database-driven
+            'sales.discounts.current',
+            'sales.discounts.sale',
+            'sales.discounts.update',
+            
+            // Current Pending Sale
+            'sales.current-pending',
+            
+            // User-specific sales routes
+            'users.sales.create',
+            'users.sales.cart.add',
+            'users.sales.current-pending',
+            'users.sales.cart.update-quantity',
+            'users.sales.cart.remove',
+            'users.sales.cart.state',
             
             // Products
             'products.index',
@@ -540,8 +611,6 @@ class RolePermissionSeeder extends Seeder
             'sales.drafts.store',
             'sales.items.void',
             'sales.payment.store',
-            'sales.sales.syncDraft',
-            'sales.sales.syncDraftImmediate',
             'sales.find-sale-item',
             'sales.sales.assignCustomer',
             'sales.sales.processLoyalty',
@@ -549,6 +618,28 @@ class RolePermissionSeeder extends Seeder
             'sales.discounts.order.remove',
             'sales.items.discount.apply',
             'sales.items.discount.remove',
+            
+            // Cart Management - Database-driven
+            'sales.cart.add',
+            'sales.cart.remove',
+            'sales.cart.update-quantity',
+            'sales.cart.state',
+            
+            // Discount Management - Database-driven
+            'sales.discounts.current',
+            'sales.discounts.sale',
+            'sales.discounts.update',
+            
+            // Current Pending Sale
+            'sales.current-pending',
+            
+            // User-specific sales routes
+            'users.sales.create',
+            'users.sales.cart.add',
+            'users.sales.current-pending',
+            'users.sales.cart.update-quantity',
+            'users.sales.cart.remove',
+            'users.sales.cart.state',
             
             // Products
             'products.index',
@@ -627,8 +718,6 @@ class RolePermissionSeeder extends Seeder
             'sales.drafts.store',
             'sales.items.void',
             'sales.payment.store',
-            'sales.sales.syncDraft',
-            'sales.sales.syncDraftImmediate',
             'sales.find-sale-item',
             'sales.sales.assignCustomer',
             'sales.sales.processLoyalty',
@@ -636,6 +725,28 @@ class RolePermissionSeeder extends Seeder
             'sales.discounts.order.remove',
             'sales.items.discount.apply',
             'sales.items.discount.remove',
+            
+            // Cart Management - Database-driven
+            'sales.cart.add',
+            'sales.cart.remove',
+            'sales.cart.update-quantity',
+            'sales.cart.state',
+            
+            // Discount Management - Database-driven
+            'sales.discounts.current',
+            'sales.discounts.sale',
+            'sales.discounts.update',
+            
+            // Current Pending Sale
+            'sales.current-pending',
+            
+            // User-specific sales routes
+            'users.sales.create',
+            'users.sales.cart.add',
+            'users.sales.current-pending',
+            'users.sales.cart.update-quantity',
+            'users.sales.cart.remove',
+            'users.sales.cart.state',
             
             // Products
             'products.index',
@@ -750,6 +861,17 @@ class RolePermissionSeeder extends Seeder
             'view' => 'View',
             'recent-pending' => 'Recent Pending',
             'customer-order' => 'Customer Order',
+            
+            // Cart Management Actions
+            'cart.add' => 'Add to Cart',
+            'cart.remove' => 'Remove from Cart',
+            'cart.update-quantity' => 'Update Quantity',
+            'cart.state' => 'View Cart State',
+            
+            // Discount Management Actions
+            'discounts.current' => 'View Current Discounts',
+            'discounts.sale' => 'View Sale Discounts',
+            'discounts.update' => 'Update Discounts',
         ];
 
         return $actionLabels[$action] ?? ucfirst($action);

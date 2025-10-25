@@ -45,13 +45,22 @@ Route::middleware(['auth:sanctum', 'user.permission'])->group(function () {
     Route::prefix('sales')->name('sales.')->group(function () {
         Route::get('/products', [SaleController::class, 'products'])->name('products');
         Route::post('/draft', [SaleController::class, 'storeDraft'])->name('drafts.store');
+        Route::get('/oversell-statistics', [SaleController::class, 'getOversellStatistics'])->name('oversell.statistics');
 
         // Scoped bindings
         Route::scopeBindings()->group(function () {
             Route::post('/{sale}/sales-items/void', [SaleController::class, 'voidItem'])->name('items.void');
             Route::post('/{sale}/payments', [SaleController::class, 'proceedPayment'])->name('payment.store');
-            Route::post('/{sale}/sync', [SaleController::class, 'syncDraft'])->name('sales.syncDraft');
-            Route::post('/{sale}/sync-immediate', [SaleController::class, 'syncDraftImmediate'])->name('sales.syncDraftImmediate');
+            // Cart management - database-driven
+            Route::post('/{sale}/cart/add', [SaleController::class, 'addItemToCart'])->name('cart.add');
+            Route::delete('/{sale}/cart/remove', [SaleController::class, 'removeItemFromCart'])->name('cart.remove');
+            Route::patch('/{sale}/cart/update-quantity', [SaleController::class, 'updateItemQuantity'])->name('cart.update-quantity');
+            Route::get('/{sale}/cart/state', [SaleController::class, 'getCartState'])->name('cart.state');
+            
+            // Discounts - database-driven
+            Route::get('/discounts/current', [SaleController::class, 'getCurrentDiscounts'])->name('discounts.current');
+            Route::get('/{sale}/discounts', [SaleController::class, 'getSaleDiscounts'])->name('discounts.sale');
+            Route::patch('/{sale}/discounts', [SaleController::class, 'updateSaleDiscounts'])->name('discounts.update');
             Route::get('/{sale}/find-sale-item', [SaleController::class, 'findSaleItem'])->name('find-sale-item');
             Route::post('/{sale}/assign-customer', [SaleController::class, 'assignCustomer'])->name('sales.assignCustomer');
             Route::post('/{sale}/process-loyalty', [SaleController::class, 'processLoyalty'])->name('sales.processLoyalty');

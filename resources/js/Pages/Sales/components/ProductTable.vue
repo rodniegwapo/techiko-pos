@@ -16,6 +16,15 @@ const props = defineProps({
 
 const { orders, handleAddOrder } = useOrders();
 
+// Handle adding items to cart with proper async handling
+const addToCart = async (product) => {
+  try {
+    await handleAddOrder(product);
+  } catch (error) {
+    console.error('Failed to add item to cart:', error);
+  }
+};
+
 //  Formatted total with commas (Philippine Peso example)
 const formattedTotal = (price) => {
   return new Intl.NumberFormat("en-PH", {
@@ -55,7 +64,7 @@ const formattedTotal = (price) => {
             type="primary"
             class="text-xs flex items-center p-0 mt-1 bg-transparent text-gray-800 border-none shadow-none"
             size="small"
-            @click="handleAddOrder(product)"
+            @click="addToCart(product)"
           >
             <PlusSquareOutlined /> Add to Cart
           </a-button>

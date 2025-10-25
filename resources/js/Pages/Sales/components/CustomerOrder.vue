@@ -129,72 +129,52 @@ const newCustomerForm = ref({
 
 const openOrderDicountModal = ref(false);
 
-const showDiscountOrder = () => {
+const showDiscountOrder = async () => {
   // Check if there's an active order/draft OR if there are items in the cart
   // (orderId might be null briefly while draft is being created)
   if (!orderId.value && orders.value.length === 0) return;
 
-  // Get stored regular and mandatory discount IDs
-  const regularDiscountIds = localStorage.getItem("regular_discount_ids") || "";
-  const mandatoryDiscountIds =
-    localStorage.getItem("mandatory_discount_ids") || "";
+  try {
+    // Load current discounts from database instead of localStorage
+    const response = await axios.get('/api/sales/discounts/current');
+    const { regular_discounts, mandatory_discounts } = response.data;
 
-  // Convert stored IDs back to option objects for the select components
-  const regularDiscountOptions = regularDiscountIds
-    ? regularDiscountIds
-        .split(",")
-        .map((id) => Number(id))
-        .filter((id) => id)
-        .map((id) => {
-          // Find the matching option from available discounts
-          const discount = (page.props.discounts || []).find(
-            (d) => d.id === id
-          );
-          return discount
-            ? {
-                label: `${discount.name} (${
-                  discount.type === "percentage"
-                    ? discount.value + "%"
-                    : "₱" + discount.value
-                })`,
-                value: discount.id,
-                amount: discount.value,
-                type: discount.type,
-              }
-            : null;
-        })
-        .filter(Boolean)
-    : [];
+    // Convert database discounts to option objects for the select components
+    const regularDiscountOptions = regular_discounts.map((discount) => ({
+      label: `${discount.name} (${
+        discount.type === "percentage"
+          ? discount.value + "%"
+          : "₱" + discount.value
+      })`,
+      value: discount.id,
+      amount: discount.value,
+      type: discount.type,
+    }));
 
-  const mandatoryDiscountId = mandatoryDiscountIds
-    ? Number(mandatoryDiscountIds.split(",")[0])
-    : null;
+    // Get the first active mandatory discount
+    const mandatoryDiscountOption = mandatory_discounts.length > 0 ? {
+      label: `${mandatory_discounts[0].name} (${
+        mandatory_discounts[0].type === "percentage"
+          ? mandatory_discounts[0].value + "%"
+          : "₱" + mandatory_discounts[0].value
+      })`,
+      value: mandatory_discounts[0].id,
+      amount: mandatory_discounts[0].value,
+      type: mandatory_discounts[0].type,
+    } : null;
 
-  const mandatoryDiscountOption = mandatoryDiscountId
-    ? (() => {
-        const discount = (page.props.mandatoryDiscounts || []).find(
-          (d) => d.id === mandatoryDiscountId
-        );
-        return discount
-          ? {
-              label: `${discount.name} (${
-                discount.type === "percentage"
-                  ? discount.value + "%"
-                  : "₱" + discount.value
-              })`,
-              value: discount.id,
-              amount: discount.value,
-              type: discount.type,
-            }
-          : null;
-      })()
-    : null;
-
-  formData.value = {
-    orderDiscount: regularDiscountOptions,
-    mandatoryDiscount: mandatoryDiscountOption,
-  };
-  openOrderDicountModal.value = true;
+    formData.value = {
+      orderDiscount: regularDiscountOptions,
+      mandatoryDiscount: mandatoryDiscountOption,
+    };
+    openOrderDicountModal.value = true;
+  } catch (error) {
+    console.error('Failed to load discounts:', error);
+    notification.error({
+      message: 'Error',
+      description: 'Failed to load discount options'
+    });
+  }
 };
 
 const cardClass =
