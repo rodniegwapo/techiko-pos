@@ -5,7 +5,15 @@ import ApplyProductDiscountModal from "./ApplyProductDiscountModal.vue";
 import ApplyOrderDiscountModal from "./ApplyOrderDiscountModal.vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import CustomerLoyaltyCard from "@/Components/Loyalty/CustomerLoyaltyCard.vue";
-import { ref, inject, computed, createVNode, watch, toRefs } from "vue";
+import {
+    ref,
+    inject,
+    computed,
+    createVNode,
+    watch,
+    toRefs,
+    nextTick,
+} from "vue";
 import { IconArmchair, IconUsers } from "@tabler/icons-vue";
 import {
     CloseOutlined,
@@ -26,15 +34,19 @@ const { formData, errors } = useGlobalVariables();
 const { getRoute } = useDomainRoutes();
 const page = usePage();
 
-// Debounced quantity change variables
-const addProductQuantity = ref({});
-const subtractProductQuantity = ref({});
-
 // Loading states for each product to prevent multiple rapid clicks
 const loadingStates = ref({});
 
 // Optimistic UI tracking for instant quantity updates
 const optimisticQuantities = ref({});
+
+// Track which quantities are being edited
+const editingQuantity = ref({});
+
+// Modal state for quantity input
+const quantityModalVisible = ref(false);
+const selectedOrder = ref(null);
+const tempQuantity = ref(0);
 // Props for direct data passing
 const props = defineProps({
     orders: { type: Array, default: () => [] },
@@ -113,6 +125,29 @@ const handleSubtractOrder = async (product) => {
     }
 };
 
+const handleUpdateQuantity = async (product, quantity) => {
+    if (!orderId.value) {
+        console.error("No active order - cannot update quantity");
+        return;
+    }
+
+    try {
+        const userId = page.props.auth.user.data.id;
+        const route = getRoute("users.sales.cart.update-quantity", {
+            user: userId,
+        });
+        await axios.patch(route, {
+            product_id: product.id,
+            quantity: quantity,
+        });
+
+        // Emit event to parent to refresh cart data
+        emit("cart-updated");
+    } catch (error) {
+        console.error("Failed to update quantity:", error);
+    }
+};
+
 const removeOrder = async (product) => {
     if (!orderId.value) {
         console.error("No active order - cannot remove item");
@@ -133,8 +168,8 @@ const removeOrder = async (product) => {
     }
 };
 
-// Optimistic UI click handlers with debounced API calls
-const onAddClick = (product) => {
+// Optimistic UI click handlers with direct API calls
+const onAddClick = async (product) => {
     // Prevent multiple rapid clicks
     if (loadingStates.value[product.id]) return;
 
@@ -147,15 +182,21 @@ const onAddClick = (product) => {
     }
     optimisticQuantities.value[product.id] += 1;
 
-    // Update debounced variable for API call
-    addProductQuantity.value = {
-        productId: product.id,
-        quantity: optimisticQuantities.value[product.id],
-        timestamp: Date.now(),
-    };
+    try {
+        // Call the API directly
+        await handleAddOrder(product);
+        // Clear optimistic state after successful API call
+        delete optimisticQuantities.value[product.id];
+    } catch (error) {
+        // Revert optimistic state on error
+        optimisticQuantities.value[product.id] = product.quantity;
+    } finally {
+        // Clear loading state
+        loadingStates.value[product.id] = false;
+    }
 };
 
-const onSubtractClick = (product) => {
+const onSubtractClick = async (product) => {
     // Prevent multiple rapid clicks
     if (loadingStates.value[product.id]) return;
 
@@ -171,17 +212,98 @@ const onSubtractClick = (product) => {
         optimisticQuantities.value[product.id] - 1
     );
 
-    // Update debounced variable for API call
-    subtractProductQuantity.value = {
-        productId: product.id,
-        quantity: optimisticQuantities.value[product.id],
-        timestamp: Date.now(),
-    };
+    try {
+        // Call the API directly
+        await handleSubtractOrder(product);
+        // Clear optimistic state after successful API call
+        delete optimisticQuantities.value[product.id];
+    } catch (error) {
+        // Revert optimistic state on error
+        optimisticQuantities.value[product.id] = product.quantity;
+    } finally {
+        // Clear loading state
+        loadingStates.value[product.id] = false;
+    }
 };
 
 // Helper function to get display quantity (optimistic or actual)
 const getDisplayQuantity = (order) => {
     return optimisticQuantities.value[order.id] ?? order.quantity;
+};
+
+// Open quantity modal
+const toggleQuantityEdit = (order) => {
+    if (loadingStates.value[order.id]) return;
+
+    selectedOrder.value = order;
+    tempQuantity.value = getDisplayQuantity(order);
+    quantityModalVisible.value = true;
+
+    // Focus input after modal opens
+    nextTick(() => {
+        const input = document.querySelector(".ant-input-number-input");
+        if (input) {
+            input.focus();
+            input.select();
+        }
+    });
+};
+
+// Finish quantity editing
+const finishQuantityEdit = (order) => {
+    editingQuantity.value[order.id] = false;
+};
+
+// Save quantity from modal
+const saveQuantity = async () => {
+    if (!selectedOrder.value) return;
+
+    const newQuantity = parseInt(tempQuantity.value);
+    if (isNaN(newQuantity) || newQuantity < 0) {
+        notification.error({
+            message: "Invalid quantity",
+            description: "Please enter a valid number",
+        });
+        return;
+    }
+
+    // Set loading state
+    loadingStates.value[selectedOrder.value.id] = true;
+
+    try {
+        // Call the function directly
+        await handleUpdateQuantity(selectedOrder.value, newQuantity);
+
+        // Update optimistic state
+        optimisticQuantities.value[selectedOrder.value.id] = newQuantity;
+
+        // Close modal
+        quantityModalVisible.value = false;
+
+        notification.success({
+            message: "Quantity updated",
+            description: `Quantity updated to ${newQuantity}`,
+        });
+    } catch (error) {
+        // Revert optimistic state on error
+        optimisticQuantities.value[selectedOrder.value.id] =
+            selectedOrder.value.quantity;
+
+        notification.error({
+            message: "Update failed",
+            description: "Failed to update quantity. Please try again.",
+        });
+    } finally {
+        // Clear loading state
+        loadingStates.value[selectedOrder.value.id] = false;
+    }
+};
+
+// Cancel quantity modal
+const cancelQuantity = () => {
+    quantityModalVisible.value = false;
+    selectedOrder.value = null;
+    tempQuantity.value = 0;
 };
 
 const finalizeOrder = async () => {
@@ -488,57 +610,6 @@ const emit = defineEmits([
     "cart-updated",
 ]);
 
-// Debounced watchers for quantity changes
-watch(
-    addProductQuantity,
-    useDebounceFn(async (newValue) => {
-        if (newValue.productId && newValue.quantity) {
-            const product = orders.value.find(
-                (item) => item.id === newValue.productId
-            );
-            if (product) {
-                try {
-                    await handleAddOrder(product);
-                    // Clear optimistic state after successful API call
-                    delete optimisticQuantities.value[newValue.productId];
-                } catch (error) {
-                    // Revert optimistic state on error
-                    optimisticQuantities.value[newValue.productId] =
-                        product.quantity;
-                } finally {
-                    // Clear loading state regardless of success or failure
-                    loadingStates.value[newValue.productId] = false;
-                }
-            }
-        }
-    }, 300)
-);
-
-watch(
-    subtractProductQuantity,
-    useDebounceFn(async (newValue) => {
-        if (newValue.productId && newValue.quantity !== undefined) {
-            const product = orders.value.find(
-                (item) => item.id === newValue.productId
-            );
-            if (product) {
-                try {
-                    await handleSubtractOrder(product);
-                    // Clear optimistic state after successful API call
-                    delete optimisticQuantities.value[newValue.productId];
-                } catch (error) {
-                    // Revert optimistic state on error
-                    optimisticQuantities.value[newValue.productId] =
-                        product.quantity;
-                } finally {
-                    // Clear loading state regardless of success or failure
-                    loadingStates.value[newValue.productId] = false;
-                }
-            }
-        }
-    }, 300)
-);
-
 // Reset optimistic quantities when orders data changes (cart refresh)
 watch(
     orders,
@@ -547,6 +618,12 @@ watch(
         optimisticQuantities.value = {};
         // Clear loading states when cart data is refreshed
         loadingStates.value = {};
+        // Clear editing states when cart data is refreshed
+        editingQuantity.value = {};
+        // Close modal if open
+        quantityModalVisible.value = false;
+        selectedOrder.value = null;
+        tempQuantity.value = 0;
     },
     { deep: true }
 );
@@ -763,49 +840,55 @@ defineExpose({
                                 </div>
 
                                 <div
-                                    class="text-md flex items-center gap-1 text-gray-800"
+                                    class="flex items-center gap-2"
                                     @click.stop
                                 >
+                                    <a-tooltip title="Remove item">
+                                        <a-button
+                                            type="text"
+                                            size="small"
+                                            :disabled="
+                                                loadingStates[order.id] ||
+                                                getDisplayQuantity(order) <= 0
+                                            "
+                                            @click.stop="onSubtractClick(order)"
+                                            class="quantity-button minus"
+                                        >
+                                            <template #icon>
+                                                <MinusSquareOutlined />
+                                            </template>
+                                        </a-button>
+                                    </a-tooltip>
+
+                                    <!-- Quantity Display with modal input -->
+                                    <div
+                                        class="quantity-display cursor-pointer"
+                                        @click="toggleQuantityEdit(order)"
+                                    >
+                                        <span
+                                            v-if="loadingStates[order.id]"
+                                            class="quantity-loading text-xs"
+                                        >
+                                            <a-spin size="small" />
+                                        </span>
+                                        <span
+                                            v-else
+                                            class="text-sm font-semibold text-gray-700"
+                                        >
+                                            {{ getDisplayQuantity(order) }}
+                                        </span>
+                                    </div>
+
                                     <a-tooltip title="Add item">
                                         <a-button
                                             type="text"
                                             size="small"
                                             :disabled="loadingStates[order.id]"
-                                            :loading="loadingStates[order.id]"
                                             @click.stop="onAddClick(order)"
-                                            class="p-0 h-auto border-0 text-green-600 hover:text-green-700 disabled:opacity-50"
+                                            class="quantity-button plus"
                                         >
                                             <template #icon>
                                                 <PlusSquareOutlined />
-                                            </template>
-                                        </a-button>
-                                    </a-tooltip>
-
-                                    <!-- Show loading skeleton for quantity during API calls -->
-                                    <div
-                                        v-if="loadingStates[order.id]"
-                                        class="animate-pulse"
-                                        @click.stop
-                                    >
-                                        <div
-                                            class="h-4 bg-gray-200 rounded w-8 mx-2"
-                                        ></div>
-                                    </div>
-                                    <span v-else class="mx-1 font-medium" @click.stop>
-                                        {{ getDisplayQuantity(order) }}
-                                    </span>
-
-                                    <a-tooltip title="Remove item">
-                                        <a-button
-                                            type="text"
-                                            size="small"
-                                            :disabled="loadingStates[order.id]"
-                                            :loading="loadingStates[order.id]"
-                                            @click.stop="onSubtractClick(order)"
-                                            class="p-0 h-auto border-0 text-red-600 hover:text-red-700 disabled:opacity-50"
-                                        >
-                                            <template #icon>
-                                                <MinusSquareOutlined />
                                             </template>
                                         </a-button>
                                     </a-tooltip>
@@ -1068,6 +1151,75 @@ defineExpose({
             </div>
         </div>
     </a-modal>
+
+    <!-- Quantity Input Modal -->
+    <a-modal
+        v-model:visible="quantityModalVisible"
+        title="Update Quantity"
+        :width="400"
+        @cancel="quantityModalVisible = false"
+    >
+        <div class="space-y-4">
+            <!-- Product Info -->
+            <div class="bg-gray-50 p-3 rounded">
+                <h4 class="font-semibold text-gray-900">
+                    {{ selectedOrder?.name }}
+                </h4>
+                <p class="text-sm text-gray-600">
+                    Current: {{ selectedOrder?.quantity }} | Price: ₱{{
+                        selectedOrder?.price
+                    }}
+                </p>
+            </div>
+
+            <!-- Quantity Input -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    New Quantity
+                </label>
+                <a-input-number
+                    v-model:value="tempQuantity"
+                    :min="0"
+                    :max="999"
+                    :precision="0"
+                    size="large"
+                    class="w-full"
+                    placeholder="Enter quantity"
+                    @keyup.enter="saveQuantity"
+                />
+                <p class="text-xs text-gray-500 mt-1">
+                    Enter a number between 0 and 999
+                </p>
+            </div>
+
+            <!-- Total Preview -->
+            <div class="bg-green-50 p-3 rounded border border-green-200">
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-600">Total Amount:</span>
+                    <span class="text-lg font-bold text-green-600">
+                        ₱{{
+                            (
+                                tempQuantity * (selectedOrder?.price || 0)
+                            ).toFixed(2)
+                        }}
+                    </span>
+                </div>
+            </div>
+        </div>
+        <template #footer>
+            <!-- Clear button -->
+            <a-button @click="cancelQuantity" size="large"> Cancel </a-button>
+
+            <primary-button
+                type="primary"
+                @click="saveQuantity"
+                :loading="loadingStates[selectedOrder?.id]"
+                size="large"
+            >
+                Update Quantity
+            </primary-button>
+        </template>
+    </a-modal>
 </template>
 <style>
 /* Slide horizontal animation */
@@ -1084,5 +1236,37 @@ defineExpose({
 .slide-x-leave-to {
     opacity: 0;
     transform: translateX(-100%);
+}
+
+/* Enhanced Quantity Controls Styling */
+.quantity-display {
+    @apply flex items-center justify-center min-w-[2rem] h-6 bg-gray-100 rounded border;
+    @apply transition-all duration-200;
+}
+
+.quantity-display:hover {
+    @apply bg-gray-200;
+}
+
+.quantity-display.editing {
+    @apply bg-white border-blue-300 shadow-sm;
+}
+
+.quantity-button {
+    @apply p-1 h-6 w-6 border-0 transition-all duration-200;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.quantity-button.minus {
+    @apply text-red-600 hover:text-red-700 hover:bg-red-50;
+}
+
+.quantity-button.plus {
+    @apply text-green-600 hover:text-green-700 hover:bg-green-50;
+}
+
+/* Loading state for quantity display */
+.quantity-loading {
+    @apply animate-pulse;
 }
 </style>
