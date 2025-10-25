@@ -25,6 +25,16 @@ import { useDebounceFn } from "@vueuse/core";
 const { formData, errors } = useGlobalVariables();
 const { getRoute } = useDomainRoutes();
 const page = usePage();
+
+// Debounced quantity change variables
+const addProductQuantity = ref({});
+const subtractProductQuantity = ref({});
+
+// Loading states for each product to prevent multiple rapid clicks
+const loadingStates = ref({});
+
+// Optimistic UI tracking for instant quantity updates
+const optimisticQuantities = ref({});
 // Props for direct data passing
 const props = defineProps({
     orders: { type: Array, default: () => [] },
@@ -72,9 +82,9 @@ const handleAddOrder = async (product) => {
             product_id: product.id,
             quantity: 1,
         });
-        
+
         // Emit event to parent to refresh cart data
-        emit('cart-updated');
+        emit("cart-updated");
     } catch (error) {
         console.error("Failed to add item:", error);
     }
@@ -88,14 +98,16 @@ const handleSubtractOrder = async (product) => {
 
     try {
         const userId = page.props.auth.user.data.id;
-        const route = getRoute("users.sales.cart.update-quantity", { user: userId });
+        const route = getRoute("users.sales.cart.update-quantity", {
+            user: userId,
+        });
         await axios.patch(route, {
             product_id: product.id,
             quantity: Math.max(0, product.quantity - 1),
         });
-        
+
         // Emit event to parent to refresh cart data
-        emit('cart-updated');
+        emit("cart-updated");
     } catch (error) {
         console.error("Failed to subtract item:", error);
     }
@@ -113,12 +125,63 @@ const removeOrder = async (product) => {
         await axios.delete(route, {
             data: { product_id: product.id },
         });
-        
+
         // Emit event to parent to refresh cart data
-        emit('cart-updated');
+        emit("cart-updated");
     } catch (error) {
         console.error("Failed to remove item:", error);
     }
+};
+
+// Optimistic UI click handlers with debounced API calls
+const onAddClick = (product) => {
+    // Prevent multiple rapid clicks
+    if (loadingStates.value[product.id]) return;
+
+    // Set loading state
+    loadingStates.value[product.id] = true;
+
+    // Immediately update UI optimistically
+    if (!optimisticQuantities.value[product.id]) {
+        optimisticQuantities.value[product.id] = product.quantity;
+    }
+    optimisticQuantities.value[product.id] += 1;
+
+    // Update debounced variable for API call
+    addProductQuantity.value = {
+        productId: product.id,
+        quantity: optimisticQuantities.value[product.id],
+        timestamp: Date.now(),
+    };
+};
+
+const onSubtractClick = (product) => {
+    // Prevent multiple rapid clicks
+    if (loadingStates.value[product.id]) return;
+
+    // Set loading state
+    loadingStates.value[product.id] = true;
+
+    // Immediately update UI optimistically
+    if (!optimisticQuantities.value[product.id]) {
+        optimisticQuantities.value[product.id] = product.quantity;
+    }
+    optimisticQuantities.value[product.id] = Math.max(
+        0,
+        optimisticQuantities.value[product.id] - 1
+    );
+
+    // Update debounced variable for API call
+    subtractProductQuantity.value = {
+        productId: product.id,
+        quantity: optimisticQuantities.value[product.id],
+        timestamp: Date.now(),
+    };
+};
+
+// Helper function to get display quantity (optimistic or actual)
+const getDisplayQuantity = (order) => {
+    return optimisticQuantities.value[order.id] ?? order.quantity;
 };
 
 const finalizeOrder = async () => {
@@ -419,7 +482,74 @@ const handleAddCustomer = async () => {
 };
 
 // Emit customer changes to parent
-const emit = defineEmits(["customerChanged", "discount-applied", "cart-updated"]);
+const emit = defineEmits([
+    "customerChanged",
+    "discount-applied",
+    "cart-updated",
+]);
+
+// Debounced watchers for quantity changes
+watch(
+    addProductQuantity,
+    useDebounceFn(async (newValue) => {
+        if (newValue.productId && newValue.quantity) {
+            const product = orders.value.find(
+                (item) => item.id === newValue.productId
+            );
+            if (product) {
+                try {
+                    await handleAddOrder(product);
+                    // Clear optimistic state after successful API call
+                    delete optimisticQuantities.value[newValue.productId];
+                } catch (error) {
+                    // Revert optimistic state on error
+                    optimisticQuantities.value[newValue.productId] =
+                        product.quantity;
+                } finally {
+                    // Clear loading state regardless of success or failure
+                    loadingStates.value[newValue.productId] = false;
+                }
+            }
+        }
+    }, 300)
+);
+
+watch(
+    subtractProductQuantity,
+    useDebounceFn(async (newValue) => {
+        if (newValue.productId && newValue.quantity !== undefined) {
+            const product = orders.value.find(
+                (item) => item.id === newValue.productId
+            );
+            if (product) {
+                try {
+                    await handleSubtractOrder(product);
+                    // Clear optimistic state after successful API call
+                    delete optimisticQuantities.value[newValue.productId];
+                } catch (error) {
+                    // Revert optimistic state on error
+                    optimisticQuantities.value[newValue.productId] =
+                        product.quantity;
+                } finally {
+                    // Clear loading state regardless of success or failure
+                    loadingStates.value[newValue.productId] = false;
+                }
+            }
+        }
+    }, 300)
+);
+
+// Reset optimistic quantities when orders data changes (cart refresh)
+watch(
+    orders,
+    (newOrders) => {
+        // Clear optimistic state when cart data is refreshed
+        optimisticQuantities.value = {};
+        // Clear loading states when cart data is refreshed
+        loadingStates.value = {};
+    },
+    { deep: true }
+);
 
 // Watch for customer changes and emit to parent
 watch(
@@ -634,30 +764,45 @@ defineExpose({
 
                                 <div
                                     class="text-md flex items-center gap-1 text-gray-800"
+                                    @click.stop
                                 >
                                     <a-tooltip title="Add item">
                                         <a-button
                                             type="text"
                                             size="small"
-                                            @click.stop="handleAddOrder(order)"
-                                            class="p-0 h-auto border-0 text-green-600 hover:text-green-700"
+                                            :disabled="loadingStates[order.id]"
+                                            :loading="loadingStates[order.id]"
+                                            @click.stop="onAddClick(order)"
+                                            class="p-0 h-auto border-0 text-green-600 hover:text-green-700 disabled:opacity-50"
                                         >
                                             <template #icon>
                                                 <PlusSquareOutlined />
                                             </template>
                                         </a-button>
                                     </a-tooltip>
-                                    <span class="mx-2 font-medium">{{
-                                        order.quantity
-                                    }}</span>
+
+                                    <!-- Show loading skeleton for quantity during API calls -->
+                                    <div
+                                        v-if="loadingStates[order.id]"
+                                        class="animate-pulse"
+                                        @click.stop
+                                    >
+                                        <div
+                                            class="h-4 bg-gray-200 rounded w-8 mx-2"
+                                        ></div>
+                                    </div>
+                                    <span v-else class="mx-1 font-medium" @click.stop>
+                                        {{ getDisplayQuantity(order) }}
+                                    </span>
+
                                     <a-tooltip title="Remove item">
                                         <a-button
                                             type="text"
                                             size="small"
-                                            @click.stop="
-                                                handleSubtractOrder(order)
-                                            "
-                                            class="p-0 h-auto border-0 text-red-600 hover:text-red-700"
+                                            :disabled="loadingStates[order.id]"
+                                            :loading="loadingStates[order.id]"
+                                            @click.stop="onSubtractClick(order)"
+                                            class="p-0 h-auto border-0 text-red-600 hover:text-red-700 disabled:opacity-50"
                                         >
                                             <template #icon>
                                                 <MinusSquareOutlined />
@@ -665,8 +810,17 @@ defineExpose({
                                         </a-button>
                                     </a-tooltip>
                                 </div>
-                                <div class="text-[11px]">
-                                    {{ order.price }} x {{ order.quantity }}
+                                <div class="text-[11px]" @click.stop>
+                                    {{ order.price }} x
+                                    <span
+                                        v-if="loadingStates[order.id]"
+                                        class="animate-pulse bg-gray-200 rounded px-1"
+                                    >
+                                        {{ getDisplayQuantity(order) }}
+                                    </span>
+                                    <span v-else>{{
+                                        getDisplayQuantity(order)
+                                    }}</span>
                                 </div>
                             </div>
 
@@ -688,13 +842,28 @@ defineExpose({
 
                                 <div
                                     class="text-xs"
-                                    v-if="order.discount && parseFloat(order.discount) > 0"
+                                    v-if="
+                                        order.discount &&
+                                        parseFloat(order.discount) > 0
+                                    "
                                 >
                                     <div
                                         class="text-gray-600 border-b px-2"
-                                        v-if="order.discounts && order.discounts.length > 0 && (order.discounts[0].type === 'percentage' || order.discounts[0].type === 'percent')"
+                                        v-if="
+                                            order.discounts &&
+                                            order.discounts.length > 0 &&
+                                            (order.discounts[0].type ===
+                                                'percentage' ||
+                                                order.discounts[0].type ===
+                                                    'percent')
+                                        "
                                     >
-                                        Disc: {{ parseFloat(order.discounts[0].value) }}% - 
+                                        Disc:
+                                        {{
+                                            parseFloat(
+                                                order.discounts[0].value
+                                            )
+                                        }}% -
                                         {{
                                             formattedTotal(
                                                 parseFloat(order.discount) || 0
@@ -703,9 +872,18 @@ defineExpose({
                                     </div>
                                     <div
                                         class="text-gray-600 border-b px-2"
-                                        v-else-if="order.discounts && order.discounts.length > 0 && order.discounts[0].type === 'amount'"
+                                        v-else-if="
+                                            order.discounts &&
+                                            order.discounts.length > 0 &&
+                                            order.discounts[0].type === 'amount'
+                                        "
                                     >
-                                        Disc: ₱{{ parseFloat(order.discounts[0].value).toFixed(2) }} - 
+                                        Disc: ₱{{
+                                            parseFloat(
+                                                order.discounts[0].value
+                                            ).toFixed(2)
+                                        }}
+                                        -
                                         {{
                                             formattedTotal(
                                                 parseFloat(order.discount) || 0
@@ -716,7 +894,7 @@ defineExpose({
                                         class="text-gray-600 border-b px-2"
                                         v-else
                                     >
-                                        Disc: - 
+                                        Disc: -
                                         {{
                                             formattedTotal(
                                                 parseFloat(order.discount) || 0
