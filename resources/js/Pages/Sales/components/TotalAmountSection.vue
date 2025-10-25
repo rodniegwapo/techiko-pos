@@ -2,10 +2,10 @@
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import ApplyOrderDiscountModal from "./ApplyOrderDiscountModal.vue";
 import { IconDiscount, IconArrowRightToArc } from "@tabler/icons-vue";
-import { useOrders } from "@/Composables/useOrderV2";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
-import { ref, computed, createVNode } from "vue";
+import { useHelpers } from "@/Composables/useHelpers";
+import { ref, computed, createVNode, toRefs } from "vue";
 import { Modal, notification } from "ant-design-vue";
 import { ExclamationCircleOutlined } from "@ant-design/icons-vue";
 import axios from "axios";
@@ -13,26 +13,72 @@ import { usePage } from "@inertiajs/vue3";
 
 const { formData, errors } = useGlobalVariables();
 const { getRoute } = useDomainRoutes();
+const { formattedTotal } = useHelpers();
 const page = usePage();
-const {
-  orders,
-  orderDiscountAmount,
-  orderDiscountId,
-  totalAmount,
-  formattedTotal,
-  orderId,
-  finalizeOrder,
-} = useOrders();
 
-// Get customer data from parent component (will be passed as prop)
+// Props for direct data passing
 const props = defineProps({
   selectedCustomer: {
     type: Object,
     default: null
-  }
+  },
+  orders: { type: Array, default: () => [] },
+  currentSale: { type: Object, default: () => null },
+  orderDiscountAmount: { type: Number, default: 0 },
+  orderDiscountId: { type: String, default: '' },
+  orderId: { type: [String, Number], default: null },
+  discountOptions: { type: Object, default: () => ({}) }
 });
 
+const { orders, currentSale, orderDiscountAmount, orderDiscountId, orderId, discountOptions } = toRefs(props);
+
+// Emit events to parent
+const emit = defineEmits(['discount-applied']);
+
+// Computed values
+const totalAmount = computed(() => {
+  return orders.value.reduce((sum, order) => {
+    const price = parseFloat(order.price) || 0;
+    const quantity = parseInt(order.quantity) || 0;
+    const subtotal = !isNaN(price * quantity) ? price * quantity : quantity * price;
+    return sum + subtotal;
+  }, 0);
+});
+
+// Using formattedTotal from useHelpers composable
+
 const amountReceived = ref(0);
+
+// Direct finalize order function
+const finalizeOrder = async () => {
+  if (!orderId.value) {
+    notification.error({
+      message: 'No active order',
+      description: 'Please create an order first'
+    });
+    return;
+  }
+
+  try {
+    const response = await axios.post(getRoute('sales.finalize', { sale: orderId.value }));
+    notification.success({
+      message: 'Order finalized successfully',
+      description: 'The order has been completed'
+    });
+    
+    // Reset state
+    orders.value = [];
+    orderId.value = null;
+    orderDiscountAmount.value = 0;
+    orderDiscountId.value = '';
+  } catch (error) {
+    console.error('Failed to finalize order:', error);
+    notification.error({
+      message: 'Failed to finalize order',
+      description: error.response?.data?.message || 'An error occurred'
+    });
+  }
+};
 
 const openOrderDicountModal = ref(false);
 
@@ -42,12 +88,20 @@ const showDiscountOrder = async () => {
   if (!orderId.value && orders.value.length === 0) return;
   
   // Load current discounts from database instead of localStorage
+  let regularDiscountOptions = [];
+  let mandatoryDiscountOption = null;
+  let currentPromotionalDiscounts = [];
+  let currentMandatoryDiscount = null;
+  
   try {
-    const response = await axios.get(getRoute('sales.discounts.current'));
-    const { regular_discounts, mandatory_discounts } = response.data;
+    // Use consolidated discount data from props instead of API call
+    console.log('TotalAmountSection - discountOptions:', discountOptions.value);
+    const { promotional_discount_options, mandatory_discount_options } = discountOptions.value;
+    console.log('TotalAmountSection - promotional_discount_options:', promotional_discount_options);
+    console.log('TotalAmountSection - mandatory_discount_options:', mandatory_discount_options);
 
     // Convert database discounts to option objects for the select components
-    const regularDiscountOptions = regular_discounts.map((discount) => ({
+    regularDiscountOptions = (promotional_discount_options || []).map((discount) => ({
       label: `${discount.name} (${
         discount.type === "percentage"
           ? discount.value + "%"
@@ -59,16 +113,65 @@ const showDiscountOrder = async () => {
     }));
 
     // Get the first active mandatory discount
-    const mandatoryDiscountOption = mandatory_discounts.length > 0 ? {
-      label: `${mandatory_discounts[0].name} (${
-        mandatory_discounts[0].type === "percentage"
-          ? mandatory_discounts[0].value + "%"
-          : "₱" + mandatory_discounts[0].value
+    mandatoryDiscountOption = (mandatory_discount_options && mandatory_discount_options.length > 0) ? {
+      label: `${mandatory_discount_options[0].name} (${
+        mandatory_discount_options[0].type === "percentage"
+          ? mandatory_discount_options[0].value + "%"
+          : "₱" + mandatory_discount_options[0].value
       })`,
-      value: mandatory_discounts[0].id,
-      amount: mandatory_discounts[0].value,
-      type: mandatory_discounts[0].type,
+      value: mandatory_discount_options[0].id,
+      amount: mandatory_discount_options[0].value,
+      type: mandatory_discount_options[0].type,
     } : null;
+    
+    // Load currently applied discounts from the sale (if any)
+    if (orderId.value) {
+      try {
+        const saleResponse = await axios.get(getRoute('sales.discounts.sale', { sale: orderId.value }));
+        console.log('Sale discounts response:', saleResponse.data);
+        
+        // Handle different response structures - backend returns 'discounts'
+        const sale_discounts = saleResponse.data?.discounts || saleResponse.data?.sale_discounts || [];
+        
+        if (sale_discounts && Array.isArray(sale_discounts)) {
+          // Get currently applied promotional discounts
+          const appliedPromotional = sale_discounts.filter(item => item.discount_type === 'regular');
+          currentPromotionalDiscounts = appliedPromotional.map(item => ({
+            label: `${item.discount?.name || 'Unknown'} (${
+              item.discount?.type === "percentage"
+                ? item.discount.value + "%"
+                : "₱" + item.discount.value
+            })`,
+            value: item.discount_id,
+            amount: item.discount?.value,
+            type: item.discount?.type,
+          }));
+          
+          console.log('Current promotional discounts loaded:', currentPromotionalDiscounts);
+          
+          // Get currently applied mandatory discount
+          const appliedMandatory = sale_discounts.filter(item => item.discount_type === 'mandatory');
+          if (appliedMandatory.length > 0) {
+            const mandatory = appliedMandatory[0];
+            currentMandatoryDiscount = {
+              label: `${mandatory.mandatoryDiscount?.name || 'Unknown'} (${
+                mandatory.mandatoryDiscount?.type === "percentage"
+                  ? mandatory.mandatoryDiscount.value + "%"
+                  : "₱" + mandatory.mandatoryDiscount.value
+              })`,
+              value: mandatory.mandatory_discount_id,
+              amount: mandatory.mandatoryDiscount?.value,
+              type: mandatory.mandatoryDiscount?.type,
+            };
+          }
+          
+          console.log('Current mandatory discount loaded:', currentMandatoryDiscount);
+        }
+      } catch (saleError) {
+        console.log('No current discounts found or error loading sale discounts:', saleError);
+        // This is not an error - just means no discounts are currently applied
+      }
+    }
   } catch (error) {
     console.error('Failed to load discounts:', error);
     notification.error({
@@ -79,8 +182,8 @@ const showDiscountOrder = async () => {
   }
   
   formData.value = {
-    orderDiscount: regularDiscountOptions,
-    mandatoryDiscount: mandatoryDiscountOption,
+    orderDiscount: currentPromotionalDiscounts, // Show currently applied promotional discounts
+    mandatoryDiscount: currentMandatoryDiscount, // Show currently applied mandatory discount
   };
   openOrderDicountModal.value = true;
 };
@@ -283,7 +386,14 @@ const paymentMethod = ref("cash");
       <!-- Order Discount Modal -->
       <apply-order-discount-modal
         :openModal="openOrderDicountModal"
+        :orderId="orderId"
+        :orders="orders"
+        :currentSale="currentSale"
+        :orderDiscountAmount="orderDiscountAmount"
+        :orderDiscountId="orderDiscountId"
+        :discountOptions="discountOptions"
         @close="openOrderDicountModal = false"
+        @discount-applied="emit('discount-applied')"
       />
     </div>
   </div>

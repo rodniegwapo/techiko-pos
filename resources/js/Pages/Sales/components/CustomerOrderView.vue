@@ -1,8 +1,11 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from "vue";
-import { useOrders } from "@/Composables/useOrderV2";
+// Removed useOrderV2 import - using direct props instead
 
-const { orderId } = useOrders();
+// Props for direct data passing
+const props = defineProps({
+  orderId: { type: [String, Number], default: null }
+});
 const order = ref(null);
 
 onMounted(() => {

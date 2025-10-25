@@ -5,7 +5,7 @@ import ApplyProductDiscountModal from "./ApplyProductDiscountModal.vue";
 import ApplyOrderDiscountModal from "./ApplyOrderDiscountModal.vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import CustomerLoyaltyCard from "@/Components/Loyalty/CustomerLoyaltyCard.vue";
-import { ref, inject, computed, createVNode, watch } from "vue";
+import { ref, inject, computed, createVNode, watch, toRefs } from "vue";
 import { IconArmchair, IconUsers } from "@tabler/icons-vue";
 import {
   CloseOutlined,
@@ -15,29 +15,116 @@ import {
   PlusOutlined,
 } from "@ant-design/icons-vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
-import { useOrders } from "@/Composables/useOrderV2";
 import { useHelpers } from "@/Composables/useHelpers";
+import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import axios from "axios";
 import { Modal, notification } from "ant-design-vue";
 import { usePage } from "@inertiajs/vue3";
 import { useDebounceFn } from "@vueuse/core";
 
 const { formData, errors } = useGlobalVariables();
+const { getRoute } = useDomainRoutes();
 const page = usePage();
-const {
-  orders,
-  orderDiscountAmount,
-  orderDiscountId,
-  handleAddOrder,
-  handleSubtractOrder,
-  totalAmount,
-  formattedTotal,
-  removeOrder,
-  orderId,
-  finalizeOrder,
-} = useOrders();
+// Props for direct data passing
+const props = defineProps({
+  orders: { type: Array, default: () => [] },
+  orderId: { type: [String, Number], default: null },
+  orderDiscountAmount: { type: Number, default: 0 },
+  orderDiscountId: { type: String, default: '' },
+  discountOptions: { type: Object, default: () => ({}) },
+  loading: { type: Boolean, default: false }
+});
 
-const { formattedPercent } = useHelpers();
+const { orders, orderId, orderDiscountAmount, orderDiscountId, discountOptions, loading } = toRefs(props);
+
+// Computed values
+const totalAmount = computed(() => {
+  return orders.value.reduce((sum, order) => {
+    const price = parseFloat(order.price) || 0;
+    const quantity = parseInt(order.quantity) || 0;
+    const subtotal = !isNaN(price * quantity) ? price * quantity : quantity * price;
+    return sum + subtotal;
+  }, 0);
+});
+
+// Using formattedTotal from useHelpers composable
+
+// Direct API functions
+const handleAddOrder = async (product) => {
+  if (!orderId.value) {
+    console.error('No active order - cannot add item');
+    return;
+  }
+  
+  try {
+    const route = getRoute('cart.add', { sale: orderId.value });
+    await axios.post(route, {
+      product_id: product.id,
+      quantity: 1
+    });
+  } catch (error) {
+    console.error('Failed to add item:', error);
+  }
+};
+
+const handleSubtractOrder = async (product) => {
+  if (!orderId.value) {
+    console.error('No active order - cannot subtract item');
+    return;
+  }
+  
+  try {
+    const route = getRoute('cart.update-quantity', { sale: orderId.value });
+    await axios.patch(route, {
+      product_id: product.id,
+      quantity: Math.max(0, product.quantity - 1)
+    });
+  } catch (error) {
+    console.error('Failed to subtract item:', error);
+  }
+};
+
+const removeOrder = async (product) => {
+  if (!orderId.value) {
+    console.error('No active order - cannot remove item');
+    return;
+  }
+  
+  try {
+    const route = getRoute('cart.remove', { sale: orderId.value });
+    await axios.delete(route, {
+      data: { product_id: product.id }
+    });
+  } catch (error) {
+    console.error('Failed to remove item:', error);
+  }
+};
+
+const finalizeOrder = async () => {
+  if (!orderId.value) {
+    notification.error({
+      message: 'No active order',
+      description: 'Please create an order first'
+    });
+    return;
+  }
+
+  try {
+    const response = await axios.post(getRoute('sales.finalize', { sale: orderId.value }));
+    notification.success({
+      message: 'Order finalized successfully',
+      description: 'The order has been completed'
+    });
+  } catch (error) {
+    console.error('Failed to finalize order:', error);
+    notification.error({
+      message: 'Failed to finalize order',
+      description: error.response?.data?.message || 'An error occurred'
+    });
+  }
+};
+
+const { formattedPercent, formattedTotal } = useHelpers();
 
 const formFields = [
   { key: "amount", label: "Amount", type: "text", disabled: true },
@@ -63,10 +150,10 @@ const showVoidItem = async (product) => {
   };
 };
 
-const loading = ref(false);
+const isLoadingVoid = ref(false);
 const handleSubmitVoid = async () => {
   try {
-    loading.value = true;
+    isLoadingVoid.value = true;
     await axios.post(
       route("sales.items.void", {
         sale: orderId.value,
@@ -83,7 +170,7 @@ const handleSubmitVoid = async () => {
   } catch ({ response }) {
     errors.value = response?.data?.errors;
   } finally {
-    loading.value = false;
+    isLoadingVoid.value = false;
   }
 };
 
@@ -592,12 +679,20 @@ defineExpose({
   <apply-product-discount-modal
     :openModal="openApplyDiscountModal"
     :product="currentProduct"
+    :orderId="orderId"
+    :orders="orders"
+    :discountOptions="discountOptions"
     @close="openApplyDiscountModal = false"
   />
 
   <apply-order-discount-modal
     :openModal="openOrderDicountModal"
     :product="currentProduct"
+    :orderId="orderId"
+    :orders="orders"
+    :orderDiscountAmount="orderDiscountAmount"
+    :orderDiscountId="orderDiscountId"
+    :discountOptions="discountOptions"
     @close="openOrderDicountModal = false"
   />
 

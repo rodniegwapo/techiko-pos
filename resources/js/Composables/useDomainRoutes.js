@@ -84,7 +84,8 @@ export function useDomainRoutes() {
         getRoute,
         isInDomainContext,
         currentDomain,
-        isSuperUser
+        isSuperUser,
+        getCurrentDomainFromUrl
     };
 }
 
