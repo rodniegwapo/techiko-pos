@@ -765,7 +765,7 @@ class SaleController extends Controller
             ->pending()
             ->where('user_id', $userId)
             ->orderBy('created_at', 'desc')
-            ->with(['saleItems.product', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount'])
+            ->with(['saleItems.product', 'saleItems.discounts', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount'])
             ->first();
 
         return response()->json([
@@ -888,7 +888,7 @@ class SaleController extends Controller
             ->pending()
             ->where('user_id', $userId)
             ->orderBy('created_at', 'desc')
-            ->with(['saleItems.product', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount'])
+            ->with(['saleItems.product', 'saleItems.discounts', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount'])
             ->first();
 
         if (!$sale) {
