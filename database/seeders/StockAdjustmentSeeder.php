@@ -2,12 +2,12 @@
 
 namespace Database\Seeders;
 
-use App\Models\Product\Product;
-use App\Models\InventoryLocation;
+use Illuminate\Database\Seeder;
 use App\Models\StockAdjustment;
 use App\Models\StockAdjustmentItem;
+use App\Models\InventoryLocation;
+use App\Models\Product\Product;
 use App\Models\User;
-use Illuminate\Database\Seeder;
 use Carbon\Carbon;
 
 class StockAdjustmentSeeder extends Seeder
@@ -17,271 +17,139 @@ class StockAdjustmentSeeder extends Seeder
      */
     public function run(): void
     {
-        $this->command->info('⚖️ Creating stock adjustments...');
-        $this->createStockAdjustments();
+        // Get locations
+        $jollibeeMain = InventoryLocation::where('code', 'JB-MAIN')->first();
+        $jollibeeBranch = InventoryLocation::where('code', 'JB-BRANCH')->first();
+        $jollibeeWarehouse = InventoryLocation::where('code', 'JB-WH')->first();
         
-        $this->command->info('📋 Creating adjustment items...');
-        $this->createAdjustmentItems();
-        
-        $this->command->info('✅ Stock adjustments seeded successfully!');
+        $mcdonaldsMain = InventoryLocation::where('code', 'MC-MAIN')->first();
+        $mcdonaldsBranch = InventoryLocation::where('code', 'MC-BRANCH')->first();
+        $mcdonaldsWarehouse = InventoryLocation::where('code', 'MC-WH')->first();
+
+        // Get products for each domain
+        $jollibeeProducts = Product::where('domain', 'jollibee-corp')->take(8)->get();
+        $mcdonaldsProducts = Product::where('domain', 'mcdonalds-corp')->take(8)->get();
+
+        // Get users
+        $jollibeeUsers = User::where('domain', 'jollibee-corp')->get();
+        $mcdonaldsUsers = User::where('domain', 'mcdonalds-corp')->get();
+
+        $statuses = ['draft', 'pending_approval', 'approved', 'rejected'];
+        $reasons = [
+            'physical_count',
+            'damaged_goods',
+            'expired_goods',
+            'theft_loss',
+            'supplier_error',
+            'system_error',
+            'promotion',
+            'sample',
+            'other'
+        ];
+
+        // Create adjustments for Jollibee locations
+        if ($jollibeeMain && $jollibeeProducts->count() > 0) {
+            $this->createAdjustmentsForLocation($jollibeeMain, $jollibeeProducts, $jollibeeUsers, 'jollibee-corp', $statuses, $reasons);
+        }
+
+        if ($jollibeeBranch && $jollibeeProducts->count() > 0) {
+            $this->createAdjustmentsForLocation($jollibeeBranch, $jollibeeProducts, $jollibeeUsers, 'jollibee-corp', $statuses, $reasons);
+        }
+
+        if ($jollibeeWarehouse && $jollibeeProducts->count() > 0) {
+            $this->createAdjustmentsForLocation($jollibeeWarehouse, $jollibeeProducts, $jollibeeUsers, 'jollibee-corp', $statuses, $reasons);
+        }
+
+        // Create adjustments for McDonald's locations
+        if ($mcdonaldsMain && $mcdonaldsProducts->count() > 0) {
+            $this->createAdjustmentsForLocation($mcdonaldsMain, $mcdonaldsProducts, $mcdonaldsUsers, 'mcdonalds-corp', $statuses, $reasons);
+        }
+
+        if ($mcdonaldsBranch && $mcdonaldsProducts->count() > 0) {
+            $this->createAdjustmentsForLocation($mcdonaldsBranch, $mcdonaldsProducts, $mcdonaldsUsers, 'mcdonalds-corp', $statuses, $reasons);
+        }
+
+        if ($mcdonaldsWarehouse && $mcdonaldsProducts->count() > 0) {
+            $this->createAdjustmentsForLocation($mcdonaldsWarehouse, $mcdonaldsProducts, $mcdonaldsUsers, 'mcdonalds-corp', $statuses, $reasons);
+        }
     }
 
-    /**
-     * Create stock adjustments
-     */
-    private function createStockAdjustments()
+    private function createAdjustmentsForLocation($location, $products, $users, $domain, $statuses, $reasons)
     {
-        $locations = InventoryLocation::where('is_active', true)->get();
-        $users = User::all();
+        $adjustmentsPerLocation = 12;
+        $startDate = Carbon::now()->subDays(20);
         
-        if ($users->isEmpty()) {
-            $this->command->error('No users found. Please run UserSeeder first.');
-            return;
-        }
-
-        $adjustmentCount = 0;
-        $startDate = now()->subMonths(3);
-        $endDate = now();
-
-        foreach ($locations as $location) {
-            // Create 2-8 adjustments per location over 3 months
-            $adjustmentsPerLocation = rand(2, 8);
+        for ($i = 0; $i < $adjustmentsPerLocation; $i++) {
+            $user = $users->random();
+            $status = $statuses[array_rand($statuses)];
+            $reason = $reasons[array_rand($reasons)];
             
-            for ($i = 0; $i < $adjustmentsPerLocation; $i++) {
-                $adjustmentDate = Carbon::createFromTimestamp(
-                    rand($startDate->timestamp, $endDate->timestamp)
-                );
-                
-                $adjustmentTypes = [
-                    'physical_count' => 'Physical inventory count',
-                    'damage' => 'Damage assessment',
-                    'theft' => 'Theft investigation',
-                    'expiry' => 'Expired products removal',
-                    'quality_control' => 'Quality control check',
-                    'audit' => 'Audit adjustment',
-                ];
-                
-                $type = array_rand($adjustmentTypes);
-                $statuses = ['pending', 'approved', 'completed', 'rejected'];
-                $status = $statuses[rand(0, 2)]; // Exclude 'rejected' for seed data
-                
-                $adjustment = StockAdjustment::create([
-                    'adjustment_number' => 'ADJ-' . now()->format('Y') . '-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT) . '-' . uniqid(),
-                    'location_id' => $location->id,
-                    'domain' => $location->domain,
-                    'type' => $this->mapAdjustmentType($type),
-                    'reason' => $this->mapAdjustmentReason($type),
-                    'description' => $this->generateAdjustmentNotes($type),
-                    'total_value_change' => rand(-500, 500),
-                    'status' => $this->mapStatus($status),
-                    'created_by' => $users->random()->id,
-                    'approved_by' => $status === 'approved' || $status === 'completed' ? $users->random()->id : null,
-                    'approved_at' => $status === 'approved' || $status === 'completed' ? $adjustmentDate->addHours(rand(1, 24)) : null,
-                    'created_at' => $adjustmentDate,
-                    'updated_at' => $adjustmentDate,
-                ]);
-                
-                $adjustmentCount++;
-            }
-        }
-
-        $this->command->info("Created {$adjustmentCount} stock adjustments");
-    }
-
-    /**
-     * Create adjustment items
-     */
-    private function createAdjustmentItems()
-    {
-        $adjustments = StockAdjustment::all();
-        $products = Product::where('track_inventory', true)->get();
-        
-        if ($adjustments->isEmpty() || $products->isEmpty()) {
-            $this->command->warn('No adjustments or products found.');
-            return;
-        }
-
-        $itemCount = 0;
-
-        foreach ($adjustments as $adjustment) {
-            // Create 3-15 items per adjustment
-            $itemsPerAdjustment = rand(3, 15);
-            $selectedProducts = $products->random($itemsPerAdjustment);
+            // Create random date within last 20 days
+            $randomDate = $startDate->copy()->addDays(rand(0, 20))->addHours(rand(0, 23))->addMinutes(rand(0, 59));
             
+            $adjustment = StockAdjustment::create([
+                'adjustment_number' => $this->generateAdjustmentNumber(),
+                'location_id' => $location->id,
+                'created_by' => $user->id,
+                'approved_by' => $status === 'approved' ? $users->where('role_level', '<=', 2)->random()->id : null,
+                'status' => $status,
+                'reason' => $reason,
+                'description' => $this->generateAdjustmentNotes($reason, $location->name),
+                'total_value_change' => 0, // Will be calculated after items are added
+                'domain' => $domain,
+                'created_at' => $randomDate,
+                'updated_at' => $randomDate,
+            ]);
+
+            // Add 1-4 items to each adjustment
+            $itemCount = rand(1, 4);
+            $selectedProducts = $products->random($itemCount);
+            $totalValue = 0;
+
             foreach ($selectedProducts as $product) {
-                $quantityBefore = rand(10, 100);
-                $variance = rand(-10, 10);
-                $quantityAfter = max(0, $quantityBefore + $variance);
-                $unitCost = $product->cost ?? rand(50, 500);
-                
+                $systemQuantity = rand(10, 50);
+                $actualQuantity = rand(5, 45);
+                $adjustmentQuantity = $actualQuantity - $systemQuantity;
+                $unitCost = rand(10, 500);
+                $totalCostChange = $adjustmentQuantity * $unitCost;
+                $totalValue += abs($totalCostChange);
+
                 StockAdjustmentItem::create([
                     'stock_adjustment_id' => $adjustment->id,
                     'product_id' => $product->id,
-                    'system_quantity' => $quantityBefore,
-                    'actual_quantity' => $quantityAfter,
-                    'adjustment_quantity' => $variance,
+                    'system_quantity' => $systemQuantity,
+                    'actual_quantity' => $actualQuantity,
+                    'adjustment_quantity' => $adjustmentQuantity,
                     'unit_cost' => $unitCost,
-                    'total_cost_change' => $variance * $unitCost,
-                    'batch_number' => $this->generateBatchNumber($adjustment->reason),
-                    'expiry_date' => $this->generateExpiryDate(),
-                    'notes' => $this->generateItemNotes($adjustment->reason, $variance),
+                    'total_cost_change' => $totalCostChange,
+                    'notes' => "Adjustment for {$product->name}",
                 ]);
-                
-                $itemCount++;
             }
-        }
 
-        $this->command->info("Created {$itemCount} adjustment items");
+            // Update the total value
+            $adjustment->update(['total_value_change' => $totalValue]);
+        }
     }
 
-    /**
-     * Generate adjustment notes based on type
-     */
-    private function generateAdjustmentNotes($type)
+    private function generateAdjustmentNotes($reason, $locationName)
     {
         $notes = [
-            'physical_count' => [
-                'Monthly physical inventory count',
-                'Quarterly stock audit',
-                'End of month inventory reconciliation',
-                'Annual physical count',
-            ],
-            'damage' => [
-                'Damage assessment after storm',
-                'Water damage inspection',
-                'Handling damage review',
-                'Transportation damage assessment',
-            ],
-            'theft' => [
-                'Security incident investigation',
-                'Suspected theft review',
-                'Missing inventory report',
-                'Security audit findings',
-            ],
-            'expiry' => [
-                'Expired products removal',
-                'Near expiry date review',
-                'Shelf life assessment',
-                'Product rotation check',
-            ],
-            'quality_control' => [
-                'Quality control inspection',
-                'Product quality assessment',
-                'Defective goods review',
-                'Quality standards check',
-            ],
-            'audit' => [
-                'Internal audit findings',
-                'Compliance audit',
-                'Financial audit adjustment',
-                'Regulatory audit',
-            ],
+            'physical_count' => "Physical count adjustment at {$locationName} - inventory reconciliation",
+            'damaged_goods' => "Damaged goods found at {$locationName} - quality control inspection",
+            'expired_goods' => "Expired products at {$locationName} - disposal required",
+            'theft_loss' => "Inventory discrepancy at {$locationName} - possible theft or loss",
+            'supplier_error' => "Supplier error at {$locationName} - incorrect shipment",
+            'system_error' => "System error at {$locationName} - data correction needed",
+            'promotion' => "Promotional giveaway at {$locationName} - marketing campaign",
+            'sample' => "Sample products at {$locationName} - promotional samples",
+            'other' => "Other adjustment at {$locationName} - miscellaneous reason",
         ];
 
-        return $notes[$type][array_rand($notes[$type])];
+        return $notes[$reason] ?? "Stock adjustment at {$locationName}";
     }
 
-    /**
-     * Generate item reason based on adjustment type
-     */
-    private function generateItemReason($adjustmentType)
+    private function generateAdjustmentNumber()
     {
-        $reasons = [
-            'physical_count' => ['Count discrepancy', 'Measurement error', 'Recording error', 'System error'],
-            'damage' => ['Water damage', 'Physical damage', 'Handling damage', 'Transport damage'],
-            'theft' => ['Suspected theft', 'Missing items', 'Security breach', 'Unauthorized removal'],
-            'expiry' => ['Expired product', 'Near expiry', 'Shelf life exceeded', 'Date code issue'],
-            'quality_control' => ['Defective item', 'Quality issue', 'Substandard product', 'Contamination'],
-            'audit' => ['Audit finding', 'Compliance issue', 'Documentation error', 'Process error'],
-        ];
-
-        return $reasons[$adjustmentType][array_rand($reasons[$adjustmentType])];
-    }
-
-    /**
-     * Generate item notes based on adjustment type and variance
-     */
-    private function generateItemNotes($adjustmentType, $variance)
-    {
-        if ($variance > 0) {
-            return "Found additional {$variance} units during {$adjustmentType}";
-        } elseif ($variance < 0) {
-            return "Missing " . abs($variance) . " units during {$adjustmentType}";
-        } else {
-            return "No variance found during {$adjustmentType}";
-        }
-    }
-
-    /**
-     * Generate batch number based on adjustment type
-     */
-    private function generateBatchNumber($adjustmentType)
-    {
-        $prefixes = [
-            'physical_count' => 'PC',
-            'damage' => 'DMG',
-            'theft' => 'THF',
-            'expiry' => 'EXP',
-            'quality_control' => 'QC',
-            'audit' => 'AUD',
-        ];
-
-        $prefix = $prefixes[$adjustmentType] ?? 'ADJ';
-        return $prefix . '-' . rand(10000, 99999);
-    }
-
-    /**
-     * Generate expiry date
-     */
-    private function generateExpiryDate()
-    {
-        $days = rand(30, 730); // 1 month to 2 years
-        return now()->addDays($days);
-    }
-
-    /**
-     * Map adjustment type to database enum
-     */
-    private function mapAdjustmentType($type)
-    {
-        return match ($type) {
-            'physical_count' => 'recount',
-            'damage' => 'decrease',
-            'theft' => 'decrease',
-            'expiry' => 'decrease',
-            'quality_control' => 'decrease',
-            'audit' => 'recount',
-            default => 'decrease'
-        };
-    }
-
-    /**
-     * Map adjustment reason to database enum
-     */
-    private function mapAdjustmentReason($type)
-    {
-        return match ($type) {
-            'physical_count' => 'physical_count',
-            'damage' => 'damaged_goods',
-            'theft' => 'theft_loss',
-            'expiry' => 'expired_goods',
-            'quality_control' => 'damaged_goods',
-            'audit' => 'physical_count',
-            default => 'other'
-        };
-    }
-
-    /**
-     * Map status to database enum
-     */
-    private function mapStatus($status)
-    {
-        return match ($status) {
-            'pending' => 'pending_approval',
-            'approved' => 'approved',
-            'completed' => 'approved',
-            'rejected' => 'rejected',
-            default => 'draft'
-        };
+        return 'ADJ-' . str_pad(rand(1000, 9999), 4, '0', STR_PAD_LEFT) . '-' . time();
     }
 }

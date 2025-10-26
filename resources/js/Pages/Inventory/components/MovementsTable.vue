@@ -56,12 +56,6 @@ const columns = computed(() => {
       key: "quantity",
       align: "left",
     },
-    {
-      title: "Location",
-      dataIndex: "location",
-      key: "location",
-      align: "left",
-    },
   ];
 
   // Add domain column for super users only
@@ -175,13 +169,6 @@ const dataSource = computed(() => {
         </div>
       </template>
 
-      <!-- Location Column -->
-      <template v-else-if="column.key === 'location'">
-          <p class="font-medium text-sm">
-            {{ record.location?.name || "Unknown" }}
-          </p>
-   
-      </template>
 
       <!-- Movement Type Column -->
       <template v-else-if="column.key === 'type'">

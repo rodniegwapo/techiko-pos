@@ -12,7 +12,6 @@ import {
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { useHelpers } from "@/Composables/useHelpers";
 import { router } from "@inertiajs/vue3";
-import LocationColumn from "@/Components/LocationColumn.vue";
 
 const { formatCurrency, formatDate } = useHelpers();
 const page = usePage();
@@ -48,7 +47,6 @@ const columns = computed(() => {
             align: "left",
         },
         { title: "Stock", dataIndex: "stock", key: "stock", align: "left" },
-        { title: "Location", dataIndex: "location", key: "location", align: "left" },
         { title: "Status", dataIndex: "status", key: "status", align: "left" },
         { title: "Value", dataIndex: "value", key: "value", align: "left" },
     ];
@@ -219,14 +217,6 @@ const dataSource = computed(() => {
                 </div>
             </template>
 
-            <!-- Location Column -->
-            <template v-else-if="column.key === 'location'">
-                <LocationColumn 
-                    v-if="record.location"
-                    :location="record.location"
-                />
-                <span v-else class="text-sm text-gray-400">No location</span>
-            </template>
 
             <!-- Status Column -->
             <template v-else-if="column.key === 'status'">
