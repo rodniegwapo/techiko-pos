@@ -41,6 +41,11 @@ Route::middleware(['auth:sanctum', 'user.permission'])->group(function () {
      * Global API Routes (non-domain specific)
      * -----------------------
      */
+    // Global Dashboard API routes
+    Route::prefix('dashboard')->name('dashboard.')->group(function () {
+        Route::post('/sales-chart', [\App\Http\Controllers\DashboardController::class, 'getSalesChartData'])->name('sales-chart');
+    });
+    
     // Note: Sales routes are now domain-specific and handled in routes/domains.php
 
 
