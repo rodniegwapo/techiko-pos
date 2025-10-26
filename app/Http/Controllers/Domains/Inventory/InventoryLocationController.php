@@ -12,11 +12,25 @@ class InventoryLocationController extends Controller
 {
     public function index(Request $request, Domain $domain)
     {
-        $items = InventoryLocation::active()
-            ->forDomain($domain->name_slug)
-            ->when($request->search, fn($q, $s) => $q->search($s))
-            ->orderBy('name')
-            ->paginate($request->per_page ?? 15);
+        $user = auth()->user();
+        
+        // Apply role-based access control
+        if ($user->hasLocationRestriction() && $user->location_id) {
+            // Manager and below with assigned location - show only their location
+            $items = InventoryLocation::active()
+                ->forDomain($domain->name_slug)
+                ->where('id', $user->location_id)
+                ->when($request->search, fn($q, $s) => $q->search($s))
+                ->orderBy('name')
+                ->paginate($request->per_page ?? 15);
+        } else {
+            // Super user, admin, or manager without assigned location - show all domain locations
+            $items = InventoryLocation::active()
+                ->forDomain($domain->name_slug)
+                ->when($request->search, fn($q, $s) => $q->search($s))
+                ->orderBy('name')
+                ->paginate($request->per_page ?? 15);
+        }
 
         $locationTypes = [
             ['label' => 'Store', 'value' => 'store'],

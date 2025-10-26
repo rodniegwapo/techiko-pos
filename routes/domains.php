@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('domains/{domain:name_slug}')
-    ->middleware(['auth', 'user.permission'])
+    ->middleware(['auth', 'user.permission', 'role.access'])
     ->name('domains.')
     ->group(function () {
         // Dashboard (Organization-specific)

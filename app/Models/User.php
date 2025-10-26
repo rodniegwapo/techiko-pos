@@ -21,6 +21,17 @@ class User extends Authenticatable
     protected $guard_name = 'web';
 
     /**
+     * Role level constants
+     */
+    const ROLE_LEVELS = [
+        1 => 'Super User',
+        2 => 'Admin', 
+        3 => 'Manager',
+        4 => 'Staff',
+        5 => 'Viewer'
+    ];
+
+    /**
      * The attributes that are not mass assignable.
      *
      * @var array<int, string>
@@ -113,7 +124,7 @@ class User extends Authenticatable
      */
     public function isSuperUser(): bool
     {
-        return $this->is_super_user;
+        return $this->is_super_user || $this->role_level === 1;
     }
 
 
@@ -204,5 +215,86 @@ class User extends Authenticatable
             ->where('route_name', $routeName)
             ->orWhere('name', $routeName) // Fallback for backward compatibility
             ->get();
+    }
+
+    /**
+     * Role Level Methods
+     */
+
+
+    /**
+     * Check if user is admin (level 2)
+     */
+    public function isAdmin(): bool
+    {
+        return $this->role_level === 2;
+    }
+
+    /**
+     * Check if user is manager or above (level 3+)
+     */
+    public function isManagerOrAbove(): bool
+    {
+        return $this->role_level <= 3;
+    }
+
+    /**
+     * Check if user can switch locations
+     */
+    public function canSwitchLocations(): bool
+    {
+        return $this->can_switch_locations || $this->role_level <= 2;
+    }
+
+    /**
+     * Check if user has domain access (not super user)
+     */
+    public function hasDomainRestriction(): bool
+    {
+        return $this->role_level > 1;
+    }
+
+    /**
+     * Check if user has location restriction
+     */
+    public function hasLocationRestriction(): bool
+    {
+        return $this->role_level >= 3;
+    }
+
+    /**
+     * Get the role level name
+     */
+    public function getRoleLevelName(): string
+    {
+        return self::ROLE_LEVELS[$this->role_level] ?? 'Unknown';
+    }
+
+    /**
+     * Get effective location ID based on role level
+     */
+    public function getEffectiveLocationId($requestLocationId = null)
+    {
+        // Super user and admin can switch locations
+        if ($this->role_level <= 2) {
+            return $requestLocationId ?? $this->location_id;
+        }
+        
+        // Manager and below are restricted to their assigned location
+        return $this->location_id;
+    }
+
+    /**
+     * Get effective domain based on role level
+     */
+    public function getEffectiveDomain($requestDomain = null)
+    {
+        // Super user has no domain restriction
+        if ($this->role_level === 1) {
+            return $requestDomain ?? $this->domain;
+        }
+        
+        // Admin and below are restricted to their domain
+        return $this->domain;
     }
 }

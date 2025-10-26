@@ -21,13 +21,15 @@ class UserSeeder extends Seeder
             SpatieRole::findOrCreate($enumRole->value, 'web');
         }
 
-        // Create super user (no role needed)
+        // Create super user (Level 1 - no restrictions)
         $superUser = User::updateOrCreate(
             ['email' => 'super.admin@example.com'],
             [
                 'name' => 'Super Admin',
                 'password' => Hash::make('password'),
                 'is_super_user' => true,
+                'role_level' => 1,
+                'can_switch_locations' => true,
             ]
         );
 
@@ -36,6 +38,13 @@ class UserSeeder extends Seeder
         $pickDomain = function (int $i) use ($domainSlugs) {
             $count = max(count($domainSlugs), 1);
             return $domainSlugs[ $i % $count ] ?? null;
+        };
+
+        // Load inventory locations for assignment
+        $locations = \App\Models\InventoryLocation::all();
+        $pickLocation = function (int $i) use ($locations) {
+            $count = max(count($locations), 1);
+            return $locations[ $i % $count ]->id ?? null;
         };
 
         // Users mapped to their roles - Expanded for cascading hierarchy
@@ -141,18 +150,31 @@ class UserSeeder extends Seeder
 
         $i = 0;
         foreach ($users as $data) {
+            // Determine role level based on role
+            $roleLevel = match($data['role']) {
+                'admin' => 2,
+                'manager' => 3,
+                'supervisor' => 4,
+                'cashier' => 5,
+                default => 3
+            };
+
             $user = User::updateOrCreate(
                 ['email' => $data['email']],
                 [
                     'name' => $data['name'],
                     'password' => Hash::make($data['password']),
                     'is_super_user' => false,
-                    'domain' => $pickDomain($i++),
+                    'domain' => $pickDomain($i),
+                    'role_level' => $roleLevel,
+                    'location_id' => $roleLevel >= 3 ? $pickLocation($i) : null, // Level 3+ get assigned locations
+                    'can_switch_locations' => $roleLevel <= 2, // Level 1-2 can switch locations
                 ]
             );
 
             // Assign role using string value
             $user->assignRole($data['role']);
+            $i++;
         }
     }
 }

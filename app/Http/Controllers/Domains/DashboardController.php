@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Domains;
 
 use App\Http\Controllers\Api\DashboardController as BaseDashboardController;
+use App\Traits\DomainLocationScoping;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use App\Models\Sale;
@@ -10,12 +11,11 @@ use Carbon\Carbon;
 
 class DashboardController extends BaseDashboardController
 {
-    protected $domain;
+    use DomainLocationScoping;
 
     public function __construct()
     {
-        // Get domain from route parameter
-        $this->domain = request()->route('domain');
+        // Don't initialize scoping in constructor - do it in methods when user is authenticated
     }
 
     /**
@@ -23,6 +23,9 @@ class DashboardController extends BaseDashboardController
      */
     public function getSalesChartData(Request $request): JsonResponse
     {
+        // Initialize domain and location scoping
+        $this->initializeScoping($request);
+        
         $request->validate([
             'time_range' => 'required|in:daily,weekly,monthly',
             'location_id' => 'nullable'
@@ -137,13 +140,15 @@ class DashboardController extends BaseDashboardController
     }
 
     /**
-     * Override to add domain scoping to day sales data
+     * Override to add domain and location scoping to day sales data
      */
     protected function getDaySalesData(Carbon $date): array
     {
         $query = Sale::whereDate('created_at', $date->format('Y-m-d'))
-            ->where('payment_status', 'paid')
-            ->where('domain', $this->domain);
+            ->where('payment_status', 'paid');
+
+        // Apply domain and location scoping
+        $this->applyScoping($query);
 
         $sales = $query->sum('grand_total');
         $transactions = $query->count();
@@ -155,13 +160,15 @@ class DashboardController extends BaseDashboardController
     }
 
     /**
-     * Override to add domain scoping to week sales data
+     * Override to add domain and location scoping to week sales data
      */
     protected function getWeekSalesData(Carbon $startDate, Carbon $endDate): array
     {
         $query = Sale::whereBetween('created_at', [$startDate, $endDate])
-            ->where('payment_status', 'paid')
-            ->where('domain', $this->domain);
+            ->where('payment_status', 'paid');
+
+        // Apply domain and location scoping
+        $this->applyScoping($query);
 
         $sales = $query->sum('grand_total');
         $transactions = $query->count();
@@ -173,13 +180,15 @@ class DashboardController extends BaseDashboardController
     }
 
     /**
-     * Override to add domain scoping to month sales data
+     * Override to add domain and location scoping to month sales data
      */
     protected function getMonthSalesData(string $startDate, Carbon $endDate): array
     {
         $query = Sale::whereBetween('created_at', [$startDate, $endDate])
-            ->where('payment_status', 'paid')
-            ->where('domain', $this->domain);
+            ->where('payment_status', 'paid');
+
+        // Apply domain and location scoping
+        $this->applyScoping($query);
 
         $sales = $query->sum('grand_total');
         $transactions = $query->count();
