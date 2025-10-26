@@ -50,12 +50,6 @@ const columns = computed(() => {
       align: "left",
     },
     {
-      title: "Location",
-      dataIndex: "location",
-      key: "location",
-      align: "left",
-    },
-    {
       title: "Reason",
       dataIndex: "reason",
       key: "reason",
@@ -266,14 +260,6 @@ const dataSource = computed(() => {
         </div>
       </template>
 
-      <!-- Location Column -->
-      <template v-else-if="column.key === 'location'">
-
-          <p class="font-medium text-sm">
-            {{ record.location?.name || "Unknown" }}
-          </p>
-       
-      </template>
 
       <!-- Domain Column -->
       <template v-else-if="column.key === 'domain'">

@@ -22,14 +22,15 @@ import ContentHeader from "@/Components/ContentHeader.vue";
 import RefreshButton from "@/Components/buttons/Refresh.vue";
 import FilterDropdown from "@/Components/filters/FilterDropdown.vue";
 import ActiveFilters from "@/Components/filters/ActiveFilters.vue";
-import LocationInfoAlert from "@/Components/LocationInfoAlert.vue";
 
 const page = usePage();
 const { spinning } = useGlobalVariables();
 const { formattedTotal } = useHelpers();
 
 // Use permission composable
-const isSuperUser = computed(() => usePage().props.auth?.user?.data?.is_super_user || false);
+const isSuperUser = computed(
+    () => usePage().props.auth?.user?.data?.is_super_user || false
+);
 
 const selectedLocation = ref(null);
 
@@ -105,7 +106,7 @@ const navigateToMovements = () =>
     });
 
 const navigateToAdjustments = () => {
-    if (usePermissionsV2('inventory.adjustments.store') || isSuperUser.value) {
+    if (usePermissionsV2("inventory.adjustments.store") || isSuperUser.value) {
         router.visit(route("inventory.adjustments.index"));
     }
 };
@@ -147,8 +148,8 @@ const summaryCards = computed(() => [
 
 const quickActions = computed(() => {
     const actions = [];
-    
-    if (usePermissionsV2('inventory.index') || isSuperUser.value) {
+
+    if (usePermissionsV2("inventory.index") || isSuperUser.value) {
         actions.push(
             {
                 title: "Manage Products",
@@ -166,8 +167,8 @@ const quickActions = computed(() => {
             }
         );
     }
-    
-    if (usePermissionsV2('inventory.adjustments.store') || isSuperUser.value) {
+
+    if (usePermissionsV2("inventory.adjustments.store") || isSuperUser.value) {
         actions.push({
             title: "Stock Adjustments",
             desc: "Create and manage stock adjustments",
@@ -176,7 +177,7 @@ const quickActions = computed(() => {
             action: navigateToAdjustments,
         });
     }
-    
+
     return actions;
 });
 
@@ -277,8 +278,6 @@ onMounted(() => setTimeout(() => (chartLoaded.value = true), 400));
                 <RefreshButton @click="getItems" />
             </template>
         </ContentHeader>
-
-        <LocationInfoAlert />
 
         <!-- KPI Cards -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
