@@ -12,9 +12,10 @@ class DomainSeeder extends Seeder
      */
     public function run(): void
     {
+        // Jollibee Corporation
         Domain::create([
-            'name' => 'Rodnie Store',
-            'name_slug' => 'rodnie-store',
+            'name' => 'Jollibee Corporation',
+            'name_slug' => 'jollibee-corp',
             'timezone' => 'Asia/Manila',
             'country_code' => 'PH',
             'currency_code' => 'PHP',
@@ -24,25 +25,14 @@ class DomainSeeder extends Seeder
             'is_active' => true,
         ]);
 
+        // McDonald's Corporation
         Domain::create([
-            'name' => 'Tokyo Branch',
-            'name_slug' => 'tokyo-branch',
-            'timezone' => 'Asia/Tokyo',
-            'country_code' => 'JP',
-            'currency_code' => 'JPY',
+            'name' => 'McDonald\'s Corporation',
+            'name_slug' => 'mcdonalds-corp',
+            'timezone' => 'Asia/Manila',
+            'country_code' => 'PH',
+            'currency_code' => 'PHP',
             'date_format' => 'Y-m-d',
-            'time_format' => '24h',
-            'language_code' => 'ja',
-            'is_active' => true,
-        ]);
-
-        Domain::create([
-            'name' => 'New York Branch',
-            'name_slug' => 'new-york-branch',
-            'timezone' => 'America/New_York',
-            'country_code' => 'US',
-            'currency_code' => 'USD',
-            'date_format' => 'm/d/Y',
             'time_format' => '12h',
             'language_code' => 'en',
             'is_active' => true,

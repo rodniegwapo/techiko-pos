@@ -27,7 +27,7 @@ class UserController extends Controller
         $currentUser = auth()->user();
 
         $users = User::query()
-            ->with(['roles', 'supervisor'])
+            ->with(['roles', 'supervisor', 'location'])
             ->where('domain', $domain->name_slug)
             ->when($request->search, fn($q, $s) => $q->search($s))
             ->when($request->role, function ($query, $role) {
@@ -40,11 +40,19 @@ class UserController extends Controller
 
         $roles = $this->userService->getManageableRoles($currentUser);
 
+        // Get current location and available locations for the alert
+        $user = auth()->user();
+        $effectiveLocationId = $user->getEffectiveLocationId($request->input('location_id'));
+        $currentLocation = $effectiveLocationId
+            ? \App\Models\InventoryLocation::forDomain($domain->name_slug)->findOrFail($effectiveLocationId)
+            : (\App\Models\InventoryLocation::active()->forDomain($domain->name_slug)->where('is_default', true)->first() 
+               ?? \App\Models\InventoryLocation::active()->forDomain($domain->name_slug)->first() 
+               ?? \App\Models\InventoryLocation::getDefault());
+
         return Inertia::render('Users/Index', [
             'items' => UserResource::collection($users),
             'roles' => $roles,
             'hierarchy' => UserHierarchyService::getRoleHierarchy(),
-            'currentDomain' => $domain,
             'isGlobalView' => !$domain,
         ]);
     }

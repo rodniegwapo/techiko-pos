@@ -22,6 +22,7 @@ import ContentHeader from "@/Components/ContentHeader.vue";
 import RefreshButton from "@/Components/buttons/Refresh.vue";
 import FilterDropdown from "@/Components/filters/FilterDropdown.vue";
 import ActiveFilters from "@/Components/filters/ActiveFilters.vue";
+import LocationInfoAlert from "@/Components/LocationInfoAlert.vue";
 
 const page = usePage();
 const { spinning } = useGlobalVariables();
@@ -276,6 +277,8 @@ onMounted(() => setTimeout(() => (chartLoaded.value = true), 400));
                 <RefreshButton @click="getItems" />
             </template>
         </ContentHeader>
+
+        <LocationInfoAlert />
 
         <!-- KPI Cards -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

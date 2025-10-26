@@ -368,7 +368,15 @@ class InventoryService
             $productQuery->forDomain($domain);
         }
 
-        $totalProducts = $productQuery->count();
+        // Count products directly from product_inventory table for this location
+        $totalProducts = ProductInventory::where('location_id', $location->id)
+            ->whereHas('product', function($query) use ($domain) {
+                if ($domain) {
+                    $query->forDomain($domain);
+                }
+            })
+            ->count();
+        
         $inStockProducts = $productQuery->inStock($location)->count();
         $lowStockProducts = $productQuery->lowStock($location)->count();
         $outOfStockProducts = $productQuery->outOfStock($location)->count();

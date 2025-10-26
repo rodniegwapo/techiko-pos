@@ -41,10 +41,15 @@ class DashboardController extends Controller
             'operational_status' => $this->getOperationalStatus($domain),
         ];
 
+        // Get current domain and available locations for the alert
+        $currentDomain = $domain ? \App\Models\Domain::where('name_slug', $domain)->first() : null;
+        $availableLocations = $currentDomain 
+            ? InventoryLocation::active()->forDomain($domain)->get()
+            : InventoryLocation::active()->get();
+
         return Inertia::render('Dashboard/Index', [
             'stats' => $stats,
             'locations' => InventoryLocation::active()->get(),
-            'currentLocation' => $location,
             'filters' => $request->only(['location_id']),
         ]);
     }

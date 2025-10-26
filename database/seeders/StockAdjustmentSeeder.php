@@ -35,14 +35,8 @@ class StockAdjustmentSeeder extends Seeder
         $users = User::all();
         
         if ($users->isEmpty()) {
-            $this->command->warn('No users found. Creating default user...');
-            $user = User::create([
-                'name' => 'System User',
-                'email' => 'system@example.com',
-                'password' => bcrypt('password'),
-                'domain' => 'default-store',
-            ]);
-            $users = collect([$user]);
+            $this->command->error('No users found. Please run UserSeeder first.');
+            return;
         }
 
         $adjustmentCount = 0;

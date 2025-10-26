@@ -11,6 +11,7 @@ import ActiveFilters from "@/Components/filters/ActiveFilters.vue";
 import ProductTable from "./components/ProductTable.vue";
 import CustomerOrder from "./components/CustomerOrder.vue";
 import TotalAmountSection from "./components/TotalAmountSection.vue";
+import LocationInfoAlert from "@/Components/LocationInfoAlert.vue";
 
 import {
     CloseOutlined,
@@ -271,6 +272,7 @@ watchDebounced(search, getProducts, { debounce: 300 });
     <AuthenticatedLayout>
         <Head title="Sales" />
         <ContentHeader title="Sales" />
+        <LocationInfoAlert />
         <ContentLayoutV2 title="Create Transaction">
             <template #filters>
                 <a-input-search

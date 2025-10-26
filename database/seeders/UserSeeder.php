@@ -47,108 +47,91 @@ class UserSeeder extends Seeder
             return $locations[ $i % $count ]->id ?? null;
         };
 
-        // Users mapped to their roles - Expanded for cascading hierarchy
+        // Organization-specific users
         $users = [
-            // Level 2 - Admin
+            // Jollibee Corporation Users
             [
-                'name' => 'John Admin',
-                'email' => 'admin@example.com',
-                'password' => 'admin',
+                'name' => 'Jollibee Admin',
+                'email' => 'admin@jollibee-corp.com',
+                'password' => 'jollibee123',
                 'role' => 'admin',
+                'domain' => 'jollibee-corp',
             ],
             [
-                'name' => 'Sarah Admin',
-                'email' => 'admin2@example.com',
-                'password' => 'admin',
+                'name' => 'Jollibee Manager - Makati',
+                'email' => 'manager@jollibee-corp.com',
+                'password' => 'jollibee123',
+                'role' => 'manager',
+                'domain' => 'jollibee-corp',
+                'location_code' => 'JB-MAIN',
+            ],
+            [
+                'name' => 'Jollibee Manager - SM Mall',
+                'email' => 'branch@jollibee-corp.com',
+                'password' => 'jollibee123',
+                'role' => 'manager',
+                'domain' => 'jollibee-corp',
+                'location_code' => 'JB-BRANCH',
+            ],
+            [
+                'name' => 'Jollibee Cashier - Makati',
+                'email' => 'cashier1@jollibee-corp.com',
+                'password' => 'jollibee123',
+                'role' => 'cashier',
+                'domain' => 'jollibee-corp',
+                'location_code' => 'JB-MAIN',
+            ],
+            [
+                'name' => 'Jollibee Cashier - SM Mall',
+                'email' => 'cashier2@jollibee-corp.com',
+                'password' => 'jollibee123',
+                'role' => 'cashier',
+                'domain' => 'jollibee-corp',
+                'location_code' => 'JB-BRANCH',
+            ],
+
+            // McDonald's Corporation Users
+            [
+                'name' => 'McDonald\'s Admin',
+                'email' => 'admin@mcdonalds-corp.com',
+                'password' => 'mcdonalds123',
                 'role' => 'admin',
+                'domain' => 'mcdonalds-corp',
             ],
-            
-            // Level 3 - Manager
             [
-                'name' => 'Mike Manager',
-                'email' => 'manager@example.com',
-                'password' => 'manager',
+                'name' => 'McDonald\'s Manager - Ortigas',
+                'email' => 'manager@mcdonalds-corp.com',
+                'password' => 'mcdonalds123',
                 'role' => 'manager',
+                'domain' => 'mcdonalds-corp',
+                'location_code' => 'MC-MAIN',
             ],
             [
-                'name' => 'Lisa Manager',
-                'email' => 'manager2@example.com',
-                'password' => 'manager',
+                'name' => 'McDonald\'s Manager - BGC',
+                'email' => 'branch@mcdonalds-corp.com',
+                'password' => 'mcdonalds123',
                 'role' => 'manager',
+                'domain' => 'mcdonalds-corp',
+                'location_code' => 'MC-BRANCH',
             ],
             [
-                'name' => 'David Manager',
-                'email' => 'manager3@example.com',
-                'password' => 'manager',
-                'role' => 'manager',
-            ],
-            
-            // Level 4 - Supervisor
-            [
-                'name' => 'Emma Supervisor',
-                'email' => 'supervisor@example.com',
-                'password' => 'supervisor',
-                'role' => 'supervisor',
-            ],
-            [
-                'name' => 'Tom Supervisor',
-                'email' => 'supervisor2@example.com',
-                'password' => 'supervisor',
-                'role' => 'supervisor',
-            ],
-            [
-                'name' => 'Anna Supervisor',
-                'email' => 'supervisor3@example.com',
-                'password' => 'supervisor',
-                'role' => 'supervisor',
-            ],
-            [
-                'name' => 'Chris Supervisor',
-                'email' => 'supervisor4@example.com',
-                'password' => 'supervisor',
-                'role' => 'supervisor',
-            ],
-            
-            // Level 5 - Cashier
-            [
-                'name' => 'Alex Cashier',
-                'email' => 'cashier@example.com',
-                'password' => 'cashier',
+                'name' => 'McDonald\'s Cashier - Ortigas',
+                'email' => 'cashier1@mcdonalds-corp.com',
+                'password' => 'mcdonalds123',
                 'role' => 'cashier',
+                'domain' => 'mcdonalds-corp',
+                'location_code' => 'MC-MAIN',
             ],
             [
-                'name' => 'Maria Cashier',
-                'email' => 'cashier2@example.com',
-                'password' => 'cashier',
+                'name' => 'McDonald\'s Cashier - BGC',
+                'email' => 'cashier2@mcdonalds-corp.com',
+                'password' => 'mcdonalds123',
                 'role' => 'cashier',
-            ],
-            [
-                'name' => 'James Cashier',
-                'email' => 'cashier3@example.com',
-                'password' => 'cashier',
-                'role' => 'cashier',
-            ],
-            [
-                'name' => 'Sophie Cashier',
-                'email' => 'cashier4@example.com',
-                'password' => 'cashier',
-                'role' => 'cashier',
-            ],
-            [
-                'name' => 'Ryan Cashier',
-                'email' => 'cashier5@example.com',
-                'password' => 'cashier',
-                'role' => 'cashier',
-            ],
-            [
-                'name' => 'Nina Cashier',
-                'email' => 'cashier6@example.com',
-                'password' => 'cashier',
-                'role' => 'cashier',
+                'domain' => 'mcdonalds-corp',
+                'location_code' => 'MC-BRANCH',
             ],
         ];
 
-        $i = 0;
         foreach ($users as $data) {
             // Determine role level based on role
             $roleLevel = match($data['role']) {
@@ -159,22 +142,29 @@ class UserSeeder extends Seeder
                 default => 3
             };
 
+            // Get location ID if location_code is specified
+            $locationId = null;
+            if (isset($data['location_code'])) {
+                $location = \App\Models\InventoryLocation::where('code', $data['location_code'])->first();
+                $locationId = $location ? $location->id : null;
+            }
+
             $user = User::updateOrCreate(
                 ['email' => $data['email']],
                 [
                     'name' => $data['name'],
                     'password' => Hash::make($data['password']),
                     'is_super_user' => false,
-                    'domain' => $pickDomain($i),
+                    'domain' => $data['domain'],
                     'role_level' => $roleLevel,
-                    'location_id' => $roleLevel >= 3 ? $pickLocation($i) : null, // Level 3+ get assigned locations
+                    'location_id' => $locationId,
                     'can_switch_locations' => $roleLevel <= 2, // Level 1-2 can switch locations
                 ]
             );
 
             // Assign role using string value
             $user->assignRole($data['role']);
-            $i++;
         }
     }
 }
+

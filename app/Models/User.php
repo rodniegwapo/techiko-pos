@@ -297,4 +297,12 @@ class User extends Authenticatable
         // Admin and below are restricted to their domain
         return $this->domain;
     }
+
+    /**
+     * Get the user's assigned location
+     */
+    public function location()
+    {
+        return $this->belongsTo(\App\Models\InventoryLocation::class);
+    }
 }

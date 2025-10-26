@@ -12,6 +12,7 @@ import { Modal, notification } from "ant-design-vue";
 import { usePage } from "@inertiajs/vue3";
 import axios from "axios";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
+import LocationInfo from "@/Components/LocationInfo.vue";
 
 const page = usePage();
 const { hasPermission } = usePermissionsV2();
@@ -63,6 +64,11 @@ const columns = computed(() => {
         {
             title: "Status",
             key: "status",
+            align: "left",
+        },
+        {
+            title: "Location",
+            key: "location",
             align: "left",
         },
         {
@@ -402,6 +408,16 @@ const handleStatusToggle = async (user) => {
                         :status="(record.data || record).status === 'active' ? 'success' : 'error'"
                         :text="(record.data || record).status === 'active' ? 'Active' : 'Inactive'"
                     />
+                </div>
+            </template>
+
+            <template v-if="column.key === 'location'">
+                <div class="flex items-center">
+                    <LocationInfo 
+                        v-if="(record.data || record).location"
+                        :location="(record.data || record).location"
+                    />
+                    <span v-else class="text-sm text-gray-400">No location assigned</span>
                 </div>
             </template>
 

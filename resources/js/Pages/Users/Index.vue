@@ -19,6 +19,7 @@ import ActiveFilters from "@/Components/filters/ActiveFilters.vue";
 import UserTable from "./components/UserTable.vue";
 import AddUserModal from "./components/AddUserModal.vue";
 import UserDetailsModal from "./components/UserDetailsModal.vue";
+import LocationInfoAlert from "@/Components/LocationInfoAlert.vue";
 
 const page = usePage();
 const { openModal, isEdit, spinning } = useGlobalVariables();
@@ -240,7 +241,6 @@ const getRoleColorHex = (level) => {
     <AuthenticatedLayout>
         <Head title="User Management" />
         <ContentHeader class="mb-8" title="User Management" />
-
         <ContentLayout title="User Management">
             <template #filters>
                 <RefreshButton :loading="spinning" @click="getItems" />
@@ -288,6 +288,10 @@ const getRoleColorHex = (level) => {
                             )
                     "
                 />
+            </template>
+
+            <template #activeStore>
+                <LocationInfoAlert />
             </template>
 
             <template #table>
