@@ -97,9 +97,7 @@ class InventoryController extends Controller
             'inventories' => ProductInventoryResource::collection($inventories),
             'locations' => InventoryLocation::active()->forDomain($slug)->get(),
             'categories' => \App\Models\Category::where('domain', $slug)
-                ->whereHas('products.inventories', function ($query) use ($location) {
-                    $query->where('location_id', $location->id);
-                })
+                ->where('location_id', $location->id)
                 ->get(),
             'filters' => $request->only(['search', 'stock_status', 'category_id']),
             'isGlobalView' => false,

@@ -24,19 +24,15 @@ class Helpers
     /**
      * Get the effective location for a user based on their role and domain
      */
-    public static function getEffectiveLocation($domain = null, $requestLocationId = null)
+    public static function getEffectiveLocation($domain = null)
     {
         $user = auth()->user();
-
-        if (!$user) {
-            return null;
-        }
-
+        
         // If user has a specific location_id, use it
-        if ($user->location_id) {
+        if ($user && $user->location_id) {
             return InventoryLocation::forDomain($domain->name_slug)->find($user->location_id);
         }
-
+        
         // Fallback to domain's default location
         return InventoryLocation::active()
             ->forDomain($domain->name_slug)

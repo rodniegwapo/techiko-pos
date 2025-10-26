@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Domain;
 use App\Models\Category;
 use App\Http\Resources\CategoryResource;
+use App\Helpers;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -16,9 +17,11 @@ class CategoryController extends Controller
      */
     public function index(Request $request, Domain $domain = null)
     {
+        $location = Helpers::getEffectiveLocation($domain);
 
         $query = Category::query()
             ->where('domain', $domain->name_slug)
+            ->where('location_id', $location->id)
             ->withCount('products')
             // Use Searchable trait on Category
             ->when($request->input('search'), function ($q, $search) {
@@ -47,6 +50,11 @@ class CategoryController extends Controller
         if ($domain) {
             $validated['domain'] = $domain->name_slug;
         }
+        
+        // Get effective location for the category
+        $location = Helpers::getEffectiveLocation($domain);
+        $validated['location_id'] = $location->id;
+        
         $category = Category::create($validated);
 
         return redirect()->back()->with('success', 'Category created successfully');
