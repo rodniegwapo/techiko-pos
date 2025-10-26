@@ -22,7 +22,7 @@ class StockAdjustmentController extends Controller
      */
     public function index(Request $request, Domain $domain)
     {
-        $location = Helpers::getEffectiveLocation($domain, $request->input('location_id'));
+        $location = Helpers::getActiveLocation($domain, $request->input('location_id'));
 
         $query = StockAdjustment::with(['location', 'createdBy', 'approvedBy'])
             ->withCount('items')

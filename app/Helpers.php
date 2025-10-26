@@ -22,20 +22,28 @@ class Helpers
     }
 
     /**
-     * Get the effective location for a user based on their role and domain
+     * Get the active location for a user based on their role and domain
      */
-    public static function getEffectiveLocation($domain = null)
+    public static function getActiveLocation($domain = null, $locationId = null)
     {
         $user = auth()->user();
         
+        // Handle case where domain might be a string or object
+        $domainSlug = $domain instanceof \App\Models\Domain ? $domain->name_slug : $domain;
+        
+        // If a specific location_id is provided, use it
+        if ($locationId) {
+            return InventoryLocation::forDomain($domainSlug)->find($locationId);
+        }
+        
         // If user has a specific location_id, use it
         if ($user && $user->location_id) {
-            return InventoryLocation::forDomain($domain->name_slug)->find($user->location_id);
+            return InventoryLocation::forDomain($domainSlug)->find($user->location_id);
         }
         
         // Fallback to domain's default location
         return InventoryLocation::active()
-            ->forDomain($domain->name_slug)
+            ->forDomain($domainSlug)
             ->where('is_default', true)
             ->first();
     }

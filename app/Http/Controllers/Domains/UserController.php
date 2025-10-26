@@ -42,7 +42,7 @@ class UserController extends Controller
         $roles = $this->userService->getManageableRoles($currentUser);
 
         // Get current location and available locations for the alert
-        $currentLocation = Helpers::getEffectiveLocation($domain, $request->input('location_id'));
+        $currentLocation = Helpers::getActiveLocation($domain, $request->input('location_id'));
 
         return Inertia::render('Users/Index', [
             'items' => UserResource::collection($users),

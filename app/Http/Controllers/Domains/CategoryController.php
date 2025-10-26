@@ -17,7 +17,7 @@ class CategoryController extends Controller
      */
     public function index(Request $request, Domain $domain = null)
     {
-        $location = Helpers::getEffectiveLocation($domain);
+        $location = Helpers::getActiveLocation($domain);
 
         $query = Category::query()
             ->where('domain', $domain->name_slug)
@@ -52,7 +52,7 @@ class CategoryController extends Controller
         }
         
         // Get effective location for the category
-        $location = Helpers::getEffectiveLocation($domain);
+        $location = Helpers::getActiveLocation($domain);
         $validated['location_id'] = $location->id;
         
         $category = Category::create($validated);

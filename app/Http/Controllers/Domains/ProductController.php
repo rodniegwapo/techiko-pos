@@ -20,7 +20,7 @@ class ProductController extends Controller
      */
     public function index(Request $request, Domain $domain = null)
     {
-        $location = Helpers::getEffectiveLocation($domain, $request->input('location_id'));
+        $location = Helpers::getActiveLocation($domain, $request->input('location_id'));
         // Simple query - much cleaner!
         $query = Product::query()
             ->with('category')
@@ -67,7 +67,7 @@ class ProductController extends Controller
         }
 
         // Get effective location for the product
-        $location = Helpers::getEffectiveLocation($domain, $request->input('location_id'));
+        $location = Helpers::getActiveLocation($domain, $request->input('location_id'));
         $validated['location_id'] = $location->id;
 
         $product = Product::create($validated);

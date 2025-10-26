@@ -51,7 +51,8 @@ class HandleInertiaRequests extends Middleware
     {
         // Get domain from route parameter
         $domain = $request->route('domain');
-        $domainSlug = data_get($domain, 'name_slug');
+        $domainSlug = data_get($domain, 'name_slug') ?? $domain;
+
 
         if ($domainSlug) {
             return Domain::where('name_slug', $domainSlug)->first();
@@ -77,14 +78,8 @@ class HandleInertiaRequests extends Middleware
         $domain = $this->getCurrentDomain($request);
         if (!$domain) return null;
 
-        // Apply role-based location filtering
-        $effectiveLocationId = $user->getEffectiveLocationId($request->input('location_id'));
-
-        return $effectiveLocationId
-            ? InventoryLocation::forDomain($domain->name_slug)->findOrFail($effectiveLocationId)
-            : (InventoryLocation::active()->forDomain($domain->name_slug)->where('is_default', true)->first()
-                ?? InventoryLocation::active()->forDomain($domain->name_slug)->first()
-                ?? InventoryLocation::getDefault());
+        // Use the centralized helper function
+        return \App\Helpers::getActiveLocation($domain, $request->input('location_id'));
     }
 
     /**

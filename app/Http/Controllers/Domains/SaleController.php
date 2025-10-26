@@ -31,7 +31,7 @@ class SaleController extends Controller
 
     public function index(Request $request, Domain $domain)
     {
-        $location = Helpers::getEffectiveLocation($domain);
+        $location = Helpers::getActiveLocation($domain);
 
         return Inertia::render('Sales/Index', [
             'domain' => $domain,
@@ -67,7 +67,7 @@ class SaleController extends Controller
 
         $loyaltyResults = null;
 
-        $location = Helpers::getEffectiveLocation($domain);
+        $location = Helpers::getActiveLocation($domain);
 
         try {
             DB::transaction(function () use ($sale, $validated, &$loyaltyResults, $location) {
