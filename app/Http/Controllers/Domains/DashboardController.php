@@ -1,29 +1,35 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers\Domains;
 
-use App\Http\Controllers\Controller;
+use App\Http\Controllers\Api\DashboardController as BaseDashboardController;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Carbon\Carbon;
 use App\Models\Sale;
-use App\Models\SaleItem;
-use DB;
+use Carbon\Carbon;
 
-class DashboardController extends Controller
+class DashboardController extends BaseDashboardController
 {
+    protected $domain;
+
+    public function __construct()
+    {
+        // Get domain from route parameter
+        $this->domain = request()->route('domain');
+    }
+
     /**
-     * Get sales chart data based on time range
+     * Get sales chart data with domain scoping
      */
     public function getSalesChartData(Request $request): JsonResponse
     {
         $request->validate([
             'time_range' => 'required|in:daily,weekly,monthly',
-            'location_id' => 'nullable' // Remove validation since sales table doesn't have location_id
+            'location_id' => 'nullable'
         ]);
 
         $timeRange = $request->input('time_range');
-        $locationId = $request->input('location_id'); // Keep for future use
+        $locationId = $request->input('location_id');
 
         $data = match ($timeRange) {
             'daily' => $this->getWeeklyData(),
@@ -36,7 +42,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * Get weekly data (Monday to Sunday of current week)
+     * Override to add domain scoping to weekly data
      */
     protected function getWeeklyData(): array
     {
@@ -65,7 +71,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * Get monthly data (weeks within current month)
+     * Override to add domain scoping to monthly data
      */
     protected function getMonthlyData(): array
     {
@@ -105,7 +111,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * Get yearly data (months of current year)
+     * Override to add domain scoping to yearly data
      */
     protected function getYearlyData(): array
     {
@@ -131,12 +137,13 @@ class DashboardController extends Controller
     }
 
     /**
-     * Get sales data for a specific day
+     * Override to add domain scoping to day sales data
      */
-    private function getDaySalesData(Carbon $date): array
+    protected function getDaySalesData(Carbon $date): array
     {
         $query = Sale::whereDate('created_at', $date->format('Y-m-d'))
-            ->where('payment_status', 'paid');
+            ->where('payment_status', 'paid')
+            ->where('domain', $this->domain);
 
         $sales = $query->sum('grand_total');
         $transactions = $query->count();
@@ -148,12 +155,13 @@ class DashboardController extends Controller
     }
 
     /**
-     * Get sales data for a week
+     * Override to add domain scoping to week sales data
      */
-    private function getWeekSalesData(Carbon $startDate, Carbon $endDate): array
+    protected function getWeekSalesData(Carbon $startDate, Carbon $endDate): array
     {
         $query = Sale::whereBetween('created_at', [$startDate, $endDate])
-            ->where('payment_status', 'paid');
+            ->where('payment_status', 'paid')
+            ->where('domain', $this->domain);
 
         $sales = $query->sum('grand_total');
         $transactions = $query->count();
@@ -165,12 +173,13 @@ class DashboardController extends Controller
     }
 
     /**
-     * Get sales data for a month
+     * Override to add domain scoping to month sales data
      */
-    private function getMonthSalesData(string $startDate, Carbon $endDate): array
+    protected function getMonthSalesData(string $startDate, Carbon $endDate): array
     {
         $query = Sale::whereBetween('created_at', [$startDate, $endDate])
-            ->where('payment_status', 'paid');
+            ->where('payment_status', 'paid')
+            ->where('domain', $this->domain);
 
         $sales = $query->sum('grand_total');
         $transactions = $query->count();
