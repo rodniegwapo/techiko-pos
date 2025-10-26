@@ -37,7 +37,7 @@ class ProductController extends Controller
 
         return Inertia::render('Products/Index', [
             'items' => ProductResource::collection($products),
-            'categories' => Category::where('domain', $domain->name_slug)->get(),
+            'categories' => Category::where('domain', $domain->name_slug)->where('location_id', $location->id)->get(),
             'sold_by_types' => \App\Models\Product\ProductSoldType::all(),
             'isGlobalView' => !$domain,
         ]);

@@ -19,6 +19,11 @@ class Category extends Model
         return $this->hasMany(Product::class);
     }
 
+    public function location()
+    {
+        return $this->belongsTo(InventoryLocation::class);
+    }
+
     // Remove domain relationship - now using domain string column
     // public function domain(){
     //     return $this->belongsTo(Domain::class);
