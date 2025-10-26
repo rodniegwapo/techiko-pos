@@ -1,9 +1,20 @@
 import { ref, computed, watch } from "vue";
-import { router } from "@inertiajs/vue3";
+import { router, usePage } from "@inertiajs/vue3";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes.js";
 
 export function useSalesChartData(graphFilter, selectedLocation) {
+    console.log("useSalesChartData composable initialized");
+
     const { getRoute } = useDomainRoutes();
+    const page = usePage();
+
+    // Detect if we're in global context (no domain in URL)
+    const isGlobalContext = computed(() => {
+        const url = window.location.pathname;
+        const isGlobal = !url.includes("/domains/");
+        console.log("isGlobalContext computed:", { url, isGlobal });
+        return isGlobal;
+    });
     const isLoading = ref(false);
     const chartData = ref({
         categories: [],
@@ -29,10 +40,10 @@ export function useSalesChartData(graphFilter, selectedLocation) {
     // Process raw data from backend into chart format
     const processRawData = (rawData, timeRange) => {
         // Transform raw sales data to match your useGraphCategories format
-        const formattedData = rawData.map(sale => ({
+        const formattedData = rawData.map((sale) => ({
             date_time: sale.created_at,
             grand_total: parseFloat(sale.grand_total),
-            payment_method: sale.payment_method
+            payment_method: sale.payment_method,
         }));
 
         // Use your graph categories logic here
@@ -42,56 +53,70 @@ export function useSalesChartData(graphFilter, selectedLocation) {
         const transactionsData = [];
 
         // Group data by time period based on timeRange
-        if (timeRange === 'daily') {
+        if (timeRange === "daily") {
             // Group by day for last 7 days
             const days = Array.from({ length: 7 }, (_, i) => {
                 const date = new Date();
                 date.setDate(date.getDate() - (6 - i));
-                return date.toISOString().split('T')[0];
+                return date.toISOString().split("T")[0];
             });
 
-            categories.push(...days.map(day => {
-                const date = new Date(day);
-                return date.toLocaleDateString('en-US', { weekday: 'short' });
-            }));
+            categories.push(
+                ...days.map((day) => {
+                    const date = new Date(day);
+                    return date.toLocaleDateString("en-US", {
+                        weekday: "short",
+                    });
+                })
+            );
 
-            days.forEach(day => {
-                const daySales = formattedData.filter(sale => 
+            days.forEach((day) => {
+                const daySales = formattedData.filter((sale) =>
                     sale.date_time.startsWith(day)
                 );
-                const totalSales = daySales.reduce((sum, sale) => sum + sale.grand_total, 0);
+                const totalSales = daySales.reduce(
+                    (sum, sale) => sum + sale.grand_total,
+                    0
+                );
                 const transactionCount = daySales.length;
-                
+
                 salesData.push(totalSales);
                 transactionsData.push(transactionCount);
             });
-        } else if (timeRange === 'weekly') {
+        } else if (timeRange === "weekly") {
             // Group by week for last 4 weeks
             const weeks = Array.from({ length: 4 }, (_, i) => {
                 const date = new Date();
-                date.setDate(date.getDate() - (7 * (3 - i)));
+                date.setDate(date.getDate() - 7 * (3 - i));
                 return date;
             });
 
-            categories.push(...weeks.map((_, i) => `${3 - i} week${3 - i > 1 ? 's' : ''} ago`));
+            categories.push(
+                ...weeks.map(
+                    (_, i) => `${3 - i} week${3 - i > 1 ? "s" : ""} ago`
+                )
+            );
 
-            weeks.forEach(week => {
+            weeks.forEach((week) => {
                 const weekStart = new Date(week);
                 const weekEnd = new Date(week);
                 weekEnd.setDate(weekEnd.getDate() + 6);
 
-                const weekSales = formattedData.filter(sale => {
+                const weekSales = formattedData.filter((sale) => {
                     const saleDate = new Date(sale.date_time);
                     return saleDate >= weekStart && saleDate <= weekEnd;
                 });
-                
-                const totalSales = weekSales.reduce((sum, sale) => sum + sale.grand_total, 0);
+
+                const totalSales = weekSales.reduce(
+                    (sum, sale) => sum + sale.grand_total,
+                    0
+                );
                 const transactionCount = weekSales.length;
-                
+
                 salesData.push(totalSales);
                 transactionsData.push(transactionCount);
             });
-        } else if (timeRange === 'monthly') {
+        } else if (timeRange === "monthly") {
             // Group by month for last 12 months
             const months = Array.from({ length: 12 }, (_, i) => {
                 const date = new Date();
@@ -99,22 +124,35 @@ export function useSalesChartData(graphFilter, selectedLocation) {
                 return date;
             });
 
-            categories.push(...months.map(month => 
-                month.toLocaleDateString('en-US', { month: 'short' })
-            ));
+            categories.push(
+                ...months.map((month) =>
+                    month.toLocaleDateString("en-US", { month: "short" })
+                )
+            );
 
-            months.forEach(month => {
-                const monthStart = new Date(month.getFullYear(), month.getMonth(), 1);
-                const monthEnd = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+            months.forEach((month) => {
+                const monthStart = new Date(
+                    month.getFullYear(),
+                    month.getMonth(),
+                    1
+                );
+                const monthEnd = new Date(
+                    month.getFullYear(),
+                    month.getMonth() + 1,
+                    0
+                );
 
-                const monthSales = formattedData.filter(sale => {
+                const monthSales = formattedData.filter((sale) => {
                     const saleDate = new Date(sale.date_time);
                     return saleDate >= monthStart && saleDate <= monthEnd;
                 });
-                
-                const totalSales = monthSales.reduce((sum, sale) => sum + sale.grand_total, 0);
+
+                const totalSales = monthSales.reduce(
+                    (sum, sale) => sum + sale.grand_total,
+                    0
+                );
                 const transactionCount = monthSales.length;
-                
+
                 salesData.push(totalSales);
                 transactionsData.push(transactionCount);
             });
@@ -123,38 +161,53 @@ export function useSalesChartData(graphFilter, selectedLocation) {
         return {
             categories,
             salesData,
-            transactionsData
+            transactionsData,
         };
     };
 
     const fetchChartData = async () => {
-        console.log('fetchChartData called with:', {
-            route: getRoute('dashboard.sales-chart'),
+        // Determine the correct route based on context
+        const route = isGlobalContext.value
+            ? "/api/dashboard/sales-chart" // Global route
+            : getRoute("dashboard.sales-chart"); // Domain route
+
+        console.log("routess", route);
+        console.log("fetchChartData called with:", {
+            route: route,
+            isGlobalContext: isGlobalContext.value,
+            currentUrl: window.location.pathname,
             time_range: graphFilter.value,
-            location_id: selectedLocation?.value || null
+            location_id: selectedLocation?.value || null,
         });
 
         isLoading.value = true;
 
         try {
-            // Use domain-aware routing for API calls
-            const response = await window.axios.post(
-                getRoute('dashboard.sales-chart'),
-                {
-                    time_range: graphFilter.value,
-                    location_id: selectedLocation?.value || null,
-                }
-            );
+            // Use appropriate route based on context
+            const response = await window.axios.post(route, {
+                time_range: graphFilter.value,
+                location_id: selectedLocation?.value || null,
+            });
 
+            console.log("respondsss", response);
             if (response.data && response.data.raw_data) {
                 // Process raw data using your graph categories logic
-                chartData.value = processRawData(response.data.raw_data, response.data.time_range);
+                chartData.value = processRawData(
+                    response.data.raw_data,
+                    response.data.time_range
+                );
             } else {
                 // Fallback to generated data if API fails
                 chartData.value = generateFallbackData();
             }
         } catch (error) {
-            console.warn("Failed to fetch chart data, using fallback:", error);
+            console.error("Failed to fetch chart data:", {
+                error: error,
+                route: route,
+                isGlobalContext: isGlobalContext.value,
+                response: error.response?.data,
+                status: error.response?.status,
+            });
             chartData.value = generateFallbackData();
         } finally {
             isLoading.value = false;
@@ -164,13 +217,10 @@ export function useSalesChartData(graphFilter, selectedLocation) {
     // Watch for changes in filter or location to fetch new data
     watch(
         [graphFilter, selectedLocation],
-        (newValues, oldValues) => {
-            // Only fetch if values actually changed (not on initial mount)
-            if (oldValues && oldValues.length > 0) {
-                fetchChartData();
-            }
+        () => {
+            fetchChartData();
         },
-        { immediate: false }
+        { immediate: true }  // Run on initial mount and when values change
     );
 
     // Weekly view: Monday to Sunday of current week
