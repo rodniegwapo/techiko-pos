@@ -25,12 +25,10 @@ class UserController extends Controller
     public function index(Request $request, Domain $domain = null)
     {
         $currentUser = auth()->user();
-        
+
         $users = User::query()
             ->with(['roles', 'supervisor'])
-            ->when($domain, function ($query) use ($domain) {
-                return $query->where('domain', $domain->name_slug);
-            })
+            ->where('domain', $domain->name_slug)
             ->when($request->search, fn($q, $s) => $q->search($s))
             ->when($request->role, function ($query, $role) {
                 return $query->whereHas('roles', function ($q) use ($role) {
@@ -133,7 +131,7 @@ class UserController extends Controller
     public function hierarchy(Request $request, Domain $domain = null)
     {
         $currentUser = auth()->user();
-        
+
         // For domain context, show all users in the domain
         if ($domain) {
             $users = User::with(['roles', 'supervisor', 'subordinates'])
@@ -145,7 +143,7 @@ class UserController extends Controller
             // For global context, use the hierarchy-based approach
             $users = $this->userService->getHierarchyUsers($currentUser);
         }
-        
+
         $hierarchy = UserHierarchyService::getRoleHierarchy();
 
         return Inertia::render('Users/Hierarchy', [
@@ -191,9 +189,9 @@ class UserController extends Controller
             try {
                 $userRole = $user->roles()->orderBy('level')->first();
                 $userRoleName = $userRole ? $userRole->name : 'No Role';
-                
+
                 $bestSupervisor = UserHierarchyService::getBestSupervisor($user);
-                
+
                 // Special case: If user is admin (level 2) and no supervisor found in domain, 
                 // assign to Super Admin (super users can supervise across domains)
                 if (!$bestSupervisor && $userRole && $userRole->level === 2) {
@@ -202,11 +200,11 @@ class UserController extends Controller
                         $bestSupervisor = $superAdmin;
                     }
                 }
-                
+
                 if ($bestSupervisor && $bestSupervisor->id !== $user->id) {
                     $supervisorRole = $bestSupervisor->roles()->orderBy('level')->first();
                     $supervisorRoleName = $supervisorRole ? $supervisorRole->name : ($bestSupervisor->is_super_user ? 'Super User' : 'No Role');
-                    
+
                     $user->update(['supervisor_id' => $bestSupervisor->id]);
                     $results['assigned']++;
                     $results['details'][] = "✅ Assigned {$user->name} ({$userRoleName}) to {$bestSupervisor->name} ({$supervisorRoleName})";
@@ -239,19 +237,19 @@ class UserController extends Controller
     {
         $currentUser = auth()->user();
         $isSuperUser = $currentUser->is_super_user;
-        
+
         if ($user) {
             // Ensure user belongs to this domain (unless current user is super user)
             if (!$isSuperUser && $user->domain !== $domain->name_slug) {
                 abort(403, 'User does not belong to this domain');
             }
-            
+
             // Get supervisors that can supervise this specific user
             $supervisors = UserHierarchyService::getAssignableSupervisors($user);
-            
+
             // Filter by domain only if current user is not super user
             if (!$isSuperUser) {
-                $supervisors = $supervisors->filter(function($supervisor) use ($domain) {
+                $supervisors = $supervisors->filter(function ($supervisor) use ($domain) {
                     return $supervisor['domain'] === $domain->name_slug;
                 });
             }
@@ -269,12 +267,12 @@ class UserController extends Controller
                         $query = User::whereHas('roles', function ($q) use ($nextLevel) {
                             $q->where('level', $nextLevel);
                         });
-                        
+
                         // Only filter by domain if not super user
                         if (!$isSuperUser) {
                             $query->where('domain', $domain->name_slug);
                         }
-                        
+
                         $supervisors = $query->with('roles')
                             ->select('id', 'name', 'email')
                             ->get();
@@ -285,10 +283,10 @@ class UserController extends Controller
                         $tempUser->domain = $domain->name_slug;
                         $tempUser->setRelation('roles', collect([$role]));
                         $supervisors = UserHierarchyService::getAssignableSupervisors($tempUser);
-                        
+
                         // Filter by domain only if current user is not super user
                         if (!$isSuperUser) {
-                            $supervisors = $supervisors->filter(function($supervisor) use ($domain) {
+                            $supervisors = $supervisors->filter(function ($supervisor) use ($domain) {
                                 return $supervisor['domain'] === $domain->name_slug;
                             });
                         }
@@ -299,10 +297,10 @@ class UserController extends Controller
             } else {
                 // Get all users that can be supervisors (have lower level roles)
                 $supervisors = UserHierarchyService::getSupervisableUsers($currentUser);
-                
+
                 // Filter by domain only if current user is not super user
                 if (!$isSuperUser) {
-                    $supervisors = $supervisors->filter(function($supervisor) use ($domain) {
+                    $supervisors = $supervisors->filter(function ($supervisor) use ($domain) {
                         return $supervisor['domain'] === $domain->name_slug;
                     });
                 }
@@ -323,18 +321,18 @@ class UserController extends Controller
         if ($user->domain !== $domain->name_slug) {
             abort(403, 'User does not belong to this domain');
         }
-        
+
         // Get supervisors that can supervise this user, filtered by domain
         $supervisors = UserHierarchyService::getAssignableSupervisors($user);
-        
+
         // Filter by domain if not super user
         $currentUser = auth()->user();
         if (!$currentUser->is_super_user) {
-            $supervisors = $supervisors->filter(function($supervisor) use ($domain) {
+            $supervisors = $supervisors->filter(function ($supervisor) use ($domain) {
                 return $supervisor['domain'] === $domain->name_slug;
             });
         }
-        
+
         return response()->json(['supervisors' => $supervisors]);
     }
 
@@ -353,7 +351,7 @@ class UserController extends Controller
         }
 
         $supervisor = User::findOrFail($request->supervisor_id);
-        
+
         // Check if supervisor belongs to same domain (unless current user is super user)
         $currentUser = auth()->user();
         if (!$currentUser->is_super_user && $supervisor->domain !== $domain->name_slug) {

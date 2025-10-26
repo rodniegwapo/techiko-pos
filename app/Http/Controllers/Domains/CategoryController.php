@@ -16,12 +16,10 @@ class CategoryController extends Controller
      */
     public function index(Request $request, Domain $domain = null)
     {
+
         $query = Category::query()
+            ->where('domain', $domain->name_slug)
             ->withCount('products')
-            // Filter by current domain if present
-            ->when($domain, function ($q) use ($domain) {
-                return $q->forDomain($domain->name_slug);
-            })
             // Use Searchable trait on Category
             ->when($request->input('search'), function ($q, $search) {
                 return $q->search($search);
@@ -86,7 +84,7 @@ class CategoryController extends Controller
 
         // Check if category has products
         $productCount = \App\Models\Product\Product::where('category_id', $category->id)->count();
-        
+
         if ($productCount > 0) {
             return redirect()->back()->with('error', "Cannot delete category with {$productCount} existing products. Please move or delete the products first.");
         }

@@ -33,9 +33,7 @@ class ProductController extends Controller
 
         // Get categories for the domain
         $categories = Category::query()
-            ->when($domain, function ($query) use ($domain) {
-                return $query->where('domain', $domain->name_slug);
-            })
+            ->where('domain', $domain->name_slug)
             ->get();
 
         // Get sold types
