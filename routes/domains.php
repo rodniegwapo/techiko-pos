@@ -7,7 +7,7 @@ Route::prefix('domains/{domain:name_slug}')
     ->name('domains.')
     ->group(function () {
         // Dashboard (Organization-specific)
-        Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
+        Route::get('/dashboard', [\App\Http\Controllers\Domains\DashboardController::class, 'index'])->name('dashboard');
 
         // Dashboard API routes (Organization-specific)
         Route::prefix('dashboard')->name('dashboard.')->group(function () {

@@ -2,200 +2,210 @@
 
 namespace App\Http\Controllers\Domains;
 
-use App\Http\Controllers\Api\DashboardController as BaseDashboardController;
-use App\Traits\DomainLocationScoping;
+use App\Http\Controllers\Controller;
+use App\Helpers;
+use App\Models\Domain;
+use App\Models\InventoryLocation;
+use App\Models\Sale;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use App\Models\Sale;
-use Carbon\Carbon;
+use Inertia\Inertia;
 
-class DashboardController extends BaseDashboardController
+class DashboardController extends Controller
 {
-    use DomainLocationScoping;
-
-    public function __construct()
+    /**
+     * Display the dashboard for a specific domain
+     */
+    public function index(Request $request, Domain $domain)
     {
-        // Don't initialize scoping in constructor - do it in methods when user is authenticated
+        $location = Helpers::getActiveLocation($domain, $request->input('location_id'));
+
+
+        logger('this is fuctking test');
+        // Only essential KPIs - let frontend handle complex analytics
+        $stats = [
+            'kpis' => $this->getKPIs($location, $domain->name_slug),
+            'recent_transactions' => $this->getRecentTransactions($domain->name_slug, $location),
+        ];
+
+        $availableLocations = InventoryLocation::active()->forDomain($domain->name_slug)->get();
+
+        return Inertia::render('Dashboard/Index', [
+            'stats' => $stats,
+            'locations' => $availableLocations,
+            'filters' => $request->only(['location_id']),
+        ]);
     }
 
     /**
-     * Get sales chart data with domain scoping
+     * Get sales chart data - return raw data for frontend processing
      */
     public function getSalesChartData(Request $request): JsonResponse
     {
-        // Initialize domain and location scoping
-        $this->initializeScoping($request);
-        
         $request->validate([
             'time_range' => 'required|in:daily,weekly,monthly',
             'location_id' => 'nullable'
         ]);
 
-        $timeRange = $request->input('time_range');
-        $locationId = $request->input('location_id');
+        $domainParam = $request->route('domain');
+        $domain = $domainParam instanceof Domain ? $domainParam->name_slug : $domainParam;
+        $timeRange = $request->input('time_range', 'daily');
 
-        $data = match ($timeRange) {
-            'daily' => $this->getWeeklyData(),
-            'weekly' => $this->getMonthlyData(),
-            'monthly' => $this->getYearlyData(),
-            default => $this->getWeeklyData()
+        // Get the active location for filtering
+        $location = Helpers::getActiveLocation($domainParam, $request->input('location_id'));
+
+        // Return raw data - let frontend handle formatting
+        $salesQuery = Sale::where('domain', $domain)
+            ->where('payment_status', 'paid')
+            ->where('created_at', '>=', $this->getStartDate($timeRange));
+
+        // Add location filtering if location exists
+        if ($location) {
+            $salesQuery->where('location_id', $location->id);
+        }
+
+        $sales = $salesQuery->select(['created_at', 'grand_total', 'payment_method'])
+            ->orderBy('created_at')
+            ->get();
+
+        return response()->json([
+            'raw_data' => $sales,
+            'time_range' => $timeRange
+        ]);
+    }
+
+    /**
+     * Get KPIs for the dashboard
+     */
+    protected function getKPIs($location, $domain = null)
+    {
+        $today = now()->startOfDay();
+        $yesterday = now()->subDay()->startOfDay();
+        $thisWeek = now()->startOfWeek();
+        $lastWeek = now()->subWeek()->startOfWeek();
+
+        // Build base query with domain AND location filtering
+        $salesQuery = Sale::where('payment_status', 'paid');
+        if ($domain) {
+            $salesQuery->where('domain', $domain);
+        }
+        if ($location) {
+            $salesQuery->where('location_id', $location->id);
+        }
+
+        // Today's Sales
+        $todaySales = (clone $salesQuery)
+            ->whereDate('created_at', $today)
+            ->sum('grand_total') ?? 0;
+
+        $yesterdaySales = (clone $salesQuery)
+            ->whereDate('created_at', $yesterday)
+            ->sum('grand_total') ?? 0;
+
+        $salesGrowth = $yesterdaySales > 0
+            ? round((($todaySales - $yesterdaySales) / $yesterdaySales) * 100, 1)
+            : 0;
+
+        // Total Revenue (This Week)
+        $thisWeekRevenue = (clone $salesQuery)
+            ->where('created_at', '>=', $thisWeek)
+            ->sum('grand_total') ?? 0;
+
+        $lastWeekRevenue = (clone $salesQuery)
+            ->where('created_at', '>=', $lastWeek)
+            ->where('created_at', '<', $thisWeek)
+            ->sum('grand_total') ?? 0;
+
+        $revenueGrowth = $lastWeekRevenue > 0
+            ? round((($thisWeekRevenue - $lastWeekRevenue) / $lastWeekRevenue) * 100, 1)
+            : 0;
+
+        // Active Orders (Pending Sales)
+        $pendingQuery = Sale::where('payment_status', 'pending');
+        if ($domain) {
+            $pendingQuery->where('domain', $domain);
+        }
+        if ($location) {
+            $pendingQuery->where('location_id', $location->id);
+        }
+
+        $activeOrders = (clone $pendingQuery)->count();
+
+        // Inventory Value
+        $inventoryValue = $location ? $location->getTotalInventoryValue() : 0;
+
+        return [
+            'today_sales' => [
+                'value' => $todaySales,
+                'growth' => $salesGrowth,
+                'label' => 'Today\'s Sales',
+                'icon' => 'dollar',
+                'color' => 'green'
+            ],
+            'total_revenue' => [
+                'value' => $thisWeekRevenue,
+                'growth' => $revenueGrowth,
+                'label' => 'This Week Revenue',
+                'icon' => 'trending-up',
+                'color' => 'blue'
+            ],
+            'active_orders' => [
+                'value' => $activeOrders,
+                'growth' => 0,
+                'label' => 'Pending Orders',
+                'icon' => 'shopping-cart',
+                'color' => 'orange'
+            ],
+            'inventory_value' => [
+                'value' => $inventoryValue,
+                'growth' => 0,
+                'label' => 'Inventory Value',
+                'icon' => 'package',
+                'color' => 'purple'
+            ]
+        ];
+    }
+
+    /**
+     * Get recent transactions
+     */
+    protected function getRecentTransactions($domain = null, $location = null)
+    {
+        $transactionsQuery = Sale::with(['customer', 'saleItems.product'])
+            ->where('payment_status', 'paid');
+
+        if ($domain) {
+            $transactionsQuery->where('domain', $domain);
+        }
+        if ($location) {
+            $transactionsQuery->where('location_id', $location->id);
+        }
+
+        return $transactionsQuery->latest()
+            ->limit(10)
+            ->get()
+            ->map(function ($sale) {
+                return [
+                    'id' => $sale->id,
+                    'customer_name' => $sale->customer->name ?? 'Walk-in Customer',
+                    'total' => $sale->grand_total,
+                    'items_count' => $sale->saleItems->count(),
+                    'date' => $sale->created_at->format('M d, Y H:i'),
+                    'status' => $sale->payment_status
+                ];
+            });
+    }
+
+    /**
+     * Get start date based on time range
+     */
+    private function getStartDate($timeRange)
+    {
+        return match ($timeRange) {
+            'daily' => now()->subDays(7),
+            'weekly' => now()->subWeeks(4),
+            'monthly' => now()->subMonths(12),
+            default => now()->subDays(7)
         };
-
-        return response()->json($data);
-    }
-
-    /**
-     * Override to add domain scoping to weekly data
-     */
-    protected function getWeeklyData(): array
-    {
-        $startOfWeek = Carbon::now()->startOfWeek();
-        $endOfWeek = Carbon::now()->endOfWeek();
-
-        $days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        $categories = [];
-        $salesData = [];
-        $transactionsData = [];
-
-        for ($i = 0; $i < 7; $i++) {
-            $currentDay = $startOfWeek->copy()->addDays($i);
-            $categories[] = $days[$i];
-
-            $dayData = $this->getDaySalesData($currentDay);
-            $salesData[] = $dayData['sales'];
-            $transactionsData[] = $dayData['transactions'];
-        }
-
-        return [
-            'categories' => $categories,
-            'salesData' => $salesData,
-            'transactionsData' => $transactionsData
-        ];
-    }
-
-    /**
-     * Override to add domain scoping to monthly data
-     */
-    protected function getMonthlyData(): array
-    {
-        $startOfMonth = Carbon::now()->startOfMonth();
-        $endOfMonth = Carbon::now()->endOfMonth();
-
-        $weeks = [];
-        $salesData = [];
-        $transactionsData = [];
-
-        $currentWeek = 1;
-        $currentDate = $startOfMonth->copy();
-
-        while ($currentDate->lte($endOfMonth)) {
-            $weekStart = $currentDate->copy();
-            $weekEnd = $currentDate->copy()->addDays(6);
-
-            if ($weekEnd->gt($endOfMonth)) {
-                $weekEnd = $endOfMonth->copy();
-            }
-
-            $weeks[] = "Week {$currentWeek}";
-
-            $weekData = $this->getWeekSalesData($weekStart, $weekEnd);
-            $salesData[] = $weekData['sales'];
-            $transactionsData[] = $weekData['transactions'];
-
-            $currentDate->addWeek();
-            $currentWeek++;
-        }
-
-        return [
-            'categories' => $weeks,
-            'salesData' => $salesData,
-            'transactionsData' => $transactionsData
-        ];
-    }
-
-    /**
-     * Override to add domain scoping to yearly data
-     */
-    protected function getYearlyData(): array
-    {
-        $months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
-                  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        $salesData = [];
-        $transactionsData = [];
-
-        for ($month = 1; $month <= 12; $month++) {
-            $monthStart = Carbon::now()->year . '-' . str_pad($month, 2, '0', STR_PAD_LEFT) . '-01';
-            $monthEnd = Carbon::parse($monthStart)->endOfMonth();
-
-            $monthData = $this->getMonthSalesData($monthStart, $monthEnd);
-            $salesData[] = $monthData['sales'];
-            $transactionsData[] = $monthData['transactions'];
-        }
-
-        return [
-            'categories' => $months,
-            'salesData' => $salesData,
-            'transactionsData' => $transactionsData
-        ];
-    }
-
-    /**
-     * Override to add domain and location scoping to day sales data
-     */
-    protected function getDaySalesData(Carbon $date): array
-    {
-        $query = Sale::whereDate('created_at', $date->format('Y-m-d'))
-            ->where('payment_status', 'paid');
-
-        // Apply domain and location scoping
-        $this->applyScoping($query);
-
-        $sales = $query->sum('grand_total');
-        $transactions = $query->count();
-
-        return [
-            'sales' => (float) $sales,
-            'transactions' => $transactions
-        ];
-    }
-
-    /**
-     * Override to add domain and location scoping to week sales data
-     */
-    protected function getWeekSalesData(Carbon $startDate, Carbon $endDate): array
-    {
-        $query = Sale::whereBetween('created_at', [$startDate, $endDate])
-            ->where('payment_status', 'paid');
-
-        // Apply domain and location scoping
-        $this->applyScoping($query);
-
-        $sales = $query->sum('grand_total');
-        $transactions = $query->count();
-
-        return [
-            'sales' => (float) $sales,
-            'transactions' => $transactions
-        ];
-    }
-
-    /**
-     * Override to add domain and location scoping to month sales data
-     */
-    protected function getMonthSalesData(string $startDate, Carbon $endDate): array
-    {
-        $query = Sale::whereBetween('created_at', [$startDate, $endDate])
-            ->where('payment_status', 'paid');
-
-        // Apply domain and location scoping
-        $this->applyScoping($query);
-
-        $sales = $query->sum('grand_total');
-        $transactions = $query->count();
-
-        return [
-            'sales' => (float) $sales,
-            'transactions' => $transactions
-        ];
     }
 }
