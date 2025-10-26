@@ -16,6 +16,7 @@ import FilterDropdown from "@/Components/filters/FilterDropdown.vue";
 import ActiveFilters from "@/Components/filters/ActiveFilters.vue";
 import ProductTable from "./components/ProductTable.vue";
 import AddModal from "./components/AddModal.vue";
+import LocationInfoAlert from "@/Components/LocationInfoAlert.vue";
 
 const page = usePage();
 const { showModal } = useHelpers();
@@ -147,6 +148,10 @@ const { pagination, handleTableChange } = useTable("items", tableFilters);
             () => Object.keys(filters).forEach((k) => (filters[k] = null))
           "
         />
+      </template>
+
+      <template #activeStore>
+        <LocationInfoAlert />
       </template>
 
       <!-- Table -->

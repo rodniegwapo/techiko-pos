@@ -16,6 +16,7 @@ import FilterDropdown from "@/Components/filters/FilterDropdown.vue";
 import ActiveFilters from "@/Components/filters/ActiveFilters.vue";
 import CustomerTable from "./components/CustomerTable.vue";
 import AddCustomerModal from "./components/AddCustomerModal.vue";
+import LocationInfoAlert from "@/Components/LocationInfoAlert.vue";
 import CustomerDetailsModal from "./components/CustomerDetailsModal.vue";
 
 const page = usePage();
@@ -207,6 +208,10 @@ console.log("Items prop:", props.items);
             () => Object.keys(filters).forEach((k) => (filters[k] = null))
           "
         />
+      </template>
+
+      <template #activeStore>
+        <LocationInfoAlert />
       </template>
 
       <template #table>
