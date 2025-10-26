@@ -9,6 +9,7 @@ use App\Models\InventoryLocation;
 use App\Models\Product\Product;
 use App\Models\StockAdjustment;
 use App\Services\InventoryService;
+use App\Helpers;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -21,16 +22,7 @@ class StockAdjustmentController extends Controller
      */
     public function index(Request $request, Domain $domain)
     {
-        $user = auth()->user();
-        
-        // Apply role-based location filtering
-        $effectiveLocationId = $user->getEffectiveLocationId($request->input('location_id'));
-        
-        $location = $effectiveLocationId
-            ? InventoryLocation::forDomain($domain->name_slug)->findOrFail($effectiveLocationId)
-            : (InventoryLocation::active()->forDomain($domain->name_slug)->where('is_default', true)->first() 
-               ?? InventoryLocation::active()->forDomain($domain->name_slug)->first() 
-               ?? InventoryLocation::getDefault());
+        $location = Helpers::getEffectiveLocation($domain, $request->input('location_id'));
 
         $query = StockAdjustment::with(['location', 'createdBy', 'approvedBy'])
             ->withCount('items')

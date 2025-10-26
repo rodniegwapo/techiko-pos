@@ -22,7 +22,7 @@ class InventoryController extends Controller
     public function index(Request $request, Domain $domain)
     {
         $slug = $domain->name_slug;
-        $location = Helpers::getEffectiveLocation($domain, $request->input('location_id'));
+        $location = Helpers::getEffectiveLocation($domain);
 
         $report = $this->inventoryService->getInventoryReport($location, $slug);
 
@@ -40,7 +40,7 @@ class InventoryController extends Controller
 
         $query = ProductInventory::with(['product', 'location'])
             ->where('location_id', $location->id)
-            ->whereHas('product', function($q) use ($slug) {
+            ->whereHas('product', function ($q) use ($slug) {
                 $q->where('domain', $slug);
             });
 
@@ -97,7 +97,7 @@ class InventoryController extends Controller
             'inventories' => ProductInventoryResource::collection($inventories),
             'locations' => InventoryLocation::active()->forDomain($slug)->get(),
             'categories' => \App\Models\Category::where('domain', $slug)
-                ->whereHas('products.inventories', function($query) use ($location) {
+                ->whereHas('products.inventories', function ($query) use ($location) {
                     $query->where('location_id', $location->id);
                 })
                 ->get(),
@@ -109,16 +109,7 @@ class InventoryController extends Controller
     public function movements(Request $request, Domain $domain)
     {
         $slug = $domain->name_slug;
-        $user = auth()->user();
-
-        // Apply role-based location filtering
-        $effectiveLocationId = $user->getEffectiveLocationId($request->input('location_id'));
-        
-        $location = $effectiveLocationId
-            ? InventoryLocation::forDomain($slug)->findOrFail($effectiveLocationId)
-            : (InventoryLocation::active()->forDomain($slug)->where('is_default', true)->first() 
-               ?? InventoryLocation::active()->forDomain($slug)->first() 
-               ?? InventoryLocation::getDefault());
+        $location = Helpers::getEffectiveLocation($domain, $request->input('location_id'));
 
         $query = InventoryMovement::query()
             ->where('domain', $slug)
@@ -192,21 +183,12 @@ class InventoryController extends Controller
     public function valuation(Request $request, Domain $domain)
     {
         $slug = $domain->name_slug;
-        $user = auth()->user();
-
-        // Apply role-based location filtering
-        $effectiveLocationId = $user->getEffectiveLocationId($request->input('location_id'));
-        
-        $location = $effectiveLocationId
-            ? InventoryLocation::forDomain($slug)->findOrFail($effectiveLocationId)
-            : (InventoryLocation::active()->forDomain($slug)->where('is_default', true)->first() 
-               ?? InventoryLocation::active()->forDomain($slug)->first() 
-               ?? InventoryLocation::getDefault());
+        $location = Helpers::getEffectiveLocation($domain, $request->input('location_id'));
 
         $inventories = ProductInventory::with('product')
             ->where('location_id', $location->id)
             ->where('quantity_on_hand', '>', 0)
-            ->whereHas('product', function($q) use ($slug) {
+            ->whereHas('product', function ($q) use ($slug) {
                 $q->where('domain', $slug);
             })
             ->get();

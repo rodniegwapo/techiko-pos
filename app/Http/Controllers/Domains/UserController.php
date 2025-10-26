@@ -8,6 +8,7 @@ use App\Models\Domain;
 use App\Models\User;
 use App\Services\UserHierarchyService;
 use App\Services\UserService;
+use App\Helpers;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -41,13 +42,7 @@ class UserController extends Controller
         $roles = $this->userService->getManageableRoles($currentUser);
 
         // Get current location and available locations for the alert
-        $user = auth()->user();
-        $effectiveLocationId = $user->getEffectiveLocationId($request->input('location_id'));
-        $currentLocation = $effectiveLocationId
-            ? \App\Models\InventoryLocation::forDomain($domain->name_slug)->findOrFail($effectiveLocationId)
-            : (\App\Models\InventoryLocation::active()->forDomain($domain->name_slug)->where('is_default', true)->first() 
-               ?? \App\Models\InventoryLocation::active()->forDomain($domain->name_slug)->first() 
-               ?? \App\Models\InventoryLocation::getDefault());
+        $currentLocation = Helpers::getEffectiveLocation($domain, $request->input('location_id'));
 
         return Inertia::render('Users/Index', [
             'items' => UserResource::collection($users),
