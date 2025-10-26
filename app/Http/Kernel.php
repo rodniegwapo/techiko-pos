@@ -79,5 +79,6 @@ class Kernel extends HttpKernel
         'check.permission' => \App\Http\Middleware\CheckPermission::class,
         'check.super.user' => \App\Http\Middleware\CheckSuperUser::class,
         'user.permission' => \App\Http\Middleware\UserPermissionCheckMiddleware::class,
+        'role.access' => \App\Http\Middleware\RoleBasedAccessControl::class,
     ];
 }

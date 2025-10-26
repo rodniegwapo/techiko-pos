@@ -21,9 +21,13 @@ class InventoryController extends Controller
     public function index(Request $request, Domain $domain)
     {
         $slug = $domain->name_slug;
+        $user = auth()->user();
 
-        $location = $request->location_id
-            ? InventoryLocation::forDomain($slug)->findOrFail($request->location_id)
+        // Apply role-based location filtering
+        $effectiveLocationId = $user->getEffectiveLocationId($request->input('location_id'));
+        
+        $location = $effectiveLocationId
+            ? InventoryLocation::forDomain($slug)->findOrFail($effectiveLocationId)
             : (InventoryLocation::active()->forDomain($slug)->first() ?? InventoryLocation::getDefault());
 
         $report = $this->inventoryService->getInventoryReport($location, $slug);
@@ -40,13 +44,20 @@ class InventoryController extends Controller
     public function products(Request $request, Domain $domain)
     {
         $slug = $domain->name_slug;
+        $user = auth()->user();
 
-        $location = $request->location_id
-            ? InventoryLocation::forDomain($slug)->findOrFail($request->location_id)
+        // Apply role-based location filtering
+        $effectiveLocationId = $user->getEffectiveLocationId($request->input('location_id'));
+        
+        $location = $effectiveLocationId
+            ? InventoryLocation::forDomain($slug)->findOrFail($effectiveLocationId)
             : (InventoryLocation::active()->forDomain($slug)->first() ?? InventoryLocation::getDefault());
 
         $query = ProductInventory::with(['product', 'location'])
-            ->where('location_id', $location->id);
+            ->where('location_id', $location->id)
+            ->whereHas('product', function($q) use ($slug) {
+                $q->where('domain', $slug);
+            });
 
         if ($request->search) {
             $query->whereHas('product', fn($q) => $q->search($request->search));
@@ -140,7 +151,7 @@ class InventoryController extends Controller
         return Inertia::render('Inventory/Movements', [
             'movements' => InventoryMovementResource::collection($movements),
             'locations' => InventoryLocation::active()->forDomain($slug)->get(),
-            'products' => Product::select('id', 'name', 'SKU')->get(),
+            'products' => Product::select('id', 'name', 'SKU')->where('domain', $slug)->get(),
             'domains' => Domain::select('id', 'name', 'name_slug')->get(),
             'movementTypes' => [
                 'sale' => 'Sale',
@@ -187,13 +198,21 @@ class InventoryController extends Controller
     public function valuation(Request $request, Domain $domain)
     {
         $slug = $domain->name_slug;
-        $location = $request->location_id
-            ? InventoryLocation::forDomain($slug)->findOrFail($request->location_id)
+        $user = auth()->user();
+
+        // Apply role-based location filtering
+        $effectiveLocationId = $user->getEffectiveLocationId($request->input('location_id'));
+        
+        $location = $effectiveLocationId
+            ? InventoryLocation::forDomain($slug)->findOrFail($effectiveLocationId)
             : (InventoryLocation::active()->forDomain($slug)->first() ?? InventoryLocation::getDefault());
 
         $inventories = ProductInventory::with('product')
             ->where('location_id', $location->id)
             ->where('quantity_on_hand', '>', 0)
+            ->whereHas('product', function($q) use ($slug) {
+                $q->where('domain', $slug);
+            })
             ->get();
 
         $totalValue = $inventories->sum('total_value');
@@ -263,7 +282,7 @@ class InventoryController extends Controller
             'notes' => 'nullable|string|max:500',
         ]);
 
-        $product = Product::findOrFail($validated['product_id']);
+        $product = Product::where('domain', $domain->name_slug)->findOrFail($validated['product_id']);
         $fromLocation = InventoryLocation::forDomain($domain->name_slug)->findOrFail($validated['from_location_id']);
         $toLocation = InventoryLocation::forDomain($domain->name_slug)->findOrFail($validated['to_location_id']);
 

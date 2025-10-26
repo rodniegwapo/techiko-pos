@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Events\OrderUpdated;
 use App\Events\CustomerUpdated;
 use App\Models\Product\Discount;
+use App\Models\InventoryLocation;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -48,6 +49,11 @@ class Sale extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function location()
+    {
+        return $this->belongsTo(InventoryLocation::class);
     }
 
     public function recalcTotals(): void
