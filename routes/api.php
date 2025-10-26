@@ -11,8 +11,7 @@ use App\Http\Controllers\{
     UserController,
     InventoryController,
     StockAdjustmentController,
-    InventoryLocationController,
-    Api\DashboardController
+    InventoryLocationController
 };
 
 /*
@@ -99,14 +98,6 @@ Route::middleware(['auth:sanctum', 'user.permission'])->group(function () {
     ]);
 
 
-    /**
-     * -----------------------
-     * Dashboard Routes
-     * -----------------------
-     */
-    Route::prefix('dashboard')->name('dashboard.')->group(function () {
-        Route::post('/sales-chart', [DashboardController::class, 'getSalesChartData'])->name('sales-chart');
-    });
 
 
     /**

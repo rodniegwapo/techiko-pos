@@ -26,7 +26,114 @@ export function useSalesChartData(graphFilter, selectedLocation) {
         }
     };
 
+    // Process raw data from backend into chart format
+    const processRawData = (rawData, timeRange) => {
+        // Transform raw sales data to match your useGraphCategories format
+        const formattedData = rawData.map(sale => ({
+            date_time: sale.created_at,
+            grand_total: parseFloat(sale.grand_total),
+            payment_method: sale.payment_method
+        }));
+
+        // Use your graph categories logic here
+        // For now, let's create a simple format that matches the expected structure
+        const categories = [];
+        const salesData = [];
+        const transactionsData = [];
+
+        // Group data by time period based on timeRange
+        if (timeRange === 'daily') {
+            // Group by day for last 7 days
+            const days = Array.from({ length: 7 }, (_, i) => {
+                const date = new Date();
+                date.setDate(date.getDate() - (6 - i));
+                return date.toISOString().split('T')[0];
+            });
+
+            categories.push(...days.map(day => {
+                const date = new Date(day);
+                return date.toLocaleDateString('en-US', { weekday: 'short' });
+            }));
+
+            days.forEach(day => {
+                const daySales = formattedData.filter(sale => 
+                    sale.date_time.startsWith(day)
+                );
+                const totalSales = daySales.reduce((sum, sale) => sum + sale.grand_total, 0);
+                const transactionCount = daySales.length;
+                
+                salesData.push(totalSales);
+                transactionsData.push(transactionCount);
+            });
+        } else if (timeRange === 'weekly') {
+            // Group by week for last 4 weeks
+            const weeks = Array.from({ length: 4 }, (_, i) => {
+                const date = new Date();
+                date.setDate(date.getDate() - (7 * (3 - i)));
+                return date;
+            });
+
+            categories.push(...weeks.map((_, i) => `${3 - i} week${3 - i > 1 ? 's' : ''} ago`));
+
+            weeks.forEach(week => {
+                const weekStart = new Date(week);
+                const weekEnd = new Date(week);
+                weekEnd.setDate(weekEnd.getDate() + 6);
+
+                const weekSales = formattedData.filter(sale => {
+                    const saleDate = new Date(sale.date_time);
+                    return saleDate >= weekStart && saleDate <= weekEnd;
+                });
+                
+                const totalSales = weekSales.reduce((sum, sale) => sum + sale.grand_total, 0);
+                const transactionCount = weekSales.length;
+                
+                salesData.push(totalSales);
+                transactionsData.push(transactionCount);
+            });
+        } else if (timeRange === 'monthly') {
+            // Group by month for last 12 months
+            const months = Array.from({ length: 12 }, (_, i) => {
+                const date = new Date();
+                date.setMonth(date.getMonth() - (11 - i));
+                return date;
+            });
+
+            categories.push(...months.map(month => 
+                month.toLocaleDateString('en-US', { month: 'short' })
+            ));
+
+            months.forEach(month => {
+                const monthStart = new Date(month.getFullYear(), month.getMonth(), 1);
+                const monthEnd = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+
+                const monthSales = formattedData.filter(sale => {
+                    const saleDate = new Date(sale.date_time);
+                    return saleDate >= monthStart && saleDate <= monthEnd;
+                });
+                
+                const totalSales = monthSales.reduce((sum, sale) => sum + sale.grand_total, 0);
+                const transactionCount = monthSales.length;
+                
+                salesData.push(totalSales);
+                transactionsData.push(transactionCount);
+            });
+        }
+
+        return {
+            categories,
+            salesData,
+            transactionsData
+        };
+    };
+
     const fetchChartData = async () => {
+        console.log('fetchChartData called with:', {
+            route: getRoute('dashboard.sales-chart'),
+            time_range: graphFilter.value,
+            location_id: selectedLocation?.value || null
+        });
+
         isLoading.value = true;
 
         try {
@@ -39,8 +146,9 @@ export function useSalesChartData(graphFilter, selectedLocation) {
                 }
             );
 
-            if (response.data) {
-                chartData.value = response.data;
+            if (response.data && response.data.raw_data) {
+                // Process raw data using your graph categories logic
+                chartData.value = processRawData(response.data.raw_data, response.data.time_range);
             } else {
                 // Fallback to generated data if API fails
                 chartData.value = generateFallbackData();
@@ -56,10 +164,13 @@ export function useSalesChartData(graphFilter, selectedLocation) {
     // Watch for changes in filter or location to fetch new data
     watch(
         [graphFilter, selectedLocation],
-        () => {
-            fetchChartData();
+        (newValues, oldValues) => {
+            // Only fetch if values actually changed (not on initial mount)
+            if (oldValues && oldValues.length > 0) {
+                fetchChartData();
+            }
         },
-        { immediate: true }
+        { immediate: false }
     );
 
     // Weekly view: Monday to Sunday of current week
