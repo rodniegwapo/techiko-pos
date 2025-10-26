@@ -11,6 +11,7 @@ use App\Models\InventoryMovement;
 use App\Models\Product\Product;
 use App\Models\ProductInventory;
 use App\Services\InventoryService;
+use App\Helpers;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -21,16 +22,7 @@ class InventoryController extends Controller
     public function index(Request $request, Domain $domain)
     {
         $slug = $domain->name_slug;
-        $user = auth()->user();
-
-        // Apply role-based location filtering
-        $effectiveLocationId = $user->getEffectiveLocationId($request->input('location_id'));
-        
-        $location = $effectiveLocationId
-            ? InventoryLocation::forDomain($slug)->findOrFail($effectiveLocationId)
-            : (InventoryLocation::active()->forDomain($slug)->where('is_default', true)->first() 
-               ?? InventoryLocation::active()->forDomain($slug)->first() 
-               ?? InventoryLocation::getDefault());
+        $location = Helpers::getEffectiveLocation($domain, $request->input('location_id'));
 
         $report = $this->inventoryService->getInventoryReport($location, $slug);
 
@@ -44,16 +36,7 @@ class InventoryController extends Controller
     public function products(Request $request, Domain $domain)
     {
         $slug = $domain->name_slug;
-        $user = auth()->user();
-
-        // Apply role-based location filtering
-        $effectiveLocationId = $user->getEffectiveLocationId($request->input('location_id'));
-        
-        $location = $effectiveLocationId
-            ? InventoryLocation::forDomain($slug)->findOrFail($effectiveLocationId)
-            : (InventoryLocation::active()->forDomain($slug)->where('is_default', true)->first() 
-               ?? InventoryLocation::active()->forDomain($slug)->first() 
-               ?? InventoryLocation::getDefault());
+        $location = Helpers::getEffectiveLocation($domain, $request->input('location_id'));
 
         $query = ProductInventory::with(['product', 'location'])
             ->where('location_id', $location->id)
