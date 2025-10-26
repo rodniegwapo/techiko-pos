@@ -45,7 +45,8 @@ class Product extends Model
     // }
 
     // Add scope for easy domain filtering
-    public function scopeForDomain($query, $domain) {
+    public function scopeForDomain($query, $domain)
+    {
         return $query->where('domain', $domain);
     }
 
@@ -54,10 +55,17 @@ class Product extends Model
         return $this->belongsTo(Category::class);
     }
 
+    public function location()
+    {
+        return $this->belongsTo(InventoryLocation::class);
+    }
+
     public function saleitems()
     {
         return $this->hasMany(SaleItem::class);
     }
+
+
 
     /**
      * Get the inventory records for this product
@@ -157,7 +165,7 @@ class Product extends Model
         }
 
         $totalAvailable = $this->getTotalAvailableQuantityAttribute();
-        
+
         if ($totalAvailable <= 0) {
             return 'out_of_stock';
         }
@@ -185,7 +193,7 @@ class Product extends Model
         if ($location) {
             return $query->whereHas('inventories', function ($q) use ($location) {
                 $q->where('location_id', $location->id)
-                  ->where('quantity_available', '>', 0);
+                    ->where('quantity_available', '>', 0);
             });
         }
 
@@ -204,7 +212,7 @@ class Product extends Model
         if ($location) {
             return $query->whereHas('inventories', function ($q) use ($location) {
                 $q->where('location_id', $location->id)
-                  ->whereRaw('quantity_available <= products.reorder_level');
+                    ->whereRaw('quantity_available <= products.reorder_level');
             });
         }
 
@@ -221,7 +229,7 @@ class Product extends Model
         if ($location) {
             return $query->whereHas('inventories', function ($q) use ($location) {
                 $q->where('location_id', $location->id)
-                  ->where('quantity_available', '<=', 0);
+                    ->where('quantity_available', '<=', 0);
             });
         }
 

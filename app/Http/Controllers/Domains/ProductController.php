@@ -6,7 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\ProductResource;
 use App\Models\Domain;
 use App\Models\Product\Product;
+use App\Models\ProductInventory;
 use App\Models\Category;
+use App\Models\InventoryLocation;
+use App\Helpers;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -17,11 +20,12 @@ class ProductController extends Controller
      */
     public function index(Request $request, Domain $domain = null)
     {
+        $location = Helpers::getEffectiveLocation($domain, $request->input('location_id'));
+        // Simple query - much cleaner!
         $query = Product::query()
             ->with('category')
-            ->when($domain, function ($query) use ($domain) {
-                return $query->where('domain', $domain->name_slug);
-            })
+            ->where('domain', $domain->name_slug)
+            ->where('location_id', $location->id)
             ->when($request->search, fn($q, $s) => $q->search($s))
             ->when($request->category, function ($query, $category) {
                 return $query->whereHas('category', function ($q) use ($category) {
@@ -31,20 +35,10 @@ class ProductController extends Controller
 
         $products = $query->latest()->paginate(15);
 
-        // Get categories for the domain
-        $categories = Category::query()
-            ->where('domain', $domain->name_slug)
-            ->get();
-
-        // Get sold types
-        $soldByTypes = \App\Models\Product\ProductSoldType::all();
-
         return Inertia::render('Products/Index', [
-            // Frontend expects `items` with a paginated resource
             'items' => ProductResource::collection($products),
-            'categories' => $categories,
-            'sold_by_types' => $soldByTypes,
-            'currentDomain' => $domain,
+            'categories' => Category::where('domain', $domain->name_slug)->get(),
+            'sold_by_types' => \App\Models\Product\ProductSoldType::all(),
             'isGlobalView' => !$domain,
         ]);
     }
@@ -71,6 +65,11 @@ class ProductController extends Controller
         if ($domain) {
             $validated['domain'] = $domain->name_slug;
         }
+
+        // Get effective location for the product
+        $location = Helpers::getEffectiveLocation($domain, $request->input('location_id'));
+        $validated['location_id'] = $location->id;
+
         $product = Product::create($validated);
 
         return redirect()->back()->with('success', 'Product created successfully');
