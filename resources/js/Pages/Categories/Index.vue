@@ -14,6 +14,7 @@ import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { watchDebounced } from "@vueuse/core";
 import { router } from "@inertiajs/vue3";
 import { useHelpers } from "@/Composables/useHelpers";
+import LocationInfoAlert from "@/Components/LocationInfoAlert.vue";
 
 const page = usePage();
 const { openModal, isEdit } = useGlobalVariables();
@@ -69,6 +70,10 @@ const { pagination, handleTableChange ,spinning} = useTable("items", tableFilter
           </template>
           Create Category
         </a-button>
+      </template>
+
+      <template #activeStore>
+        <LocationInfoAlert />
       </template>
 
       <template #table>

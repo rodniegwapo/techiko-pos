@@ -11,7 +11,6 @@ import ActiveFilters from "@/Components/filters/ActiveFilters.vue";
 import ProductTable from "./components/ProductTable.vue";
 import CustomerOrder from "./components/CustomerOrder.vue";
 import TotalAmountSection from "./components/TotalAmountSection.vue";
-import LocationInfoAlert from "@/Components/LocationInfoAlert.vue";
 
 import {
     CloseOutlined,
@@ -36,91 +35,109 @@ const orderId = ref(null);
 const orders = ref([]);
 const currentSale = ref(null);
 const orderDiscountAmount = ref(0);
-const orderDiscountId = ref('');
+const orderDiscountId = ref("");
 const isLoadingCart = ref(false);
 const discountOptions = ref({
     product_discount_options: [],
     promotional_discount_options: [],
-    mandatory_discount_options: []
+    mandatory_discount_options: [],
 });
 
 // Direct API functions
 const loadCurrentPendingSale = async () => {
     isLoadingCart.value = true;
-    
+
     try {
         const userId = page.props.auth.user.data.id;
         const route = getRoute("users.sales.current-pending", { user: userId });
-        console.log('Loading user pending sale, Route:', route);
+        console.log("Loading user pending sale, Route:", route);
         const response = await axios.get(route);
-        console.log('User pending sale API response:', response.data);
-        
+        console.log("User pending sale API response:", response.data);
+
         if (response.data.sale) {
-            const { sale, items, discounts, totals, discount_options } = response.data;
-            
+            const { sale, items, discounts, totals, discount_options } =
+                response.data;
+
             // Set the orderId from the found sale
             orderId.value = sale.id;
-            
+
             // Store the full sale object for the modal
             currentSale.value = sale;
-            console.log('Stored current sale:', currentSale.value);
-            
+            console.log("Stored current sale:", currentSale.value);
+
             // Store discount options for modals
             if (discount_options) {
                 discountOptions.value = discount_options;
-                console.log('Loaded discount options:', discount_options);
-                console.log('Product discount options:', discount_options.product_discount_options);
-                console.log('Promotional discount options:', discount_options.promotional_discount_options);
-                console.log('Mandatory discount options:', discount_options.mandatory_discount_options);
+                console.log("Loaded discount options:", discount_options);
+                console.log(
+                    "Product discount options:",
+                    discount_options.product_discount_options
+                );
+                console.log(
+                    "Promotional discount options:",
+                    discount_options.promotional_discount_options
+                );
+                console.log(
+                    "Mandatory discount options:",
+                    discount_options.mandatory_discount_options
+                );
             }
-            
+
             // Transform database response to match frontend expectations
             orders.value = transformCartItems(items);
-            orderDiscountAmount.value = parseFloat(totals?.discount_amount) || 0;
-            orderDiscountId.value = discounts?.map(d => d.discount_id).join(',') || '';
-            
-            console.log('User pending sale loaded:', { sale, items, totals });
-            console.log('Updated orders array from loadCurrentPendingSale:', orders.value);
-            
+            orderDiscountAmount.value =
+                parseFloat(totals?.discount_amount) || 0;
+            orderDiscountId.value =
+                discounts?.map((d) => d.discount_id).join(",") || "";
+
+            console.log("User pending sale loaded:", { sale, items, totals });
+            console.log(
+                "Updated orders array from loadCurrentPendingSale:",
+                orders.value
+            );
+
             // Log product-level discounts for debugging
-            const productsWithDiscounts = orders.value.filter(order => 
-                order.discount_id || order.discount_amount > 0
+            const productsWithDiscounts = orders.value.filter(
+                (order) => order.discount_id || order.discount_amount > 0
             );
             if (productsWithDiscounts.length > 0) {
-                console.log('Products with discounts loaded:', productsWithDiscounts);
+                console.log(
+                    "Products with discounts loaded:",
+                    productsWithDiscounts
+                );
             } else {
-                console.log('No product-level discounts found');
+                console.log("No product-level discounts found");
             }
-            
+
             // Log order-level discounts for debugging
             if (orderDiscountAmount.value > 0) {
-                console.log('Order-level discount loaded:', {
+                console.log("Order-level discount loaded:", {
                     amount: orderDiscountAmount.value,
-                    discount_ids: orderDiscountId.value
+                    discount_ids: orderDiscountId.value,
                 });
             } else {
-                console.log('No order-level discounts found');
+                console.log("No order-level discounts found");
             }
         } else {
-            console.log('No pending sale found for user');
+            console.log("No pending sale found for user");
             orderId.value = null;
             orders.value = [];
             orderDiscountAmount.value = 0;
-            orderDiscountId.value = '';
+            orderDiscountId.value = "";
         }
     } catch (error) {
-        console.error('Failed to load current pending sale:', error);
+        console.error("Failed to load current pending sale:", error);
         orderId.value = null;
         orders.value = [];
         orderDiscountAmount.value = 0;
-        orderDiscountId.value = '';
+        orderDiscountId.value = "";
     } finally {
         isLoadingCart.value = false;
     }
 };
 
 const createDraft = async () => {
-    console.log('createDraft called - now handled by user-specific routes');
+    console.log("createDraft called - now handled by user-specific routes");
     // This function is no longer needed as user-specific routes handle sale creation automatically
     return orderId.value;
 };
@@ -128,19 +145,19 @@ const createDraft = async () => {
 // Utility function to transform cart items
 const transformCartItems = (items) => {
     if (!items || !Array.isArray(items)) {
-        console.warn('transformCartItems received invalid items:', items);
+        console.warn("transformCartItems received invalid items:", items);
         return [];
     }
-    
-    return items.map(item => {
-        console.log('Transforming item:', item);
-        console.log('Product data:', item.product);
-        console.log('Product name:', item.product?.name);
-        console.log('Product ID:', item.product_id);
-        
-        const productName = item.product?.name || 'Unknown Product';
-        console.log('Final product name:', productName);
-        
+
+    return items.map((item) => {
+        console.log("Transforming item:", item);
+        console.log("Product data:", item.product);
+        console.log("Product name:", item.product?.name);
+        console.log("Product ID:", item.product_id);
+
+        const productName = item.product?.name || "Unknown Product";
+        console.log("Final product name:", productName);
+
         return {
             id: item.product_id,
             name: productName,
@@ -167,24 +184,31 @@ const handleCustomerChanged = async (customer) => {
     // Only load pending sale when customer is selected
     if (customer) {
         try {
-            console.log('Customer selected, loading pending sale...');
+            console.log("Customer selected, loading pending sale...");
             await loadCurrentPendingSale();
-            
+
             // If no pending sale found, create a new draft
             if (!orderId.value) {
-                console.log('No pending sale found, creating new draft...');
+                console.log("No pending sale found, creating new draft...");
                 await createDraft();
             }
-            
-            console.log('Assigning customer to sale:', { orderId: orderId.value, customer: customer?.id });
-            
+
+            console.log("Assigning customer to sale:", {
+                orderId: orderId.value,
+                customer: customer?.id,
+            });
+
             if (!orderId.value) {
-                console.error('OrderId is null or undefined after createDraft!');
-                throw new Error('No order ID available');
+                console.error(
+                    "OrderId is null or undefined after createDraft!"
+                );
+                throw new Error("No order ID available");
             }
-            
-            const route = getRoute("sales.sales.assignCustomer", { sale: orderId.value });
-            console.log('Generated route:', route);
+
+            const route = getRoute("sales.sales.assignCustomer", {
+                sale: orderId.value,
+            });
+            console.log("Generated route:", route);
             await axios.post(route, {
                 customer_id: customer?.id || null,
             });
@@ -192,7 +216,7 @@ const handleCustomerChanged = async (customer) => {
             console.error("Error handling customer selection:", error);
         }
     } else {
-        console.log('Customer deselected - keeping current order state');
+        console.log("Customer deselected - keeping current order state");
     }
 };
 
@@ -214,24 +238,28 @@ const filtersConfig = [
 const products = ref([]);
 const loading = ref(false);
 onMounted(async () => {
-    console.log('Sales page loaded - checking for existing pending sale');
-    
+    console.log("Sales page loaded - checking for existing pending sale");
+
     // Load products first
     getProducts();
-    
+
     // Auto-load current user's pending sale on page reload
     try {
-        console.log('Auto-loading current user pending sale...');
+        console.log("Auto-loading current user pending sale...");
         await loadCurrentPendingSale();
-        
+
         if (orderId.value) {
-            console.log('Found existing pending sale:', orderId.value);
-            console.log('Cart state automatically loaded with items and discounts');
+            console.log("Found existing pending sale:", orderId.value);
+            console.log(
+                "Cart state automatically loaded with items and discounts"
+            );
         } else {
-            console.log('No pending sale found - waiting for customer selection');
+            console.log(
+                "No pending sale found - waiting for customer selection"
+            );
         }
     } catch (error) {
-        console.error('Failed to auto-load pending sale:', error);
+        console.error("Failed to auto-load pending sale:", error);
         // Continue normally - user can still create new orders
     }
 });
@@ -272,7 +300,7 @@ watchDebounced(search, getProducts, { debounce: 300 });
     <AuthenticatedLayout>
         <Head title="Sales" />
         <ContentHeader title="Sales" />
-        <LocationInfoAlert />
+
         <ContentLayoutV2 title="Create Transaction">
             <template #filters>
                 <a-input-search
@@ -298,8 +326,8 @@ watchDebounced(search, getProducts, { debounce: 300 });
             </template>
 
             <template #table>
-                <ProductTable 
-                    :products="products" 
+                <ProductTable
+                    :products="products"
                     :loading="loading"
                     :orders="orders"
                     :orderId="orderId"
@@ -307,8 +335,8 @@ watchDebounced(search, getProducts, { debounce: 300 });
                 />
             </template>
             <template #right-side-content>
-                <customer-order 
-                    @customer-changed="handleCustomerChanged" 
+                <customer-order
+                    @customer-changed="handleCustomerChanged"
                     @discount-applied="loadCurrentPendingSale"
                     @cart-updated="loadCurrentPendingSale"
                     :loading="isLoadingCart"
@@ -321,7 +349,7 @@ watchDebounced(search, getProducts, { debounce: 300 });
             </template>
         </ContentLayoutV2>
         <template #content-footer>
-            <total-amount-section 
+            <total-amount-section
                 :selected-customer="selectedCustomer"
                 :orders="orders"
                 :currentSale="currentSale"
