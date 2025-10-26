@@ -8,6 +8,11 @@ Route::prefix('domains/{domain:name_slug}')
     ->group(function () {
         // Dashboard (Organization-specific)
         Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
+        
+        // Dashboard API routes (Organization-specific)
+        Route::prefix('api/dashboard')->name('dashboard.')->group(function () {
+            Route::post('/sales-chart', [\App\Http\Controllers\Domains\DashboardController::class, 'getSalesChartData'])->name('sales-chart');
+        });
 
         // Sales (Organization-specific)
         Route::get('/sales', [\App\Http\Controllers\Domains\SaleController::class, 'index'])->name('sales.index');

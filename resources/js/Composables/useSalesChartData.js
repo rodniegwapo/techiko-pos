@@ -1,7 +1,9 @@
 import { ref, computed, watch } from "vue";
 import { router } from "@inertiajs/vue3";
+import { useDomainRoutes } from "@/Composables/useDomainRoutes.js";
 
 export function useSalesChartData(graphFilter, selectedLocation) {
+    const { getRoute } = useDomainRoutes();
     const isLoading = ref(false);
     const chartData = ref({
         categories: [],
@@ -28,9 +30,9 @@ export function useSalesChartData(graphFilter, selectedLocation) {
         isLoading.value = true;
 
         try {
-            // Use global axios for better error handling and automatic CSRF token handling
+            // Use domain-aware routing for API calls
             const response = await window.axios.post(
-                "/api/dashboard/sales-chart",
+                getRoute('dashboard.sales-chart'),
                 {
                     time_range: graphFilter.value,
                     location_id: selectedLocation?.value || null,
