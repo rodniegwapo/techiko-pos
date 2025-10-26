@@ -22,7 +22,7 @@ class InventoryController extends Controller
     public function index(Request $request, Domain $domain)
     {
         $slug = $domain->name_slug;
-        $location = Helpers::getEffectiveLocation($domain);
+        $location = Helpers::getActiveLocation($domain);
 
         $report = $this->inventoryService->getInventoryReport($location, $slug);
 
@@ -36,7 +36,7 @@ class InventoryController extends Controller
     public function products(Request $request, Domain $domain)
     {
         $slug = $domain->name_slug;
-        $location = Helpers::getEffectiveLocation($domain, $request->input('location_id'));
+        $location = Helpers::getActiveLocation($domain, $request->input('location_id'));
 
         $query = ProductInventory::with(['product', 'location'])
             ->where('location_id', $location->id)
@@ -107,7 +107,7 @@ class InventoryController extends Controller
     public function movements(Request $request, Domain $domain)
     {
         $slug = $domain->name_slug;
-        $location = Helpers::getEffectiveLocation($domain, $request->input('location_id'));
+        $location = Helpers::getActiveLocation($domain, $request->input('location_id'));
 
         $query = InventoryMovement::query()
             ->where('domain', $slug)
@@ -181,7 +181,7 @@ class InventoryController extends Controller
     public function valuation(Request $request, Domain $domain)
     {
         $slug = $domain->name_slug;
-        $location = Helpers::getEffectiveLocation($domain, $request->input('location_id'));
+        $location = Helpers::getActiveLocation($domain, $request->input('location_id'));
 
         $inventories = ProductInventory::with('product')
             ->where('location_id', $location->id)

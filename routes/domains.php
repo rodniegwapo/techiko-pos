@@ -8,33 +8,33 @@ Route::prefix('domains/{domain:name_slug}')
     ->group(function () {
         // Dashboard (Organization-specific)
         Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
-        
+
         // Dashboard API routes (Organization-specific)
-        Route::prefix('api/dashboard')->name('dashboard.')->group(function () {
+        Route::prefix('dashboard')->name('dashboard.')->group(function () {
             Route::post('/sales-chart', [\App\Http\Controllers\Domains\DashboardController::class, 'getSalesChartData'])->name('sales-chart');
         });
 
         // Sales (Organization-specific)
         Route::get('/sales', [\App\Http\Controllers\Domains\SaleController::class, 'index'])->name('sales.index');
         Route::get('/sales/products', [\App\Http\Controllers\Domains\SaleController::class, 'products'])->name('sales.products');
-        
+
         // User-specific sales routes (handles "no sales id yet" case)
         Route::prefix('users/{user}')->name('users.')->group(function () {
             // Create new sale for user (when no sales id yet)
             Route::post('/sales', [\App\Http\Controllers\Domains\SaleController::class, 'createSaleForUser'])->name('sales.create');
-            
+
             // Add item to user's latest pending sale (auto-finds or creates)
             Route::post('/sales/cart/add', [\App\Http\Controllers\Domains\SaleController::class, 'addItemToUserCart'])->name('sales.cart.add');
-            
+
             // Get user's current pending sale
             Route::get('/sales/current-pending', [\App\Http\Controllers\Domains\SaleController::class, 'getUserPendingSale'])->name('sales.current-pending');
-            
+
             // Other cart operations for user's latest sale
             Route::patch('/sales/cart/update-quantity', [\App\Http\Controllers\Domains\SaleController::class, 'updateUserCartQuantity'])->name('sales.cart.update-quantity');
             Route::delete('/sales/cart/remove', [\App\Http\Controllers\Domains\SaleController::class, 'removeFromUserCart'])->name('sales.cart.remove');
             Route::get('/sales/cart/state', [\App\Http\Controllers\Domains\SaleController::class, 'getUserCartState'])->name('sales.cart.state');
         });
-        
+
         // Sales API routes (Organization-specific)
         Route::prefix('sales')->name('sales.')->group(function () {
             Route::post('/draft', [\App\Http\Controllers\Domains\SaleController::class, 'storeDraft'])->name('drafts.store');
@@ -49,12 +49,12 @@ Route::prefix('domains/{domain:name_slug}')
                 Route::delete('/{sale}/cart/remove', [\App\Http\Controllers\Domains\SaleController::class, 'removeItemFromCart'])->name('cart.remove');
                 Route::patch('/{sale}/cart/update-quantity', [\App\Http\Controllers\Domains\SaleController::class, 'updateItemQuantity'])->name('cart.update-quantity');
                 Route::get('/{sale}/cart/state', [\App\Http\Controllers\Domains\SaleController::class, 'getCartState'])->name('cart.state');
-                
+
                 // Discounts - database-driven
                 Route::get('/{sale}/discounts', [\App\Http\Controllers\Domains\SaleDiscountController::class, 'getSaleDiscounts'])->name('discounts.sale');
                 Route::patch('/{sale}/discounts', [\App\Http\Controllers\Domains\SaleDiscountController::class, 'updateSaleDiscounts'])->name('discounts.update');
                 Route::delete('/{sale}/discounts', [\App\Http\Controllers\Domains\SaleDiscountController::class, 'removeSaleDiscounts'])->name('discounts.remove');
-                
+
                 // Item-level discounts
                 Route::post('/{sale}/items/{saleItem}/discounts', [\App\Http\Controllers\Domains\SaleDiscountController::class, 'applyItemDiscount'])->name('items.discount.apply');
                 Route::delete('/{sale}/items/{saleItem}/discounts', [\App\Http\Controllers\Domains\SaleDiscountController::class, 'removeItemDiscount'])->name('items.discount.remove');
@@ -93,7 +93,7 @@ Route::prefix('domains/{domain:name_slug}')
         Route::get('/loyalty/customers', [\App\Http\Controllers\Domains\LoyaltyController::class, 'customers'])->name('loyalty.customers');
         Route::get('/loyalty/analytics', [\App\Http\Controllers\Domains\LoyaltyController::class, 'analytics'])->name('loyalty.analytics');
         Route::post('/loyalty/customers/{customer}/adjust-points', [\App\Http\Controllers\Domains\LoyaltyController::class, 'adjustPoints'])->name('loyalty.adjust-points');
-        
+
         // Tier Management (Organization-specific)
         Route::apiResource('loyalty/tiers', \App\Http\Controllers\Domains\LoyaltyTierController::class)->names([
             'index'   => 'loyalty.tiers.index',
@@ -112,17 +112,17 @@ Route::prefix('domains/{domain:name_slug}')
         Route::resource('users', \App\Http\Controllers\Domains\UserController::class)
             ->only(['index', 'store', 'update', 'destroy'])
             ->names('users');
-        
+
         // User Hierarchy (Organization-specific)
         Route::get('/users/hierarchy', [\App\Http\Controllers\Domains\UserController::class, 'hierarchy'])->name('users.hierarchy');
-        
+
         // Auto-assign supervisors (Organization-specific)
         Route::post('/supervisors/auto-assign', [\App\Http\Controllers\Domains\UserController::class, 'autoAssignSupervisors'])->name('supervisors.auto-assign');
-        
+
         // Available supervisors (Organization-specific)
         Route::get('/supervisors/available', [\App\Http\Controllers\Domains\UserController::class, 'availableSupervisors'])->name('supervisors.available');
         Route::get('/supervisors/available/{user}', [\App\Http\Controllers\Domains\UserController::class, 'availableSupervisorsForUser'])->name('supervisors.available-for-user');
-        
+
         // Assign supervisor (Organization-specific)
         Route::post('/users/{user}/assign-supervisor', [\App\Http\Controllers\Domains\UserController::class, 'assignSupervisor'])->name('users.assign-supervisor');
 
@@ -147,7 +147,7 @@ Route::prefix('domains/{domain:name_slug}')
             Route::post('/adjustments/{adjustment}/approve', [\App\Http\Controllers\Domains\Inventory\StockAdjustmentController::class, 'approve'])->name('adjustments.approve');
             Route::post('/adjustments/{adjustment}/reject', [\App\Http\Controllers\Domains\Inventory\StockAdjustmentController::class, 'reject'])->name('adjustments.reject');
             Route::get('/adjustment-products', [\App\Http\Controllers\Domains\Inventory\StockAdjustmentController::class, 'getProductsForAdjustment'])->name('adjustment-products');
-            
+
             Route::resource('locations', \App\Http\Controllers\Domains\Inventory\InventoryLocationController::class)->names('locations');
             // set-default/toggle-status handlers remain global unless you want domain-specific ones
         });
@@ -155,5 +155,3 @@ Route::prefix('domains/{domain:name_slug}')
         // Terminal Setup (Organization-specific)
         Route::post('/setup-terminal', [\App\Http\Controllers\TerminalController::class, 'setupTerminal'])->name('setup.terminal');
     });
-
-
