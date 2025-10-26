@@ -22,9 +22,7 @@ class RoleController extends Controller
         $roles = Role::query()
             ->with('permissions')
             ->where('name', '!=', 'super admin')
-            ->when($domain, function ($query) use ($domain) {
-                return $query->where('domain', $domain->name_slug);
-            })
+            ->where('domain', $domain->name_slug)
             ->when($request->search, fn($q, $s) => $q->search($s))
             ->orderBy('name')
             ->paginate(10);

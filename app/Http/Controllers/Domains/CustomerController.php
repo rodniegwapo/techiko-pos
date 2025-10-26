@@ -16,9 +16,8 @@ class CustomerController extends Controller
     public function index(Request $request, Domain $domain = null)
     {
         $query = Customer::query()
-            ->when($domain, function ($query) use ($domain) {
-                return $query->where('domain', $domain->name_slug);
-            })
+            ->where('domain', $domain->name_slug)
+
             ->when($request->search, function ($query, $search) {
                 // Use Searchable trait on Customer: supports name, email, phone, etc.
                 return $query->search($search);
