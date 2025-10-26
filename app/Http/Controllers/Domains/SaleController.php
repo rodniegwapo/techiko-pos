@@ -13,6 +13,7 @@ use App\Models\Sale;
 use App\Models\InventoryLocation;
 use App\Services\SaleService;
 use App\Services\InventoryService;
+use App\Helpers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -30,19 +31,11 @@ class SaleController extends Controller
 
     public function index(Request $request, Domain $domain)
     {
-        $user = auth()->user();
-        
-        // Get current location for the alert
-        $effectiveLocationId = $user->getEffectiveLocationId($request->input('location_id'));
-        $currentLocation = $effectiveLocationId
-            ? InventoryLocation::forDomain($domain->name_slug)->findOrFail($effectiveLocationId)
-            : (InventoryLocation::active()->forDomain($domain->name_slug)->where('is_default', true)->first() 
-               ?? InventoryLocation::active()->forDomain($domain->name_slug)->first() 
-               ?? InventoryLocation::getDefault());
+        $location = Helpers::getEffectiveLocation($domain);
 
         return Inertia::render('Sales/Index', [
             'domain' => $domain,
-            'categories' => Category::where('domain', $domain->name_slug)->get(),
+            'categories' => Category::where('domain', $domain->name_slug)->where('location_id', $location->id)->get(),
         ]);
     }
 
@@ -74,25 +67,22 @@ class SaleController extends Controller
 
         $loyaltyResults = null;
 
+        $location = Helpers::getEffectiveLocation($domain);
+
         try {
-            DB::transaction(function () use ($sale, $validated, &$loyaltyResults) {
+            DB::transaction(function () use ($sale, $validated, &$loyaltyResults, $location) {
                 // 1. Complete sale and process inventory
                 $this->saleService->completeSale($sale, auth()->user());
 
+
                 // 2. Handle overselling situations (create automatic stock adjustments)
                 $oversoldItems = $this->saleService->handleOverselling($sale);
-                if (!empty($oversoldItems)) {
-                    \Log::info('Oversell detected during sale completion', [
-                        'sale_id' => $sale->id,
-                        'invoice_number' => $sale->invoice_number,
-                        'oversold_count' => count($oversoldItems)
-                    ]);
-                }
 
                 // 3. Update payment details
                 $sale->update([
                     'grand_total' => $sale->total_amount,
-                    'payment_method' => $validated['payment_method']
+                    'payment_method' => $validated['payment_method'],
+                    'location_id' => $location->id
                 ]);
 
                 // 4. Process loyalty if customer is provided
@@ -104,21 +94,10 @@ class SaleController extends Controller
 
                     // Process loyalty rewards
                     $loyaltyResults = $customer->processLoyaltyForSale($validated['sale_amount'] ?? $sale->total_amount);
-
-                    \Log::info('Loyalty processed for sale', [
-                        'sale_id' => $sale->id,
-                        'customer_id' => $customer->id,
-                        'points_earned' => $loyaltyResults['points_earned'] ?? 0,
-                        'tier_upgraded' => $loyaltyResults['tier_upgraded'] ?? false
-                    ]);
                 }
             });
         } catch (\Exception $e) {
-            \Log::error('Payment processing failed', [
-                'sale_id' => $sale->id,
-                'error' => $e->getMessage(),
-                'customer_id' => $validated['customer_id'] ?? null
-            ]);
+
 
             return response()->json([
                 'success' => false,
@@ -618,7 +597,7 @@ class SaleController extends Controller
         if ($sale && $sale->saleItems) {
             foreach ($sale->saleItems as $item) {
                 $itemData = $item->toArray();
-                
+
                 // Add discount information if item has discounts
                 if ($item->discounts && $item->discounts->count() > 0) {
                     $discount = $item->discounts->first(); // Get the first discount
@@ -626,7 +605,7 @@ class SaleController extends Controller
                     $itemData['discount_type'] = $discount->type;
                     $itemData['discount_amount'] = $discount->value;
                 }
-                
+
                 $transformedItems[] = $itemData;
             }
         }

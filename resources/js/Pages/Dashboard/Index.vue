@@ -11,7 +11,6 @@ import SummaryCards from "./components/SummaryCards.vue";
 import SalesOverview from "./components/SalesOverview.vue";
 import TopProducts from "./components/TopProducts.vue";
 import InventoryAlerts from "./components/InventoryAlerts.vue";
-import LocationInfoAlert from "@/Components/LocationInfoAlert.vue";
 
 const {
     selectedLocation,
@@ -45,8 +44,6 @@ const {
                 <RefreshButton @click="getItems" />
             </template>
         </ContentHeader>
-
-        <LocationInfoAlert />
 
         <SummaryCards :cards="summaryCards" />
 
