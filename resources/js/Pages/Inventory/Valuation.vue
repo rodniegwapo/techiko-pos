@@ -17,6 +17,7 @@ import ContentLayout from "@/Components/ContentLayout.vue";
 import RefreshButton from "@/Components/buttons/Refresh.vue";
 import FilterDropdown from "@/Components/filters/FilterDropdown.vue";
 import ActiveFilters from "@/Components/filters/ActiveFilters.vue";
+import LocationInfoAlert from "@/Components/LocationInfoAlert.vue";
 
 const page = usePage();
 const { spinning } = useGlobalVariables();
@@ -260,6 +261,10 @@ const printValuation = () => {
             closable
           />
         </div>
+      </template>
+
+      <template #activeStore>
+        <LocationInfoAlert />
       </template>
 
       <template #table>

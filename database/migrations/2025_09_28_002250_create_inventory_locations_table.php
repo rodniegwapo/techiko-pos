@@ -30,17 +30,6 @@ return new class extends Migration
             $table->index('is_default');
             $table->index(['type', 'is_active']);
         });
-        
-        // Insert default location
-        \DB::table('inventory_locations')->insert([
-            'name' => 'Main Store',
-            'code' => 'MAIN',
-            'type' => 'store',
-            'is_active' => true,
-            'is_default' => true,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
     }
 
     /**

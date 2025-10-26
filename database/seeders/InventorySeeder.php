@@ -40,75 +40,122 @@ class InventorySeeder extends Seeder
         // Get domains to assign locations
         $domains = Domain::all();
         if ($domains->isEmpty()) {
-            $this->command->warn('No domains found. Creating default domain...');
-            $domain = Domain::create([
-                'name' => 'Default Store',
-                'name_slug' => 'default-store',
-                'timezone' => 'Asia/Manila',
-                'country_code' => 'PH',
-                'currency_code' => 'PHP',
-                'date_format' => 'Y-m-d',
-                'time_format' => '12h',
-                'language_code' => 'en',
-                'is_active' => true,
-            ]);
-            $domains = collect([$domain]);
+            $this->command->error('No domains found. Please run DomainSeeder first.');
+            return;
         }
 
         foreach ($domains as $domain) {
-            // Main Store (Default)
-            $mainStore = InventoryLocation::firstOrCreate(
-                ['code' => 'MAIN'],
-                [
-                    'name' => 'Main Store - ' . $domain->name,
-                    'code' => 'MAIN',
-                    'type' => 'store',
-                    'address' => '123 Main Street, ' . $domain->name,
-                    'contact_person' => 'Store Manager',
-                    'phone' => '+63-2-123-4567',
-                    'email' => 'store@' . $domain->name_slug . '.com',
-                    'is_active' => true,
-                    'is_default' => true,
-                    'domain' => $domain->name_slug,
-                ]
-            );
-            $locations[] = $mainStore;
+            // Only create locations for our specific organizations
+            if (!in_array($domain->name_slug, ['jollibee-corp', 'mcdonalds-corp'])) {
+                continue;
+            }
+            
+            if ($domain->name_slug === 'jollibee-corp') {
+                // Jollibee Corporation Stores
+                $mainStore = InventoryLocation::firstOrCreate(
+                    ['code' => 'JB-MAIN'],
+                    [
+                        'name' => 'Jollibee Main Store - Makati',
+                        'code' => 'JB-MAIN',
+                        'type' => 'store',
+                        'address' => '123 Ayala Avenue, Makati City',
+                        'contact_person' => 'Jollibee Store Manager',
+                        'phone' => '+63-2-123-4567',
+                        'email' => 'main@jollibee-corp.com',
+                        'is_active' => true,
+                        'is_default' => true,
+                        'domain' => $domain->name_slug,
+                    ]
+                );
+                $locations[] = $mainStore;
 
-            // Warehouse
-            $warehouse = InventoryLocation::firstOrCreate(
-                ['code' => 'WH01'],
-                [
-                    'name' => 'Main Warehouse - ' . $domain->name,
-                    'code' => 'WH01',
-                    'type' => 'warehouse',
-                    'address' => '456 Warehouse District, ' . $domain->name,
-                    'contact_person' => 'Warehouse Manager',
-                    'phone' => '+63-2-234-5678',
-                    'email' => 'warehouse@' . $domain->name_slug . '.com',
-                    'is_active' => true,
-                    'is_default' => false,
-                    'domain' => $domain->name_slug,
-                ]
-            );
-            $locations[] = $warehouse;
+                $branchStore = InventoryLocation::firstOrCreate(
+                    ['code' => 'JB-BRANCH'],
+                    [
+                        'name' => 'Jollibee Branch Store - SM Mall',
+                        'code' => 'JB-BRANCH',
+                        'type' => 'store',
+                        'address' => '456 SM Mall of Asia, Pasay City',
+                        'contact_person' => 'Jollibee Branch Manager',
+                        'phone' => '+63-2-234-5678',
+                        'email' => 'branch@jollibee-corp.com',
+                        'is_active' => true,
+                        'is_default' => false,
+                        'domain' => $domain->name_slug,
+                    ]
+                );
+                $locations[] = $branchStore;
 
-            // Additional Store
-            $store2 = InventoryLocation::firstOrCreate(
-                ['code' => 'STORE2'],
-                [
-                    'name' => 'Branch Store - ' . $domain->name,
-                    'code' => 'STORE2',
-                    'type' => 'store',
-                    'address' => '789 Mall Level 2, ' . $domain->name,
-                    'contact_person' => 'Branch Manager',
-                    'phone' => '+63-2-345-6789',
-                    'email' => 'branch@' . $domain->name_slug . '.com',
-                    'is_active' => true,
-                    'is_default' => false,
-                    'domain' => $domain->name_slug,
-                ]
-            );
-            $locations[] = $store2;
+                $warehouse = InventoryLocation::firstOrCreate(
+                    ['code' => 'JB-WH'],
+                    [
+                        'name' => 'Jollibee Distribution Center',
+                        'code' => 'JB-WH',
+                        'type' => 'warehouse',
+                        'address' => '789 Industrial Park, Laguna',
+                        'contact_person' => 'Jollibee Warehouse Manager',
+                        'phone' => '+63-2-345-6789',
+                        'email' => 'warehouse@jollibee-corp.com',
+                        'is_active' => true,
+                        'is_default' => false,
+                        'domain' => $domain->name_slug,
+                    ]
+                );
+                $locations[] = $warehouse;
+
+            } elseif ($domain->name_slug === 'mcdonalds-corp') {
+                // McDonald's Corporation Stores
+                $mainStore = InventoryLocation::firstOrCreate(
+                    ['code' => 'MC-MAIN'],
+                    [
+                        'name' => 'McDonald\'s Main Store - Ortigas',
+                        'code' => 'MC-MAIN',
+                        'type' => 'store',
+                        'address' => '123 Ortigas Avenue, Pasig City',
+                        'contact_person' => 'McDonald\'s Store Manager',
+                        'phone' => '+63-2-456-7890',
+                        'email' => 'main@mcdonalds-corp.com',
+                        'is_active' => true,
+                        'is_default' => true,
+                        'domain' => $domain->name_slug,
+                    ]
+                );
+                $locations[] = $mainStore;
+
+                $branchStore = InventoryLocation::firstOrCreate(
+                    ['code' => 'MC-BRANCH'],
+                    [
+                        'name' => 'McDonald\'s Branch Store - BGC',
+                        'code' => 'MC-BRANCH',
+                        'type' => 'store',
+                        'address' => '456 Bonifacio Global City, Taguig',
+                        'contact_person' => 'McDonald\'s Branch Manager',
+                        'phone' => '+63-2-567-8901',
+                        'email' => 'branch@mcdonalds-corp.com',
+                        'is_active' => true,
+                        'is_default' => false,
+                        'domain' => $domain->name_slug,
+                    ]
+                );
+                $locations[] = $branchStore;
+
+                $warehouse = InventoryLocation::firstOrCreate(
+                    ['code' => 'MC-WH'],
+                    [
+                        'name' => 'McDonald\'s Distribution Center',
+                        'code' => 'MC-WH',
+                        'type' => 'warehouse',
+                        'address' => '789 Logistics Hub, Cavite',
+                        'contact_person' => 'McDonald\'s Warehouse Manager',
+                        'phone' => '+63-2-678-9012',
+                        'email' => 'warehouse@mcdonalds-corp.com',
+                        'is_active' => true,
+                        'is_default' => false,
+                        'domain' => $domain->name_slug,
+                    ]
+                );
+                $locations[] = $warehouse;
+            }
 
             // Customer Location (for returns/exchanges)
             $customer = InventoryLocation::firstOrCreate(

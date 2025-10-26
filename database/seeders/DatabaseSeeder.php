@@ -20,7 +20,6 @@ class DatabaseSeeder extends Seeder
             PermissionModuleSeeder::class,
             RolePermissionSeeder::class,
             Roleseeder::class,
-            UserSeeder::class,
             
             // Product and category seeders
             CategorySeeder::class,
@@ -33,11 +32,14 @@ class DatabaseSeeder extends Seeder
             TierSeeder::class,
             LoyaltyProgramSeeder::class,
             
-            // Enhanced inventory seeders
+            // Enhanced inventory seeders (must be before users)
             InventorySeeder::class,
             InventoryMovementSeeder::class,
             StockAdjustmentSeeder::class,
             InventoryTransferRecommendationSeeder::class,
+            
+            // Users (after locations are created)
+            UserSeeder::class,
             
             // User authentication
             UserPinSeeder::class,

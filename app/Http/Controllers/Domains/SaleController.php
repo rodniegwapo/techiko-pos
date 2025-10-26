@@ -30,6 +30,16 @@ class SaleController extends Controller
 
     public function index(Request $request, Domain $domain)
     {
+        $user = auth()->user();
+        
+        // Get current location for the alert
+        $effectiveLocationId = $user->getEffectiveLocationId($request->input('location_id'));
+        $currentLocation = $effectiveLocationId
+            ? InventoryLocation::forDomain($domain->name_slug)->findOrFail($effectiveLocationId)
+            : (InventoryLocation::active()->forDomain($domain->name_slug)->where('is_default', true)->first() 
+               ?? InventoryLocation::active()->forDomain($domain->name_slug)->first() 
+               ?? InventoryLocation::getDefault());
+
         return Inertia::render('Sales/Index', [
             'domain' => $domain,
             'categories' => Category::where('domain', $domain->name_slug)->get(),

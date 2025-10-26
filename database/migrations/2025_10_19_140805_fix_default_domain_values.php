@@ -16,22 +16,8 @@ return new class extends Migration
         $firstDomain = DB::table('domains')->where('is_active', true)->first();
         
         if (!$firstDomain) {
-            // If no domains exist, create a default one
-            $firstDomain = DB::table('domains')->insertGetId([
-                'name' => 'Default Store',
-                'name_slug' => 'default-store',
-                'timezone' => 'Asia/Manila',
-                'country_code' => 'PH',
-                'currency_code' => 'PHP',
-                'date_format' => 'Y-m-d',
-                'time_format' => '12h',
-                'language_code' => 'en',
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-            
-            $firstDomain = DB::table('domains')->where('id', $firstDomain)->first();
+            // Skip if no domains exist - let seeders handle domain creation
+            return;
         }
         
         $domainSlug = $firstDomain->name_slug;

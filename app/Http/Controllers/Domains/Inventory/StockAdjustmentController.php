@@ -21,12 +21,22 @@ class StockAdjustmentController extends Controller
      */
     public function index(Request $request, Domain $domain)
     {
+        $user = auth()->user();
+        
+        // Apply role-based location filtering
+        $effectiveLocationId = $user->getEffectiveLocationId($request->input('location_id'));
+        
+        $location = $effectiveLocationId
+            ? InventoryLocation::forDomain($domain->name_slug)->findOrFail($effectiveLocationId)
+            : (InventoryLocation::active()->forDomain($domain->name_slug)->where('is_default', true)->first() 
+               ?? InventoryLocation::active()->forDomain($domain->name_slug)->first() 
+               ?? InventoryLocation::getDefault());
+
         $query = StockAdjustment::with(['location', 'createdBy', 'approvedBy'])
             ->withCount('items')
-            ->whereHas('location', fn($q) => $q->forDomain($domain->name_slug))
+            ->where('location_id', $location->id)
             ->when($request->input('search'), fn($q, $s) => $q->search($s))
             ->when($request->input('status'), fn($q, $status) => $q->where('status', $status))
-            ->when($request->input('location_id'), fn($q, $id) => $q->where('location_id', $id))
             ->when($request->input('date_from'), fn($q, $d) => $q->whereDate('created_at', '>=', $d))
             ->when($request->input('date_to'), fn($q, $d) => $q->whereDate('created_at', '<=', $d))
             ->orderBy('created_at', 'desc');
@@ -43,7 +53,6 @@ class StockAdjustmentController extends Controller
                 'rejected' => 'Rejected',
             ],
             'filters' => $request->only(['search', 'status', 'location_id', 'date_from', 'date_to']),
-            'currentDomain' => $domain,
             'isGlobalView' => false,
         ]);
     }

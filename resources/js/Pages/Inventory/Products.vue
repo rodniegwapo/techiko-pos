@@ -18,6 +18,7 @@ import InventoryProductTable from "./components/InventoryProductTable.vue";
 import ReceiveInventoryModal from "./components/ReceiveInventoryModal.vue";
 import TransferInventoryModal from "./components/TransferInventoryModal.vue";
 import ProductDetailsModal from "./components/ProductDetailsModal.vue";
+import LocationInfoAlert from "@/Components/LocationInfoAlert.vue";
 
 const page = usePage();
 const { showModal } = useHelpers();
@@ -30,38 +31,38 @@ const domain = ref(null);
 
 // Props from backend
 const props = defineProps({
-  inventories: Object,
-  locations: Array,
-  currentLocation: Object,
-  categories: Array,
-  domains: Array,
-  filters: Object,
+    inventories: Object,
+    locations: Array,
+    currentLocation: Object,
+    categories: Array,
+    domains: Array,
+    filters: Object,
 });
 
 // Initialize filters from backend
 onMounted(() => {
-  if (props.filters) {
-    search.value = props.filters.search || "";
-    stock_status.value = props.filters.stock_status || null;
-    domain.value = props.filters.domain || null;
-  }
-  location_id.value = props.currentLocation?.id || null;
+    if (props.filters) {
+        search.value = props.filters.search || "";
+        stock_status.value = props.filters.stock_status || null;
+        domain.value = props.filters.domain || null;
+    }
+    location_id.value = props.currentLocation?.id || null;
 });
 
 // Fetch items
 const getItems = () => {
-  router.reload({
-    only: ["inventories"],
-    preserveScroll: true,
-    data: {
-      search: search.value || undefined,
-      stock_status: stock_status.value || undefined,
-      location_id: location_id.value || undefined,
-      domain: domain.value || undefined,
-    },
-    onStart: () => (spinning.value = true),
-    onFinish: () => (spinning.value = false),
-  });
+    router.reload({
+        only: ["inventories"],
+        preserveScroll: true,
+        data: {
+            search: search.value || undefined,
+            stock_status: stock_status.value || undefined,
+            location_id: location_id.value || undefined,
+            domain: domain.value || undefined,
+        },
+        onStart: () => (spinning.value = true),
+        onFinish: () => (spinning.value = false),
+    });
 };
 
 // Watch search with debounce
@@ -69,53 +70,61 @@ watchDebounced(search, getItems, { debounce: 300 });
 
 // Filter options
 const stockStatusOptions = computed(() => [
-  { label: "In Stock", value: "in_stock" },
-  { label: "Low Stock", value: "low_stock" },
-  { label: "Out of Stock", value: "out_of_stock" },
+    { label: "In Stock", value: "in_stock" },
+    { label: "Low Stock", value: "low_stock" },
+    { label: "Out of Stock", value: "out_of_stock" },
 ]);
 
-const domainOptions = computed(() => 
-  (props.domains || []).map(domain => ({ 
-    label: domain.name, 
-    value: domain.name_slug 
-  }))
+const domainOptions = computed(() =>
+    (props.domains || []).map((domain) => ({
+        label: domain.name,
+        value: domain.name_slug,
+    }))
 );
 
 // Remove unused computed properties since we're using single filter approach
 
 // Filter management
 const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
-  getItems,
-  configs: [
-    {
-      label: "Stock Status",
-      key: "stock_status",
-      ref: stock_status,
-      getLabel: toLabel(computed(() => stockStatusOptions.value)),
-    },
-    ...(page.props.isGlobalView ? [{
-      label: "Domain",
-      key: "domain",
-      ref: domain,
-      getLabel: toLabel(computed(() => domainOptions.value)),
-    }] : []),
-  ],
+    getItems,
+    configs: [
+        {
+            label: "Stock Status",
+            key: "stock_status",
+            ref: stock_status,
+            getLabel: toLabel(computed(() => stockStatusOptions.value)),
+        },
+        ...(page.props.isGlobalView
+            ? [
+                  {
+                      label: "Domain",
+                      key: "domain",
+                      ref: domain,
+                      getLabel: toLabel(computed(() => domainOptions.value)),
+                  },
+              ]
+            : []),
+    ],
 });
 
 // FilterDropdown configuration (single filter like Products/Index)
 const filtersConfig = [
-  {
-    key: "stock_status",
-    label: "Stock Status",
-    type: "select",
-    options: stockStatusOptions.value,
-  },
-  ...(page.props.isGlobalView ? [{
-    key: "domain",
-    label: "Domain",
-    type: "select",
-    options: domainOptions.value,
-  }] : []),
+    {
+        key: "stock_status",
+        label: "Stock Status",
+        type: "select",
+        options: stockStatusOptions.value,
+    },
+    ...(page.props.isGlobalView
+        ? [
+              {
+                  key: "domain",
+                  label: "Domain",
+                  type: "select",
+                  options: domainOptions.value,
+              },
+          ]
+        : []),
 ];
 
 // Group filters in one object
@@ -126,8 +135,8 @@ const { pagination, handleTableChange } = useTable("inventories", tableFilters);
 
 // Methods
 const changeLocation = (newLocationId) => {
-  location_id.value = newLocationId;
-  getItems();
+    location_id.value = newLocationId;
+    getItems();
 };
 
 // Modal states
@@ -137,156 +146,163 @@ const detailsModalVisible = ref(false);
 const selectedProduct = ref(null);
 
 const showReceiveModal = () => {
-  receiveModalVisible.value = true;
+    receiveModalVisible.value = true;
 };
 
 const showTransferModal = () => {
-  transferModalVisible.value = true;
+    transferModalVisible.value = true;
 };
 
 const exportInventory = () => {
-  // TODO: Implement export functionality
-  console.log("Export inventory");
+    // TODO: Implement export functionality
+    console.log("Export inventory");
 };
 
 const showProductDetails = (inventory) => {
-  selectedProduct.value = inventory;
-  detailsModalVisible.value = true;
+    selectedProduct.value = inventory;
+    detailsModalVisible.value = true;
 };
 
 const handleTransferStock = (inventory) => {
-  selectedProduct.value = inventory;
-  transferModalVisible.value = true;
+    selectedProduct.value = inventory;
+    transferModalVisible.value = true;
 };
 </script>
 
 <template>
-  <Head title="Inventory Products" />
+    <Head title="Inventory Products" />
 
-  <AuthenticatedLayout>
-    <ContentHeader title="Inventory Products">
-      <template #actions>
-        <a-select
-          v-model:value="location_id"
-          placeholder="Select Location"
-          style="width: 200px; margin-right: 8px"
-          @change="changeLocation"
-        >
-          <a-select-option
-            v-for="location in locations"
-            :key="location.id"
-            :value="location.id"
-          >
-            {{ location.name }}
-          </a-select-option>
-        </a-select>
+    <AuthenticatedLayout>
+        <ContentHeader title="Inventory Products">
+            <template #actions>
+                <a-select
+                    v-model:value="location_id"
+                    placeholder="Select Location"
+                    style="width: 200px; margin-right: 8px"
+                    @change="changeLocation"
+                >
+                    <a-select-option
+                        v-for="location in locations"
+                        :key="location.id"
+                        :value="location.id"
+                    >
+                        {{ location.name }}
+                    </a-select-option>
+                </a-select>
 
-        <a-button @click="exportInventory" style="margin-right: 8px">
-          <template #icon>
-            <DownloadOutlined />
-          </template>
-          Export
-        </a-button>
+                <a-button @click="exportInventory" style="margin-right: 8px">
+                    <template #icon>
+                        <DownloadOutlined />
+                    </template>
+                    Export
+                </a-button>
 
-        <a-button
-          type="primary"
-          @click="showTransferModal"
-          style="margin-right: 8px"
-        >
-          Transfer Stock
-        </a-button>
+                <a-button
+                    type="primary"
+                    @click="showTransferModal"
+                    style="margin-right: 8px"
+                >
+                    Transfer Stock
+                </a-button>
 
-        <a-button
-          type="primary"
-          @click="showReceiveModal"
-          style="margin-right: 8px"
-        >
-          <template #icon>
-            <PlusSquareOutlined />
-          </template>
-          Receive Inventory
-        </a-button>
+                <a-button
+                    type="primary"
+                    @click="showReceiveModal"
+                    style="margin-right: 8px"
+                >
+                    <template #icon>
+                        <PlusSquareOutlined />
+                    </template>
+                    Receive Inventory
+                </a-button>
 
-        <RefreshButton @click="getItems" />
-      </template>
-    </ContentHeader>
+                <RefreshButton @click="getItems" />
+            </template>
+        </ContentHeader>
 
-    <ContentLayout title="Inventory Products">
-      <template #filters>
-        <RefreshButton :loading="spinning" @click="getItems" />
-        <a-input-search
-          v-model:value="search"
-          placeholder="Search products, SKU, or barcode..."
-          class="min-w-[100px] max-w-[300px]"
+        <ContentLayout title="Inventory Products">
+            <template #filters>
+                <RefreshButton :loading="spinning" @click="getItems" />
+                <a-input-search
+                    v-model:value="search"
+                    placeholder="Search products, SKU, or barcode..."
+                    class="min-w-[100px] max-w-[300px]"
+                />
+                <a-button
+                    @click="showReceiveModal"
+                    type="primary"
+                    class="bg-white border flex items-center border-green-500 text-green-500"
+                >
+                    <template #icon>
+                        <PlusSquareOutlined />
+                    </template>
+                    Receive Inventory
+                </a-button>
+                <FilterDropdown v-model="filters" :filters="filtersConfig" />
+            </template>
+
+            <template #activeFilters>
+                <ActiveFilters
+                    :filters="activeFilters"
+                    @remove-filter="handleClearSelectedFilter"
+                    @clear-all="
+                        () =>
+                            Object.keys(filters).forEach(
+                                (k) => (filters[k] = null)
+                            )
+                    "
+                />
+
+                <!-- Current Location Info -->
+                <!-- <div v-if="currentLocation" class="mb-4">
+                    <a-alert
+                        :message="`Viewing inventory for: ${currentLocation.name}`"
+                        :description="currentLocation.address"
+                        type="info"
+                        show-icon
+                        closable
+                    />
+                </div> -->
+            </template>
+
+            <template #activeStore>
+                <LocationInfoAlert />
+            </template>
+
+            <template #table>
+                <InventoryProductTable
+                    :inventories="inventories"
+                    :pagination="pagination"
+                    :loading="spinning"
+                    :is-global-view="page.props.isGlobalView"
+                    @handle-table-change="handleTableChange"
+                    @show-details="showProductDetails"
+                    @transfer-stock="handleTransferStock"
+                />
+            </template>
+        </ContentLayout>
+
+        <!-- Modals -->
+        <ReceiveInventoryModal
+            v-model:visible="receiveModalVisible"
+            :locations="locations"
+            :current-location="currentLocation"
+            :domains="page.props.domains"
+            @success="getItems"
         />
-        <a-button
-          @click="showReceiveModal"
-          type="primary"
-          class="bg-white border flex items-center border-green-500 text-green-500"
-        >
-          <template #icon>
-            <PlusSquareOutlined />
-          </template>
-          Receive Inventory
-        </a-button>
-        <FilterDropdown v-model="filters" :filters="filtersConfig" />
-      </template>
 
-      <template #activeFilters>
-        <ActiveFilters
-          :filters="activeFilters"
-          @remove-filter="handleClearSelectedFilter"
-          @clear-all="
-            () => Object.keys(filters).forEach((k) => (filters[k] = null))
-          "
+        <TransferInventoryModal
+            v-model:visible="transferModalVisible"
+            :locations="locations"
+            :current-location="currentLocation"
+            :selected-product="selectedProduct"
+            :domains="page.props.domains"
+            @success="getItems"
         />
-        
-        <!-- Current Location Info -->
-        <div v-if="currentLocation" class="mb-4">
-          <a-alert
-            :message="`Viewing inventory for: ${currentLocation.name}`"
-            :description="currentLocation.address"
-            type="info"
-            show-icon
-            closable
-          />
-        </div>
-      </template>
 
-      <template #table>
-        <InventoryProductTable
-          :inventories="inventories"
-          :pagination="pagination"
-          :loading="spinning"
-          :is-global-view="page.props.isGlobalView"
-          @handle-table-change="handleTableChange"
-          @show-details="showProductDetails"
-          @transfer-stock="handleTransferStock"
+        <ProductDetailsModal
+            v-model:visible="detailsModalVisible"
+            :product="selectedProduct"
         />
-      </template>
-    </ContentLayout>
-
-    <!-- Modals -->
-    <ReceiveInventoryModal
-      v-model:visible="receiveModalVisible"
-      :locations="locations"
-      :current-location="currentLocation"
-      :domains="page.props.domains"
-      @success="getItems"
-    />
-
-    <TransferInventoryModal
-      v-model:visible="transferModalVisible"
-      :locations="locations"
-      :current-location="currentLocation"
-      :selected-product="selectedProduct"
-      :domains="page.props.domains"
-      @success="getItems"
-    />
-    
-    <ProductDetailsModal 
-      v-model:visible="detailsModalVisible"
-      :product="selectedProduct"
-    />
-  </AuthenticatedLayout>
+    </AuthenticatedLayout>
 </template>

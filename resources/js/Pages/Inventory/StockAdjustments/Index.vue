@@ -16,6 +16,7 @@ import FilterDropdown from "@/Components/filters/FilterDropdown.vue";
 import ActiveFilters from "@/Components/filters/ActiveFilters.vue";
 import StockAdjustmentsTable from "../components/StockAdjustmentsTable.vue";
 import AdjustmentDetailsModal from "../components/AdjustmentDetailsModal.vue";
+import LocationInfoAlert from "@/Components/LocationInfoAlert.vue";
 
 const page = usePage();
 const { showModal } = useHelpers();
@@ -193,6 +194,10 @@ const showAdjustmentDetails = (adjustment) => {
             () => Object.keys(filters).forEach((k) => (filters[k] = null))
           "
         />
+      </template>
+
+      <template #activeStore>
+        <LocationInfoAlert />
       </template>
 
       <template #table>
