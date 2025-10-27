@@ -355,7 +355,7 @@ class DashboardController extends Controller
             return [
                 'id' => $sale->user_id,
                 'name' => $sale->user->name ?? 'Unknown User',
-                'role' => $sale->user->role_level ? 'Level ' . $sale->user->role_level : 'Staff',
+                'role' => $sale->user->roles()->first()?->name ?? 'Staff',
                 'today_sales' => $sale->total_sales,
                 'transaction_count' => $sale->transaction_count,
             ];
