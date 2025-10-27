@@ -10,7 +10,8 @@ import { useDashboardData } from "@/Composables/useDashboardData.js";
 import SummaryCards from "./components/SummaryCards.vue";
 import SalesOverview from "./components/SalesOverview.vue";
 import TopProducts from "./components/TopProducts.vue";
-import InventoryAlerts from "./components/InventoryAlerts.vue";
+import CombinedInventoryAlerts from "./components/CombinedInventoryAlerts.vue";
+import PerformanceCard from "./components/PerformanceCard.vue";
 
 const {
     selectedLocation,
@@ -18,6 +19,8 @@ const {
     summaryCards,
     topProducts,
     inventoryAlerts,
+    storePerformance,
+    topUsers,
     graphFilter,
     salesChartOptions,
     salesChartSeries,
@@ -57,6 +60,12 @@ const {
             <TopProducts class="w-[40%]" :products="topProducts" />
         </div>
 
-        <InventoryAlerts :alerts="inventoryAlerts" />
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <CombinedInventoryAlerts :alerts="inventoryAlerts" />
+            <PerformanceCard 
+                :storePerformance="storePerformance" 
+                :topUsers="topUsers" 
+            />
+        </div>
     </AuthenticatedLayout>
 </template>

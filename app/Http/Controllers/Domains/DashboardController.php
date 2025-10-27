@@ -7,8 +7,12 @@ use App\Helpers;
 use App\Models\Domain;
 use App\Models\InventoryLocation;
 use App\Models\Sale;
+use App\Models\ProductInventory;
+use App\Models\InventoryMovement;
+use App\Models\Product\Product;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class DashboardController extends Controller
@@ -25,6 +29,10 @@ class DashboardController extends Controller
         $stats = [
             'kpis' => $this->getKPIs($location, $domain->name_slug),
             'recent_transactions' => $this->getRecentTransactions($domain->name_slug, $location),
+            'inventory_alerts' => $this->getInventoryAlerts($location, $domain->name_slug),
+            'top_products' => $this->getTopProducts($location, $domain->name_slug),
+            'store_performance' => $this->getStorePerformance($domain->name_slug),
+            'top_users' => $this->getTopUsers($location, $domain->name_slug),
         ];
 
         $availableLocations = InventoryLocation::active()->forDomain($domain->name_slug)->get();
@@ -192,6 +200,154 @@ class DashboardController extends Controller
                     'status' => $sale->payment_status
                 ];
             });
+    }
+
+    /**
+     * Get inventory alerts for the domain
+     */
+    private function getInventoryAlerts($location, $domain)
+    {
+        // Use Product model to filter by domain, then get inventory data
+        $lowStockQuery = ProductInventory::whereHas('product', function($query) use ($domain) {
+                $query->where('domain', $domain);
+            })
+            ->where(function($query) {
+                $query->whereColumn('quantity_available', '<=', 'location_reorder_level')
+                      ->orWhere(function($subQuery) {
+                          $subQuery->whereNull('location_reorder_level')
+                                   ->whereColumn('quantity_available', '<=', DB::raw('(SELECT reorder_level FROM products WHERE products.id = product_inventory.product_id)'));
+                      });
+            })
+            ->where('quantity_available', '>', 0);
+
+        $outOfStockQuery = ProductInventory::whereHas('product', function($query) use ($domain) {
+                $query->where('domain', $domain);
+            })
+            ->where('quantity_available', '<=', 0);
+
+        if ($location) {
+            $lowStockQuery->where('location_id', $location->id);
+            $outOfStockQuery->where('location_id', $location->id);
+        }
+
+        return [
+            'low_stock_products' => $lowStockQuery->with('product:id,name,SKU,reorder_level')
+                ->limit(5)
+                ->get()
+                ->map(function($inventory) {
+                    $minLevel = $inventory->location_reorder_level ?? $inventory->product->reorder_level ?? 0;
+                    return [
+                        'id' => $inventory->product_id,
+                        'name' => $inventory->product->name ?? 'Unknown Product',
+                        'SKU' => $inventory->product->SKU ?? 'N/A',
+                        'current_stock' => $inventory->quantity_available,
+                        'min_stock_level' => $minLevel,
+                    ];
+                }),
+            'out_of_stock_products' => $outOfStockQuery->with('product:id,name,SKU,reorder_level')
+                ->limit(5)
+                ->get()
+                ->map(function($inventory) {
+                    $minLevel = $inventory->location_reorder_level ?? $inventory->product->reorder_level ?? 0;
+                    return [
+                        'id' => $inventory->product_id,
+                        'name' => $inventory->product->name ?? 'Unknown Product',
+                        'SKU' => $inventory->product->SKU ?? 'N/A',
+                        'current_stock' => $inventory->quantity_available,
+                        'min_stock_level' => $minLevel,
+                    ];
+                }),
+        ];
+    }
+
+    /**
+     * Get top products for the domain
+     */
+    private function getTopProducts($location, $domain)
+    {
+        $topProductsQuery = InventoryMovement::where('movement_type', 'sale')
+            ->where('created_at', '>=', now()->subDays(7))
+            ->where('domain', $domain);
+
+        if ($location) {
+            $topProductsQuery->where('location_id', $location->id);
+        }
+
+        return $topProductsQuery
+            ->select('product_id', DB::raw('SUM(ABS(quantity_change)) as total_sold'))
+            ->groupBy('product_id')
+            ->orderBy('total_sold', 'desc')
+            ->limit(5)
+            ->with('product')
+            ->get()
+            ->map(function ($movement) {
+                return [
+                    'product' => $movement->product,
+                    'quantity_sold' => $movement->total_sold
+                ];
+            });
+    }
+
+    /**
+     * Get store performance for the domain
+     */
+    private function getStorePerformance($domain)
+    {
+        $today = now()->startOfDay();
+        
+        return InventoryLocation::active()
+            ->forDomain($domain)
+            ->with(['sales' => function($query) use ($today, $domain) {
+                $query->where('payment_status', 'paid')
+                      ->where('domain', $domain)
+                      ->whereDate('created_at', $today);
+            }])
+            ->get()
+            ->map(function($location) {
+                $todaySales = $location->sales->sum('grand_total');
+                $transactionCount = $location->sales->count();
+                
+                return [
+                    'id' => $location->id,
+                    'name' => $location->name,
+                    'location_type' => $location->type,
+                    'today_sales' => $todaySales,
+                    'transaction_count' => $transactionCount,
+                ];
+            })
+            ->sortByDesc('today_sales')
+            ->values();
+    }
+
+    /**
+     * Get top users for the domain
+     */
+    private function getTopUsers($location, $domain)
+    {
+        $today = now()->startOfDay();
+        
+        $query = Sale::where('payment_status', 'paid')
+            ->where('domain', $domain)
+            ->whereDate('created_at', $today)
+            ->select('user_id', DB::raw('SUM(grand_total) as total_sales'), DB::raw('COUNT(*) as transaction_count'))
+            ->groupBy('user_id')
+            ->with('user:id,name,role_level')
+            ->orderBy('total_sales', 'desc')
+            ->limit(5);
+
+        if ($location) {
+            $query->where('location_id', $location->id);
+        }
+
+        return $query->get()->map(function($sale) {
+            return [
+                'id' => $sale->user_id,
+                'name' => $sale->user->name ?? 'Unknown User',
+                'role' => $sale->user->role_level ? 'Level ' . $sale->user->role_level : 'Staff',
+                'today_sales' => $sale->total_sales,
+                'transaction_count' => $sale->transaction_count,
+            ];
+        });
     }
 
     /**

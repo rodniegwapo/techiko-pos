@@ -40,6 +40,8 @@ class DashboardController extends Controller
             'customer_insights' => $this->getCustomerInsights(null),
             'recent_transactions' => $this->getRecentTransactions(null),
             'top_products' => $this->getTopProducts($location, null),
+            'store_performance' => $this->getStorePerformance(),
+            'top_users' => $this->getTopUsers($location),
             'operational_status' => $this->getOperationalStatus(null),
         ];
 
@@ -450,6 +452,59 @@ class DashboardController extends Controller
                     'quantity_sold' => $movement->total_sold
                 ];
             });
+    }
+
+    private function getStorePerformance()
+    {
+        $today = now()->startOfDay();
+        
+        return InventoryLocation::active()
+            ->with(['sales' => function($query) use ($today) {
+                $query->where('payment_status', 'paid')
+                      ->whereDate('created_at', $today);
+            }])
+            ->get()
+            ->map(function($location) {
+                $todaySales = $location->sales->sum('grand_total');
+                $transactionCount = $location->sales->count();
+                
+                return [
+                    'id' => $location->id,
+                    'name' => $location->name,
+                    'location_type' => $location->type,
+                    'today_sales' => $todaySales,
+                    'transaction_count' => $transactionCount,
+                ];
+            })
+            ->sortByDesc('today_sales')
+            ->values();
+    }
+
+    private function getTopUsers($location = null)
+    {
+        $today = now()->startOfDay();
+        
+        $query = Sale::where('payment_status', 'paid')
+            ->whereDate('created_at', $today)
+            ->select('user_id', DB::raw('SUM(grand_total) as total_sales'), DB::raw('COUNT(*) as transaction_count'))
+            ->groupBy('user_id')
+            ->with('user:id,name,role_level')
+            ->orderBy('total_sales', 'desc')
+            ->limit(5);
+
+        if ($location) {
+            $query->where('location_id', $location->id);
+        }
+
+        return $query->get()->map(function($sale) {
+            return [
+                'id' => $sale->user_id,
+                'name' => $sale->user->name ?? 'Unknown User',
+                'role' => $sale->user->role_level ? 'Level ' . $sale->user->role_level : 'Staff',
+                'today_sales' => $sale->total_sales,
+                'transaction_count' => $sale->transaction_count,
+            ];
+        });
     }
 
     private function getOperationalStatus($domain = null)
