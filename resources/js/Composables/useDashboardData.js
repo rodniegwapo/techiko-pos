@@ -137,9 +137,15 @@ export function useDashboardData() {
             [],
     }));
 
-    const storePerformance = computed(() => 
-        props.stats?.store_performance?.slice(0, 5) || []
-    );
+    const storePerformance = computed(() => {
+        const data = props.stats?.store_performance || {};
+        return {
+            locations: data.locations?.slice(0, 5) || [],
+            totalSales: data.total_sales || 0,
+            totalTransactions: data.total_transactions || 0,
+            totalLocations: data.total_locations || 0,
+        };
+    });
 
     const topUsers = computed(() => 
         props.stats?.top_users?.slice(0, 5) || []

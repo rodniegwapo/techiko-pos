@@ -295,7 +295,7 @@ class DashboardController extends Controller
     {
         $today = now()->startOfDay();
         
-        return InventoryLocation::active()
+        $locations = InventoryLocation::active()
             ->forDomain($domain)
             ->with(['sales' => function($query) use ($today, $domain) {
                 $query->where('payment_status', 'paid')
@@ -317,6 +317,18 @@ class DashboardController extends Controller
             })
             ->sortByDesc('today_sales')
             ->values();
+
+        // Calculate totals
+        $totalSales = $locations->sum('today_sales');
+        $totalTransactions = $locations->sum('transaction_count');
+        $totalLocations = $locations->count();
+
+        return [
+            'locations' => $locations,
+            'total_sales' => $totalSales,
+            'total_transactions' => $totalTransactions,
+            'total_locations' => $totalLocations,
+        ];
     }
 
     /**
