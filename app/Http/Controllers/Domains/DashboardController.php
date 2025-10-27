@@ -21,7 +21,6 @@ class DashboardController extends Controller
         $location = Helpers::getActiveLocation($domain, $request->input('location_id'));
 
 
-        logger('this is fuctking test');
         // Only essential KPIs - let frontend handle complex analytics
         $stats = [
             'kpis' => $this->getKPIs($location, $domain->name_slug),
@@ -33,7 +32,6 @@ class DashboardController extends Controller
         return Inertia::render('Dashboard/Index', [
             'stats' => $stats,
             'locations' => $availableLocations,
-            'filters' => $request->only(['location_id']),
         ]);
     }
 
