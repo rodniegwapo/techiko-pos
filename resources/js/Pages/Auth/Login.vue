@@ -68,7 +68,7 @@ const submit = () => {
                         </div>
                         <div>
                             <div class="text-3xl font-bold text-white">
-                                <span class="text-green-400">Tech</span>icko
+                                <span class="text-green-400">Tech</span>iko
                             </div>
                             <div class="text-blue-100 text-sm">
                                 Point of Sale Solutions
