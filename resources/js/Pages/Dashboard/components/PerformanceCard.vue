@@ -1,7 +1,7 @@
 <template>
     <div class="bg-white rounded-lg border p-6 shadow-sm">
         <!-- Store Performance (Admin/Super User/Role 1-2) -->
-        <div v-if="isHighLevelUser">
+        <div v-if="isHighLevelUser" class="flex flex-col h-full">
             <div class="flex items-center mb-4">
                 <div
                     class="p-2 rounded-lg border border-blue-200 bg-blue-50 mr-3 relative"
@@ -18,12 +18,12 @@
                 </div>
             </div>
 
-            <div
-                class="max-h-[400px] min-h-[400px] overflow-y-scroll overflow-x-hidden"
-            >
+            <!-- Main content area with flex layout -->
+            <div class="flex flex-col flex-1 min-h-0">
+                <!-- Scrollable stores list -->
                 <div
                     v-if="storePerformance.locations.length > 0"
-                    class="space-y-2 flex flex-col w-full justify-between"
+                    class="flex-1 overflow-y-auto space-y-2"
                 >
                     <div
                         v-for="(store, index) in storePerformance.locations"
@@ -56,51 +56,59 @@
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <!-- Total Sales Summary -->
-                    <div class="mt-4 pt-4 border-t border-gray-200">
-                        <div
-                            class="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                        >
-                            <div class="flex items-center">
-                                <div
-                                    class="bg-gray-100 rounded-full flex items-center justify-center mr-3 w-8 h-8"
-                                >
-                                    <span
-                                        class="text-sm font-bold text-gray-600"
-                                        >Σ</span
-                                    >
-                                </div>
-                                <div>
-                                    <div class="font-medium text-gray-900">
-                                        Total Sales Today
-                                    </div>
-                                    <div class="text-sm text-gray-500">
-                                        {{ storePerformance.totalLocations }}
-                                        locations
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="text-right">
-                                <div class="text-lg font-bold text-gray-900">
-                                    {{
-                                        formatCurrency(
-                                            storePerformance.totalSales
-                                        )
-                                    }}
-                                </div>
-                                <div class="text-xs text-gray-500">
-                                    {{ storePerformance.totalTransactions }}
-                                    transactions
-                                </div>
-                            </div>
+                <!-- Empty state -->
+                <div
+                    v-else
+                    class="flex-1 flex items-center justify-center text-center py-8 text-gray-500"
+                >
+                    <div>
+                        <div class="text-lg font-medium mb-1">
+                            No Sales Today
                         </div>
+                        <div class="text-sm">Check back later for updates</div>
                     </div>
                 </div>
 
-                <div v-else class="text-center py-4 text-gray-500">
-                    <div class="text-lg font-medium mb-1">No Sales Today</div>
-                    <div class="text-sm">Check back later for updates</div>
+                <!-- Total Sales Summary - Always at bottom -->
+                <div
+                    v-if="storePerformance.locations.length > 0"
+                    class="mt-4 pt-4 border-t border-gray-200 flex-shrink-0"
+                >
+                    <div
+                        class="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                    >
+                        <div class="flex items-center">
+                            <div
+                                class="bg-gray-100 rounded-full flex items-center justify-center mr-3 w-8 h-8"
+                            >
+                                <span class="text-sm font-bold text-gray-600"
+                                    >Σ</span
+                                >
+                            </div>
+                            <div>
+                                <div class="font-medium text-gray-900">
+                                    Total Sales Today
+                                </div>
+                                <div class="text-sm text-gray-500">
+                                    {{ storePerformance.totalLocations }}
+                                    locations
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-lg font-bold text-gray-900">
+                                {{
+                                    formatCurrency(storePerformance.totalSales)
+                                }}
+                            </div>
+                            <div class="text-xs text-gray-500">
+                                {{ storePerformance.totalTransactions }}
+                                transactions
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
