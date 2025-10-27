@@ -208,21 +208,21 @@ class DashboardController extends Controller
     private function getInventoryAlerts($location, $domain)
     {
         // Use Product model to filter by domain, then get inventory data
-        $lowStockQuery = ProductInventory::whereHas('product', function($query) use ($domain) {
-                $query->where('domain', $domain);
-            })
-            ->where(function($query) {
+        $lowStockQuery = ProductInventory::whereHas('product', function ($query) use ($domain) {
+            $query->where('domain', $domain);
+        })
+            ->where(function ($query) {
                 $query->whereColumn('quantity_available', '<=', 'location_reorder_level')
-                      ->orWhere(function($subQuery) {
-                          $subQuery->whereNull('location_reorder_level')
-                                   ->whereColumn('quantity_available', '<=', DB::raw('(SELECT reorder_level FROM products WHERE products.id = product_inventory.product_id)'));
-                      });
+                    ->orWhere(function ($subQuery) {
+                        $subQuery->whereNull('location_reorder_level')
+                            ->whereColumn('quantity_available', '<=', DB::raw('(SELECT reorder_level FROM products WHERE products.id = product_inventory.product_id)'));
+                    });
             })
             ->where('quantity_available', '>', 0);
 
-        $outOfStockQuery = ProductInventory::whereHas('product', function($query) use ($domain) {
-                $query->where('domain', $domain);
-            })
+        $outOfStockQuery = ProductInventory::whereHas('product', function ($query) use ($domain) {
+            $query->where('domain', $domain);
+        })
             ->where('quantity_available', '<=', 0);
 
         if ($location) {
@@ -234,7 +234,7 @@ class DashboardController extends Controller
             'low_stock_products' => $lowStockQuery->with('product:id,name,SKU,reorder_level')
                 ->limit(5)
                 ->get()
-                ->map(function($inventory) {
+                ->map(function ($inventory) {
                     $minLevel = $inventory->location_reorder_level ?? $inventory->product->reorder_level ?? 0;
                     return [
                         'id' => $inventory->product_id,
@@ -247,7 +247,7 @@ class DashboardController extends Controller
             'out_of_stock_products' => $outOfStockQuery->with('product:id,name,SKU,reorder_level')
                 ->limit(5)
                 ->get()
-                ->map(function($inventory) {
+                ->map(function ($inventory) {
                     $minLevel = $inventory->location_reorder_level ?? $inventory->product->reorder_level ?? 0;
                     return [
                         'id' => $inventory->product_id,
@@ -294,19 +294,19 @@ class DashboardController extends Controller
     private function getStorePerformance($domain)
     {
         $today = now()->startOfDay();
-        
+
         $locations = InventoryLocation::active()
             ->forDomain($domain)
-            ->with(['sales' => function($query) use ($today, $domain) {
+            ->with(['sales' => function ($query) use ($today, $domain) {
                 $query->where('payment_status', 'paid')
-                      ->where('domain', $domain)
-                      ->whereDate('created_at', $today);
+                    ->where('domain', $domain)
+                    ->whereDate('created_at', $today);
             }])
             ->get()
-            ->map(function($location) {
+            ->map(function ($location) {
                 $todaySales = $location->sales->sum('grand_total');
                 $transactionCount = $location->sales->count();
-                
+
                 return [
                     'id' => $location->id,
                     'name' => $location->name,
@@ -337,7 +337,7 @@ class DashboardController extends Controller
     private function getTopUsers($location, $domain)
     {
         $today = now()->startOfDay();
-        
+
         $query = Sale::where('payment_status', 'paid')
             ->where('domain', $domain)
             ->whereDate('created_at', $today)
@@ -351,7 +351,7 @@ class DashboardController extends Controller
             $query->where('location_id', $location->id);
         }
 
-        return $query->get()->map(function($sale) {
+        return $query->get()->map(function ($sale) {
             return [
                 'id' => $sale->user_id,
                 'name' => $sale->user->name ?? 'Unknown User',
