@@ -70,6 +70,14 @@ class InventoryLocation extends Model
     }
 
     /**
+     * Get the sales for this location
+     */
+    public function sales()
+    {
+        return $this->hasMany(Sale::class, 'location_id');
+    }
+
+    /**
      * Scope to get only active locations
      */
     public function scopeActive($query)

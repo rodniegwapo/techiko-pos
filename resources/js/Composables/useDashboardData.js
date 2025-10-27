@@ -137,12 +137,22 @@ export function useDashboardData() {
             [],
     }));
 
+    const storePerformance = computed(() => 
+        props.stats?.store_performance?.slice(0, 5) || []
+    );
+
+    const topUsers = computed(() => 
+        props.stats?.top_users?.slice(0, 5) || []
+    );
+
     return {
         selectedLocation,
         filtersConfig,
         summaryCards,
         topProducts,
         inventoryAlerts,
+        storePerformance,
+        topUsers,
         graphFilter,
         salesChartOptions,
         salesChartSeries,
