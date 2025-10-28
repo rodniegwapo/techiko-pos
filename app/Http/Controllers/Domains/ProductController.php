@@ -17,34 +17,135 @@ use Inertia\Inertia;
 class ProductController extends Controller
 {
     use LocationCategoryScoping;
+
     /**
-     * Display a listing of products for the domain.
+     * Resolve active location for the given domain and request.
      */
-    public function index(Request $request, Domain $domain = null)
+    private function resolveActiveLocation(Request $request, Domain $domain = null)
     {
-        $location = Helpers::getActiveLocation($domain, $request->input('location_id'));
-        // Simple query - much cleaner!
+        return Helpers::getActiveLocation($domain, $request->input('location_id'));
+    }
+
+    /**
+     * Centralized validation for product data.
+     */
+    private function validatedData(Request $request, ?Product $product = null, ?Domain $domain = null): array
+    {
+        $productId = $product?->id;
+        $domainSlug = $domain?->name_slug;
+
+        return $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'sold_type' => ['required', 'string', 'max:255', 'exists:product_sold_types,name'],
+            'price' => ['required', 'numeric', 'min:0'],
+            'cost' => ['nullable', 'numeric', 'min:0'],
+
+            'category_id' => ['required', 'exists:categories,id'],
+            'SKU' => ['nullable', 'string', 'max:255', 'unique:products,SKU,' . $productId],
+            'barcode' => ['nullable', 'string', 'max:255', 'unique:products,barcode,' . $productId],
+
+            'track_inventory' => ['boolean'],
+            'reorder_level' => ['nullable', 'numeric', 'min:0'],
+            'max_stock_level' => ['nullable', 'numeric', 'min:0'],
+            'unit_weight' => ['nullable', 'numeric', 'min:0'],
+
+            'location_id' => ['nullable', 'exists:inventory_locations,id'],
+        ], [], [
+            'name' => 'product name',
+            'sold_type' => 'sold type',
+            'category_id' => 'category',
+            'location_id' => 'location',
+        ]);
+    }
+
+    /**
+     * Validate product uniqueness within domain and location scope.
+     */
+    private function validateProductUniqueness(Request $request, ?Product $product = null, ?Domain $domain = null)
+    {
+        if (!$request->filled('location_id') || !$domain) {
+            return; // Skip if no location or domain context
+        }
+
+        $query = Product::where('domain', $domain->name_slug)
+            ->whereHas('activeLocations', function ($q) use ($request) {
+                $q->where('location_id', $request->input('location_id'));
+            });
+
+        if ($product) {
+            $query->where('id', '!=', $product->id);
+        }
+
+        $existingProduct = $query->first();
+
+        if ($existingProduct) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'name' => ['A product with this name already exists in the selected location for this domain.'],
+            ]);
+        }
+    }
+
+    /**
+     * Build the base product query scoped by domain and optionally by location.
+     */
+    private function buildProductQuery(Request $request, Domain $domain, $location)
+    {
         $query = Product::query()
             ->with('category')
-            ->where('domain', $domain->name_slug)
-            ->whereHas('activeLocations', function($q) use ($location) {
+            ->where('domain', $domain->name_slug);
+
+        if ($location) {
+            $query->whereHas('activeLocations', function ($q) use ($location) {
                 $q->where('location_id', $location->id);
-            })
+            });
+        }
+
+        return $query
             ->when($request->search, fn($q, $s) => $q->search($s))
             ->when($request->category, function ($query, $category) {
                 return $query->whereHas('category', function ($q) use ($category) {
                     $q->where('name', $category);
                 });
             });
+    }
 
-        $products = $query->latest()->paginate(15);
+    /**
+     * Build categories query derived from location if present; otherwise domain-scoped.
+     */
+    private function buildCategoriesQuery(Domain $domain, $location)
+    {
+        return $location
+            ? $this->getCategoriesForLocation($domain->name_slug, $location)
+            : Category::where('domain', $domain->name_slug);
+    }
 
+    /**
+     * Standard response for products index.
+     */
+    private function respondWithIndex($products, $categoriesQuery, $location)
+    {
         return Inertia::render('Products/Index', [
             'items' => ProductResource::collection($products),
-            'categories' => $this->getCategoriesForLocation($domain->name_slug, $location)->get(),
+            'categories' => $categoriesQuery->get(),
             'sold_by_types' => \App\Models\Product\ProductSoldType::all(),
-            'isGlobalView' => !$domain,
+            'isGlobalView' => false,
+            'currentLocation' => $location,
         ]);
+    }
+    /**
+     * Display a listing of products for the domain.
+     */
+    public function index(Request $request, Domain $domain = null)
+    {
+        $location = $this->resolveActiveLocation($request, $domain);
+        $products = $this->buildProductQuery($request, $domain, $location)
+            ->latest()
+            ->paginate(15);
+
+        $categoriesQuery = $this->buildCategoriesQuery($domain, $location);
+
+        return $this->respondWithIndex($products, $categoriesQuery, $location);
     }
 
     /**
@@ -52,30 +153,19 @@ class ProductController extends Controller
      */
     public function store(Request $request, Domain $domain = null)
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'sold_type' => 'required|string|max:255',
-            'price' => 'required|numeric|min:0',
-            'cost' => 'nullable|numeric|min:0',
-            'category_id' => 'required|exists:categories,id',
-            'SKU' => 'nullable|string|max:255',
-            'track_inventory' => 'boolean',
-            'reorder_level' => 'nullable|numeric|min:0',
-            'max_stock_level' => 'nullable|numeric|min:0',
-            'unit_weight' => 'nullable|numeric|min:0',
-        ]);
+        $this->validateProductUniqueness($request, null, $domain);
+        $validated = $this->validatedData($request, null, $domain);
 
         if ($domain) {
             $validated['domain'] = $domain->name_slug;
         }
 
-        // Create product and attach to active location via pivot
-        $location = Helpers::getActiveLocation($domain, $request->input('location_id'));
-
         $product = Product::create($validated);
+
+        $location = $this->resolveActiveLocation($request, $domain)
+            ?: ($request->location_id ? InventoryLocation::find($request->location_id) : null);
+
         if ($location) {
-            // ensure product is available at the active location
             $product->addToLocation($location, true);
         }
 
@@ -92,21 +182,16 @@ class ProductController extends Controller
             abort(403, 'Product does not belong to this domain');
         }
 
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'sold_type' => 'required|string|max:255',
-            'price' => 'required|numeric|min:0',
-            'cost' => 'nullable|numeric|min:0',
-            'category_id' => 'required|exists:categories,id',
-            'SKU' => 'nullable|string|max:255',
-            'track_inventory' => 'boolean',
-            'reorder_level' => 'nullable|numeric|min:0',
-            'max_stock_level' => 'nullable|numeric|min:0',
-            'unit_weight' => 'nullable|numeric|min:0',
-        ]);
-
+        $this->validateProductUniqueness($request, $product, $domain);
+        $validated = $this->validatedData($request, $product, $domain);
         $product->update($validated);
+
+        if ($request->filled('location_id')) {
+            $location = InventoryLocation::find($request->input('location_id'));
+            if ($location) {
+                $product->addToLocation($location, true);
+            }
+        }
 
         return redirect()->back()->with('success', 'Product updated successfully');
     }

@@ -71,6 +71,11 @@ class InventoryController extends Controller
             $query->whereHas('product', fn($q) => $q->where('category_id', $request->category_id));
         }
 
+        // Add domain filtering for global view
+        if ($request->domain) {
+            $query->whereHas('product', fn($q) => $q->where('domain', $request->domain));
+        }
+
         $inventories = $query->orderBy('quantity_available', 'asc')
             ->paginate($request->per_page ?? 20);
 
@@ -113,7 +118,8 @@ class InventoryController extends Controller
             'inventories' => ProductInventoryResource::collection($inventories),
             'locations' => InventoryLocation::active()->get(),
             'categories' => $categories->get(),
-            'filters' => $request->only(['search', 'stock_status', 'category_id']),
+            'domains' => Domain::select('id', 'name', 'name_slug')->get(),
+            'filters' => $request->only(['search', 'stock_status', 'category_id', 'domain']),
             'isGlobalView' => true,
         ]);
     }
