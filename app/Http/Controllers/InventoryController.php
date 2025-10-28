@@ -179,4 +179,83 @@ class InventoryController extends Controller
             }),
         ]);
     }
+
+    /**
+     * Search products for receiving inventory (global search across domains)
+     */
+    public function searchProducts(Request $request)
+    {
+        $query = Product::query()
+            ->with('category')
+            ->when($request->search, fn($q, $search) => $q->search($search))
+            ->when($request->domain, fn($q, $domain) => $q->where('domain', $domain))
+            ->when($request->category_id, fn($q, $categoryId) => $q->where('category_id', $categoryId));
+
+        $products = $query->limit(20)->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => \App\Http\Resources\ProductResource::collection($products)
+        ]);
+    }
+
+    /**
+     * Receive inventory at a location (global method)
+     */
+    public function receive(Request $request)
+    {
+        $validated = $request->validate([
+            'location_id' => 'required|exists:inventory_locations,id',
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.unit_cost' => 'required|numeric|min:0',
+            'items.*.batch_number' => 'nullable|string|max:255',
+            'items.*.expiry_date' => 'nullable|date',
+            'items.*.notes' => 'nullable|string|max:500',
+            'reference_type' => 'nullable|string',
+            'reference_id' => 'nullable|integer',
+        ]);
+
+        $location = InventoryLocation::findOrFail($validated['location_id']);
+
+        $this->inventoryService->receiveInventory(
+            $validated['items'],
+            auth()->user(),
+            $location,
+            $validated['reference_type'] ?? null,
+            $validated['reference_id'] ?? null
+        );
+
+        return response()->json(['success' => true, 'message' => 'Inventory received successfully']);
+    }
+
+    /**
+     * Transfer inventory between locations (global method)
+     */
+    public function transfer(Request $request)
+    {
+        $validated = $request->validate([
+            'product_id' => 'required|exists:products,id',
+            'from_location_id' => 'required|exists:inventory_locations,id',
+            'to_location_id' => 'required|exists:inventory_locations,id|different:from_location_id',
+            'quantity' => 'required|integer|min:1',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $product = Product::findOrFail($validated['product_id']);
+        $fromLocation = InventoryLocation::findOrFail($validated['from_location_id']);
+        $toLocation = InventoryLocation::findOrFail($validated['to_location_id']);
+
+        $this->inventoryService->transferInventory(
+            $product,
+            $fromLocation,
+            $toLocation,
+            $validated['quantity'],
+            auth()->user(),
+            $validated['notes'] ?? null
+        );
+
+        return response()->json(['success' => true, 'message' => 'Inventory transferred successfully']);
+    }
 }

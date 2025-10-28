@@ -141,6 +141,9 @@ Route::prefix('domains/{domain:name_slug}')
 
             Route::post('/receive', [\App\Http\Controllers\Domains\Inventory\InventoryController::class, 'receive'])->name('receive');
             Route::post('/transfer', [\App\Http\Controllers\Domains\Inventory\InventoryController::class, 'transfer'])->name('transfer');
+            
+            // Search routes
+            Route::get('/search/products', [\App\Http\Controllers\Domains\Inventory\InventoryController::class, 'searchProducts'])->name('search.products');
 
             Route::resource('adjustments', \App\Http\Controllers\Domains\Inventory\StockAdjustmentController::class)->names('adjustments');
             Route::post('/adjustments/{adjustment}/submit', [\App\Http\Controllers\Domains\Inventory\StockAdjustmentController::class, 'submitForApproval'])->name('adjustments.submit');

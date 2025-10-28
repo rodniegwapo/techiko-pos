@@ -40,7 +40,7 @@ class HandleInertiaRequests extends Middleware
             'currentDomain' => $this->getCurrentDomain($request),
             'currentLocation' => $this->getCurrentLocation($request),
             'availableLocations' => $this->getAvailableLocations($request),
-            'default_store' => $request->user() ? InventoryLocation::query()->where('is_default', true)->first() : null,
+            'default_store' => $request->user() ? $this->getDefaultStore($request) : null,
         ];
     }
 
@@ -91,5 +91,16 @@ class HandleInertiaRequests extends Middleware
         if (!$domain) return collect();
 
         return InventoryLocation::active()->forDomain($domain->name_slug)->get();
+    }
+
+    /**
+     * Get the default store for the current domain
+     */
+    private function getDefaultStore(Request $request)
+    {
+        $domain = $this->getCurrentDomain($request);
+        if (!$domain) return null;
+
+        return InventoryLocation::getDefault($domain->name_slug);
     }
 }

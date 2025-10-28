@@ -21,8 +21,11 @@ class CategoryController extends Controller
     {
         $location = Helpers::getActiveLocation($domain);
 
-        $query = $this->getCategoriesWithCountsForLocation($domain->name_slug, $location)
-            ->when($request->input('search'), function ($q, $search) {
+        $query = $location 
+            ? $this->getCategoriesWithCountsForLocation($domain->name_slug, $location)
+            : Category::where('domain', $domain->name_slug)->withCount('products');
+        
+        $query = $query->when($request->input('search'), function ($q, $search) {
                 return $q->search($search);
             });
 
