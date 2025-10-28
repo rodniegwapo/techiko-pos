@@ -19,7 +19,7 @@ use Inertia\Inertia;
 class InventoryController extends Controller
 {
     use LocationCategoryScoping;
-    
+
     public function __construct(private InventoryService $inventoryService) {}
 
     public function index(Request $request, Domain $domain)
@@ -39,7 +39,7 @@ class InventoryController extends Controller
     public function products(Request $request, Domain $domain)
     {
         $slug = $domain->name_slug;
-        $location = Helpers::getActiveLocation($domain, $request->input('location_id'));
+        $location = Helpers::getActiveLocation($domain);
 
         $query = ProductInventory::with(['product', 'location'])
             ->where('location_id', $location->id)
