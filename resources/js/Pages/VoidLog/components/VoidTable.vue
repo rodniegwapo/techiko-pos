@@ -19,6 +19,10 @@ const props = defineProps({
     type: Object,
     default: {},
   },
+  isGlobalView: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const columns = [
@@ -37,8 +41,8 @@ const columns = [
     key: "created_at",
     align: "left",
   },
-  // Add domain column for super users only
-  ...(page.props.auth?.user?.data?.is_super_user ? [{
+  // Add domain column for super users only in global view
+  ...(page.props.auth?.user?.data?.is_super_user && props.isGlobalView ? [{
     title: "Domain",
     dataIndex: "domain",
     key: "domain",

@@ -25,6 +25,11 @@ const props = defineProps({
     type: Object,
     default: null,
   },
+  // When true, we're in global view and should render locations list using eager-loaded data
+  isGlobalView: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const { visible } = toRefs(props);
@@ -35,7 +40,7 @@ const emit = defineEmits(["update:visible"]);
 const storeData = ref(null);
 const storeLoading = ref(false);
 
-// Load store summary when product changes
+// Load store summary when product changes (domain-scoped view only)
 const loadStoreData = async () => {
   if (!props.product?.location_id) return;
   
@@ -55,7 +60,7 @@ const loadStoreData = async () => {
 watch(
   () => props.product,
   (newProduct) => {
-    if (newProduct && props.visible) {
+    if (newProduct && props.visible && !props.isGlobalView) {
       loadStoreData();
     }
   },
@@ -66,7 +71,7 @@ watch(
 watch(
   () => props.visible,
   (isVisible) => {
-    if (isVisible && props.product) {
+    if (isVisible && props.product && !props.isGlobalView) {
       loadStoreData();
     }
   }
@@ -114,6 +119,9 @@ const getStockStatusText = (status) => {
       return "Unknown";
   }
 };
+
+// Eager-loaded locations for global view (from product.product.locations)
+const allLocations = computed(() => props.product?.product?.locations || []);
 </script>
 
 <template>
@@ -126,7 +134,7 @@ const getStockStatusText = (status) => {
     <template #title>
       <div class="flex items-center justify-between">
         <span>Product Details</span>
-        <div v-if="storeData" class="flex items-center space-x-2">
+        <div v-if="!props.isGlobalView && storeData" class="flex items-center space-x-2">
           <a-tag color="blue" size="small">
             <IconShoppingCart :size="14" class="mr-1" />
             {{ storeData.total_products_count }} total items
@@ -140,11 +148,16 @@ const getStockStatusText = (status) => {
             {{ storeData.out_of_stock_products_count }} out of stock
           </a-tag>
         </div>
+        <div v-else-if="props.isGlobalView && allLocations.length" class="flex items-center space-x-2">
+          <a-tag color="blue" size="small">
+            {{ allLocations.length }} locations
+          </a-tag>
+        </div>
       </div>
     </template>
     <div v-if="product" class="space-y-6">
-      <!-- Store Context Banner -->
-      <div v-if="storeData" class="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border border-blue-200">
+      <!-- Store Context Banner (domain-scoped) -->
+      <div v-if="!props.isGlobalView && storeData" class="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border border-blue-200">
         <div class="flex items-center justify-between">
           <div>
             <h5 class="font-semibold text-blue-900">{{ storeData.name }}</h5>
@@ -234,8 +247,8 @@ const getStockStatusText = (status) => {
         </a-tag>
       </div>
 
-      <!-- Stock Information -->
-      <div>
+      <!-- Stock Information (single location only) -->
+      <div v-if="!props.isGlobalView">
         <h4 class="text-lg font-semibold mb-3 flex items-center">
           <IconBuildingStore :size="20" class="mr-2" />
           Stock Information
@@ -293,6 +306,29 @@ const getStockStatusText = (status) => {
             </div>
           </a-col>
         </a-row>
+      </div>
+
+      <!-- Global View: Locations Table -->
+      <div v-if="props.isGlobalView">
+        <h4 class="text-lg font-semibold mb-3">Stock Across All Locations</h4>
+        <div v-if="!allLocations.length" class="text-center text-gray-500 py-6">
+          No location data available
+        </div>
+        <div v-else class="overflow-x-auto">
+          <a-table :data-source="allLocations" :pagination="false" size="small">
+            <a-table-column title="Location" key="name">
+              <template #default="{ record }">
+                <div class="font-semibold">{{ record.name }}</div>
+                <div class="text-xs text-gray-500">{{ record.address }}</div>
+              </template>
+            </a-table-column>
+            <a-table-column title="Status" key="status" align="center">
+              <template #default="{ record }">
+                <a-tag color="blue" size="small">Active</a-tag>
+              </template>
+            </a-table-column>
+          </a-table>
+        </div>
       </div>
 
       <!-- Financial Information -->

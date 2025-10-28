@@ -155,8 +155,8 @@ const tableColumns = computed(() => {
         },
     ];
 
-    // Add domain column for super users only
-    if (page.props.auth?.user?.data?.is_super_user) {
+    // Add domain column for super users only in global view
+    if (page.props.auth?.user?.data?.is_super_user && page.props.isGlobalView) {
         baseColumns.splice(2, 0, {
             title: "Domain",
             dataIndex: "domain",
