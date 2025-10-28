@@ -303,6 +303,7 @@ const handleTransferStock = (inventory) => {
         <ProductDetailsModal
             v-model:visible="detailsModalVisible"
             :product="selectedProduct"
+            :is-global-view="page.props.isGlobalView"
         />
     </AuthenticatedLayout>
 </template>

@@ -157,23 +157,23 @@ class InventoryController extends Controller
 
     public function lowStock(Request $request, Domain $domain)
     {
-        $slug = $domain->name_slug;
-        $location = $request->location_id
-            ? InventoryLocation::forDomain($slug)->findOrFail($request->location_id)
-            : null;
-
-        $lowStockProducts = $this->inventoryService->getLowStockProducts($location);
+        $location = Helpers::getActiveLocation($domain, $request->input('location_id'));
+        
+        $lowStockProducts = $this->inventoryService->getLowStockProducts($location, $domain->name_slug);
 
         return response()->json([
             'products' => $lowStockProducts->map(function ($product) use ($location) {
-                $inventory = $location ? $product->inventoryAt($location) : $product->defaultInventory();
+                $inventory = $product->inventoryAt($location);
+                $reorderLevel = $inventory ? $inventory->getEffectiveReorderLevel() : $product->reorder_level;
+                $currentStock = $inventory ? $inventory->quantity_available : 0;
+                
                 return [
                     'id' => $product->id,
                     'name' => $product->name,
                     'sku' => $product->SKU,
-                    'current_stock' => $inventory ? $inventory->quantity_available : 0,
-                    'reorder_level' => $product->reorder_level,
-                    'shortage' => max(0, $product->reorder_level - ($inventory ? $inventory->quantity_available : 0)),
+                    'current_stock' => $currentStock,
+                    'reorder_level' => $reorderLevel,
+                    'shortage' => max(0, $reorderLevel - $currentStock),
                 ];
             }),
         ]);
@@ -182,7 +182,7 @@ class InventoryController extends Controller
     public function valuation(Request $request, Domain $domain)
     {
         $slug = $domain->name_slug;
-        $location = Helpers::getActiveLocation($domain, $request->input('location_id'));
+        $location = Helpers::getActiveLocation($domain);
 
         $inventories = ProductInventory::with('product')
             ->where('location_id', $location->id)

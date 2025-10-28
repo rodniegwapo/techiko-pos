@@ -22,6 +22,10 @@ const props = defineProps({
     default: {},
     type: Object,
   },
+  isGlobalView: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const { spinning } = useGlobalVariables();
@@ -115,6 +119,7 @@ const { pagination, handleTableChange } = useTable("items", tableFilters);
         <VoidTable
           @handle-table-change="handleTableChange"
           :pagination="pagination"
+          :is-global-view="props.isGlobalView"
         />
       </template>
     </ContentLayout>

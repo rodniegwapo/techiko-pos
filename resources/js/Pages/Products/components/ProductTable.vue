@@ -65,8 +65,8 @@ const columns = computed(() => {
         },
     ];
 
-    // Add domain column for super users only
-    if (page.props.auth?.user?.data?.is_super_user) {
+    // Add domain column for super users only in global view
+    if (page.props.auth?.user?.data?.is_super_user && props.isGlobalView) {
         baseColumns.splice(2, 0, {
             title: "Domain",
             dataIndex: "domain",
@@ -327,23 +327,33 @@ const showDetails = (product) => {
                                  selectedProduct.domain || "N/A"
                              }}</span>
                          </div>
-                         <!-- Location Information -->
-                         <div v-if="currentLocation" class="flex justify-between">
-                             <span class="text-sm text-gray-600">Location:</span>
-                             <span class="font-semibold text-blue-600">{{
-                                 currentLocation.name || 'Unknown Location'
-                             }}</span>
-                         </div>
-                         <div v-if="currentLocation?.address" class="flex justify-between">
-                             <span class="text-sm text-gray-600">Address:</span>
-                             <span class="text-xs text-gray-500">{{
-                                 currentLocation.address
-                             }}</span>
-                         </div>
-                         <div v-else class="flex justify-between">
-                             <span class="text-sm text-gray-600">Location:</span>
-                             <span class="text-xs text-gray-500">No location data available</span>
-                         </div>
+                        <!-- Location Information -->
+                        <!-- Global view: show locations from eager-loaded relation -->
+                        <div v-if="props.isGlobalView && (selectedProduct.locations?.length || 0) > 0" class="flex justify-between">
+                            <span class="text-sm text-gray-600">Locations:</span>
+                            <div class="text-right">
+                                <span class="font-semibold text-blue-600">
+                                    {{ selectedProduct.locations.length }} location(s)
+                                </span>
+                                <div class="text-xs text-gray-500 mt-1">
+                                    <div v-for="loc in selectedProduct.locations.slice(0, 3)" :key="loc.id">
+                                        {{ loc.name }}
+                                    </div>
+                                    <div v-if="selectedProduct.locations.length > 3" class="text-gray-400">
+                                        +{{ selectedProduct.locations.length - 3 }} more...
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Domain-scoped view: show the current location -->
+                        <div v-else-if="!props.isGlobalView && currentLocation" class="flex justify-between">
+                            <span class="text-sm text-gray-600">Location:</span>
+                            <span class="font-semibold text-blue-600">{{ currentLocation.name || 'Unknown Location' }}</span>
+                        </div>
+                        <div v-else class="flex justify-between">
+                            <span class="text-sm text-gray-600">Location:</span>
+                            <span class="text-xs text-gray-500">No location data available</span>
+                        </div>
                     </div>
                 </div>
 
