@@ -44,8 +44,13 @@ class SaleController extends Controller
 
     public function products(Request $request, Domain $domain)
     {
+        $location = Helpers::getActiveLocation($domain, $request->input('location_id'));
+        
         $query = Product::query()
             ->where('domain', $domain->name_slug)
+            ->whereHas('activeLocations', function($q) use ($location) {
+                $q->where('location_id', $location->id);
+            })
             ->when($request->input('search'), fn($q, $search) => $q->search($search))
             ->when($request->input('category'), function ($q, $category) {
                 $q->whereHas('category', fn($q) => $q->where('name', $category));
