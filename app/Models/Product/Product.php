@@ -7,6 +7,7 @@ use App\Models\SaleItem;
 use App\Models\ProductInventory;
 use App\Models\InventoryMovement;
 use App\Models\InventoryLocation;
+use App\Models\LocationProduct;
 use App\Traits\Searchable;
 use Database\Factories\Product\ProductFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -55,6 +56,32 @@ class Product extends Model
         return $this->belongsTo(Category::class);
     }
 
+    /**
+     * Get all locations where this product is available
+     */
+    public function locations()
+    {
+        return $this->belongsToMany(InventoryLocation::class, 'location_product', 'product_id', 'location_id')
+                    ->using(LocationProduct::class)
+                    ->withPivot('is_active')
+                    ->withTimestamps();
+    }
+
+    /**
+     * Get only active locations where this product is available
+     */
+    public function activeLocations()
+    {
+        return $this->belongsToMany(InventoryLocation::class, 'location_product', 'product_id', 'location_id')
+                    ->using(LocationProduct::class)
+                    ->wherePivot('is_active', true)
+                    ->withPivot('is_active')
+                    ->withTimestamps();
+    }
+
+    /**
+     * @deprecated Use locations() or activeLocations() instead
+     */
     public function location()
     {
         return $this->belongsTo(InventoryLocation::class);
@@ -234,5 +261,47 @@ class Product extends Model
         }
 
         return $query->whereRaw('(SELECT SUM(quantity_available) FROM product_inventory WHERE product_id = products.id) <= 0');
+    }
+
+    /**
+     * Add product to a location
+     */
+    public function addToLocation(InventoryLocation $location, bool $isActive = true)
+    {
+        return $this->activeLocations()->syncWithoutDetaching([
+            $location->id => ['is_active' => $isActive]
+        ]);
+    }
+
+    /**
+     * Remove product from a location
+     */
+    public function removeFromLocation(InventoryLocation $location)
+    {
+        return $this->activeLocations()->detach($location->id);
+    }
+
+    /**
+     * Check if product is available at location
+     */
+    public function isAvailableAt(InventoryLocation $location): bool
+    {
+        return $this->activeLocations()->where('location_id', $location->id)->exists();
+    }
+
+    /**
+     * Toggle product availability at location
+     */
+    public function toggleAtLocation(InventoryLocation $location): bool
+    {
+        $isCurrentlyActive = $this->activeLocations()->where('location_id', $location->id)->exists();
+        
+        if ($isCurrentlyActive) {
+            $this->removeFromLocation($location);
+            return false;
+        } else {
+            $this->addToLocation($location);
+            return true;
+        }
     }
 }
