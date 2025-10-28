@@ -5,8 +5,10 @@ import { IconPlus, IconTrash, IconSearch, IconShoppingCart, IconAlertTriangle, I
 import { notification } from "ant-design-vue";
 import axios from "axios";
 import { usePage } from "@inertiajs/vue3";
+import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 
 const page = usePage();
+const { getRoute } = useDomainRoutes();
 
 const emit = defineEmits(["success", "update:visible"]);
 
@@ -51,7 +53,7 @@ const loadStoreItemCount = async (locationId) => {
   
   storeLoading.value = true;
   try {
-    const response = await axios.get(`/api/inventory/locations/${locationId}/summary`);
+    const response = await axios.get(getRoute('inventory.locations.summary', { location: locationId }));
     selectedStore.value = response.data;
   } catch (error) {
     console.error('Failed to load store summary:', error);
@@ -89,8 +91,11 @@ const searchProducts = async () => {
 
   searchLoading.value = true;
   try {
-    const response = await axios.get(route('sales.products'), {
-      params: { search: productSearch.value },
+    const params = { search: productSearch.value };
+    
+    // Use getRoute for consistent route resolution
+    const response = await axios.get(getRoute('inventory.search.products'), {
+      params,
     });
     searchResults.value = response.data.data || [];
   } catch (error) {
@@ -164,7 +169,8 @@ const handleSubmit = async () => {
   loading.value = true;
 
   try {
-    const response = await axios.post(route('inventory.receive'), form);
+    // Use getRoute for consistent route resolution
+    const response = await axios.post(getRoute('inventory.receive'), form);
 
     if (response.data.success) {
       notification.success({

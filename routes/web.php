@@ -76,6 +76,9 @@ Route::middleware(['auth', 'user.permission'])->group(function () {
         Route::post('/receive', [\App\Http\Controllers\InventoryController::class, 'receive'])->name('receive');
         Route::post('/transfer', [\App\Http\Controllers\InventoryController::class, 'transfer'])->name('transfer');
         
+        // Search routes
+        Route::get('/search/products', [\App\Http\Controllers\InventoryController::class, 'searchProducts'])->name('search.products');
+        
         Route::resource('adjustments', \App\Http\Controllers\StockAdjustmentController::class)->names('adjustments');
         Route::post('/adjustments/{adjustment}/submit', [\App\Http\Controllers\StockAdjustmentController::class, 'submitForApproval'])->name('adjustments.submit');
         Route::post('/adjustments/{adjustment}/approve', [\App\Http\Controllers\StockAdjustmentController::class, 'approve'])->name('adjustments.approve');

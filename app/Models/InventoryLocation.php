@@ -110,12 +110,43 @@ class InventoryLocation extends Model
     }
 
     /**
-     * Get the default location
+     * Get the default location for a specific domain
      */
-    public static function getDefault()
+    public static function getDefault($domain = null)
     {
-        return static::where('is_default', true)->first() 
-            ?? static::active()->first();
+        $query = static::where('is_default', true);
+        
+        if ($domain) {
+            $domainSlug = $domain instanceof \App\Models\Domain ? $domain->name_slug : $domain;
+            $query->where('domain', $domainSlug);
+        }
+        
+        return $query->first() ?? static::active()->where('domain', $domainSlug ?? null)->first();
+    }
+    
+    /**
+     * Get the default location for a specific domain (scope)
+     */
+    public function scopeDefaultForDomain($query, $domain)
+    {
+        $domainSlug = $domain instanceof \App\Models\Domain ? $domain->name_slug : $domain;
+        return $query->where('domain', $domainSlug)->where('is_default', true);
+    }
+    
+    /**
+     * Set as default location for its domain
+     */
+    public function setAsDefault()
+    {
+        // First, unset any existing default for this domain
+        static::where('domain', $this->domain)
+            ->where('is_default', true)
+            ->update(['is_default' => false]);
+        
+        // Set this location as default
+        $this->update(['is_default' => true]);
+        
+        return $this;
     }
 
     /**

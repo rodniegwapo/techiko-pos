@@ -206,21 +206,18 @@ class InventoryLocationController extends Controller
     }
 
     /**
-     * Set location as default
+     * Set location as default for its domain
      */
     public function setDefault(Request $request, InventoryLocation $location)
     {
-        // Unset current default
-        InventoryLocation::where('is_default', true)->update(['is_default' => false]);
-        
-        // Set new default
-        $location->update(['is_default' => true]);
+        // Use the new domain-specific method
+        $location->setAsDefault();
 
         if ($request->expectsJson()) {
             return new InventoryLocationResource($location);
         }
 
-        return redirect()->back()->with('success', 'Default location updated successfully.');
+        return redirect()->back()->with('success', 'Default location updated successfully for this domain.');
     }
 
     /**

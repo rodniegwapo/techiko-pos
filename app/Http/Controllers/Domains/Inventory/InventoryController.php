@@ -41,6 +41,17 @@ class InventoryController extends Controller
         $slug = $domain->name_slug;
         $location = Helpers::getActiveLocation($domain);
 
+        if (!$location) {
+            return Inertia::render('Inventory/Products', [
+                'inventories' => [],
+                'locations' => InventoryLocation::active()->forDomain($slug)->get(),
+                'categories' => Category::where('domain', $slug)->get(),
+                'filters' => $request->only(['search', 'stock_status', 'category_id']),
+                'isGlobalView' => false,
+                'current_location' => null,
+            ]);
+        }
+
         $query = ProductInventory::with(['product', 'location'])
             ->where('location_id', $location->id)
             ->whereHas('product', function ($q) use ($slug) {
@@ -110,6 +121,16 @@ class InventoryController extends Controller
         $slug = $domain->name_slug;
         $location = Helpers::getActiveLocation($domain, $request->input('location_id'));
 
+        if (!$location) {
+            return Inertia::render('Inventory/Movements', [
+                'movements' => [],
+                'locations' => InventoryLocation::active()->forDomain($slug)->get(),
+                'filters' => $request->only(['search', 'movement_type', 'date_from', 'date_to']),
+                'isGlobalView' => false,
+                'current_location' => null,
+            ]);
+        }
+
         $query = InventoryMovement::query()
             ->where('domain', $slug)
             ->where('location_id', $location->id)
@@ -163,7 +184,7 @@ class InventoryController extends Controller
 
         return response()->json([
             'products' => $lowStockProducts->map(function ($product) use ($location) {
-                $inventory = $product->inventoryAt($location);
+                $inventory = $location ? $product->inventoryAt($location) : null;
                 $reorderLevel = $inventory ? $inventory->getEffectiveReorderLevel() : $product->reorder_level;
                 $currentStock = $inventory ? $inventory->quantity_available : 0;
                 
@@ -183,6 +204,14 @@ class InventoryController extends Controller
     {
         $slug = $domain->name_slug;
         $location = Helpers::getActiveLocation($domain);
+
+        if (!$location) {
+            return response()->json([
+                'total_value' => 0,
+                'total_quantity' => 0,
+                'inventories' => [],
+            ]);
+        }
 
         $inventories = ProductInventory::with('product')
             ->where('location_id', $location->id)
@@ -273,5 +302,24 @@ class InventoryController extends Controller
         );
 
         return response()->noContent(200);
+    }
+
+    /**
+     * Search products for receiving inventory (domain-specific)
+     */
+    public function searchProducts(Request $request, Domain $domain)
+    {
+        $query = Product::query()
+            ->where('domain', $domain->name_slug)
+            ->with('category')
+            ->when($request->search, fn($q, $search) => $q->search($search))
+            ->when($request->category_id, fn($q, $categoryId) => $q->where('category_id', $categoryId));
+
+        $products = $query->limit(20)->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => \App\Http\Resources\ProductResource::collection($products)
+        ]);
     }
 }

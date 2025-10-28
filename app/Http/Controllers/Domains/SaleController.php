@@ -38,7 +38,9 @@ class SaleController extends Controller
 
         return Inertia::render('Sales/Index', [
             'domain' => $domain,
-            'categories' => $this->getCategoriesForLocation($domain->name_slug, $location)->get(),
+            'categories' => $location 
+                ? $this->getCategoriesForLocation($domain->name_slug, $location)->get()
+                : Category::where('domain', $domain->name_slug)->get(),
         ]);
     }
 
