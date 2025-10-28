@@ -321,12 +321,12 @@ const showDetails = (product) => {
                                 selectedProduct.sold_type || "N/A"
                             }}</span>
                         </div>
-                         <div class="flex justify-between">
-                             <span class="text-sm text-gray-600">Domain:</span>
-                             <span class="font-semibold">{{
-                                 selectedProduct.domain || "N/A"
-                             }}</span>
-                         </div>
+                        <div class="flex justify-between">
+                            <span class="text-sm text-gray-600">Domain:</span>
+                            <span class="font-semibold">{{
+                                selectedProduct.domain || "N/A"
+                            }}</span>
+                        </div>
                         <!-- Location Information -->
                         <!-- Global view: show locations from eager-loaded relation -->
                         <div v-if="props.isGlobalView && (selectedProduct.locations?.length || 0) > 0" class="flex justify-between">

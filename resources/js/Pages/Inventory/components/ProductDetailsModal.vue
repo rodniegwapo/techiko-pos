@@ -231,6 +231,18 @@ const allLocations = computed(() => props.product?.product?.locations || []);
           <p class="text-sm text-gray-500">
             SKU: {{ product.product?.SKU || "N/A" }}
           </p>
+          <!-- Domain and Location Info -->
+          <div class="flex items-center space-x-4 mt-2">
+            <a-tag color="blue" size="small">
+              Domain: {{ product.product?.domain || "N/A" }}
+            </a-tag>
+            <a-tag v-if="!props.isGlobalView && product.location" color="green" size="small">
+              Location: {{ product.location?.name || "N/A" }}
+            </a-tag>
+            <a-tag v-else-if="props.isGlobalView" color="purple" size="small">
+              {{ allLocations.length }} locations
+            </a-tag>
+          </div>
         </div>
 
         <!-- Status Badge -->
