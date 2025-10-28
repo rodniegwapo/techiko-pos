@@ -14,12 +14,15 @@ use App\Models\InventoryLocation;
 use App\Services\SaleService;
 use App\Services\InventoryService;
 use App\Helpers;
+use App\Traits\LocationCategoryScoping;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class SaleController extends Controller
 {
+    use LocationCategoryScoping;
+    
     protected $saleService;
     protected $inventoryService;
 
@@ -35,7 +38,7 @@ class SaleController extends Controller
 
         return Inertia::render('Sales/Index', [
             'domain' => $domain,
-            'categories' => Category::where('domain', $domain->name_slug)->where('location_id', $location->id)->get(),
+            'categories' => $this->getCategoriesForLocation($domain->name_slug, $location)->get(),
         ]);
     }
 

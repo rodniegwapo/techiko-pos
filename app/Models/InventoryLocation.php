@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Traits\Searchable;
+use App\Models\LocationProduct;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -75,6 +76,29 @@ class InventoryLocation extends Model
     public function sales()
     {
         return $this->hasMany(Sale::class, 'location_id');
+    }
+
+    /**
+     * Get all products available at this location
+     */
+    public function products()
+    {
+        return $this->belongsToMany(Product\Product::class, 'location_product', 'location_id', 'product_id')
+                    ->using(LocationProduct::class)
+                    ->withPivot('is_active')
+                    ->withTimestamps();
+    }
+
+    /**
+     * Get only active products available at this location
+     */
+    public function activeProducts()
+    {
+        return $this->belongsToMany(Product\Product::class, 'location_product', 'location_id', 'product_id')
+                    ->using(LocationProduct::class)
+                    ->wherePivot('is_active', true)
+                    ->withPivot('is_active')
+                    ->withTimestamps();
     }
 
     /**

@@ -7,11 +7,13 @@ use App\Models\Domain;
 use App\Models\Category;
 use App\Http\Resources\CategoryResource;
 use App\Helpers;
+use App\Traits\LocationCategoryScoping;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class CategoryController extends Controller
 {
+    use LocationCategoryScoping;
     /**
      * Display a listing of categories for the domain.
      */
@@ -19,11 +21,7 @@ class CategoryController extends Controller
     {
         $location = Helpers::getActiveLocation($domain);
 
-        $query = Category::query()
-            ->where('domain', $domain->name_slug)
-            ->where('location_id', $location->id)
-            ->withCount('products')
-            // Use Searchable trait on Category
+        $query = $this->getCategoriesWithCountsForLocation($domain->name_slug, $location)
             ->when($request->input('search'), function ($q, $search) {
                 return $q->search($search);
             });
@@ -51,10 +49,7 @@ class CategoryController extends Controller
             $validated['domain'] = $domain->name_slug;
         }
         
-        // Get effective location for the category
-        $location = Helpers::getActiveLocation($domain);
-        $validated['location_id'] = $location->id;
-        
+        // Create category (no direct location binding)
         $category = Category::create($validated);
 
         return redirect()->back()->with('success', 'Category created successfully');

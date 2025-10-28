@@ -10,11 +10,13 @@ use App\Models\ProductInventory;
 use App\Models\Category;
 use App\Models\InventoryLocation;
 use App\Helpers;
+use App\Traits\LocationCategoryScoping;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class ProductController extends Controller
 {
+    use LocationCategoryScoping;
     /**
      * Display a listing of products for the domain.
      */
@@ -25,7 +27,9 @@ class ProductController extends Controller
         $query = Product::query()
             ->with('category')
             ->where('domain', $domain->name_slug)
-            ->where('location_id', $location->id)
+            ->whereHas('activeLocations', function($q) use ($location) {
+                $q->where('location_id', $location->id);
+            })
             ->when($request->search, fn($q, $s) => $q->search($s))
             ->when($request->category, function ($query, $category) {
                 return $query->whereHas('category', function ($q) use ($category) {
@@ -37,7 +41,7 @@ class ProductController extends Controller
 
         return Inertia::render('Products/Index', [
             'items' => ProductResource::collection($products),
-            'categories' => Category::where('domain', $domain->name_slug)->where('location_id', $location->id)->get(),
+            'categories' => $this->getCategoriesForLocation($domain->name_slug, $location)->get(),
             'sold_by_types' => \App\Models\Product\ProductSoldType::all(),
             'isGlobalView' => !$domain,
         ]);
@@ -66,11 +70,14 @@ class ProductController extends Controller
             $validated['domain'] = $domain->name_slug;
         }
 
-        // Get effective location for the product
+        // Create product and attach to active location via pivot
         $location = Helpers::getActiveLocation($domain, $request->input('location_id'));
-        $validated['location_id'] = $location->id;
 
         $product = Product::create($validated);
+        if ($location) {
+            // ensure product is available at the active location
+            $product->addToLocation($location, true);
+        }
 
         return redirect()->back()->with('success', 'Product created successfully');
     }

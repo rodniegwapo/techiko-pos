@@ -12,11 +12,14 @@ use App\Models\Product\Product;
 use App\Models\ProductInventory;
 use App\Services\InventoryService;
 use App\Helpers;
+use App\Traits\LocationCategoryScoping;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class InventoryController extends Controller
 {
+    use LocationCategoryScoping;
+    
     public function __construct(private InventoryService $inventoryService) {}
 
     public function index(Request $request, Domain $domain)
@@ -96,9 +99,7 @@ class InventoryController extends Controller
         return Inertia::render('Inventory/Products', [
             'inventories' => ProductInventoryResource::collection($inventories),
             'locations' => InventoryLocation::active()->forDomain($slug)->get(),
-            'categories' => \App\Models\Category::where('domain', $slug)
-                ->where('location_id', $location->id)
-                ->get(),
+            'categories' => $this->getCategoriesForLocation($slug, $location)->get(),
             'filters' => $request->only(['search', 'stock_status', 'category_id']),
             'isGlobalView' => false,
         ]);
