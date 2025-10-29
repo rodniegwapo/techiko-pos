@@ -39,7 +39,6 @@ class DashboardController extends Controller
 
         return Inertia::render('Dashboard/Index', [
             'stats' => $stats,
-            'locations' => $availableLocations,
         ]);
     }
 
