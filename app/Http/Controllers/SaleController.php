@@ -164,25 +164,8 @@ class SaleController extends Controller
     /**
      * Add item to cart
      */
-    public function addItemToCart(Request $request, $saleId = null)
+    public function addItemToCart(Request $request, Sale $sale)
     {
-        // Handle both route model binding and manual ID resolution
-        if ($saleId instanceof Sale) {
-            $sale = $saleId;
-        } else {
-            $saleId = $saleId ?? $request->route('sale');
-            $domain = $request->route('domain');
-
-            // If we're in a domain context, scope by domain
-            if ($domain) {
-                $sale = Sale::where('id', $saleId)
-                    ->where('domain', $domain)
-                    ->firstOrFail();
-            } else {
-                $sale = Sale::findOrFail($saleId);
-            }
-        }
-
         // Ensure the sale belongs to the current domain if in domain context
         $domain = $request->route('domain');
         if ($domain && $sale->domain !== $domain) {
@@ -241,23 +224,15 @@ class SaleController extends Controller
     /**
      * Remove item from cart
      */
-    public function removeItemFromCart(Request $request, $saleId = null)
+    public function removeItemFromCart(Request $request, Sale $sale)
     {
-        // Handle both route model binding and manual ID resolution
-        if ($saleId instanceof Sale) {
-            $sale = $saleId;
-        } else {
-            $saleId = $saleId ?? $request->route('sale');
-            $domain = $request->route('domain');
-
-            // If we're in a domain context, scope by domain
-            if ($domain) {
-                $sale = Sale::where('id', $saleId)
-                    ->where('domain', $domain)
-                    ->firstOrFail();
-            } else {
-                $sale = Sale::findOrFail($saleId);
-            }
+        // Ensure the sale belongs to the current domain if in domain context
+        $domain = $request->route('domain');
+        if ($domain && $sale->domain !== $domain) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Sale not found in this domain'
+            ], 404);
         }
 
         $validated = $request->validate([
@@ -286,23 +261,15 @@ class SaleController extends Controller
     /**
      * Update item quantity in cart
      */
-    public function updateItemQuantity(Request $request, $saleId = null)
+    public function updateItemQuantity(Request $request, Sale $sale)
     {
-        // Handle both route model binding and manual ID resolution
-        if ($saleId instanceof Sale) {
-            $sale = $saleId;
-        } else {
-            $saleId = $saleId ?? $request->route('sale');
-            $domain = $request->route('domain');
-
-            // If we're in a domain context, scope by domain
-            if ($domain) {
-                $sale = Sale::where('id', $saleId)
-                    ->where('domain', $domain)
-                    ->firstOrFail();
-            } else {
-                $sale = Sale::findOrFail($saleId);
-            }
+        // Ensure the sale belongs to the current domain if in domain context
+        $domain = $request->route('domain');
+        if ($domain && $sale->domain !== $domain) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Sale not found in this domain'
+            ], 404);
         }
 
         $validated = $request->validate([
@@ -340,23 +307,15 @@ class SaleController extends Controller
     /**
      * Get current cart state
      */
-    public function getCartState(Request $request, $saleId = null)
+    public function getCartState(Request $request, Sale $sale)
     {
-        // Handle both route model binding and manual ID resolution
-        if ($saleId instanceof Sale) {
-            $sale = $saleId;
-        } else {
-            $saleId = $saleId ?? $request->route('sale');
-            $domain = $request->route('domain');
-
-            // If we're in a domain context, scope by domain
-            if ($domain) {
-                $sale = Sale::where('id', $saleId)
-                    ->where('domain', $domain)
-                    ->firstOrFail();
-            } else {
-                $sale = Sale::findOrFail($saleId);
-            }
+        // Ensure the sale belongs to the current domain if in domain context
+        $domain = $request->route('domain');
+        if ($domain && $sale->domain !== $domain) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Sale not found in this domain'
+            ], 404);
         }
 
         $sale->load(['saleItems.product', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount']);
@@ -492,6 +451,15 @@ class SaleController extends Controller
 
     public function voidItem(Request $request, Sale $sale)
     {
+        // Ensure the sale belongs to the current domain if in domain context
+        $domain = $request->route('domain');
+        if ($domain && $sale->domain !== $domain) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Sale not found in this domain'
+            ], 404);
+        }
+
         $validated = $request->validate([
             'pin_code' => 'required|string',
             'reason' => 'nullable|string',
@@ -508,29 +476,30 @@ class SaleController extends Controller
 
     public function findSaleItem(Request $request, Sale $sale)
     {
+        // Ensure the sale belongs to the current domain if in domain context
+        $domain = $request->route('domain');
+        if ($domain && $sale->domain !== $domain) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Sale not found in this domain'
+            ], 404);
+        }
+
         return $sale->saleItems()
             ->with('discounts') // Load the discounts relationship
             ->where('product_id', $request->product_id)
             ->first();
     }
 
-    public function assignCustomer(Request $request, $saleId = null)
+    public function assignCustomer(Request $request, Sale $sale)
     {
-        // Handle both route model binding and manual ID resolution
-        if ($saleId instanceof Sale) {
-            $sale = $saleId;
-        } else {
-            $saleId = $saleId ?? $request->route('sale');
-            $domain = $request->route('domain');
-
-            // If we're in a domain context, scope by domain
-            if ($domain) {
-                $sale = Sale::where('id', $saleId)
-                    ->where('domain', $domain)
-                    ->firstOrFail();
-            } else {
-                $sale = Sale::findOrFail($saleId);
-            }
+        // Ensure the sale belongs to the current domain if in domain context
+        $domain = $request->route('domain');
+        if ($domain && $sale->domain !== $domain) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Sale not found in this domain'
+            ], 404);
         }
 
         $validated = $request->validate([
@@ -569,6 +538,15 @@ class SaleController extends Controller
 
     public function testCustomerEvent(Request $request, Sale $sale)
     {
+        // Ensure the sale belongs to the current domain if in domain context
+        $domain = $request->route('domain');
+        if ($domain && $sale->domain !== $domain) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Sale not found in this domain'
+            ], 404);
+        }
+
         \Log::info("Testing CustomerUpdated event", [
             'sale_id' => $sale->id
         ]);
@@ -584,6 +562,15 @@ class SaleController extends Controller
 
     public function processLoyalty(Request $request, Sale $sale)
     {
+        // Ensure the sale belongs to the current domain if in domain context
+        $domain = $request->route('domain');
+        if ($domain && $sale->domain !== $domain) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Sale not found in this domain'
+            ], 404);
+        }
+
         // Ensure sale is paid (optional validation)
         if ($sale->payment_status !== 'paid') {
             return response()->json(['error' => 'Sale not completed'], 400);
@@ -618,6 +605,15 @@ class SaleController extends Controller
 
     public function testOrderEvent(Request $request, Sale $sale)
     {
+        // Ensure the sale belongs to the current domain if in domain context
+        $domain = $request->route('domain');
+        if ($domain && $sale->domain !== $domain) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Sale not found in this domain'
+            ], 404);
+        }
+
         \Log::info("Testing OrderUpdated event", [
             'sale_id' => $sale->id
         ]);
@@ -655,10 +651,10 @@ class SaleController extends Controller
 
         // Apply location-based filtering based on user role
         if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
-            // Admin/Super Admin: Filter by default location or current location
-            $defaultLocation = $currentUser->location_id ?? $request->input('location_id');
-            if ($defaultLocation) {
-                $query->where('location_id', $defaultLocation);
+            // Admin/Super Admin: Use Helpers::getActiveLocation()
+            $location = \App\Helpers::getActiveLocation($domain);
+            if ($location) {
+                $query->where('location_id', $location->id);
             }
         } else {
             // Regular users: Filter by their assigned location
@@ -747,9 +743,21 @@ class SaleController extends Controller
             ->orderBy('created_at', 'desc')
             ->first();
 
-        // If no pending sale exists, create one
+        // If no pending sale exists, create one with location
         if (!$sale) {
-            $sale = $this->saleService->storeDraft($user);
+            $currentUser = auth()->user();
+            $userRole = $currentUser ? $currentUser->roles()->first() : null;
+            
+            if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
+                // Admin/Super Admin: Use Helpers::getActiveLocation()
+                $location = \App\Helpers::getActiveLocation($domain);
+                $locationId = $location?->id;
+            } else {
+                // Regular users: Use their assigned location
+                $locationId = $user->location_id;
+            }
+            
+            $sale = $this->saleService->storeDraft($user, $locationId);
         }
 
         // Now add item to the sale
@@ -807,10 +815,10 @@ class SaleController extends Controller
         
         // Apply location-based filtering based on user role
         if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
-            // Admin/Super Admin: Filter by default location or current location
-            $defaultLocation = $currentUser->location_id ?? $request->input('location_id');
-            if ($defaultLocation) {
-                $query->where('location_id', $defaultLocation);
+            // Admin/Super Admin: Use Helpers::getActiveLocation()
+            $location = \App\Helpers::getActiveLocation($domain);
+            if ($location) {
+                $query->where('location_id', $location->id);
             }
         } else {
             // Regular users: Filter by their assigned location and user ID
@@ -855,10 +863,10 @@ class SaleController extends Controller
         
         // Apply location-based filtering based on user role
         if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
-            // Admin/Super Admin: Filter by default location or current location
-            $defaultLocation = $currentUser->location_id ?? $request->input('location_id');
-            if ($defaultLocation) {
-                $query->where('location_id', $defaultLocation);
+            // Admin/Super Admin: Use Helpers::getActiveLocation()
+            $location = \App\Helpers::getActiveLocation($domain);
+            if ($location) {
+                $query->where('location_id', $location->id);
             }
         } else {
             // Regular users: Filter by their assigned location and user ID
@@ -909,12 +917,28 @@ class SaleController extends Controller
         // Explicitly get the 'user' parameter from the route
         $userId = $request->route('user');
 
-        // Get user's latest pending sale
-        $sale = Sale::forDomain($domain)
+        $currentUser = auth()->user();
+        $userRole = $currentUser ? $currentUser->roles()->first() : null;
+
+        $query = Sale::forDomain($domain)
             ->pending()
             ->where('user_id', $userId)
-            ->orderBy('created_at', 'desc')
-            ->first();
+            ->orderBy('created_at', 'desc');
+
+        // Apply location-based filtering based on user role
+        if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
+            // Admin/Super Admin: Use Helpers::getActiveLocation()
+            $location = \App\Helpers::getActiveLocation($domain);
+            if ($location) {
+                $query->where('location_id', $location->id);
+            }
+        } else {
+            // Regular users: Filter by their assigned location
+            $query->where('location_id', $currentUser->location_id);
+        }
+
+        // Get user's latest pending sale
+        $sale = $query->first();
 
         if (!$sale) {
             return response()->json(['success' => false, 'message' => 'No pending sale found'], 404);
@@ -951,13 +975,29 @@ class SaleController extends Controller
         // Explicitly get the 'user' parameter from the route
         $userId = $request->route('user');
 
-        // Get user's latest pending sale
-        $sale = Sale::forDomain($domain)
+        $currentUser = auth()->user();
+        $userRole = $currentUser ? $currentUser->roles()->first() : null;
+
+        $query = Sale::forDomain($domain)
             ->pending()
             ->where('user_id', $userId)
             ->orderBy('created_at', 'desc')
-            ->with(['saleItems.product', 'saleItems.discounts', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount'])
-            ->first();
+            ->with(['saleItems.product', 'saleItems.discounts', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount']);
+
+        // Apply location-based filtering based on user role
+        if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
+            // Admin/Super Admin: Use Helpers::getActiveLocation()
+            $location = \App\Helpers::getActiveLocation($domain);
+            if ($location) {
+                $query->where('location_id', $location->id);
+            }
+        } else {
+            // Regular users: Filter by their assigned location
+            $query->where('location_id', $currentUser->location_id);
+        }
+
+        // Get user's latest pending sale
+        $sale = $query->first();
 
         if (!$sale) {
             return response()->json([
