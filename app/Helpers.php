@@ -41,7 +41,10 @@ class Helpers
             return InventoryLocation::forDomain($domainSlug)->find($user->location_id);
         }
         
-        // Fallback to domain's default location using the new method
-        return InventoryLocation::getDefault($domainSlug);
+        // Fallback to domain's default location
+        return InventoryLocation::active()
+            ->forDomain($domainSlug)
+            ->where('is_default', true)
+            ->first();
     }
 }

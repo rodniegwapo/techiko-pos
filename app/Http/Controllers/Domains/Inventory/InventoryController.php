@@ -12,6 +12,7 @@ use App\Models\Product\Product;
 use App\Models\ProductInventory;
 use App\Services\InventoryService;
 use App\Helpers;
+use App\Models\Category;
 use App\Traits\LocationCategoryScoping;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -179,7 +180,7 @@ class InventoryController extends Controller
     public function lowStock(Request $request, Domain $domain)
     {
         $location = Helpers::getActiveLocation($domain, $request->input('location_id'));
-        
+
         $lowStockProducts = $this->inventoryService->getLowStockProducts($location, $domain->name_slug);
 
         return response()->json([
@@ -187,7 +188,7 @@ class InventoryController extends Controller
                 $inventory = $location ? $product->inventoryAt($location) : null;
                 $reorderLevel = $inventory ? $inventory->getEffectiveReorderLevel() : $product->reorder_level;
                 $currentStock = $inventory ? $inventory->quantity_available : 0;
-                
+
                 return [
                     'id' => $product->id,
                     'name' => $product->name,
@@ -309,9 +310,14 @@ class InventoryController extends Controller
      */
     public function searchProducts(Request $request, Domain $domain)
     {
+        $location = Helpers::getActiveLocation($domain);
+
         $query = Product::query()
             ->where('domain', $domain->name_slug)
             ->with('category')
+            ->whereHas('activeLocations', function ($q) use ($location) {
+                $q->where('location_id', $location->id);
+            })
             ->when($request->search, fn($q, $search) => $q->search($search))
             ->when($request->category_id, fn($q, $categoryId) => $q->where('category_id', $categoryId));
 

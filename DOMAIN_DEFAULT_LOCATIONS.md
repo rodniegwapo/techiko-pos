@@ -121,3 +121,5 @@ The implementation has been tested with:
 - Location selection components should show domain context
 - Default location indicators should be domain-aware
 - Location management UI should reflect domain isolation
+
+
