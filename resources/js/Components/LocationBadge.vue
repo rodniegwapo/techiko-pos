@@ -137,14 +137,14 @@ const switchLocation = async (location) => {
 
             <a-button
                 type="primary"
-                size="large"
-                class="flex items-center space-x-2 bg-green-500 hover:bg-green-600 border-green-500 rounded-xl px-6 py-3 shadow-lg font-medium"
+                size="small"
+                class="flex items-center space-x-2 bg-white hover:bg-gray-50 border border-gray-300 hover:border-gray-400 rounded-full px-4 py-2 shadow-sm hover:shadow-md text-sm font-medium text-gray-700 hover:text-gray-900 transition-all duration-200"
             >
-                <IconMapPin class="w-5 h-5" />
-                <span class="font-medium">{{
+                <IconMapPin class="w-4 h-4 text-green-600" />
+                <span class="max-w-32 truncate">{{
                     currentLocation?.name || "Select Location"
                 }}</span>
-                <IconChevronDown class="w-4 h-4" />
+                <IconChevronDown class="w-3 h-3 text-gray-500" />
             </a-button>
         </a-popover>
     </div>
