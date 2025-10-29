@@ -21,10 +21,24 @@ class SaleService
         $this->inventoryService = $inventoryService;
     }
 
-    public function storeDraft($user)
+    public function storeDraft($user, $locationId = null)
     {
+        // Determine location based on user role and context
+        $currentUser = auth()->user();
+        $userRole = $currentUser ? $currentUser->roles()->first() : null;
+        
+        // Set location_id based on user role
+        if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
+            // Admin/Super Admin: Use provided location or current user's location
+            $finalLocationId = $locationId ?? $currentUser->location_id;
+        } else {
+            // Regular users: Use their assigned location only
+            $finalLocationId = $user->location_id;
+        }
+        
         $sale = Sale::create([
             'user_id' => $user->id,
+            'location_id' => $finalLocationId,
             'domain' => $user->domain ?? 'default',
             'payment_status' => 'pending',
             'invoice_number' => Str::random(10),
