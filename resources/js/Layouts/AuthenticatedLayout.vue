@@ -2,6 +2,7 @@
 import LeftMenu from "@/Components/sidebar/leftMenu.vue";
 import LeftSidebarWrapper from "@/Components/sidebar/leftWrapper.vue";
 import LeftAccountSettings from "@/Components/sidebar/leftAccountSettings.vue";
+import LocationBadge from "@/Components/LocationBadge.vue";
 import Terminal from "@/Components/Terminal.vue";
 
 import { onMounted, ref } from "vue";
@@ -11,8 +12,8 @@ import {
     UploadOutlined,
 } from "@ant-design/icons-vue";
 import { IconMenu2 } from "@tabler/icons-vue";
-import { useAuth } from "@/composables/useAuth";
-import { useSidebar } from "@/composables/useSidebar";
+import { useAuth } from "@/Composables/useAuth";
+import { useSidebar } from "@/Composables/useSidebar";
 
 const { user } = useAuth();
 const { isCollapsed } = useSidebar();
@@ -57,6 +58,9 @@ onMounted(() => {
                 <slot name="content-footer" />
             </div>
         </a-layout-content>
+        
+        <!-- Floating Location Badge -->
+        <LocationBadge />
     </a-layout>
 </template>
 
