@@ -20,18 +20,37 @@ const userRole = computed(() => page.props.auth?.user?.data?.roles[0]);
 // Check if user has admin/super admin permissions
 const hasLocationAccess = computed(() => {
     const role = userRole.value;
-    
+
     // Add null checks to prevent errors
     if (!role) return false;
-    
+
     return role.name === "admin" || role.name === "super admin";
 });
 
-// Get locations from global handleInertia data (always array)
-const locations = computed(() => {
-    const locs = page.props.locations || [];
-    console.log("LocationBadge - Locations from handleInertia:", locs);
+// Get available locations from global handleInertia data (always array)
+const availableLocations = computed(() => {
+    const locs = page.props.availableLocations || [];
+    console.log("LocationBadge - Available Locations from handleInertia:", locs);
     return locs;
+});
+
+// Debug visibility conditions
+const shouldShowBadge = computed(() => {
+    const debug = {
+        currentDomain: !!currentDomain.value,
+        hasLocationAccess: hasLocationAccess.value,
+        availableLocationsLength: availableLocations.value.length,
+        userRole: userRole.value?.name,
+        currentLocation: currentLocation.value?.name,
+    };
+
+    console.log("LocationBadge Debug:", debug);
+
+    return (
+        currentDomain.value &&
+        hasLocationAccess.value &&
+        availableLocations.value.length > 0
+    );
 });
 
 // Get location icon/color based on type
@@ -73,10 +92,7 @@ const switchLocation = async (location) => {
 </script>
 
 <template>
-    <div
-        v-if="currentDomain && locations.length > 0 && hasLocationAccess"
-        class="fixed top-4 right-4 z-50"
-    >
+    <div v-if="shouldShowBadge" class="fixed top-4 right-4 z-50">
         <a-popover
             v-model:open="visible"
             placement="bottomRight"
@@ -93,7 +109,7 @@ const switchLocation = async (location) => {
                     </div>
                     <div class="space-y-1 max-h-60 overflow-y-auto">
                         <div
-                            v-for="location in locations"
+                            v-for="location in availableLocations"
                             :key="location.id"
                             @click="switchLocation(location)"
                             class="p-3 hover:bg-gray-50 cursor-pointer rounded-lg flex items-center justify-between transition-colors"
