@@ -38,7 +38,7 @@ class SaleController extends Controller
 
         return Inertia::render('Sales/Index', [
             'domain' => $domain,
-            'categories' => $location 
+            'categories' => $location
                 ? $this->getCategoriesForLocation($domain->name_slug, $location)->get()
                 : Category::where('domain', $domain->name_slug)->get(),
         ]);
@@ -128,7 +128,19 @@ class SaleController extends Controller
 
     public function storeDraft(Request $request, Domain $domain)
     {
-        $order = $this->saleService->storeDraft($request->user());
+        $user = $request->user();
+        $userRole = $user->roles()->first();
+
+        if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
+            // Admin/Super Admin: Use Helpers::getActiveLocation()
+            $location = \App\Helpers::getActiveLocation($domain);
+            $locationId = $location?->id;
+        } else {
+            // Regular users: Use their assigned location
+            $locationId = $user->location_id;
+        }
+
+        $order = $this->saleService->storeDraft($user, $locationId);
 
         return response()->json(['order' => $order]);
     }
@@ -445,14 +457,28 @@ class SaleController extends Controller
     public function getCurrentPendingSale(Request $request, Domain $domain)
     {
         $userId = auth()->id();
+        $currentUser = auth()->user();
+        $userRole = $currentUser ? $currentUser->roles()->first() : null;
 
-        // Get the latest pending sale for this user in this domain
-        $sale = Sale::forDomain($domain->name_slug)
+        $query = Sale::forDomain($domain->name_slug)
             ->pending()
             ->where('user_id', $userId)
             ->orderBy('created_at', 'desc')
-            ->with(['saleItems.product', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount', 'saleItems.discounts'])
-            ->first();
+            ->with(['saleItems.product', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount', 'saleItems.discounts']);
+
+        // Apply location-based filtering based on user role
+        if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
+            // Admin/Super Admin: Filter by default location or current location
+            $defaultLocation = $currentUser->location_id ?? $request->input('location_id');
+            if ($defaultLocation) {
+                $query->where('location_id', $defaultLocation);
+            }
+        } else {
+            // Regular users: Filter by their assigned location
+            $query->where('location_id', $currentUser->location_id);
+        }
+
+        $sale = $query->first();
 
         // Always return success, even if no sale found
         return response()->json([
@@ -482,8 +508,21 @@ class SaleController extends Controller
         // Verify the user exists and is accessible
         $user = \App\Models\User::findOrFail($userId);
 
-        // Create new sale for this user
-        $sale = $this->saleService->storeDraft($user);
+        // Determine location based on current user's role
+        $currentUser = auth()->user();
+        $userRole = $currentUser ? $currentUser->roles()->first() : null;
+
+        if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
+            // Admin/Super Admin: Use Helpers::getActiveLocation()
+            $location = \App\Helpers::getActiveLocation($domain);
+            $locationId = $location?->id;
+        } else {
+            // Regular users: Use their assigned location
+            $locationId = $user->location_id;
+        }
+
+        // Create new sale for this user with location
+        $sale = $this->saleService->storeDraft($user, $locationId);
 
         return response()->json([
             'success' => true,
@@ -511,16 +550,44 @@ class SaleController extends Controller
 
         $user = \App\Models\User::findOrFail($userId);
 
-        // Get or create latest pending sale for this user
-        $sale = Sale::forDomain($domain->name_slug)
-            ->pending()
-            ->where('user_id', $userId)
-            ->orderBy('created_at', 'desc')
-            ->first();
+        $currentUser = auth()->user();
+        $userRole = $currentUser->roles()->first();
 
-        // If no pending sale exists, create one
+        $query = Sale::forDomain($domain->name_slug)
+            ->pending()
+            ->orderBy('created_at', 'desc');
+
+        // Apply location-based filtering based on user role
+        if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
+            // Admin/Super Admin: Filter by default location or current location
+            $defaultLocation = $currentUser->location_id ?? $request->input('location_id');
+            if ($defaultLocation) {
+                $query->where('location_id', $defaultLocation);
+            }
+        } else {
+            // Regular users: Filter by their assigned location and user ID
+            $query->where('location_id', $currentUser->location_id)
+                ->where('user_id', $userId);
+        }
+
+        // Get or create latest pending sale for this user
+        $sale = $query->first();
+
+        // If no pending sale exists, create one with location
         if (!$sale) {
-            $sale = $this->saleService->storeDraft($user);
+            $currentUser = auth()->user();
+            $userRole = $currentUser ? $currentUser->roles()->first() : null;
+
+            if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
+                // Admin/Super Admin: Use Helpers::getActiveLocation()
+                $location = \App\Helpers::getActiveLocation($domain);
+                $locationId = $location?->id;
+            } else {
+                // Regular users: Use their assigned location
+                $locationId = $user->location_id;
+            }
+
+            $sale = $this->saleService->storeDraft($user, $locationId);
         }
 
         // Now add item to the sale
@@ -570,12 +637,30 @@ class SaleController extends Controller
         // Explicitly get the 'user' parameter from the route
         $userId = $request->route('user');
 
-        $sale = Sale::forDomain($domain->name_slug)
+        $currentUser = auth()->user();
+        $userRole = $currentUser->roles()->first();
+
+
+        logger($userRole);
+        $query = Sale::forDomain($domain->name_slug)
             ->pending()
-            ->where('user_id', $userId)
             ->orderBy('created_at', 'desc')
-            ->with(['saleItems.product', 'saleItems.discounts', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount'])
-            ->first();
+            ->with(['saleItems.product', 'saleItems.discounts', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount']);
+
+        // Apply location-based filtering based on user role
+        if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
+            // Admin/Super Admin: Use Helpers::getActiveLocation()
+            $location = \App\Helpers::getActiveLocation($domain);
+            if ($location) {
+                $query->where('location_id', $location->id);
+            }
+        } else {
+            // Regular users: Filter by their assigned location and user ID
+            $query->where('location_id', $currentUser->location_id)
+                ->where('user_id', $userId);
+        }
+
+        $sale = $query->first();
 
         // Get all available discount options
         $productDiscounts = Discount::where('is_active', true)
@@ -650,12 +735,28 @@ class SaleController extends Controller
         // Explicitly get the 'user' parameter from the route
         $userId = $request->route('user');
 
-        // Get user's latest pending sale
-        $sale = Sale::forDomain($domain->name_slug)
+        $currentUser = auth()->user();
+        $userRole = $currentUser->roles()->first();
+
+        $query = Sale::forDomain($domain->name_slug)
             ->pending()
-            ->where('user_id', $userId)
-            ->orderBy('created_at', 'desc')
-            ->first();
+            ->orderBy('created_at', 'desc');
+
+        // Apply location-based filtering based on user role
+        if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
+            // Admin/Super Admin: Filter by default location or current location
+            $defaultLocation = $currentUser->location_id ?? $request->input('location_id');
+            if ($defaultLocation) {
+                $query->where('location_id', $defaultLocation);
+            }
+        } else {
+            // Regular users: Filter by their assigned location and user ID
+            $query->where('location_id', $currentUser->location_id)
+                ->where('user_id', $userId);
+        }
+
+        // Get user's latest pending sale
+        $sale = $query->first();
 
         if (!$sale) {
             return response()->json(['success' => false, 'message' => 'No pending sale found'], 404);
@@ -696,12 +797,28 @@ class SaleController extends Controller
         // Explicitly get the 'user' parameter from the route
         $userId = $request->route('user');
 
-        // Get user's latest pending sale
-        $sale = Sale::forDomain($domain->name_slug)
+        $currentUser = auth()->user();
+        $userRole = $currentUser->roles()->first();
+
+        $query = Sale::forDomain($domain->name_slug)
             ->pending()
-            ->where('user_id', $userId)
-            ->orderBy('created_at', 'desc')
-            ->first();
+            ->orderBy('created_at', 'desc');
+
+        // Apply location-based filtering based on user role
+        if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
+            // Admin/Super Admin: Filter by default location or current location
+            $defaultLocation = $currentUser->location_id ?? $request->input('location_id');
+            if ($defaultLocation) {
+                $query->where('location_id', $defaultLocation);
+            }
+        } else {
+            // Regular users: Filter by their assigned location and user ID
+            $query->where('location_id', $currentUser->location_id)
+                ->where('user_id', $userId);
+        }
+
+        // Get user's latest pending sale
+        $sale = $query->first();
 
         if (!$sale) {
             return response()->json(['success' => false, 'message' => 'No pending sale found'], 404);
@@ -736,14 +853,28 @@ class SaleController extends Controller
     {
         // Explicitly get the 'user' parameter from the route
         $userId = $request->route('user');
+        $currentUser = auth()->user();
+        $userRole = $currentUser ? $currentUser->roles()->first() : null;
 
-        // Get user's latest pending sale
-        $sale = Sale::forDomain($domain->name_slug)
+        $query = Sale::forDomain($domain->name_slug)
             ->pending()
             ->where('user_id', $userId)
             ->orderBy('created_at', 'desc')
-            ->with(['saleItems.product', 'saleItems.discounts', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount'])
-            ->first();
+            ->with(['saleItems.product', 'saleItems.discounts', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount']);
+
+        // Apply location-based filtering based on user role
+        if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
+            // Admin/Super Admin: Filter by default location or current location
+            $defaultLocation = $currentUser->location_id ?? $request->input('location_id');
+            if ($defaultLocation) {
+                $query->where('location_id', $defaultLocation);
+            }
+        } else {
+            // Regular users: Filter by their assigned location
+            $query->where('location_id', $currentUser->location_id);
+        }
+
+        $sale = $query->first();
 
         if (!$sale) {
             return response()->json([
