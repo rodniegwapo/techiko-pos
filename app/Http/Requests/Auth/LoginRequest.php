@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Models\Domain;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
@@ -41,26 +42,40 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
-        if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
-            RateLimiter::hit($this->throttleKey());
-
-            throw ValidationException::withMessages([
-                'email' => trans('auth.failed'),
-            ]);
+        if (!Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
+            $this->hitRateLimiter();
+            $this->throwValidationError(trans('auth.failed'));
         }
 
-        // Check if user is active
         $user = Auth::user();
-        if ($user && $user->status !== 'active') {
-            Auth::logout();
-            RateLimiter::hit($this->throttleKey());
-            
-            throw ValidationException::withMessages([
-                'email' => 'Your account has been deactivated. Please contact an administrator.',
-            ]);
+
+        if ($user && !$user->isSuperUser()) {
+            $this->validateDomainAndUser($user);
         }
 
         RateLimiter::clear($this->throttleKey());
+    }
+
+    /**
+     * Validate the user's domain and account status.
+     *
+     * @throws \Illuminate\Validation\ValidationException
+     */
+    protected function validateDomainAndUser($user): void
+    {
+        if (!$user->domain) {
+            $this->logoutAndFail('Your organization is not registered yet. Please contact support.');
+        }
+
+        $domain = Domain::where('name_slug', $user->domain)->first();
+
+        if (!$domain || !$domain->is_active) {
+            $this->logoutAndFail('Your organization is pending approval or inactive. Please wait for admin activation.');
+        }
+
+        if ($user->status !== 'active') {
+            $this->logoutAndFail('Your account has been deactivated. Please contact an administrator.');
+        }
     }
 
     /**
@@ -68,9 +83,9 @@ class LoginRequest extends FormRequest
      *
      * @throws \Illuminate\Validation\ValidationException
      */
-    public function ensureIsNotRateLimited(): void
+    protected function ensureIsNotRateLimited(): void
     {
-        if (! RateLimiter::tooManyAttempts($this->throttleKey(), 5)) {
+        if (!RateLimiter::tooManyAttempts($this->throttleKey(), 5)) {
             return;
         }
 
@@ -78,19 +93,49 @@ class LoginRequest extends FormRequest
 
         $seconds = RateLimiter::availableIn($this->throttleKey());
 
-        throw ValidationException::withMessages([
-            'email' => trans('auth.throttle', [
-                'seconds' => $seconds,
-                'minutes' => ceil($seconds / 60),
-            ]),
-        ]);
+        $this->throwValidationError(trans('auth.throttle', [
+            'seconds' => $seconds,
+            'minutes' => ceil($seconds / 60),
+        ]));
     }
 
     /**
      * Get the rate limiting throttle key for the request.
      */
-    public function throttleKey(): string
+    protected function throttleKey(): string
     {
-        return Str::transliterate(Str::lower($this->string('email')).'|'.$this->ip());
+        return Str::transliterate(
+            Str::lower($this->string('email')) . '|' . $this->ip()
+        );
+    }
+
+    /**
+     * Increment the rate limiter hit count.
+     */
+    protected function hitRateLimiter(): void
+    {
+        RateLimiter::hit($this->throttleKey());
+    }
+
+    /**
+     * Log out user and throw a validation error with message.
+     *
+     * @throws \Illuminate\Validation\ValidationException
+     */
+    protected function logoutAndFail(string $message): void
+    {
+        Auth::logout();
+        $this->hitRateLimiter();
+        $this->throwValidationError($message);
+    }
+
+    /**
+     * Throw a standardized validation exception for email errors.
+     *
+     * @throws \Illuminate\Validation\ValidationException
+     */
+    protected function throwValidationError(string $message): void
+    {
+        throw ValidationException::withMessages(['email' => $message]);
     }
 }
