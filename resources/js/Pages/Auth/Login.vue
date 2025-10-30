@@ -150,7 +150,7 @@ const submit = () => {
                     <!-- Trust Statement -->
                     <p class="text-blue-100 text-sm">
                         Join thousands of retailers and businesses trusting
-                        Techicko for their POS and business automation needs.
+                        Techiko for their POS and business automation needs.
                     </p>
                 </div>
             </div>
@@ -160,26 +160,13 @@ const submit = () => {
                 class="w-full lg:w-1/2 flex items-center justify-center px-8 py-12"
             >
                 <div class="w-full max-w-md">
-                    <!-- Mobile Logo (visible on small screens) -->
-                    <div class="lg:hidden text-center mb-8">
-                        <div
-                            class="w-16 h-16 bg-gradient-to-br from-blue-600 to-teal-500 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg"
-                        >
-                            <ApplicationLogo class="w-10 h-10 text-white" />
-                        </div>
-                        <h1 class="text-2xl font-bold text-gray-900">
-                            Techicko
-                        </h1>
-                        <p class="text-gray-600 text-sm">Digital Solutions</p>
-                    </div>
-
                     <!-- Form Header -->
                     <div class="text-center mb-8">
                         <h2 class="text-3xl font-bold text-gray-900 mb-2">
                             Welcome Back
                         </h2>
                         <p class="text-gray-600">
-                            Sign in to your Techicko account to continue
+                            Sign in to your Techiko account to continue
                         </p>
                     </div>
 
@@ -317,7 +304,7 @@ const submit = () => {
                     <!-- Terms -->
                     <div class="mt-8 text-center">
                         <p class="text-xs text-gray-500">
-                            By signing in, you agree to Techicko's
+                            By signing in, you agree to Techiko's
                             <a
                                 href="#"
                                 class="text-blue-600 hover:text-blue-500"
