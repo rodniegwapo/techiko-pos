@@ -57,7 +57,7 @@ const submit = () => {
   loading.value = true;
   errors.value = {};
 
-  router.put(getRoute("inventory.locations.update", props.location?.data?.id), form, {
+  router.put(getRoute("inventory.locations.update", { location: props.location?.data?.id }), form, {
     onSuccess: () => {},
     onError: (formErrors) => {
       errors.value = formErrors;

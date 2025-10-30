@@ -174,11 +174,11 @@ const createLocation = () => {
 };
 
 const viewLocation = (location) => {
-    router.visit(getRoute("inventory.locations.show", location.id));
+    router.visit(getRoute("inventory.locations.show", { location: location.id }));
 };
 
 const editLocation = (location) => {
-    router.visit(getRoute("inventory.locations.edit", location.id));
+    router.visit(getRoute("inventory.locations.edit", { location: location.id }));
 };
 
 const deleteLocation = (location) => {
@@ -186,7 +186,7 @@ const deleteLocation = (location) => {
         title: "Delete Location",
         content: `Are you sure you want to delete "${location.name}"?`,
         onOk: () => {
-            router.delete(getRoute("inventory.locations.destroy", location.id), {
+            router.delete(getRoute("inventory.locations.destroy", { location: location.id }), {
                 onSuccess: () => {
                     // Success handled by redirect
                 },
