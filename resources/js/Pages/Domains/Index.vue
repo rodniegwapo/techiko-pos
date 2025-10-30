@@ -26,27 +26,27 @@ const { hasPermission } = usePermissionsV2();
 const props = defineProps({
     domains: {
         type: Object,
-        default: () => ({ data: [] })
+        default: () => ({ data: [] }),
     },
     timezones: {
         type: Array,
-        default: () => []
+        default: () => [],
     },
     currencies: {
         type: Array,
-        default: () => []
+        default: () => [],
     },
     countries: {
         type: Array,
-        default: () => []
+        default: () => [],
     },
 });
 
 // Debug props
-console.log('Index.vue props:', {
+console.log("Index.vue props:", {
     timezones: props.timezones,
     currencies: props.currencies,
-    countries: props.countries
+    countries: props.countries,
 });
 
 // Filter state
@@ -87,14 +87,14 @@ const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
             getLabel: toLabel(
                 computed(() => {
                     try {
-                        return Array.isArray(props.countries) 
+                        return Array.isArray(props.countries)
                             ? props.countries.map((c) => ({
-                                label: c.name || c,
-                                value: c.name || c,
-                            }))
+                                  label: c.name || c,
+                                  value: c.name || c,
+                              }))
                             : [];
                     } catch (error) {
-                        console.warn('Error creating country options:', error);
+                        console.warn("Error creating country options:", error);
                         return [];
                     }
                 })
@@ -122,11 +122,11 @@ const filtersConfig = computed(() => {
                 key: "country",
                 label: "Country",
                 type: "select",
-                options: Array.isArray(props.countries) 
+                options: Array.isArray(props.countries)
                     ? props.countries.map((c) => ({
-                        label: c.name || c,
-                        value: c.name || c,
-                    }))
+                          label: c.name || c,
+                          value: c.name || c,
+                      }))
                     : [],
             },
             {
@@ -140,7 +140,7 @@ const filtersConfig = computed(() => {
             },
         ];
     } catch (error) {
-        console.warn('Error creating filters config:', error);
+        console.warn("Error creating filters config:", error);
         return [];
     }
 });
@@ -175,19 +175,39 @@ const handleDelete = (domain) => {
             onStart: () => (spinning.value = true),
             onSuccess: () => {
                 notification.success({
-                    message: 'Success',
-                    description: 'Domain deleted successfully!',
+                    message: "Success",
+                    description: "Domain deleted successfully!",
                 });
             },
             onError: (errors) => {
                 notification.error({
-                    message: 'Error',
-                    description: 'Failed to delete domain.',
+                    message: "Error",
+                    description: "Failed to delete domain.",
                 });
             },
             onFinish: () => (spinning.value = false),
         });
     }
+};
+
+const handleToggle = (domain) => {
+    router.post(
+        route("domains.toggle-status", {
+            domain: domain.name_slug,
+        }),
+        {},
+        {
+            preserveScroll: true,
+            onStart: () => (spinning.value = true),
+            onSuccess: () => {
+                getItems(); // Refresh the list
+            },
+            onError: () => {
+                // Optionally show error notification
+            },
+            onFinish: () => (spinning.value = false),
+        }
+    );
 };
 
 const handleModalClose = () => {
@@ -253,6 +273,7 @@ const handleModalSuccess = () => {
                     @edit="handleEdit"
                     @view="handleView"
                     @delete="handleDelete"
+                    @toggle="handleToggle"
                 />
             </template>
         </ContentLayout>

@@ -103,4 +103,20 @@ class DomainController extends Controller
         return redirect()->route('domains.index')
             ->with('success', 'Domain deleted successfully.');
     }
+
+    /**
+     * Toggle domain active status
+     */
+    public function toggleStatus(Request $request, Domain $domain)
+    {
+        // Toggle the is_active field
+        $domain->update([
+            'is_active' => !$domain->is_active,
+        ]);
+
+        // Prepare the success message based on the new state
+        $status = $domain->is_active ? 'activated' : 'deactivated';
+
+        return back()->with('success', "Domain '{$domain->name}' has been {$status}.");
+    }
 }
