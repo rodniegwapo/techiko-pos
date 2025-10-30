@@ -22,7 +22,7 @@ const goBack = () => {
 };
 
 const editLocation = () => {
-  router.visit(getRoute('inventory.locations.edit', props.location?.data?.id));
+  router.visit(getRoute('inventory.locations.edit', { location: props.location?.data?.id }));
 };
 
 const viewProducts = () => {
