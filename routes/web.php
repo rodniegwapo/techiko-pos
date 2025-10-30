@@ -110,6 +110,7 @@ Route::middleware(['auth', 'user.permission'])->prefix('domains')->name('domains
     Route::get('/{domain}/edit', [\App\Http\Controllers\DomainController::class, 'edit'])->name('edit');
     Route::put('/{domain}', [\App\Http\Controllers\DomainController::class, 'update'])->name('update');
     Route::delete('/{domain}', [\App\Http\Controllers\DomainController::class, 'destroy'])->name('destroy');
+    Route::post('/{domain}/toggle-status', [\App\Http\Controllers\DomainController::class, 'toggleStatus'])->name('toggle-status');
 });
 
 // Global routes (not domain-specific)

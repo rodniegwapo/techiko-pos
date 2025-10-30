@@ -31,7 +31,7 @@ const props = defineProps({
     },
 });
 
-const emit = defineEmits(["edit", "view", "delete", "change"]);
+const emit = defineEmits(["edit", "view", "delete", "change", "toggle"]);
 
 // Table change handler
 const handleChange = (pagination, filters, sorter) => {
@@ -109,6 +109,10 @@ const handleDelete = (domain) => {
             // Do nothing on cancel
         },
     });
+};
+
+const handleToggle = (domain, checked) => {
+    emit("toggle", domain, checked);
 };
 
 const getStatusColor = (isActive) => {
@@ -203,9 +207,13 @@ const getStatusText = (isActive) => {
 
             <!-- Status Column -->
             <template v-else-if="column.key === 'is_active'">
-                <a-tag :color="getStatusColor(record.is_active)">
-                    {{ getStatusText(record.is_active) }}
-                </a-tag>
+                <a-switch
+                    :checked="record.is_active"
+                    @change="(checked) => handleToggle(record, checked)"
+                    :checked-children="'Active'"
+                    :un-checked-children="'Inactive'"
+                    class="min-w-[80px]"
+                />
             </template>
 
             <!-- Actions Column -->
