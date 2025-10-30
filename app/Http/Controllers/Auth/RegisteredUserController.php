@@ -46,7 +46,9 @@ class RegisteredUserController extends Controller
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'status' => 'inactive'
+            'status' => 'inactive',
+            'role_level' => 2, // Admin level by default for registrants
+            'can_switch_locations' => true,
         ]);
 
         // 2) Create an organization (domain) in pending state
@@ -59,6 +61,13 @@ class RegisteredUserController extends Controller
         ]);
 
         $user->update(['domain' => $domain->name_slug]);
+
+        // 3b) Assign Admin role via Spatie
+        try {
+            $user->assignRole('admin');
+        } catch (\Throwable $e) {
+            // ignore if role missing; seeding should create roles
+        }
 
         // 4) Do NOT auto-login; send to a public thank-you page
         return redirect()->route('registration.thankyou');
