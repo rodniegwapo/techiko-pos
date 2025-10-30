@@ -7,6 +7,7 @@ import { IconBuilding, IconBuildingWarehouse, IconTruck, IconUser } from "@table
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
 import ContentLayout from "@/Components/ContentLayout.vue";
+import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 
 const props = defineProps({
   location: Object,
@@ -25,6 +26,8 @@ const form = reactive({
   is_default: false,
   notes: "",
 });
+
+const { getRoute } = useDomainRoutes();
 
 const loading = ref(false);
 const errors = ref({});
@@ -47,14 +50,14 @@ onMounted(() => {
 });
 
 const goBack = () => {
-  router.visit(route("inventory.locations.index"));
+  router.visit(getRoute("inventory.locations.index"));
 };
 
 const submit = () => {
   loading.value = true;
   errors.value = {};
 
-  router.put(route("inventory.locations.update", props.location?.data?.id), form, {
+  router.put(getRoute("inventory.locations.update", props.location?.data?.id), form, {
     onSuccess: () => {},
     onError: (formErrors) => {
       errors.value = formErrors;

@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from "vue";
 import { router, Head } from "@inertiajs/vue3";
+import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { EditOutlined, ArrowLeftOutlined, PhoneOutlined, MailOutlined, EnvironmentOutlined, ShoppingCartOutlined, WarningOutlined, StopOutlined, DollarOutlined } from "@ant-design/icons-vue";
 import { IconBuilding, IconBuildingWarehouse, IconTruck, IconUser } from "@tabler/icons-vue";
 
@@ -13,23 +14,25 @@ const props = defineProps({
   stats: Object,
 });
 
+const { getRoute } = useDomainRoutes();
+
 // Methods
 const goBack = () => {
-  router.visit(route('inventory.locations.index'));
+  router.visit(getRoute('inventory.locations.index'));
 };
 
 const editLocation = () => {
-  router.visit(route('inventory.locations.edit', props.location?.data?.id));
+  router.visit(getRoute('inventory.locations.edit', props.location?.data?.id));
 };
 
 const viewProducts = () => {
-  router.visit(route('inventory.products'), {
+  router.visit(getRoute('inventory.products'), {
     data: { location_id: props.location?.data?.id }
   });
 };
 
 const viewMovements = () => {
-  router.visit(route('inventory.movements'), {
+  router.visit(getRoute('inventory.movements'), {
     data: { location_id: props.location?.data?.id }
   });
 };

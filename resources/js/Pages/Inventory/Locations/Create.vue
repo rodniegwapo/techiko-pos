@@ -12,8 +12,10 @@ import {
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
 import ContentLayout from "@/Components/ContentLayout.vue";
+import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 
 const page = usePage();
+const { getRoute } = useDomainRoutes();
 
 const props = defineProps({
   locationTypes: Array,
@@ -40,14 +42,14 @@ const errors = ref({});
 
 // Methods
 const goBack = () => {
-  router.visit(route("inventory.locations.index"));
+  router.visit(getRoute("inventory.locations.index"));
 };
 
 const submit = () => {
   loading.value = true;
   errors.value = {};
 
-  router.post(route("inventory.locations.store"), form, {
+  router.post(getRoute("inventory.locations.store"), form, {
     onSuccess: () => {
       // Success handled by redirect
     },

@@ -22,6 +22,7 @@ import { useFilters, toLabel } from "@/Composables/useFilters";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useTable } from "@/Composables/useTable";
+import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
@@ -34,6 +35,7 @@ import LocationInfoAlert from "@/Components/LocationInfoAlert.vue";
 const page = usePage();
 const { showModal, showConfirm } = useHelpers();
 const { spinning } = useGlobalVariables();
+const { getRoute } = useDomainRoutes();
 
 const search = ref("");
 const type = ref(null);
@@ -168,15 +170,15 @@ const { pagination, handleTableChange } = useTable("locations", tableFilters);
 
 // Methods
 const createLocation = () => {
-    router.visit(route("inventory.locations.create"));
+    router.visit(getRoute("inventory.locations.create"));
 };
 
 const viewLocation = (location) => {
-    router.visit(route("inventory.locations.show", location.id));
+    router.visit(getRoute("inventory.locations.show", location.id));
 };
 
 const editLocation = (location) => {
-    router.visit(route("inventory.locations.edit", location.id));
+    router.visit(getRoute("inventory.locations.edit", location.id));
 };
 
 const deleteLocation = (location) => {
@@ -184,7 +186,7 @@ const deleteLocation = (location) => {
         title: "Delete Location",
         content: `Are you sure you want to delete "${location.name}"?`,
         onOk: () => {
-            router.delete(route("inventory.locations.destroy", location.id), {
+            router.delete(getRoute("inventory.locations.destroy", location.id), {
                 onSuccess: () => {
                     // Success handled by redirect
                 },
