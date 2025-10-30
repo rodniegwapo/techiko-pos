@@ -38,6 +38,18 @@ class InventoryLocationController extends Controller
         ]);
     }
 
+    /**
+     * Show the form for creating a new location within a domain
+     */
+    public function create(Request $request, Domain $domain)
+    {
+        return inertia('Inventory/Locations/Create', [
+            'locationTypes' => $this->getLocationTypes(),
+            'currentDomain' => $domain,
+            'isGlobalView' => false,
+        ]);
+    }
+
     public function store(InventoryLocationRequest $request, Domain $domain)
     {
         $validated = $request->validated();
@@ -47,12 +59,49 @@ class InventoryLocationController extends Controller
         return back()->with('success', 'Location created');
     }
 
+    /**
+     * Display the specified location within a domain
+     */
+    public function show(Request $request, Domain $domain, InventoryLocation $location)
+    {
+        $this->ensureLocationBelongsToDomain($location, $domain);
+
+        $location->loadCount(['productInventories', 'inventoryMovements', 'stockAdjustments']);
+
+        $stats = [
+            'total_products' => $location->productInventories()->count(),
+            'in_stock_products' => $location->productInventories()->where('quantity_available', '>', 0)->count(),
+            'low_stock_products' => $location->getLowStockProductsCount(),
+            'out_of_stock_products' => $location->productInventories()->where('quantity_available', '<=', 0)->count(),
+            'total_inventory_value' => $location->getTotalInventoryValue(),
+            'recent_movements_count' => $location->inventoryMovements()->where('created_at', '>=', now()->subDays(7))->count(),
+        ];
+
+        return inertia('Inventory/Locations/Show', [
+            'location' => new InventoryLocationResource($location),
+            'stats' => $stats,
+        ]);
+    }
+
     public function update(InventoryLocationRequest $request, Domain $domain, InventoryLocation $location)
     {
         $this->ensureLocationBelongsToDomain($location, $domain);
         
         $location->update($request->validated());
         return back()->with('success', 'Location updated');
+    }
+
+    /**
+     * Show the form for editing a location within a domain
+     */
+    public function edit(Request $request, Domain $domain, InventoryLocation $location)
+    {
+        $this->ensureLocationBelongsToDomain($location, $domain);
+
+        return inertia('Inventory/Locations/Edit', [
+            'location' => new InventoryLocationResource($location),
+            'locationTypes' => $this->getLocationTypes(),
+        ]);
     }
 
     public function destroy(Domain $domain, InventoryLocation $location)
