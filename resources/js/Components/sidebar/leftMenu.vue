@@ -264,6 +264,11 @@ const menus = computed(() => {
                     return false;
                 }
                 
+                // Hide Sales for super users (Sales page not relevant for super user role)
+                if (item.key === 'sales' && isSuperUser.value) {
+                    return false;
+                }
+                
                 // Check permission for items with routeName
                 if (item.routeName && !hasPermission(item.routeName)) {
                     // Special case: Dashboard should always be available if user is authenticated
