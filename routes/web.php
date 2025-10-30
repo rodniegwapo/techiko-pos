@@ -91,6 +91,13 @@ Route::middleware(['auth', 'user.permission'])->group(function () {
     });
 });
 
+// Removed pending-approval route; we block at login instead if domain inactive
+
+// Registration Thank You page (no auth, public)
+Route::get('/thank-you', function () {
+    return inertia('Auth/RegistrationThankYou');
+})->name('registration.thankyou');
+
 // Organization-specific routes extracted to routes/domains.php
 require __DIR__ . '/domains.php';
 
