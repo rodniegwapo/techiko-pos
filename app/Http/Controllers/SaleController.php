@@ -736,12 +736,28 @@ class SaleController extends Controller
 
         $user = \App\Models\User::findOrFail($userId);
 
-        // Get or create latest pending sale for this user
-        $sale = Sale::forDomain($domain)
+        // Get or create latest pending sale for this user, scoped by location
+        $currentUser = auth()->user();
+        $userRole = $currentUser ? $currentUser->roles()->first() : null;
+
+        $query = Sale::forDomain($domain)
             ->pending()
             ->where('user_id', $userId)
-            ->orderBy('created_at', 'desc')
-            ->first();
+            ->orderBy('created_at', 'desc');
+
+        // Apply location-based filtering based on user role
+        if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
+            // Admin/Super Admin: Use Helpers::getActiveLocation()
+            $location = \App\Helpers::getActiveLocation($domain);
+            if ($location) {
+                $query->where('location_id', $location->id);
+            }
+        } else {
+            // Regular users: Filter by their assigned location
+            $query->where('location_id', $currentUser->location_id);
+        }
+
+        $sale = $query->first();
 
         // If no pending sale exists, create one with location
         if (!$sale) {
