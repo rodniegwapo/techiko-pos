@@ -43,7 +43,7 @@ class AuthenticatedSessionController extends Controller
 
         // Regular users with domain go to domain-specific dashboard
         if ($user->domain) {
-            return redirect()->route('domains.dashboard', ['domain' => $user->domain]);
+            return redirect()->route('domains.sales.index', ['domain' => $user->domain]);
         }
 
         // Users without domain go to global dashboard

@@ -468,10 +468,10 @@ class SaleController extends Controller
 
         // Apply location-based filtering based on user role
         if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
-            // Admin/Super Admin: Filter by default location or current location
-            $defaultLocation = $currentUser->location_id ?? $request->input('location_id');
-            if ($defaultLocation) {
-                $query->where('location_id', $defaultLocation);
+            // Admin/Super Admin: Use active location
+            $location = \App\Helpers::getActiveLocation($domain);
+            if ($location) {
+                $query->where('location_id', $location->id);
             }
         } else {
             // Regular users: Filter by their assigned location
@@ -555,19 +555,19 @@ class SaleController extends Controller
 
         $query = Sale::forDomain($domain->name_slug)
             ->pending()
+            ->where('user_id', $userId)
             ->orderBy('created_at', 'desc');
 
         // Apply location-based filtering based on user role
         if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
-            // Admin/Super Admin: Filter by default location or current location
-            $defaultLocation = $currentUser->location_id ?? $request->input('location_id');
-            if ($defaultLocation) {
-                $query->where('location_id', $defaultLocation);
+            // Admin/Super Admin: Use active location
+            $location = \App\Helpers::getActiveLocation($domain);
+            if ($location) {
+                $query->where('location_id', $location->id);
             }
         } else {
-            // Regular users: Filter by their assigned location and user ID
-            $query->where('location_id', $currentUser->location_id)
-                ->where('user_id', $userId);
+            // Regular users: Filter by their assigned location
+            $query->where('location_id', $currentUser->location_id);
         }
 
         // Get or create latest pending sale for this user
@@ -649,11 +649,13 @@ class SaleController extends Controller
 
         // Apply location-based filtering based on user role
         if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
-            // Admin/Super Admin: Use Helpers::getActiveLocation()
+            // Admin/Super Admin: Use active location
             $location = \App\Helpers::getActiveLocation($domain);
             if ($location) {
                 $query->where('location_id', $location->id);
             }
+            // Always scope to target user
+            $query->where('user_id', $userId);
         } else {
             // Regular users: Filter by their assigned location and user ID
             $query->where('location_id', $currentUser->location_id)
@@ -661,6 +663,8 @@ class SaleController extends Controller
         }
 
         $sale = $query->first();
+
+        logger($sale);
 
         // Get all available discount options
         $productDiscounts = Discount::where('is_active', true)
@@ -744,11 +748,13 @@ class SaleController extends Controller
 
         // Apply location-based filtering based on user role
         if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
-            // Admin/Super Admin: Filter by default location or current location
-            $defaultLocation = $currentUser->location_id ?? $request->input('location_id');
-            if ($defaultLocation) {
-                $query->where('location_id', $defaultLocation);
+            // Admin/Super Admin: Use active location
+            $location = \App\Helpers::getActiveLocation($domain);
+            if ($location) {
+                $query->where('location_id', $location->id);
             }
+            // Always scope to target user
+            $query->where('user_id', $userId);
         } else {
             // Regular users: Filter by their assigned location and user ID
             $query->where('location_id', $currentUser->location_id)
@@ -864,10 +870,10 @@ class SaleController extends Controller
 
         // Apply location-based filtering based on user role
         if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
-            // Admin/Super Admin: Filter by default location or current location
-            $defaultLocation = $currentUser->location_id ?? $request->input('location_id');
-            if ($defaultLocation) {
-                $query->where('location_id', $defaultLocation);
+            // Admin/Super Admin: Use active location
+            $location = \App\Helpers::getActiveLocation($domain);
+            if ($location) {
+                $query->where('location_id', $location->id);
             }
         } else {
             // Regular users: Filter by their assigned location
