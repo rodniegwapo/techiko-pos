@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Http\Resources\AuthUserResource;
 use App\Models\InventoryLocation;
 use App\Models\Domain;
+use App\Services\ImpersonationService;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -32,6 +33,8 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        $impersonationService = app(ImpersonationService::class);
+        
         return [
             ...parent::share($request),
             'auth' => [
@@ -41,6 +44,7 @@ class HandleInertiaRequests extends Middleware
             'currentLocation' => $this->getCurrentLocation($request),
             'availableLocations' => $this->getAvailableLocations($request),
             'default_store' => $request->user() ? $this->getDefaultStore($request) : null,
+            'impersonation' => $impersonationService->getImpersonationData(),
         ];
     }
 

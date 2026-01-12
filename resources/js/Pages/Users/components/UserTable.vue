@@ -6,10 +6,11 @@ import {
     IconTrash,
     IconCrown,
     IconWorld,
+    IconUserCheck,
 } from "@tabler/icons-vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { Modal, notification } from "ant-design-vue";
-import { usePage } from "@inertiajs/vue3";
+import { usePage, router } from "@inertiajs/vue3";
 import axios from "axios";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 import LocationInfo from "@/Components/LocationInfo.vue";
@@ -287,53 +288,113 @@ const statusLoading = ref({});
 
 const canToggleStatus = (user) => {
     const userData = user.data || user;
-    
+
     // Cannot toggle your own status
     if (userData.id === currentUser.value.id) {
         return false;
     }
-    
+
     // Super user can toggle anyone
     if (isSuperUser.value) {
         return true;
     }
-    
+
     // Users with manage permissions can toggle
     if (!hasPermission("users.update")) {
         return false;
     }
-    
+
     // Cannot toggle super users unless you're a super user
     if (userData.is_super_user && !currentUser.value.is_super_user) {
         return false;
     }
-    
+
     return true;
 };
 
 const handleStatusToggle = async (user) => {
     const userData = user.data || user;
     statusLoading.value[userData.id] = true;
-    
+
     try {
-        const response = await axios.patch(`/api/users/${userData.id}/toggle-status`);
-        
+        const response = await axios.patch(
+            `/api/users/${userData.id}/toggle-status`
+        );
+
         notification.success({
             message: "Status Updated",
             description: response.data.message,
         });
-        
+
         // Refresh the page data
         window.location.reload();
     } catch (error) {
         console.error("Toggle status error:", error);
         notification.error({
             message: "Status Update Failed",
-            description: error.response?.data?.message || "Failed to update user status",
+            description:
+                error.response?.data?.message || "Failed to update user status",
         });
     } finally {
         statusLoading.value[userData.id] = false;
     }
+};
+
+// Impersonation functionality
+const canImpersonate = (user) => {
+    const userData = user.data || user;
+
+    // Only super users can impersonate
+    if (!isSuperUser.value) {
+        return false;
+    }
+
+    // Cannot impersonate yourself
+    if (userData.id === currentUser.value.id) {
+        return false;
+    }
+
+    // Cannot impersonate other super users
+    if (userData.is_super_user) {
+        return false;
+    }
+
+    return true;
+};
+
+const handleImpersonate = (user) => {
+    const userData = user.data || user;
+
+    Modal.confirm({
+        title: "Impersonate User",
+        content: `Are you sure you want to impersonate ${userData.name}? You will be logged in as this user and can perform actions on their behalf.`,
+        okText: "Yes, Impersonate",
+        okType: "primary",
+        cancelText: "Cancel",
+        onOk: () => {
+            router.post(
+                `/impersonate/${userData.id}`,
+                {},
+                {
+                    preserveState: false,
+                    preserveScroll: false,
+                    onSuccess: () => {
+                        notification.success({
+                            message: "Impersonation Started",
+                            description: `You are now logged in as ${userData.name}`,
+                        });
+                    },
+                    onError: (errors) => {
+                        notification.error({
+                            message: "Impersonation Failed",
+                            description:
+                                errors.message || "Failed to impersonate user",
+                        });
+                    },
+                }
+            );
+        },
+    });
 };
 </script>
 
@@ -405,19 +466,29 @@ const handleStatusToggle = async (user) => {
                         :loading="statusLoading[(record.data || record).id]"
                     />
                     <a-badge
-                        :status="(record.data || record).status === 'active' ? 'success' : 'error'"
-                        :text="(record.data || record).status === 'active' ? 'Active' : 'Inactive'"
+                        :status="
+                            (record.data || record).status === 'active'
+                                ? 'success'
+                                : 'error'
+                        "
+                        :text="
+                            (record.data || record).status === 'active'
+                                ? 'Active'
+                                : 'Inactive'
+                        "
                     />
                 </div>
             </template>
 
             <template v-if="column.key === 'location'">
                 <div class="flex items-center">
-                    <LocationInfo 
+                    <LocationInfo
                         v-if="(record.data || record).location"
                         :location="(record.data || record).location"
                     />
-                    <span v-else class="text-sm text-gray-400">No location assigned</span>
+                    <span v-else class="text-sm text-gray-400"
+                        >No location assigned</span
+                    >
                 </div>
             </template>
 
@@ -490,6 +561,15 @@ const handleStatusToggle = async (user) => {
                         @click="handleEdit(record)"
                     >
                         <IconEdit size="20" class="mx-auto" />
+                    </IconTooltipButton>
+
+                    <IconTooltipButton
+                        v-if="canImpersonate(record)"
+                        hover="group-hover:bg-purple-500"
+                        name="Impersonate User"
+                        @click="handleImpersonate(record)"
+                    >
+                        <IconUserCheck size="20" class="mx-auto" />
                     </IconTooltipButton>
 
                     <IconTooltipButton

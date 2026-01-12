@@ -4,7 +4,7 @@ import { ref, onMounted, onBeforeUnmount } from "vue";
 
 // Props for direct data passing
 const props = defineProps({
-  orderId: { type: [String, Number], default: null }
+    orderId: { type: [String, Number], default: null },
 });
 const order = ref(null);
 
