@@ -24,10 +24,6 @@ const props = defineProps({
   items: Object,
 });
 
-// #region agent log
-fetch('http://127.0.0.1:7246/ingest/20b0ac64-5458-4be0-8c5e-76a1376ef703',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Categories/Index.vue:23',message:'Props received',data:{items_type:typeof props.items,items_keys:props.items?Object.keys(props.items):'NULL',items_data_type:typeof props.items?.data,items_data_length:Array.isArray(props.items?.data)?props.items.data.length:'NOT_ARRAY',has_items:!!props.items,has_items_data:!!props.items?.data},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-// #endregion
-
 const search = ref("");
 
 const getItems = () => {
