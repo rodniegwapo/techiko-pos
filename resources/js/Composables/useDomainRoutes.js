@@ -32,14 +32,6 @@ export function useDomainRoutes() {
             const inDomain = isInDomainContext.value || !!currentDomain.value;
             const domainRouteName = `domains.${routeName}`;
 
-            console.log("🔹 Route Context:", {
-                routeName,
-                params,
-                isSuperUser: isSuperUser.value,
-                inDomain,
-                domainSlug,
-            });
-
             // === SUPER USER LOGIC ===
             if (isSuperUser.value) {
                 if (inDomain && domainSlug) {
@@ -75,7 +67,6 @@ export function useDomainRoutes() {
     /*** === INTERNAL BUILDER === ***/
     const buildRoute = (name, params) => {
         const route = window.route(name, params);
-        console.log("✅ Generated route:", { name, params, route });
         return route;
     };
 
