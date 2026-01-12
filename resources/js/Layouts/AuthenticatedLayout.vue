@@ -36,7 +36,7 @@ onMounted(() => {
 <template>
     <!-- Impersonation Banner (shown at the very top) -->
     <ImpersonationBanner />
-    
+
     <a-layout
         class="relative bg-dots-darker bg-center bg-gray-200 dark:bg-dots-lighter dark:bg-gray-900 selection:bg-red-500 selection:text-white"
     >
@@ -62,7 +62,7 @@ onMounted(() => {
                 <slot name="content-footer" />
             </div>
         </a-layout-content>
-        
+
         <!-- Floating Location Badge -->
         <LocationBadge />
     </a-layout>
@@ -77,4 +77,3 @@ onMounted(() => {
     border-right: 4px solid #014945 !important;
 }
 </style>
--200
