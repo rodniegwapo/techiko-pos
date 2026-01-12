@@ -15,12 +15,77 @@ class CategoryController extends Controller
 
     public function index(Request $request)
     {
+        // #region agent log
+        $logData = [
+            'sessionId' => 'debug-session',
+            'runId' => 'run1',
+            'hypothesisId' => 'A',
+            'location' => __FILE__ . ':' . __LINE__,
+            'message' => 'Global CategoryController index entry',
+            'data' => [
+                'is_global' => true,
+                'search' => $request->input('search'),
+            ],
+            'timestamp' => now()->timestamp * 1000,
+        ];
+        $logPath = 'c:\\laragon\\www\\techiko-pos\\.cursor\\debug.log';
+        if (!is_dir(dirname($logPath))) {
+            mkdir(dirname($logPath), 0755, true);
+        }
+        file_put_contents($logPath, json_encode($logData) . "\n", FILE_APPEND);
+        // #endregion
+
         $category = Category::query()->when($request->input('search'), function ($query, $search) {
             return $query->search($search);
         })->paginate($request?->data['per_page'] ?? 10);
 
+        // #region agent log
+        $logData = [
+            'sessionId' => 'debug-session',
+            'runId' => 'run1',
+            'hypothesisId' => 'B',
+            'location' => __FILE__ . ':' . __LINE__,
+            'message' => 'Global query executed',
+            'data' => [
+                'total' => $category->total(),
+                'count' => $category->count(),
+                'current_page' => $category->currentPage(),
+                'per_page' => $category->perPage(),
+                'has_data' => $category->count() > 0,
+            ],
+            'timestamp' => now()->timestamp * 1000,
+        ];
+        $logPath = 'c:\\laragon\\www\\techiko-pos\\.cursor\\debug.log';
+        if (!is_dir(dirname($logPath))) {
+            mkdir(dirname($logPath), 0755, true);
+        }
+        file_put_contents($logPath, json_encode($logData) . "\n", FILE_APPEND);
+        // #endregion
+
+        $resourceCollection = CategoryResource::collection($category);
+
+        // #region agent log
+        $logData = [
+            'sessionId' => 'debug-session',
+            'runId' => 'run1',
+            'hypothesisId' => 'C',
+            'location' => __FILE__ . ':' . __LINE__,
+            'message' => 'Global resource collection created',
+            'data' => [
+                'resource_type' => get_class($resourceCollection),
+                'resource_count' => $resourceCollection->count(),
+            ],
+            'timestamp' => now()->timestamp * 1000,
+        ];
+        $logPath = 'c:\\laragon\\www\\techiko-pos\\.cursor\\debug.log';
+        if (!is_dir(dirname($logPath))) {
+            mkdir(dirname($logPath), 0755, true);
+        }
+        file_put_contents($logPath, json_encode($logData) . "\n", FILE_APPEND);
+        // #endregion
+
         return inertia('Categories/Index', [
-            'items' => CategoryResource::collection($category),
+            'items' => $resourceCollection,
             'isGlobalView' => true,
             'domains' => \App\Models\Domain::select('id', 'name', 'name_slug')->get(),
         ]);

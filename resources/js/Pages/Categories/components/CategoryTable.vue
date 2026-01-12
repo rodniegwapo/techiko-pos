@@ -19,6 +19,10 @@ const props = defineProps({
   isGlobalView: { type: Boolean, default: false },
 });
 
+// #region agent log
+fetch('http://127.0.0.1:7246/ingest/20b0ac64-5458-4be0-8c5e-76a1376ef703',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CategoryTable.vue:20',message:'Categories prop received',data:{categories_type:typeof props.categories,is_array:Array.isArray(props.categories),categories_length:Array.isArray(props.categories)?props.categories.length:'NOT_ARRAY',categories_keys:props.categories?Object.keys(props.categories):'NULL',first_item:Array.isArray(props.categories)&&props.categories.length>0?props.categories[0]:'EMPTY'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+// #endregion
+
 const columns = computed(() => {
   const baseColumns = [
     { title: "Category", dataIndex: "name", key: "name", align: "left" },

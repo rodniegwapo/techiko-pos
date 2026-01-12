@@ -19,11 +19,52 @@ class CategoryController extends Controller
      */
     public function index(Request $request, Domain $domain = null)
     {
-        $location = Helpers::getActiveLocation($domain);
+        // #region agent log
+        $logData = [
+            'sessionId' => 'debug-session',
+            'runId' => 'run1',
+            'hypothesisId' => 'A',
+            'location' => __FILE__ . ':' . __LINE__,
+            'message' => 'CategoryController index entry',
+            'data' => [
+                'domain' => $domain ? $domain->name_slug : 'NULL',
+                'domain_id' => $domain ? $domain->id : 'NULL',
+                'has_domain' => $domain !== null,
+            ],
+            'timestamp' => now()->timestamp * 1000,
+        ];
+        $logPath = 'c:\\laragon\\www\\techiko-pos\\.cursor\\debug.log';
+        if (!is_dir(dirname($logPath))) {
+            mkdir(dirname($logPath), 0755, true);
+        }
+        file_put_contents($logPath, json_encode($logData) . "\n", FILE_APPEND);
+        // #endregion
 
-        $query = $location 
-            ? $this->getCategoriesWithCountsForLocation($domain->name_slug, $location)
-            : Category::where('domain', $domain->name_slug)->withCount('products');
+        // For category management, show all categories for the domain regardless of location
+        // Location filtering should only apply to product/inventory views, not category management
+        $query = $domain 
+            ? Category::where('domain', $domain->name_slug)->withCount('products')
+            : Category::query()->withCount('products');
+        
+        // #region agent log
+        $logData = [
+            'sessionId' => 'debug-session',
+            'runId' => 'post-fix',
+            'hypothesisId' => 'B',
+            'location' => __FILE__ . ':' . __LINE__,
+            'message' => 'Query built - showing all categories for domain',
+            'data' => [
+                'query_type' => 'all_categories_for_domain',
+                'domain_slug' => $domain ? $domain->name_slug : 'NULL',
+            ],
+            'timestamp' => now()->timestamp * 1000,
+        ];
+        $logPath = 'c:\\laragon\\www\\techiko-pos\\.cursor\\debug.log';
+        if (!is_dir(dirname($logPath))) {
+            mkdir(dirname($logPath), 0755, true);
+        }
+        file_put_contents($logPath, json_encode($logData) . "\n", FILE_APPEND);
+        // #endregion
         
         $query = $query->when($request->input('search'), function ($q, $search) {
                 return $q->search($search);
@@ -31,11 +72,79 @@ class CategoryController extends Controller
 
         $items = $query->latest()->paginate($request?->data['per_page'] ?? 15);
 
-        return Inertia::render('Categories/Index', [
-            'items' => CategoryResource::collection($items),
+        // #region agent log
+        $logData = [
+            'sessionId' => 'debug-session',
+            'runId' => 'post-fix',
+            'hypothesisId' => 'B',
+            'location' => __FILE__ . ':' . __LINE__,
+            'message' => 'Query executed - pagination result',
+            'data' => [
+                'total' => $items->total(),
+                'count' => $items->count(),
+                'current_page' => $items->currentPage(),
+                'per_page' => $items->perPage(),
+                'has_data' => $items->count() > 0,
+            ],
+            'timestamp' => now()->timestamp * 1000,
+        ];
+        $logPath = 'c:\\laragon\\www\\techiko-pos\\.cursor\\debug.log';
+        if (!is_dir(dirname($logPath))) {
+            mkdir(dirname($logPath), 0755, true);
+        }
+        file_put_contents($logPath, json_encode($logData) . "\n", FILE_APPEND);
+        // #endregion
+
+        $resourceCollection = CategoryResource::collection($items);
+
+        // #region agent log
+        $logData = [
+            'sessionId' => 'debug-session',
+            'runId' => 'run1',
+            'hypothesisId' => 'C',
+            'location' => __FILE__ . ':' . __LINE__,
+            'message' => 'Resource collection created',
+            'data' => [
+                'resource_type' => get_class($resourceCollection),
+                'resource_count' => $resourceCollection->count(),
+                'has_data_property' => property_exists($resourceCollection, 'data'),
+            ],
+            'timestamp' => now()->timestamp * 1000,
+        ];
+        $logPath = 'c:\\laragon\\www\\techiko-pos\\.cursor\\debug.log';
+        if (!is_dir(dirname($logPath))) {
+            mkdir(dirname($logPath), 0755, true);
+        }
+        file_put_contents($logPath, json_encode($logData) . "\n", FILE_APPEND);
+        // #endregion
+
+        $response = Inertia::render('Categories/Index', [
+            'items' => $resourceCollection,
             'currentDomain' => $domain,
             'isGlobalView' => !$domain,
         ]);
+
+        // #region agent log
+        $logData = [
+            'sessionId' => 'debug-session',
+            'runId' => 'run1',
+            'hypothesisId' => 'C',
+            'location' => __FILE__ . ':' . __LINE__,
+            'message' => 'Inertia response prepared',
+            'data' => [
+                'items_type' => gettype($resourceCollection),
+                'is_global_view' => !$domain,
+            ],
+            'timestamp' => now()->timestamp * 1000,
+        ];
+        $logPath = 'c:\\laragon\\www\\techiko-pos\\.cursor\\debug.log';
+        if (!is_dir(dirname($logPath))) {
+            mkdir(dirname($logPath), 0755, true);
+        }
+        file_put_contents($logPath, json_encode($logData) . "\n", FILE_APPEND);
+        // #endregion
+
+        return $response;
     }
 
     /**
