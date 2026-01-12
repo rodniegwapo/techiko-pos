@@ -4,6 +4,7 @@ import LeftSidebarWrapper from "@/Components/sidebar/leftWrapper.vue";
 import LeftAccountSettings from "@/Components/sidebar/leftAccountSettings.vue";
 import LocationBadge from "@/Components/LocationBadge.vue";
 import Terminal from "@/Components/Terminal.vue";
+import ImpersonationBanner from "@/Components/ImpersonationBanner.vue";
 
 import { onMounted, ref } from "vue";
 import {
@@ -33,6 +34,9 @@ onMounted(() => {
 </script>
 
 <template>
+    <!-- Impersonation Banner (shown at the very top) -->
+    <ImpersonationBanner />
+    
     <a-layout
         class="relative bg-dots-darker bg-center bg-gray-200 dark:bg-dots-lighter dark:bg-gray-900 selection:bg-red-500 selection:text-white"
     >

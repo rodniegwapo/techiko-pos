@@ -25,6 +25,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    
+    // User Impersonation (Super Users Only)
+    Route::post('/impersonate/{user}', [\App\Http\Controllers\ImpersonationController::class, 'impersonate'])
+        ->name('impersonate');
+    Route::post('/stop-impersonating', [\App\Http\Controllers\ImpersonationController::class, 'stopImpersonating'])
+        ->name('stop-impersonating');
 });
 
 // ===================================
