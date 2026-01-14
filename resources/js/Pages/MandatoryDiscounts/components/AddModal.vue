@@ -1,8 +1,6 @@
 <script setup>
-import { computed, ref, toRefs } from "vue";
-import VerticalForm from "@/Components/Forms/VerticalForm.vue";
+import { computed, ref } from "vue";
 import PrimaryButton from "@/Components/PrimaryButton.vue";
-import { useEmits } from "@/Composables/useEmits";
 import { router } from "@inertiajs/vue3";
 import { useTable } from "@/Composables/useTable";
 import { usePage } from "@inertiajs/vue3";
@@ -11,7 +9,7 @@ import { useHelpers } from "@/Composables/useHelpers";
 
 const { spinning } = useTable();
 const page = usePage();
-const { formData, openModal, isEdit } = useGlobalVariables();
+const { formData, openModal, isEdit, errors } = useGlobalVariables();
 const { inertiaProgressLifecyle } = useHelpers();
 
 const props = defineProps({
@@ -22,71 +20,76 @@ const props = defineProps({
 });
 
 const domainOptions = computed(() => {
-  const list = Array.isArray(page?.props?.domains)
-    ? page.props.domains
-    : [];
+  const list = Array.isArray(page?.props?.domains) ? page.props.domains : [];
   return list.map((item) => ({ label: item.name, value: item.name_slug }));
 });
 
-const formFields = computed(() => {
-  const baseFields = [
-    {
-      key: "name",
-      label: "Discount Name",
-      type: "text",
-      placeholder: "e.g., Senior Citizen, PWD, Student",
-    },
-    {
-      key: "type",
-      label: "Discount Type",
-      type: "select",
-      options: [
-        { label: "Percentage", value: "percentage" },
-        { label: "Amount", value: "amount" },
-      ],
-    },
-    {
-      key: "value",
-      label: "Discount Value",
-      type: "number",
-      placeholder: "Enter discount value (e.g., 20 for 20% or 100 for ₱100)",
-    },
-    {
-      key: "is_active",
-      label: "Status",
-      type: "select",
-      options: [
-        { label: "Active", value: true },
-        { label: "Inactive", value: false },
-      ],
-    },
-  ];
+// Handle type value extraction for select
+const handleTypeChange = (value) => {
+    formData.value.type = value;
+};
 
-  // Add domain field for global view
-  if (page.props.isGlobalView) {
-    baseFields.splice(1, 0, {
-      key: "domain",
-      label: "Domain",
-      type: "select",
-      options: domainOptions.value,
-      required: true
-    });
-  }
-
-  return baseFields;
+// Get type value for select binding
+const typeValue = computed({
+    get: () => {
+        const val = formData.value?.type;
+        if (typeof val === 'object' && val?.value !== undefined) {
+            return val.value;
+        }
+        return val;
+    },
+    set: (value) => {
+        formData.value.type = value;
+    }
 });
 
-const errors = ref({});
+// Handle is_active value extraction for select
+const handleIsActiveChange = (value) => {
+    formData.value.is_active = value === true || value === 'true' || value === 1;
+};
+
+// Get is_active value for select binding
+const isActiveValue = computed({
+    get: () => {
+        const val = formData.value?.is_active;
+        if (typeof val === 'object' && val?.value !== undefined) {
+            return val.value === true || val.value === 'true' || val.value === 1;
+        }
+        return val === true || val === 'true' || val === 1;
+    },
+    set: (value) => {
+        formData.value.is_active = value === true || value === 'true' || value === 1;
+    }
+});
+
+// Handle domain value extraction for select
+const handleDomainChange = (value) => {
+    formData.value.domain = value;
+};
+
+// Get domain value for select binding
+const domainValue = computed({
+    get: () => {
+        const val = formData.value?.domain;
+        if (typeof val === 'object' && val?.value !== undefined) {
+            return val.value;
+        }
+        return val;
+    },
+    set: (value) => {
+        formData.value.domain = value;
+    }
+});
 
 const handleSave = () => {
   const payload = {
     ...formData.value,
-    type: formData.value?.type?.value || formData.value?.type,
+    type: formData.value?.type?.value || formData.value.type,
     is_active:
       formData.value?.is_active?.value !== undefined
-        ? formData.value?.is_active?.value
-        : formData.value?.is_active !== undefined
-        ? formData.value?.is_active
+        ? formData.value.is_active.value === true || formData.value.is_active.value === 'true' || formData.value.is_active.value === 1
+        : formData.value.is_active !== undefined
+        ? formData.value.is_active === true || formData.value.is_active === 'true' || formData.value.is_active === 1
         : true,
   };
 
@@ -100,12 +103,12 @@ const handleSave = () => {
 const handleUpdate = () => {
   const payload = {
     ...formData.value,
-    type: formData.value?.type?.value || formData.value?.type,
+    type: formData.value?.type?.value || formData.value.type,
     is_active:
       formData.value?.is_active?.value !== undefined
-        ? formData.value?.is_active?.value
-        : formData.value?.is_active !== undefined
-        ? formData.value?.is_active
+        ? formData.value.is_active.value === true || formData.value.is_active.value === 'true' || formData.value.is_active.value === 1
+        : formData.value.is_active !== undefined
+        ? formData.value.is_active === true || formData.value.is_active === 'true' || formData.value.is_active === 1
         : true,
   };
 
@@ -131,7 +134,88 @@ const modalTitle = computed(() => {
     @cancel="openModal = false"
     :maskClosable="false"
   >
-    <vertical-form v-model="formData" :fields="formFields" :errors="errors" />
+    <a-form layout="vertical">
+      <!-- Discount Name -->
+      <a-form-item
+        label="Discount Name"
+        :validate-status="errors.name ? 'error' : ''"
+        :help="errors.name || ''"
+      >
+        <a-input
+          v-model:value="formData.name"
+          placeholder="e.g., Senior Citizen, PWD, Student"
+          size="large"
+        />
+      </a-form-item>
+
+      <!-- Domain (conditional for global view) -->
+      <a-form-item
+        v-if="page.props.isGlobalView"
+        label="Domain"
+        :validate-status="errors.domain ? 'error' : ''"
+        :help="errors.domain || ''"
+      >
+        <a-select
+          v-model:value="domainValue"
+          :options="domainOptions"
+          placeholder="Select domain"
+          size="large"
+          @change="handleDomainChange"
+        />
+      </a-form-item>
+
+      <!-- Discount Type -->
+      <a-form-item
+        label="Discount Type"
+        :validate-status="errors.type ? 'error' : ''"
+        :help="errors.type || ''"
+      >
+        <a-select
+          v-model:value="typeValue"
+          :options="[
+            { label: 'Percentage', value: 'percentage' },
+            { label: 'Amount', value: 'amount' }
+          ]"
+          placeholder="Select discount type"
+          size="large"
+          @change="handleTypeChange"
+        />
+      </a-form-item>
+
+      <!-- Discount Value -->
+      <a-form-item
+        label="Discount Value"
+        :validate-status="errors.value ? 'error' : ''"
+        :help="errors.value || ''"
+      >
+        <a-input-number
+          v-model:value="formData.value"
+          placeholder="Enter discount value (e.g., 20 for 20% or 100 for ₱100)"
+          :min="0"
+          :precision="2"
+          style="width: 100%"
+          size="large"
+        />
+      </a-form-item>
+
+      <!-- Status -->
+      <a-form-item
+        label="Status"
+        :validate-status="errors.is_active ? 'error' : ''"
+        :help="errors.is_active || ''"
+      >
+        <a-select
+          v-model:value="isActiveValue"
+          :options="[
+            { label: 'Active', value: true },
+            { label: 'Inactive', value: false }
+          ]"
+          placeholder="Select status"
+          size="large"
+          @change="handleIsActiveChange"
+        />
+      </a-form-item>
+    </a-form>
 
     <template #footer>
       <a-button @click="openModal = false">Cancel</a-button>

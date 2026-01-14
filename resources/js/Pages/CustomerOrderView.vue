@@ -37,16 +37,10 @@ const {
 console.log("CustomerOrderView - Customer data:", customer.value);
 
 // Watch for customer changes
-watch(
-    customer,
-    (newCustomer, oldCustomer) => {
-        console.log("CustomerOrderView - Customer changed:", {
-            old: oldCustomer,
-            new: newCustomer,
-        });
-    },
-    { deep: true, immediate: true }
-);
+watch(customer, (newCustomer, oldCustomer) => {}, {
+    deep: true,
+    immediate: true,
+});
 
 // Test function to manually trigger customer event
 const testCustomerEvent = async () => {
