@@ -15,8 +15,8 @@ class DiscountController extends Controller
         $domainSlug = $request->route('domain');
 
         $data = Discount::query()
-            ->when($domainSlug, fn($q) => $q->forDomain($domainSlug))
-            ->when($request->input('domain'), fn($q, $domain) => $q->where('domain', $domain))
+            ->when($domainSlug, fn ($q) => $q->forDomain($domainSlug))
+            ->when($request->input('domain'), fn ($q, $domain) => $q->where('domain', $domain))
             ->when($request->input('search'), function ($query, $search) {
                 return $query->search($search);
             })
@@ -24,8 +24,8 @@ class DiscountController extends Controller
 
         return Inertia::render('Discounts/Index', [
             'items' => DiscountResource::collection($data),
-            'isGlobalView' => !$domainSlug,
-            'domains' => !$domainSlug ? \App\Models\Domain::all() : [],
+            'isGlobalView' => ! $domainSlug,
+            'domains' => ! $domainSlug ? \App\Models\Domain::all() : [],
         ]);
     }
 
@@ -51,7 +51,7 @@ class DiscountController extends Controller
 
         // Manually resolve the discount model
         $discountModel = Discount::find($discount);
-        if (!$discountModel) {
+        if (! $discountModel) {
             return redirect()->back()->with('error', 'Discount not found');
         }
 
@@ -67,13 +67,13 @@ class DiscountController extends Controller
         logger('Domain parameter:', ['domain' => $domain]);
         logger('Discount parameter type:', ['type' => gettype($discount)]);
         logger('Discount parameter value:', ['value' => $discount]);
-        
+
         // Manually resolve the discount model
         $discountModel = Discount::find($discount);
-        if (!$discountModel) {
+        if (! $discountModel) {
             return redirect()->back()->with('error', 'Discount not found');
         }
-        
+
         $discountModel->delete();
 
         return redirect()->back()->with('success', 'Discount deleted successfully');
@@ -87,8 +87,8 @@ class DiscountController extends Controller
             'value' => 'numeric|required',
             'min_order_amount' => 'numeric|nullable',
             'scope' => 'string|in:order,product|required',
-            'start_date' => 'date|required',
-            'end_date' => 'date|required|after:start_date'
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|required_with:start_date|after:start_date',
         ];
 
         // Add domain validation for global view

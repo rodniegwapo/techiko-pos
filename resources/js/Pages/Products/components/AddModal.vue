@@ -1,8 +1,6 @@
 <script setup>
-import { computed, ref, toRefs } from "vue";
-import VerticalForm from "@/components/Forms/VerticalForm.vue";
+import { computed, ref } from "vue";
 import PrimaryButton from "@/Components/PrimaryButton.vue";
-import { useEmits } from "@/Composables/useEmits";
 import { router } from "@inertiajs/vue3";
 import { useTable } from "@/Composables/useTable";
 import { usePage } from "@inertiajs/vue3";
@@ -12,7 +10,7 @@ import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 
 const { spinning } = useTable();
 const page = usePage();
-const { formData, openModal, isEdit } = useGlobalVariables();
+const { formData, openModal, isEdit, errors } = useGlobalVariables();
 const { inertiaProgressLifecyle } = useHelpers();
 const { getRoute } = useDomainRoutes();
 
@@ -44,60 +42,76 @@ const domainOptions = computed(() => {
   return list.map((item) => ({ label: item.name, value: item.name_slug }));
 });
 
-const formFields = computed(() => {
-  const baseFields = [
-    { key: "name", label: "Product Name", type: "text" },
-    {
-      key: "category_id",
-      label: "Category",
-      type: "select",
-      options: categoriesOption.value,
-    },
-    { key: "cost", label: "Cost", type: "number" },
-    { key: "price", label: "Price", type: "number" },
-    { key: "SKU", label: "SKU", type: "text" },
-    { key: "barcode", label: "Barcode", type: "text" },
-    {
-      key: "sold_type",
-      label: "Sold Type",
-      type: "radio",
-      options: soltTypeOptions.value,
-    },
-    {
-      key: "representation_type",
-      label: "Representation Type",
-      type: "select",
-      options: ["color"],
-    },
-    {
-      key: "representation",
-      label: "Representation",
-      type: "text",
-    },
-  ];
+// Handle category_id value extraction for select
+const handleCategoryChange = (value) => {
+  formData.value.category_id = value;
+};
 
-  // Add domain field for global view
-  if (page.props.isGlobalView) {
-    baseFields.splice(1, 0, {
-      key: "domain",
-      label: "Domain",
-      type: "select",
-      options: domainOptions.value,
-      required: true
-    });
+// Get category_id value for select binding
+const categoryIdValue = computed({
+  get: () => {
+    const val = formData.value?.category_id;
+    if (typeof val === 'object' && val?.value !== undefined) {
+      return val.value;
+    }
+    return val;
+  },
+  set: (value) => {
+    formData.value.category_id = value;
   }
-
-  return baseFields;
 });
 
-const errors = ref({});
+// Handle domain value extraction for select
+const handleDomainChange = (value) => {
+  formData.value.domain = value;
+};
+
+// Get domain value for select binding
+const domainValue = computed({
+  get: () => {
+    const val = formData.value?.domain;
+    if (typeof val === 'object' && val?.value !== undefined) {
+      return val.value;
+    }
+    return val;
+  },
+  set: (value) => {
+    formData.value.domain = value;
+  }
+});
+
+// Handle representation_type value extraction
+const handleRepresentationTypeChange = (value) => {
+  formData.value.representation_type = value;
+};
+
+// Get representation_type value for select binding
+const representationTypeValue = computed({
+  get: () => {
+    const val = formData.value?.representation_type;
+    if (typeof val === 'object' && val?.value !== undefined) {
+      return val.value;
+    }
+    return val;
+  },
+  set: (value) => {
+    formData.value.representation_type = value;
+  }
+});
+
 const handleSave = () => {
-  formData.value.category_id = formData.value?.category_id?.value;
+  // Ensure category_id is a number, not an object
+  if (typeof formData.value.category_id === 'object' && formData.value.category_id?.value !== undefined) {
+    formData.value.category_id = formData.value.category_id.value;
+  }
   router.post(getRoute("products.store"), formData.value, inertiaProgressLifecyle);
 };
 
 const handleUpdate = () => {
-  formData.value.category_id = formData.value?.category_id?.value;
+  // Ensure category_id is a number, not an object
+  if (typeof formData.value.category_id === 'object' && formData.value.category_id?.value !== undefined) {
+    formData.value.category_id = formData.value.category_id.value;
+  }
   router.put(
     getRoute("products.update", {
       product: formData.value.id,
@@ -115,20 +129,160 @@ const handleUpdate = () => {
     @cancel="openModal = false"
     :maskClosable="false"
   >
+    <a-form layout="vertical">
+      <!-- Product Name -->
+      <a-form-item
+        label="Product Name"
+        :validate-status="errors.name ? 'error' : ''"
+        :help="errors.name || ''"
+      >
+        <a-input
+          v-model:value="formData.name"
+          placeholder="Enter product name"
+          size="large"
+        />
+      </a-form-item>
 
-    <vertical-form v-model="formData" :fields="formFields" :errors="errors" />
-    <!-- <a-upload
-      v-model:file-list="fileList"
-      name="file"
-      action="https://www.mocky.io/v2/5cc8019d300000980a055e76"
-      :headers="headers"
-      @change="handleChange"
-    >
-      <a-button>
-        <upload-outlined></upload-outlined>
-        Click to Upload
-      </a-button>
-    </a-upload> -->
+      <!-- Domain (conditional for global view) -->
+      <a-form-item
+        v-if="page.props.isGlobalView"
+        label="Domain"
+        :validate-status="errors.domain ? 'error' : ''"
+        :help="errors.domain || ''"
+      >
+        <a-select
+          v-model:value="domainValue"
+          :options="domainOptions"
+          placeholder="Select domain"
+          size="large"
+          @change="handleDomainChange"
+        />
+      </a-form-item>
+
+      <!-- Category -->
+      <a-form-item
+        label="Category"
+        :validate-status="errors.category_id ? 'error' : ''"
+        :help="errors.category_id || ''"
+      >
+        <a-select
+          v-model:value="categoryIdValue"
+          :options="categoriesOption"
+          placeholder="Select category"
+          show-search
+          :filter-option="(input, option) => option.label.toLowerCase().includes(input.toLowerCase())"
+          size="large"
+          @change="handleCategoryChange"
+        />
+      </a-form-item>
+
+      <!-- Cost -->
+      <a-form-item
+        label="Cost"
+        :validate-status="errors.cost ? 'error' : ''"
+        :help="errors.cost || ''"
+      >
+        <a-input-number
+          v-model:value="formData.cost"
+          placeholder="Enter cost"
+          :min="0"
+          :precision="2"
+          style="width: 100%"
+          size="large"
+        />
+      </a-form-item>
+
+      <!-- Price -->
+      <a-form-item
+        label="Price"
+        :validate-status="errors.price ? 'error' : ''"
+        :help="errors.price || ''"
+      >
+        <a-input-number
+          v-model:value="formData.price"
+          placeholder="Enter price"
+          :min="0"
+          :precision="2"
+          style="width: 100%"
+          size="large"
+        />
+      </a-form-item>
+
+      <!-- SKU -->
+      <a-form-item
+        label="SKU"
+        :validate-status="errors.SKU ? 'error' : ''"
+        :help="errors.SKU || ''"
+      >
+        <a-input
+          v-model:value="formData.SKU"
+          placeholder="Enter SKU"
+          size="large"
+        />
+      </a-form-item>
+
+      <!-- Barcode -->
+      <a-form-item
+        label="Barcode"
+        :validate-status="errors.barcode ? 'error' : ''"
+        :help="errors.barcode || ''"
+      >
+        <a-input
+          v-model:value="formData.barcode"
+          placeholder="Enter barcode"
+          size="large"
+        />
+      </a-form-item>
+
+      <!-- Sold Type -->
+      <a-form-item
+        label="Sold Type"
+        :validate-status="errors.sold_type ? 'error' : ''"
+        :help="errors.sold_type || ''"
+      >
+        <a-radio-group
+          v-model:value="formData.sold_type"
+          size="large"
+        >
+          <a-radio
+            v-for="option in soltTypeOptions"
+            :key="option"
+            :value="option"
+          >
+            {{ option }}
+          </a-radio>
+        </a-radio-group>
+      </a-form-item>
+
+      <!-- Representation Type -->
+      <a-form-item
+        label="Representation Type"
+        :validate-status="errors.representation_type ? 'error' : ''"
+        :help="errors.representation_type || ''"
+      >
+        <a-select
+          v-model:value="representationTypeValue"
+          :options="[{ label: 'Color', value: 'color' }]"
+          placeholder="Select representation type"
+          size="large"
+          @change="handleRepresentationTypeChange"
+        />
+      </a-form-item>
+
+      <!-- Representation -->
+      <a-form-item
+        label="Representation"
+        :validate-status="errors.representation ? 'error' : ''"
+        :help="errors.representation || ''"
+      >
+        <a-input
+          v-model:value="formData.representation"
+          placeholder="Enter representation (e.g., hex color code)"
+          size="large"
+        />
+      </a-form-item>
+    </a-form>
+
     <template #footer>
       <a-button @click="openModal = false">Cancel</a-button>
 

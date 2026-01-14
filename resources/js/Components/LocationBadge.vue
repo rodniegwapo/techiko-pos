@@ -30,7 +30,7 @@ const hasLocationAccess = computed(() => {
 // Get available locations from global handleInertia data (always array)
 const availableLocations = computed(() => {
     const locs = page.props.availableLocations || [];
-    console.log("LocationBadge - Available Locations from handleInertia:", locs);
+
     return locs;
 });
 
@@ -43,8 +43,6 @@ const shouldShowBadge = computed(() => {
         userRole: userRole.value?.name,
         currentLocation: currentLocation.value?.name,
     };
-
-    console.log("LocationBadge Debug:", debug);
 
     return (
         currentDomain.value &&

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Domains;
 
+use App\Helpers;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ProductResource;
 use App\Models\Category;
@@ -10,10 +11,8 @@ use App\Models\Domain;
 use App\Models\Product\Discount;
 use App\Models\Product\Product;
 use App\Models\Sale;
-use App\Models\InventoryLocation;
-use App\Services\SaleService;
 use App\Services\InventoryService;
-use App\Helpers;
+use App\Services\SaleService;
 use App\Traits\LocationCategoryScoping;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -24,6 +23,7 @@ class SaleController extends Controller
     use LocationCategoryScoping;
 
     protected $saleService;
+
     protected $inventoryService;
 
     public function __construct(SaleService $saleService, InventoryService $inventoryService)
@@ -53,15 +53,15 @@ class SaleController extends Controller
             ->whereHas('activeLocations', function ($q) use ($location) {
                 $q->where('location_id', $location->id);
             })
-            ->when($request->input('search'), fn($q, $search) => $q->search($search))
+            ->when($request->input('search'), fn ($q, $search) => $q->search($search))
             ->when($request->input('category'), function ($q, $category) {
-                $q->whereHas('category', fn($q) => $q->where('name', $category));
+                $q->whereHas('category', fn ($q) => $q->where('name', $category));
             })
             ->with('category');
 
         $products = $query->when(
             ! $request->input('search') && ! $request->input('category'),
-            fn($q) => $q->limit(30)
+            fn ($q) => $q->limit(30)
         )->get();
 
         return ProductResource::collection($products);
@@ -72,7 +72,7 @@ class SaleController extends Controller
         $validated = $request->validate([
             'customer_id' => 'nullable|exists:customers,id',
             'sale_amount' => 'nullable|numeric|min:0',
-            'payment_method' => 'required|string'
+            'payment_method' => 'required|string',
         ]);
 
         $loyaltyResults = null;
@@ -84,7 +84,6 @@ class SaleController extends Controller
                 // 1. Complete sale and process inventory
                 $this->saleService->completeSale($sale, auth()->user());
 
-
                 // 2. Handle overselling situations (create automatic stock adjustments)
                 $oversoldItems = $this->saleService->handleOverselling($sale);
 
@@ -92,7 +91,7 @@ class SaleController extends Controller
                 $sale->update([
                     'grand_total' => $sale->total_amount,
                     'payment_method' => $validated['payment_method'],
-                    'location_id' => $location->id
+                    'location_id' => $location->id,
                 ]);
 
                 // 4. Process loyalty if customer is provided
@@ -108,10 +107,9 @@ class SaleController extends Controller
             });
         } catch (\Exception $e) {
 
-
             return response()->json([
                 'success' => false,
-                'message' => 'Payment processing failed: ' . $e->getMessage()
+                'message' => 'Payment processing failed: '.$e->getMessage(),
             ], 500);
         }
 
@@ -122,7 +120,7 @@ class SaleController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Payment processed successfully',
-            'loyalty_results' => $loyaltyResults
+            'loyalty_results' => $loyaltyResults,
         ]);
     }
 
@@ -152,7 +150,7 @@ class SaleController extends Controller
     {
         $validated = $request->validate([
             'product_id' => 'required|exists:products,id',
-            'quantity' => 'required|integer|min:1'
+            'quantity' => 'required|integer|min:1',
         ]);
 
         // Fetch product price from database for security and data integrity
@@ -170,7 +168,7 @@ class SaleController extends Controller
             $saleItem = $sale->saleItems()->create([
                 'product_id' => $validated['product_id'],
                 'quantity' => $validated['quantity'],
-                'unit_price' => $unitPrice
+                'unit_price' => $unitPrice,
             ]);
         }
 
@@ -191,8 +189,8 @@ class SaleController extends Controller
             'totals' => [
                 'subtotal' => $sale->total_amount,
                 'discount_amount' => $sale->discount_amount,
-                'grand_total' => $sale->grand_total
-            ]
+                'grand_total' => $sale->grand_total,
+            ],
         ]);
     }
 
@@ -202,7 +200,7 @@ class SaleController extends Controller
     public function removeItemFromCart(Request $request, Domain $domain, Sale $sale)
     {
         $validated = $request->validate([
-            'product_id' => 'required|exists:products,id'
+            'product_id' => 'required|exists:products,id',
         ]);
 
         $sale->saleItems()->where('product_id', $validated['product_id'])->delete();
@@ -219,8 +217,8 @@ class SaleController extends Controller
             'totals' => [
                 'subtotal' => $sale->total_amount,
                 'discount_amount' => $sale->discount_amount,
-                'grand_total' => $sale->grand_total
-            ]
+                'grand_total' => $sale->grand_total,
+            ],
         ]);
     }
 
@@ -231,7 +229,7 @@ class SaleController extends Controller
     {
         $validated = $request->validate([
             'product_id' => 'required|exists:products,id',
-            'quantity' => 'required|integer|min:1'
+            'quantity' => 'required|integer|min:1',
         ]);
 
         $saleItem = $sale->saleItems()
@@ -256,8 +254,8 @@ class SaleController extends Controller
             'totals' => [
                 'subtotal' => $sale->total_amount,
                 'discount_amount' => $sale->discount_amount,
-                'grand_total' => $sale->grand_total
-            ]
+                'grand_total' => $sale->grand_total,
+            ],
         ]);
     }
 
@@ -276,8 +274,8 @@ class SaleController extends Controller
             'totals' => [
                 'subtotal' => $sale->total_amount,
                 'discount_amount' => $sale->discount_amount,
-                'grand_total' => $sale->grand_total
-            ]
+                'grand_total' => $sale->grand_total,
+            ],
         ]);
     }
 
@@ -324,7 +322,7 @@ class SaleController extends Controller
             'success' => true,
             'regular_discounts' => $regularDiscounts,
             'product_discounts' => $productDiscounts,
-            'mandatory_discounts' => $mandatoryDiscounts
+            'mandatory_discounts' => $mandatoryDiscounts,
         ]);
     }
 
@@ -355,12 +353,12 @@ class SaleController extends Controller
     public function assignCustomer(Request $request, Domain $domain, Sale $sale)
     {
         $validated = $request->validate([
-            'customer_id' => 'nullable|exists:customers,id'
+            'customer_id' => 'nullable|exists:customers,id',
         ]);
 
         \Log::info("Domains\SaleController::assignCustomer called", [
             'sale_id' => $sale->id,
-            'customer_id' => $validated['customer_id']
+            'customer_id' => $validated['customer_id'],
         ]);
 
         // Update sale with customer and trigger customer update event
@@ -368,7 +366,7 @@ class SaleController extends Controller
 
         $response = [
             'success' => true,
-            'message' => $validated['customer_id'] ? 'Customer assigned successfully' : 'Customer removed successfully'
+            'message' => $validated['customer_id'] ? 'Customer assigned successfully' : 'Customer removed successfully',
         ];
 
         // If customer is assigned, include customer data in response
@@ -390,8 +388,8 @@ class SaleController extends Controller
 
     public function testCustomerEvent(Request $request, Domain $domain, Sale $sale)
     {
-        \Log::info("Testing CustomerUpdated event", [
-            'sale_id' => $sale->id
+        \Log::info('Testing CustomerUpdated event', [
+            'sale_id' => $sale->id,
         ]);
 
         // Manually trigger the CustomerUpdated event
@@ -399,7 +397,7 @@ class SaleController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'CustomerUpdated event triggered for testing'
+            'message' => 'CustomerUpdated event triggered for testing',
         ]);
     }
 
@@ -412,7 +410,7 @@ class SaleController extends Controller
 
         $validated = $request->validate([
             'customer_id' => 'required|exists:customers,id',
-            'sale_amount' => 'required|numeric|min:0'
+            'sale_amount' => 'required|numeric|min:0',
         ]);
 
         $customer = Customer::findOrFail($validated['customer_id']);
@@ -433,14 +431,14 @@ class SaleController extends Controller
                 'tier' => $customer->tier,
                 'lifetime_spent' => $customer->lifetime_spent,
                 'total_purchases' => $customer->total_purchases,
-            ]
+            ],
         ], $results));
     }
 
     public function testOrderEvent(Request $request, Domain $domain, Sale $sale)
     {
-        \Log::info("Testing OrderUpdated event", [
-            'sale_id' => $sale->id
+        \Log::info('Testing OrderUpdated event', [
+            'sale_id' => $sale->id,
         ]);
 
         // Manually trigger the OrderUpdated event
@@ -448,13 +446,13 @@ class SaleController extends Controller
             'saleItems.product',
             'saleDiscounts',
             'saleItems.discounts',
-            'customer'
+            'customer',
         ])));
 
         return response()->json([
             'success' => true,
             'message' => 'OrderUpdated event triggered for testing',
-            'sale_id' => $sale->id
+            'sale_id' => $sale->id,
         ]);
     }
 
@@ -496,12 +494,12 @@ class SaleController extends Controller
             'totals' => $sale ? [
                 'subtotal' => $sale->total_amount,
                 'discount_amount' => $sale->discount_amount,
-                'grand_total' => $sale->grand_total
+                'grand_total' => $sale->grand_total,
             ] : [
                 'subtotal' => 0,
                 'discount_amount' => 0,
-                'grand_total' => 0
-            ]
+                'grand_total' => 0,
+            ],
         ]);
     }
 
@@ -534,7 +532,7 @@ class SaleController extends Controller
         return response()->json([
             'success' => true,
             'sale' => $sale,
-            'message' => 'Sale created for user'
+            'message' => 'Sale created for user',
         ]);
     }
 
@@ -552,7 +550,7 @@ class SaleController extends Controller
             'route_user_param' => $request->route('user'),
             'domain' => $domain->name_slug,
             'route_parameters' => $request->route()->parameters(),
-            'all_parameters' => $request->all()
+            'all_parameters' => $request->all(),
         ]);
 
         $user = \App\Models\User::findOrFail($userId);
@@ -581,7 +579,7 @@ class SaleController extends Controller
         $sale = $query->first();
 
         // If no pending sale exists, create one with location
-        if (!$sale) {
+        if (! $sale) {
             $currentUser = auth()->user();
             $userRole = $currentUser ? $currentUser->roles()->first() : null;
 
@@ -600,7 +598,7 @@ class SaleController extends Controller
         // Now add item to the sale
         $validated = $request->validate([
             'product_id' => 'required|exists:products,id',
-            'quantity' => 'required|integer|min:1'
+            'quantity' => 'required|integer|min:1',
         ]);
 
         // Fetch product price from database for security and data integrity
@@ -616,7 +614,7 @@ class SaleController extends Controller
             $saleItem = $sale->saleItems()->create([
                 'product_id' => $validated['product_id'],
                 'quantity' => $validated['quantity'],
-                'unit_price' => $unitPrice
+                'unit_price' => $unitPrice,
             ]);
         }
 
@@ -631,8 +629,8 @@ class SaleController extends Controller
             'totals' => [
                 'subtotal' => $sale->total_amount,
                 'discount_amount' => $sale->discount_amount,
-                'grand_total' => $sale->grand_total
-            ]
+                'grand_total' => $sale->grand_total,
+            ],
         ]);
     }
 
@@ -727,17 +725,17 @@ class SaleController extends Controller
             'totals' => $sale ? [
                 'subtotal' => $sale->total_amount,
                 'discount_amount' => $sale->discount_amount,
-                'grand_total' => $sale->grand_total
+                'grand_total' => $sale->grand_total,
             ] : [
                 'subtotal' => 0,
                 'discount_amount' => 0,
-                'grand_total' => 0
+                'grand_total' => 0,
             ],
             'discount_options' => [
                 'product_discount_options' => $productDiscounts,
                 'promotional_discount_options' => $promotionalDiscounts,
-                'mandatory_discount_options' => $mandatoryDiscounts
-            ]
+                'mandatory_discount_options' => $mandatoryDiscounts,
+            ],
         ]);
     }
 
@@ -774,13 +772,13 @@ class SaleController extends Controller
         // Get user's latest pending sale
         $sale = $query->first();
 
-        if (!$sale) {
+        if (! $sale) {
             return response()->json(['success' => false, 'message' => 'No pending sale found'], 404);
         }
 
         $validated = $request->validate([
             'product_id' => 'required|exists:products,id',
-            'quantity' => 'required|integer|min:1'
+            'quantity' => 'required|integer|min:1',
         ]);
 
         $saleItem = $sale->saleItems()
@@ -800,8 +798,8 @@ class SaleController extends Controller
             'totals' => [
                 'subtotal' => $sale->total_amount,
                 'discount_amount' => $sale->discount_amount,
-                'grand_total' => $sale->grand_total
-            ]
+                'grand_total' => $sale->grand_total,
+            ],
         ]);
     }
 
@@ -836,12 +834,12 @@ class SaleController extends Controller
         // Get user's latest pending sale
         $sale = $query->first();
 
-        if (!$sale) {
+        if (! $sale) {
             return response()->json(['success' => false, 'message' => 'No pending sale found'], 404);
         }
 
         $validated = $request->validate([
-            'product_id' => 'required|exists:products,id'
+            'product_id' => 'required|exists:products,id',
         ]);
 
         $sale->saleItems()->where('product_id', $validated['product_id'])->delete();
@@ -857,8 +855,8 @@ class SaleController extends Controller
             'totals' => [
                 'subtotal' => $sale->total_amount,
                 'discount_amount' => $sale->discount_amount,
-                'grand_total' => $sale->grand_total
-            ]
+                'grand_total' => $sale->grand_total,
+            ],
         ]);
     }
 
@@ -892,7 +890,7 @@ class SaleController extends Controller
 
         $sale = $query->first();
 
-        if (!$sale) {
+        if (! $sale) {
             return response()->json([
                 'success' => true,
                 'sale' => null,
@@ -901,8 +899,8 @@ class SaleController extends Controller
                 'totals' => [
                     'subtotal' => 0,
                     'discount_amount' => 0,
-                    'grand_total' => 0
-                ]
+                    'grand_total' => 0,
+                ],
             ]);
         }
 
@@ -914,8 +912,8 @@ class SaleController extends Controller
             'totals' => [
                 'subtotal' => $sale->total_amount,
                 'discount_amount' => $sale->discount_amount,
-                'grand_total' => $sale->grand_total
-            ]
+                'grand_total' => $sale->grand_total,
+            ],
         ]);
     }
 
@@ -937,7 +935,7 @@ class SaleController extends Controller
 
         return response()->json([
             'success' => true,
-            'statistics' => $statistics
+            'statistics' => $statistics,
         ]);
     }
 }

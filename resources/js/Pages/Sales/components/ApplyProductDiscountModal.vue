@@ -1,5 +1,4 @@
 <script setup>
-import VerticalForm from "@/Components/Forms/VerticalForm.vue";
 import PrimaryButton from "@/Components/PrimaryButton.vue";
 import { ref, toRefs, watch, computed } from "vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
@@ -79,10 +78,7 @@ watch(openModal, async (isOpen) => {
         
         // Pre-populate the form with current discount data
         if (currentProduct.discount_id) {
-          formData.value.discount = {
-            value: currentProduct.discount_id,
-            label: `${currentProduct.discount_type} - ${currentProduct.discount_amount}`
-          };
+          formData.value.discount = currentProduct.discount_id;
         }
       } else {
         console.log('No existing discount found for this product');
@@ -100,7 +96,12 @@ watch(openModal, async (isOpen) => {
 /** 🔹 Apply discount */
 const handleSave = async () => {
   try {
-    if (!formData.value?.discount?.value) return emit("close");
+    // Extract discount value (could be direct value or object with .value property)
+    const discountId = typeof formData.value?.discount === 'object' && formData.value.discount?.value !== undefined
+      ? formData.value.discount.value
+      : formData.value?.discount;
+    
+    if (!discountId) return emit("close");
     loading.value = true;
 
     // fetch sale item (data is already in database via user-specific routes)
@@ -128,7 +129,7 @@ const handleSave = async () => {
 
     // selected discount
     const selectedDiscount = discounts.value.find(
-      (d) => d.id === formData.value.discount.value
+      (d) => d.id === discountId
     );
     if (!selectedDiscount) return emit("close");
 
@@ -290,7 +291,8 @@ const handleClearDiscount = async () => {
   }
 };
 
-const formFields = computed(() => {
+// Get filtered and formatted discount options for select
+const discountOptions = computed(() => {
   const filteredDiscounts = discounts.value.filter(
     (item) => {
       const isProductScope = item.scope == "product";
@@ -321,23 +323,30 @@ const formFields = computed(() => {
   
   console.log('ApplyProductDiscountModal - filtered discounts for form:', filteredDiscounts);
   
-  const options = filteredDiscounts.map((item) => ({
+  return filteredDiscounts.map((item) => ({
     label: `${item.name} (${item.type === 'percentage' || item.type === 'percent' ? parseFloat(item.value) + '%' : '₱' + parseFloat(item.value).toFixed(2)})`,
     value: item.id,
     amount: item.value,
   }));
-  
-  console.log('ApplyProductDiscountModal - form options:', options);
-  
-  return [
-    {
-      key: "discount",
-      label: "Select Discount",
-      type: "select",
-      isAllowClear: false,
-      options: options,
-    },
-  ];
+});
+
+// Handle discount value extraction for select
+const handleDiscountChange = (value) => {
+  formData.value.discount = value;
+};
+
+// Get discount value for select binding
+const discountValue = computed({
+  get: () => {
+    const val = formData.value?.discount;
+    if (typeof val === 'object' && val?.value !== undefined) {
+      return val.value;
+    }
+    return val;
+  },
+  set: (value) => {
+    formData.value.discount = value;
+  }
 });
 </script>
 <template>
@@ -348,7 +357,24 @@ const formFields = computed(() => {
     width="400px"
     :maskClosable="false"
   >
-    <vertical-form v-model="formData" :fields="formFields" :errors="errors" />
+    <a-form layout="vertical">
+      <a-form-item
+        label="Select Discount"
+        :validate-status="errors.discount ? 'error' : ''"
+        :help="errors.discount || ''"
+      >
+        <a-select
+          v-model:value="discountValue"
+          :options="discountOptions"
+          placeholder="Select discount"
+          :allowClear="false"
+          show-search
+          :filter-option="(input, option) => option.label.toLowerCase().includes(input.toLowerCase())"
+          size="large"
+          @change="handleDiscountChange"
+        />
+      </a-form-item>
+    </a-form>
     <template #footer>
       <!-- Clear button only visible if product already has discount -->
       <a-button
