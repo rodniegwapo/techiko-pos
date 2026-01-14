@@ -135,24 +135,14 @@ const handleCustomerChanged = async (customer) => {
     // Only load pending sale when customer is selected
     if (customer) {
         try {
-            console.log("Customer selected, loading pending sale...");
             await loadCurrentPendingSale();
 
             // If no pending sale found, create a new draft
             if (!orderId.value) {
-                console.log("No pending sale found, creating new draft...");
                 await createDraft();
             }
 
-            console.log("Assigning customer to sale:", {
-                orderId: orderId.value,
-                customer: customer?.id,
-            });
-
             if (!orderId.value) {
-                console.error(
-                    "OrderId is null or undefined after createDraft!"
-                );
                 throw new Error("No order ID available");
             }
 
