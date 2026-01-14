@@ -2,14 +2,13 @@
 
 namespace App\Http\Controllers\Domains;
 
+use App\Helpers;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ProductResource;
-use App\Models\Domain;
-use App\Models\Product\Product;
-use App\Models\ProductInventory;
 use App\Models\Category;
+use App\Models\Domain;
 use App\Models\InventoryLocation;
-use App\Helpers;
+use App\Models\Product\Product;
 use App\Traits\LocationCategoryScoping;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -21,7 +20,7 @@ class ProductController extends Controller
     /**
      * Resolve active location for the given domain and request.
      */
-    private function resolveActiveLocation(Request $request, Domain $domain = null)
+    private function resolveActiveLocation(Request $request, ?Domain $domain = null)
     {
         return Helpers::getActiveLocation($domain, $request->input('location_id'));
     }
@@ -42,8 +41,8 @@ class ProductController extends Controller
             'cost' => ['nullable', 'numeric', 'min:0'],
 
             'category_id' => ['required', 'exists:categories,id'],
-            'SKU' => ['nullable', 'string', 'max:255', 'unique:products,SKU,' . $productId],
-            'barcode' => ['nullable', 'string', 'max:255', 'unique:products,barcode,' . $productId],
+            'SKU' => ['nullable', 'string', 'max:255', 'unique:products,SKU,'.$productId],
+            'barcode' => ['nullable', 'string', 'max:255', 'unique:products,barcode,'.$productId],
 
             'track_inventory' => ['boolean'],
             'reorder_level' => ['nullable', 'numeric', 'min:0'],
@@ -64,7 +63,7 @@ class ProductController extends Controller
      */
     private function validateProductUniqueness(Request $request, ?Product $product = null, ?Domain $domain = null)
     {
-        if (!$request->filled('location_id') || !$domain) {
+        if (! $request->filled('location_id') || ! $domain) {
             return; // Skip if no location or domain context
         }
 
@@ -91,6 +90,9 @@ class ProductController extends Controller
      */
     private function buildProductQuery(Request $request, Domain $domain, $location)
     {
+
+        logger($domain);
+        logger('domansssewe');
         $query = Product::query()
             ->with('category')
             ->where('domain', $domain->name_slug);
@@ -102,7 +104,7 @@ class ProductController extends Controller
         }
 
         return $query
-            ->when($request->search, fn($q, $s) => $q->search($s))
+            ->when($request->search, fn ($q, $s) => $q->search($s))
             ->when($request->category, function ($query, $category) {
                 return $query->whereHas('category', function ($q) use ($category) {
                     $q->where('name', $category);
@@ -113,11 +115,9 @@ class ProductController extends Controller
     /**
      * Build categories query derived from location if present; otherwise domain-scoped.
      */
-    private function buildCategoriesQuery(Domain $domain, $location)
+    private function buildCategoriesQuery(Domain $domain)
     {
-        return $location
-            ? $this->getCategoriesForLocation($domain->name_slug, $location)
-            : Category::where('domain', $domain->name_slug);
+        return Category::where('domain', $domain->name_slug);
     }
 
     /**
@@ -133,10 +133,11 @@ class ProductController extends Controller
             'currentLocation' => $location,
         ]);
     }
+
     /**
      * Display a listing of products for the domain.
      */
-    public function index(Request $request, Domain $domain = null)
+    public function index(Request $request, ?Domain $domain = null)
     {
         $location = $this->resolveActiveLocation($request, $domain);
         $products = $this->buildProductQuery($request, $domain, $location)
@@ -151,7 +152,7 @@ class ProductController extends Controller
     /**
      * Store a newly created product for the domain.
      */
-    public function store(Request $request, Domain $domain = null)
+    public function store(Request $request, ?Domain $domain = null)
     {
         $this->validateProductUniqueness($request, null, $domain);
         $validated = $this->validatedData($request, null, $domain);
