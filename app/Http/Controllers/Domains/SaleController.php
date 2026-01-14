@@ -287,9 +287,13 @@ class SaleController extends Controller
     public function getCurrentDiscounts(Request $request, Domain $domain)
     {
         // Get active regular discounts (order-level)
+        // Handle NULL start_date - if start_date is NULL, treat as "always active"
         $regularDiscounts = Discount::where('is_active', true)
             ->where('scope', 'order')
-            ->where('start_date', '<=', now())
+            ->where(function ($query) {
+                $query->whereNull('start_date')
+                    ->orWhere('start_date', '<=', now());
+            })
             ->where(function ($query) {
                 $query->whereNull('end_date')
                     ->orWhere('end_date', '>=', now());
@@ -300,7 +304,10 @@ class SaleController extends Controller
         // Get active product discounts (product-level)
         $productDiscounts = Discount::where('is_active', true)
             ->where('scope', 'product')
-            ->where('start_date', '<=', now())
+            ->where(function ($query) {
+                $query->whereNull('start_date')
+                    ->orWhere('start_date', '<=', now());
+            })
             ->where(function ($query) {
                 $query->whereNull('end_date')
                     ->orWhere('end_date', '>=', now());
@@ -640,8 +647,6 @@ class SaleController extends Controller
         $currentUser = auth()->user();
         $userRole = $currentUser->roles()->first();
 
-
-        logger($userRole);
         $query = Sale::forDomain($domain->name_slug)
             ->pending()
             ->orderBy('created_at', 'desc')
@@ -664,12 +669,14 @@ class SaleController extends Controller
 
         $sale = $query->first();
 
-        logger($sale);
-
         // Get all available discount options
+        // Handle NULL start_date - if start_date is NULL, treat as "always active"
         $productDiscounts = Discount::where('is_active', true)
             ->where('scope', 'product')
-            ->where('start_date', '<=', now())
+            ->where(function ($query) {
+                $query->whereNull('start_date')
+                    ->orWhere('start_date', '<=', now());
+            })
             ->where(function ($query) {
                 $query->whereNull('end_date')
                     ->orWhere('end_date', '>=', now());
@@ -679,7 +686,10 @@ class SaleController extends Controller
 
         $promotionalDiscounts = Discount::where('is_active', true)
             ->where('scope', 'order')
-            ->where('start_date', '<=', now())
+            ->where(function ($query) {
+                $query->whereNull('start_date')
+                    ->orWhere('start_date', '<=', now());
+            })
             ->where(function ($query) {
                 $query->whereNull('end_date')
                     ->orWhere('end_date', '>=', now());
