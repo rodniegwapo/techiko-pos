@@ -47,10 +47,10 @@ class LoyaltyProgramSeeder extends Seeder
 
             // Seed some customers with loyalty activity for this domain (idempotent-ish by email)
             $sample = [
-                ['name' => 'John Walker',   'email' => 'john.'.Str::slug($slug).'@example.com',   'tier' => 'bronze',   'points' => 1200,  'spent' => 15000,  'purchases' => 8],
-                ['name' => 'Alice Carter',  'email' => 'alice.'.Str::slug($slug).'@example.com',  'tier' => 'silver',   'points' => 4200,  'spent' => 32000,  'purchases' => 16],
-                ['name' => 'Robert Davis',  'email' => 'robert.'.Str::slug($slug).'@example.com', 'tier' => 'gold',     'points' => 9800,  'spent' => 62000,  'purchases' => 28],
-                ['name' => 'Sophia Miller', 'email' => 'sophia.'.Str::slug($slug).'@example.com', 'tier' => 'platinum', 'points' => 15200, 'spent' => 128000, 'purchases' => 55],
+                ['name' => 'John Walker',   'email' => 'john.'.Str::slug($slug).'@example.com',   'tier' => 'bronze',   'points' => 1200,  'spent' => 15000,  'purchases' => 8,  'credit_limit' => 10000],
+                ['name' => 'Alice Carter',  'email' => 'alice.'.Str::slug($slug).'@example.com',  'tier' => 'silver',   'points' => 4200,  'spent' => 32000,  'purchases' => 16, 'credit_limit' => 25000],
+                ['name' => 'Robert Davis',  'email' => 'robert.'.Str::slug($slug).'@example.com', 'tier' => 'gold',     'points' => 9800,  'spent' => 62000,  'purchases' => 28, 'credit_limit' => 50000],
+                ['name' => 'Sophia Miller', 'email' => 'sophia.'.Str::slug($slug).'@example.com', 'tier' => 'platinum', 'points' => 15200, 'spent' => 128000, 'purchases' => 55, 'credit_limit' => 100000],
             ];
 
             foreach ($sample as $c) {
@@ -64,6 +64,10 @@ class LoyaltyProgramSeeder extends Seeder
                         'loyalty_points' => $c['points'],
                         'lifetime_spent' => $c['spent'],
                         'total_purchases' => $c['purchases'],
+                        'credit_enabled' => true,
+                        'credit_limit' => $c['credit_limit'],
+                        'credit_balance' => 0,
+                        'credit_terms_days' => 30,
                     ]
                 );
             }
