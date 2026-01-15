@@ -11,6 +11,7 @@ use App\Models\Domain;
 use App\Models\Product\Discount;
 use App\Models\Product\Product;
 use App\Models\Sale;
+use App\Services\CreditService;
 use App\Services\InventoryService;
 use App\Services\SaleService;
 use App\Traits\LocationCategoryScoping;
@@ -26,10 +27,13 @@ class SaleController extends Controller
 
     protected $inventoryService;
 
-    public function __construct(SaleService $saleService, InventoryService $inventoryService)
+    protected $creditService;
+
+    public function __construct(SaleService $saleService, InventoryService $inventoryService, CreditService $creditService)
     {
         $this->saleService = $saleService;
         $this->inventoryService = $inventoryService;
+        $this->creditService = $creditService;
     }
 
     public function index(Request $request, Domain $domain)
@@ -72,41 +76,71 @@ class SaleController extends Controller
         $validated = $request->validate([
             'customer_id' => 'nullable|exists:customers,id',
             'sale_amount' => 'nullable|numeric|min:0',
-            'payment_method' => 'required|string',
+            'payment_method' => 'required|string|in:cash,card,e-wallet,credit',
         ]);
 
         $loyaltyResults = null;
+        $creditResults = null;
 
         $location = Helpers::getActiveLocation($domain);
 
         try {
-            DB::transaction(function () use ($sale, $validated, &$loyaltyResults, $location) {
+            DB::transaction(function () use ($sale, $validated, &$loyaltyResults, &$creditResults, $location) {
                 // 1. Complete sale and process inventory
                 $this->saleService->completeSale($sale, auth()->user());
 
                 // 2. Handle overselling situations (create automatic stock adjustments)
                 $oversoldItems = $this->saleService->handleOverselling($sale);
 
-                // 3. Update payment details
-                $sale->update([
-                    'grand_total' => $sale->total_amount,
-                    'payment_method' => $validated['payment_method'],
-                    'location_id' => $location->id,
-                ]);
+                // 3. Handle credit payment if selected
+                if ($validated['payment_method'] === 'credit') {
+                    if (!$validated['customer_id']) {
+                        throw new \Exception('Customer is required for credit payments.');
+                    }
 
-                // 4. Process loyalty if customer is provided
-                if ($validated['customer_id']) {
                     $customer = Customer::findOrFail($validated['customer_id']);
 
-                    // Link customer to sale and trigger order update event
-                    $sale->updateCustomer($customer->id);
+                    // Validate credit limit
+                    $saleAmount = $validated['sale_amount'] ?? $sale->grand_total;
+                    $this->creditService->checkCreditLimit($customer, $saleAmount);
 
-                    // Process loyalty rewards
-                    $loyaltyResults = $customer->processLoyaltyForSale($validated['sale_amount'] ?? $sale->total_amount);
+                    // Process credit sale
+                    $creditTransaction = $this->creditService->processCreditSale(
+                        $sale,
+                        $customer,
+                        $saleAmount
+                    );
+
+                    $creditResults = [
+                        'transaction_id' => $creditTransaction->id,
+                        'credit_balance' => $customer->fresh()->credit_balance,
+                        'available_credit' => $customer->fresh()->getAvailableCredit(),
+                    ];
+
+                    // Link customer to sale
+                    $sale->updateCustomer($customer->id);
+                } else {
+                    // 4. Update payment details for non-credit payments
+                    $sale->update([
+                        'grand_total' => $sale->total_amount,
+                        'payment_method' => $validated['payment_method'],
+                        'location_id' => $location->id,
+                        'payment_status' => 'paid',
+                    ]);
+
+                    // 5. Process loyalty if customer is provided
+                    if ($validated['customer_id']) {
+                        $customer = Customer::findOrFail($validated['customer_id']);
+
+                        // Link customer to sale and trigger order update event
+                        $sale->updateCustomer($customer->id);
+
+                        // Process loyalty rewards
+                        $loyaltyResults = $customer->processLoyaltyForSale($validated['sale_amount'] ?? $sale->total_amount);
+                    }
                 }
             });
         } catch (\Exception $e) {
-
             return response()->json([
                 'success' => false,
                 'message' => 'Payment processing failed: '.$e->getMessage(),
@@ -116,11 +150,12 @@ class SaleController extends Controller
         // Trigger payment completed event to clear the order view
         event(new \App\Events\PaymentCompleted($sale));
 
-        // Return response with loyalty results
+        // Return response with loyalty and credit results
         return response()->json([
             'success' => true,
             'message' => 'Payment processed successfully',
             'loyalty_results' => $loyaltyResults,
+            'credit_results' => $creditResults,
         ]);
     }
 

@@ -5,7 +5,8 @@ import { IconDiscount, IconArrowRightToArc } from "@tabler/icons-vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useHelpers } from "@/Composables/useHelpers";
-import { ref, computed, createVNode, toRefs } from "vue";
+import { useCredit } from "@/Composables/useCredit";
+import { ref, computed, createVNode, toRefs, watch } from "vue";
 import { Modal, notification } from "ant-design-vue";
 import { ExclamationCircleOutlined } from "@ant-design/icons-vue";
 import axios from "axios";
@@ -14,6 +15,7 @@ import { usePage } from "@inertiajs/vue3";
 const { formData, errors } = useGlobalVariables();
 const { getRoute } = useDomainRoutes();
 const { formattedTotal } = useHelpers();
+const { checkCreditAvailability } = useCredit();
 const page = usePage();
 
 // Props for direct data passing
@@ -240,6 +242,25 @@ const handleProceedPayment = async () => {
     try {
         proceedPaymentLoading.value = true;
 
+        // Validate credit payment
+        if (paymentMethod.value === "credit") {
+            if (!props.selectedCustomer?.id) {
+                notification.error({
+                    message: "Error",
+                    description: "Customer is required for credit payments.",
+                });
+                throw new Error("Customer required for credit payment");
+            }
+
+            if (!creditLimitSufficient.value) {
+                notification.error({
+                    message: "Credit Limit Exceeded",
+                    description: `Available credit (₱${creditInfo.value?.availableCredit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}) is insufficient for this transaction.`,
+                });
+                throw new Error("Credit limit exceeded");
+            }
+        }
+
         // Single API call to process payment and loyalty together
         const response = await axios.post(
             getRoute("sales.payment.store", {
@@ -258,8 +279,15 @@ const handleProceedPayment = async () => {
 
         // Show success notification based on response
         const loyaltyResults = response.data.loyalty_results;
+        const creditResults = response.data.credit_results;
 
-        if (loyaltyResults && loyaltyResults.points_earned) {
+        if (creditResults) {
+            notification.success({
+                message: "Credit Sale Processed!",
+                description: `Transaction completed on credit. Remaining credit: ₱${creditResults.available_credit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+                duration: 5,
+            });
+        } else if (loyaltyResults && loyaltyResults.points_earned) {
             notification.success({
                 message: "Payment Successful!",
                 description: `Transaction completed. ${props.selectedCustomer.name} earned ${loyaltyResults.points_earned} points!`,
@@ -293,9 +321,10 @@ const handleProceedPayment = async () => {
         orderDiscountAmount.value = 0;
         orderDiscountId.value = "";
     } catch (error) {
+        const errorMessage = error.response?.data?.message || error.message || "Please try again or contact support.";
         notification.error({
             message: "Payment failed",
-            description: "Please try again or contact support.",
+            description: errorMessage,
         });
         throw error;
     } finally {
@@ -304,12 +333,68 @@ const handleProceedPayment = async () => {
 };
 
 const disabledPaymentButtonColor = computed(() => {
+    if (paymentMethod.value === "credit") {
+        if (!creditLimitSufficient.value) return "";
+        if (orders.value.length == 0) return "";
+        return "bg-green-700 border-green-700 hover:bg-green-600";
+    }
     if (amountReceived.value < totalAmount.value) return "";
     if (orders.value.length == 0) return "";
     return "bg-green-700 border-green-700 hover:bg-green-600";
 });
 
 const paymentMethod = ref("cash");
+const creditInfo = ref(null);
+const checkingCredit = ref(false);
+
+// Watch for customer changes and check credit availability
+watch(
+    () => props.selectedCustomer,
+    async (customer) => {
+        if (customer && customer.id) {
+            checkingCredit.value = true;
+            try {
+                creditInfo.value = await checkCreditAvailability(customer.id, totalAmount.value);
+            } catch (error) {
+                console.error("Error checking credit availability:", error);
+                creditInfo.value = null;
+            } finally {
+                checkingCredit.value = false;
+            }
+        } else {
+            creditInfo.value = null;
+        }
+    },
+    { immediate: true }
+);
+
+// Watch total amount changes to re-check credit
+watch(
+    () => totalAmount.value,
+    async (amount) => {
+        if (props.selectedCustomer?.id && paymentMethod.value === "credit") {
+            checkingCredit.value = true;
+            try {
+                creditInfo.value = await checkCreditAvailability(props.selectedCustomer.id, amount);
+            } catch (error) {
+                console.error("Error checking credit availability:", error);
+            } finally {
+                checkingCredit.value = false;
+            }
+        }
+    }
+);
+
+// Check if credit payment is available
+const canUseCredit = computed(() => {
+    return props.selectedCustomer?.credit_enabled && creditInfo.value?.creditEnabled;
+});
+
+// Check if credit limit is sufficient
+const creditLimitSufficient = computed(() => {
+    if (paymentMethod.value !== "credit" || !creditInfo.value) return true;
+    return creditInfo.value.availableCredit >= (totalAmount.value - orderDiscountAmount.value);
+});
 </script>
 
 <template>
@@ -380,11 +465,32 @@ const paymentMethod = ref("cash");
                         <a-radio-button value="card"
                             >Pay in Card</a-radio-button
                         >
+                        <a-radio-button 
+                            value="credit"
+                            :disabled="!canUseCredit"
+                        >
+                            Pay on Credit
+                        </a-radio-button>
                     </a-radio-group>
+                    <!-- Credit Information Display -->
+                    <div v-if="paymentMethod === 'credit' && creditInfo" class="mt-2 text-sm">
+                        <div v-if="checkingCredit" class="text-gray-500">Checking credit...</div>
+                        <div v-else>
+                            <div class="text-gray-600">
+                                Available Credit: <span class="font-medium text-green-600">₱{{ creditInfo.availableCredit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
+                            </div>
+                            <div class="text-gray-600">
+                                Current Balance: <span class="font-medium text-red-600">₱{{ creditInfo.creditBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
+                            </div>
+                            <div v-if="!creditLimitSufficient" class="text-red-600 font-medium mt-1">
+                                ⚠️ Insufficient credit for this transaction
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Amount Received -->
-                <div class="flex items-start flex-col gap-2">
+                <!-- Amount Received (only show for non-credit payments) -->
+                <div v-if="paymentMethod !== 'credit'" class="flex items-start flex-col gap-2">
                     <span class="text-gray-700 whitespace-nowrap"
                         >Amount Received:</span
                     >
@@ -402,8 +508,8 @@ const paymentMethod = ref("cash");
                     />
                 </div>
 
-                <!-- Change -->
-                <div class="flex items-start flex-col gap-2">
+                <!-- Change (only show for non-credit payments) -->
+                <div v-if="paymentMethod !== 'credit'" class="flex items-start flex-col gap-2">
                     <span class="text-gray-700 whitespace-nowrap">Change:</span>
                     <a-input readonly :value="formattedTotal(customerChange)" />
                 </div>
@@ -418,8 +524,9 @@ const paymentMethod = ref("cash");
                         @click="handleProceedPaymentConfirmation"
                         :disabled="
                             proceedPaymentLoading ||
-                            amountReceived <
-                                totalAmount - orderDiscountAmount ||
+                            (paymentMethod !== 'credit' && amountReceived <
+                                totalAmount - orderDiscountAmount) ||
+                            (paymentMethod === 'credit' && !creditLimitSufficient) ||
                             orders.length == 0
                         "
                         :loading="proceedPaymentLoading"

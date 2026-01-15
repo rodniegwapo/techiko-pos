@@ -103,11 +103,19 @@ class PermissionModuleSeeder extends Seeder
                 'is_active' => true,
             ],
             [
+                'name' => 'credits',
+                'display_name' => 'Credit Management',
+                'icon' => 'credit-card',
+                'description' => 'Customer credit and payment management',
+                'sort_order' => 12,
+                'is_active' => true,
+            ],
+            [
                 'name' => 'mandatory-discounts',
                 'display_name' => 'Mandatory Discounts',
                 'icon' => 'tag-off',
                 'description' => 'Mandatory discount management',
-                'sort_order' => 12,
+                'sort_order' => 13,
                 'is_active' => true,
             ],
             [
@@ -115,7 +123,7 @@ class PermissionModuleSeeder extends Seeder
                 'display_name' => 'Void Logs',
                 'icon' => 'x-circle',
                 'description' => 'Void transaction logs',
-                'sort_order' => 13,
+                'sort_order' => 14,
                 'is_active' => true,
             ],
             [
@@ -123,7 +131,7 @@ class PermissionModuleSeeder extends Seeder
                 'display_name' => 'Orders',
                 'icon' => 'clipboard-list',
                 'description' => 'Order management',
-                'sort_order' => 14,
+                'sort_order' => 15,
                 'is_active' => true,
             ],
             [
@@ -131,7 +139,7 @@ class PermissionModuleSeeder extends Seeder
                 'display_name' => 'Supervisors',
                 'icon' => 'user-check',
                 'description' => 'Supervisor management',
-                'sort_order' => 15,
+                'sort_order' => 16,
                 'is_active' => true,
             ],
             [
@@ -139,7 +147,7 @@ class PermissionModuleSeeder extends Seeder
                 'display_name' => 'Setup',
                 'icon' => 'settings',
                 'description' => 'System setup and configuration',
-                'sort_order' => 16,
+                'sort_order' => 17,
                 'is_active' => true,
             ],
         ];

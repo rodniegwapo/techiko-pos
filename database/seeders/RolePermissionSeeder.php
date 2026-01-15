@@ -133,6 +133,15 @@ class RolePermissionSeeder extends Seeder
             'loyalty.tiers.update',
             'loyalty.tiers.destroy',
             
+            // Credit Management
+            'credits.index',
+            'credits.overdue',
+            'credits.show',
+            'credits.transactions.store',
+            'credits.transactions.update',
+            'credits.history',
+            'credits.settings.update',
+            
             // Inventory Management
             'inventory.index',
             'inventory.products',
@@ -394,6 +403,15 @@ class RolePermissionSeeder extends Seeder
             'loyalty.tiers.update',
             'loyalty.tiers.destroy',
             
+            // Credit Management
+            'credits.index',
+            'credits.overdue',
+            'credits.show',
+            'credits.transactions.store',
+            'credits.transactions.update',
+            'credits.history',
+            'credits.settings.update',
+            
             // Inventory Management
             'inventory.index',
             'inventory.products',
@@ -545,6 +563,15 @@ class RolePermissionSeeder extends Seeder
             'loyalty.tiers.index',
             'loyalty.tiers.show',
             
+            // Credit Management
+            'credits.index',
+            'credits.overdue',
+            'credits.show',
+            'credits.transactions.store',
+            'credits.transactions.update',
+            'credits.history',
+            'credits.settings.update',
+            
             // Inventory Management
             'inventory.index',
             'inventory.products',
@@ -674,6 +701,13 @@ class RolePermissionSeeder extends Seeder
             'loyalty.tiers.index',
             'loyalty.tiers.show',
             
+            // Credit Management
+            'credits.index',
+            'credits.overdue',
+            'credits.show',
+            'credits.transactions.store',
+            'credits.history',
+            
             // Inventory Management
             'inventory.index',
             'inventory.products',
@@ -770,6 +804,11 @@ class RolePermissionSeeder extends Seeder
             'loyalty.adjust-points',
             'loyalty.tiers.index',
             'loyalty.tiers.show',
+            
+            // Credit Management (view only)
+            'credits.index',
+            'credits.show',
+            'credits.history',
             
             // Inventory Management (view only)
             'inventory.index',

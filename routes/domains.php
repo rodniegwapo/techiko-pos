@@ -108,6 +108,17 @@ Route::prefix('domains/{domain:name_slug}')
             ->only(['index', 'store', 'update', 'destroy'])
             ->names('customers');
 
+        // Credit Management (Organization-specific)
+        Route::prefix('credits')->name('credits.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Domains\CreditController::class, 'index'])->name('index');
+            Route::get('/overdue', [\App\Http\Controllers\Domains\CreditController::class, 'overdue'])->name('overdue');
+            Route::get('/customers/{customer}', [\App\Http\Controllers\Domains\CreditController::class, 'show'])->name('show');
+            Route::post('/customers/{customer}/transactions', [\App\Http\Controllers\Domains\CreditController::class, 'storeTransaction'])->name('transactions.store');
+            Route::put('/transactions/{transaction}', [\App\Http\Controllers\Domains\CreditController::class, 'updateTransaction'])->name('transactions.update');
+            Route::get('/customers/{customer}/history', [\App\Http\Controllers\Domains\CreditController::class, 'history'])->name('history');
+            Route::put('/customers/{customer}/settings', [\App\Http\Controllers\Domains\CreditController::class, 'updateCreditSettings'])->name('settings.update');
+        });
+
         // Users (Organization-specific)
         Route::resource('users', \App\Http\Controllers\Domains\UserController::class)
             ->only(['index', 'store', 'update', 'destroy'])
