@@ -16,11 +16,11 @@ class LoyaltyProgramSeeder extends Seeder
 
         // Seed global loyalty tiers once (table enforces unique name)
         $tiers = [
-                ['name' => 'bronze',   'display_name' => 'Bronze',   'multiplier' => 1.00, 'spending_threshold' => 0,     'sort_order' => 1],
-                ['name' => 'silver',   'display_name' => 'Silver',   'multiplier' => 1.25, 'spending_threshold' => 20000, 'sort_order' => 2],
-                ['name' => 'gold',     'display_name' => 'Gold',     'multiplier' => 1.50, 'spending_threshold' => 50000, 'sort_order' => 3],
-                ['name' => 'platinum', 'display_name' => 'Platinum', 'multiplier' => 2.00, 'spending_threshold' => 100000,'sort_order' => 4],
-            ];
+            ['name' => 'bronze',   'display_name' => 'Bronze',   'multiplier' => 1.00, 'spending_threshold' => 0,     'sort_order' => 1],
+            ['name' => 'silver',   'display_name' => 'Silver',   'multiplier' => 1.25, 'spending_threshold' => 20000, 'sort_order' => 2],
+            ['name' => 'gold',     'display_name' => 'Gold',     'multiplier' => 1.50, 'spending_threshold' => 50000, 'sort_order' => 3],
+            ['name' => 'platinum', 'display_name' => 'Platinum', 'multiplier' => 2.00, 'spending_threshold' => 100000, 'sort_order' => 4],
+        ];
 
         foreach ($tiers as $t) {
             LoyaltyTier::updateOrCreate(
@@ -74,5 +74,3 @@ class LoyaltyProgramSeeder extends Seeder
         }
     }
 }
-
-
