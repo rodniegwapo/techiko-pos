@@ -42,7 +42,7 @@ onMounted(() => {
     if (!Array.isArray(openKeys.value)) {
         openKeys.value = [];
     }
-    
+
     // Initialize menu state
     initializeMenuState();
 });
@@ -67,18 +67,20 @@ const isInDomainContext = computed(() => !!getCurrentDomainFromUrl());
 // Helper function to get dashboard tag text
 const getDashboardTagText = () => {
     const currentDomainSlug = getCurrentDomainFromUrl();
-    
+
     if (isSuperUser.value) {
         if (currentDomainSlug) {
             // Super user in domain context
-            return currentDomainSlug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            return currentDomainSlug
+                .replace(/-/g, " ")
+                .replace(/\b\w/g, (l) => l.toUpperCase());
         } else {
             // Super user in global context
-            return 'Global Admin';
+            return "Global Admin";
         }
     } else {
         // Regular user
-        return currentDomain?.name || 'Organization';
+        return currentDomain?.name || "Organization";
     }
 };
 
@@ -248,16 +250,16 @@ const menuItems = [
 const menus = computed(() => {
     const filterMenuItems = (items) => {
         if (!Array.isArray(items)) {
-            console.warn('Menu items is not an array:', items);
+            console.warn("Menu items is not an array:", items);
             return [];
         }
-        
+
         return items
-            .filter(item => {
-                if (!item || typeof item !== 'object') {
+            .filter((item) => {
+                if (!item || typeof item !== "object") {
                     return false;
                 }
-                
+
                 // Hide global-only menus when browsing inside a domain
                 if (isInDomainContext.value && item.globalOnly) {
                     return false;
@@ -272,27 +274,27 @@ const menus = computed(() => {
                 if (item.superUserOnly && !isSuperUser.value) {
                     return false;
                 }
-                
+
                 // Hide Sales for super users (Sales page not relevant for super user role)
-                if (item.key === 'sales' && isSuperUser.value) {
+                if (item.key === "sales" && isSuperUser.value) {
                     return false;
                 }
-                
+
                 // Check permission for items with routeName
                 if (item.routeName && !hasPermission(item.routeName)) {
                     // Special case: Dashboard should always be available if user is authenticated
-                    if (item.key === 'dashboard') {
+                    if (item.key === "dashboard") {
                         return true; // Dashboard is always available
                     } else {
                         return false;
                     }
                 }
-                
+
                 return true;
             })
-            .map(item => {
+            .map((item) => {
                 const filteredItem = { ...item };
-                
+
                 // Filter children if they exist
                 if (item.children && Array.isArray(item.children)) {
                     const filteredChildren = filterMenuItems(item.children);
@@ -303,11 +305,11 @@ const menus = computed(() => {
                         delete filteredItem.children;
                     }
                 }
-                
+
                 return filteredItem;
             });
     };
-    
+
     return filterMenuItems(menuItems);
 });
 
@@ -316,21 +318,28 @@ const menus = computed(() => {
 // ===================
 const handleClick = (menu) => {
     if (!menu.routeName) {
-        console.warn('No routeName for menu:', menu);
+        console.warn("No routeName for menu:", menu);
         return;
     }
-    
+
     try {
         const routePath = getRoute(menu.routeName);
-        
-        if (routePath && routePath !== '#') {
+
+        if (routePath && routePath !== "#") {
             selectedKeys.value = [menu.key];
             router.visit(routePath);
         } else {
-            console.error('Invalid route generated for menu:', menu.title, 'routeName:', menu.routeName, 'generated:', routePath);
+            console.error(
+                "Invalid route generated for menu:",
+                menu.title,
+                "routeName:",
+                menu.routeName,
+                "generated:",
+                routePath
+            );
         }
     } catch (error) {
-        console.error('Navigation error:', error, 'for menu:', menu);
+        console.error("Navigation error:", error, "for menu:", menu);
     }
 };
 
@@ -339,14 +348,14 @@ const handleClick = (menu) => {
 // ===================
 const initializeMenuState = () => {
     const currentPath = window.location.pathname;
-    
+
     // Special handling for dashboard routes
-    if (currentPath.includes('/dashboard')) {
-        selectedKeys.value = ['dashboard'];
+    if (currentPath.includes("/dashboard")) {
+        selectedKeys.value = ["dashboard"];
         openKeys.value = [];
         return;
     }
-    
+
     // Find matching menu item
     const findMatchingMenu = (items, parentKey = null) => {
         for (const item of items) {
@@ -364,20 +373,23 @@ const initializeMenuState = () => {
         }
         return null;
     };
-    
+
     const match = findMatchingMenu(safeMenus.value);
     if (match) {
         selectedKeys.value = [match.item.key];
         if (match.parentKey) {
             openKeys.value = [match.parentKey];
         }
-    } else if (currentPath.includes('/dashboard')) {
-        selectedKeys.value = ['dashboard'];
+    } else if (currentPath.includes("/dashboard")) {
+        selectedKeys.value = ["dashboard"];
         openKeys.value = [];
     }
 };
 
-watch(() => page.url, () => initializeMenuState());
+watch(
+    () => page.url,
+    () => initializeMenuState()
+);
 
 const handleOpenChange = (keys) => {
     openKeys.value = keys;
@@ -393,7 +405,7 @@ const isMenuReady = computed(() => {
 const safeMenus = computed(() => {
     const menuData = menus.value;
     if (!Array.isArray(menuData)) {
-        console.warn('Menus is not an array, returning empty array:', menuData);
+        console.warn("Menus is not an array, returning empty array:", menuData);
         return [];
     }
     return menuData;
@@ -429,7 +441,12 @@ const safeMenus = computed(() => {
                     <div class="flex items-center gap-2">
                         {{ menu.title }}
                         <span v-if="menu.title === 'Dashboard'" class="text-xs">
-                            <a-tag :color="getCurrentDomainFromUrl() ? 'green' : 'blue'" class="text-[10px]">
+                            <a-tag
+                                :color="
+                                    getCurrentDomainFromUrl() ? 'green' : 'blue'
+                                "
+                                class="text-[10px]"
+                            >
                                 {{ getDashboardTagText() }}
                             </a-tag>
                         </span>
@@ -468,7 +485,7 @@ const safeMenus = computed(() => {
                 </a-sub-menu>
             </template>
         </a-menu>
-        
+
         <!-- Loading state -->
         <div v-else class="flex items-center justify-center p-4">
             <div class="text-gray-500">Loading menu...</div>
