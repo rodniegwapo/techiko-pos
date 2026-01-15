@@ -2,10 +2,9 @@
 
 namespace App\Services;
 
+use App\Models\CreditTransaction;
 use App\Models\Customer;
 use App\Models\Sale;
-use App\Models\CreditTransaction;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class CreditService
@@ -59,7 +58,7 @@ class CreditService
         }
 
         // If specific transactions are provided, mark them as paid
-        if (!empty($transactionIds) && $transactionType === 'payment') {
+        if (! empty($transactionIds) && $transactionType === 'payment') {
             $transactions = CreditTransaction::whereIn('id', $transactionIds)
                 ->where('customer_id', $customer->id)
                 ->where('transaction_type', 'credit')
@@ -95,7 +94,7 @@ class CreditService
             amount: $amount,
             saleId: null,
             referenceNumber: $referenceNumber,
-            notes: $notes ?? ucfirst($transactionType) . " transaction" . (!empty($transactionIds) ? " - Applied to transactions" : "")
+            notes: $notes ?? ucfirst($transactionType).' transaction'.(! empty($transactionIds) ? ' - Applied to transactions' : '')
         );
 
         Log::info('Credit transaction processed', [
@@ -114,12 +113,12 @@ class CreditService
      */
     public function checkCreditLimit(Customer $customer, float $amount): bool
     {
-        if (!$customer->credit_enabled) {
+        if (! $customer->credit_enabled) {
             throw new \Exception('Credit is not enabled for this customer.');
         }
 
-        if (!$customer->canPurchaseOnCredit($amount)) {
-            throw new \Exception('Credit limit exceeded. Available credit: ' . number_format($customer->getAvailableCredit(), 2));
+        if (! $customer->canPurchaseOnCredit($amount)) {
+            throw new \Exception('Credit limit exceeded. Available credit: '.number_format($customer->getAvailableCredit(), 2));
         }
 
         return true;
