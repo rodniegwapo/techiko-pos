@@ -353,14 +353,16 @@ watch(
     async (customer) => {
         if (customer && customer.id) {
             checkingCredit.value = true;
-            try {
-                creditInfo.value = await checkCreditAvailability(customer.id, totalAmount.value);
-            } catch (error) {
-                console.error("Error checking credit availability:", error);
-                creditInfo.value = null;
-            } finally {
-                checkingCredit.value = false;
-            }
+            // Use customer data directly instead of API call
+            const availableCredit = Math.max(0, (customer.credit_limit || 0) - (customer.credit_balance || 0));
+            creditInfo.value = {
+                available: availableCredit >= totalAmount.value,
+                availableCredit: availableCredit,
+                creditLimit: customer.credit_limit || 0,
+                creditBalance: customer.credit_balance || 0,
+                creditEnabled: customer.credit_enabled || false,
+            };
+            checkingCredit.value = false;
         } else {
             creditInfo.value = null;
         }
@@ -372,15 +374,10 @@ watch(
 watch(
     () => totalAmount.value,
     async (amount) => {
-        if (props.selectedCustomer?.id && paymentMethod.value === "credit") {
-            checkingCredit.value = true;
-            try {
-                creditInfo.value = await checkCreditAvailability(props.selectedCustomer.id, amount);
-            } catch (error) {
-                console.error("Error checking credit availability:", error);
-            } finally {
-                checkingCredit.value = false;
-            }
+        if (props.selectedCustomer?.id && creditInfo.value) {
+            // Recalculate availability based on new amount
+            const availableCredit = Math.max(0, (props.selectedCustomer.credit_limit || 0) - (props.selectedCustomer.credit_balance || 0));
+            creditInfo.value.available = availableCredit >= amount;
         }
     }
 );

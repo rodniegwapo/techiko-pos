@@ -66,8 +66,18 @@ export function useDomainRoutes() {
 
     /*** === INTERNAL BUILDER === ***/
     const buildRoute = (name, params) => {
-        const route = window.route(name, params);
-        return route;
+        try {
+            const route = window.route(name, params);
+            // Check if route is valid (not undefined, null, or empty string)
+            if (!route || route === '' || route === '#') {
+                console.warn(`⚠️ Route '${name}' returned invalid value:`, route);
+                return '#';
+            }
+            return route;
+        } catch (error) {
+            console.error(`❌ Error building route '${name}':`, error);
+            return '#';
+        }
     };
 
     /*** === RETURN API === ***/
