@@ -31,10 +31,11 @@ class CreditService
         );
 
         // Update sale
+        // Note: payment_status is already set to 'paid' by completeSale()
+        // We only update credit-specific fields here
         $sale->update([
             'is_credit_sale' => true,
             'payment_method' => 'credit',
-            'payment_status' => 'pending',
         ]);
 
         Log::info('Credit sale processed', [
