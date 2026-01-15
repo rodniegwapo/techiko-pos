@@ -26,6 +26,9 @@ class Customer extends Model
         'date_of_birth' => 'date',
         'tier_achieved_date' => 'date',
         'lifetime_spent' => 'decimal:2',
+        'credit_limit' => 'decimal:2',
+        'credit_balance' => 'decimal:2',
+        'credit_enabled' => 'boolean',
     ];
 
     // Relationships
@@ -43,6 +46,11 @@ class Customer extends Model
     public function sales()
     {
         return $this->hasMany(Sale::class);
+    }
+
+    public function creditTransactions()
+    {
+        return $this->hasMany(CreditTransaction::class);
     }
 
     // Loyalty methods
@@ -180,5 +188,82 @@ class Customer extends Model
             'total_purchases' => 0,
             'tier_achieved_date' => now(),
         ];
+    }
+
+    // Credit methods
+    public function getAvailableCredit(): float
+    {
+        return max(0, $this->credit_limit - $this->credit_balance);
+    }
+
+    public function canPurchaseOnCredit(float $amount): bool
+    {
+        if (!$this->credit_enabled) {
+            return false;
+        }
+
+        return $this->getAvailableCredit() >= $amount;
+    }
+
+    public function addCreditTransaction(string $type, float $amount, ?int $saleId = null, ?string $referenceNumber = null, ?string $notes = null, ?\DateTime $dueDate = null): CreditTransaction
+    {
+        $balanceBefore = $this->credit_balance;
+
+        // Calculate new balance based on transaction type
+        // For adjustment, amount can be positive (increase) or negative (decrease)
+        $balanceAfter = match ($type) {
+            'credit' => $balanceBefore + abs($amount),
+            'payment' => max(0, $balanceBefore - abs($amount)),
+            'adjustment' => max(0, $balanceBefore + $amount), // Amount can be positive or negative
+            'refund' => max(0, $balanceBefore - abs($amount)),
+            default => $balanceBefore,
+        };
+
+        // Update customer balance
+        $this->update(['credit_balance' => $balanceAfter]);
+
+        // Create transaction record
+        // For adjustment, store the actual amount (can be negative)
+        // For other types, store absolute value
+        $transactionAmount = $type === 'adjustment' ? $amount : abs($amount);
+
+        $transaction = CreditTransaction::create([
+            'customer_id' => $this->id,
+            'sale_id' => $saleId,
+            'transaction_type' => $type,
+            'amount' => $transactionAmount,
+            'balance_before' => $balanceBefore,
+            'balance_after' => $balanceAfter,
+            'due_date' => $dueDate ?? ($type === 'credit' ? now()->addDays($this->credit_terms_days) : null),
+            'reference_number' => $referenceNumber,
+            'notes' => $notes,
+            'user_id' => auth()->id(),
+            'domain' => $this->domain ?? null,
+        ]);
+
+        return $transaction;
+    }
+
+    public function getOverdueTransactions()
+    {
+        return $this->creditTransactions()
+            ->overdue()
+            ->orderBy('due_date', 'asc')
+            ->get();
+    }
+
+    public function getTotalOverdueAmount(): float
+    {
+        return $this->creditTransactions()
+            ->overdue()
+            ->sum('amount');
+    }
+
+    public function getCreditHistory(int $limit = 50)
+    {
+        return $this->creditTransactions()
+            ->orderBy('created_at', 'desc')
+            ->limit($limit)
+            ->get();
     }
 }

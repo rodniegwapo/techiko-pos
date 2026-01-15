@@ -41,14 +41,14 @@ const handleScopeChange = (value) => {
 const scopeValue = computed({
     get: () => {
         const val = formData.value?.scope;
-        if (typeof val === 'object' && val?.value !== undefined) {
+        if (typeof val === "object" && val?.value !== undefined) {
             return val.value;
         }
         return val;
     },
     set: (value) => {
         formData.value.scope = value;
-    }
+    },
 });
 
 // Handle domain value extraction for select
@@ -60,14 +60,14 @@ const handleDomainChange = (value) => {
 const domainValue = computed({
     get: () => {
         const val = formData.value?.domain;
-        if (typeof val === 'object' && val?.value !== undefined) {
+        if (typeof val === "object" && val?.value !== undefined) {
             return val.value;
         }
         return val;
     },
     set: (value) => {
         formData.value.domain = value;
-    }
+    },
 });
 
 const handleSave = () => {
@@ -208,7 +208,7 @@ const handleUpdate = () => {
                     v-model:value="scopeValue"
                     :options="[
                         { label: 'Order', value: 'order' },
-                        { label: 'Product', value: 'product' }
+                        { label: 'Product', value: 'product' },
                     ]"
                     placeholder="Select scope"
                     size="large"

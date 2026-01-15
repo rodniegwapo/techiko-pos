@@ -13,6 +13,7 @@ import {
     IconUserCheck,
     IconWorld,
     IconKey,
+    IconCreditCard,
 } from "@tabler/icons-vue";
 import { router, usePage } from "@inertiajs/vue3";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
@@ -206,6 +207,14 @@ const menuItems = [
         icon: IconUsers,
         routeName: "customers.index",
         path: "/customers",
+    },
+    {
+        key: "credits",
+        title: "Credit Management",
+        icon: IconCreditCard,
+        routeName: "credits.index",
+        path: "/credits",
+        domainOnly: true,
     },
     {
         key: "users",

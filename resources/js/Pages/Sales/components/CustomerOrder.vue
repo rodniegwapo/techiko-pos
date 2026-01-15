@@ -25,6 +25,7 @@ import {
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
+import { useCredit } from "@/Composables/useCredit";
 import axios from "axios";
 import { Modal, notification } from "ant-design-vue";
 import { usePage } from "@inertiajs/vue3";
@@ -32,7 +33,9 @@ import { useDebounceFn } from "@vueuse/core";
 
 const { formData, errors } = useGlobalVariables();
 const { getRoute } = useDomainRoutes();
+const { checkCreditAvailability } = useCredit();
 const page = usePage();
+const creditInfo = ref(null);
 
 // Loading states for each product to prevent multiple rapid clicks
 const loadingStates = ref({});
@@ -407,6 +410,27 @@ const customer = ref("");
 
 // Customer loyalty state
 const selectedCustomer = ref(null);
+
+// Watch for customer changes and load credit info
+watch(
+    () => selectedCustomer.value,
+    async (customer) => {
+        if (customer && customer.id) {
+            try {
+                creditInfo.value = await checkCreditAvailability(
+                    customer.id,
+                    0
+                );
+            } catch (error) {
+                console.error("Error loading credit info:", error);
+                creditInfo.value = null;
+            }
+        } else {
+            creditInfo.value = null;
+        }
+    },
+    { immediate: true }
+);
 const customerSearchQuery = ref("");
 const customerOptions = ref([]);
 const searchingCustomers = ref(false);
@@ -758,6 +782,79 @@ defineExpose({
                 @view-details="showCustomerDetails"
                 @clear-customer="clearCustomer"
             />
+
+            <!-- Credit Information Card -->
+            <div
+                v-if="selectedCustomer && creditInfo?.creditEnabled"
+                class="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4"
+            >
+                <div class="flex items-center justify-between mb-2">
+                    <h4 class="font-semibold text-blue-900">
+                        Credit Information
+                    </h4>
+                    <a-tag v-if="creditInfo.overdueAmount > 0" color="error"
+                        >Overdue</a-tag
+                    >
+                    <a-tag v-else color="success">Good Standing</a-tag>
+                </div>
+                <div class="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                        <span class="text-gray-600">Credit Limit:</span>
+                        <span class="font-medium text-blue-700 ml-2">
+                            ₱{{
+                                (creditInfo.creditLimit || 0).toLocaleString(
+                                    "en-US",
+                                    {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                    }
+                                )
+                            }}
+                        </span>
+                    </div>
+                    <div>
+                        <span class="text-gray-600">Current Balance:</span>
+                        <span class="font-medium text-red-600 ml-2">
+                            ₱{{
+                                (creditInfo.creditBalance || 0).toLocaleString(
+                                    "en-US",
+                                    {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                    }
+                                )
+                            }}
+                        </span>
+                    </div>
+                    <div>
+                        <span class="text-gray-600">Available Credit:</span>
+                        <span class="font-medium text-green-600 ml-2">
+                            ₱{{
+                                (
+                                    creditInfo.availableCredit || 0
+                                ).toLocaleString("en-US", {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                })
+                            }}
+                        </span>
+                    </div>
+                    <div v-if="creditInfo.overdueAmount > 0">
+                        <span class="text-gray-600">Overdue:</span>
+                        <span class="font-medium text-red-600 ml-2">
+                            ₱{{
+                                creditInfo.overdueAmount.toLocaleString(
+                                    "en-US",
+                                    {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                    }
+                                )
+                            }}
+                        </span>
+                    </div>
+                </div>
+            </div>
 
             <!-- Quick Add Customer -->
             <div class="flex gap-2">
@@ -1146,6 +1243,62 @@ defineExpose({
                     <p>
                         <strong>Total Purchases:</strong>
                         {{ selectedCustomer.total_purchases || 0 }}
+                    </p>
+                </div>
+                <div v-if="creditInfo?.creditEnabled">
+                    <h4 class="font-medium text-gray-700">Credit Status</h4>
+                    <p>
+                        <strong>Credit Limit:</strong>
+                        ₱{{
+                            (creditInfo.creditLimit || 0).toLocaleString(
+                                "en-US",
+                                {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                }
+                            )
+                        }}
+                    </p>
+                    <p>
+                        <strong>Current Balance:</strong>
+                        <span class="text-red-600">
+                            ₱{{
+                                (creditInfo.creditBalance || 0).toLocaleString(
+                                    "en-US",
+                                    {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                    }
+                                )
+                            }}
+                        </span>
+                    </p>
+                    <p>
+                        <strong>Available Credit:</strong>
+                        <span class="text-green-600">
+                            ₱{{
+                                (
+                                    creditInfo.availableCredit || 0
+                                ).toLocaleString("en-US", {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                })
+                            }}
+                        </span>
+                    </p>
+                    <p v-if="creditInfo.overdueAmount > 0">
+                        <strong>Overdue Amount:</strong>
+                        <span class="text-red-600 font-medium">
+                            ₱{{
+                                creditInfo.overdueAmount.toLocaleString(
+                                    "en-US",
+                                    {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                    }
+                                )
+                            }}
+                        </span>
                     </p>
                 </div>
             </div>
