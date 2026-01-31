@@ -24,6 +24,7 @@ class Product extends Model
         'cost',
         'name',
         'SKU',
+        'barcode',
         'category.name'
     ];
 
@@ -62,9 +63,9 @@ class Product extends Model
     public function locations()
     {
         return $this->belongsToMany(InventoryLocation::class, 'location_product', 'product_id', 'location_id')
-                    ->using(LocationProduct::class)
-                    ->withPivot('is_active')
-                    ->withTimestamps();
+            ->using(LocationProduct::class)
+            ->withPivot('is_active')
+            ->withTimestamps();
     }
 
     /**
@@ -73,10 +74,10 @@ class Product extends Model
     public function activeLocations()
     {
         return $this->belongsToMany(InventoryLocation::class, 'location_product', 'product_id', 'location_id')
-                    ->using(LocationProduct::class)
-                    ->wherePivot('is_active', true)
-                    ->withPivot('is_active')
-                    ->withTimestamps();
+            ->using(LocationProduct::class)
+            ->wherePivot('is_active', true)
+            ->withPivot('is_active')
+            ->withTimestamps();
     }
 
     /**
@@ -295,7 +296,7 @@ class Product extends Model
     public function toggleAtLocation(InventoryLocation $location): bool
     {
         $isCurrentlyActive = $this->activeLocations()->where('location_id', $location->id)->exists();
-        
+
         if ($isCurrentlyActive) {
             $this->removeFromLocation($location);
             return false;

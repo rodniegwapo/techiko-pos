@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, provide } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount, provide } from "vue";
 import axios from "axios";
 
 import ContentHeader from "@/Components/ContentHeader.vue";
@@ -17,6 +17,7 @@ import {
     PlusSquareOutlined,
     MinusSquareOutlined,
 } from "@ant-design/icons-vue";
+import { message } from "ant-design-vue";
 
 import { usePage, router, Head } from "@inertiajs/vue3";
 import { useFilters, toLabel } from "@/Composables/useFilters";
@@ -29,6 +30,158 @@ const { getRoute } = useDomainRoutes();
 const search = ref("");
 const category = ref();
 const spinning = ref(false);
+const barcodeBuffer = ref("");
+const lastKeyTime = ref(0);
+const BARCODE_DELAY = 50; // ms
+
+const handleGlobalKeydown = (e) => {
+    // If user is typing in an input, we might want to let them type.
+    // BUT scanners act as keyboard.
+    // If the input is the search box, the scanner will just type into it.
+    // If the scanner ends with ENTER, it will trigger the search.
+    // However, the user wants "Auto add".
+    // If we rely on search, we get search results.
+    // If we intercept, we can auto add.
+
+    const tagName = e.target.tagName;
+    const isInput = tagName === "INPUT" || tagName === "TEXTAREA";
+
+    // If typing in search box, let it be populated, but capture ENTER to check if it's a barcode scan?
+    // Or we can rely on the timing to detect scan?
+
+    // Logic:
+    // 1. Detect rapid keystrokes (Scanner).
+    // 2. Buffer them.
+    // 3. On Enter, if buffer is valid, process scan.
+
+    const now = Date.now();
+
+    if (e.key === "Enter") {
+        if (barcodeBuffer.value.length > 0) {
+            // Valid scan detected?
+            // Prevent default if it's a scan (so it doesn't submit form)
+            if (
+                now - lastKeyTime.value < BARCODE_DELAY * 10 ||
+                barcodeBuffer.value.length > 3
+            ) {
+                e.preventDefault();
+                processScan(barcodeBuffer.value);
+            }
+            barcodeBuffer.value = "";
+        }
+        return;
+    }
+
+    // Filter out special keys
+    if (e.key.length > 1) return;
+
+    if (now - lastKeyTime.value > BARCODE_DELAY) {
+        // Too slow, probably manual typing. Reset buffer unless it's the start.
+        // If it's the very first char, maybe start buffering?
+        // But if typing fast manually?
+
+        // Simple approach: Always buffer, but clear if too slow?
+        // No, that breaks manual typing if we listen globally.
+
+        // If focused on input, let default behavior happen.
+        // But also capture for buffer to check for scan?
+
+        // If we are NOT in an input, capture.
+        if (!isInput) {
+            barcodeBuffer.value = ""; // Reset
+        }
+    }
+
+    if (!isInput) {
+        barcodeBuffer.value += e.key;
+        lastKeyTime.value = now;
+    } else {
+        // If in input, we also capture to buffer to detect scan-paste?
+        barcodeBuffer.value += e.key;
+        lastKeyTime.value = now;
+    }
+};
+
+onMounted(() => {
+    window.addEventListener("keydown", handleGlobalKeydown);
+});
+
+onBeforeUnmount(() => {
+    window.removeEventListener("keydown", handleGlobalKeydown);
+});
+
+const processScan = (code) => {
+    search.value = code;
+    // Call getProducts and then try to add to cart
+    handleScanAndAdd();
+};
+
+const handleScanAndAdd = async () => {
+    loading.value = true;
+    const hide = message.loading("Processing scan...", 0);
+    try {
+        const items = await axios.get(
+            getRoute("sales.products", {
+                category: category.value,
+                search: search.value,
+            }),
+        );
+        const results = items.data.data;
+
+        products.value = results;
+
+        if (results.length === 1) {
+            const product = results[0];
+            await addToCart(product);
+            message.success(`Added ${product.name} to cart`);
+            search.value = "";
+            getProducts();
+        } else if (results.length > 1) {
+            const exactMatch = results.find(
+                (p) => p.code === search.value || p.barcode === search.value,
+            );
+
+            if (exactMatch) {
+                await addToCart(exactMatch);
+                message.success(`Added ${exactMatch.name} to cart`);
+                search.value = "";
+                getProducts();
+            } else {
+                message.warning("Multiple products found, please select one.");
+            }
+        } else {
+            message.error(`Product not found: ${search.value}`);
+        }
+    } catch (e) {
+        console.error("Scan error:", e);
+        message.error("Error processing scan");
+    } finally {
+        hide();
+        loading.value = false;
+    }
+};
+
+const addToCart = async (product) => {
+    try {
+        loading.value = true;
+        const userId = page.props.auth.user.data.id;
+        const route = getRoute("users.sales.cart.add", { user: userId });
+
+        await axios.post(route, {
+            product_id: product.id,
+            quantity: 1,
+        });
+
+        // Refresh cart
+        await loadCurrentPendingSale();
+
+        // Feedback?
+    } catch (error) {
+        console.error("Failed to add item to cart:", error);
+    } finally {
+        loading.value = false;
+    }
+};
 
 // Direct database integration - no composable needed
 const orderId = ref(null);
@@ -76,7 +229,7 @@ const loadCurrentPendingSale = async () => {
 
             // Log product-level discounts for debugging
             const productsWithDiscounts = orders.value.filter(
-                (order) => order.discount_id || order.discount_amount > 0
+                (order) => order.discount_id || order.discount_amount > 0,
             );
         } else {
             orderId.value = null;
@@ -195,7 +348,7 @@ const getProducts = async () => {
         getRoute("sales.products", {
             category: category.value,
             search: search.value,
-        })
+        }),
     );
     products.value = items.data.data;
     loading.value = false;
@@ -211,8 +364,8 @@ const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
                     (page.props?.categories ?? []).map((item) => ({
                         label: item.name,
                         value: item.name,
-                    }))
-                )
+                    })),
+                ),
             ),
         },
     ],
@@ -243,7 +396,7 @@ watchDebounced(search, getProducts, { debounce: 300 });
                     @clear-all="
                         () =>
                             Object.keys(filters).forEach(
-                                (k) => (filters[k] = null)
+                                (k) => (filters[k] = null),
                             )
                     "
                     :always-show="true"
