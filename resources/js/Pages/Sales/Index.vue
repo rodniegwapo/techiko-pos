@@ -30,91 +30,17 @@ const { getRoute } = useDomainRoutes();
 const search = ref("");
 const category = ref();
 const spinning = ref(false);
-const barcodeBuffer = ref("");
-const lastKeyTime = ref(0);
-const BARCODE_DELAY = 50; // ms
+import { useBarcodeScanner } from "@/Composables/useBarcodeScanner";
 
-const handleGlobalKeydown = (e) => {
-    // If user is typing in an input, we might want to let them type.
-    // BUT scanners act as keyboard.
-    // If the input is the search box, the scanner will just type into it.
-    // If the scanner ends with ENTER, it will trigger the search.
-    // However, the user wants "Auto add".
-    // If we rely on search, we get search results.
-    // If we intercept, we can auto add.
-
-    const tagName = e.target.tagName;
-    const isInput = tagName === "INPUT" || tagName === "TEXTAREA";
-
-    // If typing in search box, let it be populated, but capture ENTER to check if it's a barcode scan?
-    // Or we can rely on the timing to detect scan?
-
-    // Logic:
-    // 1. Detect rapid keystrokes (Scanner).
-    // 2. Buffer them.
-    // 3. On Enter, if buffer is valid, process scan.
-
-    const now = Date.now();
-
-    if (e.key === "Enter") {
-        if (barcodeBuffer.value.length > 0) {
-            // Valid scan detected?
-            // Prevent default if it's a scan (so it doesn't submit form)
-            if (
-                now - lastKeyTime.value < BARCODE_DELAY * 10 ||
-                barcodeBuffer.value.length > 3
-            ) {
-                e.preventDefault();
-                processScan(barcodeBuffer.value);
-            }
-            barcodeBuffer.value = "";
-        }
-        return;
-    }
-
-    // Filter out special keys
-    if (e.key.length > 1) return;
-
-    if (now - lastKeyTime.value > BARCODE_DELAY) {
-        // Too slow, probably manual typing. Reset buffer unless it's the start.
-        // If it's the very first char, maybe start buffering?
-        // But if typing fast manually?
-
-        // Simple approach: Always buffer, but clear if too slow?
-        // No, that breaks manual typing if we listen globally.
-
-        // If focused on input, let default behavior happen.
-        // But also capture for buffer to check for scan?
-
-        // If we are NOT in an input, capture.
-        if (!isInput) {
-            barcodeBuffer.value = ""; // Reset
-        }
-    }
-
-    if (!isInput) {
-        barcodeBuffer.value += e.key;
-        lastKeyTime.value = now;
-    } else {
-        // If in input, we also capture to buffer to detect scan-paste?
-        barcodeBuffer.value += e.key;
-        lastKeyTime.value = now;
-    }
-};
-
-onMounted(() => {
-    window.addEventListener("keydown", handleGlobalKeydown);
-});
-
-onBeforeUnmount(() => {
-    window.removeEventListener("keydown", handleGlobalKeydown);
-});
+// ... (other refs)
 
 const processScan = (code) => {
     search.value = code;
     // Call getProducts and then try to add to cart
     handleScanAndAdd();
 };
+
+useBarcodeScanner(processScan);
 
 const handleScanAndAdd = async () => {
     loading.value = true;
