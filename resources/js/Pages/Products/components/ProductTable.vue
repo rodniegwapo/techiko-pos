@@ -12,7 +12,7 @@ import { useHelpers } from "@/Composables/useHelpers";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 
-import { usePage } from "@inertiajs/vue3";
+import { usePage, router } from "@inertiajs/vue3";
 
 const page = usePage();
 
@@ -89,26 +89,12 @@ const handleDeleteCategory = (record) => {
     confirmDelete(
         "products.destroy",
         { product: record.id },
-        "Do you want to delete this item ?"
+        "Do you want to delete this item ?",
     );
 };
 
 const handleClickEdit = (record) => {
-    openModal.value = true;
-
-    // Transform the record data for the form
-    const transformedData = { ...record };
-
-    // Convert category_id to the format expected by the select component
-    if (record.category_id) {
-        transformedData.category_id = {
-            value: record.category_id,
-            label: record.category?.name || `Category ${record.category_id}`,
-        };
-    }
-
-    formData.value = transformedData;
-    isEdit.value = true;
+    router.visit(getRoute("products.edit", { product: record.id }));
 };
 
 const showDetails = (product) => {
@@ -329,30 +315,60 @@ const showDetails = (product) => {
                         </div>
                         <!-- Location Information -->
                         <!-- Global view: show locations from eager-loaded relation -->
-                        <div v-if="props.isGlobalView && (selectedProduct.locations?.length || 0) > 0" class="flex justify-between">
-                            <span class="text-sm text-gray-600">Locations:</span>
+                        <div
+                            v-if="
+                                props.isGlobalView &&
+                                (selectedProduct.locations?.length || 0) > 0
+                            "
+                            class="flex justify-between"
+                        >
+                            <span class="text-sm text-gray-600"
+                                >Locations:</span
+                            >
                             <div class="text-right">
                                 <span class="font-semibold text-blue-600">
-                                    {{ selectedProduct.locations.length }} location(s)
+                                    {{ selectedProduct.locations.length }}
+                                    location(s)
                                 </span>
                                 <div class="text-xs text-gray-500 mt-1">
-                                    <div v-for="loc in selectedProduct.locations.slice(0, 3)" :key="loc.id">
+                                    <div
+                                        v-for="loc in selectedProduct.locations.slice(
+                                            0,
+                                            3,
+                                        )"
+                                        :key="loc.id"
+                                    >
                                         {{ loc.name }}
                                     </div>
-                                    <div v-if="selectedProduct.locations.length > 3" class="text-gray-400">
-                                        +{{ selectedProduct.locations.length - 3 }} more...
+                                    <div
+                                        v-if="
+                                            selectedProduct.locations.length > 3
+                                        "
+                                        class="text-gray-400"
+                                    >
+                                        +{{
+                                            selectedProduct.locations.length - 3
+                                        }}
+                                        more...
                                     </div>
                                 </div>
                             </div>
                         </div>
                         <!-- Domain-scoped view: show the current location -->
-                        <div v-else-if="!props.isGlobalView && currentLocation" class="flex justify-between">
+                        <div
+                            v-else-if="!props.isGlobalView && currentLocation"
+                            class="flex justify-between"
+                        >
                             <span class="text-sm text-gray-600">Location:</span>
-                            <span class="font-semibold text-blue-600">{{ currentLocation.name || 'Unknown Location' }}</span>
+                            <span class="font-semibold text-blue-600">{{
+                                currentLocation.name || "Unknown Location"
+                            }}</span>
                         </div>
                         <div v-else class="flex justify-between">
                             <span class="text-sm text-gray-600">Location:</span>
-                            <span class="text-xs text-gray-500">No location data available</span>
+                            <span class="text-xs text-gray-500"
+                                >No location data available</span
+                            >
                         </div>
                     </div>
                 </div>

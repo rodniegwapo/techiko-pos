@@ -41,8 +41,8 @@ class ProductController extends Controller
             'cost' => ['nullable', 'numeric', 'min:0'],
 
             'category_id' => ['required', 'exists:categories,id'],
-            'SKU' => ['nullable', 'string', 'max:255', 'unique:products,SKU,'.$productId],
-            'barcode' => ['nullable', 'string', 'max:255', 'unique:products,barcode,'.$productId],
+            'SKU' => ['nullable', 'string', 'max:255', 'unique:products,SKU,' . $productId],
+            'barcode' => ['nullable', 'string', 'max:255', 'unique:products,barcode,' . $productId],
 
             'track_inventory' => ['boolean'],
             'reorder_level' => ['nullable', 'numeric', 'min:0'],
@@ -104,7 +104,7 @@ class ProductController extends Controller
         }
 
         return $query
-            ->when($request->search, fn ($q, $s) => $q->search($s))
+            ->when($request->search, fn($q, $s) => $q->search($s))
             ->when($request->category, function ($query, $category) {
                 return $query->whereHas('category', function ($q) use ($category) {
                     $q->where('name', $category);
@@ -210,5 +210,42 @@ class ProductController extends Controller
         $product->delete();
 
         return redirect()->back()->with('success', 'Product deleted successfully');
+    }
+    /**
+     * Show the form for creating a new product.
+     */
+    public function create(Request $request, Domain $domain)
+    {
+        $location = $this->resolveActiveLocation($request, $domain);
+        $categoriesQuery = $this->buildCategoriesQuery($domain, $location);
+
+        return Inertia::render('Products/Create', [
+            'categories' => $categoriesQuery->get(),
+            'sold_by_types' => \App\Models\Product\ProductSoldType::all(),
+            'isGlobalView' => false,
+            'currentLocation' => $location,
+        ]);
+    }
+
+    /**
+     * Show the form for editing the specified product.
+     */
+    public function edit(Request $request, Domain $domain, Product $product)
+    {
+        // Ensure product belongs to this domain
+        if ($product->domain !== $domain->name_slug) {
+            abort(403, 'Product does not belong to this domain');
+        }
+
+        $location = $this->resolveActiveLocation($request, $domain);
+        $categoriesQuery = $this->buildCategoriesQuery($domain, $location);
+
+        return Inertia::render('Products/Edit', [
+            'product' => $product,
+            'categories' => $categoriesQuery->get(),
+            'sold_by_types' => \App\Models\Product\ProductSoldType::all(),
+            'isGlobalView' => false,
+            'currentLocation' => $location,
+        ]);
     }
 }

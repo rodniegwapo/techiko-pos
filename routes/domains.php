@@ -67,7 +67,7 @@ Route::prefix('domains/{domain:name_slug}')
 
         // Products (Organization-specific)
         Route::resource('products', \App\Http\Controllers\Domains\ProductController::class)
-            ->only(['index', 'store', 'update', 'destroy'])
+            ->only(['index', 'store', 'update', 'destroy', 'create', 'edit'])
             ->names('products');
 
         // Categories (Organization-specific)
@@ -152,7 +152,7 @@ Route::prefix('domains/{domain:name_slug}')
 
             Route::post('/receive', [\App\Http\Controllers\Domains\Inventory\InventoryController::class, 'receive'])->name('receive');
             Route::post('/transfer', [\App\Http\Controllers\Domains\Inventory\InventoryController::class, 'transfer'])->name('transfer');
-            
+
             // Search routes
             Route::get('/search/products', [\App\Http\Controllers\Domains\Inventory\InventoryController::class, 'searchProducts'])->name('search.products');
 
