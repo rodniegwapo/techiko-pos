@@ -2,7 +2,7 @@
 import TechikoLogo from "@/Components/TechikoLogo.vue";
 import TLogo from "@/Components/TLogo.vue";
 import { IconLayoutSidebarLeftCollapse } from "@tabler/icons-vue";
-import { useSidebar } from "@/composables/useSidebar";
+import { useSidebar } from "@/Composables/useSidebar";
 
 const props = defineProps({
     impersonator: Boolean,
