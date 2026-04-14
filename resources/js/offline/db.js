@@ -59,7 +59,9 @@ export async function listNeedsAttentionForDomain(domainSlug) {
     return rows
         .filter((r) => r.status !== "synced" && r.status !== "rejected")
         .sort((a, b) =>
-            String(a.created_at || "").localeCompare(String(b.created_at || ""))
+            String(a.created_at || "").localeCompare(
+                String(b.created_at || ""),
+            ),
         );
 }
 
