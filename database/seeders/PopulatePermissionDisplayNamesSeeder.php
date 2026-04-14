@@ -109,6 +109,8 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
             
             // Sales
             'sales.index' => 'View Sales',
+            'sales.offline-transactions' => 'Offline Sales Queue',
+            'sales.offline-sync' => 'Sync Offline Sales',
             'sales.create' => 'Create Sale',
             'sales.store' => 'Create Sale',
             'sales.edit' => 'Edit Sale',

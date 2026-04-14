@@ -47,6 +47,8 @@ class RolePermissionSeeder extends Seeder
             
             // Sales
             'sales.index',
+            'sales.offline-transactions',
+            'sales.offline-sync',
             'sales.products',
             'sales.drafts.store',
             'sales.items.void',
@@ -317,6 +319,8 @@ class RolePermissionSeeder extends Seeder
             
             // Sales
             'sales.index',
+            'sales.offline-transactions',
+            'sales.offline-sync',
             'sales.products',
             'sales.drafts.store',
             'sales.items.void',
@@ -492,6 +496,8 @@ class RolePermissionSeeder extends Seeder
             
             // Sales
             'sales.index',
+            'sales.offline-transactions',
+            'sales.offline-sync',
             'sales.products',
             'sales.drafts.store',
             'sales.items.void',
@@ -634,6 +640,8 @@ class RolePermissionSeeder extends Seeder
             
             // Sales
             'sales.index',
+            'sales.offline-transactions',
+            'sales.offline-sync',
             'sales.products',
             'sales.drafts.store',
             'sales.items.void',
@@ -748,6 +756,8 @@ class RolePermissionSeeder extends Seeder
             
             // Sales
             'sales.index',
+            'sales.offline-transactions',
+            'sales.offline-sync',
             'sales.products',
             'sales.drafts.store',
             'sales.items.void',
