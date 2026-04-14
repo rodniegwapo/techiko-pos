@@ -15,6 +15,7 @@ use App\Helpers;
 use App\Models\Category;
 use App\Traits\LocationCategoryScoping;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class InventoryController extends Controller
@@ -253,6 +254,8 @@ class InventoryController extends Controller
 
     public function receive(Request $request, Domain $domain)
     {
+        $validReferenceTypes = InventoryMovement::getValidReferenceTypes();
+
         $validated = $request->validate([
             'location_id' => 'required|exists:inventory_locations,id',
             'items' => 'required|array|min:1',
@@ -262,18 +265,21 @@ class InventoryController extends Controller
             'items.*.batch_number' => 'nullable|string|max:255',
             'items.*.expiry_date' => 'nullable|date',
             'items.*.notes' => 'nullable|string|max:500',
-            'reference_type' => 'nullable|string',
+            'reference_type' => ['nullable', 'string', Rule::in($validReferenceTypes)],
             'reference_id' => 'nullable|integer',
         ]);
 
         $location = InventoryLocation::forDomain($domain->name_slug)->findOrFail($validated['location_id']);
 
+        $referenceType = $validated['reference_type'] ?? 'Purchase';
+        $referenceId = $validated['reference_id'] ?? null;
+
         $this->inventoryService->receiveInventory(
             $validated['items'],
             auth()->user(),
             $location,
-            $validated['reference_type'] ?? null,
-            $validated['reference_id'] ?? null
+            $referenceType,
+            $referenceId
         );
 
         return response()->json(['success' => true, 'message' => 'Inventory received successfully']);
