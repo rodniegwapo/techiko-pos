@@ -203,14 +203,13 @@ class InventoryService
     {
         $oldQuantity = $inventory->quantity_on_hand;
         $newQuantity = $oldQuantity + $movement->quantity_change;
-        
-        // Update quantity
-        $inventory->quantity_on_hand = max(0, $newQuantity);
-        
-        // Update costs for incoming inventory
+
+        // Weighted average must use pre-movement on-hand; updateAverageCost reads quantity_on_hand.
         if ($movement->quantity_change > 0 && $movement->unit_cost) {
             $inventory->updateAverageCost($movement->quantity_change, $movement->unit_cost);
         }
+
+        $inventory->quantity_on_hand = max(0, $newQuantity);
         
         // Update timestamps
         $inventory->last_movement_at = now();
