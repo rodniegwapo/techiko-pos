@@ -6,7 +6,7 @@ import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useCredit } from "@/Composables/useCredit";
-import { ref, computed, createVNode, toRefs, watch } from "vue";
+import { ref, computed, createVNode, toRefs, watch, inject } from "vue";
 import { Modal, notification } from "ant-design-vue";
 import { ExclamationCircleOutlined } from "@ant-design/icons-vue";
 import axios from "axios";
@@ -17,6 +17,11 @@ const { getRoute } = useDomainRoutes();
 const { formattedTotal } = useHelpers();
 const { checkCreditAvailability } = useCredit();
 const page = usePage();
+
+const salesCartIsOnline = inject(
+    "isSalesOnline",
+    computed(() => true),
+);
 
 // Props for direct data passing
 const props = defineProps({
@@ -30,6 +35,7 @@ const props = defineProps({
     orderDiscountId: { type: String, default: "" },
     orderId: { type: [String, Number], default: null },
     discountOptions: { type: Object, default: () => ({}) },
+    offlinePaymentMethod: { type: String, default: "cash" },
 });
 
 const {
@@ -42,7 +48,12 @@ const {
 } = toRefs(props);
 
 // Emit events to parent
-const emit = defineEmits(["discount-applied", "cart-updated"]);
+const emit = defineEmits([
+    "discount-applied",
+    "cart-updated",
+    "save-offline-sale",
+    "update:offlinePaymentMethod",
+]);
 
 // Computed values
 const totalAmount = computed(() => {
@@ -63,6 +74,13 @@ const amountReceived = ref(0);
 const openOrderDicountModal = ref(false);
 
 const showDiscountOrder = async () => {
+    if (!salesCartIsOnline.value) {
+        notification.warning({
+            message: "Requires connection",
+            description: "Order discounts are not available offline.",
+        });
+        return;
+    }
     // Check if there's an active order/draft OR if there are items in the cart
     // (orderId might be null briefly while draft is being created)
     if (!orderId.value && orders.value.length === 0) return;
@@ -239,6 +257,13 @@ const handleProceedPaymentConfirmation = () => {
 };
 
 const handleProceedPayment = async () => {
+    if (!salesCartIsOnline.value) {
+        notification.warning({
+            message: "Offline",
+            description: "Use “Save as offline sale” instead.",
+        });
+        return;
+    }
     try {
         proceedPaymentLoading.value = true;
 
@@ -347,6 +372,33 @@ const paymentMethod = ref("cash");
 const creditInfo = ref(null);
 const checkingCredit = ref(false);
 
+watch(
+    () => props.offlinePaymentMethod,
+    (v) => {
+        if (v && paymentMethod.value !== v) {
+            paymentMethod.value = v;
+        }
+    },
+    { immediate: true },
+);
+
+watch(paymentMethod, (v) => {
+    if (!salesCartIsOnline.value) {
+        emit("update:offlinePaymentMethod", v);
+    }
+});
+
+watch(
+    salesCartIsOnline,
+    (online) => {
+        if (!online && paymentMethod.value === "credit") {
+            paymentMethod.value = "cash";
+            emit("update:offlinePaymentMethod", "cash");
+        }
+    },
+    { immediate: true },
+);
+
 // Watch for customer changes and check credit availability
 watch(
     () => props.selectedCustomer,
@@ -412,7 +464,7 @@ const creditLimitSufficient = computed(() => {
                         :class="{
                             'hover:bg-green-700 p-1': orders.length !== 0,
                         }"
-                        :disabled="orders.length == 0"
+                        :disabled="orders.length == 0 || !salesCartIsOnline"
                         @click="showDiscountOrder"
                     >
                         <IconDiscount size="20" class="mx-auto" />
@@ -462,9 +514,9 @@ const creditLimitSufficient = computed(() => {
                         <a-radio-button value="card"
                             >Pay in Card</a-radio-button
                         >
-                        <a-radio-button 
+                        <a-radio-button
                             value="credit"
-                            :disabled="!canUseCredit"
+                            :disabled="!salesCartIsOnline || !canUseCredit"
                         >
                             Pay on Credit
                         </a-radio-button>
@@ -511,10 +563,11 @@ const creditLimitSufficient = computed(() => {
                     <a-input readonly :value="formattedTotal(customerChange)" />
                 </div>
 
-                <!-- Proceed Payment Button -->
+                <!-- Proceed Payment / Offline save -->
                 <div class="flex flex-col gap-2">
                     <div class="invisible">Proceed Payment</div>
                     <a-button
+                        v-if="salesCartIsOnline"
                         type="primary"
                         class="w-[300px]"
                         :class="disabledPaymentButtonColor"
@@ -529,6 +582,15 @@ const creditLimitSufficient = computed(() => {
                         :loading="proceedPaymentLoading"
                     >
                         Proceed Payment
+                    </a-button>
+                    <a-button
+                        v-else
+                        type="primary"
+                        class="w-[300px] bg-amber-700 border-amber-700 hover:bg-amber-600"
+                        :disabled="orders.length == 0"
+                        @click="emit('save-offline-sale')"
+                    >
+                        Save as offline sale
                     </a-button>
                 </div>
             </div>

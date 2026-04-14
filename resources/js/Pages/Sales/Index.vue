@@ -1,6 +1,22 @@
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, provide } from "vue";
+import {
+    ref,
+    computed,
+    onMounted,
+    onBeforeUnmount,
+    provide,
+    watch,
+    h,
+} from "vue";
 import axios from "axios";
+import { v4 as uuidv4 } from "uuid";
+import { Modal, Button, notification } from "ant-design-vue";
+import {
+    getOfflineCart,
+    putOfflineCart,
+    clearOfflineCart,
+    addPendingSale,
+} from "@/offline/db.js";
 
 import ContentHeader from "@/Components/ContentHeader.vue";
 import ContentLayoutV2 from "@/Components/ContentLayoutV2.vue";
@@ -19,13 +35,179 @@ import {
 } from "@ant-design/icons-vue";
 import { message } from "ant-design-vue";
 
-import { usePage, router, Head } from "@inertiajs/vue3";
+import { usePage, Head, Link } from "@inertiajs/vue3";
 import { useFilters, toLabel } from "@/Composables/useFilters";
 import { watchDebounced } from "@vueuse/core";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 
 const page = usePage();
 const { getRoute } = useDomainRoutes();
+
+const isOnline = ref(
+    typeof navigator !== "undefined" ? navigator.onLine : true,
+);
+/** When true while browser is online, keep using Dexie cart (user chose "Keep offline draft"). */
+const forceOfflineCartMode = ref(false);
+const salesCartIsOnline = computed(
+    () => isOnline.value && !forceOfflineCartMode.value,
+);
+provide("isSalesOnline", salesCartIsOnline);
+
+const domainSlug = computed(
+    () => page.props.domain?.name_slug ?? page.props.domain?.nameSlug,
+);
+const activeLocationId = computed(() => page.props.currentLocation?.id);
+const cashierUserId = computed(() => page.props.auth?.user?.data?.id);
+
+const offlinePaymentMethod = ref("cash");
+const offlineProductLookup = ref([]);
+
+const orderId = ref(null);
+const orders = ref([]);
+const currentSale = ref(null);
+const orderDiscountAmount = ref(0);
+const orderDiscountId = ref("");
+const selectedCustomer = ref(null);
+
+const MAX_OFFLINE_PRODUCT_LOOKUP = 500;
+
+function mergeProductLookup(entries) {
+    const byId = new Map(
+        (offlineProductLookup.value || []).map((p) => [p.id, p]),
+    );
+    for (const p of entries) {
+        if (!p?.id) continue;
+        byId.set(p.id, {
+            id: p.id,
+            name: p.name ?? "",
+            price: parseFloat(p.price) || 0,
+            barcode: p.barcode ?? "",
+            code: p.code ?? "",
+        });
+    }
+    const arr = [...byId.values()];
+    offlineProductLookup.value = arr.slice(-MAX_OFFLINE_PRODUCT_LOOKUP);
+}
+
+function ordersToLineItems(ordersList) {
+    return (ordersList || []).map((o) => ({
+        product_id: o.id,
+        quantity: parseInt(o.quantity, 10) || 0,
+        unit_price: parseFloat(o.price) || 0,
+        name: o.name,
+    }));
+}
+
+function lineItemsToOrders(lines) {
+    return (lines || []).map((li) => ({
+        id: li.product_id,
+        name: li.name || "Unknown Product",
+        price: li.unit_price,
+        quantity: li.quantity,
+        subtotal: li.unit_price * li.quantity,
+        discount_id: null,
+        discount_type: null,
+        discount: null,
+        discount_amount: 0,
+        discounts: [],
+    }));
+}
+
+async function persistOfflineCartToDexie() {
+    if (
+        !domainSlug.value ||
+        cashierUserId.value == null ||
+        salesCartIsOnline.value
+    ) {
+        return;
+    }
+    await putOfflineCart({
+        domain_slug: domainSlug.value,
+        user_id: cashierUserId.value,
+        line_items: ordersToLineItems(orders.value),
+        payment_method: offlinePaymentMethod.value,
+        location_id: activeLocationId.value ?? null,
+        customer_id: selectedCustomer.value?.id ?? null,
+        customer_snapshot: selectedCustomer.value
+            ? {
+                  id: selectedCustomer.value.id,
+                  name: selectedCustomer.value.name,
+              }
+            : null,
+        notes: null,
+        product_lookup: offlineProductLookup.value,
+    });
+}
+
+async function hydrateFromOfflineCart() {
+    if (!domainSlug.value || cashierUserId.value == null) return;
+    const row = await getOfflineCart(domainSlug.value, cashierUserId.value);
+    if (!row) {
+        orderId.value = null;
+        orders.value = [];
+        orderDiscountAmount.value = 0;
+        orderDiscountId.value = "";
+        currentSale.value = null;
+        offlinePaymentMethod.value = "cash";
+        selectedCustomer.value = null;
+        return;
+    }
+    orderId.value = null;
+    orders.value = lineItemsToOrders(row.line_items);
+    orderDiscountAmount.value = 0;
+    orderDiscountId.value = "";
+    currentSale.value = null;
+    offlinePaymentMethod.value = row.payment_method || "cash";
+    if (row.product_lookup?.length) {
+        offlineProductLookup.value = row.product_lookup;
+    }
+    if (row.customer_snapshot) {
+        selectedCustomer.value = {
+            id: row.customer_snapshot.id,
+            name: row.customer_snapshot.name,
+        };
+    } else {
+        selectedCustomer.value = null;
+    }
+}
+
+function onWindowOnline() {
+    isOnline.value = true;
+    onReconnectPrompt();
+}
+
+async function onWindowOffline() {
+    isOnline.value = false;
+    forceOfflineCartMode.value = false;
+    await persistOfflineCartToDexie();
+}
+
+async function onReconnectPrompt() {
+    if (!domainSlug.value || cashierUserId.value == null) return;
+    const row = await getOfflineCart(domainSlug.value, cashierUserId.value);
+    const hasDraft = row?.line_items?.length > 0;
+    if (!hasDraft) {
+        forceOfflineCartMode.value = false;
+        await loadCurrentPendingSale();
+        return;
+    }
+    Modal.confirm({
+        title: "Back online",
+        content:
+            "You have an offline cart draft. Discard it and load your server cart?",
+        okText: "Discard offline & load server",
+        cancelText: "Keep offline draft",
+        async onOk() {
+            forceOfflineCartMode.value = false;
+            await clearOfflineCart(domainSlug.value, cashierUserId.value);
+            await loadCurrentPendingSale();
+        },
+        async onCancel() {
+            forceOfflineCartMode.value = true;
+            await hydrateFromOfflineCart();
+        },
+    });
+}
 
 const search = ref("");
 const category = ref();
@@ -46,6 +228,30 @@ const handleScanAndAdd = async () => {
     loading.value = true;
     const hide = message.loading("Processing scan...", 0);
     try {
+        if (!salesCartIsOnline.value) {
+            const q = String(search.value || "").trim();
+            const pool = offlineProductLookup.value || [];
+            const exactMatch = pool.find(
+                (p) => p.code === q || p.barcode === q,
+            );
+            if (exactMatch) {
+                await addToCart({
+                    id: exactMatch.id,
+                    name: exactMatch.name,
+                    price: exactMatch.price,
+                    barcode: exactMatch.barcode,
+                    code: exactMatch.code,
+                });
+                message.success(`Added ${exactMatch.name} to cart`);
+                search.value = "";
+            } else {
+                message.error(
+                    `Product not found offline. Scan requires a cached product (add from catalog while online, or complete sale from items already in cart).`,
+                );
+            }
+            return;
+        }
+
         const items = await axios.get(
             getRoute("sales.products", {
                 category: category.value,
@@ -55,6 +261,7 @@ const handleScanAndAdd = async () => {
         const results = items.data.data;
 
         products.value = results;
+        mergeProductLookup(results);
 
         if (results.length === 1) {
             const product = results[0];
@@ -90,6 +297,33 @@ const handleScanAndAdd = async () => {
 const addToCart = async (product) => {
     try {
         loading.value = true;
+        mergeProductLookup([product]);
+
+        if (!salesCartIsOnline.value) {
+            const idx = orders.value.findIndex((o) => o.id === product.id);
+            if (idx === -1) {
+                const price = parseFloat(product.price) || 0;
+                orders.value.push({
+                    id: product.id,
+                    name: product.name,
+                    price,
+                    quantity: 1,
+                    subtotal: price,
+                    discount_id: null,
+                    discount_type: null,
+                    discount: null,
+                    discount_amount: 0,
+                    discounts: [],
+                });
+            } else {
+                const o = orders.value[idx];
+                o.quantity = (parseInt(o.quantity, 10) || 0) + 1;
+                o.subtotal = (parseFloat(o.price) || 0) * o.quantity;
+            }
+            await persistOfflineCartToDexie();
+            return;
+        }
+
         const userId = page.props.auth.user.data.id;
         const route = getRoute("users.sales.cart.add", { user: userId });
 
@@ -98,10 +332,7 @@ const addToCart = async (product) => {
             quantity: 1,
         });
 
-        // Refresh cart
         await loadCurrentPendingSale();
-
-        // Feedback?
     } catch (error) {
         console.error("Failed to add item to cart:", error);
     } finally {
@@ -109,12 +340,6 @@ const addToCart = async (product) => {
     }
 };
 
-// Direct database integration - no composable needed
-const orderId = ref(null);
-const orders = ref([]);
-const currentSale = ref(null);
-const orderDiscountAmount = ref(0);
-const orderDiscountId = ref("");
 const isLoadingCart = ref(false);
 const discountOptions = ref({
     product_discount_options: [],
@@ -124,6 +349,12 @@ const discountOptions = ref({
 
 // Direct API functions
 const loadCurrentPendingSale = async () => {
+    if (!salesCartIsOnline.value) {
+        await persistOfflineCartToDexie();
+        isLoadingCart.value = false;
+        return;
+    }
+
     isLoadingCart.value = true;
 
     try {
@@ -204,19 +435,19 @@ const transformCartItems = (items) => {
     });
 };
 
-// Customer state management
-const selectedCustomer = ref(null);
-
 // Handle customer changes from CustomerOrder component
 const handleCustomerChanged = async (customer) => {
     selectedCustomer.value = customer;
 
-    // Only load pending sale when customer is selected
+    if (!salesCartIsOnline.value) {
+        await persistOfflineCartToDexie();
+        return;
+    }
+
     if (customer) {
         try {
             await loadCurrentPendingSale();
 
-            // If no pending sale found, create a new draft
             if (!orderId.value) {
                 await createDraft();
             }
@@ -238,6 +469,221 @@ const handleCustomerChanged = async (customer) => {
     }
 };
 
+function onOfflineCartAdd(product) {
+    const idx = orders.value.findIndex((o) => o.id === product.id);
+    if (idx === -1) {
+        const price = parseFloat(product.price) || 0;
+        orders.value.push({
+            id: product.id,
+            name: product.name,
+            price,
+            quantity: 1,
+            subtotal: price,
+            discount_id: null,
+            discount_type: null,
+            discount: null,
+            discount_amount: 0,
+            discounts: [],
+        });
+    } else {
+        const o = orders.value[idx];
+        o.quantity = (parseInt(o.quantity, 10) || 0) + 1;
+        o.subtotal = (parseFloat(o.price) || 0) * o.quantity;
+    }
+    persistOfflineCartToDexie();
+}
+
+function onOfflineCartSubtract(product) {
+    const idx = orders.value.findIndex((o) => o.id === product.id);
+    if (idx === -1) return;
+    const o = orders.value[idx];
+    const next = Math.max(0, (parseInt(o.quantity, 10) || 0) - 1);
+    if (next === 0) {
+        orders.value.splice(idx, 1);
+    } else {
+        o.quantity = next;
+        o.subtotal = (parseFloat(o.price) || 0) * next;
+    }
+    persistOfflineCartToDexie();
+}
+
+function onOfflineCartSetQty(product, quantity) {
+    const idx = orders.value.findIndex((o) => o.id === product.id);
+    if (idx === -1) return;
+    const q = parseInt(quantity, 10);
+    if (isNaN(q) || q < 0) return;
+    if (q === 0) {
+        orders.value.splice(idx, 1);
+    } else {
+        const o = orders.value[idx];
+        o.quantity = q;
+        o.subtotal = (parseFloat(o.price) || 0) * q;
+    }
+    persistOfflineCartToDexie();
+}
+
+function onOfflineCartRemove(product) {
+    const idx = orders.value.findIndex((o) => o.id === product.id);
+    if (idx !== -1) {
+        orders.value.splice(idx, 1);
+        persistOfflineCartToDexie();
+    }
+}
+
+async function resumeServerCartMode() {
+    forceOfflineCartMode.value = false;
+    if (!domainSlug.value || cashierUserId.value == null) return;
+    await clearOfflineCart(domainSlug.value, cashierUserId.value);
+    await loadCurrentPendingSale();
+    message.success("Switched to server cart.");
+}
+
+function syncOfflinePaymentMethod(v) {
+    offlinePaymentMethod.value = v;
+}
+
+async function completeOfflineSale() {
+    if (salesCartIsOnline.value) {
+        message.error("Only available while offline or in offline cart mode.");
+        return;
+    }
+    if (!domainSlug.value || !cashierUserId.value) {
+        message.error("Missing session context.");
+        return;
+    }
+    if (!activeLocationId.value) {
+        message.error("No active location. Select a store location, then try again.");
+        return;
+    }
+    const lines = ordersToLineItems(orders.value).filter(
+        (l) => l.quantity > 0,
+    );
+    if (!lines.length) {
+        message.error("Add at least one line item.");
+        return;
+    }
+    let payment = offlinePaymentMethod.value || "cash";
+    if (payment === "credit") {
+        message.error("Credit payments cannot be saved offline. Choose cash or card.");
+        return;
+    }
+    if (payment !== "cash" && payment !== "card") {
+        payment = "cash";
+    }
+    const clientMutationId = uuidv4();
+    const payload = {
+        items: lines.map((l) => ({
+            product_id: Number(l.product_id),
+            quantity: Number(l.quantity),
+            unit_price: Number(l.unit_price),
+        })),
+        payment_method: payment,
+        location_id: activeLocationId.value,
+        cashier_user_id: cashierUserId.value,
+        notes: null,
+        customer_id: selectedCustomer.value?.id
+            ? Number(selectedCustomer.value.id)
+            : null,
+        recorded_at: new Date().toISOString(),
+    };
+
+    try {
+        await addPendingSale({
+            client_mutation_id: clientMutationId,
+            status: "pending_review",
+            domain_slug: domainSlug.value,
+            location_id: activeLocationId.value,
+            payload,
+        });
+        await clearOfflineCart(domainSlug.value, cashierUserId.value);
+        orders.value = [];
+        orderId.value = null;
+        selectedCustomer.value = null;
+        currentSale.value = null;
+        orderDiscountAmount.value = 0;
+        orderDiscountId.value = "";
+        offlinePaymentMethod.value = "cash";
+        offlineProductLookup.value = [];
+        forceOfflineCartMode.value = false;
+        message.success("Saved locally. Review under Offline transactions.");
+    } catch (e) {
+        console.error(e);
+        message.error("Could not save offline sale.");
+    }
+}
+
+const NOTIFICATION_KEY_OFFLINE = "sales-offline-warning";
+const NOTIFICATION_KEY_OFFLINE_DRAFT = "sales-offline-draft-mode";
+
+function closeOfflineWarningNotification() {
+    notification.close(NOTIFICATION_KEY_OFFLINE);
+}
+
+function showOfflineWarningNotification() {
+    const offlineTxUrl = getRoute("sales.offline-transactions");
+    notification.warning({
+        key: NOTIFICATION_KEY_OFFLINE,
+        message: "You are offline",
+        description: h("div", { class: "text-sm space-y-2" }, [
+            h(
+                "p",
+                { class: "mb-0" },
+                "The cart is stored on this device. Product search and discounts need a connection. Use a barcode if the product was loaded or added while online.",
+            ),
+            h(
+                Link,
+                {
+                    href: offlineTxUrl,
+                    class: "font-medium underline",
+                },
+                () => "Offline transactions",
+            ),
+        ]),
+        duration: 0,
+        placement: "topRight",
+    });
+}
+
+function closeDraftModeNotification() {
+    notification.close(NOTIFICATION_KEY_OFFLINE_DRAFT);
+}
+
+function showDraftModeNotification() {
+    const offlineTxUrl = getRoute("sales.offline-transactions");
+    notification.info({
+        key: NOTIFICATION_KEY_OFFLINE_DRAFT,
+        message: "Offline cart draft",
+        description: h("div", { class: "text-sm space-y-2" }, [
+            h(
+                "p",
+                { class: "mb-0" },
+                "You are online but still using the offline cart draft on this device.",
+            ),
+            h(
+                Link,
+                {
+                    href: offlineTxUrl,
+                    class: "font-medium underline",
+                },
+                () => "Offline transactions",
+            ),
+        ]),
+        duration: 0,
+        placement: "topRight",
+        btn: h(
+            Button,
+            {
+                type: "primary",
+                size: "small",
+                onClick: () => {
+                    void resumeServerCartMode();
+                },
+            },
+            () => "Discard draft & use server cart",
+        ),
+    });
+}
+
 // Filters setup
 
 // FilterDropdown configuration
@@ -255,29 +701,53 @@ const filtersConfig = [
 
 const products = ref([]);
 const loading = ref(false);
-onMounted(async () => {
-    // Load products first
-    getProducts();
 
-    // Auto-load current user's pending sale on page reload
+onMounted(async () => {
+    if (typeof window !== "undefined") {
+        window.addEventListener("online", onWindowOnline);
+        window.addEventListener("offline", onWindowOffline);
+    }
     try {
-        await loadCurrentPendingSale();
+        if (salesCartIsOnline.value) {
+            await getProducts();
+            await loadCurrentPendingSale();
+        } else {
+            isLoadingCart.value = true;
+            await hydrateFromOfflineCart();
+            isLoadingCart.value = false;
+        }
     } catch (error) {
-        console.error("Failed to auto-load pending sale:", error);
-        // Continue normally - user can still create new orders
+        console.error("Failed to initialize sales screen:", error);
+    }
+});
+
+onBeforeUnmount(() => {
+    closeOfflineWarningNotification();
+    closeDraftModeNotification();
+    if (typeof window !== "undefined") {
+        window.removeEventListener("online", onWindowOnline);
+        window.removeEventListener("offline", onWindowOffline);
     }
 });
 
 const getProducts = async () => {
+    if (!salesCartIsOnline.value) {
+        loading.value = false;
+        return;
+    }
     loading.value = true;
-    const items = await axios.get(
-        getRoute("sales.products", {
-            category: category.value,
-            search: search.value,
-        }),
-    );
-    products.value = items.data.data;
-    loading.value = false;
+    try {
+        const items = await axios.get(
+            getRoute("sales.products", {
+                category: category.value,
+                search: search.value,
+            }),
+        );
+        products.value = items.data.data;
+        mergeProductLookup(products.value);
+    } finally {
+        loading.value = false;
+    }
 };
 const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
     getItems: getProducts,
@@ -297,7 +767,46 @@ const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
     ],
 });
 
-watchDebounced(search, getProducts, { debounce: 300 });
+watchDebounced(
+    search,
+    () => {
+        if (salesCartIsOnline.value) getProducts();
+    },
+    { debounce: 300 },
+);
+
+watch(
+    [orders, selectedCustomer, offlinePaymentMethod],
+    () => {
+        if (!salesCartIsOnline.value) persistOfflineCartToDexie();
+    },
+    { deep: true },
+);
+
+watch(
+    isOnline,
+    (online) => {
+        if (online) {
+            closeOfflineWarningNotification();
+        } else {
+            closeDraftModeNotification();
+            showOfflineWarningNotification();
+        }
+    },
+    { immediate: true },
+);
+
+watch(
+    [isOnline, forceOfflineCartMode],
+    () => {
+        if (isOnline.value && forceOfflineCartMode.value) {
+            showDraftModeNotification();
+        } else {
+            closeDraftModeNotification();
+        }
+    },
+    { immediate: true },
+);
 </script>
 
 <template>
@@ -311,8 +820,13 @@ watchDebounced(search, getProducts, { debounce: 300 });
                     v-model:value="search"
                     placeholder="Search Product"
                     class="min-w-[100px] max-w-[300px]"
+                    :disabled="!salesCartIsOnline"
                 />
-                <RefreshButton :loading="loading" @click="getProducts" />
+                <RefreshButton
+                    :loading="loading"
+                    :disabled="!salesCartIsOnline"
+                    @click="getProducts"
+                />
                 <FilterDropdown v-model="filters" :filters="filtersConfig" />
             </template>
             <template #activeFilters>
@@ -336,6 +850,7 @@ watchDebounced(search, getProducts, { debounce: 300 });
                     :orders="orders"
                     :orderId="orderId"
                     @cart-updated="loadCurrentPendingSale"
+                    @offline-add-product="addToCart"
                 />
             </template>
             <template #right-side-content>
@@ -343,6 +858,12 @@ watchDebounced(search, getProducts, { debounce: 300 });
                     @customer-changed="handleCustomerChanged"
                     @discount-applied="loadCurrentPendingSale"
                     @cart-updated="loadCurrentPendingSale"
+                    @offline-cart-add="onOfflineCartAdd"
+                    @offline-cart-subtract="onOfflineCartSubtract"
+                    @offline-cart-set-qty="
+                        (e) => onOfflineCartSetQty(e.product, e.quantity)
+                    "
+                    @offline-cart-remove="onOfflineCartRemove"
                     :loading="isLoadingCart"
                     :orders="orders"
                     :orderId="orderId"
@@ -361,8 +882,11 @@ watchDebounced(search, getProducts, { debounce: 300 });
                 :orderDiscountId="orderDiscountId"
                 :orderId="orderId"
                 :discountOptions="discountOptions"
+                :offline-payment-method="offlinePaymentMethod"
                 @discount-applied="loadCurrentPendingSale"
                 @cart-updated="loadCurrentPendingSale"
+                @update:offline-payment-method="syncOfflinePaymentMethod"
+                @save-offline-sale="completeOfflineSale"
             />
         </template>
     </AuthenticatedLayout>

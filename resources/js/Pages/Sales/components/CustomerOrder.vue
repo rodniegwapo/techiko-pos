@@ -37,6 +37,11 @@ const { checkCreditAvailability } = useCredit();
 const page = usePage();
 const creditInfo = ref(null);
 
+const salesCartIsOnline = inject(
+    "isSalesOnline",
+    computed(() => true),
+);
+
 // Loading states for each product to prevent multiple rapid clicks
 const loadingStates = ref({});
 
@@ -85,6 +90,11 @@ const totalAmount = computed(() => {
 
 // Direct API functions
 const handleAddOrder = async (product) => {
+    if (!salesCartIsOnline.value) {
+        emit("offline-cart-add", product);
+        return;
+    }
+
     if (!orderId.value) {
         console.error("No active order - cannot add item");
         return;
@@ -106,6 +116,11 @@ const handleAddOrder = async (product) => {
 };
 
 const handleSubtractOrder = async (product) => {
+    if (!salesCartIsOnline.value) {
+        emit("offline-cart-subtract", product);
+        return;
+    }
+
     if (!orderId.value) {
         console.error("No active order - cannot subtract item");
         return;
@@ -129,6 +144,11 @@ const handleSubtractOrder = async (product) => {
 };
 
 const handleUpdateQuantity = async (product, quantity) => {
+    if (!salesCartIsOnline.value) {
+        emit("offline-cart-set-qty", { product, quantity });
+        return;
+    }
+
     if (!orderId.value) {
         console.error("No active order - cannot update quantity");
         return;
@@ -152,6 +172,11 @@ const handleUpdateQuantity = async (product, quantity) => {
 };
 
 const removeOrder = async (product) => {
+    if (!salesCartIsOnline.value) {
+        emit("offline-cart-remove", product);
+        return;
+    }
+
     if (!orderId.value) {
         console.error("No active order - cannot remove item");
         return;
@@ -365,6 +390,19 @@ const isLoadingVoid = ref(false);
 const handleSubmitVoid = async () => {
     try {
         isLoadingVoid.value = true;
+        if (!salesCartIsOnline.value) {
+            emit("offline-cart-remove", {
+                id: formData.value.product_id,
+                name: formData.value.sale_item,
+            });
+            openvoidModal.value = false;
+            clearForm();
+            notification.success({
+                message: "Removed",
+                description: "Item removed from offline cart.",
+            });
+            return;
+        }
         await axios.post(
             route("sales.items.void", {
                 sale: orderId.value,
@@ -398,6 +436,13 @@ const clearForm = () => {
 const currentProduct = ref({});
 const openApplyDiscountModal = ref(false);
 const handleShowProductDiscountModal = (product) => {
+    if (!salesCartIsOnline.value) {
+        notification.warning({
+            message: "Requires connection",
+            description: "Product discounts are not available offline.",
+        });
+        return;
+    }
     formData.value = {
         discount: product.discounts?.[0]?.id || null,
     };
@@ -416,6 +461,10 @@ watch(
     () => selectedCustomer.value,
     async (customer) => {
         if (customer && customer.id) {
+            if (!salesCartIsOnline.value) {
+                creditInfo.value = null;
+                return;
+            }
             try {
                 creditInfo.value = await checkCreditAvailability(
                     customer.id,
@@ -449,6 +498,13 @@ const newCustomerForm = ref({
 const openOrderDicountModal = ref(false);
 
 const showDiscountOrder = async () => {
+    if (!salesCartIsOnline.value) {
+        notification.warning({
+            message: "Requires connection",
+            description: "Order discounts are not available offline.",
+        });
+        return;
+    }
     // Check if there's an active order/draft OR if there are items in the cart
     // (orderId might be null briefly while draft is being created)
     if (!orderId.value && orders.value.length === 0) return;
@@ -509,6 +565,11 @@ const handleCustomerSearch = useDebounceFn(async (query) => {
     console.log("Searching for:", query); // Debug log
 
     if (!query || query.length < 2) {
+        customerOptions.value = [];
+        return;
+    }
+
+    if (!salesCartIsOnline.value) {
         customerOptions.value = [];
         return;
     }
@@ -585,6 +646,13 @@ const showCustomerDetails = () => {
 
 // Add new customer
 const handleAddCustomer = async () => {
+    if (!salesCartIsOnline.value) {
+        notification.warning({
+            message: "Requires connection",
+            description: "Adding customers needs a network connection.",
+        });
+        return;
+    }
     if (!newCustomerForm.value.name) {
         notification.error({
             message: "Validation Error",
@@ -632,6 +700,10 @@ const emit = defineEmits([
     "customerChanged",
     "discount-applied",
     "cart-updated",
+    "offline-cart-add",
+    "offline-cart-subtract",
+    "offline-cart-set-qty",
+    "offline-cart-remove",
 ]);
 
 // Reset optimistic quantities when orders data changes (cart refresh)
@@ -675,6 +747,7 @@ defineExpose({
             v-model:checked="isLoyalCustomer"
             checked-children="Loyal"
             un-checked-children="Walk-in"
+            :disabled="!salesCartIsOnline"
             @change="handleCustomerTypeChange"
         />
     </div>
@@ -697,6 +770,7 @@ defineExpose({
                 :options="customerOptions"
                 placeholder="Search customer by name, phone, or email (min 2 chars)"
                 :loading="searchingCustomers"
+                :disabled="!salesCartIsOnline"
                 @search="handleCustomerSearch"
                 @select="handleCustomerSelect"
                 @clear="
@@ -861,6 +935,7 @@ defineExpose({
                 <a-button
                     type="primary"
                     size="small"
+                    :disabled="!salesCartIsOnline"
                     @click="showAddCustomerModal = true"
                 >
                     <div class="flex items-center gap-2">
