@@ -11,6 +11,11 @@ class OfflineSalesDB extends Dexie {
             pending_sales:
                 "client_mutation_id, status, domain_slug, location_id, created_at",
         });
+        this.version(2).stores({
+            pending_sales:
+                "client_mutation_id, status, domain_slug, location_id, created_at",
+            offline_cart: "key, domain_slug, user_id",
+        });
     }
 }
 
@@ -120,4 +125,56 @@ export async function markRetry(clientMutationId) {
 
 export async function removePending(clientMutationId) {
     await offlineDb.pending_sales.delete(clientMutationId);
+}
+
+/** @param {string} domainSlug @param {number|string} userId */
+export function offlineCartKey(domainSlug, userId) {
+    return `${domainSlug}:${userId}`;
+}
+
+/**
+ * @param {string} domainSlug
+ * @param {number|string} userId
+ * @returns {Promise<object|undefined>}
+ */
+export async function getOfflineCart(domainSlug, userId) {
+    if (!domainSlug || userId == null) return undefined;
+    return offlineDb.offline_cart.get(offlineCartKey(domainSlug, userId));
+}
+
+/**
+ * @param {object} payload
+ * @param {string} payload.domain_slug
+ * @param {number|string} payload.user_id
+ * @param {Array<{product_id:number,quantity:number,unit_price:number,name?:string}>} payload.line_items
+ * @param {string} [payload.payment_method]
+ * @param {number|null} [payload.location_id]
+ * @param {number|null} [payload.customer_id]
+ * @param {object|null} [payload.customer_snapshot]
+ * @param {string|null} [payload.notes]
+ * @param {Array<{id:number,barcode?:string,code?:string,name:string,price:number}>} [payload.product_lookup]
+ */
+export async function putOfflineCart(payload) {
+    const now = new Date().toISOString();
+    const record = {
+        key: offlineCartKey(payload.domain_slug, payload.user_id),
+        domain_slug: payload.domain_slug,
+        user_id: payload.user_id,
+        line_items: payload.line_items ?? [],
+        payment_method: payload.payment_method ?? "cash",
+        location_id: payload.location_id ?? null,
+        customer_id: payload.customer_id ?? null,
+        customer_snapshot: payload.customer_snapshot ?? null,
+        notes: payload.notes ?? null,
+        product_lookup: payload.product_lookup ?? [],
+        updated_at: now,
+    };
+    await offlineDb.offline_cart.put(record);
+    return record;
+}
+
+/** @param {string} domainSlug @param {number|string} userId */
+export async function clearOfflineCart(domainSlug, userId) {
+    if (!domainSlug || userId == null) return;
+    await offlineDb.offline_cart.delete(offlineCartKey(domainSlug, userId));
 }
