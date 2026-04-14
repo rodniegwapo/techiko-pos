@@ -49,7 +49,7 @@ onMounted(() => {
 });
 
 const isSuperUser = computed(
-    () => !!page.props.auth?.user?.data?.is_super_user
+    () => !!page.props.auth?.user?.data?.is_super_user,
 );
 
 // Get current domain from page props
@@ -344,7 +344,7 @@ const handleClick = (menu) => {
                 "routeName:",
                 menu.routeName,
                 "generated:",
-                routePath
+                routePath,
             );
         }
     } catch (error) {
@@ -397,7 +397,7 @@ const initializeMenuState = () => {
 
 watch(
     () => page.url,
-    () => initializeMenuState()
+    () => initializeMenuState(),
 );
 
 const handleOpenChange = (keys) => {
