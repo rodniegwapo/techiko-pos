@@ -174,9 +174,13 @@ class InventoryService
             
             // Get or create inventory record
             $inventory = $this->getOrCreateInventory($product, $location);
-            
-            // Create the movement record
-            $movement = InventoryMovement::createMovement($data);
+
+            $movementPayload = array_merge($data, [
+                'domain' => $data['domain'] ?? $location->domain ?? $product->domain,
+            ]);
+
+            // Create the movement record (domain required for domain-scoped movements listing)
+            $movement = InventoryMovement::createMovement($movementPayload);
             
             // Update inventory levels
             $this->updateInventoryLevels($inventory, $movement);

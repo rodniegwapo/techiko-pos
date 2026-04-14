@@ -125,11 +125,27 @@ class InventoryController extends Controller
 
         if (!$location) {
             return Inertia::render('Inventory/Movements', [
-                'movements' => [],
+                'movements' => InventoryMovementResource::collection(
+                    new \Illuminate\Pagination\LengthAwarePaginator([], 0, 50)
+                ),
                 'locations' => InventoryLocation::active()->forDomain($slug)->get(),
-                'filters' => $request->only(['search', 'movement_type', 'date_from', 'date_to']),
+                'products' => Product::select('id', 'name', 'SKU')->where('domain', $slug)->get(),
+                'domains' => Domain::select('id', 'name', 'name_slug')->get(),
+                'movementTypes' => [
+                    'sale' => 'Sale',
+                    'purchase' => 'Purchase',
+                    'adjustment' => 'Stock Adjustment',
+                    'transfer_in' => 'Transfer In',
+                    'transfer_out' => 'Transfer Out',
+                    'return' => 'Customer Return',
+                    'damage' => 'Damaged Goods',
+                    'theft' => 'Theft/Loss',
+                    'expired' => 'Expired Products',
+                    'promotion' => 'Promotional Giveaway',
+                ],
+                'filters' => $request->only(['search', 'location_id', 'product_id', 'movement_type', 'date_from', 'date_to']),
                 'isGlobalView' => false,
-                'current_location' => null,
+                'currentLocation' => null,
             ]);
         }
 
@@ -175,6 +191,7 @@ class InventoryController extends Controller
             ],
             'filters' => $request->only(['search', 'location_id', 'product_id', 'movement_type', 'date_from', 'date_to']),
             'isGlobalView' => false,
+            'currentLocation' => $location,
         ]);
     }
 
