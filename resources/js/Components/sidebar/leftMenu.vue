@@ -52,7 +52,7 @@ const isSuperUser = computed(
 );
 
 // Get current domain from page props
-const currentDomain = computed(() => page.props.domain);
+const currentDomain = computed(() => page.props.currentDomain);
 
 // Helper function to detect domain from current URL
 const getCurrentDomainFromUrl = () => {
