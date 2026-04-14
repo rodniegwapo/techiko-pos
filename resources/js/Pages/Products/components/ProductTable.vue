@@ -65,6 +65,15 @@ const columns = computed(() => {
         },
     ];
 
+    if (!props.isGlobalView && currentLocation.value) {
+        baseColumns.push({
+            title: "Qty (store)",
+            dataIndex: "location_quantity_available",
+            key: "location_quantity_available",
+            align: "right",
+        });
+    }
+
     // Add domain column for super users only in global view
     if (page.props.auth?.user?.data?.is_super_user && props.isGlobalView) {
         baseColumns.splice(2, 0, {
@@ -165,6 +174,14 @@ const showDetails = (product) => {
                         </div></a-tag
                     >
                 </div>
+            </template>
+            <template v-if="column.key == 'location_quantity_available'">
+                <span v-if="!record.track_inventory" class="text-gray-400"
+                    >N/A</span
+                >
+                <span v-else class="font-medium">{{
+                    record.location_quantity_available ?? 0
+                }}</span>
             </template>
             <template v-if="column.key == 'action'">
                 <div class="flex items-center gap-2">
