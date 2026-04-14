@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Http\Resources\StockAdjustmentResource;
+use App\Models\Domain;
 use App\Models\InventoryLocation;
 use App\Models\Product\Product;
 use App\Models\StockAdjustment;
 use App\Services\InventoryService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Inertia\Inertia;
 
 class StockAdjustmentController extends Controller
@@ -18,6 +20,84 @@ class StockAdjustmentController extends Controller
     {
         // Middleware is handled at route level
         $this->inventoryService = $inventoryService;
+    }
+
+    /**
+     * Reasons list shared by create / edit / domain create.
+     *
+     * @return array<string, string>
+     */
+    public static function adjustmentReasons(): array
+    {
+        return [
+            'physical_count' => 'Physical Count',
+            'damaged_goods' => 'Damaged Goods',
+            'expired_goods' => 'Expired Goods',
+            'theft_loss' => 'Theft/Loss',
+            'supplier_error' => 'Supplier Error',
+            'system_error' => 'System Error',
+            'promotion' => 'Promotion',
+            'sample' => 'Sample',
+            'other' => 'Other',
+        ];
+    }
+
+    /**
+     * Locations shown in adjustment forms: all stores for super users, org stores only otherwise.
+     */
+    protected function adjustmentFormLocations(): \Illuminate\Database\Eloquent\Collection
+    {
+        $user = auth()->user();
+
+        if ($user->is_super_user) {
+            return InventoryLocation::active()->get();
+        }
+
+        if (empty($user->domain)) {
+            return InventoryLocation::active()->whereRaw('1 = 0')->get();
+        }
+
+        return InventoryLocation::active()->forDomain($user->domain)->get();
+    }
+
+    /**
+     * Domain options for global create (super = all; org user = single org or empty).
+     *
+     * @return \Illuminate\Database\Eloquent\Collection<int, Domain>
+     */
+    protected function adjustmentFormDomains(): \Illuminate\Database\Eloquent\Collection
+    {
+        $user = auth()->user();
+        $query = Domain::query()->select('id', 'name', 'name_slug');
+
+        if ($user->is_super_user) {
+            return $query->get();
+        }
+
+        if (empty($user->domain)) {
+            return $query->whereRaw('1 = 0')->get();
+        }
+
+        return $query->where('name_slug', $user->domain)->get();
+    }
+
+    protected function isGlobalAdjustmentForm(): bool
+    {
+        return (bool) auth()->user()?->is_super_user;
+    }
+
+    protected function ensureAdjustmentAccessible(StockAdjustment $adjustment): void
+    {
+        $user = auth()->user();
+        if ($user->is_super_user) {
+            return;
+        }
+
+        $adjustment->loadMissing('location');
+
+        if (empty($user->domain) || ! $adjustment->location || $adjustment->location->domain !== $user->domain) {
+            abort(403, 'You cannot access this adjustment.');
+        }
     }
 
     /**
@@ -59,17 +139,7 @@ class StockAdjustmentController extends Controller
                 'approved' => 'Approved',
                 'rejected' => 'Rejected',
             ],
-            'reasons' => [
-                'physical_count' => 'Physical Count',
-                'damaged_goods' => 'Damaged Goods',
-                'expired_goods' => 'Expired Goods',
-                'theft_loss' => 'Theft/Loss',
-                'supplier_error' => 'Supplier Error',
-                'system_error' => 'System Error',
-                'promotion' => 'Promotion',
-                'sample' => 'Sample',
-                'other' => 'Other',
-            ],
+            'reasons' => static::adjustmentReasons(),
             'filters' => $request->only(['search', 'status', 'location_id', 'date_from', 'date_to', 'domain']),
             'isGlobalView' => true,
         ]);
@@ -81,20 +151,10 @@ class StockAdjustmentController extends Controller
     public function create()
     {
         return Inertia::render('Inventory/StockAdjustments/Create', [
-            'locations' => InventoryLocation::active()->get(),
-            'reasons' => [
-                'physical_count' => 'Physical Count',
-                'damaged_goods' => 'Damaged Goods',
-                'expired_goods' => 'Expired Goods',
-                'theft_loss' => 'Theft/Loss',
-                'supplier_error' => 'Supplier Error',
-                'system_error' => 'System Error',
-                'promotion' => 'Promotion',
-                'sample' => 'Sample',
-                'other' => 'Other',
-            ],
-            'domains' => \App\Models\Domain::select('id', 'name', 'name_slug')->get(),
-            'isGlobalView' => true,
+            'locations' => $this->adjustmentFormLocations(),
+            'reasons' => static::adjustmentReasons(),
+            'domains' => $this->adjustmentFormDomains(),
+            'isGlobalView' => $this->isGlobalAdjustmentForm(),
         ]);
     }
 
@@ -124,11 +184,38 @@ class StockAdjustmentController extends Controller
 
         $validated = $request->validate($rules);
 
+        $user = auth()->user();
+        $location = InventoryLocation::query()->findOrFail($validated['location_id']);
+
+        if (! $user->is_super_user) {
+            if (empty($user->domain) || $location->domain !== $user->domain) {
+                abort(403, 'You may only create adjustments for locations in your organization.');
+            }
+            $validated['domain'] = $user->domain;
+        } else {
+            $validated['domain'] = $validated['domain'] ?? $location->domain;
+        }
+
+        $adjustmentPayload = Arr::only($validated, [
+            'location_id', 'type', 'reason', 'description', 'domain',
+        ]);
+
+        if (! $user->is_super_user && ! empty($user->domain)) {
+            $productIds = collect($validated['items'])->pluck('product_id')->unique()->all();
+            $invalidCount = Product::query()
+                ->whereIn('id', $productIds)
+                ->where('domain', '!=', $user->domain)
+                ->count();
+            if ($invalidCount > 0) {
+                abort(403, 'One or more products are not in your organization.');
+            }
+        }
+
         try {
             $adjustment = $this->inventoryService->createStockAdjustment(
-                $validated,
+                $adjustmentPayload,
                 $validated['items'],
-                auth()->user()
+                $user
             );
 
             return response()->json([
@@ -149,6 +236,8 @@ class StockAdjustmentController extends Controller
      */
     public function show(Request $request, StockAdjustment $adjustment)
     {
+        $this->ensureAdjustmentAccessible($adjustment);
+
         try {
             $adjustment->load([
                 'location',
@@ -197,6 +286,8 @@ class StockAdjustmentController extends Controller
             abort(403, 'Only draft adjustments can be edited');
         }
 
+        $this->ensureAdjustmentAccessible($adjustment);
+
         $adjustment->load([
             'location',
             'createdBy',
@@ -205,18 +296,8 @@ class StockAdjustmentController extends Controller
 
         return Inertia::render('Inventory/StockAdjustments/Edit', [
             'adjustment' => $adjustment,
-            'locations' => InventoryLocation::active()->get(),
-            'reasons' => [
-                'physical_count' => 'Physical Count',
-                'damaged_goods' => 'Damaged Goods',
-                'expired_goods' => 'Expired Goods',
-                'theft_loss' => 'Theft/Loss',
-                'supplier_error' => 'Supplier Error',
-                'system_error' => 'System Error',
-                'promotion' => 'Promotion',
-                'sample' => 'Sample',
-                'other' => 'Other',
-            ],
+            'locations' => $this->adjustmentFormLocations(),
+            'reasons' => static::adjustmentReasons(),
         ]);
     }
 
@@ -225,6 +306,8 @@ class StockAdjustmentController extends Controller
      */
     public function update(Request $request, StockAdjustment $adjustment)
     {
+        $this->ensureAdjustmentAccessible($adjustment);
+
         if ($adjustment->status !== 'draft') {
             return response()->json([
                 'success' => false,
@@ -258,6 +341,8 @@ class StockAdjustmentController extends Controller
      */
     public function submitForApproval(Request $request, StockAdjustment $adjustment)
     {
+        $this->ensureAdjustmentAccessible($adjustment);
+
         try {
             $adjustment->submitForApproval();
 
@@ -286,6 +371,8 @@ class StockAdjustmentController extends Controller
      */
     public function approve(Request $request, StockAdjustment $adjustment)
     {
+        $this->ensureAdjustmentAccessible($adjustment);
+
         try {
             $adjustment->approve(auth()->user());
 
@@ -314,6 +401,8 @@ class StockAdjustmentController extends Controller
      */
     public function reject(Request $request, StockAdjustment $adjustment)
     {
+        $this->ensureAdjustmentAccessible($adjustment);
+
         try {
             $adjustment->reject();
 
@@ -342,6 +431,8 @@ class StockAdjustmentController extends Controller
      */
     public function destroy(StockAdjustment $adjustment)
     {
+        $this->ensureAdjustmentAccessible($adjustment);
+
         if ($adjustment->status !== 'draft') {
             return response()->json([
                 'success' => false,
@@ -377,9 +468,22 @@ class StockAdjustmentController extends Controller
 
             $locationId = $validated['location_id'];
 
+            $location = InventoryLocation::query()->findOrFail($locationId);
+            $user = auth()->user();
+
+            if (! $user->is_super_user) {
+                if (empty($user->domain) || $location->domain !== $user->domain) {
+                    abort(403, 'You may only search products for locations in your organization.');
+                }
+            }
+
             $query = Product::with(['inventories' => function ($q) use ($locationId) {
                 $q->where('location_id', $locationId);
             }])->where('track_inventory', true);
+
+            if (! $user->is_super_user) {
+                $query->where('domain', $user->domain);
+            }
 
             if (! empty($validated['search'])) {
                 $query->search($validated['search']);
@@ -402,6 +506,8 @@ class StockAdjustmentController extends Controller
                 'success' => true,
                 'data' => $products,
             ]);
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+            throw $e;
         } catch (\Exception $e) {
             \Log::error('Error in getProductsForAdjustment: '.$e->getMessage(), [
                 'request' => $request->all(),

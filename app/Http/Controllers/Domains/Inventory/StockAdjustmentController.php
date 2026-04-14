@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Domains\Inventory;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\StockAdjustmentController as GlobalStockAdjustmentController;
 use App\Http\Resources\StockAdjustmentResource;
 use App\Models\Domain;
 use App\Models\InventoryLocation;
@@ -46,6 +47,23 @@ class StockAdjustmentController extends Controller
             ],
             'filters' => $request->only(['search', 'status', 'location_id', 'date_from', 'date_to']),
             'isGlobalView' => false,
+        ]);
+    }
+
+    /**
+     * Show the form for creating a stock adjustment within this domain.
+     */
+    public function create(Domain $domain)
+    {
+        return Inertia::render('Inventory/StockAdjustments/Create', [
+            'locations' => InventoryLocation::active()->forDomain($domain->name_slug)->get(),
+            'reasons' => GlobalStockAdjustmentController::adjustmentReasons(),
+            'domains' => Domain::query()
+                ->select('id', 'name', 'name_slug')
+                ->where('name_slug', $domain->name_slug)
+                ->get(),
+            'isGlobalView' => false,
+            'currentDomain' => $domain,
         ]);
     }
 
