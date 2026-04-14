@@ -45,12 +45,22 @@ onMounted(() => {
   }
 });
 
+const locationIdQuery = () => {
+  if (typeof window === "undefined") {
+    return {};
+  }
+  const url = new URL(page.url, window.location.origin);
+  const id = url.searchParams.get("location_id");
+  return id ? { location_id: id } : {};
+};
+
 // Fetch items
 const getItems = () => {
   router.reload({
-    only: ["movements"],
+    only: ["movements", "currentLocation"],
     preserveScroll: true,
     data: {
+      ...locationIdQuery(),
       search: search.value || undefined,
       movement_type: movement_type.value || undefined,
       domain: domain.value || undefined,
@@ -116,8 +126,10 @@ const filtersConfig = [
 // Group filters in one object
 const tableFilters = { search, movement_type, domain };
 
-// Table management
-const { pagination, handleTableChange } = useTable("movements", tableFilters);
+// Table management (keep location_id when filtering/paginating in domain context)
+const { pagination, handleTableChange } = useTable("movements", tableFilters, {
+  preserveQueryKeys: ["location_id"],
+});
 
 // Methods
 const exportMovements = () => {
@@ -182,6 +194,15 @@ const showMovementDetails = (movement) => {
       <template #activeStore>
         <LocationInfoAlert />
       </template>
+
+      <a-alert
+        v-if="!page.props.isGlobalView && !page.props.currentLocation"
+        type="warning"
+        show-icon
+        message="Select a store"
+        description="Choose a location or open this page with ?location_id= in the URL to view movements for this organization."
+        class="mb-4"
+      />
 
       <template #table>
         <MovementsTable
