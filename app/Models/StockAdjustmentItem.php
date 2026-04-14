@@ -97,7 +97,7 @@ class StockAdjustmentItem extends Model
             'movement_type' => $movementType,
             'quantity_change' => $this->adjustment_quantity,
             'unit_cost' => $this->unit_cost,
-            'reference_type' => StockAdjustment::class,
+            'reference_type' => 'StockAdjustment',
             'reference_id' => $this->stock_adjustment_id,
             'batch_number' => $this->batch_number,
             'expiry_date' => $this->expiry_date,
