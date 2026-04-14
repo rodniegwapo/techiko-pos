@@ -258,4 +258,24 @@ class InventoryController extends Controller
 
         return response()->json(['success' => true, 'message' => 'Inventory transferred successfully']);
     }
+
+    /**
+     * JSON summary for a single location (used by stock adjustment create UI).
+     */
+    public function getLocationSummary(Request $request, InventoryLocation $location)
+    {
+        $domain = $request->query('domain');
+        $report = $this->inventoryService->getInventoryReport($location, $domain);
+        $summary = $report['summary'];
+
+        return response()->json([
+            'location_id' => $location->id,
+            'location_name' => $location->name,
+            'total_products_count' => $summary['total_products'],
+            'in_stock_products_count' => $summary['in_stock_products'],
+            'low_stock_products_count' => $summary['low_stock_products'],
+            'out_of_stock_products_count' => $summary['out_of_stock_products'],
+            'total_inventory_value' => $summary['total_inventory_value'],
+        ]);
+    }
 }
