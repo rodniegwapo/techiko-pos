@@ -70,7 +70,7 @@ const columns = computed(() => {
             title: "Qty (store)",
             dataIndex: "location_quantity_available",
             key: "location_quantity_available",
-            align: "right",
+            align: "left",
         });
     }
 
