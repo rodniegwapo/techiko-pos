@@ -9,14 +9,21 @@ use App\Models\Category;
 use App\Models\Customer;
 use App\Models\Domain;
 use App\Models\Product\Discount;
+use App\Models\InventoryLocation;
+use App\Models\OfflineSaleSync;
 use App\Models\Product\Product;
 use App\Models\Sale;
+use App\Models\User;
 use App\Services\CreditService;
 use App\Services\InventoryService;
 use App\Services\SaleService;
 use App\Traits\LocationCategoryScoping;
+use Carbon\Carbon;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class SaleController extends Controller
@@ -950,6 +957,245 @@ class SaleController extends Controller
                 'grand_total' => $sale->grand_total,
             ],
         ]);
+    }
+
+    /**
+     * Offline sales capture + review (Dexie on the client; this page is Inertia shell + props).
+     */
+    public function offlineTransactionsPage(Request $request, Domain $domain)
+    {
+        $locations = InventoryLocation::forDomain($domain->name_slug)
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'code', 'is_default']);
+
+        $activeLocation = Helpers::getActiveLocation($domain);
+
+        return Inertia::render('Sales/OfflineTransactions', [
+            'domain' => $domain,
+            'locations' => $locations,
+            'activeLocationId' => $activeLocation?->id,
+        ]);
+    }
+
+    /**
+     * Idempotent replay of one or more offline-finalized sales (client mutation IDs).
+     */
+    public function offlineSync(Request $request, Domain $domain)
+    {
+        $validated = $request->validate([
+            'sales' => ['required', 'array', 'min:1'],
+            'sales.*.client_mutation_id' => ['required', 'uuid'],
+            'sales.*.payload' => ['required', 'array'],
+            'sales.*.payload.items' => ['required', 'array', 'min:1'],
+            'sales.*.payload.items.*.product_id' => ['required', 'integer', 'exists:products,id'],
+            'sales.*.payload.items.*.quantity' => ['required', 'integer', 'min:1'],
+            'sales.*.payload.items.*.unit_price' => ['required', 'numeric', 'min:0'],
+            'sales.*.payload.payment_method' => ['required', 'string', 'in:cash,card,e-wallet'],
+            'sales.*.payload.location_id' => ['required', 'integer'],
+            'sales.*.payload.customer_id' => ['nullable', 'integer', 'exists:customers,id'],
+            'sales.*.payload.notes' => ['nullable', 'string', 'max:2000'],
+            'sales.*.payload.recorded_at' => ['nullable', 'date'],
+            'sales.*.payload.cashier_user_id' => ['required', 'integer', 'exists:users,id'],
+        ]);
+
+        $results = [];
+
+        foreach ($validated['sales'] as $entry) {
+            $mutationId = $entry['client_mutation_id'];
+            $payload = $entry['payload'];
+
+            try {
+                $results[] = $this->processOneOfflineSaleSync($domain, $mutationId, $payload);
+            } catch (ValidationException $e) {
+                $first = collect($e->errors())->flatten()->first();
+                $results[] = [
+                    'client_mutation_id' => $mutationId,
+                    'success' => false,
+                    'message' => $first ?: $e->getMessage() ?: 'Validation failed.',
+                    'errors' => $e->errors(),
+                ];
+            } catch (\Throwable $e) {
+                $results[] = [
+                    'client_mutation_id' => $mutationId,
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                ];
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'results' => $results,
+        ]);
+    }
+
+    /**
+     * @return array{client_mutation_id: string, success: bool, sale_id?: int, duplicate?: bool, message?: string}
+     */
+    private function processOneOfflineSaleSync(Domain $domain, string $clientMutationId, array $payload): array
+    {
+        $location = InventoryLocation::forDomain($domain->name_slug)
+            ->where('id', $payload['location_id'])
+            ->where('is_active', true)
+            ->first();
+
+        if (! $location) {
+            throw ValidationException::withMessages([
+                'location_id' => ['Invalid or inactive location for this organization.'],
+            ]);
+        }
+
+        $cashier = User::findOrFail((int) $payload['cashier_user_id']);
+        if (! $cashier->isSuperUser() && $cashier->domain !== $domain->name_slug) {
+            throw ValidationException::withMessages([
+                'cashier_user_id' => ['Cashier does not belong to this organization.'],
+            ]);
+        }
+
+        $productIds = collect($payload['items'])->pluck('product_id')->unique()->values();
+        $domainProductCount = Product::query()
+            ->where('domain', $domain->name_slug)
+            ->whereIn('id', $productIds)
+            ->count();
+
+        if ($domainProductCount !== $productIds->count()) {
+            throw ValidationException::withMessages([
+                'items' => ['One or more products are invalid for this organization.'],
+            ]);
+        }
+
+        if (! empty($payload['customer_id'])) {
+            $customerOk = Customer::query()
+                ->where('id', $payload['customer_id'])
+                ->where('domain', $domain->name_slug)
+                ->exists();
+
+            if (! $customerOk) {
+                throw ValidationException::withMessages([
+                    'customer_id' => ['Customer is invalid for this organization.'],
+                ]);
+            }
+        }
+
+        $stockItems = collect($payload['items'])->map(function (array $row) {
+            return [
+                'product_id' => (int) $row['product_id'],
+                'quantity' => (int) $row['quantity'],
+            ];
+        })->all();
+
+        $short = $this->inventoryService->checkStockAvailability($stockItems, $location);
+        if (! empty($short)) {
+            $names = collect($short)->pluck('product_name')->implode(', ');
+
+            throw ValidationException::withMessages([
+                'stock' => ["Insufficient stock for: {$names}"],
+            ]);
+        }
+
+        return DB::transaction(function () use ($domain, $clientMutationId, $payload, $location, $cashier) {
+            $syncRow = null;
+
+            try {
+                $syncRow = OfflineSaleSync::query()->create([
+                    'user_id' => auth()->id(),
+                    'domain' => $domain->name_slug,
+                    'client_mutation_id' => $clientMutationId,
+                    'sale_id' => null,
+                ]);
+            } catch (QueryException $e) {
+                if (! $this->isUniqueConstraintViolation($e)) {
+                    throw $e;
+                }
+
+                $existing = OfflineSaleSync::query()
+                    ->where('domain', $domain->name_slug)
+                    ->where('client_mutation_id', $clientMutationId)
+                    ->first();
+
+                if ($existing && $existing->sale_id) {
+                    return [
+                        'client_mutation_id' => $clientMutationId,
+                        'success' => true,
+                        'sale_id' => $existing->sale_id,
+                        'duplicate' => true,
+                    ];
+                }
+
+                throw ValidationException::withMessages([
+                    'client_mutation_id' => ['This sale is already being synced. Retry in a moment.'],
+                ]);
+            }
+
+            try {
+                $transactionDate = isset($payload['recorded_at'])
+                    ? Carbon::parse($payload['recorded_at'])
+                    : now();
+
+                $sale = Sale::query()->create([
+                    'user_id' => $cashier->id,
+                    'location_id' => $location->id,
+                    'domain' => $domain->name_slug,
+                    'payment_status' => 'pending',
+                    'invoice_number' => Str::upper(Str::random(10)),
+                    'transaction_date' => $transactionDate,
+                    'customer_id' => $payload['customer_id'] ?? null,
+                    'payment_method' => $payload['payment_method'],
+                    'notes' => $payload['notes'] ?? null,
+                    'tax_amount' => 0,
+                ]);
+
+                foreach ($payload['items'] as $row) {
+                    $sale->saleItems()->create([
+                        'product_id' => (int) $row['product_id'],
+                        'quantity' => (int) $row['quantity'],
+                        'unit_price' => (float) $row['unit_price'],
+                    ]);
+                }
+
+                $sale->recalcTotals();
+
+                $this->saleService->completeSale($sale, $cashier, $location);
+                $this->saleService->handleOverselling($sale);
+
+                $sale->update([
+                    'grand_total' => $sale->total_amount,
+                    'payment_method' => $payload['payment_method'],
+                    'location_id' => $location->id,
+                    'payment_status' => 'paid',
+                ]);
+
+                OfflineSaleSync::query()
+                    ->whereKey($syncRow->id)
+                    ->update(['sale_id' => $sale->id]);
+
+                event(new \App\Events\PaymentCompleted($sale));
+
+                return [
+                    'client_mutation_id' => $clientMutationId,
+                    'success' => true,
+                    'sale_id' => $sale->id,
+                ];
+            } catch (\Throwable $e) {
+                if ($syncRow) {
+                    OfflineSaleSync::query()->whereKey($syncRow->id)->delete();
+                }
+
+                throw $e;
+            }
+        });
+    }
+
+    private function isUniqueConstraintViolation(QueryException $e): bool
+    {
+        $sqlState = $e->errorInfo[0] ?? '';
+        $code = isset($e->errorInfo[1]) ? (int) $e->errorInfo[1] : 0;
+
+        return $sqlState === '23000'
+            || $code === 1062 // MySQL duplicate
+            || $code === 19 // SQLite UNIQUE constraint
+            || str_contains(strtolower($e->getMessage()), 'unique');
     }
 
     /**

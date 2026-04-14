@@ -14,6 +14,7 @@ import {
     IconWorld,
     IconKey,
     IconCreditCard,
+    IconAccessPointOff,
 } from "@tabler/icons-vue";
 import { router, usePage } from "@inertiajs/vue3";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
@@ -105,6 +106,14 @@ const menuItems = [
         routeName: "sales.index",
         path: "/sales",
         domainOnly: true, // Sales are now domain-only
+    },
+    {
+        key: "offline-sales",
+        title: "Offline sales",
+        icon: IconAccessPointOff,
+        routeName: "sales.offline-transactions",
+        path: "/sales/offline-transactions",
+        domainOnly: true,
     },
     {
         key: "domains",
