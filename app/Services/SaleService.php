@@ -9,6 +9,7 @@ use App\Models\UserPin;
 use App\Models\VoidLog;
 use App\Models\InventoryLocation;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -255,31 +256,41 @@ class SaleService
      */
     public function handleOverselling(Sale $sale)
     {
+        if (! $sale->location_id) {
+            Log::warning('handleOverselling skipped: sale has no location_id', [
+                'sale_id' => $sale->id,
+            ]);
+
+            return [];
+        }
+
+        $sale->loadMissing('saleItems.product', 'location', 'user');
+
         $oversoldItems = [];
-        
+
         foreach ($sale->saleItems as $saleItem) {
-            // Get current stock from ProductInventory model
-            $productInventory = \App\Models\ProductInventory::where('product_id', $saleItem->product_id)->first();
+            $productInventory = \App\Models\ProductInventory::query()
+                ->where('product_id', $saleItem->product_id)
+                ->where('location_id', $sale->location_id)
+                ->first();
+
             $currentStock = $productInventory ? $productInventory->quantity_on_hand : 0;
-            
-            // If stock is negative, we have an oversell situation
+
             if ($currentStock < 0) {
                 $oversoldItems[] = [
                     'product_id' => $saleItem->product_id,
-                    'system_quantity' => 0, // System showed 0 or positive
-                    'actual_quantity' => abs($currentStock), // What was actually sold
-                    'adjustment_quantity' => abs($currentStock), // Positive adjustment
-                    'unit_cost' => $saleItem->unit_price,
-                    'reason' => 'oversell_found',
-                    'notes' => "Oversold during sale #{$sale->invoice_number} - Customer purchased {$saleItem->quantity} units"
+                    'system_quantity' => 0,
+                    'actual_quantity' => abs($currentStock),
+                    'unit_cost' => $saleItem->product?->cost ?? $saleItem->unit_price ?? 0,
+                    'notes' => "Oversold during sale #{$sale->invoice_number} - Customer purchased {$saleItem->quantity} units",
                 ];
             }
         }
-        
-        if (!empty($oversoldItems)) {
+
+        if (! empty($oversoldItems)) {
             $this->createOversellAdjustment($sale, $oversoldItems);
         }
-        
+
         return $oversoldItems;
     }
 
@@ -288,34 +299,44 @@ class SaleService
      */
     private function createOversellAdjustment(Sale $sale, array $oversoldItems)
     {
+        $domain = $sale->domain
+            ?? $sale->location?->domain
+            ?? $sale->user?->domain
+            ?? 'default';
+
         $adjustment = \App\Models\StockAdjustment::create([
             'adjustment_number' => \App\Models\StockAdjustment::generateAdjustmentNumber(),
+            'type' => 'increase',
             'reason' => 'oversell_found',
             'description' => "Automatic adjustment for overselling in sale #{$sale->invoice_number}",
-            'status' => 'approved', // Auto-approve oversell adjustments
+            'status' => 'approved',
             'created_by' => $sale->user_id,
             'approved_by' => $sale->user_id,
             'approved_at' => now(),
-            'location_id' => $sale->location_id ?? 1, // Default location
-            'domain' => $sale->user->domain ?? 'default'
+            'location_id' => $sale->location_id,
+            'domain' => $domain,
         ]);
-        
-        // Create adjustment items
+
         foreach ($oversoldItems as $item) {
-            $adjustment->items()->create($item);
+            $adjustment->items()->create(\Illuminate\Support\Arr::only($item, [
+                'product_id',
+                'system_quantity',
+                'actual_quantity',
+                'unit_cost',
+                'notes',
+            ]));
         }
-        
-        // Process the adjustment to update inventory
-        $adjustment->processAdjustmentItems();
-        
-        // Log the oversell for management review
-        \Log::info('Oversell detected and adjusted', [
+
+        $adjustment->calculateTotalValueChange();
+        $adjustment->applyInventoryFromApprovedAdjustment();
+
+        Log::info('Oversell detected and adjusted', [
             'sale_id' => $sale->id,
             'invoice_number' => $sale->invoice_number,
             'adjustment_id' => $adjustment->id,
-            'oversold_items' => count($oversoldItems)
+            'oversold_items' => count($oversoldItems),
         ]);
-        
+
         return $adjustment;
     }
 

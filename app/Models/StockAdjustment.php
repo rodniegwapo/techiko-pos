@@ -174,6 +174,16 @@ class StockAdjustment extends Model
     }
 
     /**
+     * Apply line items to inventory for an adjustment that is already approved
+     * (e.g. automatic oversell reconciliation). Does not change status.
+     */
+    public function applyInventoryFromApprovedAdjustment(): void
+    {
+        $this->loadMissing('items');
+        $this->processAdjustmentItems();
+    }
+
+    /**
      * Process adjustment items and update inventory
      */
     protected function processAdjustmentItems()
