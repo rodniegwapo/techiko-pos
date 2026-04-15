@@ -12,6 +12,7 @@ import RefreshButton from "@/Components/buttons/Refresh.vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useNetworkInfo } from "@/Composables/useNetworkInfo";
+import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 import {
     addPendingSale,
     listNeedsAttentionForDomain,
@@ -25,6 +26,7 @@ import {
 const page = usePage();
 const { getRoute } = useDomainRoutes();
 const { spinning } = useGlobalVariables();
+const { hasPermission } = usePermissionsV2();
 
 const domainSlug = computed(
     () => page.props.domain?.name_slug ?? page.props.domain?.nameSlug,
@@ -57,12 +59,46 @@ watch(
 
 const lineItems = ref([{ product_id: "", quantity: 1, unit_price: "" }]);
 const paymentMethod = ref("cash");
+const selectedPaymentCardTypeId = ref(null);
+const cardTypes = ref([]);
+const loadingCardTypes = ref(false);
 const notes = ref("");
 const customerId = ref("");
 
 const queue = ref([]);
 const loadingQueue = ref(false);
 const captureModalVisible = ref(false);
+
+async function fetchCardTypes() {
+    if (!domainSlug.value || !hasPermission("payment-card-types.list")) {
+        cardTypes.value = [];
+        return;
+    }
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+        return;
+    }
+    loadingCardTypes.value = true;
+    try {
+        const { data } = await axios.get(getRoute("payment-card-types.list"));
+        cardTypes.value = data?.data ?? [];
+    } catch {
+        cardTypes.value = [];
+    } finally {
+        loadingCardTypes.value = false;
+    }
+}
+
+watch(paymentMethod, (v) => {
+    if (v !== "card") {
+        selectedPaymentCardTypeId.value = null;
+    }
+});
+
+watch(captureModalVisible, (open) => {
+    if (open) {
+        fetchCardTypes();
+    }
+});
 
 const locationNameById = computed(() => {
     const m = {};
@@ -102,11 +138,18 @@ const captureDisabled = computed(() => {
             r.unit_price !== "" &&
             Number(r.unit_price) >= 0,
     );
-    return rows.length < 1;
+    if (rows.length < 1) return true;
+    if (paymentMethod.value === "card") {
+        if (!hasPermission("payment-card-types.list")) return true;
+        if (!selectedPaymentCardTypeId.value) return true;
+    }
+    return false;
 });
 
 function closeCaptureModal() {
     captureModalVisible.value = false;
+    selectedPaymentCardTypeId.value = null;
+    paymentMethod.value = "cash";
 }
 
 async function saveOfflineSale() {
@@ -117,6 +160,13 @@ async function saveOfflineSale() {
     if (!cashierUserId.value) {
         message.error("Not logged in.");
         return;
+    }
+
+    if (paymentMethod.value === "card") {
+        if (!selectedPaymentCardTypeId.value) {
+            message.error("Select a card payment type.");
+            return;
+        }
     }
 
     const items = lineItems.value
@@ -133,10 +183,22 @@ async function saveOfflineSale() {
             unit_price: Number(r.unit_price),
         }));
 
+    const selectedType = cardTypes.value.find(
+        (t) => t.id === selectedPaymentCardTypeId.value,
+    );
+
     const clientMutationId = uuidv4();
     const payload = {
         items,
         payment_method: paymentMethod.value,
+        payment_card_type_id:
+            paymentMethod.value === "card" && selectedPaymentCardTypeId.value
+                ? Number(selectedPaymentCardTypeId.value)
+                : null,
+        payment_card_type_name:
+            paymentMethod.value === "card" && selectedType?.name
+                ? selectedType.name
+                : null,
         location_id: selectedLocationId.value,
         cashier_user_id: cashierUserId.value,
         notes: notes.value || null,
@@ -156,6 +218,8 @@ async function saveOfflineSale() {
     lineItems.value = [{ product_id: "", quantity: 1, unit_price: "" }];
     notes.value = "";
     customerId.value = "";
+    selectedPaymentCardTypeId.value = null;
+    paymentMethod.value = "cash";
     captureModalVisible.value = false;
     await loadQueue();
 }
@@ -172,6 +236,18 @@ function lineTotals(items) {
         (s, it) => s + Number(it.unit_price) * Number(it.quantity),
         0,
     );
+}
+
+function paymentDisplay(record) {
+    const method = record.payload?.payment_method || "—";
+    const name = record.payload?.payment_card_type_name;
+    if (method === "card" && name) {
+        return `card · ${name}`;
+    }
+    if (method === "card" && record.payload?.payment_card_type_id) {
+        return `card · #${record.payload.payment_card_type_id}`;
+    }
+    return method;
 }
 
 function lineSummary(record) {
@@ -193,7 +269,7 @@ const columns = [
     { title: "Location", key: "location", width: 140 },
     { title: "Lines", key: "lines", ellipsis: true },
     { title: "Total", key: "total", align: "right", width: 100 },
-    { title: "Payment", key: "payment", width: 100 },
+    { title: "Payment", key: "payment", width: 160 },
     { title: "Status", key: "status", width: 120 },
     { title: "Actions", key: "actions", width: 200, fixed: "right" },
 ];
@@ -281,6 +357,7 @@ async function updateOnline() {
     const wasOffline = !isOnline.value;
     isOnline.value = navigator.onLine;
     if (isOnline.value && wasOffline) {
+        await fetchCardTypes();
         const didSync = await flushAcceptedOnReconnect();
         if (didSync) {
             message.success("Back online — syncing accepted sales.");
@@ -296,6 +373,7 @@ onMounted(async () => {
     await loadQueue();
     if (navigator.onLine) {
         await flushAcceptedOnReconnect();
+        await fetchCardTypes();
     }
 });
 
@@ -471,7 +549,7 @@ function tableRowClassName(_record, index) {
                             {{ formatMoney(lineTotals(record.payload?.items)) }}
                         </template>
                         <template v-else-if="column.key === 'payment'">
-                            {{ record.payload?.payment_method || "—" }}
+                            {{ paymentDisplay(record) }}
                         </template>
                         <template v-else-if="column.key === 'status'">
                             <div>
@@ -555,10 +633,53 @@ function tableRowClassName(_record, index) {
                     >
                     <a-select v-model:value="paymentMethod" class="w-full">
                         <a-select-option value="cash">Cash</a-select-option>
-                        <a-select-option value="card">Card</a-select-option>
+                        <a-select-option
+                            value="card"
+                            :disabled="
+                                !hasPermission('payment-card-types.list') ||
+                                (!loadingCardTypes && cardTypes.length === 0)
+                            "
+                        >
+                            Card
+                        </a-select-option>
                         <a-select-option value="e-wallet"
                             >E-wallet</a-select-option
                         >
+                    </a-select>
+                    <p
+                        v-if="
+                            paymentMethod === 'card' &&
+                            !loadingCardTypes &&
+                            cardTypes.length === 0 &&
+                            hasPermission('payment-card-types.list')
+                        "
+                        class="mt-1 text-xs text-amber-700"
+                    >
+                        No card types configured. Add types in Payment wallet
+                        while online.
+                    </p>
+                </div>
+                <div
+                    v-if="paymentMethod === 'card'"
+                    class="md:col-span-2"
+                >
+                    <label class="mb-1 block text-sm text-gray-600"
+                        >Card payment type</label
+                    >
+                    <a-select
+                        v-model:value="selectedPaymentCardTypeId"
+                        class="w-full"
+                        placeholder="Select type"
+                        :loading="loadingCardTypes"
+                        allow-clear
+                    >
+                        <a-select-option
+                            v-for="t in cardTypes"
+                            :key="t.id"
+                            :value="t.id"
+                        >
+                            {{ t.name }}
+                        </a-select-option>
                     </a-select>
                 </div>
                 <div class="md:col-span-2">

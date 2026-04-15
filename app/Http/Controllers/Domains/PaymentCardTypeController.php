@@ -21,7 +21,35 @@ class PaymentCardTypeController extends Controller
 
         return Inertia::render('Wallet/Index', [
             'cardTypes' => $types,
+            'walletCashTotals' => $this->paidSalesTotalsByPaymentMethod($domain, 'cash'),
+            'walletCreditTotals' => $this->paidSalesTotalsByPaymentMethod($domain, 'credit'),
         ]);
+    }
+
+    /**
+     * Today / yesterday sums for paid sales by payment method (domain-wide), same date rules as money().
+     *
+     * @return array{today_total: float, yesterday_total: float}
+     */
+    private function paidSalesTotalsByPaymentMethod(Domain $domain, string $paymentMethod): array
+    {
+        $base = Sale::query()
+            ->where('domain', $domain->name_slug)
+            ->where('payment_status', 'paid')
+            ->where('payment_method', $paymentMethod);
+
+        $todayTotal = (clone $base)
+            ->whereDate('transaction_date', now()->toDateString())
+            ->sum('grand_total');
+
+        $yesterdayTotal = (clone $base)
+            ->whereDate('transaction_date', now()->subDay()->toDateString())
+            ->sum('grand_total');
+
+        return [
+            'today_total' => (float) $todayTotal,
+            'yesterday_total' => (float) $yesterdayTotal,
+        ];
     }
 
     /**
