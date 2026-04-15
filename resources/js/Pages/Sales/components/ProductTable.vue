@@ -80,14 +80,7 @@ const formattedTotal = (price) => {
             size="large"
         />
         <div
-            v-else-if="!salesCartIsOnline"
-            class="flex items-center justify-center h-full min-h-[200px] text-center text-gray-500 text-sm px-6"
-        >
-            Product grid is unavailable offline. Use a barcode scanner for
-            products you have already loaded or added while online.
-        </div>
-        <div
-            v-else
+            v-else-if="products.length"
             class="grid [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))] gap-4 mt-2"
         >
             <div
@@ -120,7 +113,14 @@ const formattedTotal = (price) => {
             </div>
         </div>
         <div
-            v-if="salesCartIsOnline && products.length == 0"
+            v-else-if="!salesCartIsOnline"
+            class="flex items-center justify-center h-full min-h-[200px] text-center text-gray-500 text-sm px-6"
+        >
+            No offline catalog loaded. While online, use &quot;Sync for offline&quot;
+            on Sales, or add items via barcode from a prior session.
+        </div>
+        <div
+            v-else
             class="text-[40px] text-nowrap uppercase font-bold text-gray-200 -rotate-45 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
         >
             No Item Found

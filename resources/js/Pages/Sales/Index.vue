@@ -16,6 +16,8 @@ import {
     putOfflineCart,
     clearOfflineCart,
     addPendingSale,
+    getOfflineCatalogSnapshot,
+    putOfflineCatalogSnapshot,
 } from "@/offline/db.js";
 
 import ContentHeader from "@/Components/ContentHeader.vue";
@@ -32,6 +34,7 @@ import {
     CloseOutlined,
     PlusSquareOutlined,
     MinusSquareOutlined,
+    CloudDownloadOutlined,
 } from "@ant-design/icons-vue";
 import { message } from "ant-design-vue";
 
@@ -69,7 +72,178 @@ const orderDiscountAmount = ref(0);
 const orderDiscountId = ref("");
 const selectedCustomer = ref(null);
 
+const offlineCatalogSyncedAt = ref(null);
+const offlineCustomersCache = ref([]);
+const syncingOffline = ref(false);
+
 const MAX_OFFLINE_PRODUCT_LOOKUP = 500;
+
+function discountOptionsFromSnapshot(snap) {
+    if (
+        !snap ||
+        (!snap.regular_discounts?.length &&
+            !snap.product_discounts?.length &&
+            !snap.mandatory_discounts?.length &&
+            !snap.success)
+    ) {
+        return {
+            product_discount_options: [],
+            promotional_discount_options: [],
+            mandatory_discount_options: [],
+        };
+    }
+    const mapRows = (rows) =>
+        (rows || []).map((d) => ({
+            id: d.id,
+            name: d.name,
+            type: d.type,
+            value: d.value,
+            ...d,
+        }));
+    return {
+        product_discount_options: mapRows(snap.product_discounts),
+        promotional_discount_options: mapRows(snap.regular_discounts),
+        mandatory_discount_options: mapRows(snap.mandatory_discounts),
+    };
+}
+
+async function loadOfflineCatalogMetadata() {
+    if (!domainSlug.value) return;
+    const row = await getOfflineCatalogSnapshot(
+        domainSlug.value,
+        activeLocationId.value,
+    );
+    offlineCatalogSyncedAt.value = row?.synced_at ?? null;
+}
+
+async function getOfflineScanProductPool() {
+    const poolMap = new Map(
+        (offlineProductLookup.value || []).map((p) => [p.id, p]),
+    );
+    const row = await getOfflineCatalogSnapshot(
+        domainSlug.value,
+        activeLocationId.value,
+    );
+    for (const p of row?.products || []) {
+        if (!poolMap.has(p.id)) {
+            poolMap.set(p.id, {
+                id: p.id,
+                name: p.name ?? "",
+                price: parseFloat(p.price) || 0,
+                barcode: p.barcode ?? "",
+                code: p.code ?? "",
+            });
+        }
+    }
+    return [...poolMap.values()];
+}
+
+async function syncOfflineDataForSales() {
+    if (!salesCartIsOnline.value) {
+        message.warning("Connect to the internet to sync offline data.");
+        return;
+    }
+    if (!domainSlug.value || !activeLocationId.value) {
+        message.error("Select an active location first.");
+        return;
+    }
+    syncingOffline.value = true;
+    let hideLoading = message.loading("Downloading data for offline use…", 0);
+    try {
+        const allProducts = [];
+        let catalogPage = 1;
+        const perPage = 200;
+        let lastPage = 1;
+        let catalogMetaKnown = false;
+        const catalogUrl = getRoute("sales.offline-catalog");
+        if (!catalogUrl || catalogUrl === "#") {
+            throw new Error("Could not resolve offline catalog route.");
+        }
+        do {
+            hideLoading();
+            const progressText = catalogMetaKnown
+                ? `page ${catalogPage} of ${lastPage}`
+                : `page ${catalogPage}…`;
+            hideLoading = message.loading(
+                `Downloading catalog: ${progressText}`,
+                0,
+            );
+            const res = await axios.get(catalogUrl, {
+                params: {
+                    page: catalogPage,
+                    per_page: perPage,
+                    location_id: activeLocationId.value,
+                },
+            });
+            const batch = res.data?.data ?? [];
+            const meta = res.data?.meta;
+            allProducts.push(...batch);
+            lastPage = meta?.last_page ?? 1;
+            catalogMetaKnown = true;
+            catalogPage += 1;
+        } while (catalogPage <= lastPage);
+
+        let discount_snapshot = null;
+        try {
+            const d = await axios.get("/api/sales/discounts/current");
+            if (d.data?.success) {
+                discount_snapshot = {
+                    regular_discounts: d.data.regular_discounts ?? [],
+                    product_discounts: d.data.product_discounts ?? [],
+                    mandatory_discounts: d.data.mandatory_discounts ?? [],
+                };
+            }
+        } catch {
+            /* optional */
+        }
+
+        let customers = [];
+        try {
+            const c = await axios.get("/api/customers", {
+                params: { per_page: 100, page: 1 },
+            });
+            customers = c.data?.data ?? [];
+        } catch {
+            /* optional */
+        }
+
+        hideLoading();
+        hideLoading = message.loading("Saving catalog to this device…", 0);
+
+        await putOfflineCatalogSnapshot({
+            domain_slug: domainSlug.value,
+            location_id: activeLocationId.value,
+            products: allProducts,
+            discount_snapshot,
+            customers,
+        });
+
+        offlineCatalogSyncedAt.value = new Date().toISOString();
+        mergeProductLookup(allProducts);
+        message.success(
+            `Saved for offline: ${allProducts.length} products, ${customers.length} customers (sample), discount rules snapshot.`,
+        );
+    } catch (e) {
+        console.error(e);
+        message.error(
+            e.response?.data?.message ||
+                e.message ||
+                "Failed to sync offline data.",
+        );
+    } finally {
+        hideLoading();
+        syncingOffline.value = false;
+    }
+}
+
+const lastOfflineSyncLabel = computed(() => {
+    if (!offlineCatalogSyncedAt.value) return null;
+    try {
+        return new Date(offlineCatalogSyncedAt.value).toLocaleString();
+    } catch {
+        return offlineCatalogSyncedAt.value;
+    }
+});
 
 function mergeProductLookup(entries) {
     const byId = new Map(
@@ -230,7 +404,7 @@ const handleScanAndAdd = async () => {
     try {
         if (!salesCartIsOnline.value) {
             const q = String(search.value || "").trim();
-            const pool = offlineProductLookup.value || [];
+            const pool = await getOfflineScanProductPool();
             const exactMatch = pool.find(
                 (p) => p.code === q || p.barcode === q,
             );
@@ -246,7 +420,7 @@ const handleScanAndAdd = async () => {
                 search.value = "";
             } else {
                 message.error(
-                    `Product not found offline. Scan requires a cached product (add from catalog while online, or complete sale from items already in cart).`,
+                    "Product not found in your offline catalog. While online, use “Sync for offline” on Sales to download products, then try again.",
                 );
             }
             return;
@@ -346,6 +520,30 @@ const discountOptions = ref({
     promotional_discount_options: [],
     mandatory_discount_options: [],
 });
+
+async function applyOfflineCatalogForOfflineMode() {
+    if (!domainSlug.value) return;
+    const row = await getOfflineCatalogSnapshot(
+        domainSlug.value,
+        activeLocationId.value,
+    );
+    if (!row) {
+        offlineCustomersCache.value = [];
+        return;
+    }
+    offlineCatalogSyncedAt.value = row.synced_at;
+    offlineCustomersCache.value = row.customers || [];
+    mergeProductLookup(row.products || []);
+    if (row.discount_snapshot) {
+        discountOptions.value = discountOptionsFromSnapshot({
+            success: true,
+            regular_discounts: row.discount_snapshot.regular_discounts,
+            product_discounts: row.discount_snapshot.product_discounts,
+            mandatory_discounts: row.discount_snapshot.mandatory_discounts,
+        });
+    }
+    await getProducts();
+}
 
 // Direct API functions
 const loadCurrentPendingSale = async () => {
@@ -711,9 +909,11 @@ onMounted(async () => {
         if (salesCartIsOnline.value) {
             await getProducts();
             await loadCurrentPendingSale();
+            await loadOfflineCatalogMetadata();
         } else {
             isLoadingCart.value = true;
             await hydrateFromOfflineCart();
+            await applyOfflineCatalogForOfflineMode();
             isLoadingCart.value = false;
         }
     } catch (error) {
@@ -731,12 +931,34 @@ onBeforeUnmount(() => {
 });
 
 const getProducts = async () => {
-    if (!salesCartIsOnline.value) {
-        loading.value = false;
-        return;
-    }
     loading.value = true;
     try {
+        if (!salesCartIsOnline.value) {
+            const row = await getOfflineCatalogSnapshot(
+                domainSlug.value,
+                activeLocationId.value,
+            );
+            const list = row?.products || [];
+            let filtered = [...list];
+            if (category.value) {
+                filtered = filtered.filter(
+                    (p) => p.category?.name === category.value,
+                );
+            }
+            const q = String(search.value || "").trim().toLowerCase();
+            if (q) {
+                filtered = filtered.filter(
+                    (p) =>
+                        (p.name && p.name.toLowerCase().includes(q)) ||
+                        String(p.barcode || "")
+                            .toLowerCase()
+                            .includes(q) ||
+                        String(p.code || "").toLowerCase().includes(q),
+                );
+            }
+            products.value = filtered.slice(0, 500);
+            return;
+        }
         const items = await axios.get(
             getRoute("sales.products", {
                 category: category.value,
@@ -770,7 +992,7 @@ const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
 watchDebounced(
     search,
     () => {
-        if (salesCartIsOnline.value) getProducts();
+        getProducts();
     },
     { debounce: 300 },
 );
@@ -820,13 +1042,27 @@ watch(
                     v-model:value="search"
                     placeholder="Search Product"
                     class="min-w-[100px] max-w-[300px]"
-                    :disabled="!salesCartIsOnline"
                 />
-                <RefreshButton
-                    :loading="loading"
-                    :disabled="!salesCartIsOnline"
-                    @click="getProducts"
-                />
+                <RefreshButton :loading="loading" @click="getProducts" />
+                <a-button
+                    type="default"
+                    :loading="syncingOffline"
+                    :disabled="
+                        !salesCartIsOnline || !activeLocationId
+                    "
+                    @click="syncOfflineDataForSales"
+                >
+                    <template #icon>
+                        <CloudDownloadOutlined />
+                    </template>
+                    Sync for offline
+                </a-button>
+                <span
+                    v-if="lastOfflineSyncLabel"
+                    class="text-xs text-gray-500 whitespace-nowrap"
+                >
+                    Last offline sync: {{ lastOfflineSyncLabel }}
+                </span>
                 <FilterDropdown v-model="filters" :filters="filtersConfig" />
             </template>
             <template #activeFilters>
@@ -870,6 +1106,7 @@ watch(
                     :orderDiscountAmount="orderDiscountAmount"
                     :orderDiscountId="orderDiscountId"
                     :discountOptions="discountOptions"
+                    :offline-cached-customers="offlineCustomersCache"
                 />
             </template>
         </ContentLayoutV2>

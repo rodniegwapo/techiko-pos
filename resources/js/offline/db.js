@@ -16,6 +16,12 @@ class OfflineSalesDB extends Dexie {
                 "client_mutation_id, status, domain_slug, location_id, created_at",
             offline_cart: "key, domain_slug, user_id",
         });
+        this.version(3).stores({
+            pending_sales:
+                "client_mutation_id, status, domain_slug, location_id, created_at",
+            offline_cart: "key, domain_slug, user_id",
+            offline_catalog: "key, domain_slug, location_id",
+        });
     }
 }
 
@@ -177,4 +183,55 @@ export async function putOfflineCart(payload) {
 export async function clearOfflineCart(domainSlug, userId) {
     if (!domainSlug || userId == null) return;
     await offlineDb.offline_cart.delete(offlineCartKey(domainSlug, userId));
+}
+
+/** @param {string} domainSlug @param {number|string|null} locationId */
+export function offlineCatalogKey(domainSlug, locationId) {
+    return `${domainSlug}:${locationId ?? "none"}`;
+}
+
+/**
+ * @param {string} domainSlug
+ * @param {number|string|null} locationId
+ * @returns {Promise<object|undefined>}
+ */
+export async function getOfflineCatalogSnapshot(domainSlug, locationId) {
+    if (!domainSlug) return undefined;
+    return offlineDb.offline_catalog.get(
+        offlineCatalogKey(domainSlug, locationId),
+    );
+}
+
+/**
+ * @param {object} payload
+ * @param {string} payload.domain_slug
+ * @param {number|null} payload.location_id
+ * @param {Array<object>} [payload.products]
+ * @param {object|null} [payload.discount_snapshot]
+ * @param {Array<object>} [payload.customers]
+ */
+export async function putOfflineCatalogSnapshot(payload) {
+    const now = new Date().toISOString();
+    const loc = payload.location_id ?? null;
+    const record = {
+        key: offlineCatalogKey(payload.domain_slug, loc),
+        domain_slug: payload.domain_slug,
+        location_id: loc,
+        products: payload.products ?? [],
+        discount_snapshot: payload.discount_snapshot ?? null,
+        customers: payload.customers ?? [],
+        synced_at: now,
+    };
+    try {
+        await offlineDb.offline_catalog.put(record);
+    } catch (e) {
+        const name = e?.name || e?.inner?.name;
+        if (name === "QuotaExceededError") {
+            throw new Error(
+                "Browser storage is full. Free disk space or clear other sites’ offline data, then try Sync for offline again.",
+            );
+        }
+        throw e;
+    }
+    return record;
 }

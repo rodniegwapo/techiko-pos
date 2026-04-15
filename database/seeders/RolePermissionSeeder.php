@@ -2,11 +2,10 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 class RolePermissionSeeder extends Seeder
 {
@@ -50,6 +49,7 @@ class RolePermissionSeeder extends Seeder
             'sales.offline-transactions',
             'sales.offline-sync',
             'sales.products',
+            'sales.offline-catalog',
             'sales.drafts.store',
             'sales.items.void',
             'sales.payment.store',
@@ -268,12 +268,12 @@ class RolePermissionSeeder extends Seeder
             // If we already have a permission with this name, make it unique by adding route info
             $existingPermission = Permission::where('name', $uniqueName)->where('guard_name', 'web')->first();
             if ($existingPermission) {
-                $uniqueName = $uniqueName . ' (' . $permission . ')';
+                $uniqueName = $uniqueName.' ('.$permission.')';
             }
 
             Permission::firstOrCreate([
                 'route_name' => $permission, // Technical route: "users.index"
-                'guard_name' => 'web'
+                'guard_name' => 'web',
             ], [
                 'name' => $uniqueName, // "Users - View", "Products - Create"
                 'action' => $action, // Action: "index", "create", "edit"
@@ -322,6 +322,7 @@ class RolePermissionSeeder extends Seeder
             'sales.offline-transactions',
             'sales.offline-sync',
             'sales.products',
+            'sales.offline-catalog',
             'sales.drafts.store',
             'sales.items.void',
             'sales.payment.store',
@@ -499,6 +500,7 @@ class RolePermissionSeeder extends Seeder
             'sales.offline-transactions',
             'sales.offline-sync',
             'sales.products',
+            'sales.offline-catalog',
             'sales.drafts.store',
             'sales.items.void',
             'sales.payment.store',
@@ -643,6 +645,7 @@ class RolePermissionSeeder extends Seeder
             'sales.offline-transactions',
             'sales.offline-sync',
             'sales.products',
+            'sales.offline-catalog',
             'sales.drafts.store',
             'sales.items.void',
             'sales.payment.store',
@@ -759,6 +762,7 @@ class RolePermissionSeeder extends Seeder
             'sales.offline-transactions',
             'sales.offline-sync',
             'sales.products',
+            'sales.offline-catalog',
             'sales.drafts.store',
             'sales.items.void',
             'sales.payment.store',
