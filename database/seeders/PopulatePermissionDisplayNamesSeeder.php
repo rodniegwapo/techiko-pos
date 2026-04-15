@@ -22,6 +22,7 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
             'users.store' => 'Create User',
             'users.edit' => 'Edit User',
             'users.update' => 'Update User',
+            'users.pin.update' => 'Set User PIN',
             'users.show' => 'View User',
             'users.destroy' => 'Delete User',
             'users.hierarchy' => 'View User Hierarchy',
