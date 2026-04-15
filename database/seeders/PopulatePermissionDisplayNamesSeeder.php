@@ -127,6 +127,7 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
             'payment-card-types.store' => 'Create Card Payment Type',
             'payment-card-types.update' => 'Update Card Payment Type',
             'payment-card-types.destroy' => 'Delete Card Payment Type',
+            'payment-card-types.money' => 'View Card Payment Money Details',
 
             // Customers
             'customers.index' => 'View Customers',
