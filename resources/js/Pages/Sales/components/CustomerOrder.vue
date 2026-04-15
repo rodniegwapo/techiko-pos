@@ -1,6 +1,6 @@
 <script setup>
-import VerticalForm from "@/Components/Forms/VerticalForm.vue";
 import PrimaryButton from "@/Components/PrimaryButton.vue";
+import VoidProductModal from "./VoidProductModal.vue";
 import ApplyProductDiscountModal from "./ApplyProductDiscountModal.vue";
 import ApplyOrderDiscountModal from "./ApplyOrderDiscountModal.vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
@@ -240,7 +240,7 @@ const onSubtractClick = async (product) => {
     }
     optimisticQuantities.value[product.id] = Math.max(
         0,
-        optimisticQuantities.value[product.id] - 1
+        optimisticQuantities.value[product.id] - 1,
     );
 
     try {
@@ -348,7 +348,7 @@ const finalizeOrder = async () => {
 
     try {
         const response = await axios.post(
-            getRoute("payment.store", { sale: orderId.value })
+            getRoute("payment.store", { sale: orderId.value }),
         );
         notification.success({
             message: "Order finalized successfully",
@@ -365,41 +365,38 @@ const finalizeOrder = async () => {
 
 const { formattedPercent, formattedTotal } = useHelpers();
 
-const formFields = [
-    { key: "amount", label: "Amount", type: "text", disabled: true },
-    { key: "sale_item", label: "Item", type: "text", disabled: true },
-    { key: "pin_code", label: "Enter Pin", type: "password" },
-    {
-        key: "reason",
-        label: "Reason",
-        type: "textarea",
-    },
-];
-
 const openvoidModal = ref(false);
+const voidLine = ref(null);
+
+watch(openvoidModal, (open) => {
+    if (!open) {
+        voidLine.value = null;
+    }
+});
 
 const showVoidItem = async (product) => {
     errors.value = {};
-    openvoidModal.value = true;
-    formData.value = {
+    voidLine.value = {
         ...product,
         sale_item: product.name,
         amount: product.price,
         product_id: product.id,
     };
+    openvoidModal.value = true;
 };
 
 const isLoadingVoid = ref(false);
-const handleSubmitVoid = async () => {
+const handleSubmitVoid = async ({ pin_code, reason }) => {
+    if (!voidLine.value) return;
     try {
         isLoadingVoid.value = true;
         if (!salesCartIsOnline.value) {
             emit("offline-cart-remove", {
-                id: formData.value.product_id,
-                name: formData.value.sale_item,
+                id: voidLine.value.product_id,
+                name: voidLine.value.sale_item,
             });
             openvoidModal.value = false;
-            clearForm();
+            voidLine.value = null;
             notification.success({
                 message: "Removed",
                 description: "Item removed from offline cart.",
@@ -407,33 +404,28 @@ const handleSubmitVoid = async () => {
             return;
         }
         await axios.post(
-            route("sales.items.void", {
+            getRoute("sales.items.void", {
                 sale: orderId.value,
             }),
-            formData.value
+            {
+                product_id: voidLine.value.product_id,
+                pin_code,
+                reason,
+            },
         );
-        removeOrder(formData.value);
+        removeOrder({ id: voidLine.value.product_id });
         openvoidModal.value = false;
-        clearForm();
+        voidLine.value = null;
+        errors.value = {};
         notification["success"]({
             message: "Success",
             description: "The item was successfully voided.",
         });
-    } catch ({ response }) {
-        errors.value = response?.data?.errors;
+    } catch (error) {
+        errors.value = error?.response?.data?.errors ?? {};
     } finally {
         isLoadingVoid.value = false;
     }
-};
-
-const clearForm = () => {
-    formData.value = {
-        amount: "",
-        sale_item: "",
-        pin_code: "",
-        reason: "",
-        product_id: null,
-    };
 };
 
 const currentProduct = ref({});
@@ -471,7 +463,7 @@ watch(
             try {
                 creditInfo.value = await checkCreditAvailability(
                     customer.id,
-                    0
+                    0,
                 );
             } catch (error) {
                 console.error("Error loading credit info:", error);
@@ -481,7 +473,7 @@ watch(
             creditInfo.value = null;
         }
     },
-    { immediate: true }
+    { immediate: true },
 );
 const customerSearchQuery = ref("");
 const customerOptions = ref([]);
@@ -624,7 +616,7 @@ const handleCustomerSelect = (customerId) => {
     console.log("Customer selected:", customerId); // Debug log
 
     const option = customerOptions.value.find(
-        (opt) => opt.value === customerId
+        (opt) => opt.value === customerId,
     );
     if (option) {
         selectedCustomer.value = option.customer;
@@ -686,7 +678,7 @@ const handleAddCustomer = async () => {
     try {
         const response = await axios.post(
             "/api/customers",
-            newCustomerForm.value
+            newCustomerForm.value,
         );
 
         selectedCustomer.value = response.data.customer;
@@ -741,7 +733,7 @@ watch(
         selectedOrder.value = null;
         tempQuantity.value = 0;
     },
-    { deep: true }
+    { deep: true },
 );
 
 // Watch for customer changes and emit to parent
@@ -750,7 +742,7 @@ watch(
     (newCustomer) => {
         emit("customerChanged", newCustomer);
     },
-    { immediate: true }
+    { immediate: true },
 );
 
 // Export customer data for parent component
@@ -906,7 +898,7 @@ defineExpose({
                                     {
                                         minimumFractionDigits: 2,
                                         maximumFractionDigits: 2,
-                                    }
+                                    },
                                 )
                             }}
                         </span>
@@ -920,7 +912,7 @@ defineExpose({
                                     {
                                         minimumFractionDigits: 2,
                                         maximumFractionDigits: 2,
-                                    }
+                                    },
                                 )
                             }}
                         </span>
@@ -947,7 +939,7 @@ defineExpose({
                                     {
                                         minimumFractionDigits: 2,
                                         maximumFractionDigits: 2,
-                                    }
+                                    },
                                 )
                             }}
                         </span>
@@ -1141,12 +1133,12 @@ defineExpose({
                                         Disc:
                                         {{
                                             parseFloat(
-                                                order.discounts[0].value
+                                                order.discounts[0].value,
                                             )
                                         }}% -
                                         {{
                                             formattedTotal(
-                                                parseFloat(order.discount) || 0
+                                                parseFloat(order.discount) || 0,
                                             )
                                         }}
                                     </div>
@@ -1160,13 +1152,13 @@ defineExpose({
                                     >
                                         Disc: ₱{{
                                             parseFloat(
-                                                order.discounts[0].value
+                                                order.discounts[0].value,
                                             ).toFixed(2)
                                         }}
                                         -
                                         {{
                                             formattedTotal(
-                                                parseFloat(order.discount) || 0
+                                                parseFloat(order.discount) || 0,
                                             )
                                         }}
                                     </div>
@@ -1177,7 +1169,7 @@ defineExpose({
                                         Disc: -
                                         {{
                                             formattedTotal(
-                                                parseFloat(order.discount) || 0
+                                                parseFloat(order.discount) || 0,
                                             )
                                         }}
                                     </div>
@@ -1195,7 +1187,7 @@ defineExpose({
                                 >
                                     {{
                                         formattedTotal(
-                                            parseFloat(order.subtotal) || 0
+                                            parseFloat(order.subtotal) || 0,
                                         )
                                     }}
                                 </div>
@@ -1207,7 +1199,7 @@ defineExpose({
                                         formattedTotal(
                                             (parseFloat(order.price) || 0) *
                                                 (parseFloat(order.quantity) ||
-                                                    0)
+                                                    0),
                                         )
                                     }}
                                 </div>
@@ -1219,26 +1211,14 @@ defineExpose({
         </Transition>
     </div>
 
-    <a-modal
+    <void-product-modal
         v-model:visible="openvoidModal"
-        title="Void Product"
-        @cancel="openvoidModal = false"
-        :maskClosable="false"
-        width="450px"
-    >
-        <vertical-form
-            v-model="formData"
-            :fields="formFields"
-            :errors="errors"
-        />
-        <template #footer>
-            <a-button @click="openvoidModal = false">Cancel</a-button>
-
-            <primary-button :loading="loading" @click="handleSubmitVoid"
-                >Submit
-            </primary-button>
-        </template>
-    </a-modal>
+        :submit-loading="isLoadingVoid"
+        :amount="voidLine?.amount"
+        :item-label="voidLine?.sale_item"
+        :errors="errors"
+        @submit="handleSubmitVoid"
+    />
 
     <apply-product-discount-modal
         :openModal="openApplyDiscountModal"
@@ -1355,7 +1335,7 @@ defineExpose({
                                 {
                                     minimumFractionDigits: 2,
                                     maximumFractionDigits: 2,
-                                }
+                                },
                             )
                         }}
                     </p>
@@ -1368,7 +1348,7 @@ defineExpose({
                                     {
                                         minimumFractionDigits: 2,
                                         maximumFractionDigits: 2,
-                                    }
+                                    },
                                 )
                             }}
                         </span>
@@ -1395,7 +1375,7 @@ defineExpose({
                                     {
                                         minimumFractionDigits: 2,
                                         maximumFractionDigits: 2,
-                                    }
+                                    },
                                 )
                             }}
                         </span>
