@@ -750,19 +750,21 @@ async function completeOfflineSale() {
         return;
     }
     if (!activeLocationId.value) {
-        message.error("No active location. Select a store location, then try again.");
+        message.error(
+            "No active location. Select a store location, then try again.",
+        );
         return;
     }
-    const lines = ordersToLineItems(orders.value).filter(
-        (l) => l.quantity > 0,
-    );
+    const lines = ordersToLineItems(orders.value).filter((l) => l.quantity > 0);
     if (!lines.length) {
         message.error("Add at least one line item.");
         return;
     }
     let payment = offlinePaymentMethod.value || "cash";
     if (payment === "credit") {
-        message.error("Credit payments cannot be saved offline. Choose cash or card.");
+        message.error(
+            "Credit payments cannot be saved offline. Choose cash or card.",
+        );
         return;
     }
     if (payment !== "cash" && payment !== "card") {
@@ -945,7 +947,9 @@ const getProducts = async () => {
                     (p) => p.category?.name === category.value,
                 );
             }
-            const q = String(search.value || "").trim().toLowerCase();
+            const q = String(search.value || "")
+                .trim()
+                .toLowerCase();
             if (q) {
                 filtered = filtered.filter(
                     (p) =>
@@ -953,7 +957,9 @@ const getProducts = async () => {
                         String(p.barcode || "")
                             .toLowerCase()
                             .includes(q) ||
-                        String(p.code || "").toLowerCase().includes(q),
+                        String(p.code || "")
+                            .toLowerCase()
+                            .includes(q),
                 );
             }
             products.value = filtered.slice(0, 500);
@@ -1037,6 +1043,11 @@ watch(
         <ContentHeader title="Sales" />
 
         <ContentLayoutV2 title="Create Transaction">
+            <template #offline-info>
+                <div>
+                    <span> Last offline sync: {{ lastOfflineSyncLabel }} </span>
+                </div>
+            </template>
             <template #filters>
                 <a-input-search
                     v-model:value="search"
@@ -1047,9 +1058,7 @@ watch(
                 <a-button
                     type="default"
                     :loading="syncingOffline"
-                    :disabled="
-                        !salesCartIsOnline || !activeLocationId
-                    "
+                    :disabled="!salesCartIsOnline || !activeLocationId"
                     @click="syncOfflineDataForSales"
                 >
                     <template #icon>
@@ -1057,12 +1066,7 @@ watch(
                     </template>
                     Sync for offline
                 </a-button>
-                <span
-                    v-if="lastOfflineSyncLabel"
-                    class="text-xs text-gray-500 whitespace-nowrap"
-                >
-                    Last offline sync: {{ lastOfflineSyncLabel }}
-                </span>
+
                 <FilterDropdown v-model="filters" :filters="filtersConfig" />
             </template>
             <template #activeFilters>
