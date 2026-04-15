@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed } from "vue";
 import { Head, router } from "@inertiajs/vue3";
-import { IconPlus, IconReportMoney } from "@tabler/icons-vue";
+import { IconPlus, IconReportMoney, IconEdit, IconTrash } from "@tabler/icons-vue";
 import axios from "axios";
 import { notification } from "ant-design-vue";
 
@@ -38,14 +38,12 @@ const rows = computed(() => props.cardTypes ?? []);
 const modalOpen = ref(false);
 const editing = ref(null);
 const formName = ref("");
-const formSortOrder = ref(0);
 const formActive = ref(true);
 const saving = ref(false);
 
 function openCreate() {
     editing.value = null;
     formName.value = "";
-    formSortOrder.value = 0;
     formActive.value = true;
     modalOpen.value = true;
 }
@@ -53,7 +51,6 @@ function openCreate() {
 function openEdit(row) {
     editing.value = row;
     formName.value = row.name;
-    formSortOrder.value = row.sort_order ?? 0;
     formActive.value = !!row.is_active;
     modalOpen.value = true;
 }
@@ -78,7 +75,6 @@ async function save() {
                 }),
                 {
                     name,
-                    sort_order: Number(formSortOrder.value) || 0,
                     is_active: formActive.value,
                 },
             );
@@ -86,7 +82,7 @@ async function save() {
         } else {
             await axios.post(getRoute("payment-card-types.store"), {
                 name,
-                sort_order: Number(formSortOrder.value) || 0,
+                sort_order: 0,
             });
             notification.success({ message: "Card type created." });
         }
@@ -278,24 +274,23 @@ function onMoneyTableChange(pag) {
                                 >
                                     <IconReportMoney size="20" class="mx-auto" />
                                 </IconTooltipButton>
-                                <a-button
+                                <IconTooltipButton
                                     v-if="hasPermission('payment-card-types.update')"
-                                    type="link"
-                                    size="small"
+                                    name="Edit card type"
+                                    hover="hover:bg-blue-500"
                                     @click="openEdit(record)"
                                 >
-                                    Edit
-                                </a-button>
-                                <a-button
+                                    <IconEdit size="20" class="mx-auto" />
+                                </IconTooltipButton>
+                                <IconTooltipButton
                                     v-if="hasPermission('payment-card-types.destroy')"
-                                    type="link"
-                                    danger
-                                    size="small"
+                                    name="Remove card type"
+                                    hover="hover:bg-red-600"
                                     :loading="deletingId === record.id"
                                     @click="remove(record)"
                                 >
-                                    Remove
-                                </a-button>
+                                    <IconTrash size="20" class="mx-auto" />
+                                </IconTooltipButton>
                             </a-space>
                         </template>
                     </template>
@@ -319,15 +314,6 @@ function onMoneyTableChange(pag) {
                         v-model:value="formName"
                         placeholder="e.g. BDO POS, Visa terminal"
                         maxlength="255"
-                    />
-                </div>
-                <div>
-                    <div class="text-sm text-gray-600 mb-1">Sort order</div>
-                    <a-input-number
-                        v-model:value="formSortOrder"
-                        :min="0"
-                        :max="65535"
-                        class="w-full"
                     />
                 </div>
                 <div
