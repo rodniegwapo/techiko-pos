@@ -1,6 +1,7 @@
 <script setup>
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import ApplyOrderDiscountModal from "./ApplyOrderDiscountModal.vue";
+import CardPaymentTypeModal from "./CardPaymentTypeModal.vue";
 import { IconDiscount, IconArrowRightToArc } from "@tabler/icons-vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
@@ -36,6 +37,9 @@ const props = defineProps({
     orderId: { type: [String, Number], default: null },
     discountOptions: { type: Object, default: () => ({}) },
     offlinePaymentMethod: { type: String, default: "cash" },
+    /** Cached card types from parent (refreshed while online) for offline modal */
+    cachedPaymentCardTypes: { type: Array, default: () => [] },
+    offlinePaymentCardTypeId: { type: [Number, String], default: null },
 });
 
 const {
@@ -53,6 +57,7 @@ const emit = defineEmits([
     "cart-updated",
     "save-offline-sale",
     "update:offlinePaymentMethod",
+    "update:offlinePaymentCardTypeId",
 ]);
 
 // Computed values
@@ -234,6 +239,39 @@ const customerChange = computed(() => {
 
 const proceedPaymentLoading = ref(false);
 
+const cardTypeModalOpen = ref(false);
+const selectedPaymentCardTypeId = ref(null);
+const paymentMethod = ref("cash");
+
+watch(
+    () => props.offlinePaymentCardTypeId,
+    (v) => {
+        if (v != null && v !== "") {
+            selectedPaymentCardTypeId.value = Number(v);
+        }
+    },
+    { immediate: true },
+);
+
+watch(selectedPaymentCardTypeId, (id) => {
+    if (!salesCartIsOnline.value) {
+        emit("update:offlinePaymentCardTypeId", id);
+    }
+});
+
+function onCardTypeModalConfirm(id) {
+    selectedPaymentCardTypeId.value = id;
+}
+
+function onCardTypeModalCancel() {
+    paymentMethod.value = "cash";
+    selectedPaymentCardTypeId.value = null;
+    if (!salesCartIsOnline.value) {
+        emit("update:offlinePaymentMethod", "cash");
+        emit("update:offlinePaymentCardTypeId", null);
+    }
+}
+
 const handleProceedPaymentConfirmation = () => {
     Modal.confirm({
         title: "Are you sure you would like to proceed?",
@@ -286,21 +324,35 @@ const handleProceedPayment = async () => {
             }
         }
 
+        if (paymentMethod.value === "card" && !selectedPaymentCardTypeId.value) {
+            notification.error({
+                message: "Card type required",
+                description: "Choose a card payment type before completing checkout.",
+            });
+            cardTypeModalOpen.value = true;
+            throw new Error("Card type required");
+        }
+
         // Single API call to process payment and loyalty together
+        const body = {
+            customer_id: props.selectedCustomer?.id || null,
+            sale_amount: totalAmount.value,
+            payment_method: paymentMethod.value,
+        };
+        if (paymentMethod.value === "card" && selectedPaymentCardTypeId.value) {
+            body.payment_card_type_id = selectedPaymentCardTypeId.value;
+        }
         const response = await axios.post(
             getRoute("sales.payment.store", {
                 sale: orderId.value,
             }),
-            {
-                // Include customer data for loyalty processing
-                customer_id: props.selectedCustomer?.id || null,
-                sale_amount: totalAmount.value,
-                payment_method: paymentMethod.value,
-            }
+            body,
         );
 
         // Clean up and finalize
         amountReceived.value = 0;
+        selectedPaymentCardTypeId.value = null;
+        paymentMethod.value = "cash";
 
         // Show success notification based on response
         const loyaltyResults = response.data.loyalty_results;
@@ -368,7 +420,6 @@ const disabledPaymentButtonColor = computed(() => {
     return "bg-green-700 border-green-700 hover:bg-green-600";
 });
 
-const paymentMethod = ref("cash");
 const creditInfo = ref(null);
 const checkingCredit = ref(false);
 
@@ -385,6 +436,11 @@ watch(
 watch(paymentMethod, (v) => {
     if (!salesCartIsOnline.value) {
         emit("update:offlinePaymentMethod", v);
+    }
+    if (v === "card") {
+        cardTypeModalOpen.value = true;
+    } else {
+        selectedPaymentCardTypeId.value = null;
     }
 });
 
@@ -577,6 +633,7 @@ const creditLimitSufficient = computed(() => {
                             (paymentMethod !== 'credit' && amountReceived <
                                 totalAmount - orderDiscountAmount) ||
                             (paymentMethod === 'credit' && !creditLimitSufficient) ||
+                            (paymentMethod === 'card' && !selectedPaymentCardTypeId) ||
                             orders.length == 0
                         "
                         :loading="proceedPaymentLoading"
@@ -587,7 +644,11 @@ const creditLimitSufficient = computed(() => {
                         v-else
                         type="primary"
                         class="w-[300px] bg-amber-700 border-amber-700 hover:bg-amber-600"
-                        :disabled="orders.length == 0"
+                        :disabled="
+                            orders.length == 0 ||
+                            (paymentMethod === 'card' &&
+                                !selectedPaymentCardTypeId)
+                        "
                         @click="emit('save-offline-sale')"
                     >
                         Save as offline sale
@@ -606,6 +667,15 @@ const creditLimitSufficient = computed(() => {
                 :discountOptions="discountOptions"
                 @close="openOrderDicountModal = false"
                 @discount-applied="emit('discount-applied')"
+            />
+
+            <card-payment-type-modal
+                v-model:open="cardTypeModalOpen"
+                :use-network="salesCartIsOnline"
+                :cached-types="cachedPaymentCardTypes"
+                :initial-selected-id="selectedPaymentCardTypeId"
+                @confirm="onCardTypeModalConfirm"
+                @cancel="onCardTypeModalCancel"
             />
         </div>
     </div>

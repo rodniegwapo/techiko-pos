@@ -154,6 +154,7 @@ export async function getOfflineCart(domainSlug, userId) {
  * @param {number|string} payload.user_id
  * @param {Array<{product_id:number,quantity:number,unit_price:number,name?:string}>} payload.line_items
  * @param {string} [payload.payment_method]
+ * @param {number|null} [payload.payment_card_type_id]
  * @param {number|null} [payload.location_id]
  * @param {number|null} [payload.customer_id]
  * @param {object|null} [payload.customer_snapshot]
@@ -168,6 +169,7 @@ export async function putOfflineCart(payload) {
         user_id: payload.user_id,
         line_items: payload.line_items ?? [],
         payment_method: payload.payment_method ?? "cash",
+        payment_card_type_id: payload.payment_card_type_id ?? null,
         location_id: payload.location_id ?? null,
         customer_id: payload.customer_id ?? null,
         customer_snapshot: payload.customer_snapshot ?? null,

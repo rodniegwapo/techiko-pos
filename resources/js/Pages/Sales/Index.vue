@@ -63,7 +63,19 @@ const activeLocationId = computed(() => page.props.currentLocation?.id);
 const cashierUserId = computed(() => page.props.auth?.user?.data?.id);
 
 const offlinePaymentMethod = ref("cash");
+const offlinePaymentCardTypeId = ref(null);
 const offlineProductLookup = ref([]);
+const cachedPaymentCardTypes = ref([]);
+
+async function refreshPaymentCardTypesCache() {
+    if (!domainSlug.value || !salesCartIsOnline.value) return;
+    try {
+        const { data } = await axios.get(getRoute("payment-card-types.list"));
+        cachedPaymentCardTypes.value = data?.data ?? [];
+    } catch (e) {
+        console.warn("Could not refresh card types cache:", e);
+    }
+}
 
 const orderId = ref(null);
 const orders = ref([]);
@@ -300,6 +312,10 @@ async function persistOfflineCartToDexie() {
         user_id: cashierUserId.value,
         line_items: ordersToLineItems(orders.value),
         payment_method: offlinePaymentMethod.value,
+        payment_card_type_id:
+            offlinePaymentMethod.value === "card"
+                ? offlinePaymentCardTypeId.value ?? null
+                : null,
         location_id: activeLocationId.value ?? null,
         customer_id: selectedCustomer.value?.id ?? null,
         customer_snapshot: selectedCustomer.value
@@ -323,6 +339,7 @@ async function hydrateFromOfflineCart() {
         orderDiscountId.value = "";
         currentSale.value = null;
         offlinePaymentMethod.value = "cash";
+        offlinePaymentCardTypeId.value = null;
         selectedCustomer.value = null;
         return;
     }
@@ -332,6 +349,7 @@ async function hydrateFromOfflineCart() {
     orderDiscountId.value = "";
     currentSale.value = null;
     offlinePaymentMethod.value = row.payment_method || "cash";
+    offlinePaymentCardTypeId.value = row.payment_card_type_id ?? null;
     if (row.product_lookup?.length) {
         offlineProductLookup.value = row.product_lookup;
     }
@@ -738,6 +756,13 @@ async function resumeServerCartMode() {
 
 function syncOfflinePaymentMethod(v) {
     offlinePaymentMethod.value = v;
+    if (v !== "card") {
+        offlinePaymentCardTypeId.value = null;
+    }
+}
+
+function syncOfflinePaymentCardTypeId(v) {
+    offlinePaymentCardTypeId.value = v;
 }
 
 async function completeOfflineSale() {
@@ -770,6 +795,12 @@ async function completeOfflineSale() {
     if (payment !== "cash" && payment !== "card") {
         payment = "cash";
     }
+    if (payment === "card" && !offlinePaymentCardTypeId.value) {
+        message.error(
+            "Select a card payment type (Pay in Card) before saving offline.",
+        );
+        return;
+    }
     const clientMutationId = uuidv4();
     const payload = {
         items: lines.map((l) => ({
@@ -778,6 +809,10 @@ async function completeOfflineSale() {
             unit_price: Number(l.unit_price),
         })),
         payment_method: payment,
+        payment_card_type_id:
+            payment === "card"
+                ? Number(offlinePaymentCardTypeId.value)
+                : null,
         location_id: activeLocationId.value,
         cashier_user_id: cashierUserId.value,
         notes: null,
@@ -803,6 +838,7 @@ async function completeOfflineSale() {
         orderDiscountAmount.value = 0;
         orderDiscountId.value = "";
         offlinePaymentMethod.value = "cash";
+        offlinePaymentCardTypeId.value = null;
         offlineProductLookup.value = [];
         forceOfflineCartMode.value = false;
         message.success("Saved locally. Review under Offline transactions.");
@@ -912,6 +948,7 @@ onMounted(async () => {
             await getProducts();
             await loadCurrentPendingSale();
             await loadOfflineCatalogMetadata();
+            await refreshPaymentCardTypesCache();
         } else {
             isLoadingCart.value = true;
             await hydrateFromOfflineCart();
@@ -1004,12 +1041,18 @@ watchDebounced(
 );
 
 watch(
-    [orders, selectedCustomer, offlinePaymentMethod],
+    [orders, selectedCustomer, offlinePaymentMethod, offlinePaymentCardTypeId],
     () => {
         if (!salesCartIsOnline.value) persistOfflineCartToDexie();
     },
     { deep: true },
 );
+
+watch(salesCartIsOnline, (online) => {
+    if (online) {
+        refreshPaymentCardTypesCache();
+    }
+});
 
 watch(
     isOnline,
@@ -1124,9 +1167,12 @@ watch(
                 :orderId="orderId"
                 :discountOptions="discountOptions"
                 :offline-payment-method="offlinePaymentMethod"
+                :cached-payment-card-types="cachedPaymentCardTypes"
+                :offline-payment-card-type-id="offlinePaymentCardTypeId"
                 @discount-applied="loadCurrentPendingSale"
                 @cart-updated="loadCurrentPendingSale"
                 @update:offline-payment-method="syncOfflinePaymentMethod"
+                @update:offline-payment-card-type-id="syncOfflinePaymentCardTypeId"
                 @save-offline-sale="completeOfflineSale"
             />
         </template>

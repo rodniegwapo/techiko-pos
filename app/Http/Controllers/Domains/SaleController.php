@@ -22,7 +22,9 @@ use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
@@ -140,6 +142,20 @@ class SaleController extends Controller
             'payment_method' => 'required|string|in:cash,card,e-wallet,credit',
         ]);
 
+        if (($validated['payment_method'] ?? '') === 'card') {
+            $validated = array_merge($validated, $request->validate([
+                'payment_card_type_id' => [
+                    'required',
+                    'integer',
+                    Rule::exists('payment_card_types', 'id')->where(function ($q) use ($domain) {
+                        $q->where('domain', $domain->name_slug)->where('is_active', true);
+                    }),
+                ],
+            ]));
+        } else {
+            $validated['payment_card_type_id'] = null;
+        }
+
         $loyaltyResults = null;
         $creditResults = null;
 
@@ -185,6 +201,7 @@ class SaleController extends Controller
                     $sale->update([
                         'grand_total' => $sale->total_amount,
                         'payment_method' => $validated['payment_method'],
+                        'payment_card_type_id' => $validated['payment_card_type_id'] ?? null,
                         'location_id' => $location->id,
                         'payment_status' => 'paid',
                     ]);
@@ -1051,6 +1068,7 @@ class SaleController extends Controller
             'sales.*.payload.notes' => ['nullable', 'string', 'max:2000'],
             'sales.*.payload.recorded_at' => ['nullable', 'date'],
             'sales.*.payload.cashier_user_id' => ['required', 'integer', 'exists:users,id'],
+            'sales.*.payload.payment_card_type_id' => ['nullable', 'integer'],
         ]);
 
         $results = [];
@@ -1132,6 +1150,18 @@ class SaleController extends Controller
             }
         }
 
+        if (($payload['payment_method'] ?? '') === 'card') {
+            Validator::make($payload, [
+                'payment_card_type_id' => [
+                    'required',
+                    'integer',
+                    Rule::exists('payment_card_types', 'id')->where(function ($q) use ($domain) {
+                        $q->where('domain', $domain->name_slug)->where('is_active', true);
+                    }),
+                ],
+            ])->validate();
+        }
+
         $stockItems = collect($payload['items'])->map(function (array $row) {
             return [
                 'product_id' => (int) $row['product_id'],
@@ -1196,6 +1226,9 @@ class SaleController extends Controller
                     'transaction_date' => $transactionDate,
                     'customer_id' => $payload['customer_id'] ?? null,
                     'payment_method' => $payload['payment_method'],
+                    'payment_card_type_id' => ($payload['payment_method'] ?? '') === 'card'
+                        ? ($payload['payment_card_type_id'] ?? null)
+                        : null,
                     'notes' => $payload['notes'] ?? null,
                     'tax_amount' => 0,
                 ]);
@@ -1216,6 +1249,9 @@ class SaleController extends Controller
                 $sale->update([
                     'grand_total' => $sale->total_amount,
                     'payment_method' => $payload['payment_method'],
+                    'payment_card_type_id' => ($payload['payment_method'] ?? '') === 'card'
+                        ? ($payload['payment_card_type_id'] ?? null)
+                        : null,
                     'location_id' => $location->id,
                     'payment_status' => 'paid',
                 ]);
