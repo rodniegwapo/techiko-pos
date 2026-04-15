@@ -1099,18 +1099,20 @@ defineExpose({
                             <div
                                 class="text-right flex flex-col py-1 items-end gap-1"
                             >
-                                <a-tooltip title="Remove item from order">
-                                    <a-button
-                                        type="text"
-                                        size="small"
-                                        @click.stop="showVoidItem(order)"
-                                        class="p-1 h-auto border-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                                    >
-                                        <template #icon>
-                                            <CloseOutlined />
-                                        </template>
-                                    </a-button>
-                                </a-tooltip>
+                                <template v-if="salesCartIsOnline">
+                                    <a-tooltip title="Remove item from order">
+                                        <a-button
+                                            type="text"
+                                            size="small"
+                                            @click.stop="showVoidItem(order)"
+                                            class="p-1 h-auto border-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                        >
+                                            <template #icon>
+                                                <CloseOutlined />
+                                            </template>
+                                        </a-button>
+                                    </a-tooltip>
+                                </template>
 
                                 <div
                                     class="text-xs"
