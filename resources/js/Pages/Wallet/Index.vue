@@ -1,7 +1,12 @@
 <script setup>
 import { ref, computed } from "vue";
 import { Head, router } from "@inertiajs/vue3";
-import { IconPlus, IconReportMoney, IconEdit, IconTrash } from "@tabler/icons-vue";
+import {
+    IconPlus,
+    IconReportMoney,
+    IconEdit,
+    IconTrash,
+} from "@tabler/icons-vue";
 import axios from "axios";
 import { notification } from "ant-design-vue";
 
@@ -30,6 +35,14 @@ const props = defineProps({
     cardTypes: {
         type: Array,
         default: () => [],
+    },
+    walletCashTotals: {
+        type: Object,
+        default: () => ({ today_total: 0, yesterday_total: 0 }),
+    },
+    walletCreditTotals: {
+        type: Object,
+        default: () => ({ today_total: 0, yesterday_total: 0 }),
     },
 });
 
@@ -87,11 +100,11 @@ async function save() {
             notification.success({ message: "Card type created." });
         }
         closeModal();
-        router.reload({ only: ["cardTypes"] });
+        router.reload({
+            only: ["cardTypes", "walletCashTotals", "walletCreditTotals"],
+        });
     } catch (e) {
-        const msg =
-            firstValidationMessage(e) ||
-            "Could not save card type.";
+        const msg = firstValidationMessage(e) || "Could not save card type.";
         notification.error({ message: msg });
     } finally {
         saving.value = false;
@@ -109,11 +122,11 @@ async function remove(row) {
             }),
         );
         notification.success({ message: "Done." });
-        router.reload({ only: ["cardTypes"] });
+        router.reload({
+            only: ["cardTypes", "walletCashTotals", "walletCreditTotals"],
+        });
     } catch (e) {
-        const msg =
-            firstValidationMessage(e) ||
-            "Could not remove card type.";
+        const msg = firstValidationMessage(e) || "Could not remove card type.";
         notification.error({ message: msg });
     } finally {
         deletingId.value = null;
@@ -143,7 +156,12 @@ const historyPagination = ref({
 });
 
 const moneyHistoryColumns = [
-    { title: "Invoice", dataIndex: "invoice_number", key: "invoice_number", width: 130 },
+    {
+        title: "Invoice",
+        dataIndex: "invoice_number",
+        key: "invoice_number",
+        width: 130,
+    },
     { title: "Date", key: "date", width: 200 },
     { title: "Time", key: "time", width: 120 },
     {
@@ -202,8 +220,7 @@ async function loadMoneyDetails(page = 1) {
     } catch (e) {
         notification.error({
             message:
-                firstValidationMessage(e) ||
-                "Could not load money details.",
+                firstValidationMessage(e) || "Could not load money details.",
         });
     } finally {
         moneyLoading.value = false;
@@ -235,6 +252,87 @@ function onMoneyTableChange(pag) {
     <AuthenticatedLayout>
         <Head title="Payment wallet" />
         <ContentHeader class="mb-8" title="Payment wallet" />
+
+        <div class="mb-6 grid max-w-7xl grid-cols-1 gap-4 sm:grid-cols-2">
+            <div
+                class="rounded-lg border border-gray-200 bg-white px-4 py-4 shadow-sm"
+            >
+                <div class="text-base font-semibold text-gray-900">
+                    Cash on hand
+                </div>
+                <div class="mb-3 text-xs text-gray-500">
+                    Paid cash sales (by transaction date)
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div
+                        class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2"
+                    >
+                        <div class="text-xs uppercase text-gray-500">Today</div>
+                        <div class="text-lg font-semibold text-green-700">
+                            {{
+                                formattedTotal(
+                                    Number(walletCashTotals.today_total) || 0,
+                                )
+                            }}
+                        </div>
+                    </div>
+                    <div
+                        class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2"
+                    >
+                        <div class="text-xs uppercase text-gray-500">
+                            Yesterday
+                        </div>
+                        <div class="text-lg font-semibold text-gray-800">
+                            {{
+                                formattedTotal(
+                                    Number(walletCashTotals.yesterday_total) ||
+                                        0,
+                                )
+                            }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div
+                class="rounded-lg border border-gray-200 bg-white px-4 py-4 shadow-sm"
+            >
+                <div class="text-base font-semibold text-gray-900">Credit</div>
+                <div class="mb-3 text-xs text-gray-500">
+                    Paid credit sales (charge to account)
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div
+                        class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2"
+                    >
+                        <div class="text-xs uppercase text-gray-500">Today</div>
+                        <div class="text-lg font-semibold text-green-700">
+                            {{
+                                formattedTotal(
+                                    Number(walletCreditTotals.today_total) || 0,
+                                )
+                            }}
+                        </div>
+                    </div>
+                    <div
+                        class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2"
+                    >
+                        <div class="text-xs uppercase text-gray-500">
+                            Yesterday
+                        </div>
+                        <div class="text-lg font-semibold text-gray-800">
+                            {{
+                                formattedTotal(
+                                    Number(
+                                        walletCreditTotals.yesterday_total,
+                                    ) || 0,
+                                )
+                            }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <ContentLayout title="Card payment types">
             <template #filters>
                 <a-button
@@ -256,26 +354,42 @@ function onMoneyTableChange(pag) {
                     :data-source="rows"
                     :pagination="false"
                     row-key="id"
-                    :locale="{ emptyText: 'No card types yet. Add one to use Pay in Card on Sales.' }"
+                    :locale="{
+                        emptyText:
+                            'No card types yet. Add one to use Pay in Card on Sales.',
+                    }"
                 >
                     <template #bodyCell="{ column, record }">
                         <template v-if="column.key === 'is_active'">
-                            <a-tag :color="record.is_active ? 'green' : 'default'">
+                            <a-tag
+                                :color="record.is_active ? 'green' : 'default'"
+                            >
                                 {{ record.is_active ? "Active" : "Inactive" }}
                             </a-tag>
                         </template>
                         <template v-else-if="column.key === 'actions'">
                             <a-space>
                                 <IconTooltipButton
-                                    v-if="hasPermission('payment-card-types.money')"
+                                    v-if="
+                                        hasPermission(
+                                            'payment-card-types.money',
+                                        )
+                                    "
                                     name="View money details"
                                     hover="hover:bg-emerald-600"
                                     @click="openMoneyDetails(record)"
                                 >
-                                    <IconReportMoney size="20" class="mx-auto" />
+                                    <IconReportMoney
+                                        size="20"
+                                        class="mx-auto"
+                                    />
                                 </IconTooltipButton>
                                 <IconTooltipButton
-                                    v-if="hasPermission('payment-card-types.update')"
+                                    v-if="
+                                        hasPermission(
+                                            'payment-card-types.update',
+                                        )
+                                    "
                                     name="Edit card type"
                                     hover="hover:bg-blue-500"
                                     @click="openEdit(record)"
@@ -283,7 +397,11 @@ function onMoneyTableChange(pag) {
                                     <IconEdit size="20" class="mx-auto" />
                                 </IconTooltipButton>
                                 <IconTooltipButton
-                                    v-if="hasPermission('payment-card-types.destroy')"
+                                    v-if="
+                                        hasPermission(
+                                            'payment-card-types.destroy',
+                                        )
+                                    "
                                     name="Remove card type"
                                     hover="hover:bg-red-600"
                                     :loading="deletingId === record.id"
@@ -379,7 +497,8 @@ function onMoneyTableChange(pag) {
                             }"
                             row-key="id"
                             :locale="{
-                                emptyText: 'No transactions for this card type yet.',
+                                emptyText:
+                                    'No transactions for this card type yet.',
                             }"
                             @change="onMoneyTableChange"
                         >
