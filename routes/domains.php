@@ -117,6 +117,7 @@ Route::prefix('domains/{domain:name_slug}')
             Route::get('/', [\App\Http\Controllers\Domains\PaymentCardTypeController::class, 'index'])->name('index');
             Route::get('/list', [\App\Http\Controllers\Domains\PaymentCardTypeController::class, 'list'])->name('list');
             Route::post('/', [\App\Http\Controllers\Domains\PaymentCardTypeController::class, 'store'])->name('store');
+            Route::get('/{paymentCardType}/money', [\App\Http\Controllers\Domains\PaymentCardTypeController::class, 'money'])->name('money');
             Route::put('/{paymentCardType}', [\App\Http\Controllers\Domains\PaymentCardTypeController::class, 'update'])->name('update');
             Route::delete('/{paymentCardType}', [\App\Http\Controllers\Domains\PaymentCardTypeController::class, 'destroy'])->name('destroy');
         });
