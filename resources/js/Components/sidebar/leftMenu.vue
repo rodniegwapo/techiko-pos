@@ -14,6 +14,7 @@ import {
     IconWorld,
     IconKey,
     IconCreditCard,
+    IconWallet,
     IconAccessPointOff,
 } from "@tabler/icons-vue";
 import { router, usePage } from "@inertiajs/vue3";
@@ -113,6 +114,14 @@ const menuItems = [
         icon: IconAccessPointOff,
         routeName: "sales.offline-transactions",
         path: "/sales/offline-transactions",
+        domainOnly: true,
+    },
+    {
+        key: "payment-wallet",
+        title: "Payment wallet",
+        icon: IconWallet,
+        routeName: "payment-card-types.index",
+        path: "/payment-card-types",
         domainOnly: true,
     },
     {

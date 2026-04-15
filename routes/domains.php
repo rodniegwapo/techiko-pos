@@ -112,6 +112,15 @@ Route::prefix('domains/{domain:name_slug}')
             ->only(['index', 'store', 'update', 'destroy'])
             ->names('customers');
 
+        // Payment card types (Wallet) — domain-scoped
+        Route::prefix('payment-card-types')->name('payment-card-types.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Domains\PaymentCardTypeController::class, 'index'])->name('index');
+            Route::get('/list', [\App\Http\Controllers\Domains\PaymentCardTypeController::class, 'list'])->name('list');
+            Route::post('/', [\App\Http\Controllers\Domains\PaymentCardTypeController::class, 'store'])->name('store');
+            Route::put('/{paymentCardType}', [\App\Http\Controllers\Domains\PaymentCardTypeController::class, 'update'])->name('update');
+            Route::delete('/{paymentCardType}', [\App\Http\Controllers\Domains\PaymentCardTypeController::class, 'destroy'])->name('destroy');
+        });
+
         // Credit Management (Organization-specific)
         Route::prefix('credits')->name('credits.')->group(function () {
             Route::get('/', [\App\Http\Controllers\Domains\CreditController::class, 'index'])->name('index');
