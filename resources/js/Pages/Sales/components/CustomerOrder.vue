@@ -63,6 +63,8 @@ const props = defineProps({
     orderDiscountId: { type: String, default: "" },
     discountOptions: { type: Object, default: () => ({}) },
     loading: { type: Boolean, default: false },
+    /** Customers saved during "Sync for offline" (bounded sample). */
+    offlineCachedCustomers: { type: Array, default: () => [] },
 });
 
 const {
@@ -72,6 +74,7 @@ const {
     orderDiscountId,
     discountOptions,
     loading,
+    offlineCachedCustomers,
 } = toRefs(props);
 
 // Computed values
@@ -570,7 +573,24 @@ const handleCustomerSearch = useDebounceFn(async (query) => {
     }
 
     if (!salesCartIsOnline.value) {
-        customerOptions.value = [];
+        const q = String(query).trim().toLowerCase();
+        const list = offlineCachedCustomers.value || [];
+        const filtered = list
+            .filter(
+                (c) =>
+                    (c.name && c.name.toLowerCase().includes(q)) ||
+                    (c.phone && String(c.phone).toLowerCase().includes(q)) ||
+                    (c.email && c.email.toLowerCase().includes(q)) ||
+                    String(c.display_text || "")
+                        .toLowerCase()
+                        .includes(q),
+            )
+            .slice(0, 25);
+        customerOptions.value = filtered.map((customer) => ({
+            value: customer.id,
+            label: customer.display_text || customer.name,
+            customer,
+        }));
         return;
     }
 
@@ -615,7 +635,7 @@ const handleCustomerSelect = (customerId) => {
 
         notification.success({
             message: "Customer Selected",
-            description: `${option.customer.name} (${option.customer.tier_info.name} tier) selected`,
+            description: `${option.customer.name} (${option.customer.tier_info?.name ?? "offline cache"} tier) selected`,
             duration: 2,
         });
     } else {
@@ -760,7 +780,13 @@ defineExpose({
                 v-if="!selectedCustomer && customerSearchQuery.length < 2"
                 class="text-xs text-gray-500 mb-1"
             >
-                💡 Type at least 2 characters to search for existing customers
+                <template v-if="salesCartIsOnline">
+                    Type at least 2 characters to search for existing customers
+                </template>
+                <template v-else>
+                    Offline: search only customers saved with &quot;Sync for
+                    offline&quot;. Type 2+ characters.
+                </template>
             </div>
 
             <!-- Customer Search -->
@@ -770,7 +796,6 @@ defineExpose({
                 :options="customerOptions"
                 placeholder="Search customer by name, phone, or email (min 2 chars)"
                 :loading="searchingCustomers"
-                :disabled="!salesCartIsOnline"
                 @search="handleCustomerSearch"
                 @select="handleCustomerSelect"
                 @clear="

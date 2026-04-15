@@ -8,9 +8,9 @@ use App\Http\Resources\ProductResource;
 use App\Models\Category;
 use App\Models\Customer;
 use App\Models\Domain;
-use App\Models\Product\Discount;
 use App\Models\InventoryLocation;
 use App\Models\OfflineSaleSync;
+use App\Models\Product\Discount;
 use App\Models\Product\Product;
 use App\Models\Sale;
 use App\Models\User;
@@ -70,12 +70,66 @@ class SaleController extends Controller
             })
             ->with('category');
 
+        // Default cap: 30 rows when not filtering (full catalog sync uses offlineCatalog).
         $products = $query->when(
             ! $request->input('search') && ! $request->input('category'),
             fn ($q) => $q->limit(30)
         )->get();
 
         return ProductResource::collection($products);
+    }
+
+    /**
+     * Paginated product list for offline catalog sync (all sellable SKUs at active location).
+     * Does not use the 30-item default cap from sales.products.
+     */
+    public function offlineCatalog(Request $request, Domain $domain)
+    {
+        $validated = $request->validate([
+            'location_id' => ['nullable', 'integer', 'exists:inventory_locations,id'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:250'],
+        ]);
+
+        $perPage = min((int) ($validated['per_page'] ?? 200), 250);
+        $page = max(1, (int) ($validated['page'] ?? 1));
+
+        $location = Helpers::getActiveLocation($domain, $validated['location_id'] ?? null);
+
+        if (! $location) {
+            return ProductResource::collection(collect())->additional([
+                'meta' => [
+                    'current_page' => 1,
+                    'per_page' => $perPage,
+                    'total' => 0,
+                    'last_page' => 1,
+                ],
+            ]);
+        }
+
+        $base = Product::query()
+            ->where('domain', $domain->name_slug)
+            ->whereHas('activeLocations', function ($q) use ($location) {
+                $q->where('location_id', $location->id);
+            })
+            ->with('category');
+
+        $total = (clone $base)->count();
+        $lastPage = max(1, (int) ceil($total / $perPage));
+
+        $products = (clone $base)
+            ->orderBy('id')
+            ->forPage($page, $perPage)
+            ->get();
+
+        return ProductResource::collection($products)->additional([
+            'meta' => [
+                'current_page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'last_page' => $lastPage,
+            ],
+        ]);
     }
 
     public function proceedPayment(Request $request, Domain $domain, Sale $sale)
@@ -101,7 +155,7 @@ class SaleController extends Controller
 
                 // 3. Handle credit payment if selected
                 if ($validated['payment_method'] === 'credit') {
-                    if (!$validated['customer_id']) {
+                    if (! $validated['customer_id']) {
                         throw new \Exception('Customer is required for credit payments.');
                     }
 

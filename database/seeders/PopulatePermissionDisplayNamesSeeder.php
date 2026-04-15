@@ -111,6 +111,7 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
             'sales.index' => 'View Sales',
             'sales.offline-transactions' => 'Offline Sales Queue',
             'sales.offline-sync' => 'Sync Offline Sales',
+            'sales.offline-catalog' => 'Sync Offline Product Catalog',
             'sales.create' => 'Create Sale',
             'sales.store' => 'Create Sale',
             'sales.edit' => 'Edit Sale',
@@ -178,7 +179,7 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
             $counter = 1;
             $originalDisplayName = $newDisplayName;
             while (in_array($newDisplayName, $usedNames)) {
-                $newDisplayName = $originalDisplayName . " ({$counter})";
+                $newDisplayName = $originalDisplayName." ({$counter})";
                 $counter++;
             }
 
@@ -186,7 +187,7 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
             if ($newDisplayName !== $permission->name) {
                 try {
                     $permission->update([
-                        'name' => $newDisplayName
+                        'name' => $newDisplayName,
                     ]);
                     $usedNames[] = $newDisplayName;
                     $updatedCount++;

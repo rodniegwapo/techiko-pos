@@ -17,6 +17,7 @@ Route::prefix('domains/{domain:name_slug}')
         // Sales (Organization-specific)
         Route::get('/sales', [\App\Http\Controllers\Domains\SaleController::class, 'index'])->name('sales.index');
         Route::get('/sales/products', [\App\Http\Controllers\Domains\SaleController::class, 'products'])->name('sales.products');
+        Route::get('/sales/offline-catalog', [\App\Http\Controllers\Domains\SaleController::class, 'offlineCatalog'])->name('sales.offline-catalog');
 
         // User-specific sales routes (handles "no sales id yet" case)
         Route::prefix('users/{user}')->name('users.')->group(function () {
@@ -99,10 +100,10 @@ Route::prefix('domains/{domain:name_slug}')
 
         // Tier Management (Organization-specific)
         Route::apiResource('loyalty/tiers', \App\Http\Controllers\Domains\LoyaltyTierController::class)->names([
-            'index'   => 'loyalty.tiers.index',
-            'store'   => 'loyalty.tiers.store',
-            'show'    => 'loyalty.tiers.show',
-            'update'  => 'loyalty.tiers.update',
+            'index' => 'loyalty.tiers.index',
+            'store' => 'loyalty.tiers.store',
+            'show' => 'loyalty.tiers.show',
+            'update' => 'loyalty.tiers.update',
             'destroy' => 'loyalty.tiers.destroy',
         ]);
 
