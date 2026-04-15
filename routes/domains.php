@@ -124,6 +124,8 @@ Route::prefix('domains/{domain:name_slug}')
         });
 
         // Users (Organization-specific)
+        Route::put('/users/{user}/pin', [\App\Http\Controllers\Domains\UserPinController::class, 'update'])
+            ->name('users.pin.update');
         Route::resource('users', \App\Http\Controllers\Domains\UserController::class)
             ->only(['index', 'store', 'update', 'destroy'])
             ->names('users');

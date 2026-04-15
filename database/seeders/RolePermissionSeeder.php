@@ -43,6 +43,7 @@ class RolePermissionSeeder extends Seeder
             'users.destroy',
             'users.roles',
             'users.toggle-status',
+            'users.pin.update',
 
             // Sales
             'sales.index',
@@ -316,6 +317,7 @@ class RolePermissionSeeder extends Seeder
             'users.destroy',
             'users.roles',
             'users.toggle-status',
+            'users.pin.update',
 
             // Sales
             'sales.index',

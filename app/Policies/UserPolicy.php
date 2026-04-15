@@ -195,4 +195,28 @@ class UserPolicy
         // Same permissions as assign supervisor
         return $this->assignSupervisor($user, $model);
     }
+
+    /**
+     * Set or reset POS PIN for another user (domain-scoped routes enforce domain match).
+     */
+    public function managePin(User $actor, User $target): bool
+    {
+        if ($actor->isSuperUser()) {
+            return true;
+        }
+
+        if ($target->is_super_user) {
+            return false;
+        }
+
+        if ($actor->hasRole('super admin')) {
+            return ! $target->hasRole('super admin');
+        }
+
+        if ($actor->hasRole('admin')) {
+            return ! $target->hasRole('super admin');
+        }
+
+        return false;
+    }
 }
