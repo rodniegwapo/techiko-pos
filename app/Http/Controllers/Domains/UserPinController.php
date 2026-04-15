@@ -6,11 +6,17 @@ use App\Http\Controllers\Controller;
 use App\Models\Domain;
 use App\Models\User;
 use App\Models\UserPin;
+use App\Services\UserPinService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
 
 class UserPinController extends Controller
 {
+    public function __construct(
+        private UserPinService $userPinService
+    ) {}
+
     /**
      * Create or update the POS PIN for a user in this domain.
      */
@@ -26,6 +32,12 @@ class UserPinController extends Controller
             'pin_code' => ['required', 'string', 'regex:/^\d{4,6}$/'],
             'pin_code_confirmation' => ['required', 'string', 'same:pin_code'],
         ]);
+
+        if ($this->userPinService->pinTakenInDomain($domain, $user, $validated['pin_code'])) {
+            throw ValidationException::withMessages([
+                'pin_code' => [__('This PIN is already used by another user in this organization. Choose a different PIN.')],
+            ]);
+        }
 
         UserPin::updateOrCreate(
             ['user_id' => $user->id],

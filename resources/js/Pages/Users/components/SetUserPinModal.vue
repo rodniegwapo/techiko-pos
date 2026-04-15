@@ -75,17 +75,20 @@ async function handleSubmit() {
         emit("saved");
         close();
     } catch (e) {
+        const status = e.response?.status;
         const errs = e.response?.data?.errors;
         if (errs) {
             fieldErrors.value = errs;
         }
-        notification.error({
-            message: "Could not save PIN",
-            description:
-                e.response?.data?.message ||
-                e.message ||
-                "Please check the form and try again.",
-        });
+        if (status !== 422) {
+            notification.error({
+                message: "Could not save PIN",
+                description:
+                    e.response?.data?.message ||
+                    e.message ||
+                    "Please check the form and try again.",
+            });
+        }
     } finally {
         saving.value = false;
     }
