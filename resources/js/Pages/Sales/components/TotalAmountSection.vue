@@ -670,7 +670,7 @@ const creditLimitSufficient = computed(() => {
             />
 
             <card-payment-type-modal
-                v-model:open="cardTypeModalOpen"
+                v-model:visible="cardTypeModalOpen"
                 :use-network="salesCartIsOnline"
                 :cached-types="cachedPaymentCardTypes"
                 :initial-selected-id="selectedPaymentCardTypeId"

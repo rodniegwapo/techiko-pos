@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from "vue";
 import { Head, router } from "@inertiajs/vue3";
+import { IconPlus } from "@tabler/icons-vue";
 import axios from "axios";
 import { notification } from "ant-design-vue";
 
@@ -12,6 +13,15 @@ import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 
 const { getRoute } = useDomainRoutes();
 const { hasPermission } = usePermissionsV2();
+
+function firstValidationMessage(err) {
+    const errors = err?.response?.data?.errors;
+    if (errors && typeof errors === "object") {
+        const first = Object.values(errors)[0];
+        if (Array.isArray(first) && first.length) return first[0];
+    }
+    return err?.response?.data?.message || err?.message || null;
+}
 
 const props = defineProps({
     cardTypes: {
@@ -81,8 +91,7 @@ async function save() {
         router.reload({ only: ["cardTypes"] });
     } catch (e) {
         const msg =
-            e.response?.data?.message ||
-            e.message ||
+            firstValidationMessage(e) ||
             "Could not save card type.";
         notification.error({ message: msg });
     } finally {
@@ -104,8 +113,7 @@ async function remove(row) {
         router.reload({ only: ["cardTypes"] });
     } catch (e) {
         const msg =
-            e.response?.data?.message ||
-            e.message ||
+            firstValidationMessage(e) ||
             "Could not remove card type.";
         notification.error({ message: msg });
     } finally {
@@ -134,9 +142,12 @@ const columns = [
                 <a-button
                     v-if="hasPermission('payment-card-types.store')"
                     type="primary"
-                    class="bg-green-600 border-green-600"
+                    class="bg-white border flex items-center border-green-500 text-green-500"
                     @click="openCreate"
                 >
+                    <template #icon>
+                        <IconPlus class="w-4 h-4" />
+                    </template>
                     Add card type
                 </a-button>
             </template>
@@ -183,7 +194,7 @@ const columns = [
         </ContentLayout>
 
         <a-modal
-            v-model:open="modalOpen"
+            v-model:visible="modalOpen"
             :title="editing ? 'Edit card type' : 'Add card type'"
             :confirm-loading="saving"
             ok-text="Save"

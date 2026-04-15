@@ -6,8 +6,21 @@ import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 
 const { getRoute } = useDomainRoutes();
 
+function firstValidationMessage(err) {
+    const errors = err?.response?.data?.errors;
+    if (errors && typeof errors === "object") {
+        const first = Object.values(errors)[0];
+        if (Array.isArray(first) && first.length) return first[0];
+    }
+    return (
+        err?.response?.data?.message ||
+        err?.message ||
+        "Request failed."
+    );
+}
+
 const props = defineProps({
-    open: { type: Boolean, default: false },
+    visible: { type: Boolean, default: false },
     /** When offline, parent supplies types from last online fetch */
     cachedTypes: { type: Array, default: () => [] },
     useNetwork: { type: Boolean, default: true },
@@ -15,7 +28,7 @@ const props = defineProps({
 });
 
 const emit = defineEmits([
-    "update:open",
+    "update:visible",
     "confirm",
     "cancel",
     "created",
@@ -51,10 +64,7 @@ async function fetchTypes() {
             types.value = [];
             notification.error({
                 message: "Could not load card types",
-                description:
-                    e.response?.data?.message ||
-                    e.message ||
-                    "Check your connection.",
+                description: firstValidationMessage(e) || "Check your connection.",
             });
         }
     } finally {
@@ -63,7 +73,7 @@ async function fetchTypes() {
 }
 
 watch(
-    () => props.open,
+    () => props.visible,
     async (v) => {
         if (!v) return;
         selectedId.value = props.initialSelectedId
@@ -82,7 +92,7 @@ watch(
 watch(
     () => props.cachedTypes,
     () => {
-        if (!props.useNetwork && props.open) {
+        if (!props.useNetwork && props.visible) {
             types.value = [...(props.cachedTypes || [])];
         }
     },
@@ -111,10 +121,7 @@ async function addType() {
         }
     } catch (e) {
         notification.error({
-            message:
-                e.response?.data?.message ||
-                e.message ||
-                "Could not add card type.",
+            message: firstValidationMessage(e) || "Could not add card type.",
         });
     } finally {
         adding.value = false;
@@ -130,23 +137,23 @@ function onConfirm() {
         return;
     }
     emit("confirm", selectedId.value);
-    emit("update:open", false);
+    emit("update:visible", false);
 }
 
 function onCancel() {
     emit("cancel");
-    emit("update:open", false);
+    emit("update:visible", false);
 }
 </script>
 
 <template>
     <a-modal
-        :open="open"
+        :visible="visible"
         title="Card payment type"
         :confirm-loading="false"
         width="480px"
         :mask-closable="false"
-        @update:open="(v) => emit('update:open', v)"
+        @update:visible="(v) => emit('update:visible', v)"
     >
         <div class="py-2 space-y-4">
             <p class="text-sm text-gray-600">
@@ -170,6 +177,7 @@ function onCancel() {
                         />
                         <a-button
                             type="primary"
+                            class="bg-green-700 border-green-700 hover:bg-green-600"
                             :loading="adding"
                             :disabled="!useNetwork"
                             @click="addType"
@@ -210,7 +218,12 @@ function onCancel() {
                             :disabled="adding"
                             @press-enter="addType"
                         />
-                        <a-button :loading="adding" @click="addType">
+                        <a-button
+                            type="primary"
+                            class="bg-green-700 border-green-700 hover:bg-green-600"
+                            :loading="adding"
+                            @click="addType"
+                        >
                             Add
                         </a-button>
                     </div>
@@ -220,7 +233,12 @@ function onCancel() {
 
         <template #footer>
             <a-button @click="onCancel">Pay with cash instead</a-button>
-            <a-button type="primary" :disabled="!selectedId" @click="onConfirm">
+            <a-button
+                type="primary"
+                class="bg-green-700 border-green-700 hover:bg-green-600"
+                :disabled="!selectedId"
+                @click="onConfirm"
+            >
                 Use selected type
             </a-button>
         </template>
