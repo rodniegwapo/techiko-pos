@@ -174,9 +174,13 @@ class InventoryService
             
             // Get or create inventory record
             $inventory = $this->getOrCreateInventory($product, $location);
-            
-            // Create the movement record
-            $movement = InventoryMovement::createMovement($data);
+
+            $movementPayload = array_merge($data, [
+                'domain' => $data['domain'] ?? $location->domain ?? $product->domain,
+            ]);
+
+            // Create the movement record (domain required for domain-scoped movements listing)
+            $movement = InventoryMovement::createMovement($movementPayload);
             
             // Update inventory levels
             $this->updateInventoryLevels($inventory, $movement);
@@ -203,14 +207,13 @@ class InventoryService
     {
         $oldQuantity = $inventory->quantity_on_hand;
         $newQuantity = $oldQuantity + $movement->quantity_change;
-        
-        // Update quantity
-        $inventory->quantity_on_hand = max(0, $newQuantity);
-        
-        // Update costs for incoming inventory
+
+        // Weighted average must use pre-movement on-hand; updateAverageCost reads quantity_on_hand.
         if ($movement->quantity_change > 0 && $movement->unit_cost) {
             $inventory->updateAverageCost($movement->quantity_change, $movement->unit_cost);
         }
+
+        $inventory->quantity_on_hand = max(0, $newQuantity);
         
         // Update timestamps
         $inventory->last_movement_at = now();

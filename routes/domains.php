@@ -17,6 +17,7 @@ Route::prefix('domains/{domain:name_slug}')
         // Sales (Organization-specific)
         Route::get('/sales', [\App\Http\Controllers\Domains\SaleController::class, 'index'])->name('sales.index');
         Route::get('/sales/products', [\App\Http\Controllers\Domains\SaleController::class, 'products'])->name('sales.products');
+        Route::get('/sales/offline-catalog', [\App\Http\Controllers\Domains\SaleController::class, 'offlineCatalog'])->name('sales.offline-catalog');
 
         // User-specific sales routes (handles "no sales id yet" case)
         Route::prefix('users/{user}')->name('users.')->group(function () {
@@ -37,6 +38,9 @@ Route::prefix('domains/{domain:name_slug}')
 
         // Sales API routes (Organization-specific)
         Route::prefix('sales')->name('sales.')->group(function () {
+            Route::get('/offline-transactions', [\App\Http\Controllers\Domains\SaleController::class, 'offlineTransactionsPage'])->name('offline-transactions');
+            Route::post('/offline-sync', [\App\Http\Controllers\Domains\SaleController::class, 'offlineSync'])->name('offline-sync');
+
             Route::post('/draft', [\App\Http\Controllers\Domains\SaleController::class, 'storeDraft'])->name('drafts.store');
             Route::get('/oversell-statistics', [\App\Http\Controllers\Domains\SaleController::class, 'getOversellStatistics'])->name('oversell.statistics');
 
@@ -96,10 +100,10 @@ Route::prefix('domains/{domain:name_slug}')
 
         // Tier Management (Organization-specific)
         Route::apiResource('loyalty/tiers', \App\Http\Controllers\Domains\LoyaltyTierController::class)->names([
-            'index'   => 'loyalty.tiers.index',
-            'store'   => 'loyalty.tiers.store',
-            'show'    => 'loyalty.tiers.show',
-            'update'  => 'loyalty.tiers.update',
+            'index' => 'loyalty.tiers.index',
+            'store' => 'loyalty.tiers.store',
+            'show' => 'loyalty.tiers.show',
+            'update' => 'loyalty.tiers.update',
             'destroy' => 'loyalty.tiers.destroy',
         ]);
 
@@ -107,6 +111,16 @@ Route::prefix('domains/{domain:name_slug}')
         Route::resource('customers', \App\Http\Controllers\Domains\CustomerController::class)
             ->only(['index', 'store', 'update', 'destroy'])
             ->names('customers');
+
+        // Payment card types (Wallet) — domain-scoped
+        Route::prefix('payment-card-types')->name('payment-card-types.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Domains\PaymentCardTypeController::class, 'index'])->name('index');
+            Route::get('/list', [\App\Http\Controllers\Domains\PaymentCardTypeController::class, 'list'])->name('list');
+            Route::post('/', [\App\Http\Controllers\Domains\PaymentCardTypeController::class, 'store'])->name('store');
+            Route::get('/{paymentCardType}/money', [\App\Http\Controllers\Domains\PaymentCardTypeController::class, 'money'])->name('money');
+            Route::put('/{paymentCardType}', [\App\Http\Controllers\Domains\PaymentCardTypeController::class, 'update'])->name('update');
+            Route::delete('/{paymentCardType}', [\App\Http\Controllers\Domains\PaymentCardTypeController::class, 'destroy'])->name('destroy');
+        });
 
         // Credit Management (Organization-specific)
         Route::prefix('credits')->name('credits.')->group(function () {
@@ -120,6 +134,8 @@ Route::prefix('domains/{domain:name_slug}')
         });
 
         // Users (Organization-specific)
+        Route::put('/users/{user}/pin', [\App\Http\Controllers\Domains\UserPinController::class, 'update'])
+            ->name('users.pin.update');
         Route::resource('users', \App\Http\Controllers\Domains\UserController::class)
             ->only(['index', 'store', 'update', 'destroy'])
             ->names('users');

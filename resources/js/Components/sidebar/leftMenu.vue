@@ -14,6 +14,8 @@ import {
     IconWorld,
     IconKey,
     IconCreditCard,
+    IconWallet,
+    IconAccessPointOff,
 } from "@tabler/icons-vue";
 import { router, usePage } from "@inertiajs/vue3";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
@@ -48,11 +50,11 @@ onMounted(() => {
 });
 
 const isSuperUser = computed(
-    () => !!page.props.auth?.user?.data?.is_super_user
+    () => !!page.props.auth?.user?.data?.is_super_user,
 );
 
 // Get current domain from page props
-const currentDomain = computed(() => page.props.domain);
+const currentDomain = computed(() => page.props.currentDomain);
 
 // Helper function to detect domain from current URL
 const getCurrentDomainFromUrl = () => {
@@ -105,6 +107,22 @@ const menuItems = [
         routeName: "sales.index",
         path: "/sales",
         domainOnly: true, // Sales are now domain-only
+    },
+    {
+        key: "offline-sales",
+        title: "Offline sales",
+        icon: IconAccessPointOff,
+        routeName: "sales.offline-transactions",
+        path: "/sales/offline-transactions",
+        domainOnly: true,
+    },
+    {
+        key: "payment-wallet",
+        title: "Payment wallet",
+        icon: IconWallet,
+        routeName: "payment-card-types.index",
+        path: "/payment-card-types",
+        domainOnly: true,
     },
     {
         key: "domains",
@@ -335,7 +353,7 @@ const handleClick = (menu) => {
                 "routeName:",
                 menu.routeName,
                 "generated:",
-                routePath
+                routePath,
             );
         }
     } catch (error) {
@@ -388,7 +406,7 @@ const initializeMenuState = () => {
 
 watch(
     () => page.url,
-    () => initializeMenuState()
+    () => initializeMenuState(),
 );
 
 const handleOpenChange = (keys) => {
