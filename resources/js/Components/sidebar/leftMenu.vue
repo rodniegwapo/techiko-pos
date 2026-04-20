@@ -15,6 +15,7 @@ import {
     IconKey,
     IconCreditCard,
     IconWallet,
+    IconReportMoney,
     IconAccessPointOff,
     IconSettings,
 } from "@tabler/icons-vue";
@@ -123,6 +124,14 @@ const menuItems = [
         icon: IconWallet,
         routeName: "payment-card-types.index",
         path: "/payment-card-types",
+        domainOnly: true,
+    },
+    {
+        key: "vat-report",
+        title: "VAT report",
+        icon: IconReportMoney,
+        routeName: "vat-report.index",
+        path: "/vat-report",
         domainOnly: true,
     },
     {

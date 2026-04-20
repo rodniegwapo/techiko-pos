@@ -17,6 +17,9 @@ class DomainSettingsController extends Controller
             'salesSettings' => [
                 'apply_vat_automatically' => (bool) data_get($settings, 'sales.apply_vat_automatically', false),
                 'vat_rate_percent' => (float) data_get($settings, 'sales.vat_rate_percent', 12),
+                'vat_pricing_mode' => in_array(data_get($settings, 'sales.vat_pricing_mode'), ['exclusive', 'inclusive'], true)
+                    ? data_get($settings, 'sales.vat_pricing_mode')
+                    : 'exclusive',
             ],
         ]);
     }
@@ -26,6 +29,7 @@ class DomainSettingsController extends Controller
         $validated = $request->validate([
             'apply_vat_automatically' => ['sometimes', 'boolean'],
             'vat_rate_percent' => ['sometimes', 'numeric', 'min:0', 'max:100'],
+            'vat_pricing_mode' => ['sometimes', 'string', 'in:exclusive,inclusive'],
         ]);
 
         $current = $domain->settings ?? [];
@@ -36,6 +40,9 @@ class DomainSettingsController extends Controller
         }
         if (array_key_exists('vat_rate_percent', $validated)) {
             $sales['vat_rate_percent'] = round((float) $validated['vat_rate_percent'], 2);
+        }
+        if (array_key_exists('vat_pricing_mode', $validated)) {
+            $sales['vat_pricing_mode'] = $validated['vat_pricing_mode'];
         }
 
         $current['sales'] = $sales;

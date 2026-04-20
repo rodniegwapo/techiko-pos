@@ -116,6 +116,9 @@ Route::prefix('domains/{domain:name_slug}')
             ->only(['index', 'store', 'update', 'destroy'])
             ->names('customers');
 
+        // VAT summary (output VAT from paid sales)
+        Route::get('/vat-report', [\App\Http\Controllers\Domains\VatReportController::class, 'index'])->name('vat-report.index');
+
         // Payment card types (Wallet) — domain-scoped
         Route::prefix('payment-card-types')->name('payment-card-types.')->group(function () {
             Route::get('/', [\App\Http\Controllers\Domains\PaymentCardTypeController::class, 'index'])->name('index');

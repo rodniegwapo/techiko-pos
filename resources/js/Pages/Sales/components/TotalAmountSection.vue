@@ -45,6 +45,7 @@ const props = defineProps({
         default: () => ({
             apply_vat_automatically: false,
             vat_rate_percent: 12,
+            vat_pricing_mode: "exclusive",
         }),
     },
 });
@@ -84,7 +85,12 @@ const salesSettingsResolved = computed(
         props.salesSettings ?? {
             apply_vat_automatically: false,
             vat_rate_percent: 12,
+            vat_pricing_mode: "exclusive",
         },
+);
+
+const isInclusive = computed(
+    () => salesSettingsResolved.value.vat_pricing_mode === "inclusive",
 );
 
 const netAfterOrderDiscount = computed(() =>
@@ -107,7 +113,11 @@ const taxAmountDisplay = computed(() => {
     }
     const rate =
         (Number(salesSettingsResolved.value.vat_rate_percent) || 12) / 100;
-    return Math.round(netAfterOrderDiscount.value * rate * 100) / 100;
+    const net = netAfterOrderDiscount.value;
+    if (isInclusive.value) {
+        return Math.round(net * (rate / (1 + rate)) * 100) / 100;
+    }
+    return Math.round(net * rate * 100) / 100;
 });
 
 const grandTotalDisplay = computed(() => {
@@ -118,7 +128,26 @@ const grandTotalDisplay = computed(() => {
     ) {
         return Number(currentSale.value.grand_total) || 0;
     }
+    if (
+        salesSettingsResolved.value.apply_vat_automatically &&
+        isInclusive.value
+    ) {
+        return netAfterOrderDiscount.value;
+    }
     return netAfterOrderDiscount.value + taxAmountDisplay.value;
+});
+
+const netExVatDisplay = computed(() => {
+    if (!salesSettingsResolved.value.apply_vat_automatically) {
+        return 0;
+    }
+    if (!isInclusive.value) {
+        return 0;
+    }
+    return Math.max(
+        0,
+        Number(grandTotalDisplay.value) - Number(taxAmountDisplay.value),
+    );
 });
 
 // Using formattedTotal from useHelpers composable
@@ -589,24 +618,58 @@ const creditLimitSufficient = computed(() => {
                 <!-- Tax (VAT) -->
                 <div
                     v-if="salesSettingsResolved.apply_vat_automatically"
+                    class="flex flex-col gap-0.5"
+                >
+                    <div class="flex items-center gap-2">
+                        <span class="text-gray-700 whitespace-nowrap"
+                            >Tax (VAT):</span
+                        >
+                        <span class="font-medium">{{
+                            formattedTotal(taxAmountDisplay)
+                        }}</span>
+                    </div>
+                    <span
+                        v-if="isInclusive"
+                        class="text-xs text-gray-500 pl-0"
+                        >Included in total below</span
+                    >
+                </div>
+
+                <!-- Net ex-VAT (inclusive pricing) -->
+                <div
+                    v-if="
+                        salesSettingsResolved.apply_vat_automatically &&
+                        isInclusive
+                    "
                     class="flex items-center gap-2"
                 >
                     <span class="text-gray-700 whitespace-nowrap"
-                        >Tax (VAT):</span
+                        >Net (ex-VAT):</span
                     >
                     <span class="font-medium">{{
-                        formattedTotal(taxAmountDisplay)
+                        formattedTotal(netExVatDisplay)
                     }}</span>
                 </div>
 
                 <!-- Total -->
-                <div class="flex items-center gap-2">
-                    <span class="text-gray-900 font-semibold whitespace-nowrap"
-                        >Total:</span
+                <div class="flex flex-col gap-0.5">
+                    <div class="flex items-center gap-2">
+                        <span
+                            class="text-gray-900 font-semibold whitespace-nowrap"
+                            >Total:</span
+                        >
+                        <span class="font-bold text-green-600 text-lg">
+                            {{ formattedTotal(grandTotalDisplay) }}
+                        </span>
+                    </div>
+                    <span
+                        v-if="
+                            salesSettingsResolved.apply_vat_automatically &&
+                            isInclusive
+                        "
+                        class="text-xs text-gray-500"
+                        >Amount includes VAT</span
                     >
-                    <span class="font-bold text-green-600 text-lg">
-                        {{ formattedTotal(grandTotalDisplay) }}
-                    </span>
                 </div>
             </div>
 

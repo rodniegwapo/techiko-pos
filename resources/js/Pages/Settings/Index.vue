@@ -14,6 +14,7 @@ const props = defineProps({
         default: () => ({
             apply_vat_automatically: false,
             vat_rate_percent: 12,
+            vat_pricing_mode: "exclusive",
         }),
     },
 });
@@ -21,6 +22,10 @@ const props = defineProps({
 const form = useForm({
     apply_vat_automatically: !!props.salesSettings?.apply_vat_automatically,
     vat_rate_percent: Number(props.salesSettings?.vat_rate_percent) || 12,
+    vat_pricing_mode:
+        props.salesSettings?.vat_pricing_mode === "inclusive"
+            ? "inclusive"
+            : "exclusive",
 });
 
 function submit() {
@@ -43,10 +48,17 @@ const domainName =
                 <div class="px-6 pt-2 pb-6">
                     <div class="max-w-2xl space-y-6">
                     <p class="mb-0 text-sm leading-relaxed text-gray-600">
-                        VAT is calculated on the net amount after order
-                        discounts, assuming shelf prices are
-                        <strong>VAT-exclusive</strong>. Grand total includes tax
-                        when automatic VAT is enabled.
+                        <template v-if="form.vat_pricing_mode === 'exclusive'">
+                            After order discounts, VAT is added on top of the
+                            net (VAT-exclusive prices). Grand total = net +
+                            VAT when automatic VAT is on.
+                        </template>
+                        <template v-else>
+                            After order discounts, line totals are treated as
+                            VAT-inclusive. VAT is extracted as
+                            gross × rate ÷ (100 + rate) (e.g. 12/112). Grand
+                            total equals the inclusive gross (no add-on).
+                        </template>
                     </p>
                     <a-form layout="vertical" @submit.prevent="submit">
                         <a-form-item label="Apply VAT automatically on sales">
@@ -58,6 +70,22 @@ const domainName =
                                 <code class="text-xs">tax_amount</code> from
                                 your VAT rate; when off, tax is zero.
                             </span>
+                        </a-form-item>
+                        <a-form-item label="VAT pricing mode">
+                            <a-radio-group
+                                v-model:value="form.vat_pricing_mode"
+                            >
+                                <a-radio value="exclusive"
+                                    >Exclusive (VAT on top)</a-radio
+                                >
+                                <a-radio value="inclusive"
+                                    >Inclusive (VAT in price)</a-radio
+                                >
+                            </a-radio-group>
+                            <p class="mt-1 text-xs text-gray-500">
+                                Exclusive: tax = net × rate%. Inclusive: tax =
+                                gross × rate ÷ (100 + rate).
+                            </p>
                         </a-form-item>
                         <a-form-item label="VAT rate (%)">
                             <a-input-number
