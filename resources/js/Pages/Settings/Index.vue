@@ -36,11 +36,13 @@ const domainName =
 <template>
     <AuthenticatedLayout>
         <Head title="Settings" />
-        <ContentHeader class="mb-8" :title="`Settings — ${domainName}`" />
+        <ContentHeader class="mb-6" :title="`Settings — ${domainName}`" />
         <ContentLayout title="Sales">
             <template #table>
-                <div class="max-w-xl space-y-6">
-                    <p class="text-sm text-gray-600">
+                <!-- px-6 offsets ContentLayout’s -mx-6 on #table so form aligns with the card title row -->
+                <div class="px-6 pt-2 pb-6">
+                    <div class="max-w-2xl space-y-6">
+                    <p class="mb-0 text-sm leading-relaxed text-gray-600">
                         VAT is calculated on the net amount after order
                         discounts, assuming shelf prices are
                         <strong>VAT-exclusive</strong>. Grand total includes tax
@@ -77,6 +79,7 @@ const domainName =
                             </a-button>
                         </a-form-item>
                     </a-form>
+                    </div>
                 </div>
             </template>
         </ContentLayout>
