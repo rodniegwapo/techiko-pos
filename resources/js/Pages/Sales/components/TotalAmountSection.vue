@@ -40,6 +40,13 @@ const props = defineProps({
     /** Cached card types from parent (refreshed while online) for offline modal */
     cachedPaymentCardTypes: { type: Array, default: () => [] },
     offlinePaymentCardTypeId: { type: [Number, String], default: null },
+    salesSettings: {
+        type: Object,
+        default: () => ({
+            apply_vat_automatically: false,
+            vat_rate_percent: 12,
+        }),
+    },
 });
 
 const {
@@ -70,6 +77,48 @@ const totalAmount = computed(() => {
             : quantity * price;
         return sum + subtotal;
     }, 0);
+});
+
+const salesSettingsResolved = computed(
+    () =>
+        props.salesSettings ?? {
+            apply_vat_automatically: false,
+            vat_rate_percent: 12,
+        },
+);
+
+const netAfterOrderDiscount = computed(() =>
+    Math.max(
+        0,
+        Number(totalAmount.value) - (parseFloat(orderDiscountAmount.value) || 0),
+    ),
+);
+
+const taxAmountDisplay = computed(() => {
+    if (!salesSettingsResolved.value.apply_vat_automatically) {
+        return 0;
+    }
+    if (
+        salesCartIsOnline.value &&
+        currentSale.value &&
+        currentSale.value.tax_amount != null
+    ) {
+        return Number(currentSale.value.tax_amount) || 0;
+    }
+    const rate =
+        (Number(salesSettingsResolved.value.vat_rate_percent) || 12) / 100;
+    return Math.round(netAfterOrderDiscount.value * rate * 100) / 100;
+});
+
+const grandTotalDisplay = computed(() => {
+    if (
+        salesCartIsOnline.value &&
+        currentSale.value &&
+        currentSale.value.grand_total != null
+    ) {
+        return Number(currentSale.value.grand_total) || 0;
+    }
+    return netAfterOrderDiscount.value + taxAmountDisplay.value;
 });
 
 // Using formattedTotal from useHelpers composable
@@ -231,10 +280,10 @@ const showDiscountOrder = async () => {
 
 const customerChange = computed(() => {
     const received = Number(amountReceived.value) || 0;
-    const total = Number(totalAmount.value) || 0;
+    const total = Number(grandTotalDisplay.value) || 0;
 
     if (received < 1) return 0;
-    return received - (total - orderDiscountAmount.value);
+    return received - total;
 });
 
 const proceedPaymentLoading = ref(false);
@@ -336,7 +385,7 @@ const handleProceedPayment = async () => {
         // Single API call to process payment and loyalty together
         const body = {
             customer_id: props.selectedCustomer?.id || null,
-            sale_amount: totalAmount.value,
+            sale_amount: grandTotalDisplay.value,
             payment_method: paymentMethod.value,
         };
         if (paymentMethod.value === "card" && selectedPaymentCardTypeId.value) {
@@ -415,7 +464,7 @@ const disabledPaymentButtonColor = computed(() => {
         if (orders.value.length == 0) return "";
         return "bg-green-700 border-green-700 hover:bg-green-600";
     }
-    if (amountReceived.value < totalAmount.value) return "";
+    if (amountReceived.value < grandTotalDisplay.value) return "";
     if (orders.value.length == 0) return "";
     return "bg-green-700 border-green-700 hover:bg-green-600";
 });
@@ -464,7 +513,7 @@ watch(
             // Use customer data directly instead of API call
             const availableCredit = Math.max(0, (customer.credit_limit || 0) - (customer.credit_balance || 0));
             creditInfo.value = {
-                available: availableCredit >= totalAmount.value,
+                available: availableCredit >= grandTotalDisplay.value,
                 availableCredit: availableCredit,
                 creditLimit: customer.credit_limit || 0,
                 creditBalance: customer.credit_balance || 0,
@@ -478,9 +527,9 @@ watch(
     { immediate: true }
 );
 
-// Watch total amount changes to re-check credit
+// Watch payable total changes to re-check credit
 watch(
-    () => totalAmount.value,
+    () => grandTotalDisplay.value,
     async (amount) => {
         if (props.selectedCustomer?.id && creditInfo.value) {
             // Recalculate availability based on new amount
@@ -498,7 +547,7 @@ const canUseCredit = computed(() => {
 // Check if credit limit is sufficient
 const creditLimitSufficient = computed(() => {
     if (paymentMethod.value !== "credit" || !creditInfo.value) return true;
-    return creditInfo.value.availableCredit >= (totalAmount.value - orderDiscountAmount.value);
+    return creditInfo.value.availableCredit >= grandTotalDisplay.value;
 });
 </script>
 
@@ -537,18 +586,26 @@ const creditLimitSufficient = computed(() => {
                     }}</span>
                 </div>
 
+                <!-- Tax (VAT) -->
+                <div
+                    v-if="salesSettingsResolved.apply_vat_automatically"
+                    class="flex items-center gap-2"
+                >
+                    <span class="text-gray-700 whitespace-nowrap"
+                        >Tax (VAT):</span
+                    >
+                    <span class="font-medium">{{
+                        formattedTotal(taxAmountDisplay)
+                    }}</span>
+                </div>
+
                 <!-- Total -->
                 <div class="flex items-center gap-2">
                     <span class="text-gray-900 font-semibold whitespace-nowrap"
                         >Total:</span
                     >
                     <span class="font-bold text-green-600 text-lg">
-                        {{
-                            formattedTotal(
-                                totalAmount -
-                                    (parseFloat(orderDiscountAmount) || 0)
-                            )
-                        }}
+                        {{ formattedTotal(grandTotalDisplay) }}
                     </span>
                 </div>
             </div>
@@ -605,8 +662,7 @@ const creditLimitSufficient = computed(() => {
                         placeholder="0"
                         :class="{
                             'border-red-400':
-                                amountReceived <
-                                    totalAmount - orderDiscountAmount &&
+                                amountReceived < grandTotalDisplay &&
                                 orders.length > 0,
                         }"
                         class="w-34 text-center"
@@ -630,8 +686,8 @@ const creditLimitSufficient = computed(() => {
                         @click="handleProceedPaymentConfirmation"
                         :disabled="
                             proceedPaymentLoading ||
-                            (paymentMethod !== 'credit' && amountReceived <
-                                totalAmount - orderDiscountAmount) ||
+                            (paymentMethod !== 'credit' &&
+                                amountReceived < grandTotalDisplay) ||
                             (paymentMethod === 'credit' && !creditLimitSufficient) ||
                             (paymentMethod === 'card' && !selectedPaymentCardTypeId) ||
                             orders.length == 0

@@ -173,4 +173,19 @@ class Domain extends Model
     {
         return static::where('name_slug', $slug)->active()->first();
     }
+
+    /**
+     * Sales VAT options from domain settings (defaults for backward compatibility).
+     *
+     * @return array{apply_vat_automatically: bool, vat_rate_percent: float}
+     */
+    public function salesVatSettings(): array
+    {
+        $s = $this->settings['sales'] ?? [];
+
+        return [
+            'apply_vat_automatically' => (bool) ($s['apply_vat_automatically'] ?? false),
+            'vat_rate_percent' => (float) ($s['vat_rate_percent'] ?? 12),
+        ];
+    }
 }

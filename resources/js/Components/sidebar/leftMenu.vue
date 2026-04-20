@@ -16,6 +16,7 @@ import {
     IconCreditCard,
     IconWallet,
     IconAccessPointOff,
+    IconSettings,
 } from "@tabler/icons-vue";
 import { router, usePage } from "@inertiajs/vue3";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
@@ -122,6 +123,14 @@ const menuItems = [
         icon: IconWallet,
         routeName: "payment-card-types.index",
         path: "/payment-card-types",
+        domainOnly: true,
+    },
+    {
+        key: "organization-settings",
+        title: "Settings",
+        icon: IconSettings,
+        routeName: "settings.index",
+        path: "/settings",
         domainOnly: true,
     },
     {

@@ -6,6 +6,10 @@ Route::prefix('domains/{domain:name_slug}')
     ->middleware(['auth', 'user.permission', 'role.access'])
     ->name('domains.')
     ->group(function () {
+        // Organization settings (Sales VAT, etc.)
+        Route::get('/settings', [\App\Http\Controllers\Domains\DomainSettingsController::class, 'index'])->name('settings.index');
+        Route::patch('/settings', [\App\Http\Controllers\Domains\DomainSettingsController::class, 'update'])->name('settings.update');
+
         // Dashboard (Organization-specific)
         Route::get('/dashboard', [\App\Http\Controllers\Domains\DashboardController::class, 'index'])->name('dashboard');
 
