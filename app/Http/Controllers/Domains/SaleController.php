@@ -58,6 +58,7 @@ class SaleController extends Controller
             'salesSettings' => [
                 'apply_vat_automatically' => $vat['apply_vat_automatically'],
                 'vat_rate_percent' => $vat['vat_rate_percent'],
+                'vat_pricing_mode' => $vat['vat_pricing_mode'],
             ],
         ]);
     }

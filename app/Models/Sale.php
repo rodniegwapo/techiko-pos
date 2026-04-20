@@ -90,14 +90,28 @@ class Sale extends Model
             }
         }
 
+        $pricingMode = $vat['vat_pricing_mode'] ?? 'exclusive';
+        if (! in_array($pricingMode, ['exclusive', 'inclusive'], true)) {
+            $pricingMode = 'exclusive';
+        }
+
         if (! empty($vat['apply_vat_automatically'])) {
-            $rate = max(0, min(100, (float) ($vat['vat_rate_percent'] ?? 12))) / 100;
-            $this->tax_amount = round($netAfterDiscount * $rate, 2);
+            $ratePercent = max(0, min(100, (float) ($vat['vat_rate_percent'] ?? 12)));
+            $r = $ratePercent / 100;
+            if ($pricingMode === 'inclusive') {
+                $this->tax_amount = round($netAfterDiscount * ($r / (1 + $r)), 2);
+            } else {
+                $this->tax_amount = round($netAfterDiscount * $r, 2);
+            }
         } else {
             $this->tax_amount = 0;
         }
 
-        $this->grand_total = max(0, $netAfterDiscount + $this->tax_amount);
+        if (! empty($vat['apply_vat_automatically']) && $pricingMode === 'inclusive') {
+            $this->grand_total = max(0, $netAfterDiscount);
+        } else {
+            $this->grand_total = max(0, $netAfterDiscount + $this->tax_amount);
+        }
 
         $this->save();
 

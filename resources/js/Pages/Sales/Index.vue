@@ -65,6 +65,7 @@ const salesSettings = computed(
         page.props.salesSettings ?? {
             apply_vat_automatically: false,
             vat_rate_percent: 12,
+            vat_pricing_mode: "exclusive",
         },
 );
 const activeLocationId = computed(() => page.props.currentLocation?.id);

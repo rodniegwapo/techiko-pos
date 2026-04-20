@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -148,6 +147,14 @@ class PermissionModuleSeeder extends Seeder
                 'icon' => 'settings',
                 'description' => 'System setup and configuration',
                 'sort_order' => 17,
+                'is_active' => true,
+            ],
+            [
+                'name' => 'vat-report',
+                'display_name' => 'VAT Report',
+                'icon' => 'report-money',
+                'description' => 'Output VAT summary from paid sales',
+                'sort_order' => 18,
                 'is_active' => true,
             ],
         ];
