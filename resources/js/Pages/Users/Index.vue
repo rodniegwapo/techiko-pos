@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { Head, router, usePage } from "@inertiajs/vue3";
 import { watchDebounced } from "@vueuse/core";
 import { IconPlus, IconUsers, IconHierarchy } from "@tabler/icons-vue";
@@ -19,6 +19,7 @@ import ActiveFilters from "@/Components/filters/ActiveFilters.vue";
 import UserTable from "./components/UserTable.vue";
 import AddUserModal from "./components/AddUserModal.vue";
 import UserDetailsModal from "./components/UserDetailsModal.vue";
+import SetUserPinModal from "./components/SetUserPinModal.vue";
 import LocationInfoAlert from "@/Components/LocationInfoAlert.vue";
 
 const page = usePage();
@@ -50,6 +51,8 @@ const status = ref(null);
 const selectedUser = ref(null);
 const showDetailsModal = ref(false);
 const showAddModal = ref(false);
+const showPinModal = ref(false);
+const pinModalUser = ref(null);
 const showHierarchy = ref(false);
 
 // Fetch users
@@ -182,6 +185,17 @@ const handleViewUser = (user) => {
     showDetailsModal.value = true;
 };
 
+const handleSetPin = (user) => {
+    pinModalUser.value = user;
+    showPinModal.value = true;
+};
+
+watch(showPinModal, (open) => {
+    if (!open) {
+        pinModalUser.value = null;
+    }
+});
+
 const handleModalClose = () => {
     showAddModal.value = false;
     showDetailsModal.value = false;
@@ -304,6 +318,7 @@ const getRoleColorHex = (level) => {
                     @change="handleTableChange"
                     @edit="handleEditUser"
                     @view="handleViewUser"
+                    @set-pin="handleSetPin"
                 />
             </template>
         </ContentLayout>
@@ -325,6 +340,12 @@ const getRoleColorHex = (level) => {
             @close="handleModalClose"
             @edit="handleEditUser"
             @userUpdated="handleUserUpdated"
+        />
+
+        <SetUserPinModal
+            v-model:visible="showPinModal"
+            :user="pinModalUser"
+            @saved="getItems"
         />
     </AuthenticatedLayout>
 </template>

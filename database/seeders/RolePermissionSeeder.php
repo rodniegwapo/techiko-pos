@@ -2,11 +2,10 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 class RolePermissionSeeder extends Seeder
 {
@@ -23,7 +22,7 @@ class RolePermissionSeeder extends Seeder
             // Dashboard
             'dashboard',
             'dashboard.sales-chart',
-            
+
             // User Management
             'users.index',
             'users.hierarchy',
@@ -44,10 +43,20 @@ class RolePermissionSeeder extends Seeder
             'users.destroy',
             'users.roles',
             'users.toggle-status',
-            
+            'users.pin.update',
+
             // Sales
             'sales.index',
+            'sales.offline-transactions',
+            'sales.offline-sync',
             'sales.products',
+            'sales.offline-catalog',
+            'payment-card-types.index',
+            'payment-card-types.list',
+            'payment-card-types.store',
+            'payment-card-types.update',
+            'payment-card-types.destroy',
+            'payment-card-types.money',
             'sales.drafts.store',
             'sales.items.void',
             'sales.payment.store',
@@ -58,21 +67,21 @@ class RolePermissionSeeder extends Seeder
             'sales.discounts.order.remove',
             'sales.items.discount.apply',
             'sales.items.discount.remove',
-            
+
             // Cart Management - Database-driven
             'sales.cart.add',
             'sales.cart.remove',
             'sales.cart.update-quantity',
             'sales.cart.state',
-            
+
             // Discount Management - Database-driven
             'sales.discounts.current',
             'sales.discounts.sale',
             'sales.discounts.update',
-            
+
             // Current Pending Sale
             'sales.current-pending',
-            
+
             // User-specific sales routes
             'users.sales.create',
             'users.sales.cart.add',
@@ -80,7 +89,7 @@ class RolePermissionSeeder extends Seeder
             'users.sales.cart.update-quantity',
             'users.sales.cart.remove',
             'users.sales.cart.state',
-            
+
             // Products
             'products.index',
             'products.store',
@@ -88,7 +97,7 @@ class RolePermissionSeeder extends Seeder
             'products.destroy',
             'products.create',
             'products.edit',
-            
+
             // Categories
             'categories.index',
             'categories.store',
@@ -96,7 +105,7 @@ class RolePermissionSeeder extends Seeder
             'categories.destroy',
             'categories.create',
             'categories.edit',
-            
+
             // Customers
             'customers.index',
             'customers.search',
@@ -104,7 +113,7 @@ class RolePermissionSeeder extends Seeder
             'customers.store',
             'customers.show',
             'customers.update',
-            
+
             // Discounts
             'products.discounts.index',
             'products.discounts.store',
@@ -112,7 +121,7 @@ class RolePermissionSeeder extends Seeder
             'products.discounts.destroy',
             'products.discounts.create',
             'products.discounts.edit',
-            
+
             // Mandatory Discounts
             'mandatory-discounts.index',
             'mandatory-discounts.store',
@@ -120,7 +129,7 @@ class RolePermissionSeeder extends Seeder
             'mandatory-discounts.destroy',
             'mandatory-discounts.create',
             'mandatory-discounts.edit',
-            
+
             // Loyalty Program
             'loyalty.index',
             'loyalty.stats',
@@ -132,7 +141,7 @@ class RolePermissionSeeder extends Seeder
             'loyalty.tiers.show',
             'loyalty.tiers.update',
             'loyalty.tiers.destroy',
-            
+
             // Credit Management
             'credits.index',
             'credits.overdue',
@@ -141,7 +150,7 @@ class RolePermissionSeeder extends Seeder
             'credits.transactions.update',
             'credits.history',
             'credits.settings.update',
-            
+
             // Inventory Management
             'inventory.index',
             'inventory.products',
@@ -170,7 +179,7 @@ class RolePermissionSeeder extends Seeder
             'inventory.locations.edit',
             'inventory.locations.set-default',
             'inventory.locations.toggle-status',
-            
+
             // Inventory API
             'inventory.products',
             'inventory.movements',
@@ -197,13 +206,13 @@ class RolePermissionSeeder extends Seeder
             'inventory.adjustments.approve',
             'inventory.adjustments.reject',
             'inventory.adjustment-products',
-            
+
             // Void Logs
             'voids.index',
-            
+
             // Terminal Setup
             'setup.terminal',
-            
+
             // Role Management (super user only)
             'roles.index',
             'roles.create',
@@ -214,7 +223,7 @@ class RolePermissionSeeder extends Seeder
             'roles.destroy',
             'roles.permission-matrix',
             'roles.permissions',
-            
+
             // Permission Management (super user only)
             'permissions.index',
             'permissions.store',
@@ -225,20 +234,20 @@ class RolePermissionSeeder extends Seeder
             'permissions.activate',
             'permissions.bulk-deactivate',
             'permissions.grouped',
-            
+
             // Orders
             'orders.view',
             'orders.recent-pending',
-            
+
             // Customer Order
             'customer-order',
-            
+
             // Cart Management - Database-driven
             'sales.cart.add',
             'sales.cart.remove',
             'sales.cart.update-quantity',
             'sales.cart.state',
-            
+
             // Discount Management - Database-driven
             'sales.discounts.current',
             'sales.discounts.sale',
@@ -247,31 +256,31 @@ class RolePermissionSeeder extends Seeder
 
         // Get all permission modules
         $modules = DB::table('permission_modules')->get()->keyBy('name');
-        
+
         foreach ($permissions as $permission) {
             $parts = explode('.', $permission);
             $moduleName = $parts[0];
             $action = $parts[count($parts) - 1]; // Get the last part as action
-            
+
             // Get module ID
             $module = $modules->get($moduleName);
             $moduleId = $module ? $module->id : null;
-            
+
             // Generate display name (just the action)
             $displayName = $this->getActionDisplayName($action);
-            
+
             // Use just the action name since module is already shown as section header
             $uniqueName = $displayName;
-            
+
             // If we already have a permission with this name, make it unique by adding route info
             $existingPermission = Permission::where('name', $uniqueName)->where('guard_name', 'web')->first();
             if ($existingPermission) {
-                $uniqueName = $uniqueName . ' (' . $permission . ')';
+                $uniqueName = $uniqueName.' ('.$permission.')';
             }
-            
+
             Permission::firstOrCreate([
                 'route_name' => $permission, // Technical route: "users.index"
-                'guard_name' => 'web'
+                'guard_name' => 'web',
             ], [
                 'name' => $uniqueName, // "Users - View", "Products - Create"
                 'action' => $action, // Action: "index", "create", "edit"
@@ -280,12 +289,12 @@ class RolePermissionSeeder extends Seeder
         }
 
         // Create roles and assign permissions
-        
+
         // Super Admin - Full access
         $superAdmin = Role::findOrCreate('super admin', 'web');
         $superAdmin->update(['level' => 1, 'description' => 'Full system access with all permissions']);
         $superAdmin->syncPermissions(Permission::all()->pluck('name')->toArray());
-        
+
         // Admin - Most permissions except system settings
         $admin = Role::findOrCreate('admin', 'web');
         $admin->update(['level' => 2, 'description' => 'Administrative access with user management capabilities']);
@@ -293,7 +302,7 @@ class RolePermissionSeeder extends Seeder
             // Dashboard
             'dashboard',
             'dashboard.sales-chart',
-            
+
             // User Management
             'users.index',
             'users.hierarchy',
@@ -314,10 +323,20 @@ class RolePermissionSeeder extends Seeder
             'users.destroy',
             'users.roles',
             'users.toggle-status',
-            
+            'users.pin.update',
+
             // Sales
             'sales.index',
+            'sales.offline-transactions',
+            'sales.offline-sync',
             'sales.products',
+            'sales.offline-catalog',
+            'payment-card-types.index',
+            'payment-card-types.list',
+            'payment-card-types.store',
+            'payment-card-types.update',
+            'payment-card-types.destroy',
+            'payment-card-types.money',
             'sales.drafts.store',
             'sales.items.void',
             'sales.payment.store',
@@ -328,21 +347,21 @@ class RolePermissionSeeder extends Seeder
             'sales.discounts.order.remove',
             'sales.items.discount.apply',
             'sales.items.discount.remove',
-            
+
             // Cart Management - Database-driven
             'sales.cart.add',
             'sales.cart.remove',
             'sales.cart.update-quantity',
             'sales.cart.state',
-            
+
             // Discount Management - Database-driven
             'sales.discounts.current',
             'sales.discounts.sale',
             'sales.discounts.update',
-            
+
             // Current Pending Sale
             'sales.current-pending',
-            
+
             // User-specific sales routes
             'users.sales.create',
             'users.sales.cart.add',
@@ -350,7 +369,7 @@ class RolePermissionSeeder extends Seeder
             'users.sales.cart.update-quantity',
             'users.sales.cart.remove',
             'users.sales.cart.state',
-            
+
             // Products
             'products.index',
             'products.store',
@@ -358,7 +377,7 @@ class RolePermissionSeeder extends Seeder
             'products.destroy',
             'products.create',
             'products.edit',
-            
+
             // Categories
             'categories.index',
             'categories.store',
@@ -366,7 +385,7 @@ class RolePermissionSeeder extends Seeder
             'categories.destroy',
             'categories.create',
             'categories.edit',
-            
+
             // Customers
             'customers.index',
             'customers.search',
@@ -374,7 +393,7 @@ class RolePermissionSeeder extends Seeder
             'customers.store',
             'customers.show',
             'customers.update',
-            
+
             // Discounts
             'products.discounts.index',
             'products.discounts.store',
@@ -382,7 +401,7 @@ class RolePermissionSeeder extends Seeder
             'products.discounts.destroy',
             'products.discounts.create',
             'products.discounts.edit',
-            
+
             // Mandatory Discounts
             'mandatory-discounts.index',
             'mandatory-discounts.store',
@@ -390,7 +409,7 @@ class RolePermissionSeeder extends Seeder
             'mandatory-discounts.destroy',
             'mandatory-discounts.create',
             'mandatory-discounts.edit',
-            
+
             // Loyalty Program
             'loyalty.index',
             'loyalty.stats',
@@ -402,7 +421,7 @@ class RolePermissionSeeder extends Seeder
             'loyalty.tiers.show',
             'loyalty.tiers.update',
             'loyalty.tiers.destroy',
-            
+
             // Credit Management
             'credits.index',
             'credits.overdue',
@@ -411,7 +430,7 @@ class RolePermissionSeeder extends Seeder
             'credits.transactions.update',
             'credits.history',
             'credits.settings.update',
-            
+
             // Inventory Management
             'inventory.index',
             'inventory.products',
@@ -440,7 +459,7 @@ class RolePermissionSeeder extends Seeder
             'inventory.locations.edit',
             'inventory.locations.set-default',
             'inventory.locations.toggle-status',
-            
+
             // Inventory API
             'inventory.products',
             'inventory.movements',
@@ -467,21 +486,21 @@ class RolePermissionSeeder extends Seeder
             'inventory.adjustments.approve',
             'inventory.adjustments.reject',
             'inventory.adjustment-products',
-            
+
             // Void Logs
             'voids.index',
-            
+
             // Terminal Setup
             'setup.terminal',
-            
+
             // Orders
             'orders.view',
             'orders.recent-pending',
-            
+
             // Customer Order
             'customer-order',
         ]));
-        
+
         // Manager - Operational permissions
         $manager = Role::findOrCreate('manager', 'web');
         $manager->update(['level' => 3, 'description' => 'Operational management with reporting and staff oversight']);
@@ -489,10 +508,19 @@ class RolePermissionSeeder extends Seeder
             // Dashboard
             'dashboard',
             'dashboard.sales-chart',
-            
+
             // Sales
             'sales.index',
+            'sales.offline-transactions',
+            'sales.offline-sync',
             'sales.products',
+            'sales.offline-catalog',
+            'payment-card-types.index',
+            'payment-card-types.list',
+            'payment-card-types.store',
+            'payment-card-types.update',
+            'payment-card-types.destroy',
+            'payment-card-types.money',
             'sales.drafts.store',
             'sales.items.void',
             'sales.payment.store',
@@ -503,21 +531,21 @@ class RolePermissionSeeder extends Seeder
             'sales.discounts.order.remove',
             'sales.items.discount.apply',
             'sales.items.discount.remove',
-            
+
             // Cart Management - Database-driven
             'sales.cart.add',
             'sales.cart.remove',
             'sales.cart.update-quantity',
             'sales.cart.state',
-            
+
             // Discount Management - Database-driven
             'sales.discounts.current',
             'sales.discounts.sale',
             'sales.discounts.update',
-            
+
             // Current Pending Sale
             'sales.current-pending',
-            
+
             // User-specific sales routes
             'users.sales.create',
             'users.sales.cart.add',
@@ -525,21 +553,21 @@ class RolePermissionSeeder extends Seeder
             'users.sales.cart.update-quantity',
             'users.sales.cart.remove',
             'users.sales.cart.state',
-            
+
             // Products
             'products.index',
             'products.store',
             'products.update',
             'products.create',
             'products.edit',
-            
+
             // Categories
             'categories.index',
             'categories.store',
             'categories.update',
             'categories.create',
             'categories.edit',
-            
+
             // Customers
             'customers.index',
             'customers.search',
@@ -547,13 +575,13 @@ class RolePermissionSeeder extends Seeder
             'customers.store',
             'customers.show',
             'customers.update',
-            
+
             // Discounts
             'products.discounts.index',
-            
+
             // Mandatory Discounts (manager read-only)
             'mandatory-discounts.index',
-            
+
             // Loyalty Program
             'loyalty.index',
             'loyalty.stats',
@@ -562,7 +590,7 @@ class RolePermissionSeeder extends Seeder
             'loyalty.adjust-points',
             'loyalty.tiers.index',
             'loyalty.tiers.show',
-            
+
             // Credit Management
             'credits.index',
             'credits.overdue',
@@ -571,7 +599,7 @@ class RolePermissionSeeder extends Seeder
             'credits.transactions.update',
             'credits.history',
             'credits.settings.update',
-            
+
             // Inventory Management
             'inventory.index',
             'inventory.products',
@@ -588,7 +616,7 @@ class RolePermissionSeeder extends Seeder
             'inventory.adjustments.reject',
             'inventory.locations.index',
             'inventory.locations.show',
-            
+
             // Inventory API
             'inventory.products',
             'inventory.movements',
@@ -608,18 +636,18 @@ class RolePermissionSeeder extends Seeder
             'inventory.adjustments.approve',
             'inventory.adjustments.reject',
             'inventory.adjustment-products',
-            
+
             // Void Logs
             'voids.index',
-            
+
             // Orders
             'orders.view',
             'orders.recent-pending',
-            
+
             // Customer Order
             'customer-order',
         ]));
-        
+
         // Supervisor - Shift supervision permissions
         $supervisor = Role::findOrCreate('supervisor', 'web');
         $supervisor->update(['level' => 4, 'description' => 'Shift supervision with limited management capabilities']);
@@ -627,14 +655,19 @@ class RolePermissionSeeder extends Seeder
             // Dashboard
             'dashboard',
             'dashboard.sales-chart',
-            
+
             // User Management (view only)
             'users.index',
             'users.show',
-            
+
             // Sales
             'sales.index',
+            'sales.offline-transactions',
+            'sales.offline-sync',
             'sales.products',
+            'sales.offline-catalog',
+            'payment-card-types.list',
+            'payment-card-types.store',
             'sales.drafts.store',
             'sales.items.void',
             'sales.payment.store',
@@ -645,21 +678,21 @@ class RolePermissionSeeder extends Seeder
             'sales.discounts.order.remove',
             'sales.items.discount.apply',
             'sales.items.discount.remove',
-            
+
             // Cart Management - Database-driven
             'sales.cart.add',
             'sales.cart.remove',
             'sales.cart.update-quantity',
             'sales.cart.state',
-            
+
             // Discount Management - Database-driven
             'sales.discounts.current',
             'sales.discounts.sale',
             'sales.discounts.update',
-            
+
             // Current Pending Sale
             'sales.current-pending',
-            
+
             // User-specific sales routes
             'users.sales.create',
             'users.sales.cart.add',
@@ -667,17 +700,17 @@ class RolePermissionSeeder extends Seeder
             'users.sales.cart.update-quantity',
             'users.sales.cart.remove',
             'users.sales.cart.state',
-            
+
             // Products
             'products.index',
             'products.store',
             'products.update',
             'products.create',
             'products.edit',
-            
+
             // Categories
             'categories.index',
-            
+
             // Customers
             'customers.index',
             'customers.search',
@@ -685,13 +718,13 @@ class RolePermissionSeeder extends Seeder
             'customers.store',
             'customers.show',
             'customers.update',
-            
+
             // Discounts
             'products.discounts.index',
-            
+
             // Mandatory Discounts (view only)
             'mandatory-discounts.index',
-            
+
             // Loyalty Program
             'loyalty.index',
             'loyalty.stats',
@@ -700,14 +733,14 @@ class RolePermissionSeeder extends Seeder
             'loyalty.adjust-points',
             'loyalty.tiers.index',
             'loyalty.tiers.show',
-            
+
             // Credit Management
             'credits.index',
             'credits.overdue',
             'credits.show',
             'credits.transactions.store',
             'credits.history',
-            
+
             // Inventory Management
             'inventory.index',
             'inventory.products',
@@ -715,7 +748,7 @@ class RolePermissionSeeder extends Seeder
             'inventory.low-stock',
             'inventory.locations.index',
             'inventory.locations.show',
-            
+
             // Inventory API
             'inventory.products',
             'inventory.movements',
@@ -726,18 +759,18 @@ class RolePermissionSeeder extends Seeder
             'inventory.locations.index',
             'inventory.locations.show',
             'inventory.search.locations',
-            
+
             // Void Logs
             'voids.index',
-            
+
             // Orders
             'orders.view',
             'orders.recent-pending',
-            
+
             // Customer Order
             'customer-order',
         ]));
-        
+
         // Cashier - Basic sales permissions
         $cashier = Role::findOrCreate('cashier', 'web');
         $cashier->update(['level' => 5, 'description' => 'Front-line operations with sales processing capabilities']);
@@ -745,10 +778,15 @@ class RolePermissionSeeder extends Seeder
             // Dashboard
             'dashboard',
             'dashboard.sales-chart',
-            
+
             // Sales
             'sales.index',
+            'sales.offline-transactions',
+            'sales.offline-sync',
             'sales.products',
+            'sales.offline-catalog',
+            'payment-card-types.list',
+            'payment-card-types.store',
             'sales.drafts.store',
             'sales.items.void',
             'sales.payment.store',
@@ -759,21 +797,21 @@ class RolePermissionSeeder extends Seeder
             'sales.discounts.order.remove',
             'sales.items.discount.apply',
             'sales.items.discount.remove',
-            
+
             // Cart Management - Database-driven
             'sales.cart.add',
             'sales.cart.remove',
             'sales.cart.update-quantity',
             'sales.cart.state',
-            
+
             // Discount Management - Database-driven
             'sales.discounts.current',
             'sales.discounts.sale',
             'sales.discounts.update',
-            
+
             // Current Pending Sale
             'sales.current-pending',
-            
+
             // User-specific sales routes
             'users.sales.create',
             'users.sales.cart.add',
@@ -781,10 +819,10 @@ class RolePermissionSeeder extends Seeder
             'users.sales.cart.update-quantity',
             'users.sales.cart.remove',
             'users.sales.cart.state',
-            
+
             // Products
             'products.index',
-            
+
             // Customers
             'customers.index',
             'customers.search',
@@ -792,10 +830,10 @@ class RolePermissionSeeder extends Seeder
             'customers.store',
             'customers.show',
             'customers.update',
-            
+
             // Discounts
             'products.discounts.index',
-            
+
             // Loyalty Program
             'loyalty.index',
             'loyalty.stats',
@@ -804,18 +842,18 @@ class RolePermissionSeeder extends Seeder
             'loyalty.adjust-points',
             'loyalty.tiers.index',
             'loyalty.tiers.show',
-            
+
             // Credit Management (view only)
             'credits.index',
             'credits.show',
             'credits.history',
-            
+
             // Inventory Management (view only)
             'inventory.index',
             'inventory.products',
             'inventory.locations.index',
             'inventory.locations.show',
-            
+
             // Inventory API
             'inventory.products',
             'inventory.search.products',
@@ -823,11 +861,11 @@ class RolePermissionSeeder extends Seeder
             'inventory.locations.index',
             'inventory.locations.show',
             'inventory.search.locations',
-            
+
             // Orders
             'orders.view',
             'orders.recent-pending',
-            
+
             // Customer Order
             'customer-order',
         ]));
@@ -900,13 +938,13 @@ class RolePermissionSeeder extends Seeder
             'view' => 'View',
             'recent-pending' => 'Recent Pending',
             'customer-order' => 'Customer Order',
-            
+
             // Cart Management Actions
             'cart.add' => 'Add to Cart',
             'cart.remove' => 'Remove from Cart',
             'cart.update-quantity' => 'Update Quantity',
             'cart.state' => 'View Cart State',
-            
+
             // Discount Management Actions
             'discounts.current' => 'View Current Discounts',
             'discounts.sale' => 'View Sale Discounts',
@@ -925,5 +963,4 @@ class RolePermissionSeeder extends Seeder
             ->pluck('name')
             ->toArray();
     }
-
 }

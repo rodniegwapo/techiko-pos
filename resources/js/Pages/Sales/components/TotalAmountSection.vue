@@ -1,12 +1,13 @@
 <script setup>
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import ApplyOrderDiscountModal from "./ApplyOrderDiscountModal.vue";
+import CardPaymentTypeModal from "./CardPaymentTypeModal.vue";
 import { IconDiscount, IconArrowRightToArc } from "@tabler/icons-vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useCredit } from "@/Composables/useCredit";
-import { ref, computed, createVNode, toRefs, watch } from "vue";
+import { ref, computed, createVNode, toRefs, watch, inject } from "vue";
 import { Modal, notification } from "ant-design-vue";
 import { ExclamationCircleOutlined } from "@ant-design/icons-vue";
 import axios from "axios";
@@ -17,6 +18,11 @@ const { getRoute } = useDomainRoutes();
 const { formattedTotal } = useHelpers();
 const { checkCreditAvailability } = useCredit();
 const page = usePage();
+
+const salesCartIsOnline = inject(
+    "isSalesOnline",
+    computed(() => true),
+);
 
 // Props for direct data passing
 const props = defineProps({
@@ -30,6 +36,10 @@ const props = defineProps({
     orderDiscountId: { type: String, default: "" },
     orderId: { type: [String, Number], default: null },
     discountOptions: { type: Object, default: () => ({}) },
+    offlinePaymentMethod: { type: String, default: "cash" },
+    /** Cached card types from parent (refreshed while online) for offline modal */
+    cachedPaymentCardTypes: { type: Array, default: () => [] },
+    offlinePaymentCardTypeId: { type: [Number, String], default: null },
 });
 
 const {
@@ -42,7 +52,13 @@ const {
 } = toRefs(props);
 
 // Emit events to parent
-const emit = defineEmits(["discount-applied", "cart-updated"]);
+const emit = defineEmits([
+    "discount-applied",
+    "cart-updated",
+    "save-offline-sale",
+    "update:offlinePaymentMethod",
+    "update:offlinePaymentCardTypeId",
+]);
 
 // Computed values
 const totalAmount = computed(() => {
@@ -63,6 +79,13 @@ const amountReceived = ref(0);
 const openOrderDicountModal = ref(false);
 
 const showDiscountOrder = async () => {
+    if (!salesCartIsOnline.value) {
+        notification.warning({
+            message: "Requires connection",
+            description: "Order discounts are not available offline.",
+        });
+        return;
+    }
     // Check if there's an active order/draft OR if there are items in the cart
     // (orderId might be null briefly while draft is being created)
     if (!orderId.value && orders.value.length === 0) return;
@@ -216,6 +239,39 @@ const customerChange = computed(() => {
 
 const proceedPaymentLoading = ref(false);
 
+const cardTypeModalOpen = ref(false);
+const selectedPaymentCardTypeId = ref(null);
+const paymentMethod = ref("cash");
+
+watch(
+    () => props.offlinePaymentCardTypeId,
+    (v) => {
+        if (v != null && v !== "") {
+            selectedPaymentCardTypeId.value = Number(v);
+        }
+    },
+    { immediate: true },
+);
+
+watch(selectedPaymentCardTypeId, (id) => {
+    if (!salesCartIsOnline.value) {
+        emit("update:offlinePaymentCardTypeId", id);
+    }
+});
+
+function onCardTypeModalConfirm(id) {
+    selectedPaymentCardTypeId.value = id;
+}
+
+function onCardTypeModalCancel() {
+    paymentMethod.value = "cash";
+    selectedPaymentCardTypeId.value = null;
+    if (!salesCartIsOnline.value) {
+        emit("update:offlinePaymentMethod", "cash");
+        emit("update:offlinePaymentCardTypeId", null);
+    }
+}
+
 const handleProceedPaymentConfirmation = () => {
     Modal.confirm({
         title: "Are you sure you would like to proceed?",
@@ -239,6 +295,13 @@ const handleProceedPaymentConfirmation = () => {
 };
 
 const handleProceedPayment = async () => {
+    if (!salesCartIsOnline.value) {
+        notification.warning({
+            message: "Offline",
+            description: "Use “Save as offline sale” instead.",
+        });
+        return;
+    }
     try {
         proceedPaymentLoading.value = true;
 
@@ -261,21 +324,35 @@ const handleProceedPayment = async () => {
             }
         }
 
+        if (paymentMethod.value === "card" && !selectedPaymentCardTypeId.value) {
+            notification.error({
+                message: "Card type required",
+                description: "Choose a card payment type before completing checkout.",
+            });
+            cardTypeModalOpen.value = true;
+            throw new Error("Card type required");
+        }
+
         // Single API call to process payment and loyalty together
+        const body = {
+            customer_id: props.selectedCustomer?.id || null,
+            sale_amount: totalAmount.value,
+            payment_method: paymentMethod.value,
+        };
+        if (paymentMethod.value === "card" && selectedPaymentCardTypeId.value) {
+            body.payment_card_type_id = selectedPaymentCardTypeId.value;
+        }
         const response = await axios.post(
             getRoute("sales.payment.store", {
                 sale: orderId.value,
             }),
-            {
-                // Include customer data for loyalty processing
-                customer_id: props.selectedCustomer?.id || null,
-                sale_amount: totalAmount.value,
-                payment_method: paymentMethod.value,
-            }
+            body,
         );
 
         // Clean up and finalize
         amountReceived.value = 0;
+        selectedPaymentCardTypeId.value = null;
+        paymentMethod.value = "cash";
 
         // Show success notification based on response
         const loyaltyResults = response.data.loyalty_results;
@@ -343,9 +420,40 @@ const disabledPaymentButtonColor = computed(() => {
     return "bg-green-700 border-green-700 hover:bg-green-600";
 });
 
-const paymentMethod = ref("cash");
 const creditInfo = ref(null);
 const checkingCredit = ref(false);
+
+watch(
+    () => props.offlinePaymentMethod,
+    (v) => {
+        if (v && paymentMethod.value !== v) {
+            paymentMethod.value = v;
+        }
+    },
+    { immediate: true },
+);
+
+watch(paymentMethod, (v) => {
+    if (!salesCartIsOnline.value) {
+        emit("update:offlinePaymentMethod", v);
+    }
+    if (v === "card") {
+        cardTypeModalOpen.value = true;
+    } else {
+        selectedPaymentCardTypeId.value = null;
+    }
+});
+
+watch(
+    salesCartIsOnline,
+    (online) => {
+        if (!online && paymentMethod.value === "credit") {
+            paymentMethod.value = "cash";
+            emit("update:offlinePaymentMethod", "cash");
+        }
+    },
+    { immediate: true },
+);
 
 // Watch for customer changes and check credit availability
 watch(
@@ -412,7 +520,7 @@ const creditLimitSufficient = computed(() => {
                         :class="{
                             'hover:bg-green-700 p-1': orders.length !== 0,
                         }"
-                        :disabled="orders.length == 0"
+                        :disabled="orders.length == 0 || !salesCartIsOnline"
                         @click="showDiscountOrder"
                     >
                         <IconDiscount size="20" class="mx-auto" />
@@ -462,9 +570,9 @@ const creditLimitSufficient = computed(() => {
                         <a-radio-button value="card"
                             >Pay in Card</a-radio-button
                         >
-                        <a-radio-button 
+                        <a-radio-button
                             value="credit"
-                            :disabled="!canUseCredit"
+                            :disabled="!salesCartIsOnline || !canUseCredit"
                         >
                             Pay on Credit
                         </a-radio-button>
@@ -511,10 +619,11 @@ const creditLimitSufficient = computed(() => {
                     <a-input readonly :value="formattedTotal(customerChange)" />
                 </div>
 
-                <!-- Proceed Payment Button -->
+                <!-- Proceed Payment / Offline save -->
                 <div class="flex flex-col gap-2">
                     <div class="invisible">Proceed Payment</div>
                     <a-button
+                        v-if="salesCartIsOnline"
                         type="primary"
                         class="w-[300px]"
                         :class="disabledPaymentButtonColor"
@@ -524,11 +633,25 @@ const creditLimitSufficient = computed(() => {
                             (paymentMethod !== 'credit' && amountReceived <
                                 totalAmount - orderDiscountAmount) ||
                             (paymentMethod === 'credit' && !creditLimitSufficient) ||
+                            (paymentMethod === 'card' && !selectedPaymentCardTypeId) ||
                             orders.length == 0
                         "
                         :loading="proceedPaymentLoading"
                     >
                         Proceed Payment
+                    </a-button>
+                    <a-button
+                        v-else
+                        type="primary"
+                        class="w-[300px] bg-amber-700 border-amber-700 hover:bg-amber-600"
+                        :disabled="
+                            orders.length == 0 ||
+                            (paymentMethod === 'card' &&
+                                !selectedPaymentCardTypeId)
+                        "
+                        @click="emit('save-offline-sale')"
+                    >
+                        Save as offline sale
                     </a-button>
                 </div>
             </div>
@@ -544,6 +667,15 @@ const creditLimitSufficient = computed(() => {
                 :discountOptions="discountOptions"
                 @close="openOrderDicountModal = false"
                 @discount-applied="emit('discount-applied')"
+            />
+
+            <card-payment-type-modal
+                v-model:visible="cardTypeModalOpen"
+                :use-network="salesCartIsOnline"
+                :cached-types="cachedPaymentCardTypes"
+                :initial-selected-id="selectedPaymentCardTypeId"
+                @confirm="onCardTypeModalConfirm"
+                @cancel="onCardTypeModalCancel"
             />
         </div>
     </div>

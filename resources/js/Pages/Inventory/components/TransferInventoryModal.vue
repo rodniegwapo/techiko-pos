@@ -11,6 +11,11 @@ const page = usePage();
 
 const { openModal } = useGlobalVariables();
 
+// Global Sanctum inventory API (Ziggy does not expose domain-only `sales.products` on this page).
+const inventoryApi = {
+  searchProducts: "/api/inventory/search/products",
+};
+
 const emit = defineEmits(["success", "update:visible"]);
 
 const props = defineProps({
@@ -132,10 +137,15 @@ const searchProducts = async () => {
 
   searchLoading.value = true;
   try {
-    const response = await axios.get(route("sales.products"), {
-      params: { search: productSearch.value },
-    });
-    searchResults.value = response.data.data || [];
+    const params = { search: productSearch.value };
+    if (form.domain) {
+      params.domain = form.domain;
+    }
+    const response = await axios.get(inventoryApi.searchProducts, { params });
+    const collection = response.data.data;
+    searchResults.value = Array.isArray(collection)
+      ? collection
+      : collection?.data ?? [];
   } catch (error) {
     console.error("Product search error:", error);
     searchResults.value = [];

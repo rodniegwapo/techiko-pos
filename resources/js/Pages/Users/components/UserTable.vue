@@ -7,6 +7,7 @@ import {
     IconCrown,
     IconWorld,
     IconUserCheck,
+    IconKey,
 } from "@tabler/icons-vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { Modal, notification } from "ant-design-vue";
@@ -48,7 +49,7 @@ const props = defineProps({
 });
 
 // Emits
-const emit = defineEmits(["change", "edit", "view"]);
+const emit = defineEmits(["change", "edit", "view", "set-pin"]);
 
 // Table columns
 const columns = computed(() => {
@@ -118,6 +119,31 @@ const handleEdit = (record) => {
     const userData = record.data || record;
 
     emit("edit", userData);
+};
+
+const canSetPin = (user) => {
+    const userData = user.data || user;
+    if (!hasPermission("users.pin.update")) {
+        return false;
+    }
+    if (userData.is_super_user) {
+        return false;
+    }
+    if (isSuperUser.value) {
+        return true;
+    }
+    const actorRoles =
+        currentUser.value.roles?.map((r) => r.name.toLowerCase()) || [];
+    const targetRoles =
+        userData.roles?.map((r) => r.name.toLowerCase()) || [];
+    const targetHasSuperAdminRole = targetRoles.includes("super admin");
+    if (actorRoles.includes("admin")) {
+        return !targetHasSuperAdminRole;
+    }
+    if (actorRoles.includes("super admin")) {
+        return !targetHasSuperAdminRole;
+    }
+    return false;
 };
 
 const canEdit = (user) => {
@@ -561,6 +587,15 @@ const handleImpersonate = (user) => {
                         @click="handleEdit(record)"
                     >
                         <IconEdit size="20" class="mx-auto" />
+                    </IconTooltipButton>
+
+                    <IconTooltipButton
+                        v-if="canSetPin(record)"
+                        hover="group-hover:bg-amber-500"
+                        name="Set PIN"
+                        @click="$emit('set-pin', record)"
+                    >
+                        <IconKey size="20" class="mx-auto" />
                     </IconTooltipButton>
 
                     <IconTooltipButton

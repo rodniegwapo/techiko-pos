@@ -29,12 +29,22 @@ const price = ref(null);
 const category = ref(null);
 const cost = ref(null);
 
+const locationIdQuery = () => {
+    if (typeof window === "undefined") {
+        return {};
+    }
+    const url = new URL(page.url, window.location.origin);
+    const id = url.searchParams.get("location_id");
+    return id ? { location_id: id } : {};
+};
+
 // Fetch items
 const getItems = () => {
     router.reload({
         only: ["items"],
         preserveScroll: true,
         data: {
+            ...locationIdQuery(),
             search: search.value || undefined,
             sold_type: sold_type.value || undefined,
             price: price.value || undefined,
@@ -111,7 +121,9 @@ const filtersConfig = [
 
 // group all filters in one object
 const tableFilters = { search, sold_type, price, category, cost };
-const { pagination, handleTableChange } = useTable("items", tableFilters);
+const { pagination, handleTableChange } = useTable("items", tableFilters, {
+    preserveQueryKeys: ["location_id"],
+});
 </script>
 
 <template>

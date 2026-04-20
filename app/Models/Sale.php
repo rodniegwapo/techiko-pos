@@ -2,10 +2,9 @@
 
 namespace App\Models;
 
-use App\Events\OrderUpdated;
 use App\Events\CustomerUpdated;
+use App\Events\OrderUpdated;
 use App\Models\Product\Discount;
-use App\Models\InventoryLocation;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -22,12 +21,14 @@ class Sale extends Model
     // }
 
     // Add scope for easy domain filtering
-    public function scopeForDomain($query, $domain) {
+    public function scopeForDomain($query, $domain)
+    {
         return $query->where('domain', $domain);
     }
 
     // Add scope for pending sales
-    public function scopePending($query) {
+    public function scopePending($query)
+    {
         return $query->where('payment_status', 'pending');
     }
 
@@ -54,6 +55,11 @@ class Sale extends Model
     public function location()
     {
         return $this->belongsTo(InventoryLocation::class);
+    }
+
+    public function paymentCardType()
+    {
+        return $this->belongsTo(PaymentCardType::class);
     }
 
     public function recalcTotals(): void
@@ -85,7 +91,7 @@ class Sale extends Model
             'saleItems.product',
             'saleDiscounts',
             'saleItems.discounts',
-            'customer'
+            'customer',
         ])));
 
     }
@@ -95,18 +101,18 @@ class Sale extends Model
      */
     public function updateCustomer(?int $customerId): void
     {
-        \Log::info("Sale::updateCustomer called", [
+        \Log::info('Sale::updateCustomer called', [
             'sale_id' => $this->id,
-            'customer_id' => $customerId
+            'customer_id' => $customerId,
         ]);
-        
+
         $this->update(['customer_id' => $customerId]);
-        
-        \Log::info("CustomerUpdated event being fired", [
+
+        \Log::info('CustomerUpdated event being fired', [
             'sale_id' => $this->id,
-            'customer_id' => $customerId
+            'customer_id' => $customerId,
         ]);
-        
+
         // Trigger customer update event to notify frontend
         event(new CustomerUpdated($this));
     }
