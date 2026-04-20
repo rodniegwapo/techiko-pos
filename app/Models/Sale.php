@@ -80,9 +80,24 @@ class Sale extends Model
         $orderDiscountTotal = $this->saleDiscounts()->sum('discount_amount');
         $this->discount_amount = $orderDiscountTotal;
 
-        $tax = $this->tax_amount ?? 0;
+        $netAfterDiscount = max(0, $this->total_amount - $this->discount_amount);
 
-        $this->grand_total = max(0, $this->total_amount - $this->discount_amount + $tax);
+        $vat = ['apply_vat_automatically' => false, 'vat_rate_percent' => 12];
+        if ($this->domain) {
+            $domainModel = Domain::where('name_slug', $this->domain)->first();
+            if ($domainModel) {
+                $vat = $domainModel->salesVatSettings();
+            }
+        }
+
+        if (! empty($vat['apply_vat_automatically'])) {
+            $rate = max(0, min(100, (float) ($vat['vat_rate_percent'] ?? 12))) / 100;
+            $this->tax_amount = round($netAfterDiscount * $rate, 2);
+        } else {
+            $this->tax_amount = 0;
+        }
+
+        $this->grand_total = max(0, $netAfterDiscount + $this->tax_amount);
 
         $this->save();
 

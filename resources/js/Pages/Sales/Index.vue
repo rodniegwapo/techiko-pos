@@ -59,6 +59,14 @@ provide("isSalesOnline", salesCartIsOnline);
 const domainSlug = computed(
     () => page.props.domain?.name_slug ?? page.props.domain?.nameSlug,
 );
+
+const salesSettings = computed(
+    () =>
+        page.props.salesSettings ?? {
+            apply_vat_automatically: false,
+            vat_rate_percent: 12,
+        },
+);
 const activeLocationId = computed(() => page.props.currentLocation?.id);
 const cashierUserId = computed(() => page.props.auth?.user?.data?.id);
 
@@ -1166,6 +1174,7 @@ watch(
                 :orderDiscountId="orderDiscountId"
                 :orderId="orderId"
                 :discountOptions="discountOptions"
+                :sales-settings="salesSettings"
                 :offline-payment-method="offlinePaymentMethod"
                 :cached-payment-card-types="cachedPaymentCardTypes"
                 :offline-payment-card-type-id="offlinePaymentCardTypeId"
