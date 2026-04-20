@@ -96,7 +96,8 @@ const isInclusive = computed(
 const netAfterOrderDiscount = computed(() =>
     Math.max(
         0,
-        Number(totalAmount.value) - (parseFloat(orderDiscountAmount.value) || 0),
+        Number(totalAmount.value) -
+            (parseFloat(orderDiscountAmount.value) || 0),
     ),
 );
 
@@ -178,17 +179,17 @@ const showDiscountOrder = async () => {
         // Use consolidated discount data from props instead of API call
         console.log(
             "TotalAmountSection - discountOptions:",
-            discountOptions.value
+            discountOptions.value,
         );
         const { promotional_discount_options, mandatory_discount_options } =
             discountOptions.value;
         console.log(
             "TotalAmountSection - promotional_discount_options:",
-            promotional_discount_options
+            promotional_discount_options,
         );
         console.log(
             "TotalAmountSection - mandatory_discount_options:",
-            mandatory_discount_options
+            mandatory_discount_options,
         );
 
         // Convert database discounts to option objects for the select components
@@ -202,7 +203,7 @@ const showDiscountOrder = async () => {
                 value: discount.id,
                 amount: discount.value,
                 type: discount.type,
-            })
+            }),
         );
 
         // Get the first active mandatory discount
@@ -224,7 +225,7 @@ const showDiscountOrder = async () => {
         if (orderId.value) {
             try {
                 const saleResponse = await axios.get(
-                    getRoute("sales.discounts.sale", { sale: orderId.value })
+                    getRoute("sales.discounts.sale", { sale: orderId.value }),
                 );
                 console.log("Sale discounts response:", saleResponse.data);
 
@@ -237,7 +238,7 @@ const showDiscountOrder = async () => {
                 if (sale_discounts && Array.isArray(sale_discounts)) {
                     // Get currently applied promotional discounts
                     const appliedPromotional = sale_discounts.filter(
-                        (item) => item.discount_type === "regular"
+                        (item) => item.discount_type === "regular",
                     );
                     currentPromotionalDiscounts = appliedPromotional.map(
                         (item) => ({
@@ -249,17 +250,17 @@ const showDiscountOrder = async () => {
                             value: item.discount_id,
                             amount: item.discount?.value,
                             type: item.discount?.type,
-                        })
+                        }),
                     );
 
                     console.log(
                         "Current promotional discounts loaded:",
-                        currentPromotionalDiscounts
+                        currentPromotionalDiscounts,
                     );
 
                     // Get currently applied mandatory discount
                     const appliedMandatory = sale_discounts.filter(
-                        (item) => item.discount_type === "mandatory"
+                        (item) => item.discount_type === "mandatory",
                     );
                     if (appliedMandatory.length > 0) {
                         const mandatory = appliedMandatory[0];
@@ -280,13 +281,13 @@ const showDiscountOrder = async () => {
 
                     console.log(
                         "Current mandatory discount loaded:",
-                        currentMandatoryDiscount
+                        currentMandatoryDiscount,
                     );
                 }
             } catch (saleError) {
                 console.log(
                     "No current discounts found or error loading sale discounts:",
-                    saleError
+                    saleError,
                 );
                 // This is not an error - just means no discounts are currently applied
             }
@@ -396,16 +397,20 @@ const handleProceedPayment = async () => {
             if (!creditLimitSufficient.value) {
                 notification.error({
                     message: "Credit Limit Exceeded",
-                    description: `Available credit (₱${creditInfo.value?.availableCredit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}) is insufficient for this transaction.`,
+                    description: `Available credit (₱${creditInfo.value?.availableCredit.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}) is insufficient for this transaction.`,
                 });
                 throw new Error("Credit limit exceeded");
             }
         }
 
-        if (paymentMethod.value === "card" && !selectedPaymentCardTypeId.value) {
+        if (
+            paymentMethod.value === "card" &&
+            !selectedPaymentCardTypeId.value
+        ) {
             notification.error({
                 message: "Card type required",
-                description: "Choose a card payment type before completing checkout.",
+                description:
+                    "Choose a card payment type before completing checkout.",
             });
             cardTypeModalOpen.value = true;
             throw new Error("Card type required");
@@ -439,7 +444,7 @@ const handleProceedPayment = async () => {
         if (creditResults) {
             notification.success({
                 message: "Credit Sale Processed!",
-                description: `Transaction completed on credit. Remaining credit: ₱${creditResults.available_credit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+                description: `Transaction completed on credit. Remaining credit: ₱${creditResults.available_credit.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
                 duration: 5,
             });
         } else if (loyaltyResults && loyaltyResults.points_earned) {
@@ -469,14 +474,17 @@ const handleProceedPayment = async () => {
         }
 
         // Refresh current pending sale data to show updated state
-        emit('cart-updated');
+        emit("cart-updated");
 
         localStorage.setItem("order_discount_amount", 0);
         localStorage.setItem("order_discount_ids", "");
         orderDiscountAmount.value = 0;
         orderDiscountId.value = "";
     } catch (error) {
-        const errorMessage = error.response?.data?.message || error.message || "Please try again or contact support.";
+        const errorMessage =
+            error.response?.data?.message ||
+            error.message ||
+            "Please try again or contact support.";
         notification.error({
             message: "Payment failed",
             description: errorMessage,
@@ -540,7 +548,10 @@ watch(
         if (customer && customer.id) {
             checkingCredit.value = true;
             // Use customer data directly instead of API call
-            const availableCredit = Math.max(0, (customer.credit_limit || 0) - (customer.credit_balance || 0));
+            const availableCredit = Math.max(
+                0,
+                (customer.credit_limit || 0) - (customer.credit_balance || 0),
+            );
             creditInfo.value = {
                 available: availableCredit >= grandTotalDisplay.value,
                 availableCredit: availableCredit,
@@ -553,7 +564,7 @@ watch(
             creditInfo.value = null;
         }
     },
-    { immediate: true }
+    { immediate: true },
 );
 
 // Watch payable total changes to re-check credit
@@ -562,15 +573,22 @@ watch(
     async (amount) => {
         if (props.selectedCustomer?.id && creditInfo.value) {
             // Recalculate availability based on new amount
-            const availableCredit = Math.max(0, (props.selectedCustomer.credit_limit || 0) - (props.selectedCustomer.credit_balance || 0));
+            const availableCredit = Math.max(
+                0,
+                (props.selectedCustomer.credit_limit || 0) -
+                    (props.selectedCustomer.credit_balance || 0),
+            );
             creditInfo.value.available = availableCredit >= amount;
         }
-    }
+    },
 );
 
 // Check if credit payment is available
 const canUseCredit = computed(() => {
-    return props.selectedCustomer?.credit_enabled && creditInfo.value?.creditEnabled;
+    return (
+        props.selectedCustomer?.credit_enabled &&
+        creditInfo.value?.creditEnabled
+    );
 });
 
 // Check if credit limit is sufficient
@@ -628,9 +646,7 @@ const creditLimitSufficient = computed(() => {
                             formattedTotal(taxAmountDisplay)
                         }}</span>
                     </div>
-                    <span
-                        v-if="isInclusive"
-                        class="text-xs text-gray-500 pl-0"
+                    <span v-if="isInclusive" class="text-xs text-gray-500 pl-0"
                         >Included in total below</span
                     >
                 </div>
@@ -684,30 +700,56 @@ const creditLimitSufficient = computed(() => {
                         v-model:value="paymentMethod"
                         button-style="solid"
                     >
-                        <a-radio-button value="cash"
-                            >Pay in Cash</a-radio-button
-                        >
-                        <a-radio-button value="card"
-                            >Pay in Card</a-radio-button
-                        >
+                        <a-radio-button value="cash">Cash</a-radio-button>
+                        <a-radio-button value="card">Card</a-radio-button>
                         <a-radio-button
                             value="credit"
                             :disabled="!salesCartIsOnline || !canUseCredit"
                         >
-                            Pay on Credit
+                            Credit
                         </a-radio-button>
                     </a-radio-group>
                     <!-- Credit Information Display -->
-                    <div v-if="paymentMethod === 'credit' && creditInfo" class="mt-2 text-sm">
-                        <div v-if="checkingCredit" class="text-gray-500">Checking credit...</div>
+                    <div
+                        v-if="paymentMethod === 'credit' && creditInfo"
+                        class="mt-2 text-sm"
+                    >
+                        <div v-if="checkingCredit" class="text-gray-500">
+                            Checking credit...
+                        </div>
                         <div v-else>
                             <div class="text-gray-600">
-                                Available Credit: <span class="font-medium text-green-600">₱{{ creditInfo.availableCredit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
+                                Available Credit:
+                                <span class="font-medium text-green-600"
+                                    >₱{{
+                                        creditInfo.availableCredit.toLocaleString(
+                                            "en-US",
+                                            {
+                                                minimumFractionDigits: 2,
+                                                maximumFractionDigits: 2,
+                                            },
+                                        )
+                                    }}</span
+                                >
                             </div>
                             <div class="text-gray-600">
-                                Current Balance: <span class="font-medium text-red-600">₱{{ creditInfo.creditBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
+                                Current Balance:
+                                <span class="font-medium text-red-600"
+                                    >₱{{
+                                        creditInfo.creditBalance.toLocaleString(
+                                            "en-US",
+                                            {
+                                                minimumFractionDigits: 2,
+                                                maximumFractionDigits: 2,
+                                            },
+                                        )
+                                    }}</span
+                                >
                             </div>
-                            <div v-if="!creditLimitSufficient" class="text-red-600 font-medium mt-1">
+                            <div
+                                v-if="!creditLimitSufficient"
+                                class="text-red-600 font-medium mt-1"
+                            >
                                 ⚠️ Insufficient credit for this transaction
                             </div>
                         </div>
@@ -715,7 +757,10 @@ const creditLimitSufficient = computed(() => {
                 </div>
 
                 <!-- Amount Received (only show for non-credit payments) -->
-                <div v-if="paymentMethod !== 'credit'" class="flex items-start flex-col gap-2">
+                <div
+                    v-if="paymentMethod !== 'credit'"
+                    class="flex items-start flex-col gap-2"
+                >
                     <span class="text-gray-700 whitespace-nowrap"
                         >Amount Received:</span
                     >
@@ -733,7 +778,10 @@ const creditLimitSufficient = computed(() => {
                 </div>
 
                 <!-- Change (only show for non-credit payments) -->
-                <div v-if="paymentMethod !== 'credit'" class="flex items-start flex-col gap-2">
+                <div
+                    v-if="paymentMethod !== 'credit'"
+                    class="flex items-start flex-col gap-2"
+                >
                     <span class="text-gray-700 whitespace-nowrap">Change:</span>
                     <a-input readonly :value="formattedTotal(customerChange)" />
                 </div>
@@ -751,8 +799,10 @@ const creditLimitSufficient = computed(() => {
                             proceedPaymentLoading ||
                             (paymentMethod !== 'credit' &&
                                 amountReceived < grandTotalDisplay) ||
-                            (paymentMethod === 'credit' && !creditLimitSufficient) ||
-                            (paymentMethod === 'card' && !selectedPaymentCardTypeId) ||
+                            (paymentMethod === 'credit' &&
+                                !creditLimitSufficient) ||
+                            (paymentMethod === 'card' &&
+                                !selectedPaymentCardTypeId) ||
                             orders.length == 0
                         "
                         :loading="proceedPaymentLoading"
