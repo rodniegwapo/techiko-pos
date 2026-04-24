@@ -107,48 +107,6 @@ const jsonLd = computed(() =>
             </div>
         </section>
 
-        <section
-            class="border-b border-gray-200 bg-gray-50"
-            aria-labelledby="at-a-glance-heading"
-        >
-            <div
-                class="mx-auto max-w-6xl px-4 py-10 md:px-4 md:py-12"
-            >
-                <div
-                    class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm md:p-8"
-                >
-                    <h2
-                        id="at-a-glance-heading"
-                        class="text-sm font-semibold uppercase tracking-wide text-gray-800"
-                    >
-                        At a glance
-                    </h2>
-                    <ul
-                        class="mt-4 space-y-3 text-sm text-gray-600 md:text-base"
-                    >
-                        <li class="flex items-start gap-3">
-                            <span
-                                class="mt-2 h-2 w-2 flex-shrink-0 rounded-full bg-green-400 shadow-sm"
-                            />
-                            Fast checkout with flexible discounts
-                        </li>
-                        <li class="flex items-start gap-3">
-                            <span
-                                class="mt-2 h-2 w-2 flex-shrink-0 rounded-full bg-green-400 shadow-sm"
-                            />
-                            Multi-location inventory visibility
-                        </li>
-                        <li class="flex items-start gap-3">
-                            <span
-                                class="mt-2 h-2 w-2 flex-shrink-0 rounded-full bg-green-400 shadow-sm"
-                            />
-                            Customer loyalty and reporting in one place
-                        </li>
-                    </ul>
-                </div>
-            </div>
-        </section>
-
         <div
             class="relative min-h-[5.5rem] overflow-hidden border-b border-gray-200 bg-white py-5 text-center md:min-h-[6rem] md:py-6"
         >
