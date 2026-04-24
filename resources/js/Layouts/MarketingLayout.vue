@@ -153,13 +153,15 @@ watch(
 
         <footer class="mt-auto border-t border-gray-200 bg-gray-100">
             <div
-                class="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-10 sm:flex-row sm:items-center sm:justify-between"
+                class="mx-auto grid max-w-6xl grid-cols-1 place-items-center gap-6 px-4 py-10 text-center sm:flex sm:max-w-none sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:text-left"
             >
                 <p class="text-sm text-gray-600">
                     &copy; {{ new Date().getFullYear() }} Techiko POS. All
                     rights reserved.
                 </p>
-                <div class="flex flex-wrap gap-4 text-sm text-gray-700">
+                <div
+                    class="flex w-full max-w-sm flex-wrap items-center justify-center gap-4 text-sm text-gray-700 sm:w-auto sm:max-w-none sm:justify-end"
+                >
                     <Link
                         :href="route('marketing.services')"
                         class="transition hover:text-blue-600"
