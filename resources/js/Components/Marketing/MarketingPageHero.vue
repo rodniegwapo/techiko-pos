@@ -41,11 +41,11 @@ const hasImage = computed(() => Boolean(props.imageSrc));
         />
         <div
             v-if="hasImage"
-            class="pointer-events-none absolute -right-20 -top-16 h-64 w-64 rounded-full bg-white/15 blur-3xl md:h-80 md:w-80"
+            class="pointer-events-none absolute -right-20 -top-16 hidden h-64 w-64 rounded-full bg-white/15 blur-3xl md:h-80 md:w-80 lg:block"
         />
         <div
             v-else
-            class="pointer-events-none absolute -right-16 -top-12 h-48 w-48 rounded-full bg-white/10 blur-3xl md:h-64 md:w-64"
+            class="pointer-events-none absolute -right-16 -top-12 hidden h-48 w-48 rounded-full bg-white/10 blur-3xl md:h-64 md:w-64 lg:block"
         />
         <div
             v-if="!hasImage"
@@ -81,7 +81,7 @@ const hasImage = computed(() => Boolean(props.imageSrc));
                 </p>
             </div>
             <div
-                class="mt-10 flex justify-center lg:mt-0 lg:justify-end"
+                class="mt-10 hidden justify-center lg:mt-0 lg:flex lg:justify-end"
             >
                 <img
                     :src="imageSrc"
