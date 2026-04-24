@@ -44,25 +44,25 @@ const jsonLd = computed(() =>
     </Head>
     <MarketingLayout>
         <section
-            class="relative overflow-hidden border-b border-slate-200 bg-gradient-to-br from-slate-50 via-white to-blue-50/50"
+            class="relative overflow-hidden border-b border-blue-400/30 bg-gradient-to-br from-blue-600 via-blue-600 to-blue-500"
         >
             <div
-                class="pointer-events-none absolute inset-0 bg-[radial-gradient(#e2e8f0_1.2px,transparent_1.2px)] opacity-[0.5] [background-size:20px_20px] md:[background-size:24px_24px]"
+                class="pointer-events-none absolute inset-0 bg-white/10"
             />
             <div
-                class="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-gradient-to-br from-blue-400/20 to-teal-400/20 blur-3xl md:h-96 md:w-96"
+                class="pointer-events-none absolute -right-20 -top-16 h-64 w-64 rounded-full bg-white/15 blur-3xl md:h-80 md:w-80"
             />
             <div
                 class="relative mx-auto max-w-6xl px-4 py-12 md:py-20 md:px-4 lg:grid lg:grid-cols-2 lg:gap-12 lg:items-center lg:py-24"
             >
                 <div>
                     <h1
-                        class="text-3xl font-bold tracking-tight text-slate-900 md:text-4xl lg:text-5xl"
+                        class="text-3xl font-bold tracking-tight text-white drop-shadow-sm md:text-4xl lg:text-5xl"
                     >
                         Your store, your pace — one POS that keeps up
                     </h1>
                     <p
-                        class="mt-4 max-w-xl text-base text-slate-600 leading-relaxed md:mt-5 md:text-lg"
+                        class="mt-4 max-w-xl text-base text-blue-100 leading-relaxed md:mt-5 md:text-lg"
                     >
                         One place for sales, stock, and loyalty. Built for
                         retail and hospitality teams that need a fast line and
@@ -73,50 +73,50 @@ const jsonLd = computed(() =>
                     >
                         <Link
                             :href="route('login')"
-                            class="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-teal-500 px-5 py-3 text-center text-base font-semibold text-white shadow-lg shadow-blue-500/20 transition hover:from-blue-700 hover:to-teal-600"
+                            class="inline-flex items-center justify-center rounded-xl bg-white px-5 py-3 text-center text-base font-semibold text-blue-700 shadow-lg transition hover:bg-blue-50"
                         >
                             Sign in
                         </Link>
                         <Link
                             :href="route('register')"
-                            class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-3 text-center text-base font-semibold text-slate-800 transition hover:border-slate-400 hover:bg-slate-50"
+                            class="inline-flex items-center justify-center rounded-xl border-2 border-white/50 bg-white/10 px-5 py-3 text-center text-base font-semibold text-white backdrop-blur-sm transition hover:border-white hover:bg-white/20"
                         >
                             Create account
                         </Link>
                         <Link
                             :href="route('marketing.services')"
-                            class="inline-flex items-center justify-center py-1 text-sm font-semibold text-blue-600 transition hover:text-blue-800 sm:pl-1"
+                            class="inline-flex items-center justify-center py-1 text-sm font-semibold text-white/95 underline decoration-blue-200/90 decoration-2 underline-offset-4 transition hover:text-white sm:pl-1"
                         >
                             See all features
                         </Link>
                     </div>
                 </div>
                 <div
-                    class="mt-10 rounded-2xl border border-slate-200/80 bg-white/90 p-6 shadow-xl shadow-slate-200/50 backdrop-blur md:p-7 lg:mt-0"
+                    class="mt-10 rounded-2xl border border-white/30 bg-white/10 p-6 shadow-2xl shadow-blue-900/10 backdrop-blur-md md:p-7 lg:mt-0"
                 >
                     <p
-                        class="text-sm font-semibold uppercase tracking-wide text-teal-600"
+                        class="text-sm font-semibold uppercase tracking-wide text-blue-100"
                     >
                         At a glance
                     </p>
                     <ul
-                        class="mt-4 space-y-3 text-slate-700 text-sm md:text-base"
+                        class="mt-4 space-y-3 text-sm text-white md:text-base"
                     >
-                        <li class="flex items-start gap-2">
+                        <li class="flex items-start gap-3">
                             <span
-                                class="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-blue-500"
+                                class="mt-1.5 h-2.5 w-2.5 flex-shrink-0 rounded-full border-2 border-white/80 bg-white"
                             />
                             Fast checkout with flexible discounts
                         </li>
-                        <li class="flex items-start gap-2">
+                        <li class="flex items-start gap-3">
                             <span
-                                class="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-blue-500"
+                                class="mt-1.5 h-2.5 w-2.5 flex-shrink-0 rounded-full border-2 border-white/80 bg-white"
                             />
                             Multi-location inventory visibility
                         </li>
-                        <li class="flex items-start gap-2">
+                        <li class="flex items-start gap-3">
                             <span
-                                class="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-blue-500"
+                                class="mt-1.5 h-2.5 w-2.5 flex-shrink-0 rounded-full border-2 border-white/80 bg-white"
                             />
                             Customer loyalty and reporting in one place
                         </li>
@@ -126,24 +126,24 @@ const jsonLd = computed(() =>
         </section>
 
         <div
-            class="border-b border-slate-200 bg-white py-4 text-center md:py-5"
+            class="border-b border-gray-200 bg-blue-50 py-4 text-center md:py-5"
         >
-            <p class="text-sm font-medium text-slate-600 md:text-base">
+            <p class="text-sm font-medium text-gray-800 md:text-base">
                 Built for retail and hospitality
             </p>
             <p
-                class="mx-auto mt-2 max-w-2xl px-4 text-xs text-slate-500 leading-relaxed md:text-sm"
+                class="mx-auto mt-2 max-w-2xl px-4 text-xs text-gray-600 leading-relaxed md:text-sm"
             >
                 Data handled with industry-standard security practices. See
                 <Link
                     :href="route('marketing.services')"
-                    class="font-medium text-blue-600 hover:text-blue-800"
+                    class="font-medium text-blue-600 transition hover:text-blue-700"
                     >Services</Link
                 >
                 or
                 <Link
                     :href="route('marketing.contact')"
-                    class="font-medium text-blue-600 hover:text-blue-800"
+                    class="font-medium text-blue-600 transition hover:text-blue-700"
                     >Contact</Link
                 >
                 for details.
