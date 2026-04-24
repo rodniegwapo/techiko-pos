@@ -3,8 +3,8 @@
 namespace App\Http\Middleware;
 
 use App\Http\Resources\AuthUserResource;
-use App\Models\InventoryLocation;
 use App\Models\Domain;
+use App\Models\InventoryLocation;
 use App\Services\ImpersonationService;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -21,7 +21,7 @@ class HandleInertiaRequests extends Middleware
     /**
      * Determine the current asset version.
      */
-    public function version(Request $request): string|null
+    public function version(Request $request): ?string
     {
         return parent::version($request);
     }
@@ -34,9 +34,10 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         $impersonationService = app(ImpersonationService::class);
-        
+
         return [
             ...parent::share($request),
+            'appUrl' => rtrim((string) config('app.url'), '/'),
             'auth' => [
                 'user' => $request->user() ? AuthUserResource::make($request->user()->load('roles', 'permissions')) : null,
             ],
@@ -57,7 +58,6 @@ class HandleInertiaRequests extends Middleware
         $domain = $request->route('domain');
         $domainSlug = data_get($domain, 'name_slug') ?? $domain;
 
-
         if ($domainSlug) {
             return Domain::where('name_slug', $domainSlug)->first();
         }
@@ -77,10 +77,14 @@ class HandleInertiaRequests extends Middleware
     private function getCurrentLocation(Request $request)
     {
         $user = $request->user();
-        if (!$user) return null;
+        if (! $user) {
+            return null;
+        }
 
         $domain = $this->getCurrentDomain($request);
-        if (!$domain) return null;
+        if (! $domain) {
+            return null;
+        }
 
         // Use the centralized helper function
         return \App\Helpers::getActiveLocation($domain, $request->input('location_id'));
@@ -92,7 +96,9 @@ class HandleInertiaRequests extends Middleware
     private function getAvailableLocations(Request $request)
     {
         $domain = $this->getCurrentDomain($request);
-        if (!$domain) return collect();
+        if (! $domain) {
+            return collect();
+        }
 
         return InventoryLocation::active()->forDomain($domain->name_slug)->get();
     }
@@ -103,7 +109,9 @@ class HandleInertiaRequests extends Middleware
     private function getDefaultStore(Request $request)
     {
         $domain = $this->getCurrentDomain($request);
-        if (!$domain) return null;
+        if (! $domain) {
+            return null;
+        }
 
         return InventoryLocation::getDefault($domain->name_slug);
     }
