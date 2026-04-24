@@ -1,6 +1,6 @@
 <script setup>
-import { ref, computed } from "vue";
-import { router, useForm } from "@inertiajs/vue3";
+import { computed } from "vue";
+import { useForm } from "@inertiajs/vue3";
 import { IconShield } from "@tabler/icons-vue";
 import { notification } from "ant-design-vue";
 
@@ -9,48 +9,50 @@ const props = defineProps({
         type: Boolean,
         default: false,
     },
+    permissionModules: {
+        type: Array,
+        default: () => [],
+    },
 });
 
 const emit = defineEmits(["close", "saved"]);
 
-// Form handling
 const form = useForm({
-    name: "", // Display name
-    route_name: "", // Technical route name
+    name: "",
+    route_name: "",
     description: "",
     module: "",
+    module_display_name: "",
     action: "",
 });
 
-// Available modules and actions
-const modules = [
-    { value: "users", label: "Users" },
-    { value: "roles", label: "Roles" },
-    { value: "permissions", label: "Permissions" },
-    { value: "products", label: "Products" },
-    { value: "categories", label: "Categories" },
-    { value: "inventory", label: "Inventory" },
-    { value: "sales", label: "Sales" },
-    { value: "customers", label: "Customers" },
-    { value: "loyalty", label: "Loyalty" },
-    { value: "discounts", label: "Discounts" },
-    { value: "reports", label: "Reports" },
-    { value: "settings", label: "Settings" },
-];
+// Only `value` per option — combobox mode does not support `label` + optionLabelProp.
+const moduleOptions = computed(() =>
+    (props.permissionModules || []).map((m) => ({
+        value: m.name,
+    })),
+);
 
-const actions = [
-    { value: "index", label: "View" },
-    { value: "create", label: "Create" },
-    { value: "edit", label: "Edit" },
-    { value: "delete", label: "Delete" },
-    { value: "manage", label: "Manage" },
-    { value: "export", label: "Export" },
-    { value: "import", label: "Import" },
-    { value: "approve", label: "Approve" },
-    { value: "reject", label: "Reject" },
-];
+const isNewModule = computed(() => {
+    const m = form.module;
+    if (!m || typeof m !== "string") return false;
+    return !(props.permissionModules || []).some((x) => x.name === m);
+});
 
-// Computed property for auto-generated route name
+function normalizeModuleSlug(s) {
+    if (!s || typeof s !== "string") return "";
+    return s
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+}
+
+function onModuleBlur() {
+    const n = normalizeModuleSlug(form.module);
+    if (n) form.module = n;
+}
+
 const routeName = computed(() => {
     if (form.module && form.action) {
         return `${form.module}.${form.action}`;
@@ -58,14 +60,12 @@ const routeName = computed(() => {
     return "";
 });
 
-// Watch for changes to update the route_name field
 const updateRouteName = () => {
     if (form.module && form.action) {
         form.route_name = `${form.module}.${form.action}`;
     }
 };
 
-// Methods
 const handleSubmit = () => {
     form.post(route("permissions.store"), {
         onSuccess: () => {
@@ -76,8 +76,7 @@ const handleSubmit = () => {
             handleClose();
             emit("saved");
         },
-        onError: (errors) => {
-            console.error("Form errors:", errors);
+        onError: () => {
             notification.error({
                 message: "Create Failed",
                 description:
@@ -96,6 +95,19 @@ const handleClose = () => {
 const handleCancel = () => {
     handleClose();
 };
+
+const actions = [
+    { value: "index", label: "View (index)" },
+    { value: "view", label: "View" },
+    { value: "create", label: "Create" },
+    { value: "edit", label: "Edit" },
+    { value: "delete", label: "Delete" },
+    { value: "manage", label: "Manage" },
+    { value: "export", label: "Export" },
+    { value: "import", label: "Import" },
+    { value: "approve", label: "Approve" },
+    { value: "reject", label: "Reject" },
+];
 </script>
 
 <template>
@@ -114,30 +126,44 @@ const handleCancel = () => {
             layout="vertical"
             class="space-y-4"
         >
-            <!-- Module and Action Selection -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <a-form-item
-                    label="Module"
-                    name="module"
-                    :validate-status="form.errors.module ? 'error' : ''"
-                    :help="form.errors.module"
-                    required
+            <a-form-item
+                label="Module"
+                name="module"
+                :validate-status="form.errors.module ? 'error' : ''"
+                :help="form.errors.module"
+                required
+            >
+                <a-auto-complete
+                    v-model:value="form.module"
+                    :options="moduleOptions"
+                    placeholder="Search or type a new module slug"
+                    class="w-full"
+                    @blur="onModuleBlur"
                 >
-                    <a-select
-                        v-model:value="form.module"
-                        placeholder="Select module"
-                        @change="updateRouteName"
-                    >
-                        <a-select-option
-                            v-for="module in modules"
-                            :key="module.value"
-                            :value="module.value"
-                        >
-                            {{ module.label }}
-                        </a-select-option>
-                    </a-select>
-                </a-form-item>
+                    <a-input />
+                </a-auto-complete>
+                <div class="text-sm text-gray-500 mt-1">
+                    Pick an existing module or type a slug (list shows slugs; a
+                    new module row is created on save if missing).
+                </div>
+            </a-form-item>
 
+            <a-form-item
+                v-if="isNewModule"
+                label="New module display name"
+                name="module_display_name"
+                :validate-status="
+                    form.errors.module_display_name ? 'error' : ''
+                "
+                :help="form.errors.module_display_name"
+            >
+                <a-input
+                    v-model:value="form.module_display_name"
+                    placeholder="e.g. VAT Report"
+                />
+            </a-form-item>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <a-form-item
                     label="Action"
                     name="action"
@@ -161,7 +187,6 @@ const handleCancel = () => {
                 </a-form-item>
             </div>
 
-            <!-- Display Name -->
             <a-form-item
                 label="Display Name"
                 name="name"
@@ -182,7 +207,6 @@ const handleCancel = () => {
                 </div>
             </a-form-item>
 
-            <!-- Auto-generated Route Name -->
             <a-form-item
                 label="Route Name"
                 name="route_name"
@@ -203,7 +227,6 @@ const handleCancel = () => {
                 </div>
             </a-form-item>
 
-            <!-- Description -->
             <a-form-item
                 label="Description"
                 name="description"

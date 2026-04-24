@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed } from "vue";
 import { Head, router, usePage } from "@inertiajs/vue3";
 import { watchDebounced } from "@vueuse/core";
 import { IconPlus, IconShield, IconSettings, IconTrash, IconEdit, IconEye } from "@tabler/icons-vue";
@@ -32,6 +32,10 @@ const isSuperUser = computed(() => usePage().props.auth?.user?.data?.is_super_us
 const props = defineProps({
     items: Object,
     permissionsGrouped: Object,
+    permissionModules: {
+        type: Array,
+        default: () => [],
+    },
     canCreate: Boolean,
     canEdit: Boolean,
     canDelete: Boolean,
@@ -49,7 +53,7 @@ const selectedPermission = ref(null);
 // Fetch permissions
 const getItems = () => {
     router.reload({
-        only: ["items"],
+        only: ["items", "permissionModules", "permissionsGrouped"],
         preserveScroll: true,
         data: {
             page: 1,
@@ -73,9 +77,9 @@ const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
             ref: module,
             getLabel: toLabel(
                 computed(() =>
-                    Object.keys(props.permissionsGrouped || {}).map((moduleName) => ({
-                        label: moduleName,
-                        value: moduleName,
+                    (props.permissionModules || []).map((m) => ({
+                        label: m.display_name,
+                        value: m.name,
                     }))
                 )
             ),
@@ -83,18 +87,18 @@ const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
     ],
 });
 
-// FilterDropdown configuration
-const filtersConfig = [
+// FilterDropdown configuration (all registered modules, including those with zero permissions)
+const filtersConfig = computed(() => [
     {
         key: "module",
         label: "Module",
         type: "select",
-        options: Object.keys(props.permissionsGrouped || {}).map((moduleName) => ({
-            label: moduleName,
-            value: moduleName,
+        options: (props.permissionModules || []).map((m) => ({
+            label: m.display_name,
+            value: m.name,
         })),
     },
-];
+]);
 
 // Table composable
 const tableFilters = { search, module };
@@ -215,9 +219,6 @@ const handleDeletePermission = (permission) => {
     });
 };
 
-// Debug - log the permissions data
-console.log("Permissions data:", props.items);
-console.log("Permissions grouped:", props.permissionsGrouped);
 </script>
 
 <template>
@@ -284,6 +285,7 @@ console.log("Permissions grouped:", props.permissionsGrouped);
         <!-- Create Permission Modal -->
         <PermissionCreateModal
             :visible="showCreateModal"
+            :permission-modules="permissionModules"
             @close="handleModalClose"
             @saved="handlePermissionSaved"
         />
@@ -292,6 +294,7 @@ console.log("Permissions grouped:", props.permissionsGrouped);
         <PermissionEditModal
             :visible="showEditModal"
             :permission="selectedPermission"
+            :permission-modules="permissionModules"
             @close="handleModalClose"
             @saved="handlePermissionSaved"
         />

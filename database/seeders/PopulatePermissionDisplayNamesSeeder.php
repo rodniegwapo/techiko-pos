@@ -122,12 +122,17 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
             'sales.dashboard' => 'Sales Dashboard',
             'sales.export' => 'Export Sales',
 
+            'settings.index' => 'View Organization Settings',
+            'settings.update' => 'Update Organization Settings',
+
             'payment-card-types.index' => 'View Payment Wallet',
             'payment-card-types.list' => 'List Card Payment Types',
             'payment-card-types.store' => 'Create Card Payment Type',
             'payment-card-types.update' => 'Update Card Payment Type',
             'payment-card-types.destroy' => 'Delete Card Payment Type',
             'payment-card-types.money' => 'View Card Payment Money Details',
+
+            'vat-report.index' => 'View VAT Report',
 
             // Customers
             'customers.index' => 'View Customers',
