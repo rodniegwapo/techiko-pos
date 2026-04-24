@@ -15,7 +15,9 @@ import {
     IconKey,
     IconCreditCard,
     IconWallet,
+    IconReportMoney,
     IconAccessPointOff,
+    IconSettings,
 } from "@tabler/icons-vue";
 import { router, usePage } from "@inertiajs/vue3";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
@@ -242,6 +244,22 @@ const menuItems = [
         icon: IconUserCog,
         routeName: "users.index",
         path: "/users",
+    },
+    {
+        key: "vat-report",
+        title: "VAT report",
+        icon: IconReportMoney,
+        routeName: "vat-report.index",
+        path: "/vat-report",
+        domainOnly: true,
+    },
+    {
+        key: "organization-settings",
+        title: "Settings",
+        icon: IconSettings,
+        routeName: "settings.index",
+        path: "/settings",
+        domainOnly: true,
     },
     {
         key: "roles",

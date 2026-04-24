@@ -80,9 +80,38 @@ class Sale extends Model
         $orderDiscountTotal = $this->saleDiscounts()->sum('discount_amount');
         $this->discount_amount = $orderDiscountTotal;
 
-        $tax = $this->tax_amount ?? 0;
+        $netAfterDiscount = max(0, $this->total_amount - $this->discount_amount);
 
-        $this->grand_total = max(0, $this->total_amount - $this->discount_amount + $tax);
+        $vat = ['apply_vat_automatically' => false, 'vat_rate_percent' => 12];
+        if ($this->domain) {
+            $domainModel = Domain::where('name_slug', $this->domain)->first();
+            if ($domainModel) {
+                $vat = $domainModel->salesVatSettings();
+            }
+        }
+
+        $pricingMode = $vat['vat_pricing_mode'] ?? 'exclusive';
+        if (! in_array($pricingMode, ['exclusive', 'inclusive'], true)) {
+            $pricingMode = 'exclusive';
+        }
+
+        if (! empty($vat['apply_vat_automatically'])) {
+            $ratePercent = max(0, min(100, (float) ($vat['vat_rate_percent'] ?? 12)));
+            $r = $ratePercent / 100;
+            if ($pricingMode === 'inclusive') {
+                $this->tax_amount = round($netAfterDiscount * ($r / (1 + $r)), 2);
+            } else {
+                $this->tax_amount = round($netAfterDiscount * $r, 2);
+            }
+        } else {
+            $this->tax_amount = 0;
+        }
+
+        if (! empty($vat['apply_vat_automatically']) && $pricingMode === 'inclusive') {
+            $this->grand_total = max(0, $netAfterDiscount);
+        } else {
+            $this->grand_total = max(0, $netAfterDiscount + $this->tax_amount);
+        }
 
         $this->save();
 

@@ -31,7 +31,13 @@ class RoleController extends Controller
         // Get roles with permissions (exclude super admin)
         $roles = Role::with('permissions')
             ->where('name', '!=', 'super admin')
-            ->when($request->search, fn($q, $s) => $q->search($s))
+            ->when($request->filled('search'), function ($query) use ($request) {
+                $s = trim((string) $request->search);
+                $query->where(function ($q) use ($s) {
+                    $q->where('name', 'like', '%'.$s.'%')
+                        ->orWhere('description', 'like', '%'.$s.'%');
+                });
+            })
             ->orderBy('name')
             ->paginate(10);
 
