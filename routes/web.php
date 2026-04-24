@@ -1,9 +1,6 @@
 <?php
 
-use App\Events\OrderUpdated;
 use App\Http\Controllers\ProfileController;
-use App\Models\Sale;
-use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -25,7 +22,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-    
+
     // User Impersonation (Super Users Only)
     Route::post('/impersonate/{user}', [\App\Http\Controllers\ImpersonationController::class, 'impersonate'])
         ->name('impersonate');
@@ -39,38 +36,38 @@ Route::middleware('auth')->group(function () {
 Route::middleware(['auth', 'user.permission'])->group(function () {
     // Sales (Global - All Organizations)
     Route::get('/sales', [\App\Http\Controllers\SaleController::class, 'index'])->name('sales.index');
-    
+
     // Products (Global - All Organizations)
     Route::resource('products', \App\Http\Controllers\Products\ProductController::class)
         ->only(['index', 'store', 'update', 'destroy'])
         ->names('products');
-    
+
     // Categories (Global - All Organizations)
     Route::resource('categories', \App\Http\Controllers\CategoryController::class)
         ->only(['index', 'store', 'update', 'destroy'])
         ->names('categories');
-    
+
     // Product Discounts (Global)
     Route::name('products.')->group(function () {
         Route::resource('discounts', \App\Http\Controllers\Products\DiscountController::class)
             ->only(['index', 'store', 'update', 'destroy'])
             ->names('discounts');
     });
-    
+
     // Mandatory Discounts (Global)
     Route::resource('mandatory-discounts', \App\Http\Controllers\MandatoryDiscountController::class)
         ->only(['index', 'store', 'update', 'destroy'])
         ->names('mandatory-discounts');
-    
+
     // Loyalty Program (Global)
     Route::get('/loyalty', [\App\Http\Controllers\LoyaltyController::class, 'index'])->name('loyalty.index');
-    
+
     // Customers (Global)
     Route::get('/customers', [\App\Http\Controllers\CustomerController::class, 'webIndex'])->name('customers.index');
-    
+
     // Void Logs (Global)
     Route::get('/void-logs', [\App\Http\Controllers\VoidLogController::class, 'index'])->name('voids.index');
-    
+
     // Inventory Management (Global)
     Route::prefix('inventory')->name('inventory.')->group(function () {
         Route::get('/', [\App\Http\Controllers\InventoryController::class, 'index'])->name('index');
@@ -78,19 +75,19 @@ Route::middleware(['auth', 'user.permission'])->group(function () {
         Route::get('/movements', [\App\Http\Controllers\InventoryController::class, 'movements'])->name('movements');
         Route::get('/low-stock', [\App\Http\Controllers\InventoryController::class, 'lowStock'])->name('low-stock');
         Route::get('/valuation', [\App\Http\Controllers\InventoryController::class, 'valuation'])->name('valuation');
-        
+
         Route::post('/receive', [\App\Http\Controllers\InventoryController::class, 'receive'])->name('receive');
         Route::post('/transfer', [\App\Http\Controllers\InventoryController::class, 'transfer'])->name('transfer');
-        
+
         // Search routes
         Route::get('/search/products', [\App\Http\Controllers\InventoryController::class, 'searchProducts'])->name('search.products');
-        
+
         Route::resource('adjustments', \App\Http\Controllers\StockAdjustmentController::class)->names('adjustments');
         Route::post('/adjustments/{adjustment}/submit', [\App\Http\Controllers\StockAdjustmentController::class, 'submitForApproval'])->name('adjustments.submit');
         Route::post('/adjustments/{adjustment}/approve', [\App\Http\Controllers\StockAdjustmentController::class, 'approve'])->name('adjustments.approve');
         Route::post('/adjustments/{adjustment}/reject', [\App\Http\Controllers\StockAdjustmentController::class, 'reject'])->name('adjustments.reject');
         Route::get('/adjustment-products', [\App\Http\Controllers\StockAdjustmentController::class, 'getProductsForAdjustment'])->name('adjustment-products');
-        
+
         Route::resource('locations', \App\Http\Controllers\InventoryLocationController::class)->names('locations');
         Route::post('/locations/{location}/set-default', [\App\Http\Controllers\InventoryLocationController::class, 'setDefault'])->name('locations.set-default');
         Route::post('/locations/{location}/toggle-status', [\App\Http\Controllers\InventoryLocationController::class, 'toggleStatus'])->name('locations.toggle-status');
@@ -105,7 +102,13 @@ Route::get('/thank-you', function () {
 })->name('registration.thankyou');
 
 // Organization-specific routes extracted to routes/domains.php
-require __DIR__ . '/domains.php';
+require __DIR__.'/domains.php';
+
+// PayMongo sandbox test (super users only)
+Route::middleware(['auth', 'check.super.user'])->group(function () {
+    Route::get('/paymongo/test', [\App\Http\Controllers\PayMongoTestController::class, 'index'])->name('paymongo.test');
+    Route::post('/paymongo/payment-intents', [\App\Http\Controllers\PayMongoTestController::class, 'storePaymentIntent'])->name('paymongo.payment-intents.store');
+});
 
 // Domain Management Routes (for super users)
 Route::middleware(['auth', 'user.permission'])->prefix('domains')->name('domains.')->group(function () {
@@ -172,12 +175,13 @@ Route::get('/customer-order', function () {
 // Debug routes
 Route::get('/debug-super-user', function () {
     $user = auth()->user();
+
     return response()->json([
         'user_id' => $user->id,
         'user_name' => $user->name,
         'is_super_user_field' => $user->is_super_user,
         'isSuperUser_method' => $user->isSuperUser(),
-        'method_exists' => method_exists($user, 'isSuperUser')
+        'method_exists' => method_exists($user, 'isSuperUser'),
     ]);
 })->middleware('auth');
 
@@ -189,19 +193,20 @@ Route::get('/debug-role-hierarchy', function () {
         ->get()
         ->map(function ($user) {
             $role = $user->roles()->orderBy('level')->first();
+
             return [
                 'id' => $user->id,
                 'name' => $user->name,
                 'role' => $role ? $role->name : 'No Role',
                 'level' => $role ? $role->level : null,
-                'is_super_user' => $user->is_super_user
+                'is_super_user' => $user->is_super_user,
             ];
         });
-    
+
     return response()->json([
         'role_hierarchy' => $hierarchy,
-        'users_without_supervisors' => $usersWithoutSupervisors
+        'users_without_supervisors' => $usersWithoutSupervisors,
     ]);
 })->middleware('auth');
 
-require __DIR__ . '/auth.php';
+require __DIR__.'/auth.php';

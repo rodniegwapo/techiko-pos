@@ -31,4 +31,10 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    'paymongo' => [
+        'secret' => env('PAYMONGO_SECRET_KEY'),
+        'public' => env('PAYMONGO_PUBLIC_KEY', env('PAYMONG_PUBLIC_KEY')),
+        'base_url' => rtrim(env('PAYMONGO_BASE_URL', 'https://api.paymongo.com/v1'), '/'),
+    ],
+
 ];
