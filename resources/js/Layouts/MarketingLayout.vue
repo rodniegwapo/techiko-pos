@@ -12,9 +12,11 @@ const nav = [
 </script>
 
 <template>
-    <div class="min-h-screen flex flex-col bg-slate-50 text-slate-900">
+    <div
+        class="min-h-screen flex flex-col bg-gradient-to-b from-white to-gray-100 text-gray-800"
+    >
         <header
-            class="border-b border-slate-200/80 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/80"
+            class="border-b border-gray-200 bg-white shadow-sm"
         >
             <div
                 class="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
@@ -22,9 +24,9 @@ const nav = [
                 <div class="flex items-center justify-between">
                     <Link
                         :href="route('marketing.home')"
-                        class="flex items-center gap-2 font-semibold text-slate-800 transition hover:opacity-90"
+                        class="flex items-center gap-2 font-semibold text-gray-800 transition hover:opacity-90"
                     >
-                        <ApplicationLogo class="!w-[100px]" />
+                        <ApplicationLogo class="!w-[88px]" />
                     </Link>
                 </div>
                 <nav
@@ -35,13 +37,13 @@ const nav = [
                         v-for="item in nav"
                         :key="item.href"
                         :href="route(item.href)"
-                        class="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+                        class="rounded-lg px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-blue-50 hover:text-blue-700"
                     >
                         {{ item.name }}
                     </Link>
                     <Link
                         :href="route('login')"
-                        class="ml-0 rounded-lg bg-gradient-to-r from-blue-600 to-teal-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:from-blue-700 hover:to-teal-600 sm:ml-2"
+                        class="ml-0 rounded-lg bg-gradient-to-r from-blue-600 to-blue-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:from-blue-700 hover:to-blue-600 sm:ml-2"
                     >
                         Log in
                     </Link>
@@ -53,26 +55,26 @@ const nav = [
             <slot />
         </main>
 
-        <footer class="mt-auto border-t border-slate-200 bg-white">
+        <footer class="mt-auto border-t border-gray-200 bg-gray-100">
             <div
                 class="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-10 sm:flex-row sm:items-center sm:justify-between"
             >
-                <p class="text-sm text-slate-500">
+                <p class="text-sm text-gray-600">
                     &copy; {{ new Date().getFullYear() }} Techiko POS. All
                     rights reserved.
                 </p>
-                <div class="flex flex-wrap gap-4 text-sm text-slate-600">
+                <div class="flex flex-wrap gap-4 text-sm text-gray-700">
                     <Link
                         :href="route('marketing.services')"
-                        class="hover:text-slate-900"
+                        class="transition hover:text-blue-600"
                         >Services</Link
                     >
                     <Link
                         :href="route('marketing.contact')"
-                        class="hover:text-slate-900"
+                        class="transition hover:text-blue-600"
                         >Contact</Link
                     >
-                    <Link :href="route('login')" class="hover:text-slate-900"
+                    <Link :href="route('login')" class="transition hover:text-blue-600"
                         >Log in</Link
                     >
                 </div>

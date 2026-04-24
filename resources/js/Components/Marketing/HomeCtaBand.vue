@@ -4,11 +4,11 @@ import { Link } from "@inertiajs/vue3";
 
 <template>
     <section
-        class="border-b border-slate-200/80 py-16 md:py-20"
+        class="border-b border-gray-200 bg-gray-100 py-16 md:py-20"
         aria-labelledby="cta-heading"
     >
         <div
-            class="mx-auto max-w-6xl rounded-2xl border border-slate-200/60 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-6 py-12 text-center shadow-xl md:px-10 md:py-16"
+            class="mx-auto max-w-6xl rounded-2xl border border-blue-200/60 bg-gradient-to-br from-blue-600 to-blue-700 px-6 py-12 text-center shadow-xl shadow-blue-600/20 md:px-10 md:py-16"
         >
             <h2
                 id="cta-heading"
@@ -17,13 +17,13 @@ import { Link } from "@inertiajs/vue3";
                 Ready to run your counter?
             </h2>
             <p
-                class="mx-auto mt-3 max-w-xl text-slate-300 text-base leading-relaxed md:text-lg"
+                class="mx-auto mt-3 max-w-xl text-base text-blue-100 leading-relaxed md:text-lg"
             >
                 Open an account to explore Techiko POS, or sign in if your team
                 is already on board. See
                 <Link
                     :href="route('marketing.pricing')"
-                    class="font-semibold text-white underline decoration-teal-400/80 decoration-2 underline-offset-2 transition hover:decoration-teal-300"
+                    class="font-semibold text-white underline decoration-blue-200/90 decoration-2 underline-offset-2 transition hover:text-blue-50"
                 >pricing &amp; plans</Link>
                 for how to get started.
             </p>
@@ -32,13 +32,13 @@ import { Link } from "@inertiajs/vue3";
             >
                 <Link
                     :href="route('register')"
-                    class="inline-flex items-center justify-center rounded-xl bg-white px-5 py-3 text-base font-semibold text-slate-900 shadow transition hover:bg-slate-100"
+                    class="inline-flex items-center justify-center rounded-xl bg-white px-5 py-3 text-base font-semibold text-blue-700 shadow-lg transition hover:bg-gray-100"
                 >
                     Create account
                 </Link>
                 <Link
                     :href="route('login')"
-                    class="inline-flex items-center justify-center rounded-xl border-2 border-white/40 bg-transparent px-5 py-3 text-base font-semibold text-white transition hover:border-white/70 hover:bg-white/10"
+                    class="inline-flex items-center justify-center rounded-xl border-2 border-white/70 bg-transparent px-5 py-3 text-base font-semibold text-white transition hover:border-white hover:bg-white/15"
                 >
                     Log in
                 </Link>
