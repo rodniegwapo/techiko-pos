@@ -153,7 +153,7 @@ watch(
 
         <footer class="mt-auto border-t border-gray-200 bg-gray-100">
             <div
-                class="mx-auto grid max-w-6xl grid-cols-1 place-items-center gap-6 px-4 py-10 text-center sm:flex sm:max-w-none sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:text-left"
+                class="mx-auto grid max-w-7xl grid-cols-1 place-items-center gap-6 px-4 py-10 text-center sm:flex sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:text-left"
             >
                 <p class="text-sm text-gray-600">
                     &copy; {{ new Date().getFullYear() }} Techiko POS. All
