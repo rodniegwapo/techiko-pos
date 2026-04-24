@@ -5,7 +5,7 @@ import { IconUserPlus, IconMapPin, IconCash } from "@tabler/icons-vue";
 
 <template>
     <section
-        class="border-b border-gray-200 bg-gray-100 py-14 md:py-20"
+        class="border-b border-gray-200 bg-white py-14 md:py-20"
         aria-labelledby="how-heading"
     >
         <div class="mx-auto max-w-6xl px-4">
@@ -19,22 +19,17 @@ import { IconUserPlus, IconMapPin, IconCash } from "@tabler/icons-vue";
                 Get from zero to “open for business” in three straightforward
                 steps.
             </p>
-            <ol
-                class="mt-10 grid gap-8 md:grid-cols-3"
+            <ul
+                class="mt-10 grid list-none gap-8 pl-0 md:grid-cols-3"
             >
                 <li
-                    class="relative flex flex-col rounded-2xl border border-gray-200 bg-white p-6 shadow-md"
+                    class="flex flex-col rounded-2xl border border-gray-200 bg-gray-50 p-6 shadow-md"
                 >
-                    <span
-                        class="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-blue-500 text-sm font-bold text-white shadow"
-                    >
-                        1
-                    </span>
                     <div
-                        class="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-blue-500"
+                        class="mb-4 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-green-400 shadow-sm"
                     >
                         <IconUserPlus
-                            :size="24"
+                            :size="22"
                             :strokeWidth="1.75"
                             color="white"
                             class="shrink-0"
@@ -49,24 +44,19 @@ import { IconUserPlus, IconMapPin, IconCash } from "@tabler/icons-vue";
                     </p>
                     <Link
                         :href="route('register')"
-                        class="mt-4 text-sm font-semibold text-blue-700 hover:text-blue-900"
+                        class="mt-4 text-sm font-semibold text-blue-700 transition hover:text-teal-600"
                     >
                         Start registration →
                     </Link>
                 </li>
                 <li
-                    class="relative flex flex-col rounded-2xl border border-gray-200 bg-white p-6 shadow-md"
+                    class="flex flex-col rounded-2xl border border-gray-200 bg-gray-50 p-6 shadow-md"
                 >
-                    <span
-                        class="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-blue-500 text-sm font-bold text-white shadow"
-                    >
-                        2
-                    </span>
                     <div
-                        class="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-blue-500"
+                        class="mb-4 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-green-400 shadow-sm"
                     >
                         <IconMapPin
-                            :size="24"
+                            :size="22"
                             :strokeWidth="1.75"
                             color="white"
                             class="shrink-0"
@@ -81,18 +71,13 @@ import { IconUserPlus, IconMapPin, IconCash } from "@tabler/icons-vue";
                     </p>
                 </li>
                 <li
-                    class="relative flex flex-col rounded-2xl border border-gray-200 bg-white p-6 shadow-md"
+                    class="flex flex-col rounded-2xl border border-gray-200 bg-gray-50 p-6 shadow-md"
                 >
-                    <span
-                        class="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-blue-500 text-sm font-bold text-white shadow"
-                    >
-                        3
-                    </span>
                     <div
-                        class="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-blue-500"
+                        class="mb-4 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-green-400 shadow-sm"
                     >
                         <IconCash
-                            :size="24"
+                            :size="22"
                             :strokeWidth="1.75"
                             color="white"
                             class="shrink-0"
@@ -107,12 +92,12 @@ import { IconUserPlus, IconMapPin, IconCash } from "@tabler/icons-vue";
                     </p>
                     <Link
                         :href="route('login')"
-                        class="mt-4 text-sm font-semibold text-blue-700 hover:text-blue-900"
+                        class="mt-4 text-sm font-semibold text-blue-700 transition hover:text-teal-600"
                     >
                         Sign in to the app →
                     </Link>
                 </li>
-            </ol>
+            </ul>
         </div>
     </section>
 </template>

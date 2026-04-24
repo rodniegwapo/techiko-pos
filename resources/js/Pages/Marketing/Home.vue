@@ -44,7 +44,7 @@ const jsonLd = computed(() =>
     </Head>
     <MarketingLayout>
         <section
-            class="relative overflow-hidden border-b border-blue-400/30 bg-gradient-to-br from-blue-600 via-blue-600 to-blue-500"
+            class="relative overflow-hidden border-b border-teal-500/20 bg-gradient-to-br from-blue-600 to-teal-500"
         >
             <div
                 class="pointer-events-none absolute inset-0 bg-white/10"
@@ -59,7 +59,9 @@ const jsonLd = computed(() =>
                     <h1
                         class="text-3xl font-bold tracking-tight text-white drop-shadow-sm md:text-4xl lg:text-5xl"
                     >
-                        Your store, your pace — one POS that keeps up
+                        Your store, your pace — one
+                        <span class="text-green-400">POS</span>
+                        that keeps up
                     </h1>
                     <p
                         class="mt-4 max-w-xl text-base text-blue-100 leading-relaxed md:mt-5 md:text-lg"
@@ -100,23 +102,23 @@ const jsonLd = computed(() =>
                         At a glance
                     </p>
                     <ul
-                        class="mt-4 space-y-3 text-sm text-white md:text-base"
+                        class="mt-4 space-y-3 text-sm text-blue-50 md:text-base"
                     >
                         <li class="flex items-start gap-3">
                             <span
-                                class="mt-1.5 h-2.5 w-2.5 flex-shrink-0 rounded-full border-2 border-white/80 bg-white"
+                                class="mt-2 h-2 w-2 flex-shrink-0 rounded-full bg-green-400 shadow-sm"
                             />
                             Fast checkout with flexible discounts
                         </li>
                         <li class="flex items-start gap-3">
                             <span
-                                class="mt-1.5 h-2.5 w-2.5 flex-shrink-0 rounded-full border-2 border-white/80 bg-white"
+                                class="mt-2 h-2 w-2 flex-shrink-0 rounded-full bg-green-400 shadow-sm"
                             />
                             Multi-location inventory visibility
                         </li>
                         <li class="flex items-start gap-3">
                             <span
-                                class="mt-1.5 h-2.5 w-2.5 flex-shrink-0 rounded-full border-2 border-white/80 bg-white"
+                                class="mt-2 h-2 w-2 flex-shrink-0 rounded-full bg-green-400 shadow-sm"
                             />
                             Customer loyalty and reporting in one place
                         </li>
@@ -126,7 +128,7 @@ const jsonLd = computed(() =>
         </section>
 
         <div
-            class="border-b border-gray-200 bg-blue-50 py-4 text-center md:py-5"
+            class="border-b border-gray-200 bg-gray-100 py-4 text-center md:py-5"
         >
             <p class="text-sm font-medium text-gray-800 md:text-base">
                 Built for retail and hospitality
@@ -137,15 +139,17 @@ const jsonLd = computed(() =>
                 Data handled with industry-standard security practices. See
                 <Link
                     :href="route('marketing.services')"
-                    class="font-medium text-blue-600 transition hover:text-blue-700"
-                    >Services</Link
+                    class="font-medium text-blue-600 transition hover:text-blue-800"
                 >
+                    Services
+                </Link>
                 or
                 <Link
                     :href="route('marketing.contact')"
-                    class="font-medium text-blue-600 transition hover:text-blue-700"
-                    >Contact</Link
+                    class="font-medium text-blue-600 transition hover:text-teal-600"
                 >
+                    Contact
+                </Link>
                 for details.
             </p>
         </div>
