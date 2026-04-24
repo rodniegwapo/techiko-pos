@@ -8,7 +8,7 @@ import { Link } from "@inertiajs/vue3";
         aria-labelledby="cta-heading"
     >
         <div
-            class="mx-auto max-w-6xl rounded-2xl border border-blue-200/60 bg-gradient-to-br from-blue-600 to-blue-700 px-6 py-12 text-center shadow-xl shadow-blue-600/20 md:px-10 md:py-16"
+            class="mx-auto max-w-6xl rounded-2xl border border-teal-400/40 bg-gradient-to-br from-blue-600 to-teal-500 px-6 py-12 text-center shadow-xl shadow-blue-500/20 md:px-10 md:py-16"
         >
             <h2
                 id="cta-heading"
@@ -23,7 +23,7 @@ import { Link } from "@inertiajs/vue3";
                 is already on board. See
                 <Link
                     :href="route('marketing.pricing')"
-                    class="font-semibold text-white underline decoration-blue-200/90 decoration-2 underline-offset-2 transition hover:text-blue-50"
+                    class="font-semibold text-white underline decoration-teal-200/90 decoration-2 underline-offset-2 transition hover:text-blue-50"
                 >pricing &amp; plans</Link>
                 for how to get started.
             </p>

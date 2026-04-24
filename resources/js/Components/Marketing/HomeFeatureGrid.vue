@@ -23,7 +23,7 @@ const features = [
 
 <template>
     <section
-        class="border-b border-gray-200 bg-white py-14 md:py-20"
+        class="border-b border-gray-200 bg-gray-50 py-14 md:py-20"
         aria-labelledby="features-heading"
     >
         <div class="mx-auto max-w-6xl px-4">
@@ -43,10 +43,10 @@ const features = [
                 <li
                     v-for="(f, i) in features"
                     :key="f.title"
-                    class="flex flex-col rounded-2xl border border-gray-200 bg-gray-50 p-6 shadow-md transition hover:border-blue-200 hover:shadow-lg"
+                    class="flex flex-col rounded-2xl border border-gray-200 bg-white p-6 shadow-md transition hover:border-blue-200 hover:shadow-lg"
                 >
                     <div
-                        class="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-500 shadow-inner"
+                        class="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-400 shadow-inner"
                     >
                         <IconShoppingCart
                             v-if="i === 0"

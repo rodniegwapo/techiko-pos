@@ -13,7 +13,7 @@ const nav = [
 
 <template>
     <div
-        class="min-h-screen flex flex-col bg-gradient-to-b from-white to-gray-100 text-gray-800"
+        class="min-h-screen flex flex-col bg-gray-50 text-gray-800"
     >
         <header
             class="border-b border-gray-200 bg-white shadow-sm"
@@ -37,13 +37,13 @@ const nav = [
                         v-for="item in nav"
                         :key="item.href"
                         :href="route(item.href)"
-                        class="rounded-lg px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-blue-50 hover:text-blue-700"
+                        class="rounded-lg px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-blue-50 hover:text-teal-700"
                     >
                         {{ item.name }}
                     </Link>
                     <Link
                         :href="route('login')"
-                        class="ml-0 rounded-lg bg-gradient-to-r from-blue-600 to-blue-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:from-blue-700 hover:to-blue-600 sm:ml-2"
+                        class="ml-0 rounded-lg bg-gradient-to-r from-blue-600 to-teal-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:from-blue-700 hover:to-teal-600 sm:ml-2"
                     >
                         Log in
                     </Link>
@@ -67,16 +67,21 @@ const nav = [
                     <Link
                         :href="route('marketing.services')"
                         class="transition hover:text-blue-600"
-                        >Services</Link
                     >
+                        Services
+                    </Link>
                     <Link
                         :href="route('marketing.contact')"
                         class="transition hover:text-blue-600"
-                        >Contact</Link
                     >
-                    <Link :href="route('login')" class="transition hover:text-blue-600"
-                        >Log in</Link
+                        Contact
+                    </Link>
+                    <Link
+                        :href="route('login')"
+                        class="transition hover:text-blue-600"
                     >
+                        Log in
+                    </Link>
                 </div>
             </div>
         </footer>
