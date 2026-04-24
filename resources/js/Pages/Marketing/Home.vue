@@ -49,7 +49,7 @@ const jsonLd = computed(() =>
         >
             <div class="pointer-events-none absolute inset-0 bg-white/10" />
             <div
-                class="pointer-events-none absolute -right-20 -top-16 h-64 w-64 rounded-full bg-white/15 blur-3xl md:h-80 md:w-80"
+                class="pointer-events-none absolute -right-20 -top-16 hidden h-64 w-64 rounded-full bg-white/15 blur-3xl md:h-80 md:w-80 lg:block"
             />
             <div
                 class="relative mx-auto max-w-6xl px-4 py-12 md:py-20 md:px-4 lg:grid lg:grid-cols-2 lg:gap-12 lg:items-center lg:py-24"
@@ -93,7 +93,7 @@ const jsonLd = computed(() =>
                     </div>
                 </div>
                 <div
-                    class="mt-10 flex justify-center lg:mt-0 lg:justify-end"
+                    class="mt-10 hidden justify-center lg:mt-0 lg:flex lg:justify-end"
                 >
                     <img
                         :src="bannerSrc"
