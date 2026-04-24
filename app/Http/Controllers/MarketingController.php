@@ -47,7 +47,7 @@ class MarketingController extends Controller
         return $this->render(
             'Marketing/Pricing',
             'Pricing',
-            'Explore how Techiko POS can fit your operation. Get started or talk to us about your needs.',
+            'Free, Professional, and Business plans in Philippine Pesos (PHP). Start free with 100 products, or scale with unlimited inventory and stores.',
             '/pricing'
         );
     }
