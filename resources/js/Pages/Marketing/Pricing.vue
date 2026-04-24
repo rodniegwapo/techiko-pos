@@ -1,4 +1,5 @@
 <script setup>
+import pricingSrc from "@assets/pricing.svg";
 import MarketingHeroOrbit from "@/Components/Marketing/MarketingHeroOrbit.vue";
 import MarketingPageHero from "@/Components/Marketing/MarketingPageHero.vue";
 import MarketingSeoHead from "@/Components/MarketingSeoHead.vue";
@@ -87,6 +88,10 @@ const plans = [
         <MarketingPageHero
             title="Pricing"
             subtitle="Straightforward plans in Philippine Pesos. Start free, then scale when you are ready."
+            :image-src="pricingSrc"
+            image-alt="People comparing plans and pricing on a large display"
+            :image-width="801"
+            :image-height="334"
         />
 
         <div class="relative overflow-hidden border-b border-gray-200 bg-white">
