@@ -9,6 +9,8 @@ const nav = [
     { name: "Pricing", href: "marketing.pricing" },
     { name: "Contact", href: "marketing.contact" },
 ];
+
+const isNavActive = (name) => route().current(name);
 </script>
 
 <template>
@@ -37,7 +39,13 @@ const nav = [
                         v-for="item in nav"
                         :key="item.href"
                         :href="route(item.href)"
-                        class="rounded-lg px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-blue-50 hover:text-teal-700"
+                        :aria-current="isNavActive(item.href) ? 'page' : undefined"
+                        :class="[
+                            'rounded-lg px-3 py-2 text-sm transition',
+                            isNavActive(item.href)
+                                ? 'bg-blue-50 font-semibold text-teal-800 ring-1 ring-blue-100/80'
+                                : 'font-medium text-gray-700 hover:bg-blue-50 hover:text-teal-700',
+                        ]"
                     >
                         {{ item.name }}
                     </Link>
