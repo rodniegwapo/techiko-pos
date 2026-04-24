@@ -45,7 +45,6 @@ const blocks = [
         <MarketingPageHero
             title="Services & capabilities"
             subtitle="One connected platform for the counter, stockroom, and back office—built for real retail and hospitality teams."
-            :image-src="servicesSrc"
             image-alt="Person reviewing analytics and services on a dashboard"
             :image-width="801"
             :image-height="636"
@@ -137,10 +136,7 @@ const blocks = [
                     class="mt-8 max-w-3xl text-sm text-gray-600 leading-relaxed sm:mt-10 sm:text-base"
                 >
                     Have a specific stack or retail format?
-                    <br
-                        class="sm:hidden"
-                        aria-hidden="true"
-                    />
+                    <br class="sm:hidden" aria-hidden="true" />
                     <Link
                         :href="route('marketing.contact')"
                         class="font-semibold text-blue-600 transition hover:text-teal-600"
