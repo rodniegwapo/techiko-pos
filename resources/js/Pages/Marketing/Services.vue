@@ -1,4 +1,5 @@
 <script setup>
+import MarketingHeroOrbit from "@/Components/Marketing/MarketingHeroOrbit.vue";
 import MarketingPageHero from "@/Components/Marketing/MarketingPageHero.vue";
 import MarketingSeoHead from "@/Components/MarketingSeoHead.vue";
 import MarketingLayout from "@/Layouts/MarketingLayout.vue";
@@ -45,8 +46,16 @@ const blocks = [
             subtitle="One connected platform for the counter, stockroom, and back office—built for real retail and hospitality teams."
         />
 
-        <div class="border-b border-gray-200 bg-white">
-            <div class="mx-auto max-w-6xl px-4 py-10 md:py-14">
+        <div
+            class="relative overflow-hidden border-b border-gray-200 bg-white"
+        >
+            <MarketingHeroOrbit
+                surface="light"
+                layout="band"
+            />
+            <div
+                class="relative z-10 mx-auto max-w-6xl px-4 py-10 md:py-14"
+            >
                 <p
                     class="max-w-3xl text-lg text-gray-800 leading-relaxed md:text-xl"
                 >

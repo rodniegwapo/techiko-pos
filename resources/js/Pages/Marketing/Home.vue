@@ -2,6 +2,7 @@
 import HomeCtaBand from "@/Components/Marketing/HomeCtaBand.vue";
 import HomeFeatureGrid from "@/Components/Marketing/HomeFeatureGrid.vue";
 import HomeHowItWorks from "@/Components/Marketing/HomeHowItWorks.vue";
+import MarketingHeroOrbit from "@/Components/Marketing/MarketingHeroOrbit.vue";
 import MarketingSeoHead from "@/Components/MarketingSeoHead.vue";
 import MarketingLayout from "@/Layouts/MarketingLayout.vue";
 import { Head, usePage, Link } from "@inertiajs/vue3";
@@ -46,9 +47,7 @@ const jsonLd = computed(() =>
         <section
             class="relative overflow-hidden border-b border-teal-500/20 bg-gradient-to-br from-blue-600 to-teal-500"
         >
-            <div
-                class="pointer-events-none absolute inset-0 bg-white/10"
-            />
+            <div class="pointer-events-none absolute inset-0 bg-white/10" />
             <div
                 class="pointer-events-none absolute -right-20 -top-16 h-64 w-64 rounded-full bg-white/15 blur-3xl md:h-80 md:w-80"
             />
@@ -93,48 +92,52 @@ const jsonLd = computed(() =>
                         </Link>
                     </div>
                 </div>
-                <div
-                    class="mt-10 rounded-2xl border border-white/30 bg-white/10 p-6 shadow-2xl shadow-blue-900/10 backdrop-blur-md md:p-7 lg:mt-0"
-                >
-                    <p
-                        class="text-sm font-semibold uppercase tracking-wide text-blue-100"
+                <div class="mt-10 lg:mt-0">
+                    <div
+                        class="relative z-20 rounded-2xl border border-white/30 bg-white/10 p-6 shadow-2xl shadow-blue-900/10 backdrop-blur-md md:p-7 lg:mx-auto lg:max-w-md"
                     >
-                        At a glance
-                    </p>
-                    <ul
-                        class="mt-4 space-y-3 text-sm text-blue-50 md:text-base"
-                    >
-                        <li class="flex items-start gap-3">
-                            <span
-                                class="mt-2 h-2 w-2 flex-shrink-0 rounded-full bg-green-400 shadow-sm"
-                            />
-                            Fast checkout with flexible discounts
-                        </li>
-                        <li class="flex items-start gap-3">
-                            <span
-                                class="mt-2 h-2 w-2 flex-shrink-0 rounded-full bg-green-400 shadow-sm"
-                            />
-                            Multi-location inventory visibility
-                        </li>
-                        <li class="flex items-start gap-3">
-                            <span
-                                class="mt-2 h-2 w-2 flex-shrink-0 rounded-full bg-green-400 shadow-sm"
-                            />
-                            Customer loyalty and reporting in one place
-                        </li>
-                    </ul>
+                        <p
+                            class="text-sm font-semibold uppercase tracking-wide text-blue-100"
+                        >
+                            At a glance
+                        </p>
+                        <ul
+                            class="mt-4 space-y-3 text-sm text-blue-50 md:text-base"
+                        >
+                            <li class="flex items-start gap-3">
+                                <span
+                                    class="mt-2 h-2 w-2 flex-shrink-0 rounded-full bg-green-400 shadow-sm"
+                                />
+                                Fast checkout with flexible discounts
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <span
+                                    class="mt-2 h-2 w-2 flex-shrink-0 rounded-full bg-green-400 shadow-sm"
+                                />
+                                Multi-location inventory visibility
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <span
+                                    class="mt-2 h-2 w-2 flex-shrink-0 rounded-full bg-green-400 shadow-sm"
+                                />
+                                Customer loyalty and reporting in one place
+                            </li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </section>
 
         <div
-            class="border-b border-gray-200 bg-gray-100 py-4 text-center md:py-5"
+            class="relative min-h-[5.5rem] overflow-hidden border-b border-gray-200 bg-white py-5 text-center md:min-h-[6rem] md:py-6"
         >
-            <p class="text-sm font-medium text-gray-800 md:text-base">
+            <p
+                class="relative z-10 text-sm font-medium text-gray-800 md:text-base"
+            >
                 Built for retail and hospitality
             </p>
             <p
-                class="mx-auto mt-2 max-w-2xl px-4 text-xs text-gray-600 leading-relaxed md:text-sm"
+                class="relative z-10 mx-auto mt-2 max-w-2xl px-4 text-xs text-gray-600 leading-relaxed md:text-sm"
             >
                 Data handled with industry-standard security practices. See
                 <Link

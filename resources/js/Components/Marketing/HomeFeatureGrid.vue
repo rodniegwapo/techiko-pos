@@ -1,4 +1,5 @@
 <script setup>
+import MarketingHeroOrbit from "@/Components/Marketing/MarketingHeroOrbit.vue";
 import {
     IconPackage,
     IconShoppingCart,
@@ -23,10 +24,14 @@ const features = [
 
 <template>
     <section
-        class="border-b border-gray-200 bg-gray-50 py-14 md:py-20"
+        class="relative overflow-hidden border-b border-gray-200 bg-gray-50 py-14 md:py-20"
         aria-labelledby="features-heading"
     >
-        <div class="mx-auto max-w-6xl px-4">
+        <MarketingHeroOrbit
+            surface="light"
+            layout="band"
+        />
+        <div class="relative z-10 mx-auto max-w-6xl px-4">
             <h2
                 id="features-heading"
                 class="text-2xl font-bold tracking-tight text-gray-800 md:text-3xl"

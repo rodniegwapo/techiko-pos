@@ -1,4 +1,5 @@
 <script setup>
+import MarketingHeroOrbit from "@/Components/Marketing/MarketingHeroOrbit.vue";
 import MarketingPageHero from "@/Components/Marketing/MarketingPageHero.vue";
 import MarketingSeoHead from "@/Components/MarketingSeoHead.vue";
 import MarketingLayout from "@/Layouts/MarketingLayout.vue";
@@ -83,9 +84,15 @@ const plans = [
             subtitle="Straightforward plans in Philippine Pesos. Start free, then scale when you are ready."
         />
 
-        <div class="border-b border-gray-200 bg-white">
+        <div
+            class="relative overflow-hidden border-b border-gray-200 bg-white"
+        >
+            <MarketingHeroOrbit
+                surface="light"
+                layout="band"
+            />
             <div
-                class="mx-auto max-w-6xl px-4 py-10 md:py-14"
+                class="relative z-10 mx-auto max-w-6xl px-4 py-10 md:py-14"
             >
                 <p
                     class="max-w-2xl text-lg text-gray-800 leading-relaxed md:text-xl"

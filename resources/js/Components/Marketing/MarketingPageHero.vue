@@ -22,7 +22,9 @@ defineProps({
         <div
             class="pointer-events-none absolute -right-16 -top-12 h-48 w-48 rounded-full bg-white/10 blur-3xl md:h-64 md:w-64"
         />
-        <div class="relative mx-auto max-w-6xl px-4 py-12 md:py-16 md:px-4">
+        <div
+            class="relative z-10 mx-auto max-w-6xl px-4 py-12 md:py-16 md:px-4"
+        >
             <h1
                 id="page-hero-heading"
                 class="text-3xl font-bold tracking-tight text-white drop-shadow-sm md:text-4xl"
@@ -30,7 +32,7 @@ defineProps({
                 {{ title }}
             </h1>
             <p
-                class="mt-3 max-w-2xl text-base text-blue-100 leading-relaxed md:text-lg"
+                class="mt-3 max-w-2xl text-base text-blue-100 leading-relaxed drop-shadow-sm md:text-lg"
             >
                 {{ subtitle }}
             </p>
