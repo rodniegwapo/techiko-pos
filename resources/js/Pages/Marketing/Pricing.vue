@@ -88,7 +88,6 @@ const plans = [
         <MarketingPageHero
             title="Pricing"
             subtitle="Straightforward plans in Philippine Pesos. Start free, then scale when you are ready."
-            :image-src="pricingSrc"
             image-alt="People comparing plans and pricing on a large display"
             :image-width="801"
             :image-height="334"
