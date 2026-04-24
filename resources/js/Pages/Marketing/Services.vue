@@ -1,4 +1,5 @@
 <script setup>
+import servicesSrc from "@assets/services.svg";
 import MarketingHeroOrbit from "@/Components/Marketing/MarketingHeroOrbit.vue";
 import MarketingPageHero from "@/Components/Marketing/MarketingPageHero.vue";
 import MarketingSeoHead from "@/Components/MarketingSeoHead.vue";
@@ -44,18 +45,15 @@ const blocks = [
         <MarketingPageHero
             title="Services & capabilities"
             subtitle="One connected platform for the counter, stockroom, and back office—built for real retail and hospitality teams."
+            :image-src="servicesSrc"
+            image-alt="Person reviewing analytics and services on a dashboard"
+            :image-width="600"
+            :image-height="200"
         />
 
-        <div
-            class="relative overflow-hidden border-b border-gray-200 bg-white"
-        >
-            <MarketingHeroOrbit
-                surface="light"
-                layout="band"
-            />
-            <div
-                class="relative z-10 mx-auto max-w-6xl px-4 py-10 md:py-14"
-            >
+        <div class="relative overflow-hidden border-b border-gray-200 bg-white">
+            <MarketingHeroOrbit surface="light" layout="band" />
+            <div class="relative z-10 mx-auto max-w-6xl px-4 py-10 md:py-14">
                 <p
                     class="max-w-3xl text-lg text-gray-800 leading-relaxed md:text-xl"
                 >
@@ -63,19 +61,14 @@ const blocks = [
                     less time connecting tools and more time running the floor.
                 </p>
 
-                <section
-                    class="mt-12"
-                    aria-labelledby="capabilities-heading"
-                >
+                <section class="mt-12" aria-labelledby="capabilities-heading">
                     <h2
                         id="capabilities-heading"
                         class="text-xl font-bold tracking-tight text-gray-800 md:text-2xl"
                     >
                         What we offer
                     </h2>
-                    <div
-                        class="mt-8 grid gap-6 sm:grid-cols-2"
-                    >
+                    <div class="mt-8 grid gap-6 sm:grid-cols-2">
                         <article
                             v-for="(b, i) in blocks"
                             :key="b.title"
