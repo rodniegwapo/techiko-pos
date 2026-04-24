@@ -1,4 +1,5 @@
 <script setup>
+import MarketingHeroOrbit from "@/Components/Marketing/MarketingHeroOrbit.vue";
 import MarketingPageHero from "@/Components/Marketing/MarketingPageHero.vue";
 import MarketingSeoHead from "@/Components/MarketingSeoHead.vue";
 import MarketingLayout from "@/Layouts/MarketingLayout.vue";
@@ -20,8 +21,16 @@ defineProps({
             subtitle="Software that keeps checkout fast, stock honest, and your team focused on people—not busywork."
         />
 
-        <div class="border-b border-gray-200 bg-gray-50">
-            <div class="mx-auto max-w-3xl px-4 py-10 md:py-14">
+        <div
+            class="relative overflow-hidden border-b border-gray-200 bg-gray-50"
+        >
+            <MarketingHeroOrbit
+                surface="light"
+                layout="band"
+            />
+            <div
+                class="relative z-10 mx-auto max-w-3xl px-4 py-10 md:py-14"
+            >
                 <div
                     class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm md:p-8"
                 >
