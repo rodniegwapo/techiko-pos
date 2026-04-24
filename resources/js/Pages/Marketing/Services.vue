@@ -45,7 +45,6 @@ const blocks = [
         <MarketingPageHero
             title="Services & capabilities"
             subtitle="One connected platform for the counter, stockroom, and back office—built for real retail and hospitality teams."
-            :image-src="servicesSrc"
             image-alt="Person reviewing analytics and services on a dashboard"
             :image-width="600"
             :image-height="200"
