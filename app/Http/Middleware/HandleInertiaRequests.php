@@ -3,6 +3,8 @@
 namespace App\Http\Middleware;
 
 use App\Http\Resources\AuthUserResource;
+use App\Models\Conversation;
+use App\Models\ConversationMessage;
 use App\Models\Domain;
 use App\Models\InventoryLocation;
 use App\Services\ImpersonationService;
@@ -35,12 +37,18 @@ class HandleInertiaRequests extends Middleware
     {
         $impersonationService = app(ImpersonationService::class);
 
+        $user = $request->user();
+
         return [
             ...parent::share($request),
             'appUrl' => rtrim((string) config('app.url'), '/'),
             'auth' => [
-                'user' => $request->user() ? AuthUserResource::make($request->user()->load('roles', 'permissions')) : null,
+                'user' => $user ? AuthUserResource::make($user->load('roles', 'permissions')) : null,
             ],
+            'myConversation' => $this->myConversationPayload($user),
+            'inquiryUnreadCount' => $user?->isSuperUser()
+                ? Conversation::unreadInboxConversationsForStaffCount()
+                : 0,
             'currentDomain' => $this->getCurrentDomain($request),
             'currentLocation' => $this->getCurrentLocation($request),
             'availableLocations' => $this->getAvailableLocations($request),
@@ -114,5 +122,49 @@ class HandleInertiaRequests extends Middleware
         }
 
         return InventoryLocation::getDefault($domain->name_slug);
+    }
+
+    /**
+     * @return array{id: int|null, messages: array<int, array<string, mixed>>}
+     */
+    private function myConversationPayload(?\Illuminate\Contracts\Auth\Authenticatable $user): array
+    {
+        if ($user === null) {
+            return ['id' => null, 'messages' => []];
+        }
+
+        $conversation = Conversation::query()->where('user_id', $user->id)->first();
+        if (! $conversation) {
+            return ['id' => null, 'messages' => []];
+        }
+
+        $customerId = (int) $conversation->user_id;
+        $messages = $conversation->messages()
+            ->with('author')
+            ->orderBy('created_at', 'desc')
+            ->take(50)
+            ->get()
+            ->reverse()
+            ->values();
+
+        $mapped = $messages->map(function (ConversationMessage $m) use ($customerId) {
+            return [
+                'id' => $m->id,
+                'body' => $m->body,
+                'author_user_id' => $m->author_user_id,
+                'is_from_customer' => (int) $m->author_user_id === $customerId,
+                'created_at' => $m->created_at?->toIso8601String(),
+                'author' => $m->author ? [
+                    'id' => $m->author->id,
+                    'name' => $m->author->name,
+                    'email' => $m->author->email,
+                ] : null,
+            ];
+        })->all();
+
+        return [
+            'id' => (int) $conversation->id,
+            'messages' => $mapped,
+        ];
     }
 }

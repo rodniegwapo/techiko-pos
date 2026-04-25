@@ -3,10 +3,12 @@ import LeftMenu from "@/Components/sidebar/leftMenu.vue";
 import LeftSidebarWrapper from "@/Components/sidebar/leftWrapper.vue";
 import LeftAccountSettings from "@/Components/sidebar/leftAccountSettings.vue";
 import LocationBadge from "@/Components/LocationBadge.vue";
+import InquiryChatWidget from "@/Components/InquiryChatWidget.vue";
 import Terminal from "@/Components/Terminal.vue";
 import ImpersonationBanner from "@/Components/ImpersonationBanner.vue";
 
-import { onMounted, ref } from "vue";
+import { onMounted, onUnmounted, ref, watch, provide } from "vue";
+import { usePage, router } from "@inertiajs/vue3";
 import {
     UserOutlined,
     VideoCameraOutlined,
@@ -18,6 +20,74 @@ import { useSidebar } from "@/Composables/useSidebar";
 
 const { user } = useAuth();
 const { isCollapsed } = useSidebar();
+const page = usePage();
+const pusherKey = import.meta.env.VITE_PUSHER_APP_KEY;
+
+const staffInboxBadge = ref(0);
+let staffInboxFallbackTimer = null;
+
+function syncStaffInboxFromProps() {
+    if (user.value?.is_super_user) {
+        staffInboxBadge.value = Number(page.props.inquiryUnreadCount) || 0;
+    } else {
+        staffInboxBadge.value = 0;
+    }
+}
+
+watch(
+    () => [page.props.inquiryUnreadCount, user.value?.is_super_user],
+    () => {
+        syncStaffInboxFromProps();
+    },
+    { immediate: true },
+);
+
+provide("inquiryUnreadCount", staffInboxBadge);
+
+onUnmounted(() => {
+    if (pusherKey && window.Echo) {
+        try {
+            window.Echo.leave("private-staff-inbox");
+        } catch {
+            // ignore
+        }
+    }
+    if (staffInboxFallbackTimer) {
+        clearInterval(staffInboxFallbackTimer);
+    }
+});
+
+onMounted(() => {
+    if (!user.value?.is_super_user) {
+        return;
+    }
+    if (pusherKey && window.Echo) {
+        try {
+            window.Echo.private("staff-inbox").listen(".inbox.badge", (e) => {
+                if (e.unread_conversation_count != null) {
+                    staffInboxBadge.value = e.unread_conversation_count;
+                } else {
+                    router.reload({
+                        only: ["inquiryUnreadCount"],
+                        preserveScroll: true,
+                    });
+                }
+            });
+        } catch {
+            // ignore
+        }
+    } else {
+        staffInboxFallbackTimer = setInterval(
+            () => {
+                router.reload({
+                    only: ["inquiryUnreadCount"],
+                    preserveScroll: true,
+                });
+            },
+            60_000,
+        );
+    }
+});
 
 const selectedKeys = ref(["1"]);
 const collapsed = ref(false);
@@ -65,6 +135,8 @@ onMounted(() => {
 
         <!-- Floating Location Badge -->
         <LocationBadge />
+
+        <InquiryChatWidget v-if="user" />
     </a-layout>
 </template>
 
