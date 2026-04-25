@@ -2,7 +2,6 @@
 
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\MarketingController;
-use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SeoController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
