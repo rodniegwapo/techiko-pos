@@ -186,74 +186,89 @@ function onComposerKeydown(e) {
             placement="right"
             :width="400"
         >
-            <p class="mb-4 text-sm text-gray-600">
-                Messages are delivered in real time when online. We may also
-                reply during business hours. Enable browser notifications in
-                your system settings to get alerts when the tab is in the
-                background.
-            </p>
-            <a-textarea
-                v-model:value="body"
-                :rows="3"
-                placeholder="Type a message… (Enter to send, Shift+Enter for new line)"
-                :maxlength="5000"
-                show-count
-                class="mb-3"
-                @keydown="onComposerKeydown"
-            />
-            <a-button
-                type="primary"
-                block
-                :loading="submitting"
-                class="mb-4"
-                @click="submit"
-            >
-                Send
-            </a-button>
-            <h3 class="mb-2 text-sm font-semibold text-gray-800">
-                Conversation
-            </h3>
             <div
-                v-if="!localMessages.length"
-                class="text-sm text-gray-500"
+                class="flex h-[min(80vh,640px)] max-h-full flex-col gap-0"
             >
-                No messages yet. Say hello to start.
-            </div>
-            <ul
-                v-else
-                class="max-h-[45vh] space-y-2 overflow-y-auto pr-1 text-sm"
-            >
-                <li
-                    v-for="m in localMessages"
-                    :key="m.id"
-                    :class="[
-                        'flex',
-                        m.is_from_customer ? 'justify-end' : 'justify-start',
-                    ]"
+                <p class="mb-3 shrink-0 text-sm text-gray-600">
+                    Messages are delivered in real time when online. We may also
+                    reply during business hours. Enable browser notifications in
+                    your system settings to get alerts when the tab is in the
+                    background.
+                </p>
+                <h3 class="mb-2 shrink-0 text-sm font-semibold text-gray-800">
+                    Conversation
+                </h3>
+                <div
+                    class="min-h-0 flex-1 overflow-y-auto pr-1"
                 >
                     <div
-                        :class="[
-                            'max-w-[90%] rounded-lg px-3 py-2',
-                            m.is_from_customer
-                                ? 'bg-green-100 text-gray-800'
-                                : 'bg-gray-200 text-gray-800',
-                        ]"
+                        v-if="!localMessages.length"
+                        class="text-sm text-gray-500"
                     >
-                        <p class="whitespace-pre-wrap break-words">
-                            {{ m.body }}
-                        </p>
-                        <p
-                            v-if="!m.is_from_customer && m.author"
-                            class="mt-1 text-xs text-gray-500"
-                        >
-                            {{ m.author.name || m.author.email }}
-                        </p>
-                        <p class="mt-1 text-right text-xs text-gray-500">
-                            {{ formatWhen(m.created_at) }}
-                        </p>
+                        No messages yet. Say hello to start.
                     </div>
-                </li>
-            </ul>
+                    <ul
+                        v-else
+                        class="space-y-2 text-sm"
+                    >
+                        <li
+                            v-for="m in localMessages"
+                            :key="m.id"
+                            :class="[
+                                'flex',
+                                m.is_from_customer
+                                    ? 'justify-end'
+                                    : 'justify-start',
+                            ]"
+                        >
+                            <div
+                                :class="[
+                                    'max-w-[90%] rounded-lg px-3 py-2',
+                                    m.is_from_customer
+                                        ? 'bg-green-100 text-gray-800'
+                                        : 'bg-gray-200 text-gray-800',
+                                ]"
+                            >
+                                <p class="whitespace-pre-wrap break-words">
+                                    {{ m.body }}
+                                </p>
+                                <p
+                                    v-if="!m.is_from_customer && m.author"
+                                    class="mt-1 text-xs text-gray-500"
+                                >
+                                    {{ m.author.name || m.author.email }}
+                                </p>
+                                <p
+                                    class="mt-1 text-right text-xs text-gray-500"
+                                >
+                                    {{ formatWhen(m.created_at) }}
+                                </p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+                <div
+                    class="mt-3 shrink-0 border-t border-gray-200 pt-3"
+                >
+                    <a-textarea
+                        v-model:value="body"
+                        :rows="3"
+                        placeholder="Type a message… (Enter to send, Shift+Enter for new line)"
+                        :maxlength="5000"
+                        show-count
+                        class="mb-2"
+                        @keydown="onComposerKeydown"
+                    />
+                    <a-button
+                        type="primary"
+                        block
+                        :loading="submitting"
+                        @click="submit"
+                    >
+                        Send
+                    </a-button>
+                </div>
+            </div>
         </a-drawer>
 
         <div
