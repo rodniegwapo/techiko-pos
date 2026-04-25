@@ -224,9 +224,11 @@ function sendStaff() {
 
             <div
                 v-if="thread"
-                class="w-full min-w-0 border border-gray-200 bg-white p-4 lg:max-w-md xl:max-w-lg"
+                class="flex w-full min-h-0 min-w-0 max-h-[calc(100dvh-10rem)] flex-col overflow-hidden border border-gray-200 bg-white shadow-sm lg:max-w-md xl:max-w-lg"
             >
-                <div class="mb-3 flex items-start justify-between gap-2">
+                <div
+                    class="flex shrink-0 items-start justify-between gap-2 border-b border-gray-100 p-4"
+                >
                     <div>
                         <h2 class="text-lg font-semibold text-gray-800">
                             {{ thread.user?.name || "User" }}
@@ -238,70 +240,76 @@ function sendStaff() {
                     <a-button type="text" @click="closeThread">Close</a-button>
                 </div>
                 <div
-                    class="mb-4 max-h-[50vh] space-y-2 overflow-y-auto rounded border border-gray-100 bg-gray-50 p-3"
+                    class="min-h-0 flex-1 overflow-y-auto bg-gray-50 p-3"
                 >
-                    <div
-                        v-for="m in localMessages"
-                        :key="m.id"
-                        :class="[
-                            'flex',
-                            m.is_from_customer ? 'justify-start' : 'justify-end',
-                        ]"
-                    >
+                    <div class="space-y-2">
                         <div
+                            v-for="m in localMessages"
+                            :key="m.id"
                             :class="[
-                                'max-w-[88%] rounded-lg px-3 py-2 text-sm',
-                                m.is_from_customer
-                                    ? 'bg-white text-gray-800 shadow'
-                                    : 'bg-teal-600 text-white',
+                                'flex',
+                                m.is_from_customer ? 'justify-start' : 'justify-end',
                             ]"
                         >
-                            <p class="whitespace-pre-wrap break-words">
-                                {{ m.body }}
-                            </p>
-                            <p
-                                v-if="m.author"
+                            <div
                                 :class="[
-                                    'mt-1 text-xs',
+                                    'max-w-[88%] rounded-lg px-3 py-2 text-sm',
                                     m.is_from_customer
-                                        ? 'text-gray-500'
-                                        : 'text-teal-100',
+                                        ? 'bg-white text-gray-800 shadow'
+                                        : 'bg-teal-600 text-white',
                                 ]"
                             >
-                                <template v-if="!m.is_from_customer">
-                                    {{ m.author.name || m.author.email }}
-                                </template>
-                            </p>
-                            <p
-                                :class="[
-                                    'mt-1 text-xs',
-                                    m.is_from_customer
-                                        ? 'text-gray-400'
-                                        : 'text-teal-200',
-                                ]"
-                            >
-                                {{ formatWhen(m.created_at) }}
-                            </p>
+                                <p class="whitespace-pre-wrap break-words">
+                                    {{ m.body }}
+                                </p>
+                                <p
+                                    v-if="m.author"
+                                    :class="[
+                                        'mt-1 text-xs',
+                                        m.is_from_customer
+                                            ? 'text-gray-500'
+                                            : 'text-teal-100',
+                                    ]"
+                                >
+                                    <template v-if="!m.is_from_customer">
+                                        {{ m.author.name || m.author.email }}
+                                    </template>
+                                </p>
+                                <p
+                                    :class="[
+                                        'mt-1 text-xs',
+                                        m.is_from_customer
+                                            ? 'text-gray-400'
+                                            : 'text-teal-200',
+                                    ]"
+                                >
+                                    {{ formatWhen(m.created_at) }}
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <a-textarea
-                    v-model:value="staffBody"
-                    :rows="3"
-                    :maxlength="10000"
-                    show-count
-                    placeholder="Type a reply… (Enter to send, Shift+Enter for new line)"
-                    class="mb-2"
-                    @keydown="onStaffBodyKeydown"
-                />
-                <a-button
-                    type="primary"
-                    :loading="staffLoading"
-                    block
-                    @click="sendStaff"
+                <div
+                    class="shrink-0 border-t border-gray-200 bg-white p-4 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]"
                 >
-                    Send reply
-                </a-button>
+                    <a-textarea
+                        v-model:value="staffBody"
+                        :rows="3"
+                        :maxlength="10000"
+                        show-count
+                        placeholder="Type a reply… (Enter to send, Shift+Enter for new line)"
+                        class="mb-2"
+                        @keydown="onStaffBodyKeydown"
+                    />
+                    <a-button
+                        type="primary"
+                        :loading="staffLoading"
+                        block
+                        @click="sendStaff"
+                    >
+                        Send reply
+                    </a-button>
+                </div>
             </div>
         </div>
     </AuthenticatedLayout>
