@@ -3,8 +3,10 @@
 namespace App\Http\Middleware;
 
 use App\Http\Resources\AuthUserResource;
-use App\Models\InventoryLocation;
+use App\Models\Conversation;
+use App\Models\ConversationMessage;
 use App\Models\Domain;
+use App\Models\InventoryLocation;
 use App\Services\ImpersonationService;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -21,7 +23,7 @@ class HandleInertiaRequests extends Middleware
     /**
      * Determine the current asset version.
      */
-    public function version(Request $request): string|null
+    public function version(Request $request): ?string
     {
         return parent::version($request);
     }
@@ -34,12 +36,22 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         $impersonationService = app(ImpersonationService::class);
-        
+
+        $user = $request->user();
+
         return [
             ...parent::share($request),
             'auth' => [
-                'user' => $request->user() ? AuthUserResource::make($request->user()->load('roles', 'permissions')) : null,
+                'user' => $user ? AuthUserResource::make($user->load('roles', 'permissions')) : null,
             ],
+            'myConversation' => $this->myConversationPayload($user),
+            'inquiryUnreadCount' => $user?->isSuperUser()
+                ? (int) Conversation::query()
+                    ->whereHas('messages', function ($q) {
+                        $q->whereNull('read_by_staff_at')
+                            ->whereColumn('author_user_id', 'conversations.user_id');
+                    })->count()
+                : 0,
             'currentDomain' => $this->getCurrentDomain($request),
             'currentLocation' => $this->getCurrentLocation($request),
             'availableLocations' => $this->getAvailableLocations($request),
@@ -56,7 +68,6 @@ class HandleInertiaRequests extends Middleware
         // Get domain from route parameter
         $domain = $request->route('domain');
         $domainSlug = data_get($domain, 'name_slug') ?? $domain;
-
 
         if ($domainSlug) {
             return Domain::where('name_slug', $domainSlug)->first();
@@ -77,10 +88,14 @@ class HandleInertiaRequests extends Middleware
     private function getCurrentLocation(Request $request)
     {
         $user = $request->user();
-        if (!$user) return null;
+        if (! $user) {
+            return null;
+        }
 
         $domain = $this->getCurrentDomain($request);
-        if (!$domain) return null;
+        if (! $domain) {
+            return null;
+        }
 
         // Use the centralized helper function
         return \App\Helpers::getActiveLocation($domain, $request->input('location_id'));
@@ -92,7 +107,9 @@ class HandleInertiaRequests extends Middleware
     private function getAvailableLocations(Request $request)
     {
         $domain = $this->getCurrentDomain($request);
-        if (!$domain) return collect();
+        if (! $domain) {
+            return collect();
+        }
 
         return InventoryLocation::active()->forDomain($domain->name_slug)->get();
     }
@@ -103,8 +120,54 @@ class HandleInertiaRequests extends Middleware
     private function getDefaultStore(Request $request)
     {
         $domain = $this->getCurrentDomain($request);
-        if (!$domain) return null;
+        if (! $domain) {
+            return null;
+        }
 
         return InventoryLocation::getDefault($domain->name_slug);
+    }
+
+    /**
+     * @return array{id: int|null, messages: array<int, array<string, mixed>>}
+     */
+    private function myConversationPayload(?\Illuminate\Contracts\Auth\Authenticatable $user): array
+    {
+        if ($user === null) {
+            return ['id' => null, 'messages' => []];
+        }
+
+        $conversation = Conversation::query()->where('user_id', $user->id)->first();
+        if (! $conversation) {
+            return ['id' => null, 'messages' => []];
+        }
+
+        $customerId = (int) $conversation->user_id;
+        $messages = $conversation->messages()
+            ->with('author')
+            ->orderBy('created_at', 'desc')
+            ->take(50)
+            ->get()
+            ->reverse()
+            ->values();
+
+        $mapped = $messages->map(function (ConversationMessage $m) use ($customerId) {
+            return [
+                'id' => $m->id,
+                'body' => $m->body,
+                'author_user_id' => $m->author_user_id,
+                'is_from_customer' => (int) $m->author_user_id === $customerId,
+                'created_at' => $m->created_at?->toIso8601String(),
+                'author' => $m->author ? [
+                    'id' => $m->author->id,
+                    'name' => $m->author->name,
+                    'email' => $m->author->email,
+                ] : null,
+            ];
+        })->all();
+
+        return [
+            'id' => (int) $conversation->id,
+            'messages' => $mapped,
+        ];
     }
 }

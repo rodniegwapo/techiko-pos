@@ -26,5 +26,18 @@ Broadcast::channel('order', function () {
 Broadcast::channel('orders.{id}', function ($user, $orderId) {
     // Allow the user who created the order to listen
     $sale = \App\Models\Sale::find($orderId);
+
     return $sale && (int) $user->id === (int) $sale->user_id;
+});
+
+Broadcast::channel('conversations.{conversationId}', function ($user, $conversationId) {
+    $conversation = \App\Models\Conversation::find($conversationId);
+    if (! $conversation) {
+        return false;
+    }
+    if ($user->isSuperUser()) {
+        return true;
+    }
+
+    return (int) $user->id === (int) $conversation->user_id;
 });

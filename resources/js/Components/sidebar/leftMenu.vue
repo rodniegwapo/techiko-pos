@@ -18,6 +18,7 @@ import {
     IconReportMoney,
     IconAccessPointOff,
     IconSettings,
+    IconMessages,
 } from "@tabler/icons-vue";
 import { router, usePage } from "@inertiajs/vue3";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
@@ -53,6 +54,10 @@ onMounted(() => {
 
 const isSuperUser = computed(
     () => !!page.props.auth?.user?.data?.is_super_user,
+);
+
+const inquiryUnreadCount = computed(
+    () => Number(page.props.inquiryUnreadCount) || 0,
 );
 
 // Get current domain from page props
@@ -278,6 +283,15 @@ const menuItems = [
         superUserOnly: true,
         globalOnly: true,
     },
+    {
+        key: "messages",
+        title: "Messages",
+        icon: IconMessages,
+        routeName: "messages.index",
+        path: "/messages",
+        superUserOnly: true,
+        globalOnly: true,
+    },
 ];
 
 // ===================================
@@ -485,6 +499,14 @@ const safeMenus = computed(() => {
                             >
                                 {{ getDashboardTagText() }}
                             </a-tag>
+                        </span>
+                        <span
+                            v-else-if="
+                                menu.key === 'messages' && inquiryUnreadCount > 0
+                            "
+                            class="ml-1 min-w-[1.1rem] rounded-full bg-red-500 px-1.5 text-center text-[10px] leading-tight text-white"
+                        >
+                            {{ inquiryUnreadCount }}
                         </span>
                     </div>
                 </a-menu-item>
