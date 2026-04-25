@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Events\ConversationMessageCreated;
+use App\Events\StaffInboxBadgeUpdated;
 use App\Http\Requests\StoreCustomerMessageRequest;
 use App\Http\Requests\StoreStaffMessageRequest;
 use App\Models\Conversation;
@@ -28,6 +29,7 @@ class ConversationController extends Controller
         ]);
         $message->load('author');
         broadcast(new ConversationMessageCreated($message))->toOthers();
+        broadcast(new StaffInboxBadgeUpdated(Conversation::unreadInboxConversationsForStaffCount()));
 
         return back()->with('success', 'Message sent. We will get back to you as soon as we can.');
     }

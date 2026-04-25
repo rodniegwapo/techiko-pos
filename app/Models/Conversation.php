@@ -42,4 +42,17 @@ class Conversation extends Model
             ->whereNull('read_by_staff_at')
             ->count();
     }
+
+    /**
+     * Count of distinct conversations with at least one customer message not yet read by staff.
+     * Matches the superuser "Messages" sidebar badge in {@see \App\Http\Middleware\HandleInertiaRequests}.
+     */
+    public static function unreadInboxConversationsForStaffCount(): int
+    {
+        return (int) static::query()
+            ->whereHas('messages', function ($q) {
+                $q->whereNull('read_by_staff_at')
+                    ->whereColumn('author_user_id', 'conversations.user_id');
+            })->count();
+    }
 }

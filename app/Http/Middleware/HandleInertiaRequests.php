@@ -46,11 +46,7 @@ class HandleInertiaRequests extends Middleware
             ],
             'myConversation' => $this->myConversationPayload($user),
             'inquiryUnreadCount' => $user?->isSuperUser()
-                ? (int) Conversation::query()
-                    ->whereHas('messages', function ($q) {
-                        $q->whereNull('read_by_staff_at')
-                            ->whereColumn('author_user_id', 'conversations.user_id');
-                    })->count()
+                ? Conversation::unreadInboxConversationsForStaffCount()
                 : 0,
             'currentDomain' => $this->getCurrentDomain($request),
             'currentLocation' => $this->getCurrentLocation($request),

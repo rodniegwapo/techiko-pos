@@ -117,6 +117,17 @@ function closeThread() {
     router.get(route("messages.index"));
 }
 
+function onStaffBodyKeydown(e) {
+    if (e.key !== "Enter") {
+        return;
+    }
+    if (e.shiftKey) {
+        return;
+    }
+    e.preventDefault();
+    sendStaff();
+}
+
 function sendStaff() {
     const t = staffBody.value.trim();
     if (!t || !props.openConversationId) {
@@ -279,8 +290,9 @@ function sendStaff() {
                     :rows="3"
                     :maxlength="10000"
                     show-count
-                    placeholder="Type a reply…"
+                    placeholder="Type a reply… (Enter to send, Shift+Enter for new line)"
                     class="mb-2"
+                    @keydown="onStaffBodyKeydown"
                 />
                 <a-button
                     type="primary"
