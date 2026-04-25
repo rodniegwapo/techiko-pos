@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\MarketingController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SeoController;
@@ -110,7 +111,7 @@ Route::get('/thank-you', function () {
 })->name('registration.thankyou');
 
 // Organization-specific routes extracted to routes/domains.php
-require __DIR__.'/domains.php';
+require __DIR__ . '/domains.php';
 
 // Domain Management Routes (for super users)
 Route::middleware(['auth', 'user.permission'])->prefix('domains')->name('domains.')->group(function () {
@@ -211,4 +212,18 @@ Route::get('/debug-role-hierarchy', function () {
     ]);
 })->middleware('auth');
 
-require __DIR__.'/auth.php';
+Route::middleware(['auth'])->group(function () {
+    Route::post('/inquiries', [\App\Http\Controllers\ConversationController::class, 'store'])
+        ->middleware('throttle:20,1')
+        ->name('inquiries.store');
+    Route::get('/api/conversations/{conversation}/messages', [\App\Http\Controllers\ConversationController::class, 'messagesJson'])
+        ->name('conversations.messages');
+});
+
+Route::middleware(['auth', 'check.super.user'])->group(function () {
+    Route::get('/messages', [\App\Http\Controllers\ConversationController::class, 'index'])->name('messages.index');
+    Route::post('/messages/{conversation}/read', [\App\Http\Controllers\ConversationController::class, 'markRead'])->name('messages.read');
+    Route::post('/messages/{conversation}/messages', [\App\Http\Controllers\ConversationController::class, 'storeStaff'])->name('messages.staff');
+});
+
+require __DIR__ . '/auth.php';
