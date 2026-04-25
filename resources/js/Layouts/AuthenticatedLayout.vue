@@ -3,6 +3,7 @@ import LeftMenu from "@/Components/sidebar/leftMenu.vue";
 import LeftSidebarWrapper from "@/Components/sidebar/leftWrapper.vue";
 import LeftAccountSettings from "@/Components/sidebar/leftAccountSettings.vue";
 import LocationBadge from "@/Components/LocationBadge.vue";
+import InquiryChatWidget from "@/Components/InquiryChatWidget.vue";
 import Terminal from "@/Components/Terminal.vue";
 import ImpersonationBanner from "@/Components/ImpersonationBanner.vue";
 
@@ -65,6 +66,8 @@ onMounted(() => {
 
         <!-- Floating Location Badge -->
         <LocationBadge />
+
+        <InquiryChatWidget v-if="user" />
     </a-layout>
 </template>
 
