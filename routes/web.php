@@ -1,6 +1,9 @@
 <?php
 
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\MarketingController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SeoController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -10,9 +13,15 @@ use Inertia\Inertia;
 |--------------------------------------------------------------------------
 */
 
-Route::get('/', function () {
-    return Inertia::render('Auth/Login');
-})->name('login');
+// Public marketing (SEO) – `/login` is the canonical auth entry (see routes/auth.php)
+Route::get('/', [MarketingController::class, 'home'])->name('marketing.home');
+Route::get('/services', [MarketingController::class, 'services'])->name('marketing.services');
+Route::get('/about', [MarketingController::class, 'about'])->name('marketing.about');
+Route::get('/contact', [MarketingController::class, 'contact'])->name('marketing.contact');
+Route::get('/pricing', [MarketingController::class, 'pricing'])->name('marketing.pricing');
+
+Route::get('/sitemap.xml', [SeoController::class, 'sitemap'])->name('sitemap');
+Route::get('/robots.txt', [SeoController::class, 'robots'])->name('robots');
 
 Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])
     ->middleware(['auth', 'verified'])
@@ -102,7 +111,7 @@ Route::get('/thank-you', function () {
 })->name('registration.thankyou');
 
 // Organization-specific routes extracted to routes/domains.php
-require __DIR__.'/domains.php';
+require __DIR__ . '/domains.php';
 
 // Domain Management Routes (for super users)
 Route::middleware(['auth', 'user.permission'])->prefix('domains')->name('domains.')->group(function () {
@@ -217,4 +226,4 @@ Route::middleware(['auth', 'check.super.user'])->group(function () {
     Route::post('/messages/{conversation}/messages', [\App\Http\Controllers\ConversationController::class, 'storeStaff'])->name('messages.staff');
 });
 
-require __DIR__.'/auth.php';
+require __DIR__ . '/auth.php';
