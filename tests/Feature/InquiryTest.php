@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Events\StaffInboxBadgeUpdated;
 use App\Models\Conversation;
 use App\Models\ConversationMessage;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Inertia\Testing\AssertableInertia as Inertia;
 use Tests\TestCase;
 
@@ -103,5 +105,32 @@ class InquiryTest extends TestCase
         $c = Conversation::query()->create(['user_id' => $b->id]);
         $this->actingAs($a);
         $this->getJson(route('conversations.messages', $c))->assertForbidden();
+    }
+
+    public function test_staff_inbox_badge_event_dispatched_when_customer_sends_message(): void
+    {
+        Event::fake([StaffInboxBadgeUpdated::class]);
+        $user = User::factory()->create();
+        $this->actingAs($user);
+        $this->from('/dashboard')
+            ->post(route('inquiries.store'), ['body' => 'Need support']);
+        Event::assertDispatched(StaffInboxBadgeUpdated::class, function (StaffInboxBadgeUpdated $e) {
+            return $e->unread_conversation_count >= 1;
+        });
+    }
+
+    public function test_staff_inbox_badge_event_not_dispatched_when_staff_sends_reply(): void
+    {
+        Event::fake([StaffInboxBadgeUpdated::class]);
+        $user = User::factory()->create();
+        $admin = User::factory()->create(['is_super_user' => true]);
+        $conversation = Conversation::query()->create(['user_id' => $user->id]);
+        $this->actingAs($admin);
+        $this->from('/dashboard')
+            ->post(
+                route('messages.staff', $conversation),
+                ['body' => 'Staff reply only']
+            );
+        Event::assertNotDispatched(StaffInboxBadgeUpdated::class);
     }
 }

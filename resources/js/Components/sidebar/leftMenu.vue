@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, onMounted } from "vue";
+import { ref, computed, watch, onMounted, inject } from "vue";
 import {
     IconDashboard,
     IconCategory,
@@ -56,9 +56,17 @@ const isSuperUser = computed(
     () => !!page.props.auth?.user?.data?.is_super_user,
 );
 
-const inquiryUnreadCount = computed(
-    () => Number(page.props.inquiryUnreadCount) || 0,
-);
+const inquiryUnreadCountInjected = inject("inquiryUnreadCount", null);
+const inquiryUnreadCount = computed(() => {
+    if (
+        inquiryUnreadCountInjected != null &&
+        typeof inquiryUnreadCountInjected === "object" &&
+        "value" in inquiryUnreadCountInjected
+    ) {
+        return Number(inquiryUnreadCountInjected.value) || 0;
+    }
+    return Number(page.props.inquiryUnreadCount) || 0;
+});
 
 // Get current domain from page props
 const currentDomain = computed(() => page.props.currentDomain);

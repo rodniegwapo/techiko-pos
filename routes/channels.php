@@ -30,6 +30,10 @@ Broadcast::channel('orders.{id}', function ($user, $orderId) {
     return $sale && (int) $user->id === (int) $sale->user_id;
 });
 
+Broadcast::channel('staff-inbox', function ($user) {
+    return $user->isSuperUser();
+});
+
 Broadcast::channel('conversations.{conversationId}', function ($user, $conversationId) {
     $conversation = \App\Models\Conversation::find($conversationId);
     if (! $conversation) {
