@@ -1,10 +1,18 @@
+import { existsSync } from 'fs';
 import { exec } from 'child_process';
-import { join } from 'path';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
+import { getAppPath, resolveNativephpBuildPath } from './resolveNativephpBuildPath.mjs';
+
+const appPath = getAppPath();
+const electronPackageDir = dirname(fileURLToPath(import.meta.url));
+const nativephpBuildPath = resolveNativephpBuildPath(process.env.NATIVEPHP_BUILD_PATH);
 
 const appUrl = process.env.APP_URL;
 const appId = process.env.NATIVEPHP_APP_ID;
 const appName = process.env.NATIVEPHP_APP_NAME;
-const isBuilding = process.env.NATIVEPHP_BUILDING;
+/** Set by `php artisan native:build` (Laravel). Plain `npm run build:win-*` should not set this. */
+const isLaravelNativeBuild = /^(1|true)$/i.test(String(process.env.NATIVEPHP_BUILDING ?? ''));
 const appAuthor = process.env.NATIVEPHP_APP_AUTHOR;
 const fileName = process.env.NATIVEPHP_APP_FILENAME;
 const appVersion = process.env.NATIVEPHP_APP_VERSION;
@@ -45,7 +53,7 @@ try {
     updaterConfig = {};
 }
 
-if (isBuilding) {
+if (isLaravelNativeBuild) {
     console.log('  • updater config', updaterConfig);
 }
 
@@ -55,12 +63,17 @@ export default {
     copyright: appCopyright,
     directories: {
         buildResources: 'build',
-        output: isBuilding ? join(process.env.APP_PATH, 'nativephp', 'electron', 'dist') : undefined,
+        // Local `npm run build:win-*` (no NATIVEPHP_BUILDING): use `release/` (not `out/`—electron-vite already writes `out/main/index.js` there).
+        // `php artisan native:build` sets NATIVEPHP_BUILDING and uses the project `dist/` path.
+        output: isLaravelNativeBuild
+            ? join(appPath, 'nativephp', 'electron', 'dist')
+            : join(electronPackageDir, 'release'),
     },
     files: [
         '!**/.vscode/*',
         '!src/*',
         '!dist/*',
+        '!release/*',
         '!electron.vite.config.{js,ts,mjs,cjs}',
         '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}',
         '!{.env,.env.*,.npmrc,pnpm-lock.yaml}',
@@ -82,13 +95,22 @@ export default {
     afterSign: 'build/notarize.js',
     win: {
         executableName: fileName,
-        ...(azureEndpoint && azureCertificateProfileName && azureCodeSigningAccountName ? {
-            azureSignOptions: {
-                endpoint: azureEndpoint,
-                certificateProfileName: azureCertificateProfileName,
-                codeSigningAccountName: azureCodeSigningAccountName
+        ...(azureEndpoint && azureCertificateProfileName && azureCodeSigningAccountName
+            ? {
+                azureSignOptions: {
+                    endpoint: azureEndpoint,
+                    certificateProfileName: azureCertificateProfileName,
+                    codeSigningAccountName: azureCodeSigningAccountName,
+                },
             }
-        } : {}),
+            : {
+                // Without a cert / Azure, skip signtool and the winCodeSign 7z cache. That archive extracts
+                // macOS symlinks and fails on Windows without "Developer Mode" or an elevated shell.
+                signAndEditExecutable: false,
+                verifyUpdateCodeSignature: false,
+                signtoolOptions: { sign: null },
+            }
+        ),
     },
     nsis: {
         artifactName: appName + '-${version}-setup.${ext}',
@@ -96,10 +118,15 @@ export default {
         uninstallDisplayName: '${productName}',
         createDesktopShortcut: 'always',
     },
-    protocols: {
-        name: deepLinkProtocol,
-        schemes: [deepLinkProtocol],
-    },
+    // electron-builder requires schemes to be non-empty strings; omit when NATIVEPHP_DEEPLINK_SCHEME is unset
+    ...(deepLinkProtocol
+        ? {
+            protocols: {
+                name: deepLinkProtocol,
+                schemes: [deepLinkProtocol],
+            },
+        }
+        : {}),
     mac: {
         entitlementsInherit: 'build/entitlements.mac.plist',
         artifactName: appName + '-${version}-${arch}.${ext}',
@@ -134,23 +161,34 @@ export default {
     },
     extraResources: [
         {
-            from: process.env.NATIVEPHP_BUILD_PATH,
+            from: nativephpBuildPath,
             to: 'build',
             filter: [
                 '**/*',
                 '!{.git}',
-            ]
-        }
+                '!**/.git/**',
+                '!**/node_modules/**',
+                '!**/dist/**',
+                '!**/win-unpacked/**',
+                '!**/mac/**',
+            ],
+        },
     ],
-    extraFiles: [
-        {
-            from: join(process.env.APP_PATH, 'extras'),
-            to: 'extras',
-            filter: [
-                '**/*'
-            ]
+    ...(() => {
+        const extrasPath = join(appPath, 'extras');
+        if (! existsSync(extrasPath)) {
+            return {};
         }
-    ],
+        return {
+            extraFiles: [
+                {
+                    from: extrasPath,
+                    to: 'extras',
+                    filter: ['**/*'],
+                },
+            ],
+        };
+    })(),
     ...updaterEnabled 
         ? { publish: updaterConfig } 
         : {}

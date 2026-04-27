@@ -1,5 +1,10 @@
 <?php
 
+use App\Providers\AppServiceProvider;
+use App\Providers\AuthServiceProvider;
+use App\Providers\BroadcastServiceProvider;
+use App\Providers\EventServiceProvider;
+use App\Providers\RouteServiceProvider;
 use Illuminate\Support\Facades\Facade;
 use Illuminate\Support\ServiceProvider;
 
@@ -58,6 +63,21 @@ return [
     'url' => env('APP_URL', 'http://localhost'),
 
     'asset_url' => env('ASSET_URL'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Native desktop (NativePHP / Electron) request detection
+    |--------------------------------------------------------------------------
+    |
+    | Used to treat the embedded Electron shell differently from a normal browser
+    | (e.g. root URL → login for guests). Substring match on User-Agent; set
+    | FORCE_NATIVE_DESKTOP=true only for local/testing if needed.
+    |
+    */
+
+    'native_desktop_ua_match' => env('NATIVE_DESKTOP_UA_MATCH', 'Electron'),
+
+    'force_native_desktop_client' => (bool) env('FORCE_NATIVE_DESKTOP', false),
 
     /*
     |--------------------------------------------------------------------------
@@ -163,11 +183,11 @@ return [
         /*
          * Application Service Providers...
          */
-        App\Providers\AppServiceProvider::class,
-        App\Providers\AuthServiceProvider::class,
-        App\Providers\BroadcastServiceProvider::class,
-        App\Providers\EventServiceProvider::class,
-        App\Providers\RouteServiceProvider::class,
+        AppServiceProvider::class,
+        AuthServiceProvider::class,
+        BroadcastServiceProvider::class,
+        EventServiceProvider::class,
+        RouteServiceProvider::class,
     ])->toArray(),
 
     /*

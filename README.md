@@ -83,6 +83,14 @@ The server uses [Laravel Licensing](https://github.com/masterix21/laravel-licens
 - Super users create or manage licenses on the **Domains → Show** screen. Domain users with a usable license can use the **Profile** “offline app” section and call the Sanctum API: `POST /api/licensing/register-device` and `POST /api/licensing/offline-token` (see `routes/api.php`).
 - Set `OFFLINE_INSTALLER_URL` in `.env` to a public URL for the built desktop installer; it is read from `config/offline.php` for the profile download link.
 
+**Local: offline installer download (smoke test)**
+
+- Put built installers under `public/installers/` (a committed `local-test.txt` placeholder is there for dev).
+- In `.env`, set `OFFLINE_INSTALLER_URL` to an **absolute** URL with the same origin you use in the browser (match `APP_URL`), e.g. `http://techiko-pos.test/installers/local-test.txt` on Laragon or `http://127.0.0.1:8000/installers/local-test.txt` with `php artisan serve`.
+- Run `php artisan config:clear` after changing `.env` if config is cached.
+- Sign in as a user whose organization has a **usable** offline license (seats) so the Profile “offline app” section shows the download button, then confirm the link opens in a new tab and returns 200.
+- In production, point `OFFLINE_INSTALLER_URL` at your real `.exe` (or CDN URL); you can ignore or replace the placeholder file.
+
 **Desktop client (optional next step)**
 
 Verify issued PASETO tokens inside the [NativePHP](https://nativephp.com) / Electron app using the **public** material exported for clients (per the package docs, e.g. `php artisan licensing:keys:export` where applicable) or the companion patterns from the [laravel-licensing](https://github.com/masterix21/laravel-licensing) project. A separate npm package name may differ by registry; follow the package README for client-side verification of offline tokens.
@@ -123,6 +131,8 @@ Starts the NativePHP runner and Vite together:
 composer run native:dev
 ```
 
+For guests, `/` in the Electron shell redirects to the login page; in a normal browser it shows the marketing homepage.
+
 **Run with two terminals**
 
 - Terminal 1: `php artisan native:run`
@@ -139,7 +149,11 @@ From `nativephp/electron` (after `npm install` there):
 | macOS x64  | `npm run build:mac-x64` |
 | Linux x64  | `npm run build:linux-x64` |
 
-Output goes under `nativephp/electron/dist` by default. When the NativePHP build sets `NATIVEPHP_BUILDING` and `APP_PATH`, `directories.output` in [`nativephp/electron/electron-builder.mjs`](nativephp/electron/electron-builder.mjs) may point under your app path instead; see that file and [electron-builder](https://www.electron.build/) for details.
+**Output directory:** `php artisan native:build` writes under `nativephp/electron/dist` (NativePHP sets `NATIVEPHP_BUILDING`). A plain **`npm run build:win-x64`** (without that env) uses **`nativephp/electron/release`** (installers and `win-unpacked` live there), not `out/`—**electron-vite** already compiles the main process to **`out/main/index.js`**. That avoids a locked `dist\win-unpacked` and avoids wiping the Vite `out/` tree. **`APP_PATH`** defaults to the Laravel project root. See [`nativephp/electron/electron-builder.mjs`](nativephp/electron/electron-builder.mjs) and [electron-builder](https://www.electron.build/) for details.
+
+You can also run `npm run build:win-x64` (or `build:mac-*` / `build:linux-*`) from the **repository root**; it delegates to `nativephp/electron` (dependencies must be installed there first).
+
+**Production-like builds** should use `php artisan native:build win` (or `all`, etc.): that sets `NATIVEPHP_BUILD_PATH`, `NATIVEPHP_BUILDING`, and other env vars and copies the Laravel app into the build. Running only `npm run build:win-x64` is supported for local iteration: `NATIVEPHP_BUILD_PATH` and `php.js` default to `vendor/nativephp/desktop/resources/build` (same as NativePHP’s `native:build`), and [`electron-builder.mjs`](nativephp/electron/electron-builder.mjs) no longer packages the whole Electron folder (which used to create nested `dist/.../dist/...` trees). If you need a clean `dist/` on Windows, close File Explorer under `nativephp/electron/dist`, stop any running packaged app, then run `cd nativephp/electron && npm run clean:dist` (retries on file locks) or delete `dist` manually—automated `rimraf` during the build was removed because DLLs such as `dxcompiler.dll` are often locked (EPERM). If **`NATIVEPHP_BUILD_PATH` is set to `nativephp/electron` or a path inside it** (e.g. by mistake), the resolver falls back to `vendor/nativephp/desktop/resources/build` and logs a warning; do not point that variable at the Electron app root.
 
 **Further reading:** [NativePHP documentation](https://nativephp.com/docs) for `native:run`, building, and deployment.
 
@@ -147,3 +161,4 @@ Output goes under `nativephp/electron/dist` by default. When the NativePHP build
 
 - If you see `Command failed: 'npm run dev' (exit code 1)` from the NativePHP side, the Electron package under `nativephp/electron` must run: `php.js` (PHP binary unzip), a built TypeScript `electron-plugin` (`#plugin` import), and a `MAIN_VITE_NATIVEPHP_BUILD_PATH` that matches the unzip path. This repo syncs those defaults in [`nativephp/electron/php.js`](nativephp/electron/php.js) and [`nativephp/electron/electron.vite.config.mjs`](nativephp/electron/electron.vite.config.mjs). Run `cd nativephp/electron && npm run plugin:build` if you see unresolved `#plugin` (the `dev` script runs `predev` to build the plugin when possible).
 - The embedded runtime uses the PHP zip from `vendor/nativephp/php-bin` (8.3/8.4 on Windows). If your system PHP is older (e.g. 8.2) than the shipped zips, the app picks the newest available pack and may log a short warning; matching PHP 8.3+ in Laragon is ideal.
+- **Windows `winCodeSign` / symbolic link / 7-Zip errors:** Unsigned local builds set `signtoolOptions.sign: null` and `signAndEditExecutable: false` in [`nativephp/electron/electron-builder.mjs`](nativephp/electron/electron-builder.mjs) so the packager does not need the `winCodeSign` cache (extracting that archive on Windows can require symlink privileges). For **production signing**, set the Azure Trusted Signing env vars as in NativePHP’s docs. If a broken cache remains, remove `%LOCALAPPDATA%\electron-builder\Cache\winCodeSign` and rebuild.

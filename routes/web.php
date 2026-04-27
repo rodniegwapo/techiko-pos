@@ -1,8 +1,31 @@
 <?php
 
+use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\ConversationController;
+use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DomainController;
+use App\Http\Controllers\ImpersonationController;
+use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\InventoryLocationController;
+use App\Http\Controllers\Licensing\DomainLicenseController;
+use App\Http\Controllers\LoyaltyController;
+use App\Http\Controllers\MandatoryDiscountController;
 use App\Http\Controllers\MarketingController;
+use App\Http\Controllers\PermissionController;
+use App\Http\Controllers\Products\DiscountController;
+use App\Http\Controllers\Products\ProductController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\RoleController;
+use App\Http\Controllers\SaleController;
 use App\Http\Controllers\SeoController;
+use App\Http\Controllers\StockAdjustmentController;
+use App\Http\Controllers\SupervisorAssignmentController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\VoidLogController;
+use App\Models\User;
+use App\Services\UserHierarchyService;
+use App\Support\DetectsNativeDesktopClient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -13,7 +36,7 @@ use Inertia\Inertia;
 |--------------------------------------------------------------------------
 */
 
-// Public site: `/` shows marketing to guests; authenticated users are sent to the app. `/login` is the canonical auth entry (see routes/auth.php).
+// Public site: `/` shows marketing to guests in a browser; NativePHP/Electron guests go to login. Authenticated users are sent to the app. `/login` is the canonical auth entry (see routes/auth.php).
 Route::get('/', function (Request $request) {
     if ($user = $request->user()) {
         $target = $user->postLoginIntendedUrl();
@@ -23,6 +46,10 @@ Route::get('/', function (Request $request) {
         }
 
         return redirect()->to($target);
+    }
+
+    if (DetectsNativeDesktopClient::matches($request)) {
+        return redirect()->route('login');
     }
 
     return app(MarketingController::class)->home();
@@ -35,7 +62,7 @@ Route::get('/pricing', [MarketingController::class, 'pricing'])->name('marketing
 Route::get('/sitemap.xml', [SeoController::class, 'sitemap'])->name('sitemap');
 Route::get('/robots.txt', [SeoController::class, 'robots'])->name('robots');
 
-Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])
+Route::get('/dashboard', [DashboardController::class, 'index'])
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
 
@@ -45,9 +72,9 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     // User Impersonation (Super Users Only)
-    Route::post('/impersonate/{user}', [\App\Http\Controllers\ImpersonationController::class, 'impersonate'])
+    Route::post('/impersonate/{user}', [ImpersonationController::class, 'impersonate'])
         ->name('impersonate');
-    Route::post('/stop-impersonating', [\App\Http\Controllers\ImpersonationController::class, 'stopImpersonating'])
+    Route::post('/stop-impersonating', [ImpersonationController::class, 'stopImpersonating'])
         ->name('stop-impersonating');
 });
 
@@ -56,62 +83,62 @@ Route::middleware('auth')->group(function () {
 // ===================================
 Route::middleware(['auth', 'user.permission'])->group(function () {
     // Sales (Global - All Organizations)
-    Route::get('/sales', [\App\Http\Controllers\SaleController::class, 'index'])->name('sales.index');
+    Route::get('/sales', [SaleController::class, 'index'])->name('sales.index');
 
     // Products (Global - All Organizations)
-    Route::resource('products', \App\Http\Controllers\Products\ProductController::class)
+    Route::resource('products', ProductController::class)
         ->only(['index', 'store', 'update', 'destroy'])
         ->names('products');
 
     // Categories (Global - All Organizations)
-    Route::resource('categories', \App\Http\Controllers\CategoryController::class)
+    Route::resource('categories', CategoryController::class)
         ->only(['index', 'store', 'update', 'destroy'])
         ->names('categories');
 
     // Product Discounts (Global)
     Route::name('products.')->group(function () {
-        Route::resource('discounts', \App\Http\Controllers\Products\DiscountController::class)
+        Route::resource('discounts', DiscountController::class)
             ->only(['index', 'store', 'update', 'destroy'])
             ->names('discounts');
     });
 
     // Mandatory Discounts (Global)
-    Route::resource('mandatory-discounts', \App\Http\Controllers\MandatoryDiscountController::class)
+    Route::resource('mandatory-discounts', MandatoryDiscountController::class)
         ->only(['index', 'store', 'update', 'destroy'])
         ->names('mandatory-discounts');
 
     // Loyalty Program (Global)
-    Route::get('/loyalty', [\App\Http\Controllers\LoyaltyController::class, 'index'])->name('loyalty.index');
+    Route::get('/loyalty', [LoyaltyController::class, 'index'])->name('loyalty.index');
 
     // Customers (Global)
-    Route::get('/customers', [\App\Http\Controllers\CustomerController::class, 'webIndex'])->name('customers.index');
+    Route::get('/customers', [CustomerController::class, 'webIndex'])->name('customers.index');
 
     // Void Logs (Global)
-    Route::get('/void-logs', [\App\Http\Controllers\VoidLogController::class, 'index'])->name('voids.index');
+    Route::get('/void-logs', [VoidLogController::class, 'index'])->name('voids.index');
 
     // Inventory Management (Global)
     Route::prefix('inventory')->name('inventory.')->group(function () {
-        Route::get('/', [\App\Http\Controllers\InventoryController::class, 'index'])->name('index');
-        Route::get('/products', [\App\Http\Controllers\InventoryController::class, 'products'])->name('products');
-        Route::get('/movements', [\App\Http\Controllers\InventoryController::class, 'movements'])->name('movements');
-        Route::get('/low-stock', [\App\Http\Controllers\InventoryController::class, 'lowStock'])->name('low-stock');
-        Route::get('/valuation', [\App\Http\Controllers\InventoryController::class, 'valuation'])->name('valuation');
+        Route::get('/', [InventoryController::class, 'index'])->name('index');
+        Route::get('/products', [InventoryController::class, 'products'])->name('products');
+        Route::get('/movements', [InventoryController::class, 'movements'])->name('movements');
+        Route::get('/low-stock', [InventoryController::class, 'lowStock'])->name('low-stock');
+        Route::get('/valuation', [InventoryController::class, 'valuation'])->name('valuation');
 
-        Route::post('/receive', [\App\Http\Controllers\InventoryController::class, 'receive'])->name('receive');
-        Route::post('/transfer', [\App\Http\Controllers\InventoryController::class, 'transfer'])->name('transfer');
+        Route::post('/receive', [InventoryController::class, 'receive'])->name('receive');
+        Route::post('/transfer', [InventoryController::class, 'transfer'])->name('transfer');
 
         // Search routes
-        Route::get('/search/products', [\App\Http\Controllers\InventoryController::class, 'searchProducts'])->name('search.products');
+        Route::get('/search/products', [InventoryController::class, 'searchProducts'])->name('search.products');
 
-        Route::resource('adjustments', \App\Http\Controllers\StockAdjustmentController::class)->names('adjustments');
-        Route::post('/adjustments/{adjustment}/submit', [\App\Http\Controllers\StockAdjustmentController::class, 'submitForApproval'])->name('adjustments.submit');
-        Route::post('/adjustments/{adjustment}/approve', [\App\Http\Controllers\StockAdjustmentController::class, 'approve'])->name('adjustments.approve');
-        Route::post('/adjustments/{adjustment}/reject', [\App\Http\Controllers\StockAdjustmentController::class, 'reject'])->name('adjustments.reject');
-        Route::get('/adjustment-products', [\App\Http\Controllers\StockAdjustmentController::class, 'getProductsForAdjustment'])->name('adjustment-products');
+        Route::resource('adjustments', StockAdjustmentController::class)->names('adjustments');
+        Route::post('/adjustments/{adjustment}/submit', [StockAdjustmentController::class, 'submitForApproval'])->name('adjustments.submit');
+        Route::post('/adjustments/{adjustment}/approve', [StockAdjustmentController::class, 'approve'])->name('adjustments.approve');
+        Route::post('/adjustments/{adjustment}/reject', [StockAdjustmentController::class, 'reject'])->name('adjustments.reject');
+        Route::get('/adjustment-products', [StockAdjustmentController::class, 'getProductsForAdjustment'])->name('adjustment-products');
 
-        Route::resource('locations', \App\Http\Controllers\InventoryLocationController::class)->names('locations');
-        Route::post('/locations/{location}/set-default', [\App\Http\Controllers\InventoryLocationController::class, 'setDefault'])->name('locations.set-default');
-        Route::post('/locations/{location}/toggle-status', [\App\Http\Controllers\InventoryLocationController::class, 'toggleStatus'])->name('locations.toggle-status');
+        Route::resource('locations', InventoryLocationController::class)->names('locations');
+        Route::post('/locations/{location}/set-default', [InventoryLocationController::class, 'setDefault'])->name('locations.set-default');
+        Route::post('/locations/{location}/toggle-status', [InventoryLocationController::class, 'toggleStatus'])->name('locations.toggle-status');
     });
 });
 
@@ -123,67 +150,67 @@ Route::get('/thank-you', function () {
 })->name('registration.thankyou');
 
 // Organization-specific routes extracted to routes/domains.php
-require __DIR__ . '/domains.php';
+require __DIR__.'/domains.php';
 
 // Domain Management Routes (for super users)
 Route::middleware(['auth', 'user.permission'])->prefix('domains')->name('domains.')->group(function () {
-    Route::get('/', [\App\Http\Controllers\DomainController::class, 'index'])->name('index');
-    Route::get('/create', [\App\Http\Controllers\DomainController::class, 'create'])->name('create');
-    Route::post('/', [\App\Http\Controllers\DomainController::class, 'store'])->name('store');
-    Route::get('/{domain}', [\App\Http\Controllers\DomainController::class, 'show'])->name('show');
-    Route::get('/{domain}/edit', [\App\Http\Controllers\DomainController::class, 'edit'])->name('edit');
-    Route::put('/{domain}', [\App\Http\Controllers\DomainController::class, 'update'])->name('update');
-    Route::delete('/{domain}', [\App\Http\Controllers\DomainController::class, 'destroy'])->name('destroy');
-    Route::post('/{domain}/toggle-status', [\App\Http\Controllers\DomainController::class, 'toggleStatus'])->name('toggle-status');
+    Route::get('/', [DomainController::class, 'index'])->name('index');
+    Route::get('/create', [DomainController::class, 'create'])->name('create');
+    Route::post('/', [DomainController::class, 'store'])->name('store');
+    Route::get('/{domain}', [DomainController::class, 'show'])->name('show');
+    Route::get('/{domain}/edit', [DomainController::class, 'edit'])->name('edit');
+    Route::put('/{domain}', [DomainController::class, 'update'])->name('update');
+    Route::delete('/{domain}', [DomainController::class, 'destroy'])->name('destroy');
+    Route::post('/{domain}/toggle-status', [DomainController::class, 'toggleStatus'])->name('toggle-status');
 
-    Route::post('/{domain}/license', [\App\Http\Controllers\Licensing\DomainLicenseController::class, 'store'])->name('license.store');
-    Route::post('/{domain}/license/usages/{usage}/revoke', [\App\Http\Controllers\Licensing\DomainLicenseController::class, 'revokeUsage'])->name('license.revoke-usage');
+    Route::post('/{domain}/license', [DomainLicenseController::class, 'store'])->name('license.store');
+    Route::post('/{domain}/license/usages/{usage}/revoke', [DomainLicenseController::class, 'revokeUsage'])->name('license.revoke-usage');
 });
 
 // Global routes (not domain-specific)
 Route::middleware(['auth', 'user.permission'])->group(function () {
     // User Management (global - not domain specific)
-    Route::get('/users', [\App\Http\Controllers\UserController::class, 'index'])->name('users.index');
-    Route::get('/users/hierarchy', [\App\Http\Controllers\UserController::class, 'hierarchy'])->name('users.hierarchy');
-    Route::get('/users/{user}', [\App\Http\Controllers\UserController::class, 'show'])->name('users.show');
-    Route::get('/users/{user}/edit', [\App\Http\Controllers\UserController::class, 'edit'])->name('users.edit');
+    Route::get('/users', [UserController::class, 'index'])->name('users.index');
+    Route::get('/users/hierarchy', [UserController::class, 'hierarchy'])->name('users.hierarchy');
+    Route::get('/users/{user}', [UserController::class, 'show'])->name('users.show');
+    Route::get('/users/{user}/edit', [UserController::class, 'edit'])->name('users.edit');
 
     // Supervisor Assignment Routes (Level-based)
-    Route::post('/users/{user}/assign-supervisor', [\App\Http\Controllers\SupervisorAssignmentController::class, 'assign'])
+    Route::post('/users/{user}/assign-supervisor', [SupervisorAssignmentController::class, 'assign'])
         ->name('users.assign-supervisor');
-    Route::delete('/users/{user}/remove-supervisor', [\App\Http\Controllers\SupervisorAssignmentController::class, 'remove'])
+    Route::delete('/users/{user}/remove-supervisor', [SupervisorAssignmentController::class, 'remove'])
         ->name('users.remove-supervisor');
-    Route::get('/supervisors/available', [\App\Http\Controllers\SupervisorAssignmentController::class, 'availableSupervisors'])
+    Route::get('/supervisors/available', [SupervisorAssignmentController::class, 'availableSupervisors'])
         ->name('supervisors.available');
-    Route::get('/supervisors/available/{user}', [\App\Http\Controllers\SupervisorAssignmentController::class, 'availableSupervisors'])
+    Route::get('/supervisors/available/{user}', [SupervisorAssignmentController::class, 'availableSupervisors'])
         ->name('supervisors.available-for-user');
-    Route::post('/supervisors/auto-assign', [\App\Http\Controllers\SupervisorAssignmentController::class, 'autoAssign'])
+    Route::post('/supervisors/auto-assign', [SupervisorAssignmentController::class, 'autoAssign'])
         ->name('supervisors.auto-assign');
-    Route::get('/users/{user}/supervisor-history', [\App\Http\Controllers\SupervisorAssignmentController::class, 'history'])
+    Route::get('/users/{user}/supervisor-history', [SupervisorAssignmentController::class, 'history'])
         ->name('users.supervisor-history');
 
     // Cascading Assignment Routes
-    Route::get('/supervisors/cascading-options', [\App\Http\Controllers\SupervisorAssignmentController::class, 'cascadingOptions'])
+    Route::get('/supervisors/cascading-options', [SupervisorAssignmentController::class, 'cascadingOptions'])
         ->middleware('auth')
         ->name('supervisors.cascading-options');
-    Route::post('/supervisors/{supervisor}/cascading-assign', [\App\Http\Controllers\SupervisorAssignmentController::class, 'cascadingAssign'])
+    Route::post('/supervisors/{supervisor}/cascading-assign', [SupervisorAssignmentController::class, 'cascadingAssign'])
         ->middleware('auth')
         ->name('supervisors.cascading-assign');
 
     // Role Management (Only for super user)
-    Route::get('/roles', [\App\Http\Controllers\RoleController::class, 'index'])->name('roles.index');
-    Route::get('/roles/create', [\App\Http\Controllers\RoleController::class, 'create'])->name('roles.create');
-    Route::post('/roles', [\App\Http\Controllers\RoleController::class, 'store'])->name('roles.store');
-    Route::get('/roles/{role}', [\App\Http\Controllers\RoleController::class, 'show'])->name('roles.show');
-    Route::get('/roles/{role}/edit', [\App\Http\Controllers\RoleController::class, 'edit'])->name('roles.edit');
-    Route::put('/roles/{role}', [\App\Http\Controllers\RoleController::class, 'update'])->name('roles.update');
-    Route::delete('/roles/{role}', [\App\Http\Controllers\RoleController::class, 'destroy'])->name('roles.destroy');
-    Route::get('/roles-permissions/matrix', [\App\Http\Controllers\RoleController::class, 'permissionMatrix'])->name('roles.permission-matrix');
+    Route::get('/roles', [RoleController::class, 'index'])->name('roles.index');
+    Route::get('/roles/create', [RoleController::class, 'create'])->name('roles.create');
+    Route::post('/roles', [RoleController::class, 'store'])->name('roles.store');
+    Route::get('/roles/{role}', [RoleController::class, 'show'])->name('roles.show');
+    Route::get('/roles/{role}/edit', [RoleController::class, 'edit'])->name('roles.edit');
+    Route::put('/roles/{role}', [RoleController::class, 'update'])->name('roles.update');
+    Route::delete('/roles/{role}', [RoleController::class, 'destroy'])->name('roles.destroy');
+    Route::get('/roles-permissions/matrix', [RoleController::class, 'permissionMatrix'])->name('roles.permission-matrix');
 
     // Permission Management (Only for super user)
-    Route::resource('permissions', \App\Http\Controllers\PermissionController::class)->names('permissions');
-    Route::post('/permissions/{permission}/activate', [\App\Http\Controllers\PermissionController::class, 'activate'])->name('permissions.activate');
-    Route::post('/permissions/{permission}/deactivate', [\App\Http\Controllers\PermissionController::class, 'deactivate'])->name('permissions.deactivate');
+    Route::resource('permissions', PermissionController::class)->names('permissions');
+    Route::post('/permissions/{permission}/activate', [PermissionController::class, 'activate'])->name('permissions.activate');
+    Route::post('/permissions/{permission}/deactivate', [PermissionController::class, 'deactivate'])->name('permissions.deactivate');
 });
 
 Route::get('/customer-order', function () {
@@ -204,8 +231,8 @@ Route::get('/debug-super-user', function () {
 })->middleware('auth');
 
 Route::get('/debug-role-hierarchy', function () {
-    $hierarchy = \App\Services\UserHierarchyService::getRoleHierarchyInfo();
-    $usersWithoutSupervisors = \App\Models\User::whereNull('supervisor_id')
+    $hierarchy = UserHierarchyService::getRoleHierarchyInfo();
+    $usersWithoutSupervisors = User::whereNull('supervisor_id')
         ->where('is_super_user', false)
         ->with('roles')
         ->get()
@@ -228,17 +255,17 @@ Route::get('/debug-role-hierarchy', function () {
 })->middleware('auth');
 
 Route::middleware(['auth'])->group(function () {
-    Route::post('/inquiries', [\App\Http\Controllers\ConversationController::class, 'store'])
+    Route::post('/inquiries', [ConversationController::class, 'store'])
         ->middleware('throttle:20,1')
         ->name('inquiries.store');
-    Route::get('/api/conversations/{conversation}/messages', [\App\Http\Controllers\ConversationController::class, 'messagesJson'])
+    Route::get('/api/conversations/{conversation}/messages', [ConversationController::class, 'messagesJson'])
         ->name('conversations.messages');
 });
 
 Route::middleware(['auth', 'check.super.user'])->group(function () {
-    Route::get('/messages', [\App\Http\Controllers\ConversationController::class, 'index'])->name('messages.index');
-    Route::post('/messages/{conversation}/read', [\App\Http\Controllers\ConversationController::class, 'markRead'])->name('messages.read');
-    Route::post('/messages/{conversation}/messages', [\App\Http\Controllers\ConversationController::class, 'storeStaff'])->name('messages.staff');
+    Route::get('/messages', [ConversationController::class, 'index'])->name('messages.index');
+    Route::post('/messages/{conversation}/read', [ConversationController::class, 'markRead'])->name('messages.read');
+    Route::post('/messages/{conversation}/messages', [ConversationController::class, 'storeStaff'])->name('messages.staff');
 });
 
-require __DIR__ . '/auth.php';
+require __DIR__.'/auth.php';

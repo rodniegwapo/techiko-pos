@@ -6,6 +6,9 @@
 /public/build
 /public/hot
 /public/storage
+/public/installers/*.exe
+/public/installers/*.msi
+/public/installers/*.dmg
 /storage/*.key
 /vendor
 .env

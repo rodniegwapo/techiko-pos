@@ -3,7 +3,7 @@
     "version": "1.0.0",
     "description": "An awesome app built with NativePHP",
     "main": "./out/main/index.js",
-    "author": null,
+    "author": "Techiko POS",
     "homepage": "https://nativephp.com",
     "type": "module",
     "engines": {
@@ -15,6 +15,7 @@
         "start": "electron-vite preview",
         "dev": "cross-env node php.js && electron-vite dev --watch",
         "build": "electron-vite build",
+        "clean:dist": "node clean-dist.mjs",
         "postinstall": "node ./node_modules/electron-builder/cli.js install-app-deps",
         "publish:all": "cross-env npm run build && cross-env node ./node_modules/electron-builder/cli.js --win --mac --linux --config electron-builder.mjs --x64 --arm64 -p always",
         "publish:win": "cross-env npm run publish:win-x64",

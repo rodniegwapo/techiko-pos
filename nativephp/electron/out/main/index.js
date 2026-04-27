@@ -2772,7 +2772,7 @@ class NativePHP {
 }
 const NativePHP$1 = new NativePHP();
 fixPath();
-const buildPath = path.resolve(import.meta.dirname, "C:/laragon/www/techiko-pos/vendor/nativephp/desktop/resources/build");
+const buildPath = path.resolve(import.meta.dirname, "../../../build");
 const defaultIcon = path.join(buildPath, "icon.png");
 const certificate = path.join(buildPath, "cacert.pem");
 const executable = process.platform === "win32" ? "php.exe" : "php";

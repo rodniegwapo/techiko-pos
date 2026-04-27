@@ -2,8 +2,10 @@ import fs from "fs";
 import fs_extra from 'fs-extra';
 const { copySync, removeSync, ensureDirSync } = fs_extra;
 import { join } from "path";
+import { resolveNativephpBuildPath } from './resolveNativephpBuildPath.mjs';
 import unzip from "yauzl";
 
+process.env.NATIVEPHP_BUILD_PATH = resolveNativephpBuildPath(process.env.NATIVEPHP_BUILD_PATH);
 
 const isBuilding = Boolean(process.env.NATIVEPHP_BUILDING);
 const phpBinaryPath = process.env.NATIVEPHP_PHP_BINARY_PATH;

@@ -3,7 +3,9 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
-        "build": "vite build"
+        "build": "vite build",
+        "build:win": "npm run build:win --prefix nativephp/electron",
+        "build:win-x64": "npm run build:win-x64 --prefix nativephp/electron"
     },
     "devDependencies": {
         "@inertiajs/vue3": "^1.0.0",
