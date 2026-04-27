@@ -20,6 +20,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        if (empty(config('licensing-client.server_url')) || config('licensing-client.server_url') === 'https://licensing.example.com') {
+            config(['licensing-client.server_url' => rtrim((string) config('app.url'), '/')]);
+        }
+
         // Set up morph map for polymorphic relationships
         Relation::morphMap([
             'Order' => 'App\Models\Sale',

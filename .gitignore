@@ -3,9 +3,10 @@
 
 # NativePHP Electron — install with npm in nativephp/electron (contains electron.exe > GitHub limit)
 /nativephp/electron/node_modules/
-# Electron / electron-vite build outputs (app.asar can be hundreds of MB; do not commit)
+# Electron / electron-vite / NativePHP build outputs (app.asar can be hundreds of MB; do not commit)
 /nativephp/electron/out/
 /nativephp/electron/release/
+*.asar
 /public/build
 /public/hot
 /public/storage

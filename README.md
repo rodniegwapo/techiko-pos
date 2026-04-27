@@ -65,3 +65,34 @@ If you discover a security vulnerability within Laravel, please send an e-mail t
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
 # techiko-pos
+
+## Requirements
+
+- **PHP 8.3+** with extensions: **openssl**, **sodium**, **zip**, and **gmp** (required by [laravel-licensing](https://github.com/masterix21/laravel-licensing) / PASETO; enable `extension=gmp` in `php.ini`).
+- **Node.js 22+** for [NativePHP Desktop](https://nativephp.com/docs/desktop/2/getting-started/installation) builds and dev tooling.
+
+## Laravel licensing (server + client)
+
+This app can act as the licensing authority using [masterix21/laravel-licensing](https://github.com/masterix21/laravel-licensing). Optional offline validation uses [laravel-licensing-client](https://github.com/masterix21/laravel-licensing-client).
+
+1. Copy variables from `.env.example` (`LICENSING_KEY_PASSPHRASE`, `LICENSING_SERVER_URL`, `LICENSING_ENFORCE_DOMAINS`).
+2. Generate key material (development example; protect production keys outside the repo):
+
+   ```bash
+   php artisan licensing:keys:make-root
+   php artisan licensing:keys:issue-signing --kid=your-key-id
+   ```
+
+3. **Per-domain enforcement** is off by default. Set `LICENSING_ENFORCE_DOMAINS=true` and attach the `license.domain` middleware to routes that receive a `{domain}` route parameter when you want unlicensed organizations blocked (see `App\Http\Middleware\EnsureDomainLicenseValid`).
+
+4. Licenses attach to the `Domain` model (`licenses()` morph); use `App\Services\Licensing\OrganizationLicensingService` to issue keys for an organization.
+
+## NativePHP Desktop
+
+```bash
+composer install
+php artisan native:run
+php artisan native:build
+```
+
+When the embedded app runs, `NATIVEPHP_RUNNING` is set and the app root URL is aligned to the local server from the request (see `App\Providers\NativeAppServiceProvider`). Do not commit `out/`, `release/`, or `*.asar` build outputs (see `.gitignore`).
