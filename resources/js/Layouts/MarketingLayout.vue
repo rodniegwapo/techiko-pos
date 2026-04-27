@@ -4,7 +4,7 @@ import ApplicationLogo from "@/Components/ApplicationLogo.vue";
 import { Link, usePage } from "@inertiajs/vue3";
 
 const nav = [
-    { name: "Home", href: "marketing.home" },
+    { name: "Home", href: "home" },
     { name: "Services", href: "marketing.services" },
     { name: "About", href: "marketing.about" },
     { name: "Pricing", href: "marketing.pricing" },
@@ -41,7 +41,7 @@ watch(
                         class="flex w-full items-center justify-between md:w-auto"
                     >
                         <Link
-                            :href="route('marketing.home')"
+                            :href="route('home')"
                             class="flex items-center gap-2 font-semibold text-gray-800 transition hover:opacity-90"
                         >
                             <ApplicationLogo class="!w-[88px]" />

@@ -13,7 +13,7 @@ use Inertia\Inertia;
 */
 
 // Public marketing (SEO) – `/login` is the canonical auth entry (see routes/auth.php)
-Route::get('/', [MarketingController::class, 'home'])->name('marketing.home');
+Route::get('/', [MarketingController::class, 'home'])->name('home');
 Route::get('/services', [MarketingController::class, 'services'])->name('marketing.services');
 Route::get('/about', [MarketingController::class, 'about'])->name('marketing.about');
 Route::get('/contact', [MarketingController::class, 'contact'])->name('marketing.contact');

@@ -67,7 +67,7 @@ defineProps({
                         Contact
                     </Link>
                     <Link
-                        :href="route('marketing.home')"
+                        :href="route('home')"
                         class="text-sm font-semibold text-blue-600 transition hover:text-teal-600"
                     >
                         Back to home
