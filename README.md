@@ -64,4 +64,59 @@ If you discover a security vulnerability within Laravel, please send an e-mail t
 ## License
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
-# techiko-pos
+
+---
+
+## techiko-pos
+
+### Running the desktop app (NativePHP)
+
+This project uses [NativePHP](https://nativephp.com) with an Electron shell under `nativephp/electron/`. If NativePHP is already set up in this repo, use the following to run the desktop app in development.
+
+**Prerequisites**
+
+- PHP and Composer, Node.js, and a configured `.env` (see `.env.example`).
+- Optional: desktop-related env keys and `config/nativephp.php` (app id, version, etc.).
+
+**Install project dependencies (from the project root)**
+
+```bash
+composer install
+npm install
+```
+
+For **packaging** a Windows/macOS/Linux installer, also install the Electron app dependencies (Node 22+ is required per `nativephp/electron/package.json`):
+
+```bash
+cd nativephp/electron
+npm install
+cd ../..
+```
+
+**Run in development (recommended)**
+
+Starts the NativePHP runner and Vite together:
+
+```bash
+composer run native:dev
+```
+
+**Run with two terminals**
+
+- Terminal 1: `php artisan native:run`
+- Terminal 2: `npm run dev`
+
+**Build a distributable**
+
+From `nativephp/electron` (after `npm install` there):
+
+| Platform   | Command              |
+| ---------- | -------------------- |
+| Windows x64 | `npm run build:win-x64` |
+| macOS arm64 | `npm run build:mac-arm64` |
+| macOS x64  | `npm run build:mac-x64` |
+| Linux x64  | `npm run build:linux-x64` |
+
+Output goes under `nativephp/electron/dist` by default. When the NativePHP build sets `NATIVEPHP_BUILDING` and `APP_PATH`, `directories.output` in [`nativephp/electron/electron-builder.mjs`](nativephp/electron/electron-builder.mjs) may point under your app path instead; see that file and [electron-builder](https://www.electron.build/) for details.
+
+**Further reading:** [NativePHP documentation](https://nativephp.com/docs) for `native:run`, building, and deployment.
