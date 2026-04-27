@@ -8,6 +8,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
+use App\Services\Licensing\OrganizationLicensingService;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -16,11 +17,20 @@ class ProfileController extends Controller
     /**
      * Display the user's profile form.
      */
-    public function edit(Request $request): Response
+    public function edit(Request $request, OrganizationLicensingService $licensing): Response
     {
+        $user = $request->user();
+        $domain = $licensing->resolveDomainForUser($user);
+        $licenseSummary = null;
+        if ($domain) {
+            $licenseSummary = $licensing->summaryForDomain($domain);
+        }
+
         return Inertia::render('Profile/Edit', [
-            'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
+            'mustVerifyEmail' => $user instanceof MustVerifyEmail,
             'status' => session('status'),
+            'offlineInstallerUrl' => config('offline.installer_url') ?: null,
+            'orgLicenseSummary' => $licenseSummary,
         ]);
     }
 

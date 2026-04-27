@@ -1,6 +1,7 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import DeleteUserForm from './Partials/DeleteUserForm.vue';
+import OfflineAppSection from './Partials/OfflineAppSection.vue';
 import UpdatePasswordForm from './Partials/UpdatePasswordForm.vue';
 import UpdateProfileInformationForm from './Partials/UpdateProfileInformationForm.vue';
 import { Head } from '@inertiajs/vue3';
@@ -11,6 +12,14 @@ defineProps({
     },
     status: {
         type: String,
+    },
+    offlineInstallerUrl: {
+        type: String,
+        default: null,
+    },
+    orgLicenseSummary: {
+        type: Object,
+        default: null,
     },
 });
 </script>
@@ -36,6 +45,11 @@ defineProps({
                 <div class="p-4 sm:p-8 bg-white shadow sm:rounded-lg">
                     <UpdatePasswordForm class="max-w-xl" />
                 </div>
+
+                <OfflineAppSection
+                    :offline-installer-url="offlineInstallerUrl"
+                    :org-license-summary="orgLicenseSummary"
+                />
 
                 <div class="p-4 sm:p-8 bg-white shadow sm:rounded-lg">
                     <DeleteUserForm class="max-w-xl" />

@@ -69,6 +69,28 @@ The Laravel framework is open-sourced software licensed under the [MIT license](
 
 ## techiko-pos
 
+### Organization licensing (offline / desktop)
+
+The server uses [Laravel Licensing](https://github.com/masterix21/laravel-licensing) to attach **per-organization** licenses to `App\Models\Domain` (seats, expiry, PASETO offline tokens). This system controls **entitlement to offline features and the desktop app**, not user authentication (Spatie roles and web login are unchanged).
+
+**Operations**
+
+- Enable the PHP `gmp` extension in production and development where possible. The package and PASETO stack expect it; without it, some installs use composer with `--ignore-platform-req=ext-gmp` only to satisfy install-time checks, but the runtime may still need GMP.
+- After `composer install` and `php artisan migrate`, generate a root key and a signing key (see the package [documentation](https://github.com/masterix21/laravel-licensing)):
+  - `php artisan licensing:keys:make-root`
+  - `php artisan licensing:keys:issue-signing --kid=signing-key-1`
+- Set `LICENSING_KEY_PASSPHRASE` in `.env` (and in deployment secrets) so non-interactive key commands and tests can run. **Never commit private key material.**
+- Super users create or manage licenses on the **Domains → Show** screen. Domain users with a usable license can use the **Profile** “offline app” section and call the Sanctum API: `POST /api/licensing/register-device` and `POST /api/licensing/offline-token` (see `routes/api.php`).
+- Set `OFFLINE_INSTALLER_URL` in `.env` to a public URL for the built desktop installer; it is read from `config/offline.php` for the profile download link.
+
+**Desktop client (optional next step)**
+
+Verify issued PASETO tokens inside the [NativePHP](https://nativephp.com) / Electron app using the **public** material exported for clients (per the package docs, e.g. `php artisan licensing:keys:export` where applicable) or the companion patterns from the [laravel-licensing](https://github.com/masterix21/laravel-licensing) project. A separate npm package name may differ by registry; follow the package README for client-side verification of offline tokens.
+
+**Tests**
+
+- PHPUnit sets `LICENSING_KEY_PASSPHRASE` in `phpunit.xml`. Tests that issue offline tokens also run `licensing:keys:make-root` and `licensing:keys:issue-signing` for an isolated key chain.
+
 ### Running the desktop app (NativePHP)
 
 This project uses [NativePHP](https://nativephp.com) with an Electron shell under `nativephp/electron/`. If NativePHP is already set up in this repo, use the following to run the desktop app in development.
@@ -120,3 +142,8 @@ From `nativephp/electron` (after `npm install` there):
 Output goes under `nativephp/electron/dist` by default. When the NativePHP build sets `NATIVEPHP_BUILDING` and `APP_PATH`, `directories.output` in [`nativephp/electron/electron-builder.mjs`](nativephp/electron/electron-builder.mjs) may point under your app path instead; see that file and [electron-builder](https://www.electron.build/) for details.
 
 **Further reading:** [NativePHP documentation](https://nativephp.com/docs) for `native:run`, building, and deployment.
+
+**Troubleshooting `composer run native:dev` (Windows)**
+
+- If you see `Command failed: 'npm run dev' (exit code 1)` from the NativePHP side, the Electron package under `nativephp/electron` must run: `php.js` (PHP binary unzip), a built TypeScript `electron-plugin` (`#plugin` import), and a `MAIN_VITE_NATIVEPHP_BUILD_PATH` that matches the unzip path. This repo syncs those defaults in [`nativephp/electron/php.js`](nativephp/electron/php.js) and [`nativephp/electron/electron.vite.config.mjs`](nativephp/electron/electron.vite.config.mjs). Run `cd nativephp/electron && npm run plugin:build` if you see unresolved `#plugin` (the `dev` script runs `predev` to build the plugin when possible).
+- The embedded runtime uses the PHP zip from `vendor/nativephp/php-bin` (8.3/8.4 on Windows). If your system PHP is older (e.g. 8.2) than the shipped zips, the app picks the newest available pack and may log a short warning; matching PHP 8.3+ in Laragon is ideal.

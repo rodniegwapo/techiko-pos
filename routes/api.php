@@ -24,6 +24,14 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 })->name('user');
 
+Route::middleware('auth:sanctum')
+    ->prefix('licensing')
+    ->name('licensing.')
+    ->group(function () {
+        Route::post('/register-device', [\App\Http\Controllers\Licensing\LicensingApiController::class, 'registerDevice'])->name('register-device');
+        Route::post('/offline-token', [\App\Http\Controllers\Licensing\LicensingApiController::class, 'issueOfflineToken'])->name('offline-token');
+    });
+
 /**
  * -----------------------
  * Public API routes (no authentication required)

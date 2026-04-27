@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from "vue";
-import { router, Head } from "@inertiajs/vue3";
+import { router, Head, useForm } from "@inertiajs/vue3";
 import { IconEdit, IconArrowLeft, IconWorld, IconMapPin, IconCurrencyDollar, IconClock, IconUsers, IconCalendar } from "@tabler/icons-vue";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 
@@ -8,6 +8,14 @@ const props = defineProps({
     domain: {
         type: Object,
         required: true,
+    },
+    orgLicense: {
+        type: Object,
+        default: null,
+    },
+    newLicenseKey: {
+        type: String,
+        default: null,
     },
 });
 
@@ -32,6 +40,29 @@ const handleEdit = () => {
 
 const handleBack = () => {
     router.visit(route('domains.index'));
+};
+
+const licenseForm = useForm({
+    max_usages: 5,
+    expires_at: '',
+});
+
+const submitLicense = () => {
+    licenseForm.post(route('domains.license.store', { domain: props.domain.name_slug }), {
+        preserveScroll: true,
+        onSuccess: () => {
+            licenseForm.reset();
+        },
+    });
+};
+
+const revokeUsage = (usageId) => {
+    if (!confirm('Revoke this device activation?')) return;
+    router.post(
+        route('domains.license.revoke-usage', { domain: props.domain.name_slug, usage: usageId }),
+        {},
+        { preserveScroll: true }
+    );
 };
 </script>
 
@@ -125,6 +156,94 @@ const handleBack = () => {
                                         <p class="text-gray-900">{{ domain.timezone || 'Not specified' }}</p>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+
+                        <!-- Offline / desktop license -->
+                        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                            <div class="p-6">
+                                <h2 class="text-lg font-semibold text-gray-900 mb-4">Offline desktop license</h2>
+                                <p class="text-sm text-gray-600 mb-4">
+                                    Controls device seats for the NativePHP desktop POS. One license per organization; create a new one only if none exists.
+                                </p>
+                                <div
+                                    v-if="newLicenseKey"
+                                    class="mb-4 rounded-md border border-green-200 bg-green-50 p-4"
+                                >
+                                    <p class="text-sm font-medium text-green-900 mb-2">License key (copy now; it will not be shown again)</p>
+                                    <p class="font-mono text-sm break-all text-green-800">{{ newLicenseKey }}</p>
+                                </div>
+                                <div v-if="orgLicense" class="space-y-4">
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                        <div>
+                                            <span class="text-gray-500">Status</span>
+                                            <p class="font-medium">{{ orgLicense.status }} ({{ orgLicense.usable ? 'usable' : 'not usable' }})</p>
+                                        </div>
+                                        <div>
+                                            <span class="text-gray-500">Seats</span>
+                                            <p class="font-medium">{{ orgLicense.usages?.length ?? 0 }} / {{ orgLicense.max_usages }}</p>
+                                        </div>
+                                        <div>
+                                            <span class="text-gray-500">Expires</span>
+                                            <p class="font-medium">{{ orgLicense.expires_at ? formatDate(orgLicense.expires_at) : '—' }}</p>
+                                        </div>
+                                        <div>
+                                            <span class="text-gray-500">UID</span>
+                                            <p class="font-mono text-xs break-all">{{ orgLicense.uid }}</p>
+                                        </div>
+                                    </div>
+                                    <div v-if="orgLicense.usages && orgLicense.usages.length">
+                                        <h3 class="text-sm font-semibold text-gray-800 mb-2">Active devices</h3>
+                                        <ul class="divide-y divide-gray-100 rounded-md border border-gray-100">
+                                            <li
+                                                v-for="u in orgLicense.usages"
+                                                :key="u.id"
+                                                class="flex items-center justify-between gap-2 py-2 px-3 text-sm"
+                                            >
+                                                <div>
+                                                    <p class="font-medium text-gray-900">{{ u.name || 'Device' }}</p>
+                                                    <p class="text-xs text-gray-500">{{ u.registered_at ? formatDate(u.registered_at) : '' }}</p>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    class="text-red-600 hover:text-red-800 text-xs"
+                                                    @click="revokeUsage(u.id)"
+                                                >
+                                                    Revoke
+                                                </button>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                <form v-else @submit.prevent="submitLicense" class="space-y-4 max-w-md">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Max device seats</label>
+                                        <input
+                                            v-model.number="licenseForm.max_usages"
+                                            type="number"
+                                            min="1"
+                                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700">Expires (optional)</label>
+                                        <input
+                                            v-model="licenseForm.expires_at"
+                                            type="date"
+                                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+                                        />
+                                    </div>
+                                    <div v-if="licenseForm.errors" class="text-sm text-red-600">
+                                        <p v-for="(err, k) in licenseForm.errors" :key="k">{{ err }}</p>
+                                    </div>
+                                    <button
+                                        type="submit"
+                                        :disabled="licenseForm.processing"
+                                        class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium disabled:opacity-50"
+                                    >
+                                        Create license
+                                    </button>
+                                </form>
                             </div>
                         </div>
 

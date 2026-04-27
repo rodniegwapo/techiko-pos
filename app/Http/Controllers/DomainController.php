@@ -5,13 +5,15 @@ namespace App\Http\Controllers;
 use App\Http\Resources\DomainResource;
 use App\Models\Domain;
 use App\Services\DomainService;
+use App\Services\Licensing\OrganizationLicensingService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class DomainController extends Controller
 {
     public function __construct(
-        private DomainService $domainService
+        private DomainService $domainService,
+        private OrganizationLicensingService $organizationLicensing
     ) {}
     /**
      * Display a listing of the resource.
@@ -62,8 +64,31 @@ class DomainController extends Controller
     {
         $domain->load(['users']);
 
+        $license = $this->organizationLicensing->primaryLicenseForDomain($domain);
+        $licenseForUi = null;
+        if ($license) {
+            $licenseForUi = [
+                'id' => $license->id,
+                'uid' => $license->uid,
+                'max_usages' => $license->max_usages,
+                'expires_at' => $license->expires_at?->toIso8601String(),
+                'status' => $license->status->value,
+                'usable' => $license->isUsable(),
+                'usages' => $this->organizationLicensing->listActiveUsages($license)
+                    ->map(fn ($u) => [
+                        'id' => (string) $u->getKey(),
+                        'name' => $u->name,
+                        'registered_at' => $u->registered_at?->toIso8601String(),
+                    ])
+                    ->values()
+                    ->all(),
+            ];
+        }
+
         return Inertia::render('Domains/Show', [
             'domain' => new DomainResource($domain),
+            'orgLicense' => $licenseForUi,
+            'newLicenseKey' => session('new_license_key'),
         ]);
     }
 

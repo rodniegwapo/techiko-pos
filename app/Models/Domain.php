@@ -5,8 +5,10 @@ namespace App\Models;
 use App\Traits\Searchable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
+use LucaLongo\Licensing\Models\License;
 
 class Domain extends Model
 {
@@ -74,6 +76,16 @@ class Domain extends Model
     public function users()
     {
         return $this->hasMany(User::class);
+    }
+
+    /**
+     * Offline / desktop entitlements (Laravel Licensing) for this organization.
+     *
+     * @return MorphMany<License, Domain>
+     */
+    public function licenses(): MorphMany
+    {
+        return $this->morphMany(License::class, 'licensable');
     }
 
     /**

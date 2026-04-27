@@ -15,7 +15,7 @@ use Inertia\Inertia;
 
 Route::get('/', function () {
     return Inertia::render('Auth/Login');
-})->name('login');
+})->name('home');
 
 Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])
     ->middleware(['auth', 'verified'])
@@ -117,6 +117,9 @@ Route::middleware(['auth', 'user.permission'])->prefix('domains')->name('domains
     Route::put('/{domain}', [\App\Http\Controllers\DomainController::class, 'update'])->name('update');
     Route::delete('/{domain}', [\App\Http\Controllers\DomainController::class, 'destroy'])->name('destroy');
     Route::post('/{domain}/toggle-status', [\App\Http\Controllers\DomainController::class, 'toggleStatus'])->name('toggle-status');
+
+    Route::post('/{domain}/license', [\App\Http\Controllers\Licensing\DomainLicenseController::class, 'store'])->name('license.store');
+    Route::post('/{domain}/license/usages/{usage}/revoke', [\App\Http\Controllers\Licensing\DomainLicenseController::class, 'revokeUsage'])->name('license.revoke-usage');
 });
 
 // Global routes (not domain-specific)

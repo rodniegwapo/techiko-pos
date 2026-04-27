@@ -39,7 +39,9 @@ Route::prefix('domains/{domain:name_slug}')
         // Sales API routes (Organization-specific)
         Route::prefix('sales')->name('sales.')->group(function () {
             Route::get('/offline-transactions', [\App\Http\Controllers\Domains\SaleController::class, 'offlineTransactionsPage'])->name('offline-transactions');
-            Route::post('/offline-sync', [\App\Http\Controllers\Domains\SaleController::class, 'offlineSync'])->name('offline-sync');
+            Route::post('/offline-sync', [\App\Http\Controllers\Domains\SaleController::class, 'offlineSync'])
+                ->name('offline-sync')
+                ->middleware('ensure.domain.license');
 
             Route::post('/draft', [\App\Http\Controllers\Domains\SaleController::class, 'storeDraft'])->name('drafts.store');
             Route::get('/oversell-statistics', [\App\Http\Controllers\Domains\SaleController::class, 'getOversellStatistics'])->name('oversell.statistics');

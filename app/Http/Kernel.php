@@ -80,5 +80,6 @@ class Kernel extends HttpKernel
         'check.super.user' => \App\Http\Middleware\CheckSuperUser::class,
         'user.permission' => \App\Http\Middleware\UserPermissionCheckMiddleware::class,
         'role.access' => \App\Http\Middleware\RoleBasedAccessControl::class,
+        'ensure.domain.license' => \App\Http\Middleware\EnsureDomainLicenseValid::class,
     ];
 }
