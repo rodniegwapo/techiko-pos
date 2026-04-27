@@ -4,6 +4,7 @@ use App\Events\OrderUpdated;
 use App\Http\Controllers\ProfileController;
 use App\Models\Sale;
 use Illuminate\Foundation\Application;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -13,7 +14,17 @@ use Inertia\Inertia;
 |--------------------------------------------------------------------------
 */
 
-Route::get('/', function () {
+Route::get('/', function (Request $request) {
+    if ($user = $request->user()) {
+        $target = $user->postLoginIntendedUrl();
+        $query = $request->query();
+        if (! empty($query)) {
+            $target .= (str_contains($target, '?') ? '&' : '?').http_build_query($query);
+        }
+
+        return redirect()->to($target);
+    }
+
     return Inertia::render('Auth/Login');
 })->name('home');
 

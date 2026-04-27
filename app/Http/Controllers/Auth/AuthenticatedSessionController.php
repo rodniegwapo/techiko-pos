@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
-use App\Providers\RouteServiceProvider;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -36,18 +35,7 @@ class AuthenticatedSessionController extends Controller
 
         $user = auth()->user();
 
-        // Super users always go to global dashboard, regardless of domain
-        if ($user->isSuperUser()) {
-            return redirect()->intended(RouteServiceProvider::HOME);
-        }
-
-        // Regular users with domain go to domain-specific dashboard
-        if ($user->domain) {
-            return redirect()->route('domains.sales.index', ['domain' => $user->domain]);
-        }
-
-        // Users without domain go to global dashboard
-        return redirect()->intended(RouteServiceProvider::HOME);
+        return redirect()->intended($user->postLoginIntendedUrl());
     }
 
     /**

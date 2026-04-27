@@ -127,6 +127,28 @@ class User extends Authenticatable
         return $this->is_super_user || $this->role_level === 1;
     }
 
+    /**
+     * URL to send the user after login, or when visiting / while already authenticated.
+     */
+    public function postLoginIntendedUrl(): string
+    {
+        if ($this->isSuperUser()) {
+            return route('dashboard');
+        }
+
+        if ($this->domain) {
+            return route('domains.sales.index', ['domain' => $this->domain]);
+        }
+
+        return route('dashboard');
+    }
+
+    public function postLoginIntendedUrlWithEmailVerifiedQuery(): string
+    {
+        $url = $this->postLoginIntendedUrl();
+
+        return $url.(str_contains($url, '?') ? '&' : '?').'verified=1';
+    }
 
     /**
      * Check if user has any of the specified permissions.
