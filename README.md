@@ -95,4 +95,8 @@ php artisan native:run
 php artisan native:build
 ```
 
-When the embedded app runs, `NATIVEPHP_RUNNING` is set and the app root URL is aligned to the local server from the request (see `App\Providers\NativeAppServiceProvider`). Do not commit `out/`, `release/`, or `*.asar` build outputs (see `.gitignore`).
+When the embedded app runs, `NATIVEPHP_RUNNING` is set and the app root URL is aligned to the local server from the request (see `App\Providers\NativeAppServiceProvider`). Public marketing pages (`/`, `/about`, and related routes) are **not** registered in the desktop build; `GET /` redirects guests to **login** and signed-in users to the **dashboard** (`App\Http\Controllers\NativeDesktopHomeController`). The browser build keeps full marketing routes as before.
+
+To inspect the desktop route table locally: `NATIVEPHP_RUNNING=1 php artisan route:list` (Windows: `set NATIVEPHP_RUNNING=1` then `php artisan route:list`).
+
+Do not commit `out/`, `release/`, or `*.asar` build outputs (see `.gitignore`).

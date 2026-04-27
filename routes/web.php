@@ -1,7 +1,8 @@
 <?php
 
-use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\MarketingController;
+use App\Http\Controllers\NativeDesktopHomeController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SeoController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -12,12 +13,19 @@ use Inertia\Inertia;
 |--------------------------------------------------------------------------
 */
 
-// Public marketing (SEO) – `/login` is the canonical auth entry (see routes/auth.php)
-Route::get('/', [MarketingController::class, 'home'])->name('home');
-Route::get('/services', [MarketingController::class, 'services'])->name('marketing.services');
-Route::get('/about', [MarketingController::class, 'about'])->name('marketing.about');
-Route::get('/contact', [MarketingController::class, 'contact'])->name('marketing.contact');
-Route::get('/pricing', [MarketingController::class, 'pricing'])->name('marketing.pricing');
+// Public marketing (web only). NativePHP desktop: no marketing; `/` → login or dashboard.
+$nativeDesktopRoutes = config('nativephp-internal.running')
+    || config('techiko.test_native_desktop_routes', false);
+
+if ($nativeDesktopRoutes) {
+    Route::get('/', NativeDesktopHomeController::class)->name('home');
+} else {
+    Route::get('/', [MarketingController::class, 'home'])->name('home');
+    Route::get('/services', [MarketingController::class, 'services'])->name('marketing.services');
+    Route::get('/about', [MarketingController::class, 'about'])->name('marketing.about');
+    Route::get('/contact', [MarketingController::class, 'contact'])->name('marketing.contact');
+    Route::get('/pricing', [MarketingController::class, 'pricing'])->name('marketing.pricing');
+}
 
 Route::get('/sitemap.xml', [SeoController::class, 'sitemap'])->name('sitemap');
 Route::get('/robots.txt', [SeoController::class, 'robots'])->name('robots');
