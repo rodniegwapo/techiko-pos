@@ -48,12 +48,18 @@ class SaleController extends Controller
     public function index(Request $request, Domain $domain)
     {
         $location = Helpers::getActiveLocation($domain);
+        $vat = $domain->salesVatSettings();
 
         return Inertia::render('Sales/Index', [
             'domain' => $domain,
             'categories' => $location
                 ? $this->getCategoriesForLocation($domain->name_slug, $location)->get()
                 : Category::where('domain', $domain->name_slug)->get(),
+            'salesSettings' => [
+                'apply_vat_automatically' => $vat['apply_vat_automatically'],
+                'vat_rate_percent' => $vat['vat_rate_percent'],
+                'vat_pricing_mode' => $vat['vat_pricing_mode'],
+            ],
         ]);
     }
 
@@ -197,9 +203,9 @@ class SaleController extends Controller
                     // Link customer to sale
                     $sale->updateCustomer($customer->id);
                 } else {
-                    // 4. Update payment details for non-credit payments
+                    // 4. Update payment details for non-credit payments (preserve grand_total incl. VAT)
+                    $sale->refresh();
                     $sale->update([
-                        'grand_total' => $sale->total_amount,
                         'payment_method' => $validated['payment_method'],
                         'payment_card_type_id' => $validated['payment_card_type_id'] ?? null,
                         'location_id' => $location->id,
@@ -213,8 +219,8 @@ class SaleController extends Controller
                         // Link customer to sale and trigger order update event
                         $sale->updateCustomer($customer->id);
 
-                        // Process loyalty rewards
-                        $loyaltyResults = $customer->processLoyaltyForSale($validated['sale_amount'] ?? $sale->total_amount);
+                        // Process loyalty rewards (amount should match amount charged incl. VAT)
+                        $loyaltyResults = $customer->processLoyaltyForSale($validated['sale_amount'] ?? $sale->grand_total);
                     }
                 }
             });
@@ -299,11 +305,7 @@ class SaleController extends Controller
             'sale' => $sale,
             'items' => $sale->saleItems,
             'discounts' => $sale->saleDiscounts,
-            'totals' => [
-                'subtotal' => $sale->total_amount,
-                'discount_amount' => $sale->discount_amount,
-                'grand_total' => $sale->grand_total,
-            ],
+            'totals' => $this->saleTotalsPayload($sale),
         ]);
     }
 
@@ -327,11 +329,7 @@ class SaleController extends Controller
             'sale' => $sale,
             'items' => $sale->saleItems,
             'discounts' => $sale->saleDiscounts,
-            'totals' => [
-                'subtotal' => $sale->total_amount,
-                'discount_amount' => $sale->discount_amount,
-                'grand_total' => $sale->grand_total,
-            ],
+            'totals' => $this->saleTotalsPayload($sale),
         ]);
     }
 
@@ -364,11 +362,7 @@ class SaleController extends Controller
             'sale' => $sale,
             'items' => $sale->saleItems,
             'discounts' => $sale->saleDiscounts,
-            'totals' => [
-                'subtotal' => $sale->total_amount,
-                'discount_amount' => $sale->discount_amount,
-                'grand_total' => $sale->grand_total,
-            ],
+            'totals' => $this->saleTotalsPayload($sale),
         ]);
     }
 
@@ -384,11 +378,7 @@ class SaleController extends Controller
             'sale' => $sale,
             'items' => $sale->saleItems,
             'discounts' => $sale->saleDiscounts,
-            'totals' => [
-                'subtotal' => $sale->total_amount,
-                'discount_amount' => $sale->discount_amount,
-                'grand_total' => $sale->grand_total,
-            ],
+            'totals' => $this->saleTotalsPayload($sale),
         ]);
     }
 
@@ -604,15 +594,7 @@ class SaleController extends Controller
             'sale' => $sale,
             'items' => $sale ? $sale->saleItems : [],
             'discounts' => $sale ? $sale->saleDiscounts : [],
-            'totals' => $sale ? [
-                'subtotal' => $sale->total_amount,
-                'discount_amount' => $sale->discount_amount,
-                'grand_total' => $sale->grand_total,
-            ] : [
-                'subtotal' => 0,
-                'discount_amount' => 0,
-                'grand_total' => 0,
-            ],
+            'totals' => $sale ? $this->saleTotalsPayload($sale) : $this->emptySaleTotalsPayload(),
         ]);
     }
 
@@ -739,11 +721,7 @@ class SaleController extends Controller
             'sale' => $sale,
             'items' => $sale->saleItems,
             'discounts' => $sale->saleDiscounts,
-            'totals' => [
-                'subtotal' => $sale->total_amount,
-                'discount_amount' => $sale->discount_amount,
-                'grand_total' => $sale->grand_total,
-            ],
+            'totals' => $this->saleTotalsPayload($sale),
         ]);
     }
 
@@ -835,15 +813,7 @@ class SaleController extends Controller
             'sale' => $sale,
             'items' => $transformedItems,
             'discounts' => $sale ? $sale->saleDiscounts : [],
-            'totals' => $sale ? [
-                'subtotal' => $sale->total_amount,
-                'discount_amount' => $sale->discount_amount,
-                'grand_total' => $sale->grand_total,
-            ] : [
-                'subtotal' => 0,
-                'discount_amount' => 0,
-                'grand_total' => 0,
-            ],
+            'totals' => $sale ? $this->saleTotalsPayload($sale) : $this->emptySaleTotalsPayload(),
             'discount_options' => [
                 'product_discount_options' => $productDiscounts,
                 'promotional_discount_options' => $promotionalDiscounts,
@@ -908,11 +878,7 @@ class SaleController extends Controller
             'sale' => $sale,
             'items' => $sale->saleItems,
             'discounts' => $sale->saleDiscounts,
-            'totals' => [
-                'subtotal' => $sale->total_amount,
-                'discount_amount' => $sale->discount_amount,
-                'grand_total' => $sale->grand_total,
-            ],
+            'totals' => $this->saleTotalsPayload($sale),
         ]);
     }
 
@@ -965,11 +931,7 @@ class SaleController extends Controller
             'sale' => $sale,
             'items' => $sale->saleItems,
             'discounts' => $sale->saleDiscounts,
-            'totals' => [
-                'subtotal' => $sale->total_amount,
-                'discount_amount' => $sale->discount_amount,
-                'grand_total' => $sale->grand_total,
-            ],
+            'totals' => $this->saleTotalsPayload($sale),
         ]);
     }
 
@@ -1009,11 +971,7 @@ class SaleController extends Controller
                 'sale' => null,
                 'items' => [],
                 'discounts' => [],
-                'totals' => [
-                    'subtotal' => 0,
-                    'discount_amount' => 0,
-                    'grand_total' => 0,
-                ],
+                'totals' => $this->emptySaleTotalsPayload(),
             ]);
         }
 
@@ -1022,11 +980,7 @@ class SaleController extends Controller
             'sale' => $sale,
             'items' => $sale->saleItems,
             'discounts' => $sale->saleDiscounts,
-            'totals' => [
-                'subtotal' => $sale->total_amount,
-                'discount_amount' => $sale->discount_amount,
-                'grand_total' => $sale->grand_total,
-            ],
+            'totals' => $this->saleTotalsPayload($sale),
         ]);
     }
 
@@ -1246,8 +1200,8 @@ class SaleController extends Controller
                 $this->saleService->completeSale($sale, $cashier, $location);
                 $this->saleService->handleOverselling($sale);
 
+                $sale->refresh();
                 $sale->update([
-                    'grand_total' => $sale->total_amount,
                     'payment_method' => $payload['payment_method'],
                     'payment_card_type_id' => ($payload['payment_method'] ?? '') === 'card'
                         ? ($payload['payment_card_type_id'] ?? null)
@@ -1286,6 +1240,32 @@ class SaleController extends Controller
             || $code === 1062 // MySQL duplicate
             || $code === 19 // SQLite UNIQUE constraint
             || str_contains(strtolower($e->getMessage()), 'unique');
+    }
+
+    /**
+     * @return array{subtotal: float, discount_amount: float, tax_amount: float, grand_total: float}
+     */
+    protected function saleTotalsPayload(Sale $sale): array
+    {
+        return [
+            'subtotal' => (float) $sale->total_amount,
+            'discount_amount' => (float) $sale->discount_amount,
+            'tax_amount' => (float) $sale->tax_amount,
+            'grand_total' => (float) $sale->grand_total,
+        ];
+    }
+
+    /**
+     * @return array{subtotal: int, discount_amount: int, tax_amount: int, grand_total: int}
+     */
+    protected function emptySaleTotalsPayload(): array
+    {
+        return [
+            'subtotal' => 0,
+            'discount_amount' => 0,
+            'tax_amount' => 0,
+            'grand_total' => 0,
+        ];
     }
 
     /**

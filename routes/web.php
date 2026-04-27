@@ -1,9 +1,8 @@
 <?php
 
-use App\Events\OrderUpdated;
+use App\Http\Controllers\MarketingController;
 use App\Http\Controllers\ProfileController;
-use App\Models\Sale;
-use Illuminate\Foundation\Application;
+use App\Http\Controllers\SeoController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -14,6 +13,7 @@ use Inertia\Inertia;
 |--------------------------------------------------------------------------
 */
 
+// Public site: `/` shows marketing to guests; authenticated users are sent to the app. `/login` is the canonical auth entry (see routes/auth.php).
 Route::get('/', function (Request $request) {
     if ($user = $request->user()) {
         $target = $user->postLoginIntendedUrl();
@@ -25,8 +25,15 @@ Route::get('/', function (Request $request) {
         return redirect()->to($target);
     }
 
-    return Inertia::render('Auth/Login');
+    return app(MarketingController::class)->home();
 })->name('home');
+Route::get('/services', [MarketingController::class, 'services'])->name('marketing.services');
+Route::get('/about', [MarketingController::class, 'about'])->name('marketing.about');
+Route::get('/contact', [MarketingController::class, 'contact'])->name('marketing.contact');
+Route::get('/pricing', [MarketingController::class, 'pricing'])->name('marketing.pricing');
+
+Route::get('/sitemap.xml', [SeoController::class, 'sitemap'])->name('sitemap');
+Route::get('/robots.txt', [SeoController::class, 'robots'])->name('robots');
 
 Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])
     ->middleware(['auth', 'verified'])
@@ -36,7 +43,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-    
+
     // User Impersonation (Super Users Only)
     Route::post('/impersonate/{user}', [\App\Http\Controllers\ImpersonationController::class, 'impersonate'])
         ->name('impersonate');
@@ -50,38 +57,38 @@ Route::middleware('auth')->group(function () {
 Route::middleware(['auth', 'user.permission'])->group(function () {
     // Sales (Global - All Organizations)
     Route::get('/sales', [\App\Http\Controllers\SaleController::class, 'index'])->name('sales.index');
-    
+
     // Products (Global - All Organizations)
     Route::resource('products', \App\Http\Controllers\Products\ProductController::class)
         ->only(['index', 'store', 'update', 'destroy'])
         ->names('products');
-    
+
     // Categories (Global - All Organizations)
     Route::resource('categories', \App\Http\Controllers\CategoryController::class)
         ->only(['index', 'store', 'update', 'destroy'])
         ->names('categories');
-    
+
     // Product Discounts (Global)
     Route::name('products.')->group(function () {
         Route::resource('discounts', \App\Http\Controllers\Products\DiscountController::class)
             ->only(['index', 'store', 'update', 'destroy'])
             ->names('discounts');
     });
-    
+
     // Mandatory Discounts (Global)
     Route::resource('mandatory-discounts', \App\Http\Controllers\MandatoryDiscountController::class)
         ->only(['index', 'store', 'update', 'destroy'])
         ->names('mandatory-discounts');
-    
+
     // Loyalty Program (Global)
     Route::get('/loyalty', [\App\Http\Controllers\LoyaltyController::class, 'index'])->name('loyalty.index');
-    
+
     // Customers (Global)
     Route::get('/customers', [\App\Http\Controllers\CustomerController::class, 'webIndex'])->name('customers.index');
-    
+
     // Void Logs (Global)
     Route::get('/void-logs', [\App\Http\Controllers\VoidLogController::class, 'index'])->name('voids.index');
-    
+
     // Inventory Management (Global)
     Route::prefix('inventory')->name('inventory.')->group(function () {
         Route::get('/', [\App\Http\Controllers\InventoryController::class, 'index'])->name('index');
@@ -89,19 +96,19 @@ Route::middleware(['auth', 'user.permission'])->group(function () {
         Route::get('/movements', [\App\Http\Controllers\InventoryController::class, 'movements'])->name('movements');
         Route::get('/low-stock', [\App\Http\Controllers\InventoryController::class, 'lowStock'])->name('low-stock');
         Route::get('/valuation', [\App\Http\Controllers\InventoryController::class, 'valuation'])->name('valuation');
-        
+
         Route::post('/receive', [\App\Http\Controllers\InventoryController::class, 'receive'])->name('receive');
         Route::post('/transfer', [\App\Http\Controllers\InventoryController::class, 'transfer'])->name('transfer');
-        
+
         // Search routes
         Route::get('/search/products', [\App\Http\Controllers\InventoryController::class, 'searchProducts'])->name('search.products');
-        
+
         Route::resource('adjustments', \App\Http\Controllers\StockAdjustmentController::class)->names('adjustments');
         Route::post('/adjustments/{adjustment}/submit', [\App\Http\Controllers\StockAdjustmentController::class, 'submitForApproval'])->name('adjustments.submit');
         Route::post('/adjustments/{adjustment}/approve', [\App\Http\Controllers\StockAdjustmentController::class, 'approve'])->name('adjustments.approve');
         Route::post('/adjustments/{adjustment}/reject', [\App\Http\Controllers\StockAdjustmentController::class, 'reject'])->name('adjustments.reject');
         Route::get('/adjustment-products', [\App\Http\Controllers\StockAdjustmentController::class, 'getProductsForAdjustment'])->name('adjustment-products');
-        
+
         Route::resource('locations', \App\Http\Controllers\InventoryLocationController::class)->names('locations');
         Route::post('/locations/{location}/set-default', [\App\Http\Controllers\InventoryLocationController::class, 'setDefault'])->name('locations.set-default');
         Route::post('/locations/{location}/toggle-status', [\App\Http\Controllers\InventoryLocationController::class, 'toggleStatus'])->name('locations.toggle-status');
@@ -186,12 +193,13 @@ Route::get('/customer-order', function () {
 // Debug routes
 Route::get('/debug-super-user', function () {
     $user = auth()->user();
+
     return response()->json([
         'user_id' => $user->id,
         'user_name' => $user->name,
         'is_super_user_field' => $user->is_super_user,
         'isSuperUser_method' => $user->isSuperUser(),
-        'method_exists' => method_exists($user, 'isSuperUser')
+        'method_exists' => method_exists($user, 'isSuperUser'),
     ]);
 })->middleware('auth');
 
@@ -203,19 +211,34 @@ Route::get('/debug-role-hierarchy', function () {
         ->get()
         ->map(function ($user) {
             $role = $user->roles()->orderBy('level')->first();
+
             return [
                 'id' => $user->id,
                 'name' => $user->name,
                 'role' => $role ? $role->name : 'No Role',
                 'level' => $role ? $role->level : null,
-                'is_super_user' => $user->is_super_user
+                'is_super_user' => $user->is_super_user,
             ];
         });
-    
+
     return response()->json([
         'role_hierarchy' => $hierarchy,
-        'users_without_supervisors' => $usersWithoutSupervisors
+        'users_without_supervisors' => $usersWithoutSupervisors,
     ]);
 })->middleware('auth');
+
+Route::middleware(['auth'])->group(function () {
+    Route::post('/inquiries', [\App\Http\Controllers\ConversationController::class, 'store'])
+        ->middleware('throttle:20,1')
+        ->name('inquiries.store');
+    Route::get('/api/conversations/{conversation}/messages', [\App\Http\Controllers\ConversationController::class, 'messagesJson'])
+        ->name('conversations.messages');
+});
+
+Route::middleware(['auth', 'check.super.user'])->group(function () {
+    Route::get('/messages', [\App\Http\Controllers\ConversationController::class, 'index'])->name('messages.index');
+    Route::post('/messages/{conversation}/read', [\App\Http\Controllers\ConversationController::class, 'markRead'])->name('messages.read');
+    Route::post('/messages/{conversation}/messages', [\App\Http\Controllers\ConversationController::class, 'storeStaff'])->name('messages.staff');
+});
 
 require __DIR__ . '/auth.php';

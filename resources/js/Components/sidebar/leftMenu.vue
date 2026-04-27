@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, onMounted } from "vue";
+import { ref, computed, watch, onMounted, inject } from "vue";
 import {
     IconDashboard,
     IconCategory,
@@ -15,7 +15,10 @@ import {
     IconKey,
     IconCreditCard,
     IconWallet,
+    IconReportMoney,
     IconAccessPointOff,
+    IconSettings,
+    IconMessages,
 } from "@tabler/icons-vue";
 import { router, usePage } from "@inertiajs/vue3";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
@@ -52,6 +55,18 @@ onMounted(() => {
 const isSuperUser = computed(
     () => !!page.props.auth?.user?.data?.is_super_user,
 );
+
+const inquiryUnreadCountInjected = inject("inquiryUnreadCount", null);
+const inquiryUnreadCount = computed(() => {
+    if (
+        inquiryUnreadCountInjected != null &&
+        typeof inquiryUnreadCountInjected === "object" &&
+        "value" in inquiryUnreadCountInjected
+    ) {
+        return Number(inquiryUnreadCountInjected.value) || 0;
+    }
+    return Number(page.props.inquiryUnreadCount) || 0;
+});
 
 // Get current domain from page props
 const currentDomain = computed(() => page.props.currentDomain);
@@ -244,6 +259,22 @@ const menuItems = [
         path: "/users",
     },
     {
+        key: "vat-report",
+        title: "VAT report",
+        icon: IconReportMoney,
+        routeName: "vat-report.index",
+        path: "/vat-report",
+        domainOnly: true,
+    },
+    {
+        key: "organization-settings",
+        title: "Settings",
+        icon: IconSettings,
+        routeName: "settings.index",
+        path: "/settings",
+        domainOnly: true,
+    },
+    {
         key: "roles",
         title: "Roles",
         icon: IconUserCheck,
@@ -257,6 +288,15 @@ const menuItems = [
         icon: IconKey,
         routeName: "permissions.index",
         path: "/permissions",
+        superUserOnly: true,
+        globalOnly: true,
+    },
+    {
+        key: "messages",
+        title: "Messages",
+        icon: IconMessages,
+        routeName: "messages.index",
+        path: "/messages",
         superUserOnly: true,
         globalOnly: true,
     },
@@ -467,6 +507,14 @@ const safeMenus = computed(() => {
                             >
                                 {{ getDashboardTagText() }}
                             </a-tag>
+                        </span>
+                        <span
+                            v-else-if="
+                                menu.key === 'messages' && inquiryUnreadCount > 0
+                            "
+                            class="ml-1 min-w-[1.1rem] rounded-full bg-red-500 px-1.5 text-center text-[10px] leading-tight text-white"
+                        >
+                            {{ inquiryUnreadCount }}
                         </span>
                     </div>
                 </a-menu-item>

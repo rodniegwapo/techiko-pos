@@ -8,12 +8,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
-use Spatie\Permission\Traits\HasRoles;
 use Spatie\Permission\Traits\HasPermissions;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable, HasRoles, HasPermissions, Searchable;
+    use HasApiTokens, HasFactory, HasPermissions, HasRoles, Notifiable, Searchable;
 
     /**
      * The guard name for Spatie Permission.
@@ -25,10 +25,10 @@ class User extends Authenticatable
      */
     const ROLE_LEVELS = [
         1 => 'Super User',
-        2 => 'Admin', 
+        2 => 'Admin',
         3 => 'Manager',
         4 => 'Staff',
-        5 => 'Viewer'
+        5 => 'Viewer',
     ];
 
     /**
@@ -48,7 +48,7 @@ class User extends Authenticatable
     protected $searchable = [
         'name',
         'email',
-        'roles.name'
+        'roles.name',
     ];
 
     /**
@@ -82,7 +82,8 @@ class User extends Authenticatable
     // }
 
     // Add scope for easy domain filtering
-    public function scopeForDomain($query, $domain) {
+    public function scopeForDomain($query, $domain)
+    {
         return $query->where('domain', $domain);
     }
 
@@ -100,6 +101,14 @@ class User extends Authenticatable
     public function subordinates()
     {
         return $this->hasMany(User::class, 'supervisor_id');
+    }
+
+    /**
+     * The single support conversation for this user (end-user messaging).
+     */
+    public function conversation()
+    {
+        return $this->hasOne(Conversation::class, 'user_id');
     }
 
     /**
@@ -153,7 +162,7 @@ class User extends Authenticatable
     /**
      * Check if user has any of the specified permissions.
      */
-    public function hasAnyPermission($permissions, string $guard = null): bool
+    public function hasAnyPermission($permissions, ?string $guard = null): bool
     {
         // Super users have all permissions
         if ($this->isSuperUser()) {
@@ -161,7 +170,7 @@ class User extends Authenticatable
         }
 
         $permissions = is_array($permissions) ? $permissions : [$permissions];
-        
+
         foreach ($permissions as $permission) {
             if ($this->hasPermissionTo($permission, $guard)) {
                 return true;
@@ -221,7 +230,7 @@ class User extends Authenticatable
         if ($this->isSuperUser()) {
             return true;
         }
-        
+
         return $this->permissions()
             ->where('route_name', $routeName)
             ->orWhere('name', $routeName) // Fallback for backward compatibility
@@ -242,7 +251,6 @@ class User extends Authenticatable
     /**
      * Role Level Methods
      */
-
 
     /**
      * Check if user is admin (level 2)
@@ -301,7 +309,7 @@ class User extends Authenticatable
         if ($this->role_level <= 2) {
             return $requestLocationId ?? $this->location_id;
         }
-        
+
         // Manager and below are restricted to their assigned location
         return $this->location_id;
     }
@@ -315,7 +323,7 @@ class User extends Authenticatable
         if ($this->role_level === 1) {
             return $requestDomain ?? $this->domain;
         }
-        
+
         // Admin and below are restricted to their domain
         return $this->domain;
     }

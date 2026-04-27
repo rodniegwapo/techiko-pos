@@ -6,6 +6,10 @@ Route::prefix('domains/{domain:name_slug}')
     ->middleware(['auth', 'user.permission', 'role.access'])
     ->name('domains.')
     ->group(function () {
+        // Organization settings (Sales VAT, etc.)
+        Route::get('/settings', [\App\Http\Controllers\Domains\DomainSettingsController::class, 'index'])->name('settings.index');
+        Route::patch('/settings', [\App\Http\Controllers\Domains\DomainSettingsController::class, 'update'])->name('settings.update');
+
         // Dashboard (Organization-specific)
         Route::get('/dashboard', [\App\Http\Controllers\Domains\DashboardController::class, 'index'])->name('dashboard');
 
@@ -113,6 +117,9 @@ Route::prefix('domains/{domain:name_slug}')
         Route::resource('customers', \App\Http\Controllers\Domains\CustomerController::class)
             ->only(['index', 'store', 'update', 'destroy'])
             ->names('customers');
+
+        // VAT summary (output VAT from paid sales)
+        Route::get('/vat-report', [\App\Http\Controllers\Domains\VatReportController::class, 'index'])->name('vat-report.index');
 
         // Payment card types (Wallet) — domain-scoped
         Route::prefix('payment-card-types')->name('payment-card-types.')->group(function () {

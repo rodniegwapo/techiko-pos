@@ -3,11 +3,11 @@
 namespace App\Models;
 
 use App\Traits\Searchable;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Str;
-use Carbon\Carbon;
 use LucaLongo\Licensing\Models\License;
 
 class Domain extends Model
@@ -167,7 +167,7 @@ class Domain extends Model
      */
     public function formatCurrency($amount)
     {
-        return $this->getCurrencySymbol() . number_format($amount, 2);
+        return $this->getCurrencySymbol().number_format($amount, 2);
     }
 
     /**
@@ -184,5 +184,26 @@ class Domain extends Model
     public static function findBySlug($slug)
     {
         return static::where('name_slug', $slug)->active()->first();
+    }
+
+    /**
+     * Sales VAT options from domain settings (defaults for backward compatibility).
+     *
+     * @return array{apply_vat_automatically: bool, vat_rate_percent: float, vat_pricing_mode: 'exclusive'|'inclusive'}
+     */
+    public function salesVatSettings(): array
+    {
+        $s = $this->settings['sales'] ?? [];
+
+        $mode = $s['vat_pricing_mode'] ?? 'exclusive';
+        if (! in_array($mode, ['exclusive', 'inclusive'], true)) {
+            $mode = 'exclusive';
+        }
+
+        return [
+            'apply_vat_automatically' => (bool) ($s['apply_vat_automatically'] ?? false),
+            'vat_rate_percent' => (float) ($s['vat_rate_percent'] ?? 12),
+            'vat_pricing_mode' => $mode,
+        ];
     }
 }
