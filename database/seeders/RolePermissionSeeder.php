@@ -6,6 +6,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 class RolePermissionSeeder extends Seeder
 {
@@ -15,7 +16,7 @@ class RolePermissionSeeder extends Seeder
     public function run(): void
     {
         // Reset cached roles and permissions
-        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
         // Create permissions based on actual route names from ->name() method calls
         $permissions = [
@@ -63,6 +64,7 @@ class RolePermissionSeeder extends Seeder
             'sales.drafts.store',
             'sales.items.void',
             'sales.payment.store',
+            'sales.loyalty-redemption',
             'sales.find-sale-item',
             'sales.sales.assignCustomer',
             'sales.sales.processLoyalty',
@@ -346,6 +348,7 @@ class RolePermissionSeeder extends Seeder
             'sales.drafts.store',
             'sales.items.void',
             'sales.payment.store',
+            'sales.loyalty-redemption',
             'sales.find-sale-item',
             'sales.sales.assignCustomer',
             'sales.sales.processLoyalty',
@@ -533,6 +536,7 @@ class RolePermissionSeeder extends Seeder
             'sales.drafts.store',
             'sales.items.void',
             'sales.payment.store',
+            'sales.loyalty-redemption',
             'sales.find-sale-item',
             'sales.sales.assignCustomer',
             'sales.sales.processLoyalty',
@@ -680,6 +684,7 @@ class RolePermissionSeeder extends Seeder
             'sales.drafts.store',
             'sales.items.void',
             'sales.payment.store',
+            'sales.loyalty-redemption',
             'sales.find-sale-item',
             'sales.sales.assignCustomer',
             'sales.sales.processLoyalty',
@@ -799,6 +804,7 @@ class RolePermissionSeeder extends Seeder
             'sales.drafts.store',
             'sales.items.void',
             'sales.payment.store',
+            'sales.loyalty-redemption',
             'sales.find-sale-item',
             'sales.sales.assignCustomer',
             'sales.sales.processLoyalty',

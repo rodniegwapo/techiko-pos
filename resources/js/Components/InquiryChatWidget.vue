@@ -12,7 +12,9 @@ const submitting = ref(false);
 const localMessages = ref([]);
 const floatReplyUnread = ref(0);
 
-const myConversation = computed(() => page.props.myConversation ?? { id: null, messages: [] });
+const myConversation = computed(
+    () => page.props.myConversation ?? { id: null, messages: [] },
+);
 const activeConversationId = computed(() => myConversation.value?.id ?? null);
 
 const seenIds = new Set();
@@ -186,7 +188,11 @@ function onComposerKeydown(e) {
             placement="right"
             :width="400"
             :content-wrapper-style="{ height: '100dvh', maxHeight: '100dvh' }"
-            :drawer-style="{ height: '100%', display: 'flex', flexDirection: 'column' }"
+            :drawer-style="{
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+            }"
             :header-style="{ flexShrink: 0 }"
             :body-style="{
                 padding: 0,
@@ -197,33 +203,28 @@ function onComposerKeydown(e) {
                 height: '100%',
                 overflow: 'hidden',
             }"
-            :wrap-style="{ overflow: 'hidden' }"
+            :style="{ overflow: 'hidden' }"
         >
-            <div
-                class="flex h-full min-h-0 min-w-0 flex-1 flex-col"
-            >
+            <div class="flex h-full min-h-0 min-w-0 flex-1 flex-col">
                 <p class="shrink-0 px-4 pb-2 pt-1 text-sm text-gray-600">
                     Messages are delivered in real time when online. We may also
                     reply during business hours. Enable browser notifications in
                     your system settings to get alerts when the tab is in the
                     background.
                 </p>
-                <h3 class="shrink-0 px-4 pb-2 text-sm font-semibold text-gray-800">
+                <h3
+                    class="shrink-0 px-4 pb-2 text-sm font-semibold text-gray-800"
+                >
                     Conversation
                 </h3>
-                <div
-                    class="min-h-0 flex-1 overflow-y-auto px-4 pr-3"
-                >
+                <div class="min-h-0 flex-1 overflow-y-auto px-4 pr-3">
                     <div
                         v-if="!localMessages.length"
                         class="text-sm text-gray-500"
                     >
                         No messages yet. Say hello to start.
                     </div>
-                    <ul
-                        v-else
-                        class="space-y-2 text-sm"
-                    >
+                    <ul v-else class="space-y-2 text-sm">
                         <li
                             v-for="m in localMessages"
                             :key="m.id"
@@ -286,7 +287,7 @@ function onComposerKeydown(e) {
 
         <div
             v-show="!open"
-            class="fixed bottom-24 right-6 z-[100] flex h-12 w-12 items-center justify-center"
+            class="fixed bottom-2 right-6 z-[100] flex h-12 w-12 items-center justify-center"
         >
             <a-badge
                 v-if="floatReplyUnread > 0"

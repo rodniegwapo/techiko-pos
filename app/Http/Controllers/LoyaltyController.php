@@ -24,7 +24,7 @@ class LoyaltyController extends Controller
             'total_customers' => Customer::count(),
             'loyal_customers' => Customer::whereNotNull('loyalty_points')->where('loyalty_points', '>', 0)->count(),
             'total_points' => Customer::sum('loyalty_points'),
-            'loyalty_revenue' => Customer::sum('lifetime_spent')
+            'loyalty_revenue' => Customer::sum('lifetime_spent'),
         ];
 
         return response()->json($stats);
@@ -68,7 +68,7 @@ class LoyaltyController extends Controller
                 'last_page' => $customers->lastPage(),
                 'per_page' => $customers->perPage(),
                 'total' => $customers->total(),
-            ]
+            ],
         ]);
     }
 
@@ -88,7 +88,7 @@ class LoyaltyController extends Controller
             'bronze' => '#CD7F32',
             'silver' => '#C0C0C0',
             'gold' => '#FFD700',
-            'platinum' => '#E5E4E2'
+            'platinum' => '#E5E4E2',
         ];
 
         $tierDistribution = $tierStats->map(function ($stat) use ($totalCustomers, $tierColors) {
@@ -99,13 +99,13 @@ class LoyaltyController extends Controller
                 'name' => ucfirst($stat->tier),
                 'count' => (int) $stat->count,
                 'percentage' => $percentage,
-                'color' => $tierColors[$stat->tier] ?? $tierColors['bronze']
+                'color' => $tierColors[$stat->tier] ?? $tierColors['bronze'],
             ];
         });
 
         // Points analytics
         $totalPointsIssued = Customer::sum('loyalty_points') ?? 0;
-        $totalPointsRedeemed = 0; // We don't have redemption tracking yet
+        $totalPointsRedeemed = (int) (Sale::where('payment_status', 'paid')->sum('loyalty_points_redeemed') ?? 0);
         $activePoints = $totalPointsIssued - $totalPointsRedeemed;
 
         // Sales analytics
@@ -136,7 +136,9 @@ class LoyaltyController extends Controller
             ->limit(10)
             ->get()
             ->map(function ($sale) {
-                if (!$sale->customer) return null;
+                if (! $sale->customer) {
+                    return null;
+                }
 
                 $pointsEarned = $sale->customer->calculatePointsForPurchase($sale->grand_total ?? 0);
 
@@ -145,7 +147,7 @@ class LoyaltyController extends Controller
                     'customer_name' => $sale->customer->name,
                     'action' => 'Purchase reward',
                     'points' => (int) $pointsEarned,
-                    'created_at' => $sale->transaction_date ?? $sale->created_at
+                    'created_at' => $sale->transaction_date ?? $sale->created_at,
                 ];
             })
             ->filter()
@@ -166,7 +168,7 @@ class LoyaltyController extends Controller
         return response()->json([
             'tier_distribution' => $tierDistribution,
             'recent_activity' => $recentActivity,
-            'stats' => $stats
+            'stats' => $stats,
         ]);
     }
 
@@ -175,7 +177,7 @@ class LoyaltyController extends Controller
         $validated = $request->validate([
             'type' => 'required|in:add,subtract,set',
             'amount' => 'required|integer|min:0',
-            'reason' => 'nullable|string|max:255'
+            'reason' => 'nullable|string|max:255',
         ]);
 
         DB::transaction(function () use ($customer, $validated) {
@@ -204,14 +206,14 @@ class LoyaltyController extends Controller
                 'previous_points' => $currentPoints,
                 'new_points' => $newPoints,
                 'reason' => $validated['reason'],
-                'adjusted_by' => auth()->user()->name ?? 'System'
+                'adjusted_by' => auth()->user()->name ?? 'System',
             ]);
         });
 
         return response()->json([
             'success' => true,
             'message' => 'Points adjusted successfully',
-            'new_points' => $customer->fresh()->loyalty_points
+            'new_points' => $customer->fresh()->loyalty_points,
         ]);
     }
 }

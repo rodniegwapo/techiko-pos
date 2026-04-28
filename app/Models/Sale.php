@@ -80,7 +80,9 @@ class Sale extends Model
         $orderDiscountTotal = $this->saleDiscounts()->sum('discount_amount');
         $this->discount_amount = $orderDiscountTotal;
 
-        $netAfterDiscount = max(0, $this->total_amount - $this->discount_amount);
+        $loyaltyDiscount = (float) ($this->loyalty_discount_amount ?? 0);
+
+        $netAfterDiscount = max(0, $this->total_amount - $this->discount_amount - $loyaltyDiscount);
 
         $vat = ['apply_vat_automatically' => false, 'vat_rate_percent' => 12];
         if ($this->domain) {
@@ -172,7 +174,7 @@ class Sale extends Model
         );
     }
 
-    public function applyMandatoryDiscount(\App\Models\MandatoryDiscount $mandatoryDiscount): SaleDiscount
+    public function applyMandatoryDiscount(MandatoryDiscount $mandatoryDiscount): SaleDiscount
     {
         // validate
         throw_if(! $mandatoryDiscount->is_active, \InvalidArgumentException::class, 'Mandatory discount is not active.');
