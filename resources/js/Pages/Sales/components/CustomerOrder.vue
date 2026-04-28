@@ -488,6 +488,7 @@ const newCustomerForm = ref({
     phone: "",
     email: "",
     date_of_birth: null,
+    enroll_in_loyalty: true,
 });
 
 const openOrderDicountModal = ref(false);
@@ -690,6 +691,7 @@ const handleAddCustomer = async () => {
             phone: "",
             email: "",
             date_of_birth: null,
+            enroll_in_loyalty: true,
         };
 
         notification.success({
@@ -1276,6 +1278,11 @@ defineExpose({
                     v-model:value="newCustomerForm.date_of_birth"
                     class="w-full"
                 />
+            </a-form-item>
+            <a-form-item class="mb-0">
+                <a-checkbox v-model:checked="newCustomerForm.enroll_in_loyalty">
+                    Enroll in loyalty program (Bronze tier, 0 points)
+                </a-checkbox>
             </a-form-item>
         </a-form>
     </a-modal>
