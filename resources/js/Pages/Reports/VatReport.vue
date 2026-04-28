@@ -130,12 +130,10 @@ function goToPage(pageNum) {
     );
 }
 
+/** Print-only: omit customer / location / payment (still in subtitle via location filter label) */
 const printColumns = [
     { key: "transaction_date_display", title: "Date" },
     { key: "reference", title: "Invoice / ref" },
-    { key: "customer_name", title: "Customer" },
-    { key: "location_name", title: "Location" },
-    { key: "payment_method", title: "Payment" },
     { key: "taxable_net", title: "Taxable (net)" },
     { key: "tax_amount", title: "VAT" },
     { key: "grand_total", title: "Grand total" },
@@ -412,21 +410,6 @@ const columns = [
                                         {{ row.reference }}
                                     </td>
                                     <td
-                                        class="border border-gray-300 px-2 py-1"
-                                    >
-                                        {{ row.customer_name }}
-                                    </td>
-                                    <td
-                                        class="border border-gray-300 px-2 py-1"
-                                    >
-                                        {{ row.location_name }}
-                                    </td>
-                                    <td
-                                        class="border border-gray-300 px-2 py-1"
-                                    >
-                                        {{ row.payment_method }}
-                                    </td>
-                                    <td
                                         class="border border-gray-300 px-2 py-1 text-right tabular-nums"
                                     >
                                         {{ formattedTotal(row.taxable_net) }}
@@ -445,7 +428,7 @@ const columns = [
                                 <template #footer>
                                     <tr v-if="paginationPrintNote">
                                         <td
-                                            colspan="8"
+                                            colspan="5"
                                             class="border border-gray-300 bg-gray-50 px-2 py-1.5 text-xs italic text-gray-600"
                                         >
                                             {{ paginationPrintNote }}
@@ -455,7 +438,7 @@ const columns = [
                                         class="bg-gray-100 font-semibold text-gray-900"
                                     >
                                         <td
-                                            colspan="5"
+                                            colspan="2"
                                             class="border border-gray-300 px-2 py-2 align-top"
                                         >
                                             Period totals (full selected period)
