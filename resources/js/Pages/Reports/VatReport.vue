@@ -1,7 +1,9 @@
 <script setup>
 import { computed, ref, watch } from "vue";
 import { Head, router, usePage } from "@inertiajs/vue3";
+import axios from "axios";
 import dayjs from "dayjs";
+import { message } from "ant-design-vue";
 import { IconPrinter } from "@tabler/icons-vue";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
@@ -157,6 +159,142 @@ const vatPrintOptions = {
     popTitle: "VAT report",
 };
 
+/** Same query params as screen filters; GET export streams full register (not paginated). */
+const vatExportCsvUrl = computed(() => {
+    const base = getRoute("vat-report.export");
+    if (!base || base === "#") {
+        return "#";
+    }
+    const q = new URLSearchParams();
+    if (props.filters?.start_date) {
+        q.set("start_date", props.filters.start_date);
+    }
+    if (props.filters?.end_date) {
+        q.set("end_date", props.filters.end_date);
+    }
+    if (
+        props.filters?.location_id != null &&
+        props.filters?.location_id !== ""
+    ) {
+        q.set("location_id", String(props.filters.location_id));
+    }
+    const s = q.toString();
+    return s ? `${base}?${s}` : base;
+});
+
+const exportingExcel = ref(false);
+
+async function exportExcel() {
+    const url = getRoute("vat-report.export-json");
+    if (!url || url === "#") {
+        message.error("Could not resolve export route.");
+        return;
+    }
+    exportingExcel.value = true;
+    try {
+        const { data } = await axios.get(url, {
+            params: {
+                start_date: props.filters?.start_date ?? undefined,
+                end_date: props.filters?.end_date ?? undefined,
+                location_id: props.filters?.location_id ?? undefined,
+            },
+        });
+
+        const ExcelJS = (await import("exceljs")).default;
+        const workbook = new ExcelJS.Workbook();
+
+        const register = workbook.addWorksheet("VAT register", {
+            views: [{ state: "frozen", ySplit: 1 }],
+        });
+        register.columns = [
+            { header: "ID", key: "id", width: 10 },
+            {
+                header: "Transaction datetime",
+                key: "transaction_date_display",
+                width: 20,
+            },
+            { header: "Invoice number", key: "invoice_number", width: 16 },
+            { header: "Reference", key: "reference", width: 16 },
+            { header: "Customer", key: "customer_name", width: 22 },
+            { header: "Location", key: "location_name", width: 18 },
+            { header: "Payment", key: "payment_method", width: 12 },
+            { header: "Taxable (net)", key: "taxable_net", width: 14 },
+            { header: "VAT", key: "tax_amount", width: 12 },
+            { header: "Grand total", key: "grand_total", width: 14 },
+        ];
+        register.getRow(1).font = { bold: true };
+
+        for (const row of data.transactions ?? []) {
+            register.addRow({
+                id: row.id,
+                transaction_date_display: row.transaction_date_display,
+                invoice_number: row.invoice_number ?? "",
+                reference: row.reference,
+                customer_name: row.customer_name,
+                location_name: row.location_name,
+                payment_method: row.payment_method,
+                taxable_net: Number(row.taxable_net) || 0,
+                tax_amount: Number(row.tax_amount) || 0,
+                grand_total: Number(row.grand_total) || 0,
+            });
+        }
+
+        const summaryWs = workbook.addWorksheet("Summary");
+        summaryWs.addRow(["Organization", data.domain?.name ?? ""]);
+        summaryWs.addRow(["Organization slug", data.domain?.name_slug ?? ""]);
+        summaryWs.addRow([
+            "Period",
+            `${data.filters?.start_date ?? ""} to ${data.filters?.end_date ?? ""}`,
+        ]);
+        summaryWs.addRow(["Location filter", locationFilterLabel.value]);
+        summaryWs.addRow([]);
+        summaryWs.addRow([
+            "Total output VAT",
+            Number(data.summary?.total_vat) || 0,
+        ]);
+        summaryWs.addRow([
+            "Gross sales (paid)",
+            Number(data.summary?.gross_sales) || 0,
+        ]);
+        summaryWs.addRow([
+            "Number of sales",
+            Number(data.summary?.sales_count) || 0,
+        ]);
+        summaryWs.getColumn(1).width = 22;
+        summaryWs.getColumn(2).width = 28;
+
+        const slug = (
+            String(data.domain?.name_slug ?? "vat-register").replace(
+                /[^a-zA-Z0-9_-]/g,
+                "-",
+            ) || "vat-register"
+        ).slice(0, 80);
+        const fn = `vat-register-${slug}-${data.filters?.start_date ?? ""}-${data.filters?.end_date ?? ""}.xlsx`;
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], {
+            type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = fn;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(a.href);
+    } catch (e) {
+        const msg =
+            e?.response?.data?.message ||
+            e?.message ||
+            "Could not export Excel.";
+        message.error(
+            typeof msg === "string" ? msg : "Could not export Excel.",
+        );
+    } finally {
+        exportingExcel.value = false;
+    }
+}
+
 const columns = [
     {
         title: "Date",
@@ -222,7 +360,7 @@ const columns = [
         <ContentLayout title="Output VAT (paid sales)">
             <template #table>
                 <div
-                    class="vat-report-print-root px-6 pt-2 pb-8 space-y-6 max-w-6xl"
+                    class="vat-report-print-root px-6 pt-2 pb-8 space-y-6 max-w-7xl"
                 >
                     <p class="text-sm text-gray-600 no-print">
                         Totals use
@@ -262,20 +400,32 @@ const columns = [
                         <a-button type="primary" @click="applyFilters">
                             Apply
                         </a-button>
-                        <span
-                            class="ml-auto inline-flex"
-                            v-print="vatPrintOptions"
-                        >
+                        <div class="ml-auto flex flex-wrap items-center gap-2">
+                            <!-- <a
+                                class="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-[5px] text-sm font-medium leading-snug text-gray-900 shadow-sm hover:bg-gray-50 hover:border-gray-400"
+                                :href="vatExportCsvUrl"
+                            >
+                                Export CSV
+                            </a> -->
                             <a-button
                                 type="default"
-                                class="flex items-center gap-2"
+                                :loading="exportingExcel"
+                                @click="exportExcel"
                             >
-                                <template #icon>
-                                    <IconPrinter :size="20" />
-                                </template>
-                                Print
+                                Export Excel
                             </a-button>
-                        </span>
+                            <span v-print="vatPrintOptions">
+                                <a-button
+                                    type="default"
+                                    class="flex items-center gap-2"
+                                >
+                                    <template #icon>
+                                        <IconPrinter :size="20" />
+                                    </template>
+                                    Print
+                                </a-button>
+                            </span>
+                        </div>
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">

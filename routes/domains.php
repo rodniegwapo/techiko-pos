@@ -139,6 +139,8 @@ Route::prefix('domains/{domain:name_slug}')
             ->names('customers');
 
         // VAT summary (output VAT from paid sales)
+        Route::get('/vat-report/export-json', [VatReportController::class, 'exportJson'])->name('vat-report.export-json');
+        Route::get('/vat-report/export', [VatReportController::class, 'export'])->name('vat-report.export');
         Route::get('/vat-report', [VatReportController::class, 'index'])->name('vat-report.index');
 
         // Payment card types (Wallet) — domain-scoped
