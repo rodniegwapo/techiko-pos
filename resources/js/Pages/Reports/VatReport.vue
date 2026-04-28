@@ -2,6 +2,7 @@
 import { computed, ref, watch } from "vue";
 import { Head, router, usePage } from "@inertiajs/vue3";
 import dayjs from "dayjs";
+import { IconPrinter } from "@tabler/icons-vue";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
 import ContentLayout from "@/Components/ContentLayout.vue";
@@ -267,7 +268,15 @@ const columns = [
                             class="ml-auto inline-flex"
                             v-print="vatPrintOptions"
                         >
-                            <a-button type="default"> Print </a-button>
+                            <a-button
+                                type="default"
+                                class="flex items-center gap-2"
+                            >
+                                <template #icon>
+                                    <IconPrinter :size="20" />
+                                </template>
+                                Print
+                            </a-button>
                         </span>
                     </div>
 
@@ -392,19 +401,29 @@ const columns = [
                                     :key="row.id"
                                     class="odd:bg-white even:bg-gray-50"
                                 >
-                                    <td class="border border-gray-300 px-2 py-1">
+                                    <td
+                                        class="border border-gray-300 px-2 py-1"
+                                    >
                                         {{ row.transaction_date_display }}
                                     </td>
-                                    <td class="border border-gray-300 px-2 py-1">
+                                    <td
+                                        class="border border-gray-300 px-2 py-1"
+                                    >
                                         {{ row.reference }}
                                     </td>
-                                    <td class="border border-gray-300 px-2 py-1">
+                                    <td
+                                        class="border border-gray-300 px-2 py-1"
+                                    >
                                         {{ row.customer_name }}
                                     </td>
-                                    <td class="border border-gray-300 px-2 py-1">
+                                    <td
+                                        class="border border-gray-300 px-2 py-1"
+                                    >
                                         {{ row.location_name }}
                                     </td>
-                                    <td class="border border-gray-300 px-2 py-1">
+                                    <td
+                                        class="border border-gray-300 px-2 py-1"
+                                    >
                                         {{ row.payment_method }}
                                     </td>
                                     <td
