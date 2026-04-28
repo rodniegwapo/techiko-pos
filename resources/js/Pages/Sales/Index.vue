@@ -626,12 +626,14 @@ const loadCurrentPendingSale = async () => {
             orders.value = [];
             orderDiscountAmount.value = 0;
             orderDiscountId.value = "";
+            currentSale.value = null;
         }
     } catch (error) {
         orderId.value = null;
         orders.value = [];
         orderDiscountAmount.value = 0;
         orderDiscountId.value = "";
+        currentSale.value = null;
     } finally {
         isLoadingCart.value = false;
     }

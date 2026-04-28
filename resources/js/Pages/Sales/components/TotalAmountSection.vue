@@ -109,12 +109,25 @@ const loyaltyCfg = computed(
 
 const loyaltyPointsDraft = ref(0);
 const loyaltyPatching = ref(false);
+const loyaltyRedemptionModalOpen = ref(false);
 
 watch(
-    () => currentSale.value?.loyalty_points_redeemed,
-    (v) => {
+    () =>
+        [
+            currentSale.value,
+            currentSale.value?.loyalty_points_redeemed,
+        ],
+    () => {
+        if (!currentSale.value) {
+            loyaltyPointsDraft.value = 0;
+            loyaltyRedemptionModalOpen.value = false;
+            return;
+        }
+        const v = currentSale.value.loyalty_points_redeemed;
         if (v !== undefined && v !== null) {
             loyaltyPointsDraft.value = Number(v) || 0;
+        } else {
+            loyaltyPointsDraft.value = 0;
         }
     },
     { immediate: true },
@@ -184,8 +197,6 @@ const syncLoyaltyRedemptionPatch = async () => {
         loyaltyPatching.value = false;
     }
 };
-
-const loyaltyRedemptionModalOpen = ref(false);
 
 /** Sale already has redeemed points locked to the order (still open modal to adjust/clear when caps shrink). */
 const saleHasActiveRedemption = computed(
