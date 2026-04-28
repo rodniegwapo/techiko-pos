@@ -61,6 +61,8 @@ class RolePermissionSeeder extends Seeder
             'payment-card-types.destroy',
             'payment-card-types.money',
             'vat-report.index',
+            'vat-report.export',
+            'vat-report.export-json',
             'sales.drafts.store',
             'sales.items.void',
             'sales.payment.store',
@@ -68,8 +70,8 @@ class RolePermissionSeeder extends Seeder
             'sales.find-sale-item',
             'sales.sales.assignCustomer',
             'sales.sales.processLoyalty',
-            'sales.discounts.order.apply',
-            'sales.discounts.order.remove',
+            'sales.oversell.statistics',
+            'sales.sales.testOrderEvent',
             'sales.items.discount.apply',
             'sales.items.discount.remove',
 
@@ -83,6 +85,7 @@ class RolePermissionSeeder extends Seeder
             'sales.discounts.current',
             'sales.discounts.sale',
             'sales.discounts.update',
+            'sales.discounts.remove',
 
             // Current Pending Sale
             'sales.current-pending',
@@ -194,6 +197,7 @@ class RolePermissionSeeder extends Seeder
             'inventory.transfer',
             'inventory.search.products',
             'inventory.search.movements',
+            'inventory.locations.by-domain',
             'inventory.locations.summary',
             'inventory.locations.index',
             'inventory.locations.store',
@@ -227,7 +231,6 @@ class RolePermissionSeeder extends Seeder
             'roles.update',
             'roles.destroy',
             'roles.permission-matrix',
-            'roles.permissions',
 
             // Permission Management (super user only)
             'permissions.index',
@@ -237,8 +240,6 @@ class RolePermissionSeeder extends Seeder
             'permissions.destroy',
             'permissions.deactivate',
             'permissions.activate',
-            'permissions.bulk-deactivate',
-            'permissions.grouped',
 
             // Orders
             'orders.view',
@@ -246,17 +247,6 @@ class RolePermissionSeeder extends Seeder
 
             // Customer Order
             'customer-order',
-
-            // Cart Management - Database-driven
-            'sales.cart.add',
-            'sales.cart.remove',
-            'sales.cart.update-quantity',
-            'sales.cart.state',
-
-            // Discount Management - Database-driven
-            'sales.discounts.current',
-            'sales.discounts.sale',
-            'sales.discounts.update',
         ];
 
         // Get all permission modules
@@ -345,6 +335,8 @@ class RolePermissionSeeder extends Seeder
             'payment-card-types.destroy',
             'payment-card-types.money',
             'vat-report.index',
+            'vat-report.export',
+            'vat-report.export-json',
             'sales.drafts.store',
             'sales.items.void',
             'sales.payment.store',
@@ -352,8 +344,7 @@ class RolePermissionSeeder extends Seeder
             'sales.find-sale-item',
             'sales.sales.assignCustomer',
             'sales.sales.processLoyalty',
-            'sales.discounts.order.apply',
-            'sales.discounts.order.remove',
+            'sales.oversell.statistics',
             'sales.items.discount.apply',
             'sales.items.discount.remove',
 
@@ -367,6 +358,7 @@ class RolePermissionSeeder extends Seeder
             'sales.discounts.current',
             'sales.discounts.sale',
             'sales.discounts.update',
+            'sales.discounts.remove',
 
             // Current Pending Sale
             'sales.current-pending',
@@ -478,6 +470,7 @@ class RolePermissionSeeder extends Seeder
             'inventory.transfer',
             'inventory.search.products',
             'inventory.search.movements',
+            'inventory.locations.by-domain',
             'inventory.locations.summary',
             'inventory.locations.index',
             'inventory.locations.store',
@@ -533,6 +526,8 @@ class RolePermissionSeeder extends Seeder
             'payment-card-types.destroy',
             'payment-card-types.money',
             'vat-report.index',
+            'vat-report.export',
+            'vat-report.export-json',
             'sales.drafts.store',
             'sales.items.void',
             'sales.payment.store',
@@ -540,8 +535,7 @@ class RolePermissionSeeder extends Seeder
             'sales.find-sale-item',
             'sales.sales.assignCustomer',
             'sales.sales.processLoyalty',
-            'sales.discounts.order.apply',
-            'sales.discounts.order.remove',
+            'sales.oversell.statistics',
             'sales.items.discount.apply',
             'sales.items.discount.remove',
 
@@ -555,6 +549,7 @@ class RolePermissionSeeder extends Seeder
             'sales.discounts.current',
             'sales.discounts.sale',
             'sales.discounts.update',
+            'sales.discounts.remove',
 
             // Current Pending Sale
             'sales.current-pending',
@@ -639,6 +634,7 @@ class RolePermissionSeeder extends Seeder
             'inventory.transfer',
             'inventory.search.products',
             'inventory.search.movements',
+            'inventory.locations.by-domain',
             'inventory.locations.summary',
             'inventory.locations.index',
             'inventory.locations.show',
@@ -688,8 +684,7 @@ class RolePermissionSeeder extends Seeder
             'sales.find-sale-item',
             'sales.sales.assignCustomer',
             'sales.sales.processLoyalty',
-            'sales.discounts.order.apply',
-            'sales.discounts.order.remove',
+            'sales.oversell.statistics',
             'sales.items.discount.apply',
             'sales.items.discount.remove',
 
@@ -703,6 +698,7 @@ class RolePermissionSeeder extends Seeder
             'sales.discounts.current',
             'sales.discounts.sale',
             'sales.discounts.update',
+            'sales.discounts.remove',
 
             // Current Pending Sale
             'sales.current-pending',
@@ -769,6 +765,7 @@ class RolePermissionSeeder extends Seeder
             'inventory.low-stock',
             'inventory.search.products',
             'inventory.search.movements',
+            'inventory.locations.by-domain',
             'inventory.locations.summary',
             'inventory.locations.index',
             'inventory.locations.show',
@@ -808,8 +805,7 @@ class RolePermissionSeeder extends Seeder
             'sales.find-sale-item',
             'sales.sales.assignCustomer',
             'sales.sales.processLoyalty',
-            'sales.discounts.order.apply',
-            'sales.discounts.order.remove',
+            'sales.oversell.statistics',
             'sales.items.discount.apply',
             'sales.items.discount.remove',
 
@@ -823,6 +819,7 @@ class RolePermissionSeeder extends Seeder
             'sales.discounts.current',
             'sales.discounts.sale',
             'sales.discounts.update',
+            'sales.discounts.remove',
 
             // Current Pending Sale
             'sales.current-pending',
@@ -872,6 +869,7 @@ class RolePermissionSeeder extends Seeder
             // Inventory API
             'inventory.products',
             'inventory.search.products',
+            'inventory.locations.by-domain',
             'inventory.locations.summary',
             'inventory.locations.index',
             'inventory.locations.show',
@@ -905,6 +903,7 @@ class RolePermissionSeeder extends Seeder
             'apply' => 'Apply',
             'manage' => 'Manage',
             'export' => 'Export',
+            'export-json' => 'Export JSON',
             'dashboard' => 'Dashboard',
             'search' => 'Search',
             'approve' => 'Approve',
