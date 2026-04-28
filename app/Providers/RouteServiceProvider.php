@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Models\Sale;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider as ServiceProvider;
 use Illuminate\Http\Request;
@@ -31,16 +32,16 @@ class RouteServiceProvider extends ServiceProvider
         // Configure route model binding for domain-scoped models
         Route::bind('sale', function ($value, $route) {
             $domain = $route->parameter('domain');
-            
+
             // If we're in a domain context, scope by domain
             if ($domain) {
-                return \App\Models\Sale::where('id', $value)
+                return Sale::where('id', $value)
                     ->where('domain', $domain)
                     ->firstOrFail();
             }
-            
+
             // Otherwise, use default binding
-            return \App\Models\Sale::findOrFail($value);
+            return Sale::findOrFail($value);
         });
 
         $this->routes(function () {
@@ -50,6 +51,9 @@ class RouteServiceProvider extends ServiceProvider
 
             Route::middleware('web')
                 ->group(base_path('routes/web.php'));
+
+            Route::middleware('web')
+                ->group(base_path('routes/desktop.php'));
         });
     }
 }

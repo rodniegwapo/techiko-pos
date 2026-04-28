@@ -17,6 +17,6 @@ class NativeDesktopHomeController extends Controller
             return redirect(RouteServiceProvider::HOME);
         }
 
-        return redirect()->route('login');
+        return redirect()->route('desktop.login');
     }
 }

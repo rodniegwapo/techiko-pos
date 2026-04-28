@@ -39,7 +39,7 @@ class NativeDesktopRoutesTest extends TestCase
     public function test_root_redirects_guest_to_login(): void
     {
         $this->get('/')
-            ->assertRedirect(route('login'));
+            ->assertRedirect(route('desktop.login'));
     }
 
     public function test_marketing_paths_are_not_registered(): void

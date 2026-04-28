@@ -41,7 +41,6 @@ class AuthenticatedSessionController extends Controller
             return redirect()->intended(RouteServiceProvider::HOME);
         }
 
-        // Regular users with domain go to domain-specific dashboard
         if ($user->domain) {
             return redirect()->route('domains.sales.index', ['domain' => $user->domain]);
         }

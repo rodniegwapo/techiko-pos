@@ -95,7 +95,11 @@ php artisan native:run
 php artisan native:build
 ```
 
-When the embedded app runs, `NATIVEPHP_RUNNING` is set and the app root URL is aligned to the local server from the request (see `App\Providers\NativeAppServiceProvider`). Public marketing pages (`/`, `/about`, and related routes) are **not** registered in the desktop build; `GET /` redirects guests to **login** and signed-in users to the **dashboard** (`App\Http\Controllers\NativeDesktopHomeController`). The browser build keeps full marketing routes as before.
+When the embedded app runs, `NATIVEPHP_RUNNING` is set and the app root URL is aligned to the local server from the request (see `App\Providers\NativeAppServiceProvider`). Public marketing pages (`/`, `/about`, and related routes) are **not** registered in the desktop build; `GET /` redirects guests to **`/desktop/login`** and signed-in users to the **global** dashboard route (`/dashboard`) for routing purposes (`App\Http\Controllers\NativeDesktopHomeController`). The browser build keeps full marketing routes as before.
+
+**Desktop sign-in** uses dedicated `web` routes in `routes/desktop.php` (`App\Http\Controllers\Desktop\DesktopAuthController`) and the Inertia page `resources/js/Pages/Desktop/DesktopLogin.vue`. The standard **web** login at `/login` remains for the browser. Super users are blocked from the desktop sign-in when running under NativePHP; use the **web** app for administrator access. Organization users are redirected to the **domain dashboard** after `POST /desktop/login`, and the global `/dashboard` URL redirects to `/domains/{slug}/dashboard` on desktop. `App\Http\Middleware\RedirectNativeGlobalDashboardToDomain` enforces this for the global dashboard route.
+
+**API and Sanctum:** `POST /desktop/login` establishes a normal **web session** (same as Breeze). Existing `api/*` routes that use `auth:sanctum` with `EnsureFrontendRequestsAreStateful` continue to authenticate from that session for first-party (same-origin) clients. For raw HTTP clients, call `GET /sanctum/csrf-cookie` first, then post credentials with credentials and the CSRF header, as in the Laravel + Sanctum SPA documentation.
 
 To inspect the desktop route table locally: `NATIVEPHP_RUNNING=1 php artisan route:list` (Windows: `set NATIVEPHP_RUNNING=1` then `php artisan route:list`).
 

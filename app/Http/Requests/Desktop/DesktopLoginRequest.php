@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Requests\Auth;
+namespace App\Http\Requests\Desktop;
 
 use App\Models\Domain;
 use Illuminate\Auth\Events\Lockout;
@@ -11,19 +11,14 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
-class LoginRequest extends FormRequest
+class DesktopLoginRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
         return true;
     }
 
     /**
-     * Get the validation rules that apply to the request.
-     *
      * @return array<string, Rule|array|string>
      */
     public function rules(): array
@@ -35,8 +30,6 @@ class LoginRequest extends FormRequest
     }
 
     /**
-     * Attempt to authenticate the request's credentials.
-     *
      * @throws ValidationException
      */
     public function authenticate(): void
@@ -50,6 +43,10 @@ class LoginRequest extends FormRequest
 
         $user = Auth::user();
 
+        if ($user && $user->isSuperUser() && config('nativephp-internal.running')) {
+            $this->logoutAndFail('The desktop app is for organization accounts. Use the web app for administrator access.');
+        }
+
         if ($user && ! $user->isSuperUser()) {
             $this->validateDomainAndUser($user);
         }
@@ -58,8 +55,6 @@ class LoginRequest extends FormRequest
     }
 
     /**
-     * Validate the user's domain and account status.
-     *
      * @throws ValidationException
      */
     protected function validateDomainAndUser($user): void
@@ -80,8 +75,6 @@ class LoginRequest extends FormRequest
     }
 
     /**
-     * Ensure the login request is not rate limited.
-     *
      * @throws ValidationException
      */
     protected function ensureIsNotRateLimited(): void
@@ -100,27 +93,19 @@ class LoginRequest extends FormRequest
         ]));
     }
 
-    /**
-     * Get the rate limiting throttle key for the request.
-     */
     protected function throttleKey(): string
     {
         return Str::transliterate(
-            Str::lower($this->string('email')).'|'.$this->ip()
+            'desktop|'.Str::lower($this->string('email')).'|'.$this->ip()
         );
     }
 
-    /**
-     * Increment the rate limiter hit count.
-     */
     protected function hitRateLimiter(): void
     {
         RateLimiter::hit($this->throttleKey());
     }
 
     /**
-     * Log out user and throw a validation error with message.
-     *
      * @throws ValidationException
      */
     protected function logoutAndFail(string $message): void
@@ -131,8 +116,6 @@ class LoginRequest extends FormRequest
     }
 
     /**
-     * Throw a standardized validation exception for email errors.
-     *
      * @throws ValidationException
      */
     protected function throwValidationError(string $message): void
