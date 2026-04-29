@@ -9,6 +9,7 @@ import ContentHeader from "@/Components/ContentHeader.vue";
 import PaymentHistoryTable from "./components/PaymentHistoryTable.vue";
 import OutstandingInvoicesTable from "./components/OutstandingInvoicesTable.vue";
 import RecordPaymentModal from "./components/RecordPaymentModal.vue";
+import OutstandingInvoiceOrderModal from "./components/OutstandingInvoiceOrderModal.vue";
 import CreditTransactionModal from "./components/CreditTransactionModal.vue";
 import CreditLimitModal from "./components/CreditLimitModal.vue";
 
@@ -26,6 +27,8 @@ const props = defineProps({
 });
 
 const showRecordPaymentModal = ref(false);
+const showOutstandingOrderModal = ref(false);
+const selectedOutstandingInvoice = ref(null);
 const showCreditTransactionModal = ref(false);
 const showCreditLimitModal = ref(false);
 
@@ -42,6 +45,16 @@ const handleRecordPayment = () => {
     showRecordPaymentModal.value = true;
 };
 
+const handleViewOrder = (invoice) => {
+    selectedOutstandingInvoice.value = invoice;
+    showOutstandingOrderModal.value = true;
+};
+
+const handleOutstandingOrderModalClose = () => {
+    showOutstandingOrderModal.value = false;
+    selectedOutstandingInvoice.value = null;
+};
+
 const handleAddTransaction = () => {
     showCreditTransactionModal.value = true;
 };
@@ -52,6 +65,8 @@ const handleEditCreditLimit = () => {
 
 const handleModalClose = () => {
     showRecordPaymentModal.value = false;
+    showOutstandingOrderModal.value = false;
+    selectedOutstandingInvoice.value = null;
     showCreditTransactionModal.value = false;
     showCreditLimitModal.value = false;
 };
@@ -137,6 +152,7 @@ const handleSaved = () => {
                     :invoices="outstandingInvoices"
                     :customer="customer"
                     @record-payment="handleRecordPayment"
+                    @view-order="handleViewOrder"
                 />
             </div>
 
@@ -154,6 +170,13 @@ const handleSaved = () => {
             :outstanding-invoices="outstandingInvoices"
             @close="handleModalClose"
             @saved="handleSaved"
+        />
+
+        <OutstandingInvoiceOrderModal
+            :visible="showOutstandingOrderModal"
+            :invoice="selectedOutstandingInvoice"
+            :customer="customer"
+            @close="handleOutstandingOrderModalClose"
         />
 
         <CreditTransactionModal

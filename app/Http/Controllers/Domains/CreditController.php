@@ -98,7 +98,7 @@ class CreditController extends Controller
         $outstandingInvoices = $customer->creditTransactions()
             ->where('transaction_type', 'credit')
             ->whereNull('paid_at')
-            ->with('sale')
+            ->with(['sale.saleItems.product'])
             ->orderBy('due_date', 'asc')
             ->get();
 
@@ -128,7 +128,7 @@ class CreditController extends Controller
         $outstandingInvoices = $customer->creditTransactions()
             ->where('transaction_type', 'credit')
             ->whereNull('paid_at')
-            ->with('sale')
+            ->with(['sale.saleItems.product'])
             ->orderBy('due_date', 'asc')
             ->get();
 
