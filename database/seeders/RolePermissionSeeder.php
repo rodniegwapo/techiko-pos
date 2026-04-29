@@ -154,6 +154,7 @@ class RolePermissionSeeder extends Seeder
             'credits.index',
             'credits.overdue',
             'credits.show',
+            'credits.outstanding-invoices',
             'credits.transactions.store',
             'credits.transactions.update',
             'credits.history',
@@ -427,6 +428,7 @@ class RolePermissionSeeder extends Seeder
             'credits.index',
             'credits.overdue',
             'credits.show',
+            'credits.outstanding-invoices',
             'credits.transactions.store',
             'credits.transactions.update',
             'credits.history',
@@ -603,6 +605,7 @@ class RolePermissionSeeder extends Seeder
             'credits.index',
             'credits.overdue',
             'credits.show',
+            'credits.outstanding-invoices',
             'credits.transactions.store',
             'credits.transactions.update',
             'credits.history',
@@ -748,6 +751,7 @@ class RolePermissionSeeder extends Seeder
             'credits.index',
             'credits.overdue',
             'credits.show',
+            'credits.outstanding-invoices',
             'credits.transactions.store',
             'credits.history',
 
@@ -858,6 +862,7 @@ class RolePermissionSeeder extends Seeder
             // Credit Management (view only)
             'credits.index',
             'credits.show',
+            'credits.outstanding-invoices',
             'credits.history',
 
             // Inventory Management (view only)

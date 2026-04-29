@@ -207,7 +207,7 @@ class Customer extends Model
 
     public function addCreditTransaction(string $type, float $amount, ?int $saleId = null, ?string $referenceNumber = null, ?string $notes = null, ?\DateTime $dueDate = null): CreditTransaction
     {
-        $balanceBefore = $this->credit_balance;
+        $balanceBefore = (float) $this->credit_balance;
 
         // Calculate new balance based on transaction type
         // For adjustment, amount can be positive (increase) or negative (decrease)
@@ -227,6 +227,11 @@ class Customer extends Model
         // For other types, store absolute value
         $transactionAmount = $type === 'adjustment' ? $amount : abs($amount);
 
+        $userId = auth()->id();
+        if ($userId === null) {
+            throw new \RuntimeException('You must be signed in to record credit transactions.');
+        }
+
         $transaction = CreditTransaction::create([
             'customer_id' => $this->id,
             'sale_id' => $saleId,
@@ -237,7 +242,7 @@ class Customer extends Model
             'due_date' => $dueDate ?? ($type === 'credit' ? now()->addDays($this->credit_terms_days) : null),
             'reference_number' => $referenceNumber,
             'notes' => $notes,
-            'user_id' => auth()->id(),
+            'user_id' => $userId,
             'domain' => $this->domain ?? null,
         ]);
 

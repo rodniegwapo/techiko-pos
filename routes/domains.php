@@ -158,6 +158,7 @@ Route::prefix('domains/{domain:name_slug}')
             Route::get('/', [CreditController::class, 'index'])->name('index');
             Route::get('/overdue', [CreditController::class, 'overdue'])->name('overdue');
             Route::get('/customers/{customer}', [CreditController::class, 'show'])->name('show');
+            Route::get('/customers/{customer}/outstanding-invoices', [CreditController::class, 'outstandingInvoices'])->name('outstanding-invoices');
             Route::post('/customers/{customer}/transactions', [CreditController::class, 'storeTransaction'])->name('transactions.store');
             Route::put('/transactions/{transaction}', [CreditController::class, 'updateTransaction'])->name('transactions.update');
             Route::get('/customers/{customer}/history', [CreditController::class, 'history'])->name('history');

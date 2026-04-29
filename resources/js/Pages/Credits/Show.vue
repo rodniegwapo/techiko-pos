@@ -1,9 +1,8 @@
 <script setup>
-import { ref, computed } from "vue";
+import { ref } from "vue";
 import { Head, router, usePage } from "@inertiajs/vue3";
-import { IconCreditCard, IconArrowLeft, IconPlus } from "@tabler/icons-vue";
+import { IconArrowLeft } from "@tabler/icons-vue";
 import { useHelpers } from "@/Composables/useHelpers";
-import { useCredit } from "@/Composables/useCredit";
 
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
@@ -15,7 +14,6 @@ import CreditLimitModal from "./components/CreditLimitModal.vue";
 
 const page = usePage();
 const { formattedTotal } = useHelpers();
-const { loading: creditLoading } = useCredit();
 
 const props = defineProps({
     customer: Object,

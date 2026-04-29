@@ -71,6 +71,15 @@
           >
             <IconEdit size="20" class="mx-auto" />
           </IconTooltipButton>
+
+          <IconTooltipButton
+            v-if="canRecordPayment(record)"
+            hover="group-hover:bg-teal-500"
+            name="Record Payment"
+            @click="$emit('recordPayment', record)"
+          >
+            <IconCash size="20" class="mx-auto" />
+          </IconTooltipButton>
         </div>
       </template>
     </template>
@@ -80,7 +89,7 @@
 <script setup>
 import { computed } from "vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
-import { IconEye, IconEdit } from "@tabler/icons-vue";
+import { IconEye, IconEdit, IconCash } from "@tabler/icons-vue";
 
 const props = defineProps({
   customers: Array,
@@ -88,7 +97,7 @@ const props = defineProps({
   pagination: Object,
 });
 
-const emit = defineEmits(["change", "view", "editLimit"]);
+const emit = defineEmits(["change", "view", "editLimit", "recordPayment"]);
 
 const columns = computed(() => [
   {
@@ -134,9 +143,12 @@ const columns = computed(() => [
     title: "Actions",
     key: "actions",
     align: "center",
-    width: 120,
+    width: 150,
   },
 ]);
+
+const canRecordPayment = (record) =>
+  Boolean(record.credit_enabled) && Number(record.credit_balance || 0) > 0;
 
 const handleChange = (pag, filters, sorter) => {
   emit("change", { pag, filters, sorter });
