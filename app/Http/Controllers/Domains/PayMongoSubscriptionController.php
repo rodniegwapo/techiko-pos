@@ -18,7 +18,13 @@ class PayMongoSubscriptionController extends Controller
         }
 
         if (! config('paymongo.secret_key')) {
-            return response()->json(['message' => 'Billing is not configured.'], 503);
+            return response()->json(['message' => 'Billing is not configured. Set PAYMONGO_SECRET_KEY.'], 503);
+        }
+
+        if (! config('paymongo.plan_id')) {
+            return response()->json([
+                'message' => 'Billing is not configured. Create a subscription plan in the PayMongo dashboard and set PAYMONGO_PLAN_ID in your environment.',
+            ], 503);
         }
 
         $domain->refresh();

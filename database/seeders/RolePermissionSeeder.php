@@ -246,6 +246,9 @@ class RolePermissionSeeder extends Seeder
             'orders.view',
             'orders.recent-pending',
 
+            // Billing
+            'billing.paymongo.subscribe',
+
             // Customer Order
             'customer-order',
         ];
@@ -329,6 +332,7 @@ class RolePermissionSeeder extends Seeder
             'sales.offline-catalog',
             'settings.index',
             'settings.update',
+            'billing.paymongo.subscribe',
             'payment-card-types.index',
             'payment-card-types.list',
             'payment-card-types.store',
