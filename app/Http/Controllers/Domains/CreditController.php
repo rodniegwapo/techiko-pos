@@ -9,6 +9,7 @@ use App\Models\Domain;
 use App\Services\CreditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class CreditController extends Controller
@@ -83,7 +84,7 @@ class CreditController extends Controller
     /**
      * Show customer credit details
      */
-    public function show(Request $request, Domain $domain, Customer $customer)
+    public function show(Domain $domain, Customer $customer)
     {
         // Ensure customer belongs to this domain
         if ($customer->domain !== $domain->name_slug) {
@@ -116,6 +117,29 @@ class CreditController extends Controller
     }
 
     /**
+     * JSON: customer + unpaid credit lines for record-payment modal on credits index
+     */
+    public function outstandingInvoices(Domain $domain, Customer $customer)
+    {
+        if ($customer->domain !== $domain->name_slug) {
+            abort(403, 'Customer does not belong to this domain');
+        }
+
+        $outstandingInvoices = $customer->creditTransactions()
+            ->where('transaction_type', 'credit')
+            ->whereNull('paid_at')
+            ->with('sale')
+            ->orderBy('due_date', 'asc')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'customer' => $customer->fresh(),
+            'outstanding_invoices' => $outstandingInvoices,
+        ]);
+    }
+
+    /**
      * Store a new credit transaction (payment or adjustment)
      */
     public function storeTransaction(Request $request, Domain $domain, Customer $customer)
@@ -132,19 +156,29 @@ class CreditController extends Controller
             'reference_number' => 'nullable|string|max:255',
             'notes' => 'nullable|string',
             'transaction_ids' => 'nullable|array',
-            'transaction_ids.*' => 'exists:credit_transactions,id',
+            'transaction_ids.*' => [
+                Rule::exists('credit_transactions', 'id')
+                    ->where('customer_id', $customer->id)
+                    ->where('transaction_type', 'credit')
+                    ->whereNull('paid_at'),
+            ],
             'due_date' => 'nullable|date',
         ]);
+
+        $transactionIds = array_values(array_filter(
+            $validated['transaction_ids'] ?? [],
+            static fn ($id) => $id !== null && $id !== ''
+        ));
 
         try {
             DB::beginTransaction();
 
-            $dueDate = $validated['due_date'] ? new \DateTime($validated['due_date']) : null;
+            $customer->refresh();
 
             $transaction = $this->creditService->processPayment(
                 customer: $customer,
-                amount: $validated['amount'],
-                transactionIds: $validated['transaction_ids'] ?? [],
+                amount: (float) $validated['amount'],
+                transactionIds: $transactionIds,
                 paymentMethod: $validated['payment_method'] ?? null,
                 referenceNumber: $validated['reference_number'] ?? null,
                 notes: $validated['notes'] ?? null,

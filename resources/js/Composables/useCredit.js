@@ -30,6 +30,35 @@ export function useCredit() {
     };
 
     /**
+     * Outstanding invoices + fresh customer for record-payment modal (credits index)
+     */
+    const fetchOutstandingForPayment = async (customerId) => {
+        try {
+            const response = await axios.get(
+                getRoute('credits.outstanding-invoices', { customer: customerId }),
+                { headers: { Accept: 'application/json' } }
+            );
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching outstanding invoices:', error);
+            const data = error.response?.data;
+            let message =
+                data?.message || 'Failed to load invoice data';
+            if (data?.errors && typeof data.errors === 'object') {
+                const lines = Object.values(data.errors).flat();
+                if (lines.length) {
+                    message = lines.join(' ');
+                }
+            }
+            notification.error({
+                message: 'Error',
+                description: message,
+            });
+            throw error;
+        }
+    };
+
+    /**
      * Record a payment
      */
     const recordPayment = async (customerId, data) => {
@@ -37,7 +66,13 @@ export function useCredit() {
             loading.value = true;
             const response = await axios.post(
                 getRoute('credits.transactions.store', { customer: customerId }),
-                data
+                data,
+                {
+                    headers: {
+                        Accept: 'application/json',
+                        'Content-Type': 'application/json',
+                    },
+                }
             );
 
             notification.success({
@@ -48,7 +83,15 @@ export function useCredit() {
             return response.data;
         } catch (error) {
             console.error('Error recording payment:', error);
-            const message = error.response?.data?.message || 'Failed to record payment';
+            const data = error.response?.data;
+            let message =
+                data?.message || 'Failed to record payment';
+            if (data?.errors && typeof data.errors === 'object') {
+                const lines = Object.values(data.errors).flat();
+                if (lines.length) {
+                    message = lines.join(' ');
+                }
+            }
             notification.error({
                 message: 'Error',
                 description: message,
@@ -157,6 +200,7 @@ export function useCredit() {
     return {
         loading,
         getCustomerCredit,
+        fetchOutstandingForPayment,
         recordPayment,
         checkCreditAvailability,
         getOverdueAccounts,
