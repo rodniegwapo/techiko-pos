@@ -9,13 +9,21 @@ use App\Models\Category;
 use App\Models\Domain;
 use App\Models\InventoryLocation;
 use App\Models\Product\Product;
+use App\Models\Product\ProductSoldType;
+use App\Services\Billing\ProductEntitlementService;
 use App\Traits\LocationCategoryScoping;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class ProductController extends Controller
 {
     use LocationCategoryScoping;
+
+    public function __construct(
+        private ProductEntitlementService $entitlements
+    ) {}
 
     /**
      * Resolve active location for the given domain and request.
@@ -41,8 +49,8 @@ class ProductController extends Controller
             'cost' => ['nullable', 'numeric', 'min:0'],
 
             'category_id' => ['required', 'exists:categories,id'],
-            'SKU' => ['nullable', 'string', 'max:255', 'unique:products,SKU,' . $productId],
-            'barcode' => ['nullable', 'string', 'max:255', 'unique:products,barcode,' . $productId],
+            'SKU' => ['nullable', 'string', 'max:255', 'unique:products,SKU,'.$productId],
+            'barcode' => ['nullable', 'string', 'max:255', 'unique:products,barcode,'.$productId],
 
             'track_inventory' => ['boolean'],
             'reorder_level' => ['nullable', 'numeric', 'min:0'],
@@ -79,7 +87,7 @@ class ProductController extends Controller
         $existingProduct = $query->first();
 
         if ($existingProduct) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
+            throw ValidationException::withMessages([
                 'name' => ['A product with this name already exists in the selected location for this domain.'],
             ]);
         }
@@ -88,7 +96,7 @@ class ProductController extends Controller
     /**
      * Build the base product query scoped by domain (full catalog; not filtered by store).
      */
-    private function buildProductQuery(Request $request, Domain $domain): \Illuminate\Database\Eloquent\Builder
+    private function buildProductQuery(Request $request, Domain $domain): Builder
     {
         return Product::query()
             ->with('category')
@@ -112,15 +120,15 @@ class ProductController extends Controller
     /**
      * Standard response for products index.
      */
-    private function respondWithIndex($products, $categoriesQuery, $location)
+    private function respondWithIndex($products, $categoriesQuery, $location, Domain $domain)
     {
-        return Inertia::render('Products/Index', [
+        return Inertia::render('Products/Index', array_merge([
             'items' => ProductResource::collection($products),
             'categories' => $categoriesQuery->get(),
-            'sold_by_types' => \App\Models\Product\ProductSoldType::all(),
+            'sold_by_types' => ProductSoldType::all(),
             'isGlobalView' => false,
             'currentLocation' => $location,
-        ]);
+        ], $this->entitlements->inertiaPropsForDomain($domain)));
     }
 
     /**
@@ -141,7 +149,7 @@ class ProductController extends Controller
 
         $categoriesQuery = $this->buildCategoriesQuery($domain);
 
-        return $this->respondWithIndex($products, $categoriesQuery, $location);
+        return $this->respondWithIndex($products, $categoriesQuery, $location, $domain);
     }
 
     /**
@@ -149,6 +157,14 @@ class ProductController extends Controller
      */
     public function store(Request $request, ?Domain $domain = null)
     {
+        if ($domain && ! $this->entitlements->canAddProduct($domain)) {
+            throw ValidationException::withMessages([
+                'subscription' => __('You need an active subscription to add more than :count products.', [
+                    'count' => $this->entitlements->freeTierLimit(),
+                ]),
+            ]);
+        }
+
         $this->validateProductUniqueness($request, null, $domain);
         $validated = $this->validatedData($request, null, $domain);
 
@@ -206,6 +222,7 @@ class ProductController extends Controller
 
         return redirect()->back()->with('success', 'Product deleted successfully');
     }
+
     /**
      * Show the form for creating a new product.
      */
@@ -214,12 +231,12 @@ class ProductController extends Controller
         $location = $this->resolveActiveLocation($request, $domain);
         $categoriesQuery = $this->buildCategoriesQuery($domain);
 
-        return Inertia::render('Products/Create', [
+        return Inertia::render('Products/Create', array_merge([
             'categories' => $categoriesQuery->get(),
-            'sold_by_types' => \App\Models\Product\ProductSoldType::all(),
+            'sold_by_types' => ProductSoldType::all(),
             'isGlobalView' => false,
             'currentLocation' => $location,
-        ]);
+        ], $this->entitlements->inertiaPropsForDomain($domain)));
     }
 
     /**
@@ -238,7 +255,7 @@ class ProductController extends Controller
         return Inertia::render('Products/Edit', [
             'product' => $product,
             'categories' => $categoriesQuery->get(),
-            'sold_by_types' => \App\Models\Product\ProductSoldType::all(),
+            'sold_by_types' => ProductSoldType::all(),
             'isGlobalView' => false,
             'currentLocation' => $location,
         ]);

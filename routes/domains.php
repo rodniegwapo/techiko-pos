@@ -11,6 +11,7 @@ use App\Http\Controllers\Domains\Inventory\StockAdjustmentController;
 use App\Http\Controllers\Domains\LoyaltyController;
 use App\Http\Controllers\Domains\LoyaltyTierController;
 use App\Http\Controllers\Domains\PaymentCardTypeController;
+use App\Http\Controllers\Domains\PayMongoSubscriptionController;
 use App\Http\Controllers\Domains\ProductController;
 use App\Http\Controllers\Domains\SaleController;
 use App\Http\Controllers\Domains\SaleDiscountController;
@@ -94,6 +95,9 @@ Route::prefix('domains/{domain:name_slug}')
                 Route::post('/{sale}/test-order-event', [SaleController::class, 'testOrderEvent'])->name('sales.testOrderEvent');
             });
         });
+
+        Route::post('/billing/paymongo/subscribe', [PayMongoSubscriptionController::class, 'store'])
+            ->name('billing.paymongo.subscribe');
 
         // Products (Organization-specific)
         Route::resource('products', ProductController::class)

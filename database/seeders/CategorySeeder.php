@@ -7,7 +7,6 @@ use App\Models\Domain;
 use App\Models\InventoryLocation;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
 
 class CategorySeeder extends Seeder
 {
@@ -18,19 +17,32 @@ class CategorySeeder extends Seeder
     {
         $domains = Domain::pluck('name_slug')->all();
         foreach ($domains as $slug) {
-            // Get locations for this domain
             $locations = InventoryLocation::where('domain', $slug)->get();
-            
+
             if ($locations->isEmpty()) {
-                continue; // Skip if no locations exist
+                continue;
             }
-            
-            // Create categories for each location
-            foreach ($locations as $location) {
-                Category::factory()->count(2)->create([
+
+            $categories = Category::factory()
+                ->count(2)
+                ->create([
                     'domain' => $slug,
-                    'location_id' => $location->id,
                 ]);
+
+            foreach ($categories as $category) {
+                foreach ($locations as $location) {
+                    DB::table('category_location')->updateOrInsert(
+                        [
+                            'category_id' => $category->id,
+                            'location_id' => $location->id,
+                        ],
+                        [
+                            'is_active' => true,
+                            'updated_at' => now(),
+                            'created_at' => now(),
+                        ]
+                    );
+                }
             }
         }
     }

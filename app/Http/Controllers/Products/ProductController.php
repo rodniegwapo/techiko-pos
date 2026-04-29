@@ -5,9 +5,12 @@ namespace App\Http\Controllers\Products;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ProductResource;
 use App\Models\Category;
+use App\Models\Domain;
 use App\Models\Product\Product;
 use App\Models\Product\ProductSoldType;
+use App\Services\Billing\ProductEntitlementService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class ProductController extends Controller
 {
@@ -43,13 +46,30 @@ class ProductController extends Controller
             'categories' => Category::all(),
             'sold_by_types' => ProductSoldType::all(),
             'isGlobalView' => true,
-            'domains' => \App\Models\Domain::select('id', 'name', 'name_slug')->get(),
+            'domains' => Domain::select('id', 'name', 'name_slug')->get(),
+            'product_count' => null,
+            'product_limit' => config('billing.free_tier_product_limit'),
+            'can_add_product' => true,
+            'subscription_active' => null,
+            'paymongo_public_key' => config('paymongo.public_key') ?: null,
         ]);
     }
 
     public function store(Request $request)
     {
         $data = $this->validatedData($request);
+
+        if (! empty($data['domain'])) {
+            $domain = Domain::query()->where('name_slug', $data['domain'])->first();
+            $entitlements = app(ProductEntitlementService::class);
+            if ($domain && ! $entitlements->canAddProduct($domain)) {
+                throw ValidationException::withMessages([
+                    'subscription' => __('You need an active subscription to add more than :count products.', [
+                        'count' => $entitlements->freeTierLimit(),
+                    ]),
+                ]);
+            }
+        }
 
         Product::create($data);
 
@@ -79,8 +99,8 @@ class ProductController extends Controller
             'sold_type' => ['required', 'exists:product_sold_types,name'], // must exist in table
             'price' => ['required', 'integer', 'min:0'],
             'cost' => ['required', 'integer', 'min:0'],
-            'SKU' => ['required', 'string', 'max:100', 'unique:products,SKU,' . $request->id],
-            'barcode' => ['required', 'string', 'max:255', 'unique:products,barcode,' . $request->id],
+            'SKU' => ['required', 'string', 'max:100', 'unique:products,SKU,'.$request->id],
+            'barcode' => ['required', 'string', 'max:255', 'unique:products,barcode,'.$request->id],
             'representation_type' => ['nullable', 'string', 'in:image,color,text'],
             'representation' => ['nullable', 'string'],
             'category_id' => ['nullable', 'exists:categories,id'],

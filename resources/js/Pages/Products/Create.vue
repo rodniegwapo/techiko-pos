@@ -1,12 +1,13 @@
 <script setup>
-import { computed, ref } from "vue";
-import { Link, useForm, usePage } from "@inertiajs/vue3";
+import { computed, ref, onMounted, watch } from "vue";
+import { Link, useForm, usePage, Head, router } from "@inertiajs/vue3";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
 import ContentLayout from "@/Components/ContentLayout.vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { message } from "ant-design-vue";
 import { useBarcodeScanner } from "@/Composables/useBarcodeScanner";
+import SubscriptionRequiredModal from "./components/SubscriptionRequiredModal.vue";
 
 const page = usePage();
 const { getRoute } = useDomainRoutes();
@@ -24,7 +25,41 @@ const props = defineProps({
         type: Boolean,
         default: false,
     },
+    product_count: { type: Number, default: 0 },
+    product_limit: { type: Number, default: 10 },
+    can_add_product: { type: Boolean, default: true },
+    subscription_active: { type: Boolean, default: false },
+    paymongo_public_key: { type: String, default: null },
 });
+
+const subscriptionModalVisible = ref(false);
+
+const creationBlocked = computed(
+    () => !props.isGlobalView && props.can_add_product === false
+);
+
+onMounted(() => {
+    if (creationBlocked.value) {
+        subscriptionModalVisible.value = true;
+    }
+});
+
+watch(creationBlocked, (blocked) => {
+    if (blocked) {
+        subscriptionModalVisible.value = true;
+    }
+});
+
+const onSubscriptionUpdated = () => {
+    router.reload({
+        only: [
+            "product_count",
+            "product_limit",
+            "can_add_product",
+            "subscription_active",
+        ],
+    });
+};
 
 const form = useForm({
     name: "",
@@ -56,6 +91,10 @@ const domainOptions = computed(() => {
 });
 
 const handleSave = () => {
+    if (creationBlocked.value) {
+        subscriptionModalVisible.value = true;
+        return;
+    }
     form.post(getRoute("products.store"), {
         onSuccess: () => {
             message.success("Product created successfully");
@@ -85,7 +124,10 @@ useBarcodeScanner((code) => {
             </template>
 
             <template #table>
-                <div class="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow">
+                <div
+                    class="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow"
+                    :class="{ 'opacity-50 pointer-events-none': creationBlocked }"
+                >
                     <a-form layout="vertical">
                         <!-- Product Name -->
                         <a-form-item
@@ -274,6 +316,7 @@ useBarcodeScanner((code) => {
                             <a-button
                                 type="primary"
                                 :loading="form.processing"
+                                :disabled="creationBlocked"
                                 @click="handleSave"
                                 >Create Product</a-button
                             >
@@ -282,5 +325,12 @@ useBarcodeScanner((code) => {
                 </div>
             </template>
         </ContentLayout>
+
+        <SubscriptionRequiredModal
+            v-model:visible="subscriptionModalVisible"
+            :product-count="props.product_count"
+            :product-limit="props.product_limit"
+            @subscribed="onSubscriptionUpdated"
+        />
     </AuthenticatedLayout>
 </template>

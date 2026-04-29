@@ -1,6 +1,6 @@
 <script setup>
-import { ref, computed, onMounted } from "vue";
-import { usePage, router, Head, Link } from "@inertiajs/vue3";
+import { ref, computed } from "vue";
+import { usePage, router, Head } from "@inertiajs/vue3";
 import { PlusSquareOutlined } from "@ant-design/icons-vue";
 import { watchDebounced } from "@vueuse/core";
 import { useFilters, toLabel } from "@/Composables/useFilters";
@@ -17,11 +17,41 @@ import FilterDropdown from "@/Components/filters/FilterDropdown.vue";
 import ActiveFilters from "@/Components/filters/ActiveFilters.vue";
 import ProductTable from "./components/ProductTable.vue";
 import LocationInfoAlert from "@/Components/LocationInfoAlert.vue";
+import SubscriptionRequiredModal from "./components/SubscriptionRequiredModal.vue";
 
 const page = usePage();
 // const { showModal } = useHelpers(); // Removed as we navigate to page now
 const { spinning } = useGlobalVariables();
 const { getRoute } = useDomainRoutes();
+
+const props = defineProps({
+    product_count: { type: Number, default: 0 },
+    product_limit: { type: Number, default: 10 },
+    can_add_product: { type: Boolean, default: true },
+    subscription_active: { type: Boolean, default: false },
+    paymongo_public_key: { type: String, default: null },
+});
+
+const subscriptionModalVisible = ref(false);
+
+const goCreateProduct = () => {
+    if (!page.props.isGlobalView && props.can_add_product === false) {
+        subscriptionModalVisible.value = true;
+        return;
+    }
+    router.visit(getRoute("products.create"));
+};
+
+const onSubscriptionUpdated = () => {
+    router.reload({
+        only: [
+            "product_count",
+            "product_limit",
+            "can_add_product",
+            "subscription_active",
+        ],
+    });
+};
 
 const search = ref("");
 const sold_type = ref(null);
@@ -140,17 +170,16 @@ const { pagination, handleTableChange } = useTable("items", tableFilters, {
                     class="min-w-[100px] max-w-[300px]"
                 />
 
-                <Link :href="getRoute('products.create')">
-                    <a-button
-                        type="primary"
-                        class="bg-white border flex items-center border-green-500 text-green-500"
-                    >
-                        <template #icon>
-                            <PlusSquareOutlined />
-                        </template>
-                        Create Product
-                    </a-button>
-                </Link>
+                <a-button
+                    type="primary"
+                    class="bg-white border flex items-center border-green-500 text-green-500"
+                    @click="goCreateProduct"
+                >
+                    <template #icon>
+                        <PlusSquareOutlined />
+                    </template>
+                    Create Product
+                </a-button>
                 <FilterDropdown v-model="filters" :filters="filtersConfig" />
             </template>
 
@@ -181,5 +210,12 @@ const { pagination, handleTableChange } = useTable("items", tableFilters, {
                 />
             </template>
         </ContentLayout>
+
+        <SubscriptionRequiredModal
+            v-model:visible="subscriptionModalVisible"
+            :product-count="props.product_count"
+            :product-limit="props.product_limit"
+            @subscribed="onSubscriptionUpdated"
+        />
     </AuthenticatedLayout>
 </template>

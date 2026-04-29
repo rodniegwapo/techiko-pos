@@ -2,13 +2,14 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use App\Models\StockAdjustment;
-use App\Models\StockAdjustmentItem;
 use App\Models\InventoryLocation;
 use App\Models\Product\Product;
+use App\Models\StockAdjustment;
+use App\Models\StockAdjustmentItem;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Database\Seeder;
+use Illuminate\Support\Str;
 
 class StockAdjustmentSeeder extends Seeder
 {
@@ -21,7 +22,7 @@ class StockAdjustmentSeeder extends Seeder
         $jollibeeMain = InventoryLocation::where('code', 'JB-MAIN')->first();
         $jollibeeBranch = InventoryLocation::where('code', 'JB-BRANCH')->first();
         $jollibeeWarehouse = InventoryLocation::where('code', 'JB-WH')->first();
-        
+
         $mcdonaldsMain = InventoryLocation::where('code', 'MC-MAIN')->first();
         $mcdonaldsBranch = InventoryLocation::where('code', 'MC-BRANCH')->first();
         $mcdonaldsWarehouse = InventoryLocation::where('code', 'MC-WH')->first();
@@ -44,7 +45,7 @@ class StockAdjustmentSeeder extends Seeder
             'system_error',
             'promotion',
             'sample',
-            'other'
+            'other',
         ];
 
         // Create adjustments for Jollibee locations
@@ -78,15 +79,15 @@ class StockAdjustmentSeeder extends Seeder
     {
         $adjustmentsPerLocation = 12;
         $startDate = Carbon::now()->subDays(20);
-        
+
         for ($i = 0; $i < $adjustmentsPerLocation; $i++) {
             $user = $users->random();
             $status = $statuses[array_rand($statuses)];
             $reason = $reasons[array_rand($reasons)];
-            
+
             // Create random date within last 20 days
             $randomDate = $startDate->copy()->addDays(rand(0, 20))->addHours(rand(0, 23))->addMinutes(rand(0, 59));
-            
+
             $adjustment = StockAdjustment::create([
                 'adjustment_number' => $this->generateAdjustmentNumber(),
                 'location_id' => $location->id,
@@ -148,8 +149,8 @@ class StockAdjustmentSeeder extends Seeder
         return $notes[$reason] ?? "Stock adjustment at {$locationName}";
     }
 
-    private function generateAdjustmentNumber()
+    private function generateAdjustmentNumber(): string
     {
-        return 'ADJ-' . str_pad(rand(1000, 9999), 4, '0', STR_PAD_LEFT) . '-' . time();
+        return 'ADJ-'.strtoupper(str_replace('-', '', Str::uuid()->toString()));
     }
 }
