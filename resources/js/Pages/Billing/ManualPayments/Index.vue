@@ -4,6 +4,8 @@ import { Head, router, usePage } from "@inertiajs/vue3";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
 import ContentLayout from "@/Components/ContentLayout.vue";
+import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
+import { IconCheck, IconBan } from "@tabler/icons-vue";
 import { message } from "ant-design-vue";
 
 const props = defineProps({
@@ -73,7 +75,7 @@ const columns = [
     { title: "Submitted by", key: "author" },
     { title: "Submitted", key: "created_at" },
     { title: "Status", key: "status" },
-    { title: "", key: "actions", width: 220 },
+    { title: "", key: "actions", width: 180 },
 ];
 
 const actionModalOpen = ref(false);
@@ -159,11 +161,21 @@ function submitAction() {
                     @change="handleTableChange"
                 >
                     <template #bodyCell="{ column, record }">
-                        <template v-if="column.key === 'tier'">
+                        <template v-if="column.key === 'domain'">
+                            {{ record.domain || "—" }}
+                        </template>
+                        <template v-else-if="column.key === 'tier'">
                             {{ record.service_tier?.name ?? "—" }}
                         </template>
                         <template v-else-if="column.key === 'amount'">
                             ₱{{ Number(record.amount).toFixed(2) }}
+                        </template>
+                        <template v-else-if="column.key === 'gcash_reference'">
+                            <span class="font-mono text-sm">{{
+                                record.gcash_reference ??
+                                record.gcashReference ??
+                                "—"
+                            }}</span>
                         </template>
                         <template v-else-if="column.key === 'author'">
                             {{ record.submitted_by_user?.name ?? "—" }}
@@ -189,23 +201,25 @@ function submitAction() {
                             </a-tag>
                         </template>
                         <template v-else-if="column.key === 'actions'">
-                            <a-space v-if="record.status === 'pending'">
-                                <a-button
-                                    size="small"
-                                    type="primary"
-                                    class="bg-green-600"
+                            <div
+                                v-if="record.status === 'pending'"
+                                class="flex items-center gap-2"
+                            >
+                                <IconTooltipButton
+                                    hover="group-hover:bg-green-500"
+                                    name="Approve"
                                     @click="openActionModal(record, 'approve')"
                                 >
-                                    Approve
-                                </a-button>
-                                <a-button
-                                    danger
-                                    size="small"
+                                    <IconCheck size="20" class="mx-auto" />
+                                </IconTooltipButton>
+                                <IconTooltipButton
+                                    hover="group-hover:bg-red-500"
+                                    name="Reject"
                                     @click="openActionModal(record, 'reject')"
                                 >
-                                    Reject
-                                </a-button>
-                            </a-space>
+                                    <IconBan size="20" class="mx-auto" />
+                                </IconTooltipButton>
+                            </div>
                             <div v-else class="text-xs text-gray-500 max-w-[180px]">
                                 <template v-if="record.reviewed_by_user?.name">
                                     By {{ record.reviewed_by_user.name }}

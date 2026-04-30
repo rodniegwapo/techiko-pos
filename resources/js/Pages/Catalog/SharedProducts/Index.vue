@@ -4,6 +4,8 @@ import { Head, router, useForm } from "@inertiajs/vue3";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
 import ContentLayout from "@/Components/ContentLayout.vue";
+import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
+import { IconEdit, IconTrash } from "@tabler/icons-vue";
 import { message } from "ant-design-vue";
 import { PlusSquareOutlined } from "@ant-design/icons-vue";
 import { watchDebounced } from "@vueuse/core";
@@ -136,7 +138,7 @@ const columns = [
         key: "category_label",
     },
     { title: "Sold type", dataIndex: "sold_type", key: "sold_type" },
-    { title: "Actions", key: "actions", width: 160 },
+    { title: "Actions", key: "actions", width: 120 },
 ];
 
 const pagination = computed(() => ({
@@ -197,20 +199,29 @@ function handleTableChange(pag) {
                             {{ record.sold_type || "—" }}
                         </template>
                         <template v-if="column.key === 'actions'">
-                            <a-space>
-                                <a-button type="link" size="small" @click="openEdit(record)">
-                                    Edit
-                                </a-button>
+                            <div class="flex items-center gap-2">
+                                <IconTooltipButton
+                                    hover="group-hover:bg-green-500"
+                                    name="Edit shared product"
+                                    @click="openEdit(record)"
+                                >
+                                    <IconEdit size="20" class="mx-auto" />
+                                </IconTooltipButton>
                                 <a-popconfirm
                                     title="Remove this barcode from the shared catalog?"
                                     ok-text="Delete"
                                     @confirm="confirmDestroy(record)"
                                 >
-                                    <a-button danger type="link" size="small">
-                                        Delete
-                                    </a-button>
+                                    <span class="inline-flex">
+                                        <IconTooltipButton
+                                            hover="group-hover:bg-red-500"
+                                            name="Delete"
+                                        >
+                                            <IconTrash size="20" class="mx-auto" />
+                                        </IconTooltipButton>
+                                    </span>
                                 </a-popconfirm>
-                            </a-space>
+                            </div>
                         </template>
                     </template>
                 </a-table>
