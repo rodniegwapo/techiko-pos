@@ -172,6 +172,22 @@ const menuItems = [
                 path: "/products/discounts",
             },
             {
+                key: "catalog-shared-products",
+                title: "Shared catalog",
+                routeName: "catalog.shared-products.index",
+                path: "/catalog/shared-products",
+                superUserOnly: true,
+                globalOnly: true,
+            },
+            {
+                key: "catalog-suggestions",
+                title: "Catalog suggestions",
+                routeName: "catalog.shared-product-suggestions.index",
+                path: "/catalog/shared-product-suggestions",
+                superUserOnly: true,
+                globalOnly: true,
+            },
+            {
                 key: "mandatory-discounts",
                 title: "Mandatory Discounts",
                 routeName: "mandatory-discounts.index",

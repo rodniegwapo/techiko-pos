@@ -14,6 +14,7 @@ use App\Http\Controllers\Domains\PaymentCardTypeController;
 use App\Http\Controllers\Domains\ProductController;
 use App\Http\Controllers\Domains\SaleController;
 use App\Http\Controllers\Domains\SaleDiscountController;
+use App\Http\Controllers\Domains\SharedCatalogLookupController;
 use App\Http\Controllers\Domains\UserController;
 use App\Http\Controllers\Domains\UserPinController;
 use App\Http\Controllers\Domains\VatReportController;
@@ -94,6 +95,9 @@ Route::prefix('domains/{domain:name_slug}')
                 Route::post('/{sale}/test-order-event', [SaleController::class, 'testOrderEvent'])->name('sales.testOrderEvent');
             });
         });
+
+        // Shared catalog barcode lookup (JSON)
+        Route::get('/shared-catalog/lookup', [SharedCatalogLookupController::class, 'lookup'])->name('shared-catalog.lookup');
 
         // Products (Organization-specific)
         Route::resource('products', ProductController::class)

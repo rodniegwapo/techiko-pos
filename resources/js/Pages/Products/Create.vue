@@ -1,10 +1,12 @@
 <script setup>
-import { computed, ref } from "vue";
-import { Link, useForm, usePage } from "@inertiajs/vue3";
+import { computed, ref, watch } from "vue";
+import { Head, Link, useForm, usePage } from "@inertiajs/vue3";
+import { watchDebounced } from "@vueuse/core";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
 import ContentLayout from "@/Components/ContentLayout.vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
+import { useSharedCatalogLookup } from "@/Composables/useSharedCatalogLookup";
 import { message } from "ant-design-vue";
 import { useBarcodeScanner } from "@/Composables/useBarcodeScanner";
 
@@ -37,7 +39,68 @@ const form = useForm({
     sold_type: null,
     representation_type: null,
     representation: "",
+    suggest_shared_catalog: false,
 });
+
+const domainSlug = computed(() => {
+    if (props.isGlobalView) {
+        return null;
+    }
+    const m =
+        typeof window !== "undefined"
+            ? window.location.pathname.match(/\/domains\/([^/]+)/)
+            : null;
+    if (m) {
+        return m[1];
+    }
+    return page.props.currentDomain?.name_slug ?? null;
+});
+
+const domainLookupEnabled = computed(
+    () => !props.isGlobalView && !!domainSlug.value,
+);
+
+const sharedCategoryHint = ref("");
+const barcodeLookupNonce = ref(0);
+
+function assignSharedCatalogFields(data) {
+    if (data.name) {
+        form.name = data.name;
+    }
+    sharedCategoryHint.value = data.category_label || "";
+    if (
+        data.sold_type &&
+        props.sold_by_types.some((s) => s.name === data.sold_type)
+    ) {
+        form.sold_type = data.sold_type;
+    }
+}
+
+const { lookupLoading, catalogFound, lookup } = useSharedCatalogLookup({
+    enabled: domainLookupEnabled,
+    getDomainSlug: () => domainSlug.value,
+});
+
+async function runBarcodeLookup() {
+    barcodeLookupNonce.value += 1;
+    const nonce = barcodeLookupNonce.value;
+    sharedCategoryHint.value = "";
+    await lookup(form.barcode, assignSharedCatalogFields);
+    if (nonce !== barcodeLookupNonce.value) {
+        return;
+    }
+}
+
+watchDebounced(() => form.barcode, runBarcodeLookup, {
+    debounce: 450,
+});
+
+watch(
+    () => form.barcode,
+    () => {
+        form.suggest_shared_catalog = false;
+    },
+);
 
 const categoriesOption = computed(() => {
     return props.categories.map((item) => ({
@@ -55,6 +118,14 @@ const domainOptions = computed(() => {
     return list.map((item) => ({ label: item.name, value: item.name_slug }));
 });
 
+const showSuggestToCatalog = computed(
+    () =>
+        domainLookupEnabled.value &&
+        !lookupLoading.value &&
+        String(form.barcode || "").trim() !== "" &&
+        catalogFound.value === false,
+);
+
 const handleSave = () => {
     form.post(getRoute("products.store"), {
         onSuccess: () => {
@@ -69,6 +140,7 @@ const handleSave = () => {
 useBarcodeScanner((code) => {
     form.barcode = code;
     message.success("Barcode Scanned: " + code);
+    runBarcodeLookup();
 });
 </script>
 
@@ -117,7 +189,7 @@ useBarcodeScanner((code) => {
 
                         <!-- Category -->
                         <a-form-item
-                            label="Category"
+                            label="Category (optional)"
                             :validate-status="
                                 form.errors.category_id ? 'error' : ''
                             "
@@ -126,7 +198,8 @@ useBarcodeScanner((code) => {
                             <a-select
                                 v-model:value="form.category_id"
                                 :options="categoriesOption"
-                                placeholder="Select category"
+                                placeholder="Select category or leave blank"
+                                allow-clear
                                 show-search
                                 :filter-option="
                                     (input, option) =>
@@ -207,6 +280,49 @@ useBarcodeScanner((code) => {
                                 />
                             </a-form-item>
                         </div>
+
+                        <div
+                            v-if="domainLookupEnabled"
+                            class="space-y-2 mb-4"
+                        >
+                            <a-alert
+                                v-if="lookupLoading"
+                                type="info"
+                                message="Checking shared catalog…"
+                            />
+                            <a-alert
+                                v-else-if="catalogFound"
+                                type="success"
+                                message="Matched shared catalog. Review prefilled fields before saving."
+                                show-icon
+                            />
+                            <a-alert
+                                v-else-if="showSuggestToCatalog"
+                                type="warning"
+                                message="This barcode is not in the shared catalog yet."
+                                show-icon
+                            />
+                            <a-alert
+                                v-if="
+                                    domainLookupEnabled && sharedCategoryHint
+                                "
+                                type="info"
+                                :message="`Suggested category (hint only): ${sharedCategoryHint}`"
+                            />
+                        </div>
+
+                        <a-form-item
+                            v-if="showSuggestToCatalog"
+                            label=" "
+                            :colon="false"
+                        >
+                            <a-checkbox
+                                v-model:checked="form.suggest_shared_catalog"
+                            >
+                                Submit to shared catalog for super review (name
+                                and category hint only — not your price).
+                            </a-checkbox>
+                        </a-form-item>
 
                         <!-- Sold Type -->
                         <a-form-item
