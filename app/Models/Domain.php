@@ -27,6 +27,7 @@ class Domain extends Model
     protected $casts = [
         'settings' => 'array',
         'is_active' => 'boolean',
+        'subscription_started_at' => 'datetime',
     ];
 
     protected $attributes = [

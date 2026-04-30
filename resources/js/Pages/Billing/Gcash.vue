@@ -1,9 +1,16 @@
 <script setup>
-import { computed, watch } from "vue";
-import { Head, useForm, usePage } from "@inertiajs/vue3";
+import {
+    computed,
+    watch,
+    onBeforeUnmount,
+} from "vue";
+import { Head, useForm, usePage, router } from "@inertiajs/vue3";
+import axios from "axios";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
 import ContentLayout from "@/Components/ContentLayout.vue";
+import ManualGcashDesktopQrAside from "@/Pages/Billing/ManualGcashDesktopQrAside.vue";
+import ManualGcashPayment from "@/Pages/Billing/ManualGcashPayment.vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { message } from "ant-design-vue";
 
@@ -16,6 +23,18 @@ const props = defineProps({
         type: Object,
         default: null,
     },
+    paymongoQr: {
+        type: Object,
+        default: null,
+    },
+    paymongoConfigured: {
+        type: Boolean,
+        default: false,
+    },
+    showManualGcash: {
+        type: Boolean,
+        default: false,
+    },
 });
 
 const page = usePage();
@@ -26,10 +45,18 @@ const form = useForm({
     gcash_reference: "",
 });
 
+const qrphForm = useForm({
+    service_tier_id: null,
+});
+
 const hasTiers = computed(() => Array.isArray(props.tiers) && props.tiers.length > 0);
 
 const selectedTier = computed(() =>
     props.tiers.find((t) => t.id === form.service_tier_id),
+);
+
+const selectedTierUsesBundleQrPh = computed(
+    () => !!selectedTier.value?.uses_vite_bundle_qrph,
 );
 
 const qrSrc = computed(() => {
@@ -46,7 +73,26 @@ const showPlaceholderQrNotice = computed(
         String(props.gcashQrUrl || "").includes("gcash-qr.svg"),
 );
 
-const stepCurrent = computed(() => {
+const paymongoExpiresLabel = computed(() => {
+    const raw = props.paymongoQr?.expires_at;
+    if (!raw) {
+        return "Pay within a few minutes—QR Ph codes expire quickly.";
+    }
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) {
+        return "Pay within a few minutes—QR Ph codes expire quickly.";
+    }
+    return `Pay before ${d.toLocaleString(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short",
+    })}`;
+});
+
+const hasBundledQrPhOffered = computed(() =>
+    props.tiers.some((t) => t.uses_vite_bundle_qrph),
+);
+
+const stepCurrentGcash = computed(() => {
     if (!form.service_tier_id) {
         return 0;
     }
@@ -55,6 +101,8 @@ const stepCurrent = computed(() => {
     }
     return 2;
 });
+
+const stepCurrentQrPh = computed(() => (form.service_tier_id ? 1 : 0));
 
 watch(
     () => page.props.flash?.success,
@@ -95,6 +143,72 @@ function tierLimitsLabel(tier) {
     return parts.join(" · ");
 }
 
+function startPaymongoQrph() {
+    if (!form.service_tier_id || !hasTiers.value) {
+        message.warning("Select a plan first.");
+        return;
+    }
+    if (selectedTierUsesBundleQrPh.value) {
+        return;
+    }
+    qrphForm.service_tier_id = form.service_tier_id;
+    qrphForm.post(getRoute("billing.paymongo.qrph.store"), {
+        preserveScroll: true,
+        preserveState: "errors",
+        onSuccess: () => {
+            qrphForm.clearErrors();
+        },
+    });
+}
+
+let paymongoPollTimer = null;
+
+function clearPaymongoPoll() {
+    if (paymongoPollTimer !== null) {
+        clearInterval(paymongoPollTimer);
+        paymongoPollTimer = null;
+    }
+}
+
+watch(
+    () => ({
+        pid: props.paymongoQr?.payment_intent_id,
+        bundle: selectedTierUsesBundleQrPh.value,
+    }),
+    ({ pid, bundle }) => {
+        clearPaymongoPoll();
+        if (!pid || bundle) {
+            return;
+        }
+        paymongoPollTimer = setInterval(async () => {
+            try {
+                const { data } = await axios.get(
+                    getRoute("billing.paymongo.status"),
+                    {
+                        params: { payment_intent_id: pid },
+                        headers: { Accept: "application/json" },
+                        withCredentials: true,
+                    },
+                );
+                if (data.paid) {
+                    clearPaymongoPoll();
+                    message.success("Payment confirmed. Your plan is active.");
+                    router.reload({
+                        only: ["subscription", "paymongoQr", "flash"],
+                    });
+                }
+            } catch {
+                /* ignore transient errors */
+            }
+        }, 4000);
+    },
+    { immediate: true },
+);
+
+onBeforeUnmount(() => {
+    clearPaymongoPoll();
+});
+
 function submit() {
     if (!hasTiers.value) {
         return;
@@ -126,17 +240,34 @@ const referenceHelp = computed(() => {
             <template #table>
                 <div class="max-w-5xl mx-auto px-2 sm:px-4 py-2 pb-8 space-y-6">
                     <p class="text-sm text-gray-500 -mt-1">
-                        GCash manual payment · amount must match your selected plan
+                        <template v-if="showManualGcash">
+                            Automated QR Ph (PayMongo) or GCash manual payment · amounts
+                            must match your selected plan
+                        </template>
+                        <template v-else>
+                            PayMongo QR Ph servicing · select a plan, then generate
+                            a QR Ph code to complete payment securely.
+                        </template>
                     </p>
 
                     <a-steps
+                        v-if="showManualGcash"
                         size="small"
-                        :current="stepCurrent"
+                        :current="stepCurrentGcash"
                         class="[&_.ant-steps-item-title]:text-sm"
                     >
                         <a-step title="Choose plan" />
                         <a-step title="Pay with GCash" />
                         <a-step title="Submit reference" />
+                    </a-steps>
+                    <a-steps
+                        v-else-if="paymongoConfigured || hasBundledQrPhOffered"
+                        size="small"
+                        :current="stepCurrentQrPh"
+                        class="[&_.ant-steps-item-title]:text-sm"
+                    >
+                        <a-step title="Choose plan" />
+                        <a-step title="Pay with QR Ph" />
                     </a-steps>
 
                     <a-alert
@@ -179,7 +310,8 @@ const referenceHelp = computed(() => {
                     </a-alert>
 
                     <div
-                        class="grid grid-cols-1 lg:grid-cols-2 lg:gap-10 items-start"
+                        class="grid grid-cols-1 items-start gap-10"
+                        :class="{ 'lg:grid-cols-2 lg:gap-10': showManualGcash }"
                     >
                         <div class="space-y-6 min-w-0">
                             <div>
@@ -235,130 +367,137 @@ const referenceHelp = computed(() => {
                                 >
                                     {{ form.errors.service_tier_id }}
                                 </p>
+                                <p
+                                    v-if="qrphForm.errors.service_tier_id"
+                                    class="text-red-500 text-sm mt-2"
+                                >
+                                    {{ qrphForm.errors.service_tier_id }}
+                                </p>
                             </div>
 
-                            <a-alert
-                                v-if="selectedTier"
-                                type="info"
-                                show-icon
-                                :message="`Send exactly ${currencySymbol}${Number(selectedTier.amount).toFixed(2)}`"
-                                description="Use the GCash app to send this amount to the merchant QR before submitting your reference."
-                            />
-
-                            <!-- Mobile / tablet: pay step before reference -->
-                            <div class="lg:hidden space-y-3">
+                            <div
+                                v-if="
+                                    hasTiers &&
+                                    form.service_tier_id &&
+                                    selectedTierUsesBundleQrPh
+                                "
+                                class="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-3"
+                            >
                                 <h2
-                                    class="text-base font-semibold text-gray-800 text-center sm:text-left"
+                                    class="text-base font-semibold text-gray-800"
                                 >
-                                    Pay here
+                                    Pay with QR Ph
                                 </h2>
+                                <p class="text-sm text-gray-600">
+                                    Scan the code below with your bank or e-wallet
+                                    app. Send exactly
+                                    {{
+                                        currencySymbol
+                                    }}{{ Number(selectedTier.amount).toFixed(2) }} for
+                                    <strong>{{ selectedTier.name }}</strong>.
+                                </p>
                                 <div
-                                    class="rounded-xl border border-gray-200 bg-gray-50/80 shadow-sm p-6 flex flex-col items-center"
+                                    class="rounded-lg border border-emerald-100 bg-white p-4 flex flex-col items-center"
                                 >
                                     <img
-                                        :src="qrSrc"
-                                        alt="GCash QR code"
-                                        class="max-w-[260px] w-full h-auto rounded-lg bg-white p-3 border border-gray-100 shadow-inner"
+                                        src="@assets/qrph/qrph_basic.jpg"
+                                        alt="QR Ph Basic plan"
+                                        class="max-w-[280px] w-full h-auto rounded-md"
+                                    />
+                                </div>
+                            </div>
+                            <div
+                                v-else-if="paymongoConfigured"
+                                class="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-3"
+                            >
+                                <h2
+                                    class="text-base font-semibold text-gray-800"
+                                >
+                                    Pay instantly with QR Ph
+                                </h2>
+                                <p class="text-sm text-gray-600">
+                                    PayMongo generates a one-time QR Ph code for
+                                    your selected plan. Your plan activates
+                                    automatically after payment—no waiting for
+                                    manual approval.
+                                </p>
+                                <div class="flex flex-wrap gap-2">
+                                    <a-button
+                                        type="primary"
+                                        class="!bg-emerald-600 !border-emerald-600"
+                                        :loading="qrphForm.processing"
+                                        :disabled="
+                                            !form.service_tier_id ||
+                                            !hasTiers ||
+                                            selectedTierUsesBundleQrPh
+                                        "
+                                        @click="startPaymongoQrph"
+                                    >
+                                        {{
+                                            paymongoQr
+                                                ? "Refresh QR Ph code"
+                                                : "Generate QR Ph code"
+                                        }}
+                                    </a-button>
+                                </div>
+                                <div
+                                    v-if="paymongoQr?.qr_image_data_url"
+                                    class="rounded-lg border border-emerald-100 bg-white p-4 flex flex-col items-center"
+                                >
+                                    <img
+                                        :src="paymongoQr.qr_image_data_url"
+                                        alt="QR Ph payment code"
+                                        class="max-w-[280px] w-full h-auto rounded-md"
                                     />
                                     <p
-                                        class="mt-4 text-sm text-gray-600 text-center"
+                                        class="mt-3 text-xs text-gray-600 text-center max-w-sm"
                                     >
-                                        Scan with the GCash app
+                                        {{ paymongoExpiresLabel }}
                                     </p>
                                     <p
-                                        v-if="showPlaceholderQrNotice"
-                                        class="mt-2 text-xs text-amber-800/90 text-center max-w-[280px]"
+                                        v-if="paymongoQr.tier_name"
+                                        class="mt-2 text-xs text-gray-500"
                                     >
-                                        Dev: replace the placeholder QR with your
-                                        real code under
-                                        <code
-                                            class="text-xs bg-amber-100/80 px-1 rounded"
-                                            >public/images/</code
-                                        >
+                                        Plan:
+                                        <strong>{{ paymongoQr.tier_name }}</strong>
+                                        · Status:
+                                        <span class="font-mono">{{
+                                            paymongoQr.payment_intent_status
+                                        }}</span>
                                     </p>
                                 </div>
                             </div>
-
-                            <a-form layout="vertical" class="mb-0">
-                                <a-form-item
-                                    label="GCash reference number"
-                                    :validate-status="
-                                        form.errors.gcash_reference
-                                            ? 'error'
-                                            : ''
-                                    "
-                                    :help="referenceHelp"
-                                    required
-                                >
-                                    <a-input
-                                        v-model:value="form.gcash_reference"
-                                        placeholder="Paste from your GCash receipt"
-                                        size="large"
-                                        autocomplete="off"
-                                        class="font-mono"
-                                    />
-                                </a-form-item>
-
-                                <div
-                                    class="flex flex-col sm:flex-row sm:justify-end gap-3 pt-1"
-                                >
-                                    <a-button
-                                        type="primary"
-                                        :loading="form.processing"
-                                        :disabled="
-                                            !form.service_tier_id || !hasTiers
-                                        "
-                                        class="w-full sm:w-auto bg-white border flex items-center justify-center border-green-500 text-green-500 !h-10"
-                                        @click="submit"
-                                    >
-                                        Submit reference
-                                    </a-button>
-                                </div>
-                            </a-form>
-
                             <a-alert
-                                type="info"
+                                v-else-if="hasTiers"
+                                type="warning"
                                 show-icon
                                 class="text-sm"
-                                message="Verification"
-                                description="Our team confirms each payment against the GCash ledger. You will be notified once the payment is approved."
+                                message="QR Ph checkout unavailable"
+                                :description="
+                                    showManualGcash
+                                        ? 'PayMongo is not configured on this server. Use manual GCash below or contact support.'
+                                        : 'PayMongo is not configured on this server. Contact your administrator.'
+                                "
+                            />
+
+                            <ManualGcashPayment
+                                v-if="showManualGcash"
+                                :form="form"
+                                :currency-symbol="currencySymbol"
+                                :qr-src="qrSrc"
+                                :show-placeholder-qr-notice="showPlaceholderQrNotice"
+                                :reference-help="referenceHelp"
+                                :selected-tier="selectedTier"
+                                :has-tiers="hasTiers"
+                                :submit="submit"
                             />
                         </div>
 
-                        <div
-                            class="hidden lg:block lg:sticky lg:top-24 space-y-3"
-                        >
-                            <h2
-                                class="text-base font-semibold text-gray-800 text-center"
-                            >
-                                Pay here
-                            </h2>
-                            <div
-                                class="rounded-xl border border-gray-200 bg-gray-50/80 shadow-sm p-6 flex flex-col items-center"
-                            >
-                                <img
-                                    :src="qrSrc"
-                                    alt="GCash QR code"
-                                    class="max-w-[260px] w-full h-auto rounded-lg bg-white p-3 border border-gray-100 shadow-inner"
-                                />
-                                <p
-                                    class="mt-4 text-sm text-gray-600 text-center"
-                                >
-                                    Scan with the GCash app
-                                </p>
-                                <p
-                                    v-if="showPlaceholderQrNotice"
-                                    class="mt-2 text-xs text-amber-800/90 text-center max-w-[280px]"
-                                >
-                                    Dev: replace the placeholder QR with your
-                                    real code under
-                                    <code
-                                        class="text-xs bg-amber-100/80 px-1 rounded"
-                                        >public/images/</code
-                                    >
-                                </p>
-                            </div>
-                        </div>
+                        <ManualGcashDesktopQrAside
+                            v-if="showManualGcash"
+                            :qr-src="qrSrc"
+                            :show-placeholder-qr-notice="showPlaceholderQrNotice"
+                        />
                     </div>
                 </div>
             </template>

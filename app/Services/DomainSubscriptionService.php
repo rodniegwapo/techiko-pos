@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Domain;
 use App\Models\Product\Product;
+use App\Models\ServiceTier;
 use App\Models\User;
 use Illuminate\Validation\ValidationException;
 
@@ -99,5 +100,20 @@ class DomainSubscriptionService
             'free_product_limit' => self::FREE_TIER_MAX_PRODUCTS,
             'billing_url' => route('domains.billing.gcash.index', ['domain' => $domain->name_slug]),
         ];
+    }
+
+    public function grantServicingTier(string $domainSlug, int $serviceTierId): void
+    {
+        ServiceTier::query()->where('is_active', true)->findOrFail($serviceTierId);
+
+        $domain = Domain::query()->where('name_slug', $domainSlug)->first();
+        if (! $domain) {
+            return;
+        }
+
+        $domain->update([
+            'current_service_tier_id' => $serviceTierId,
+            'subscription_started_at' => now(),
+        ]);
     }
 }
