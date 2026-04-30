@@ -3,13 +3,17 @@
 namespace App\Http\Controllers\Billing;
 
 use App\Http\Controllers\Controller;
-use App\Models\Domain;
 use App\Models\ManualPaymentRequest;
+use App\Services\DomainSubscriptionService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class AdminManualPaymentsController extends Controller
 {
+    public function __construct(
+        private DomainSubscriptionService $subscriptionService,
+    ) {}
+
     private function authorizeSuper(Request $request): void
     {
         abort_unless($request->user() && $request->user()->isSuperUser(), 403);
@@ -69,13 +73,10 @@ class AdminManualPaymentsController extends Controller
             'reviewer_note' => $data['reviewer_note'] ?? null,
         ]);
 
-        $domain = Domain::query()->where('name_slug', $manual_payment_request->domain)->first();
-        if ($domain) {
-            $domain->update([
-                'current_service_tier_id' => $manual_payment_request->service_tier_id,
-                'subscription_started_at' => now(),
-            ]);
-        }
+        $this->subscriptionService->grantServicingTier(
+            $manual_payment_request->domain,
+            (int) $manual_payment_request->service_tier_id,
+        );
 
         return redirect()->back()->with('success', 'Payment approved.');
     }

@@ -12,6 +12,7 @@ use App\Http\Controllers\Domains\LoyaltyController;
 use App\Http\Controllers\Domains\LoyaltyTierController;
 use App\Http\Controllers\Domains\ManualBillingController;
 use App\Http\Controllers\Domains\PaymentCardTypeController;
+use App\Http\Controllers\Domains\PayMongoQrPhController;
 use App\Http\Controllers\Domains\ProductController;
 use App\Http\Controllers\Domains\SaleController;
 use App\Http\Controllers\Domains\SaleDiscountController;
@@ -35,6 +36,8 @@ Route::prefix('domains/{domain:name_slug}')
 
         Route::get('/billing/gcash', [ManualBillingController::class, 'index'])->name('billing.gcash.index');
         Route::post('/billing/gcash', [ManualBillingController::class, 'store'])->name('billing.gcash.store');
+        Route::post('/billing/paymongo/qrph', [PayMongoQrPhController::class, 'store'])->name('billing.paymongo.qrph.store');
+        Route::get('/billing/paymongo/status', [PayMongoQrPhController::class, 'status'])->name('billing.paymongo.status');
 
         // Dashboard (Organization-specific)
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
