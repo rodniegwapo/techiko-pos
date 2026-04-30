@@ -65,7 +65,6 @@ class ProductController extends Controller
             'unit_weight' => ['nullable', 'numeric', 'min:0'],
 
             'location_id' => ['nullable', 'exists:inventory_locations,id'],
-            'suggest_shared_catalog' => ['sometimes', 'boolean'],
         ], [], [
             'name' => 'product name',
             'sold_type' => 'sold type',
@@ -81,9 +80,51 @@ class ProductController extends Controller
         } else {
             $validated['barcode'] = $validated['barcode'] ?? '';
         }
-        unset($validated['suggest_shared_catalog']);
 
         return $validated;
+    }
+
+    /**
+     * When a tenant saves a product with a barcode not yet in the global shared catalog,
+     * queue a pending suggestion for super review (snapshot only — no pricing).
+     */
+    private function queueSharedCatalogSuggestionIfNeeded(Request $request, Domain $domain, Product $product): void
+    {
+        $norm = BarcodeNormalizer::normalize((string) $product->barcode);
+        if ($norm === '') {
+            return;
+        }
+
+        if (SharedProduct::query()->where('barcode', $norm)->exists()) {
+            return;
+        }
+
+        $alreadyPending = SharedProductSuggestion::query()
+            ->pending()
+            ->forDomain($domain->name_slug)
+            ->where('barcode', $norm)
+            ->exists();
+
+        if ($alreadyPending) {
+            return;
+        }
+
+        $categoryLabel = $product->category_id
+            ? Category::find($product->category_id)?->name
+            : null;
+
+        SharedProductSuggestion::create([
+            'domain' => $domain->name_slug,
+            'barcode' => $norm,
+            'snapshot' => [
+                'name' => $product->name,
+                'sold_type' => $product->sold_type,
+                'category_label' => $categoryLabel,
+            ],
+            'submitted_product_id' => $product->id,
+            'submitted_by' => $request->user()?->id,
+            'status' => SharedProductSuggestion::STATUS_PENDING,
+        ]);
     }
 
     /**
@@ -178,7 +219,6 @@ class ProductController extends Controller
     public function store(Request $request, ?Domain $domain = null)
     {
         $this->validateProductUniqueness($request, null, $domain);
-        $wantsSuggestion = $request->boolean('suggest_shared_catalog');
         $validated = $this->validatedData($request, null, $domain);
 
         if ($domain) {
@@ -194,32 +234,8 @@ class ProductController extends Controller
             $product->addToLocation($location, true);
         }
 
-        if ($domain && $wantsSuggestion && BarcodeNormalizer::normalize($product->barcode) !== '') {
-            $norm = BarcodeNormalizer::normalize($product->barcode);
-            if (! SharedProduct::query()->where('barcode', $norm)->exists()) {
-                $alreadyPending = SharedProductSuggestion::query()
-                    ->pending()
-                    ->forDomain($domain->name_slug)
-                    ->where('barcode', $norm)
-                    ->exists();
-                if (! $alreadyPending) {
-                    $categoryLabel = $product->category_id
-                        ? Category::find($product->category_id)?->name
-                        : null;
-                    SharedProductSuggestion::create([
-                        'domain' => $domain->name_slug,
-                        'barcode' => $norm,
-                        'snapshot' => [
-                            'name' => $product->name,
-                            'sold_type' => $product->sold_type,
-                            'category_label' => $categoryLabel,
-                        ],
-                        'submitted_product_id' => $product->id,
-                        'submitted_by' => $request->user()?->id,
-                        'status' => SharedProductSuggestion::STATUS_PENDING,
-                    ]);
-                }
-            }
+        if ($domain) {
+            $this->queueSharedCatalogSuggestionIfNeeded($request, $domain, $product);
         }
 
         return redirect()->back()->with('success', 'Product created successfully');
@@ -238,6 +254,7 @@ class ProductController extends Controller
         $this->validateProductUniqueness($request, $product, $domain);
         $validated = $this->validatedData($request, $product, $domain);
         $product->update($validated);
+        $product->refresh();
 
         if ($request->filled('location_id')) {
             $location = InventoryLocation::find($request->input('location_id'));
@@ -245,6 +262,8 @@ class ProductController extends Controller
                 $product->addToLocation($location, true);
             }
         }
+
+        $this->queueSharedCatalogSuggestionIfNeeded($request, $domain, $product);
 
         return redirect()->back()->with('success', 'Product updated successfully');
     }

@@ -39,7 +39,6 @@ const form = useForm({
     sold_type: null,
     representation_type: null,
     representation: "",
-    suggest_shared_catalog: false,
 });
 
 const domainSlug = computed(() => {
@@ -95,13 +94,6 @@ watchDebounced(() => form.barcode, runBarcodeLookup, {
     debounce: 450,
 });
 
-watch(
-    () => form.barcode,
-    () => {
-        form.suggest_shared_catalog = false;
-    },
-);
-
 const categoriesOption = computed(() => {
     return props.categories.map((item) => ({
         label: item.name,
@@ -117,14 +109,6 @@ const domainOptions = computed(() => {
     const list = Array.isArray(page?.props?.domains) ? page.props.domains : [];
     return list.map((item) => ({ label: item.name, value: item.name_slug }));
 });
-
-const showSuggestToCatalog = computed(
-    () =>
-        domainLookupEnabled.value &&
-        !lookupLoading.value &&
-        String(form.barcode || "").trim() !== "" &&
-        catalogFound.value === false,
-);
 
 const handleSave = () => {
     form.post(getRoute("products.store"), {
@@ -281,10 +265,7 @@ useBarcodeScanner((code) => {
                             </a-form-item>
                         </div>
 
-                        <div
-                            v-if="domainLookupEnabled"
-                            class="space-y-2 mb-4"
-                        >
+                        <div v-if="domainLookupEnabled" class="space-y-2 mb-4">
                             <a-alert
                                 v-if="lookupLoading"
                                 type="info"
@@ -293,36 +274,15 @@ useBarcodeScanner((code) => {
                             <a-alert
                                 v-else-if="catalogFound"
                                 type="success"
-                                message="Matched shared catalog. Review prefilled fields before saving."
+                                message=" Review prefilled fields before saving."
                                 show-icon
                             />
                             <a-alert
-                                v-else-if="showSuggestToCatalog"
-                                type="warning"
-                                message="This barcode is not in the shared catalog yet."
-                                show-icon
-                            />
-                            <a-alert
-                                v-if="
-                                    domainLookupEnabled && sharedCategoryHint
-                                "
+                                v-if="domainLookupEnabled && sharedCategoryHint"
                                 type="info"
                                 :message="`Suggested category (hint only): ${sharedCategoryHint}`"
                             />
                         </div>
-
-                        <a-form-item
-                            v-if="showSuggestToCatalog"
-                            label=" "
-                            :colon="false"
-                        >
-                            <a-checkbox
-                                v-model:checked="form.suggest_shared_catalog"
-                            >
-                                Submit to shared catalog for super review (name
-                                and category hint only — not your price).
-                            </a-checkbox>
-                        </a-form-item>
 
                         <!-- Sold Type -->
                         <a-form-item
