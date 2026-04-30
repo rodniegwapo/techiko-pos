@@ -82,6 +82,10 @@ function submit() {
     }
     form.post(getRoute("billing.gcash.store"), {
         preserveScroll: true,
+        onSuccess: () => {
+            form.reset("gcash_reference");
+            form.clearErrors();
+        },
     });
 }
 
