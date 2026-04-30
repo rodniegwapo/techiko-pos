@@ -158,18 +158,21 @@ const menuItems = [
                 title: "Items",
                 routeName: "products.index",
                 path: "/products",
+                hideForSuperOutsideDomain: true,
             },
             {
                 key: "products-categories",
                 title: "Categories",
                 routeName: "categories.index",
                 path: "/categories",
+                hideForSuperOutsideDomain: true,
             },
             {
                 key: "products-discounts",
                 title: "Discounts",
                 routeName: "products.discounts.index",
                 path: "/products/discounts",
+                hideForSuperOutsideDomain: true,
             },
             {
                 key: "catalog-shared-products",
@@ -192,6 +195,7 @@ const menuItems = [
                 title: "Mandatory Discounts",
                 routeName: "mandatory-discounts.index",
                 path: "/mandatory-discounts",
+                hideForSuperOutsideDomain: true,
             },
         ],
     },
@@ -199,6 +203,7 @@ const menuItems = [
         key: "inventory",
         title: "Inventory",
         icon: IconPackage,
+        hideForSuperOutsideDomain: true,
         children: [
             {
                 key: "inventory-dashboard",
@@ -244,6 +249,7 @@ const menuItems = [
         icon: IconGift,
         routeName: "loyalty.index",
         path: "/loyalty",
+        hideForSuperOutsideDomain: true,
     },
     {
         key: "voids",
@@ -251,6 +257,7 @@ const menuItems = [
         icon: IconHistory,
         routeName: "voids.index",
         path: "/void-logs",
+        hideForSuperOutsideDomain: true,
     },
     {
         key: "customers",
@@ -258,6 +265,7 @@ const menuItems = [
         icon: IconUsers,
         routeName: "customers.index",
         path: "/customers",
+        hideForSuperOutsideDomain: true,
     },
     {
         key: "credits",
@@ -346,6 +354,15 @@ const menus = computed(() => {
 
                 // Check if item is super user only
                 if (item.superUserOnly && !isSuperUser.value) {
+                    return false;
+                }
+
+                // Tenant ops: hide from super when browsing global URLs (show again under /domains/{slug}/)
+                if (
+                    isSuperUser.value &&
+                    !isInDomainContext.value &&
+                    item.hideForSuperOutsideDomain
+                ) {
                     return false;
                 }
 
