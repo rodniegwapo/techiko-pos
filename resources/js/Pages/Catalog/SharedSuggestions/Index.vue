@@ -4,6 +4,8 @@ import { Head, router } from "@inertiajs/vue3";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
 import ContentLayout from "@/Components/ContentLayout.vue";
+import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
+import { IconCheck, IconBan } from "@tabler/icons-vue";
 
 const props = defineProps({
     suggestions: { type: Object, required: true },
@@ -83,7 +85,7 @@ const columns = [
     },
     { title: "Submitted by", key: "author", width: 160 },
     { title: "Status", key: "status" },
-    { title: "", key: "actions", width: 200 },
+    { title: "", key: "actions", width: 120 },
 ];
 
 const rows = computed(() =>
@@ -168,14 +170,22 @@ const statusOptions = [
                         </template>
                         <template v-if="column.key === 'actions'">
                             <template v-if="record.status === 'pending'">
-                                <a-space>
-                                    <a-button type="primary" size="small" @click="acceptRow(record.id)">
-                                        Accept
-                                    </a-button>
-                                    <a-button danger size="small" @click="openReject(record.id)">
-                                        Reject
-                                    </a-button>
-                                </a-space>
+                                <div class="flex items-center gap-2">
+                                    <IconTooltipButton
+                                        hover="group-hover:bg-green-500"
+                                        name="Accept"
+                                        @click="acceptRow(record.id)"
+                                    >
+                                        <IconCheck size="20" class="mx-auto" />
+                                    </IconTooltipButton>
+                                    <IconTooltipButton
+                                        hover="group-hover:bg-red-500"
+                                        name="Reject"
+                                        @click="openReject(record.id)"
+                                    >
+                                        <IconBan size="20" class="mx-auto" />
+                                    </IconTooltipButton>
+                                </div>
                             </template>
                             <template v-else>
                                 —
