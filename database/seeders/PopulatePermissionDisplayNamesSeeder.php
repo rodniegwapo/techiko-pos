@@ -54,6 +54,17 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
             'products.show' => 'View Product',
             'products.destroy' => 'Delete Product',
 
+            'shared-catalog.lookup' => 'Shared catalog barcode lookup',
+
+            'catalog.shared-products.index' => 'View shared catalog products',
+            'catalog.shared-products.store' => 'Create shared catalog product',
+            'catalog.shared-products.update' => 'Update shared catalog product',
+            'catalog.shared-products.destroy' => 'Delete shared catalog product',
+
+            'catalog.shared-product-suggestions.index' => 'View catalog suggestions',
+            'catalog.shared-product-suggestions.accept' => 'Accept catalog suggestion',
+            'catalog.shared-product-suggestions.reject' => 'Reject catalog suggestion',
+
             // Categories
             'categories.index' => 'View Categories',
             'categories.create' => 'Create Category',

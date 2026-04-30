@@ -161,14 +161,15 @@ const handleUpdate = () => {
 
       <!-- Category -->
       <a-form-item
-        label="Category"
+        label="Category (optional)"
         :validate-status="errors.category_id ? 'error' : ''"
         :help="errors.category_id || ''"
       >
         <a-select
           v-model:value="categoryIdValue"
           :options="categoriesOption"
-          placeholder="Select category"
+          placeholder="Select category or leave blank"
+          allow-clear
           show-search
           :filter-option="(input, option) => option.label.toLowerCase().includes(input.toLowerCase())"
           size="large"

@@ -9,8 +9,15 @@ use App\Models\Category;
 use App\Models\Domain;
 use App\Models\InventoryLocation;
 use App\Models\Product\Product;
+use App\Models\Product\ProductSoldType;
+use App\Models\SharedProduct;
+use App\Models\SharedProductSuggestion;
+use App\Support\BarcodeNormalizer;
 use App\Traits\LocationCategoryScoping;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class ProductController extends Controller
@@ -32,17 +39,25 @@ class ProductController extends Controller
     {
         $productId = $product?->id;
         $domainSlug = $domain?->name_slug;
+        $barcodeRules = ['nullable', 'string', 'max:255'];
+        if ($domainSlug) {
+            $barcodeRules[] = Rule::unique('products', 'barcode')
+                ->where(fn ($q) => $q->where('domain', $domainSlug))
+                ->ignore($productId);
+        } else {
+            $barcodeRules[] = Rule::unique('products', 'barcode')->ignore($productId);
+        }
 
-        return $request->validate([
+        $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'sold_type' => ['required', 'string', 'max:255', 'exists:product_sold_types,name'],
             'price' => ['required', 'numeric', 'min:0'],
             'cost' => ['nullable', 'numeric', 'min:0'],
 
-            'category_id' => ['required', 'exists:categories,id'],
-            'SKU' => ['nullable', 'string', 'max:255', 'unique:products,SKU,' . $productId],
-            'barcode' => ['nullable', 'string', 'max:255', 'unique:products,barcode,' . $productId],
+            'category_id' => ['nullable', 'exists:categories,id'],
+            'SKU' => ['nullable', 'string', 'max:255', 'unique:products,SKU,'.$productId],
+            'barcode' => $barcodeRules,
 
             'track_inventory' => ['boolean'],
             'reorder_level' => ['nullable', 'numeric', 'min:0'],
@@ -50,12 +65,25 @@ class ProductController extends Controller
             'unit_weight' => ['nullable', 'numeric', 'min:0'],
 
             'location_id' => ['nullable', 'exists:inventory_locations,id'],
+            'suggest_shared_catalog' => ['sometimes', 'boolean'],
         ], [], [
             'name' => 'product name',
             'sold_type' => 'sold type',
             'category_id' => 'category',
             'location_id' => 'location',
         ]);
+
+        if (array_key_exists('category_id', $validated) && $validated['category_id'] === '') {
+            $validated['category_id'] = null;
+        }
+        if (! empty($validated['barcode'])) {
+            $validated['barcode'] = BarcodeNormalizer::normalize($validated['barcode']);
+        } else {
+            $validated['barcode'] = $validated['barcode'] ?? '';
+        }
+        unset($validated['suggest_shared_catalog']);
+
+        return $validated;
     }
 
     /**
@@ -79,7 +107,7 @@ class ProductController extends Controller
         $existingProduct = $query->first();
 
         if ($existingProduct) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
+            throw ValidationException::withMessages([
                 'name' => ['A product with this name already exists in the selected location for this domain.'],
             ]);
         }
@@ -88,7 +116,7 @@ class ProductController extends Controller
     /**
      * Build the base product query scoped by domain (full catalog; not filtered by store).
      */
-    private function buildProductQuery(Request $request, Domain $domain): \Illuminate\Database\Eloquent\Builder
+    private function buildProductQuery(Request $request, Domain $domain): Builder
     {
         return Product::query()
             ->with('category')
@@ -117,7 +145,7 @@ class ProductController extends Controller
         return Inertia::render('Products/Index', [
             'items' => ProductResource::collection($products),
             'categories' => $categoriesQuery->get(),
-            'sold_by_types' => \App\Models\Product\ProductSoldType::all(),
+            'sold_by_types' => ProductSoldType::all(),
             'isGlobalView' => false,
             'currentLocation' => $location,
         ]);
@@ -150,6 +178,7 @@ class ProductController extends Controller
     public function store(Request $request, ?Domain $domain = null)
     {
         $this->validateProductUniqueness($request, null, $domain);
+        $wantsSuggestion = $request->boolean('suggest_shared_catalog');
         $validated = $this->validatedData($request, null, $domain);
 
         if ($domain) {
@@ -163,6 +192,34 @@ class ProductController extends Controller
 
         if ($location) {
             $product->addToLocation($location, true);
+        }
+
+        if ($domain && $wantsSuggestion && BarcodeNormalizer::normalize($product->barcode) !== '') {
+            $norm = BarcodeNormalizer::normalize($product->barcode);
+            if (! SharedProduct::query()->where('barcode', $norm)->exists()) {
+                $alreadyPending = SharedProductSuggestion::query()
+                    ->pending()
+                    ->forDomain($domain->name_slug)
+                    ->where('barcode', $norm)
+                    ->exists();
+                if (! $alreadyPending) {
+                    $categoryLabel = $product->category_id
+                        ? Category::find($product->category_id)?->name
+                        : null;
+                    SharedProductSuggestion::create([
+                        'domain' => $domain->name_slug,
+                        'barcode' => $norm,
+                        'snapshot' => [
+                            'name' => $product->name,
+                            'sold_type' => $product->sold_type,
+                            'category_label' => $categoryLabel,
+                        ],
+                        'submitted_product_id' => $product->id,
+                        'submitted_by' => $request->user()?->id,
+                        'status' => SharedProductSuggestion::STATUS_PENDING,
+                    ]);
+                }
+            }
         }
 
         return redirect()->back()->with('success', 'Product created successfully');
@@ -206,6 +263,7 @@ class ProductController extends Controller
 
         return redirect()->back()->with('success', 'Product deleted successfully');
     }
+
     /**
      * Show the form for creating a new product.
      */
@@ -216,7 +274,7 @@ class ProductController extends Controller
 
         return Inertia::render('Products/Create', [
             'categories' => $categoriesQuery->get(),
-            'sold_by_types' => \App\Models\Product\ProductSoldType::all(),
+            'sold_by_types' => ProductSoldType::all(),
             'isGlobalView' => false,
             'currentLocation' => $location,
         ]);
@@ -238,7 +296,7 @@ class ProductController extends Controller
         return Inertia::render('Products/Edit', [
             'product' => $product,
             'categories' => $categoriesQuery->get(),
-            'sold_by_types' => \App\Models\Product\ProductSoldType::all(),
+            'sold_by_types' => ProductSoldType::all(),
             'isGlobalView' => false,
             'currentLocation' => $location,
         ]);

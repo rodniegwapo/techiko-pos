@@ -106,6 +106,8 @@ class RolePermissionSeeder extends Seeder
             'products.create',
             'products.edit',
 
+            'shared-catalog.lookup',
+
             // Categories
             'categories.index',
             'categories.store',
@@ -248,6 +250,15 @@ class RolePermissionSeeder extends Seeder
 
             // Customer Order
             'customer-order',
+
+            // Shared catalog (domain lookup + super catalog UI)
+            'catalog.shared-products.index',
+            'catalog.shared-products.store',
+            'catalog.shared-products.update',
+            'catalog.shared-products.destroy',
+            'catalog.shared-product-suggestions.index',
+            'catalog.shared-product-suggestions.accept',
+            'catalog.shared-product-suggestions.reject',
         ];
 
         // Get all permission modules
@@ -379,6 +390,8 @@ class RolePermissionSeeder extends Seeder
             'products.destroy',
             'products.create',
             'products.edit',
+
+            'shared-catalog.lookup',
 
             // Categories
             'categories.index',
@@ -571,6 +584,8 @@ class RolePermissionSeeder extends Seeder
             'products.create',
             'products.edit',
 
+            'shared-catalog.lookup',
+
             // Categories
             'categories.index',
             'categories.store',
@@ -720,6 +735,8 @@ class RolePermissionSeeder extends Seeder
             'products.update',
             'products.create',
             'products.edit',
+
+            'shared-catalog.lookup',
 
             // Categories
             'categories.index',
