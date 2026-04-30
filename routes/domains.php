@@ -10,6 +10,7 @@ use App\Http\Controllers\Domains\Inventory\InventoryLocationController;
 use App\Http\Controllers\Domains\Inventory\StockAdjustmentController;
 use App\Http\Controllers\Domains\LoyaltyController;
 use App\Http\Controllers\Domains\LoyaltyTierController;
+use App\Http\Controllers\Domains\ManualBillingController;
 use App\Http\Controllers\Domains\PaymentCardTypeController;
 use App\Http\Controllers\Domains\ProductController;
 use App\Http\Controllers\Domains\SaleController;
@@ -31,6 +32,9 @@ Route::prefix('domains/{domain:name_slug}')
         // Organization settings (Sales VAT, etc.)
         Route::get('/settings', [DomainSettingsController::class, 'index'])->name('settings.index');
         Route::patch('/settings', [DomainSettingsController::class, 'update'])->name('settings.update');
+
+        Route::get('/billing/gcash', [ManualBillingController::class, 'index'])->name('billing.gcash.index');
+        Route::post('/billing/gcash', [ManualBillingController::class, 'store'])->name('billing.gcash.store');
 
         // Dashboard (Organization-specific)
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
