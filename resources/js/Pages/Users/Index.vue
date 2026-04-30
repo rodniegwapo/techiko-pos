@@ -39,7 +39,17 @@ const props = defineProps({
     hierarchy: Object,
     domains: Array,
     isGlobalView: Boolean,
+    subscription: {
+        type: Object,
+        default: null,
+    },
 });
+
+const usersAtCapacity = computed(
+    () =>
+        !!props.subscription &&
+        props.subscription.users_at_capacity === true,
+);
 
 // Filter state
 const search = ref("");
@@ -257,6 +267,25 @@ const getRoleColorHex = (level) => {
         <ContentHeader class="mb-8" title="User Management" />
         <ContentLayout title="User Management">
             <template #filters>
+                <a-alert
+                    v-if="
+                        props.subscription?.users_at_capacity &&
+                        props.subscription?.billing_url &&
+                        !props.isGlobalView
+                    "
+                    type="warning"
+                    show-icon
+                    class="w-full mb-4"
+                    message="Plan user limit reached"
+                >
+                    <template #description>
+                        This plan allows {{ props.subscription?.max_users }} domain users (including admins).
+                        <a class="ml-1" :href="props.subscription.billing_url">Servicing payment</a>
+                        for a higher tier.
+                    </template>
+                </a-alert>
+
+                <div class="flex flex-wrap gap-2 items-center w-full">
                 <RefreshButton :loading="spinning" @click="getItems" />
                 <a-input-search
                     v-model:value="search"
@@ -265,6 +294,7 @@ const getRoleColorHex = (level) => {
                 />
                 <a-button
                     v-if="isSuperUser || hasPermission('users.store')"
+                    :disabled="usersAtCapacity && !props.isGlobalView"
                     @click="handleAddUser"
                     type="primary"
                     class="bg-white border flex items-center border-green-500 text-green-500"
@@ -288,6 +318,7 @@ const getRoleColorHex = (level) => {
                 </a-button>
 
                 <FilterDropdown v-model="filters" :filters="filtersConfig" />
+                </div>
             </template>
 
             <!-- Active Filters -->

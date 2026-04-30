@@ -100,6 +100,11 @@ class Domain extends Model
         return $this->hasMany(Sale::class);
     }
 
+    public function currentServiceTier()
+    {
+        return $this->belongsTo(ServiceTier::class, 'current_service_tier_id');
+    }
+
     /**
      * Get the inventory locations for this domain.
      */

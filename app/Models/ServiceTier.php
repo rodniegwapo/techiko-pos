@@ -13,6 +13,8 @@ class ServiceTier extends Model
         'amount' => 'decimal:2',
         'is_active' => 'boolean',
         'sort_order' => 'integer',
+        'max_products' => 'integer',
+        'max_users' => 'integer',
     ];
 
     public function manualPaymentRequests(): HasMany

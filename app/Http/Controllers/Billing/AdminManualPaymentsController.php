@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Billing;
 
 use App\Http\Controllers\Controller;
+use App\Models\Domain;
 use App\Models\ManualPaymentRequest;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -67,6 +68,14 @@ class AdminManualPaymentsController extends Controller
             'reviewed_at' => now(),
             'reviewer_note' => $data['reviewer_note'] ?? null,
         ]);
+
+        $domain = Domain::query()->where('name_slug', $manual_payment_request->domain)->first();
+        if ($domain) {
+            $domain->update([
+                'current_service_tier_id' => $manual_payment_request->service_tier_id,
+                'subscription_started_at' => now(),
+            ]);
+        }
 
         return redirect()->back()->with('success', 'Payment approved.');
     }
