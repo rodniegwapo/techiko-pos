@@ -12,6 +12,7 @@ use App\Models\Product\Product;
 use App\Models\Product\ProductSoldType;
 use App\Models\SharedProduct;
 use App\Models\SharedProductSuggestion;
+use App\Services\DomainSubscriptionService;
 use App\Support\BarcodeNormalizer;
 use App\Traits\LocationCategoryScoping;
 use Illuminate\Database\Eloquent\Builder;
@@ -23,6 +24,10 @@ use Inertia\Inertia;
 class ProductController extends Controller
 {
     use LocationCategoryScoping;
+
+    public function __construct(
+        private DomainSubscriptionService $subscriptionService
+    ) {}
 
     /**
      * Resolve active location for the given domain and request.
@@ -181,7 +186,7 @@ class ProductController extends Controller
     /**
      * Standard response for products index.
      */
-    private function respondWithIndex($products, $categoriesQuery, $location)
+    private function respondWithIndex($products, $categoriesQuery, $location, Domain $domain)
     {
         return Inertia::render('Products/Index', [
             'items' => ProductResource::collection($products),
@@ -189,6 +194,7 @@ class ProductController extends Controller
             'sold_by_types' => ProductSoldType::all(),
             'isGlobalView' => false,
             'currentLocation' => $location,
+            'subscription' => $this->subscriptionService->subscriptionPropsForFrontend($domain),
         ]);
     }
 
@@ -210,7 +216,7 @@ class ProductController extends Controller
 
         $categoriesQuery = $this->buildCategoriesQuery($domain);
 
-        return $this->respondWithIndex($products, $categoriesQuery, $location);
+        return $this->respondWithIndex($products, $categoriesQuery, $location, $domain);
     }
 
     /**
@@ -219,6 +225,10 @@ class ProductController extends Controller
     public function store(Request $request, ?Domain $domain = null)
     {
         $this->validateProductUniqueness($request, null, $domain);
+        if ($domain) {
+            $this->subscriptionService->assertCanCreateProduct($domain);
+        }
+
         $validated = $this->validatedData($request, null, $domain);
 
         if ($domain) {
@@ -296,6 +306,7 @@ class ProductController extends Controller
             'sold_by_types' => ProductSoldType::all(),
             'isGlobalView' => false,
             'currentLocation' => $location,
+            'subscription' => $this->subscriptionService->subscriptionPropsForFrontend($domain),
         ]);
     }
 

@@ -12,6 +12,10 @@ const props = defineProps({
     gcashQrUrl: { type: String, default: "/images/gcash-qr.svg" },
     currencySymbol: { type: String, default: "₱" },
     currentDomain: { type: Object, default: () => ({}) },
+    subscription: {
+        type: Object,
+        default: null,
+    },
 });
 
 const page = usePage();
@@ -76,6 +80,21 @@ function tierCardClasses(tier) {
     ];
 }
 
+function tierLimitsLabel(tier) {
+    const parts = [];
+    if (tier.max_products != null) {
+        parts.push(`Max ${tier.max_products} products`);
+    } else {
+        parts.push("Unlimited products");
+    }
+    if (tier.max_users != null) {
+        parts.push(`Max ${tier.max_users} domain users`);
+    } else {
+        parts.push("Unlimited users");
+    }
+    return parts.join(" · ");
+}
+
 function submit() {
     if (!hasTiers.value) {
         return;
@@ -129,6 +148,36 @@ const referenceHelp = computed(() => {
                         class="mb-2"
                     />
 
+                    <a-alert
+                        v-if="subscription"
+                        type="info"
+                        show-icon
+                        class="mb-2"
+                    >
+                        <template #message>Your organization</template>
+                        <template #description>
+                            <span v-if="subscription.is_paid">
+                                Active plan: <strong>{{ subscription.tier_name }}</strong>.
+                            </span>
+                            <span v-else>
+                                Free tier: up to
+                                <strong>{{ subscription.free_product_limit }}</strong>
+                                products until you subscribe.
+                            </span>
+                            <span class="block mt-1 text-gray-600">
+                                Products: {{ subscription.product_count }}
+                                <template v-if="subscription.max_products != null">
+                                    / {{ subscription.max_products }}
+                                </template>
+                                · Users:
+                                {{ subscription.user_count }}
+                                <template v-if="subscription.max_users != null">
+                                    / {{ subscription.max_users }}
+                                </template>
+                            </span>
+                        </template>
+                    </a-alert>
+
                     <div
                         class="grid grid-cols-1 lg:grid-cols-2 lg:gap-10 items-start"
                     >
@@ -172,6 +221,11 @@ const referenceHelp = computed(() => {
                                             }}{{
                                                 Number(tier.amount).toFixed(2)
                                             }}
+                                        </p>
+                                        <p
+                                            class="mt-2 text-xs text-gray-600 leading-snug"
+                                        >
+                                            {{ tierLimitsLabel(tier) }}
                                         </p>
                                     </div>
                                 </div>

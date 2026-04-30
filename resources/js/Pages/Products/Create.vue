@@ -26,6 +26,10 @@ const props = defineProps({
         type: Boolean,
         default: false,
     },
+    subscription: {
+        type: Object,
+        default: null,
+    },
 });
 
 const form = useForm({
@@ -105,6 +109,10 @@ const soltTypeOptions = computed(() => {
     return props.sold_by_types.map((item) => item.name);
 });
 
+const productsAtCapacity = computed(
+    () => props.subscription?.products_at_capacity === true,
+);
+
 const domainOptions = computed(() => {
     const list = Array.isArray(page?.props?.domains) ? page.props.domains : [];
     return list.map((item) => ({ label: item.name, value: item.name_slug }));
@@ -115,8 +123,11 @@ const handleSave = () => {
         onSuccess: () => {
             message.success("Product created successfully");
         },
-        onError: () => {
-            message.error("Failed to create product");
+        onError: (errors) => {
+            const planMsg = errors?.plan;
+            message.error(
+                Array.isArray(planMsg) ? planMsg[0] : planMsg || "Failed to create product",
+            );
         },
     });
 };
@@ -141,7 +152,20 @@ useBarcodeScanner((code) => {
             </template>
 
             <template #table>
-                <div class="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow">
+                <div class="space-y-4">
+                    <a-alert
+                        v-if="productsAtCapacity && subscription?.billing_url"
+                        type="warning"
+                        show-icon
+                        message="Product limit reached"
+                    >
+                        <template #description>
+                            <span class="mr-1">Subscribe for unlimited products on this domain.</span>
+                            <a :href="subscription.billing_url">Open servicing payment</a>
+                        </template>
+                    </a-alert>
+
+                    <div class="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow">
                     <a-form layout="vertical">
                         <!-- Product Name -->
                         <a-form-item
@@ -350,11 +374,13 @@ useBarcodeScanner((code) => {
                             <a-button
                                 type="primary"
                                 :loading="form.processing"
+                                :disabled="productsAtCapacity"
                                 @click="handleSave"
                                 >Create Product</a-button
                             >
                         </div>
                     </a-form>
+                </div>
                 </div>
             </template>
         </ContentLayout>

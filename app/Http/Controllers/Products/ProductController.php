@@ -8,14 +8,16 @@ use App\Models\Category;
 use App\Models\Domain;
 use App\Models\Product\Product;
 use App\Models\Product\ProductSoldType;
+use App\Services\DomainSubscriptionService;
 use App\Support\BarcodeNormalizer;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class ProductController extends Controller
 {
-    public function __construct()
-    {
+    public function __construct(
+        private DomainSubscriptionService $subscriptionService,
+    ) {
         // Middleware is handled at route level
     }
 
@@ -79,6 +81,12 @@ class ProductController extends Controller
     public function store(Request $request)
     {
         $data = $this->validatedData($request, null);
+        $domainModel = isset($data['domain'])
+            ? Domain::where('name_slug', $data['domain'])->first()
+            : null;
+        if ($domainModel) {
+            $this->subscriptionService->assertCanCreateProduct($domainModel);
+        }
 
         Product::create($data);
 

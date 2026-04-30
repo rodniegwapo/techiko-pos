@@ -6,14 +6,20 @@ use App\Http\Controllers\Controller;
 use App\Models\Domain;
 use App\Models\ManualPaymentRequest;
 use App\Models\ServiceTier;
+use App\Services\DomainSubscriptionService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class ManualBillingController extends Controller
 {
+    public function __construct(
+        private DomainSubscriptionService $subscriptionService
+    ) {}
+
     public function index(Request $request, Domain $domain)
     {
+        $domain->load('currentServiceTier');
         $tiers = ServiceTier::query()->active()->get();
 
         return Inertia::render('Billing/Gcash', [
@@ -21,6 +27,7 @@ class ManualBillingController extends Controller
             'gcashQrUrl' => config('manual_billing.gcash_qr_path'),
             'currencySymbol' => config('manual_billing.currency_symbol'),
             'currentDomain' => $domain->only(['id', 'name', 'name_slug']),
+            'subscription' => $this->subscriptionService->subscriptionPropsForFrontend($domain),
         ]);
     }
 
