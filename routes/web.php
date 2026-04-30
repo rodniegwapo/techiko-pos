@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Billing\AdminManualPaymentsController;
 use App\Http\Controllers\Catalog\SharedProductController;
 use App\Http\Controllers\Catalog\SharedProductSuggestionController;
 use App\Http\Controllers\CategoryController;
@@ -105,6 +106,12 @@ Route::middleware(['auth', 'user.permission'])->group(function () {
         Route::get('shared-product-suggestions', [SharedProductSuggestionController::class, 'index'])->name('shared-product-suggestions.index');
         Route::post('shared-product-suggestions/{shared_product_suggestion}/accept', [SharedProductSuggestionController::class, 'accept'])->name('shared-product-suggestions.accept');
         Route::post('shared-product-suggestions/{shared_product_suggestion}/reject', [SharedProductSuggestionController::class, 'reject'])->name('shared-product-suggestions.reject');
+    });
+
+    Route::prefix('billing')->name('billing.')->group(function () {
+        Route::get('/manual-payments', [AdminManualPaymentsController::class, 'index'])->name('manual-payments.index');
+        Route::post('/manual-payments/{manual_payment_request}/approve', [AdminManualPaymentsController::class, 'approve'])->name('manual-payments.approve');
+        Route::post('/manual-payments/{manual_payment_request}/reject', [AdminManualPaymentsController::class, 'reject'])->name('manual-payments.reject');
     });
 
     // Inventory Management (Global)
