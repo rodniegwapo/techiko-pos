@@ -10,9 +10,10 @@ const props = defineProps({
     statusFilter: { type: String, default: "pending" },
 });
 
-const rejectModalOpen = ref(false);
+const rejectModalVisible = ref(false);
 const rejectingId = ref(null);
 const rejectReason = ref("");
+const rejectSubmitting = ref(false);
 
 const statusRadio = computed({
     get: () => props.statusFilter,
@@ -44,24 +45,32 @@ function acceptRow(id) {
 function openReject(id) {
     rejectingId.value = id;
     rejectReason.value = "";
-    rejectModalOpen.value = true;
+    rejectModalVisible.value = true;
 }
 
 function confirmReject() {
-    router.post(
-        window.route("catalog.shared-product-suggestions.reject", {
-            shared_product_suggestion: rejectingId.value,
-        }),
-        {
-            rejection_reason: rejectReason.value || null,
-        },
-        {
-            preserveScroll: true,
-            onSuccess: () => {
-                rejectModalOpen.value = false;
+    return new Promise((resolve, reject) => {
+        rejectSubmitting.value = true;
+        router.post(
+            window.route("catalog.shared-product-suggestions.reject", {
+                shared_product_suggestion: rejectingId.value,
+            }),
+            {
+                rejection_reason: rejectReason.value || null,
             },
-        },
-    );
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    rejectModalVisible.value = false;
+                    resolve();
+                },
+                onError: () => reject(new Error("reject_failed")),
+                onFinish: () => {
+                    rejectSubmitting.value = false;
+                },
+            },
+        );
+    });
 }
 
 const columns = [
@@ -178,9 +187,10 @@ const statusOptions = [
         </ContentLayout>
 
         <a-modal
-            v-model:open="rejectModalOpen"
+            v-model:visible="rejectModalVisible"
             title="Reject suggestion"
             ok-text="Reject"
+            :confirm-loading="rejectSubmitting"
             @ok="confirmReject"
         >
             <p class="text-gray-600 text-sm mb-2">

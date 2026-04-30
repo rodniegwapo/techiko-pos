@@ -7,6 +7,7 @@ import ContentLayout from "@/Components/ContentLayout.vue";
 import { message } from "ant-design-vue";
 import { PlusSquareOutlined } from "@ant-design/icons-vue";
 import { watchDebounced } from "@vueuse/core";
+import { useBarcodeScanner } from "@/Composables/useBarcodeScanner";
 
 const props = defineProps({
     products: { type: Object, required: true },
@@ -16,7 +17,7 @@ const props = defineProps({
 
 const search = ref(props.filters.search || "");
 
-const modalOpen = ref(false);
+const modalVisible = ref(false);
 const editingId = ref(null);
 
 const soldTypeOptions = computed(() =>
@@ -33,12 +34,23 @@ const form = useForm({
     representation: "",
 });
 
-watch(modalOpen, (open) => {
+watch(modalVisible, (open) => {
     if (!open) {
         editingId.value = null;
         form.reset();
         form.clearErrors();
     }
+});
+
+const barcodeScanHint =
+    "USB scanner: focus anywhere and scan; barcode fills here.";
+
+useBarcodeScanner((code) => {
+    if (!modalVisible.value) {
+        return;
+    }
+    form.barcode = String(code ?? "").trim();
+    message.success("Barcode scanned");
 });
 
 watchDebounced(search, reloadList, { debounce: 300 });
@@ -59,7 +71,7 @@ function openCreate() {
     editingId.value = null;
     form.reset();
     form.clearErrors();
-    modalOpen.value = true;
+    modalVisible.value = true;
 }
 
 function openEdit(row) {
@@ -72,33 +84,35 @@ function openEdit(row) {
     form.representation_type = row.representation_type || null;
     form.representation = row.representation || "";
     form.clearErrors();
-    modalOpen.value = true;
+    modalVisible.value = true;
 }
 
 function submitModal() {
-    const onOk = () => {
-        modalOpen.value = false;
-        message.success(
-            editingId.value ? "Shared product updated" : "Shared product created",
-        );
-    };
-
-    if (editingId.value) {
-        form.put(
-            window.route("catalog.shared-products.update", {
-                shared_product: editingId.value,
-            }),
-            {
-                preserveScroll: true,
-                onSuccess: onOk,
-            },
-        );
-    } else {
-        form.post(window.route("catalog.shared-products.store"), {
+    return new Promise((resolve, reject) => {
+        const options = {
             preserveScroll: true,
-            onSuccess: onOk,
-        });
-    }
+            onSuccess: () => {
+                modalVisible.value = false;
+                message.success(
+                    editingId.value
+                        ? "Shared product updated"
+                        : "Shared product created",
+                );
+                resolve();
+            },
+            onError: () => reject(new Error("validation_failed")),
+        };
+        if (editingId.value) {
+            form.put(
+                window.route("catalog.shared-products.update", {
+                    shared_product: editingId.value,
+                }),
+                options,
+            );
+        } else {
+            form.post(window.route("catalog.shared-products.store"), options);
+        }
+    });
 }
 
 function confirmDestroy(row) {
@@ -153,9 +167,13 @@ function handleTableChange(pag) {
                 <a-input-search
                     v-model:value="search"
                     placeholder="Search by name or barcode"
-                    style="max-width: 280px"
+                    class="min-w-[100px] max-w-[300px]"
                 />
-                <a-button type="primary" @click="openCreate">
+                <a-button
+                    type="primary"
+                    class="bg-white border flex items-center border-green-500 text-green-500"
+                    @click="openCreate"
+                >
                     <template #icon>
                         <PlusSquareOutlined />
                     </template>
@@ -200,7 +218,7 @@ function handleTableChange(pag) {
         </ContentLayout>
 
         <a-modal
-            v-model:open="modalOpen"
+            v-model:visible="modalVisible"
             :title="editingId ? 'Edit shared product' : 'Add shared product'"
             ok-text="Save"
             :confirm-loading="form.processing"
@@ -211,7 +229,7 @@ function handleTableChange(pag) {
                     label="Barcode"
                     required
                     :validate-status="form.errors.barcode ? 'error' : ''"
-                    :help="form.errors.barcode"
+                    :help="form.errors.barcode || barcodeScanHint"
                 >
                     <a-input v-model:value="form.barcode" autocomplete="off" />
                 </a-form-item>
