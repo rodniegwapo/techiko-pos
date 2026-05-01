@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from "vue";
-import { Head, router } from "@inertiajs/vue3";
+import { Head, router, usePage } from "@inertiajs/vue3";
 import {
     IconPlus,
     IconReportMoney,
@@ -13,6 +13,7 @@ import { notification } from "ant-design-vue";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
 import ContentLayout from "@/Components/ContentLayout.vue";
+import CashLedgerPanel from "@/Pages/Wallet/partials/CashLedgerPanel.vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
@@ -21,6 +22,20 @@ import { useHelpers } from "@/Composables/useHelpers";
 const { getRoute } = useDomainRoutes();
 const { hasPermission } = usePermissionsV2();
 const { formattedTotal } = useHelpers();
+
+const page = usePage();
+
+/** @param {string} url */
+function queryObjectFromPageUrl(url) {
+    if (!url || typeof url !== "string") {
+        return {};
+    }
+    const idx = url.indexOf("?");
+    if (idx === -1) {
+        return {};
+    }
+    return Object.fromEntries(new URLSearchParams(url.slice(idx + 1)));
+}
 
 function firstValidationMessage(err) {
     const errors = err?.response?.data?.errors;
@@ -44,7 +59,37 @@ const props = defineProps({
         type: Object,
         default: () => ({ today_total: 0, yesterday_total: 0 }),
     },
+    ledger: {
+        type: Object,
+        default: null,
+    },
+    runningCashBalance: {
+        type: Number,
+        default: null,
+    },
 });
+
+const activeWalletTab = computed(() => {
+    const q = queryObjectFromPageUrl(page.url);
+    const tab = q.tab;
+    if (!props.ledger) {
+        return "card-types";
+    }
+    if (tab === "card-types") {
+        return "card-types";
+    }
+    return "ledger";
+});
+
+function onWalletTabChange(key) {
+    const base = queryObjectFromPageUrl(page.url);
+    base.tab = key;
+    router.get(getRoute("payment-card-types.index"), base, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+    });
+}
 
 const rows = computed(() => props.cardTypes ?? []);
 
@@ -101,7 +146,13 @@ async function save() {
         }
         closeModal();
         router.reload({
-            only: ["cardTypes", "walletCashTotals", "walletCreditTotals"],
+            only: [
+                "cardTypes",
+                "walletCashTotals",
+                "walletCreditTotals",
+                "ledger",
+                "runningCashBalance",
+            ],
         });
     } catch (e) {
         const msg = firstValidationMessage(e) || "Could not save card type.";
@@ -123,7 +174,13 @@ async function remove(row) {
         );
         notification.success({ message: "Done." });
         router.reload({
-            only: ["cardTypes", "walletCashTotals", "walletCreditTotals"],
+            only: [
+                "cardTypes",
+                "walletCashTotals",
+                "walletCreditTotals",
+                "ledger",
+                "runningCashBalance",
+            ],
         });
     } catch (e) {
         const msg = firstValidationMessage(e) || "Could not remove card type.";
@@ -253,12 +310,14 @@ function onMoneyTableChange(pag) {
         <Head title="Payment wallet" />
         <ContentHeader class="mb-8" title="Payment wallet" />
 
-        <div class="mb-6 grid max-w-7xl grid-cols-1 gap-4 sm:grid-cols-2">
+        <div
+            class="mb-6 grid max-w-7xl grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+        >
             <div
                 class="rounded-lg border border-gray-200 bg-white px-4 py-4 shadow-sm"
             >
                 <div class="text-base font-semibold text-gray-900">
-                    Cash on hand
+                    Paid cash sales
                 </div>
                 <div class="mb-3 text-xs text-gray-500">
                     Paid cash sales (by transaction date)
@@ -291,6 +350,22 @@ function onMoneyTableChange(pag) {
                             }}
                         </div>
                     </div>
+                </div>
+                <div
+                    v-if="ledger"
+                    class="mt-4 border-t border-gray-100 pt-3 text-xs leading-relaxed text-gray-600"
+                >
+                    <span class="font-medium text-gray-700"
+                        >Manual ledger net (today)</span
+                    >
+                    —
+                    <span class="tabular-nums font-semibold text-gray-900">{{
+                        formattedTotal(Number(ledger.todayManualNet) || 0)
+                    }}</span>
+                    <span class="mt-1 block text-[11px] text-gray-500">
+                        Ledger lines for today's calendar date only; not the
+                        same as paid cash sales above unless you reconcile.
+                    </span>
                 </div>
             </div>
             <div
@@ -331,90 +406,259 @@ function onMoneyTableChange(pag) {
                     </div>
                 </div>
             </div>
+
+            <div
+                v-if="ledger && runningCashBalance !== null"
+                class="rounded-lg border border-gray-200 bg-white px-4 py-4 shadow-sm"
+            >
+                <div class="text-base font-semibold text-gray-900">
+                    Running cash balance
+                </div>
+                <div class="mb-3 text-xs text-gray-500">
+                    Manual ledger running net (all time): cash in minus cash out
+                </div>
+                <div
+                    class="text-2xl font-bold tabular-nums"
+                    :class="
+                        Number(runningCashBalance) >= 0
+                            ? 'text-green-700'
+                            : 'text-red-700'
+                    "
+                >
+                    {{ formattedTotal(Number(runningCashBalance) || 0) }}
+                </div>
+                <p class="mt-2 text-xs text-gray-500">
+                    Includes owner withdrawals and adjustments from Money
+                    Movement.
+                </p>
+            </div>
         </div>
 
-        <ContentLayout title="Card payment types">
-            <template #filters>
-                <a-button
-                    v-if="hasPermission('payment-card-types.store')"
-                    type="primary"
-                    class="bg-white border flex items-center border-green-500 text-green-500"
-                    @click="openCreate"
-                >
-                    <template #icon>
-                        <IconPlus class="w-4 h-4" />
-                    </template>
-                    Add card type
-                </a-button>
-            </template>
-
-            <template #table>
-                <a-table
-                    :columns="columns"
-                    :data-source="rows"
-                    :pagination="false"
-                    row-key="id"
-                    :locale="{
-                        emptyText:
-                            'No card types yet. Add one to use Pay in Card on Sales.',
-                    }"
-                >
-                    <template #bodyCell="{ column, record }">
-                        <template v-if="column.key === 'is_active'">
-                            <a-tag
-                                :color="record.is_active ? 'green' : 'default'"
+        <div class="mt-10 max-w-7xl">
+            <a-tabs
+                v-if="ledger"
+                :activeKey="activeWalletTab"
+                size="large"
+                class="wallet-main-tabs"
+                @change="onWalletTabChange"
+            >
+                <a-tab-pane key="ledger" tab="Money movement">
+                    <CashLedgerPanel
+                        :movements="ledger.movements"
+                        :filters="ledger.filters"
+                        :ledger-balance="ledger.ledgerBalance"
+                        :rail-card-types="ledger.railCardTypes"
+                    />
+                </a-tab-pane>
+                <a-tab-pane key="card-types" tab="Payment card types">
+                    <ContentLayout title="Payment card types">
+                        <template #filters>
+                            <a-button
+                                v-if="
+                                    hasPermission('payment-card-types.store')
+                                "
+                                type="primary"
+                                class="bg-white border flex items-center border-green-500 text-green-500"
+                                @click="openCreate"
                             >
-                                {{ record.is_active ? "Active" : "Inactive" }}
-                            </a-tag>
+                                <template #icon>
+                                    <IconPlus class="w-4 h-4" />
+                                </template>
+                                Add card type
+                            </a-button>
                         </template>
-                        <template v-else-if="column.key === 'actions'">
-                            <a-space>
-                                <IconTooltipButton
-                                    v-if="
-                                        hasPermission(
-                                            'payment-card-types.money',
-                                        )
-                                    "
-                                    name="View money details"
-                                    hover="hover:bg-emerald-600"
-                                    @click="openMoneyDetails(record)"
-                                >
-                                    <IconReportMoney
-                                        size="20"
-                                        class="mx-auto"
-                                    />
-                                </IconTooltipButton>
-                                <IconTooltipButton
-                                    v-if="
-                                        hasPermission(
-                                            'payment-card-types.update',
-                                        )
-                                    "
-                                    name="Edit card type"
-                                    hover="hover:bg-blue-500"
-                                    @click="openEdit(record)"
-                                >
-                                    <IconEdit size="20" class="mx-auto" />
-                                </IconTooltipButton>
-                                <IconTooltipButton
-                                    v-if="
-                                        hasPermission(
-                                            'payment-card-types.destroy',
-                                        )
-                                    "
-                                    name="Remove card type"
-                                    hover="hover:bg-red-600"
-                                    :loading="deletingId === record.id"
-                                    @click="remove(record)"
-                                >
-                                    <IconTrash size="20" class="mx-auto" />
-                                </IconTooltipButton>
-                            </a-space>
+
+                        <template #table>
+                            <a-table
+                                :columns="columns"
+                                :data-source="rows"
+                                :pagination="false"
+                                row-key="id"
+                                :locale="{
+                                    emptyText:
+                                        'No card types yet. Add one to use Pay in Card on Sales.',
+                                }"
+                            >
+                                <template #bodyCell="{ column, record }">
+                                    <template
+                                        v-if="column.key === 'is_active'"
+                                    >
+                                        <a-tag
+                                            :color="
+                                                record.is_active
+                                                    ? 'green'
+                                                    : 'default'
+                                            "
+                                        >
+                                            {{
+                                                record.is_active
+                                                    ? 'Active'
+                                                    : 'Inactive'
+                                            }}
+                                        </a-tag>
+                                    </template>
+                                    <template
+                                        v-else-if="column.key === 'actions'"
+                                    >
+                                        <a-space>
+                                            <IconTooltipButton
+                                                v-if="
+                                                    hasPermission(
+                                                        'payment-card-types.money',
+                                                    )
+                                                "
+                                                name="View money details"
+                                                hover="hover:bg-emerald-600"
+                                                @click="
+                                                    openMoneyDetails(record)
+                                                "
+                                            >
+                                                <IconReportMoney
+                                                    size="20"
+                                                    class="mx-auto"
+                                                />
+                                            </IconTooltipButton>
+                                            <IconTooltipButton
+                                                v-if="
+                                                    hasPermission(
+                                                        'payment-card-types.update',
+                                                    )
+                                                "
+                                                name="Edit card type"
+                                                hover="hover:bg-blue-500"
+                                                @click="openEdit(record)"
+                                            >
+                                                <IconEdit
+                                                    size="20"
+                                                    class="mx-auto"
+                                                />
+                                            </IconTooltipButton>
+                                            <IconTooltipButton
+                                                v-if="
+                                                    hasPermission(
+                                                        'payment-card-types.destroy',
+                                                    )
+                                                "
+                                                name="Remove card type"
+                                                hover="hover:bg-red-600"
+                                                :loading="
+                                                    deletingId === record.id
+                                                "
+                                                @click="remove(record)"
+                                            >
+                                                <IconTrash
+                                                    size="20"
+                                                    class="mx-auto"
+                                                />
+                                            </IconTooltipButton>
+                                        </a-space>
+                                    </template>
+                                </template>
+                            </a-table>
                         </template>
+                    </ContentLayout>
+                </a-tab-pane>
+            </a-tabs>
+
+            <div v-else>
+                <ContentLayout title="Payment card types">
+                    <template #filters>
+                        <a-button
+                            v-if="hasPermission('payment-card-types.store')"
+                            type="primary"
+                            class="bg-white border flex items-center border-green-500 text-green-500"
+                            @click="openCreate"
+                        >
+                            <template #icon>
+                                <IconPlus class="w-4 h-4" />
+                            </template>
+                            Add card type
+                        </a-button>
                     </template>
-                </a-table>
-            </template>
-        </ContentLayout>
+
+                    <template #table>
+                        <a-table
+                            :columns="columns"
+                            :data-source="rows"
+                            :pagination="false"
+                            row-key="id"
+                            :locale="{
+                                emptyText:
+                                    'No card types yet. Add one to use Pay in Card on Sales.',
+                            }"
+                        >
+                            <template #bodyCell="{ column, record }">
+                                <template v-if="column.key === 'is_active'">
+                                    <a-tag
+                                        :color="
+                                            record.is_active
+                                                ? 'green'
+                                                : 'default'
+                                        "
+                                    >
+                                        {{
+                                            record.is_active
+                                                ? 'Active'
+                                                : 'Inactive'
+                                        }}
+                                    </a-tag>
+                                </template>
+                                <template v-else-if="column.key === 'actions'">
+                                    <a-space>
+                                        <IconTooltipButton
+                                            v-if="
+                                                hasPermission(
+                                                    'payment-card-types.money',
+                                                )
+                                            "
+                                            name="View money details"
+                                            hover="hover:bg-emerald-600"
+                                            @click="openMoneyDetails(record)"
+                                        >
+                                            <IconReportMoney
+                                                size="20"
+                                                class="mx-auto"
+                                            />
+                                        </IconTooltipButton>
+                                        <IconTooltipButton
+                                            v-if="
+                                                hasPermission(
+                                                    'payment-card-types.update',
+                                                )
+                                            "
+                                            name="Edit card type"
+                                            hover="hover:bg-blue-500"
+                                            @click="openEdit(record)"
+                                        >
+                                            <IconEdit
+                                                size="20"
+                                                class="mx-auto"
+                                            />
+                                        </IconTooltipButton>
+                                        <IconTooltipButton
+                                            v-if="
+                                                hasPermission(
+                                                    'payment-card-types.destroy',
+                                                )
+                                            "
+                                            name="Remove card type"
+                                            hover="hover:bg-red-600"
+                                            :loading="deletingId === record.id"
+                                            @click="remove(record)"
+                                        >
+                                            <IconTrash
+                                                size="20"
+                                                class="mx-auto"
+                                            />
+                                        </IconTooltipButton>
+                                    </a-space>
+                                </template>
+                            </template>
+                        </a-table>
+                    </template>
+                </ContentLayout>
+            </div>
+        </div>
 
         <a-modal
             v-model:visible="modalOpen"
