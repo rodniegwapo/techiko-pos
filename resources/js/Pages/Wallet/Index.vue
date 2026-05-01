@@ -1,6 +1,7 @@
 <script setup>
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, createVNode } from "vue";
 import { Head, router, usePage } from "@inertiajs/vue3";
+import { ExclamationCircleOutlined } from "@ant-design/icons-vue";
 import {
     IconPlus,
     IconReportMoney,
@@ -10,7 +11,7 @@ import {
     IconLockOpen,
 } from "@tabler/icons-vue";
 import axios from "axios";
-import { notification } from "ant-design-vue";
+import { Modal, notification } from "ant-design-vue";
 
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
@@ -376,7 +377,6 @@ const savingOpeningCash = ref(false);
 const savingCountedCash = ref(false);
 const endingShift = ref(false);
 const reopeningShift = ref(false);
-const showEndShiftWarning = ref(false);
 const countedCardRef = ref(null);
 
 const canManageCashControl = computed(
@@ -477,14 +477,21 @@ function onEndShiftClick() {
         !props.cashControl?.counted_cash &&
         props.cashControl?.counted_cash !== 0
     ) {
-        showEndShiftWarning.value = true;
+        Modal.confirm({
+            title: "Count cash first before End Shift",
+            icon: createVNode(ExclamationCircleOutlined),
+            content:
+                "Please submit counted cash for this date first. The next day opening cash is not filled automatically.",
+            okText: "Go to Submit Counted Cash",
+            cancelText: "Cancel",
+            onOk: goToSubmitCountedCash,
+        });
         return;
     }
     endShift();
 }
 
 function goToSubmitCountedCash() {
-    showEndShiftWarning.value = false;
     countedCardRef.value?.scrollIntoView({
         behavior: "smooth",
         block: "center",
@@ -766,23 +773,6 @@ async function reopenShift() {
                 </span>
             </div>
         </div>
-
-        <a-modal
-            v-model:visible="showEndShiftWarning"
-            title="Submit counted cash first"
-            ok-text="Go to Submit Counted Cash"
-            cancel-text="Cancel"
-            @ok="goToSubmitCountedCash"
-            @cancel="showEndShiftWarning = false"
-        >
-            <p class="text-sm text-gray-700">
-                End Shift requires counted cash first.
-            </p>
-            <p class="mt-2 text-xs text-gray-500">
-                There is no automatic fallback that sets expected cash as
-                opening cash.
-            </p>
-        </a-modal>
 
         <div
             class="mb-6 grid max-w-7xl grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-2"
