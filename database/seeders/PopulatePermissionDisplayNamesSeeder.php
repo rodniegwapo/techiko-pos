@@ -65,8 +65,8 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
             'catalog.shared-product-suggestions.accept' => 'Accept catalog suggestion',
             'catalog.shared-product-suggestions.reject' => 'Reject catalog suggestion',
 
-            'billing.gcash.index' => 'View GCash servicing payment',
-            'billing.gcash.store' => 'Submit GCash payment reference',
+            'billing.servicing.index' => 'View servicing billing',
+            'billing.servicing.manual_gcash' => 'Submit manual GCash payment reference',
 
             'billing.manual-payments.index' => 'View manual payment queue',
             'billing.manual-payments.approve' => 'Approve manual GCash payment',

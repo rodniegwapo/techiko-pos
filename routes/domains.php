@@ -24,6 +24,7 @@ use App\Http\Controllers\MandatoryDiscountController;
 use App\Http\Controllers\Products\DiscountController;
 use App\Http\Controllers\TerminalController;
 use App\Http\Controllers\VoidLogController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('domains/{domain:name_slug}')
@@ -34,8 +35,16 @@ Route::prefix('domains/{domain:name_slug}')
         Route::get('/settings', [DomainSettingsController::class, 'index'])->name('settings.index');
         Route::patch('/settings', [DomainSettingsController::class, 'update'])->name('settings.update');
 
-        Route::get('/billing/gcash', [ManualBillingController::class, 'index'])->name('billing.gcash.index');
-        Route::post('/billing/gcash', [ManualBillingController::class, 'store'])->name('billing.gcash.store');
+        Route::get('/billing/gcash', function (Request $request) {
+            $domain = $request->route('domain');
+
+            return redirect()->route('domains.billing.servicing.index', [
+                'domain' => is_string($domain) ? $domain : $domain->name_slug,
+            ], 302);
+        })->name('billing.gcash.legacy');
+
+        Route::get('/billing/servicing', [ManualBillingController::class, 'index'])->name('billing.servicing.index');
+        Route::post('/billing/servicing/manual-gcash', [ManualBillingController::class, 'store'])->name('billing.servicing.manual_gcash');
         Route::post('/billing/paymongo/qrph', [PayMongoQrPhController::class, 'store'])->name('billing.paymongo.qrph.store');
         Route::get('/billing/paymongo/status', [PayMongoQrPhController::class, 'status'])->name('billing.paymongo.status');
 

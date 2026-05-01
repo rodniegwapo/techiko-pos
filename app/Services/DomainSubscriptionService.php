@@ -98,7 +98,7 @@ class DomainSubscriptionService
             'max_users' => $maxUsers,
             'users_at_capacity' => $maxUsers !== null && $userCount >= $maxUsers,
             'free_product_limit' => self::FREE_TIER_MAX_PRODUCTS,
-            'billing_url' => route('domains.billing.gcash.index', ['domain' => $domain->name_slug]),
+            'billing_url' => route('domains.billing.servicing.index', ['domain' => $domain->name_slug]),
         ];
     }
 

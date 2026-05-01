@@ -17,7 +17,7 @@ class UserPermissionCheckMiddleware
         $user = Auth::user();
 
         // Redirect unauthenticated users to login
-        if (!$user) {
+        if (! $user) {
             return redirect()->route('login');
         }
 
@@ -30,13 +30,13 @@ class UserPermissionCheckMiddleware
         $routeName = $request->route()?->getName();
 
         // Domain validation for domain routes
-        if (str_starts_with($routeName, 'domains.')) {
+        if ($routeName !== null && str_starts_with($routeName, 'domains.')) {
             // Get domain from route parameter (not from route name)
             $routeDomain = $request->route('domain');
-            
+
             // Extract domain slug from route parameter (handle both string and model)
             $routeDomainSlug = is_string($routeDomain) ? $routeDomain : $routeDomain->name_slug;
-            
+
             // Check if user belongs to this domain
             if ($user->domain !== $routeDomainSlug) {
                 return $this->unauthorizedResponse($request);
@@ -44,7 +44,7 @@ class UserPermissionCheckMiddleware
         }
 
         // Check route permission
-        if (!$this->hasRoutePermission($user, $routeName)) {
+        if (! $this->hasRoutePermission($user, $routeName)) {
             return $this->unauthorizedResponse($request);
         }
 
@@ -63,6 +63,11 @@ class UserPermissionCheckMiddleware
 
         // Normalize domain routes to base routes for permission matching
         $permissionRoute = $this->normalizeRouteForPermission($routeName);
+
+        if ($permissionRoute === 'billing.gcash.legacy') {
+            $permissionRoute = 'billing.servicing.index';
+        }
+
         $permissions = $user->getAllPermissions();
 
         return $permissions->contains('route_name', $permissionRoute);
@@ -74,7 +79,7 @@ class UserPermissionCheckMiddleware
      */
     private function normalizeRouteForPermission(?string $routeName): string
     {
-        if (!$routeName) {
+        if (! $routeName) {
             return '';
         }
 

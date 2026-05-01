@@ -299,11 +299,11 @@ const menuItems = [
         domainOnly: true,
     },
     {
-        key: "billing-gcash",
+        key: "billing-servicing",
         title: "Servicing payment",
         icon: IconWallet,
-        routeName: "billing.gcash.index",
-        path: "/billing/gcash",
+        routeName: "billing.servicing.index",
+        path: "/billing/servicing",
         domainOnly: true,
     },
     {
