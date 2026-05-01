@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Http\Middleware\RoleBasedAccessControl;
 use App\Http\Middleware\UserPermissionCheckMiddleware;
 use App\Models\Domain;
+use App\Models\InventoryLocation;
 use App\Models\PaymentCardType;
 use App\Models\User;
 use App\Models\WalletCashMovement;
@@ -26,7 +27,7 @@ class WalletCashLedgerTest extends TestCase
     }
 
     /**
-     * @return array{domainA: Domain, domainB: Domain, cardA: PaymentCardType, cardB: PaymentCardType, user: User}
+     * @return array{domainA: Domain, domainB: Domain, locationA: InventoryLocation, locationA2: InventoryLocation, locationB: InventoryLocation, cardA: PaymentCardType, cardA2: PaymentCardType, cardB: PaymentCardType, user: User}
      */
     private function seedDomainsAndTypes(): array
     {
@@ -39,14 +40,48 @@ class WalletCashLedgerTest extends TestCase
             'name_slug' => 'org-b-'.Str::lower(Str::random(6)),
         ]);
 
+        $locationA = InventoryLocation::query()->create([
+            'domain' => $domainA->name_slug,
+            'name' => 'Org A Main',
+            'code' => 'A'.Str::upper(Str::random(4)),
+            'type' => 'store',
+            'is_active' => true,
+            'is_default' => true,
+        ]);
+        $locationA2 = InventoryLocation::query()->create([
+            'domain' => $domainA->name_slug,
+            'name' => 'Org A Branch',
+            'code' => 'B'.Str::upper(Str::random(4)),
+            'type' => 'store',
+            'is_active' => true,
+            'is_default' => false,
+        ]);
+        $locationB = InventoryLocation::query()->create([
+            'domain' => $domainB->name_slug,
+            'name' => 'Org B Main',
+            'code' => 'C'.Str::upper(Str::random(4)),
+            'type' => 'store',
+            'is_active' => true,
+            'is_default' => true,
+        ]);
+
         $cardA = PaymentCardType::query()->create([
             'domain' => $domainA->name_slug,
+            'location_id' => $locationA->id,
             'name' => 'GCash A',
+            'is_active' => true,
+            'sort_order' => 0,
+        ]);
+        $cardA2 = PaymentCardType::query()->create([
+            'domain' => $domainA->name_slug,
+            'location_id' => $locationA2->id,
+            'name' => 'Maya A2',
             'is_active' => true,
             'sort_order' => 0,
         ]);
         $cardB = PaymentCardType::query()->create([
             'domain' => $domainB->name_slug,
+            'location_id' => $locationB->id,
             'name' => 'GCash B',
             'is_active' => true,
             'sort_order' => 0,
@@ -54,9 +89,10 @@ class WalletCashLedgerTest extends TestCase
 
         $user = User::factory()->create([
             'domain' => $domainA->name_slug,
+            'location_id' => $locationA->id,
         ]);
 
-        return compact('domainA', 'domainB', 'cardA', 'cardB', 'user');
+        return compact('domainA', 'domainB', 'locationA', 'locationA2', 'locationB', 'cardA', 'cardA2', 'cardB', 'user');
     }
 
     public function test_store_movement_aborts_when_card_type_is_for_another_domain(): void
@@ -66,6 +102,7 @@ class WalletCashLedgerTest extends TestCase
         $url = route('domains.wallet-cash-ledger.store', ['domain' => $s['domainA']->name_slug]);
 
         $response = $this->actingAs($s['user'])->post($url, [
+            'location_id' => $s['locationA']->id,
             'direction' => 'in',
             'amount' => 150.50,
             'kind' => 'adjustment',
@@ -87,6 +124,7 @@ class WalletCashLedgerTest extends TestCase
         $response = $this->actingAs($s['user'])->from(route('domains.payment-card-types.index', [
             'domain' => $s['domainA']->name_slug,
         ]))->post($url, [
+            'location_id' => $s['locationA']->id,
             'direction' => 'in',
             'amount' => 100,
             'kind' => 'cash_sale_topup',
@@ -100,6 +138,7 @@ class WalletCashLedgerTest extends TestCase
         $row = WalletCashMovement::query()->first();
         $this->assertNotNull($row);
         $this->assertSame($s['domainA']->name_slug, $row->domain);
+        $this->assertSame($s['locationA']->id, $row->location_id);
         $this->assertSame($s['user']->id, $row->user_id);
         $this->assertSame('in', $row->direction);
         $this->assertSame($s['cardA']->id, $row->payment_card_type_id);
@@ -128,6 +167,7 @@ class WalletCashLedgerTest extends TestCase
         $url = route('domains.wallet-cash-ledger.store', ['domain' => $s['domainA']->name_slug]);
 
         $response = $this->actingAs($s['user'])->post($url, [
+            'location_id' => $s['locationA']->id,
             'direction' => 'out',
             'amount' => 50,
             'kind' => 'owner_draw',
@@ -149,6 +189,7 @@ class WalletCashLedgerTest extends TestCase
         $response = $this->actingAs($s['user'])->from(route('domains.payment-card-types.index', [
             'domain' => $s['domainA']->name_slug,
         ]))->post($url, [
+            'location_id' => $s['locationA']->id,
             'direction' => 'out',
             'amount' => 50,
             'kind' => 'owner_draw',
@@ -174,6 +215,7 @@ class WalletCashLedgerTest extends TestCase
         $url = route('domains.wallet-cash-ledger.store', ['domain' => $s['domainA']->name_slug]);
 
         $response = $this->actingAs($s['user'])->post($url, [
+            'location_id' => $s['locationA']->id,
             'direction' => 'out',
             'amount' => 10,
             'kind' => 'owner_draw',
@@ -193,6 +235,7 @@ class WalletCashLedgerTest extends TestCase
         $url = route('domains.wallet-cash-ledger.store', ['domain' => $s['domainA']->name_slug]);
 
         $response = $this->actingAs($s['user'])->post($url, [
+            'location_id' => $s['locationA']->id,
             'direction' => 'out',
             'amount' => 25,
             'kind' => 'owner_draw',
@@ -214,6 +257,7 @@ class WalletCashLedgerTest extends TestCase
         $url = route('domains.wallet-cash-ledger.store', ['domain' => $s['domainA']->name_slug]);
 
         $response = $this->actingAs($s['user'])->post($url, [
+            'location_id' => $s['locationA']->id,
             'direction' => 'out',
             'amount' => 10,
             'kind' => 'owner_draw',
@@ -223,6 +267,25 @@ class WalletCashLedgerTest extends TestCase
         ]);
 
         $response->assertSessionHasErrors(['payment_card_type_id']);
+        $this->assertSame(0, WalletCashMovement::query()->count());
+    }
+
+    public function test_store_movement_aborts_when_card_type_is_for_another_location_same_domain(): void
+    {
+        $s = $this->seedDomainsAndTypes();
+
+        $url = route('domains.wallet-cash-ledger.store', ['domain' => $s['domainA']->name_slug]);
+
+        $response = $this->actingAs($s['user'])->post($url, [
+            'location_id' => $s['locationA']->id,
+            'direction' => 'in',
+            'amount' => 75,
+            'kind' => 'adjustment',
+            'payment_card_type_id' => $s['cardA2']->id,
+            'movement_date' => now()->toDateString(),
+        ]);
+
+        $response->assertForbidden();
         $this->assertSame(0, WalletCashMovement::query()->count());
     }
 }

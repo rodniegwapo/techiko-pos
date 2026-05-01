@@ -7,6 +7,7 @@ use App\Models\Domain;
 use App\Models\PaymentCardType;
 use App\Models\WalletCashMovement;
 use App\Support\Wallet\WalletLedgerViewData;
+use App\Support\Wallet\WalletLocationResolver;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -23,6 +24,8 @@ class WalletCashMovementController extends Controller
 
     public function store(Request $request, Domain $domain)
     {
+        $location = WalletLocationResolver::resolve($request, $domain);
+
         $validated = $request->validate([
             'direction' => ['required', 'string', 'in:in,out'],
             'amount' => ['required', 'numeric', 'min:0.01', 'max:99999999.99'],
@@ -58,11 +61,12 @@ class WalletCashMovementController extends Controller
 
         if ($paymentCardTypeId !== null) {
             $type = PaymentCardType::query()->findOrFail((int) $paymentCardTypeId);
-            WalletLedgerViewData::ensureCardTypeInDomain($domain, $type);
+            WalletLedgerViewData::ensureCardTypeInDomainLocation($domain, $location, $type);
         }
 
         WalletCashMovement::query()->create([
             'domain' => $domain->name_slug,
+            'location_id' => $location->id,
             'payment_card_type_id' => $paymentCardTypeId,
             'direction' => $validated['direction'],
             'amount' => $validated['amount'],
