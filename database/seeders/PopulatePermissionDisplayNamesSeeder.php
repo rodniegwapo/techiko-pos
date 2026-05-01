@@ -150,6 +150,9 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
             'payment-card-types.destroy' => 'Delete Card Payment Type',
             'payment-card-types.money' => 'View Card Payment Money Details',
 
+            'wallet-cash-ledger.index' => 'View cash ledger',
+            'wallet-cash-ledger.store' => 'Record cash ledger entry',
+
             'vat-report.index' => 'View VAT Report',
 
             // Customers

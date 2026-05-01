@@ -20,6 +20,7 @@ use App\Http\Controllers\Domains\SharedCatalogLookupController;
 use App\Http\Controllers\Domains\UserController;
 use App\Http\Controllers\Domains\UserPinController;
 use App\Http\Controllers\Domains\VatReportController;
+use App\Http\Controllers\Domains\WalletCashMovementController;
 use App\Http\Controllers\MandatoryDiscountController;
 use App\Http\Controllers\Products\DiscountController;
 use App\Http\Controllers\TerminalController;
@@ -171,6 +172,11 @@ Route::prefix('domains/{domain:name_slug}')
             Route::get('/{paymentCardType}/money', [PaymentCardTypeController::class, 'money'])->name('money');
             Route::put('/{paymentCardType}', [PaymentCardTypeController::class, 'update'])->name('update');
             Route::delete('/{paymentCardType}', [PaymentCardTypeController::class, 'destroy'])->name('destroy');
+        });
+
+        Route::prefix('wallet/cash-ledger')->name('wallet-cash-ledger.')->group(function () {
+            Route::get('/', [WalletCashMovementController::class, 'index'])->name('index');
+            Route::post('/', [WalletCashMovementController::class, 'store'])->name('store');
         });
 
         // Credit Management (Organization-specific)

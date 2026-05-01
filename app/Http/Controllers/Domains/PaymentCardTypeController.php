@@ -6,6 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Domain;
 use App\Models\PaymentCardType;
 use App\Models\Sale;
+use App\Support\Wallet\WalletLedgerViewData;
+use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -19,11 +22,26 @@ class PaymentCardTypeController extends Controller
             ->orderBy('name')
             ->get();
 
-        return Inertia::render('Wallet/Index', [
+        $walletCashTotals = $this->paidSalesTotalsByPaymentMethod($domain, 'cash');
+        $walletCreditTotals = $this->paidSalesTotalsByPaymentMethod($domain, 'credit');
+
+        $props = [
             'cardTypes' => $types,
-            'walletCashTotals' => $this->paidSalesTotalsByPaymentMethod($domain, 'cash'),
-            'walletCreditTotals' => $this->paidSalesTotalsByPaymentMethod($domain, 'credit'),
-        ]);
+            'walletCashTotals' => $walletCashTotals,
+            'walletCreditTotals' => $walletCreditTotals,
+            'ledger' => null,
+            'runningCashBalance' => null,
+        ];
+
+        if ($request->user()->hasPermissionToRoute('wallet-cash-ledger.index')) {
+            $ledger = WalletLedgerViewData::buildPaginated($request, $domain);
+            $today = now()->toDateString();
+            $ledger['todayManualNet'] = WalletLedgerViewData::todayManualNet($domain, $today);
+            $props['ledger'] = $ledger;
+            $props['runningCashBalance'] = WalletLedgerViewData::runningCashBalance($domain);
+        }
+
+        return Inertia::render('Wallet/Index', $props);
     }
 
     /**
@@ -141,8 +159,8 @@ class PaymentCardTypeController extends Controller
         $history->setCollection(
             $history->getCollection()->map(function (Sale $sale) {
                 $ts = $sale->transaction_date;
-                if ($ts && ! $ts instanceof \Carbon\CarbonInterface) {
-                    $ts = \Carbon\Carbon::parse($ts);
+                if ($ts && ! $ts instanceof CarbonInterface) {
+                    $ts = Carbon::parse($ts);
                 }
 
                 return [
