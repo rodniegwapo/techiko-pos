@@ -113,6 +113,20 @@ const productsAtCapacity = computed(
     () => props.subscription?.products_at_capacity === true,
 );
 
+/**
+ * Allow only digits and a single decimal point.
+ * This prevents characters like letters, spaces, and scientific notation.
+ */
+function decimalParser(value) {
+    const raw = String(value ?? "");
+    const cleaned = raw.replace(/[^\d.]/g, "");
+    const parts = cleaned.split(".");
+    if (parts.length <= 1) {
+        return cleaned;
+    }
+    return `${parts[0]}.${parts.slice(1).join("")}`;
+}
+
 const domainOptions = computed(() => {
     const list = Array.isArray(page?.props?.domains) ? page.props.domains : [];
     return list.map((item) => ({ label: item.name, value: item.name_slug }));
@@ -122,6 +136,10 @@ const handleSave = () => {
     form.post(getRoute("products.store"), {
         onSuccess: () => {
             message.success("Product created successfully");
+            form.reset();
+            form.clearErrors();
+            sharedCategoryHint.value = "";
+            barcodeLookupNonce.value += 1;
         },
         onError: (errors) => {
             const planMsg = errors?.plan;
@@ -233,6 +251,7 @@ useBarcodeScanner((code) => {
                                     placeholder="Enter cost"
                                     :min="0"
                                     :precision="2"
+                                    :parser="decimalParser"
                                     style="width: 100%"
                                     size="large"
                                 />
@@ -251,6 +270,7 @@ useBarcodeScanner((code) => {
                                     placeholder="Enter price"
                                     :min="0"
                                     :precision="2"
+                                    :parser="decimalParser"
                                     style="width: 100%"
                                     size="large"
                                 />
