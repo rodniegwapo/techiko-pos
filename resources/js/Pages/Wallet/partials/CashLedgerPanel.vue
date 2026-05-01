@@ -40,6 +40,7 @@ const { hasPermission } = usePermissionsV2();
 const { formattedTotal } = useHelpers();
 
 const page = usePage();
+const todayYmd = new Date().toISOString().slice(0, 10);
 
 function tabQueryFromUrl() {
     const url = page.url;
@@ -629,6 +630,7 @@ watch(
                     <input
                         v-model="entryForm.movement_date"
                         type="date"
+                        :max="todayYmd"
                         class="w-full rounded border border-gray-300 px-2 py-2 text-sm"
                     >
                 </div>
