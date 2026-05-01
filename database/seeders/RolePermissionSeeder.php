@@ -260,9 +260,9 @@ class RolePermissionSeeder extends Seeder
             'catalog.shared-product-suggestions.accept',
             'catalog.shared-product-suggestions.reject',
 
-            // Domain manual GCash servicing (tenant UI)
-            'billing.gcash.index',
-            'billing.gcash.store',
+            // Domain servicing billing (tenant UI)
+            'billing.servicing.index',
+            'billing.servicing.manual_gcash',
 
             // Global manual payment review (super)
             'billing.manual-payments.index',
@@ -349,8 +349,8 @@ class RolePermissionSeeder extends Seeder
             'sales.offline-catalog',
             'settings.index',
             'settings.update',
-            'billing.gcash.index',
-            'billing.gcash.store',
+            'billing.servicing.index',
+            'billing.servicing.manual_gcash',
             'payment-card-types.index',
             'payment-card-types.list',
             'payment-card-types.store',
@@ -545,8 +545,8 @@ class RolePermissionSeeder extends Seeder
             'sales.offline-catalog',
             'settings.index',
             'settings.update',
-            'billing.gcash.index',
-            'billing.gcash.store',
+            'billing.servicing.index',
+            'billing.servicing.manual_gcash',
             'payment-card-types.index',
             'payment-card-types.list',
             'payment-card-types.store',

@@ -1,11 +1,6 @@
 <script setup>
-import {
-    computed,
-    watch,
-    onBeforeUnmount,
-} from "vue";
-import { Head, useForm, usePage, router } from "@inertiajs/vue3";
-import axios from "axios";
+import { computed, watch } from "vue";
+import { Head, useForm, usePage } from "@inertiajs/vue3";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
 import ContentLayout from "@/Components/ContentLayout.vue";
@@ -13,6 +8,7 @@ import ManualGcashDesktopQrAside from "@/Pages/Billing/ManualGcashDesktopQrAside
 import ManualGcashPayment from "@/Pages/Billing/ManualGcashPayment.vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { message } from "ant-design-vue";
+import { IconCheck } from "@tabler/icons-vue";
 
 const props = defineProps({
     tiers: { type: Array, default: () => [] },
@@ -23,17 +19,13 @@ const props = defineProps({
         type: Object,
         default: null,
     },
-    paymongoQr: {
-        type: Object,
-        default: null,
-    },
-    paymongoConfigured: {
-        type: Boolean,
-        default: false,
-    },
     showManualGcash: {
         type: Boolean,
         default: false,
+    },
+    freeTier: {
+        type: Object,
+        default: null,
     },
 });
 
@@ -45,22 +37,15 @@ const form = useForm({
     gcash_reference: "",
 });
 
-const qrphForm = useForm({
-    service_tier_id: null,
-});
-
-const hasTiers = computed(() => Array.isArray(props.tiers) && props.tiers.length > 0);
+const hasTiers = computed(
+    () => Array.isArray(props.tiers) && props.tiers.length > 0,
+);
 
 const selectedTier = computed(() =>
     props.tiers.find((t) => t.id === form.service_tier_id),
 );
 
-const selectedTierUsesBundleQrPh = computed(
-    () => !!selectedTier.value?.uses_vite_bundle_qrph,
-);
-
 const qrSrc = computed(() => {
-    const p = props.gcashQrUrl || "";
     if (p.startsWith("http")) {
         return p;
     }
@@ -73,23 +58,65 @@ const showPlaceholderQrNotice = computed(
         String(props.gcashQrUrl || "").includes("gcash-qr.svg"),
 );
 
-const paymongoExpiresLabel = computed(() => {
-    const raw = props.paymongoQr?.expires_at;
-    if (!raw) {
-        return "Pay within a few minutes—QR Ph codes expire quickly.";
-    }
-    const d = new Date(raw);
-    if (Number.isNaN(d.getTime())) {
-        return "Pay within a few minutes—QR Ph codes expire quickly.";
-    }
-    return `Pay before ${d.toLocaleString(undefined, {
-        dateStyle: "medium",
-        timeStyle: "short",
-    })}`;
-});
-
 const hasBundledQrPhOffered = computed(() =>
     props.tiers.some((t) => t.uses_vite_bundle_qrph),
+);
+
+const bundledQrTier = computed(
+    () => props.tiers.find((t) => t.uses_vite_bundle_qrph) ?? null,
+);
+
+/** One paid tier flagged like Pricing “Most popular” (bundled/basic first, else lowest sort_order then amount). */
+const popularTierId = computed(() => {
+    const bundled = props.tiers.find((t) => t.uses_vite_bundle_qrph);
+    if (bundled) {
+        return bundled.id;
+    }
+    if (!props.tiers.length) {
+        return null;
+    }
+    return (
+        [...props.tiers].sort((a, b) => {
+            const ao = Number(a.sort_order ?? 0);
+            const bo = Number(b.sort_order ?? 0);
+            if (ao !== bo) return ao - bo;
+            return Number(a.amount) - Number(b.amount);
+        })[0]?.id ?? null
+    );
+});
+
+function isPopularTier(tier) {
+    return popularTierId.value != null && tier.id === popularTierId.value;
+}
+
+const servicingPriceFootnote = computed(() => "One-time servicing · PHP");
+
+const planCardSlots = computed(() => {
+    let n = props.tiers.length;
+    if (props.freeTier) {
+        n += 1;
+    }
+    return n;
+});
+
+/** Match Marketing/Pricing grid rhythm: narrow column on mobile, 3 cols when Total ≤ 3. */
+const plansGridClass = computed(() => {
+    const n = planCardSlots.value;
+    const base =
+        "grid gap-8 w-full max-md:mx-auto max-md:max-w-md md:max-w-none";
+    if (n <= 1) {
+        return `${base} grid-cols-1`;
+    }
+    if (n <= 3) {
+        return `${base} grid-cols-1 md:grid-cols-3`;
+    }
+    return `${base} grid-cols-1 sm:grid-cols-2 xl:grid-cols-4`;
+});
+
+const selectedTierAmountFormatted = computed(() =>
+    selectedTier.value != null
+        ? Number(selectedTier.value.amount).toFixed(2)
+        : "",
 );
 
 const stepCurrentGcash = computed(() => {
@@ -102,7 +129,9 @@ const stepCurrentGcash = computed(() => {
     return 2;
 });
 
-const stepCurrentQrPh = computed(() => (form.service_tier_id ? 1 : 0));
+const stepCurrentQrPh = computed(() =>
+    form.service_tier_id || bundledQrTier.value ? 1 : 0,
+);
 
 watch(
     () => page.props.flash?.success,
@@ -118,15 +147,49 @@ function selectTier(id) {
     form.service_tier_id = id;
 }
 
+const freeTierMarketing = computed(
+    () => props.freeTier?.marketing_features ?? [],
+);
+
+const freeTierSubLabel = computed(() => {
+    if (!props.subscription) {
+        return "Included when you join an organization.";
+    }
+    if (props.subscription.is_paid) {
+        return "Starter baseline—not selectable. Use paid tiers below for servicing checkout.";
+    }
+    return "Your current tier. Upgrade anytime using a paid plan.";
+});
+
 function tierCardClasses(tier) {
-    const active = form.service_tier_id === tier.id;
+    const selected = form.service_tier_id === tier.id;
+    const popular = isPopularTier(tier);
+    const base = [
+        "relative flex h-full min-h-full flex-col rounded-2xl border p-6 text-left outline-none transition-all md:p-8",
+        "cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2",
+    ];
+
+    if (selected) {
+        return [
+            ...base,
+            "border border-gray-200 border-t-4 border-t-teal-500 bg-white shadow-lg ring-2 ring-blue-500/15",
+        ];
+    }
+    if (popular) {
+        return [
+            ...base,
+            "border border-gray-200 border-t-4 border-t-teal-500 bg-white shadow-lg hover:shadow-xl",
+        ];
+    }
+
     return [
-        "rounded-xl border-2 p-4 cursor-pointer transition-all text-left outline-none",
-        active
-            ? "border-green-600 ring-2 ring-green-600/25 bg-green-50/60 shadow-sm"
-            : "border-gray-200 hover:border-gray-300 hover:bg-gray-50/80",
+        ...base,
+        "border border-gray-200 bg-gray-50 shadow-sm hover:border-blue-200 hover:shadow-md",
     ];
 }
+
+const qrPhPanelClass =
+    "rounded-2xl border border-gray-200 border-t-4 border-t-teal-500 bg-white/90 shadow-sm space-y-3 p-6";
 
 function tierLimitsLabel(tier) {
     const parts = [];
@@ -143,77 +206,11 @@ function tierLimitsLabel(tier) {
     return parts.join(" · ");
 }
 
-function startPaymongoQrph() {
-    if (!form.service_tier_id || !hasTiers.value) {
-        message.warning("Select a plan first.");
-        return;
-    }
-    if (selectedTierUsesBundleQrPh.value) {
-        return;
-    }
-    qrphForm.service_tier_id = form.service_tier_id;
-    qrphForm.post(getRoute("billing.paymongo.qrph.store"), {
-        preserveScroll: true,
-        preserveState: "errors",
-        onSuccess: () => {
-            qrphForm.clearErrors();
-        },
-    });
-}
-
-let paymongoPollTimer = null;
-
-function clearPaymongoPoll() {
-    if (paymongoPollTimer !== null) {
-        clearInterval(paymongoPollTimer);
-        paymongoPollTimer = null;
-    }
-}
-
-watch(
-    () => ({
-        pid: props.paymongoQr?.payment_intent_id,
-        bundle: selectedTierUsesBundleQrPh.value,
-    }),
-    ({ pid, bundle }) => {
-        clearPaymongoPoll();
-        if (!pid || bundle) {
-            return;
-        }
-        paymongoPollTimer = setInterval(async () => {
-            try {
-                const { data } = await axios.get(
-                    getRoute("billing.paymongo.status"),
-                    {
-                        params: { payment_intent_id: pid },
-                        headers: { Accept: "application/json" },
-                        withCredentials: true,
-                    },
-                );
-                if (data.paid) {
-                    clearPaymongoPoll();
-                    message.success("Payment confirmed. Your plan is active.");
-                    router.reload({
-                        only: ["subscription", "paymongoQr", "flash"],
-                    });
-                }
-            } catch {
-                /* ignore transient errors */
-            }
-        }, 4000);
-    },
-    { immediate: true },
-);
-
-onBeforeUnmount(() => {
-    clearPaymongoPoll();
-});
-
 function submit() {
     if (!hasTiers.value) {
         return;
     }
-    form.post(getRoute("billing.gcash.store"), {
+    form.post(getRoute("billing.servicing.manual_gcash"), {
         preserveScroll: true,
         onSuccess: () => {
             form.reset("gcash_reference");
@@ -221,6 +218,25 @@ function submit() {
         },
     });
 }
+
+const freeTierBadge = computed(() => {
+    if (!props.subscription) {
+        return {
+            label: "Included with signup",
+            pillClass: "bg-slate-200 text-slate-800",
+        };
+    }
+    if (props.subscription.is_paid) {
+        return {
+            label: "Starter baseline",
+            pillClass: "bg-slate-200 text-slate-600",
+        };
+    }
+    return {
+        label: "Current tier",
+        pillClass: "bg-emerald-100 text-emerald-900",
+    };
+});
 
 const referenceHelp = computed(() => {
     if (form.errors.gcash_reference) {
@@ -232,23 +248,34 @@ const referenceHelp = computed(() => {
 
 <template>
     <AuthenticatedLayout>
-        <Head title="Servicing payment" />
-        <ContentHeader class="mb-8" title="Servicing payment" />
-        <ContentLayout
-            :title="currentDomain?.name || 'Organization'"
-        >
+        <Head title="Servicing plans & payment" />
+        <ContentHeader class="mb-2" title="Servicing plans & payment" />
+        <p class="mb-6 text-sm text-gray-600 max-w-2xl -mt-2">
+            Upgrade your servicing subscription for higher limits and features.
+            Techiko POS includes basic inventory, utang (basic), and wallet,
+            with a
+            <strong>30-day full-feature trial</strong> for qualifying
+            organizations.
+        </p>
+        <ContentLayout :title="currentDomain?.name || 'Organization'">
             <template #table>
-                <div class="max-w-5xl mx-auto px-2 sm:px-4 py-2 pb-8 space-y-6">
-                    <p class="text-sm text-gray-500 -mt-1">
+                <div
+                    class="max-w-6xl mx-auto px-2 sm:px-4 py-2 pb-10 space-y-8"
+                >
+                    <div
+                        class="text-sm text-gray-600 leading-relaxed border-l-4 border-teal-600/80 pl-4 py-2 bg-teal-50/40 rounded-r-lg"
+                    >
                         <template v-if="showManualGcash">
-                            Automated QR Ph (PayMongo) or GCash manual payment · amounts
-                            must match your selected plan
+                            Scan the merchant QR below for Basic, or submit a
+                            manual GCash receipt reference. Amounts must match
+                            the plan you selected.
                         </template>
                         <template v-else>
-                            PayMongo QR Ph servicing · select a plan, then generate
-                            a QR Ph code to complete payment securely.
+                            Paid tiers unlock limits after verified payment.
+                            Basic can use the static merchant QR shown on this
+                            page—it does not expire.
                         </template>
-                    </p>
+                    </div>
 
                     <a-steps
                         v-if="showManualGcash"
@@ -261,7 +288,7 @@ const referenceHelp = computed(() => {
                         <a-step title="Submit reference" />
                     </a-steps>
                     <a-steps
-                        v-else-if="paymongoConfigured || hasBundledQrPhOffered"
+                        v-else-if="hasBundledQrPhOffered"
                         size="small"
                         :current="stepCurrentQrPh"
                         class="[&_.ant-steps-item-title]:text-sm"
@@ -279,213 +306,315 @@ const referenceHelp = computed(() => {
                         class="mb-2"
                     />
 
-                    <a-alert
+                    <div
                         v-if="subscription"
-                        type="info"
-                        show-icon
-                        class="mb-2"
+                        class="rounded-lg border border-gray-200 bg-white px-5 py-4 shadow-sm text-sm text-gray-800"
                     >
-                        <template #message>Your organization</template>
-                        <template #description>
+                        <p class="font-semibold text-gray-900 mb-1">
+                            Current usage
+                        </p>
+                        <p>
                             <span v-if="subscription.is_paid">
-                                Active plan: <strong>{{ subscription.tier_name }}</strong>.
+                                Active servicing plan:
+                                <strong>{{ subscription.tier_name }}</strong
+                                >.
                             </span>
                             <span v-else>
                                 Free tier: up to
-                                <strong>{{ subscription.free_product_limit }}</strong>
-                                products until you subscribe.
+                                <strong>{{
+                                    subscription.free_product_limit
+                                }}</strong>
+                                products until you subscribe to a paid plan.
                             </span>
-                            <span class="block mt-1 text-gray-600">
-                                Products: {{ subscription.product_count }}
-                                <template v-if="subscription.max_products != null">
-                                    / {{ subscription.max_products }}
-                                </template>
-                                · Users:
-                                {{ subscription.user_count }}
-                                <template v-if="subscription.max_users != null">
-                                    / {{ subscription.max_users }}
-                                </template>
-                            </span>
-                        </template>
-                    </a-alert>
+                        </p>
+                        <p class="mt-2 text-xs text-gray-600">
+                            Products: {{ subscription.product_count }}
+                            <template v-if="subscription.max_products != null">
+                                / {{ subscription.max_products }}
+                            </template>
+                            · Users:
+                            {{ subscription.user_count }}
+                            <template v-if="subscription.max_users != null">
+                                / {{ subscription.max_users }}
+                            </template>
+                        </p>
+                    </div>
 
                     <div
                         class="grid grid-cols-1 items-start gap-10"
                         :class="{ 'lg:grid-cols-2 lg:gap-10': showManualGcash }"
                     >
-                        <div class="space-y-6 min-w-0">
-                            <div>
+                        <div class="space-y-8 min-w-0">
+                            <section
+                                class="border border-gray-200 bg-white py-8 md:py-10 px-3 sm:px-6 rounded-xl shadow-sm"
+                                aria-labelledby="servicing-plans-heading"
+                            >
                                 <h2
-                                    class="text-base font-semibold text-gray-800 mb-3"
+                                    id="servicing-plans-heading"
+                                    class="text-xl font-bold tracking-tight text-gray-800 md:text-2xl"
                                 >
-                                    Select a plan
+                                    Plans & pricing
                                 </h2>
-                                <div
-                                    class="grid grid-cols-1 sm:grid-cols-2 gap-3"
+                                <p
+                                    class="mt-3 max-w-2xl text-sm text-gray-600 md:text-base"
                                 >
+                                    Free starter is included; paid servicing
+                                    tiers unlock higher limits below. Select a
+                                    tier to continue (merchant QR and/or manual
+                                    reference, depending on setup).
+                                </p>
+
+                                <div :class="['mt-8 md:mt-10', plansGridClass]">
+                                    <div
+                                        v-if="freeTier"
+                                        class="relative mx-auto w-full flex flex-col rounded-2xl border border-gray-200 bg-gray-50 p-6 text-left opacity-95 pointer-events-none select-none md:p-8"
+                                        aria-disabled="true"
+                                        role="presentation"
+                                    >
+                                        <div
+                                            class="flex flex-wrap items-start justify-between gap-2"
+                                        >
+                                            <h3
+                                                class="text-lg font-bold text-gray-800"
+                                            >
+                                                Free starter
+                                            </h3>
+                                            <span
+                                                class="rounded-full px-3 py-1 text-xs font-semibold shrink-0"
+                                                :class="freeTierBadge.pillClass"
+                                            >
+                                                {{ freeTierBadge.label }}
+                                            </span>
+                                        </div>
+                                        <div class="mt-2 space-y-1">
+                                            <p
+                                                class="flex flex-wrap items-baseline gap-x-1.5"
+                                            >
+                                                <span
+                                                    class="text-3xl font-bold tabular-nums tracking-tight text-gray-800"
+                                                    >{{ currencySymbol }}0<span
+                                                        class="text-base font-semibold text-gray-600"
+                                                        >.00</span
+                                                    ></span
+                                                >
+                                            </p>
+                                            <p class="text-sm text-gray-500">
+                                                {{ servicingPriceFootnote }}
+                                            </p>
+                                            <p
+                                                class="text-sm text-gray-600 leading-snug"
+                                            >
+                                                {{ freeTierSubLabel }}
+                                            </p>
+                                            <p
+                                                class="text-xs text-gray-500 pt-1"
+                                            >
+                                                Cap:
+                                                {{
+                                                    freeTier.product_limit ??
+                                                    subscription?.free_product_limit
+                                                }}
+                                                products · utang/wallet basics
+                                            </p>
+                                        </div>
+                                        <ul
+                                            v-if="freeTierMarketing.length"
+                                            class="mt-6 flex flex-1 flex-col gap-3 border-t border-gray-200 pt-6 text-sm text-gray-600 list-none m-0"
+                                        >
+                                            <li
+                                                v-for="(
+                                                    line, fx
+                                                ) in freeTierMarketing"
+                                                :key="fx"
+                                                class="flex gap-2"
+                                            >
+                                                <IconCheck
+                                                    :size="20"
+                                                    :strokeWidth="1.75"
+                                                    class="mt-0.5 shrink-0 text-teal-600"
+                                                    aria-hidden="true"
+                                                />
+                                                <span>{{ line }}</span>
+                                            </li>
+                                        </ul>
+                                    </div>
                                     <div
                                         v-for="tier in tiers"
                                         :key="tier.id"
-                                        role="button"
-                                        tabindex="0"
-                                        :class="tierCardClasses(tier)"
-                                        @click="selectTier(tier.id)"
-                                        @keydown.enter.prevent="selectTier(tier.id)"
+                                        class="mx-auto w-full"
                                     >
                                         <div
-                                            class="flex items-start justify-between gap-2"
+                                            role="button"
+                                            tabindex="0"
+                                            :class="tierCardClasses(tier)"
+                                            @click="selectTier(tier.id)"
+                                            @keydown.enter.prevent="
+                                                selectTier(tier.id)
+                                            "
                                         >
-                                            <span
-                                                class="font-medium text-gray-900 leading-snug"
-                                                >{{ tier.name }}</span
+                                            <p
+                                                v-if="isPopularTier(tier)"
+                                                class="mb-2 self-start rounded-full bg-gradient-to-r from-blue-600 to-teal-500 px-3 py-1 text-xs font-semibold text-white"
                                             >
-                                            <span
-                                                v-if="form.service_tier_id === tier.id"
-                                                class="text-green-600 text-lg leading-none"
-                                                aria-hidden="true"
-                                                >✓</span
+                                                Most popular
+                                            </p>
+                                            <div
+                                                class="flex items-start justify-between gap-2"
                                             >
+                                                <h3
+                                                    class="text-lg font-bold text-gray-800 leading-snug"
+                                                >
+                                                    {{ tier.name }}
+                                                </h3>
+                                                <IconCheck
+                                                    v-if="
+                                                        form.service_tier_id ===
+                                                        tier.id
+                                                    "
+                                                    :size="22"
+                                                    :strokeWidth="2"
+                                                    class="mt-1 shrink-0 text-teal-600"
+                                                    aria-hidden="false"
+                                                    aria-label="Selected plan"
+                                                />
+                                            </div>
+                                            <p
+                                                v-if="
+                                                    form.service_tier_id ===
+                                                    tier.id
+                                                "
+                                                class="mt-1 text-xs font-semibold text-teal-700"
+                                            >
+                                                Selected plan
+                                            </p>
+                                            <div class="mt-2 space-y-1">
+                                                <p
+                                                    class="flex flex-wrap items-baseline gap-x-1.5"
+                                                >
+                                                    <span
+                                                        class="text-3xl font-bold tabular-nums tracking-tight text-gray-800"
+                                                        >{{ currencySymbol
+                                                        }}{{
+                                                            Number(
+                                                                tier.amount,
+                                                            ).toFixed(2)
+                                                        }}</span
+                                                    >
+                                                </p>
+                                                <p
+                                                    class="text-sm text-gray-500"
+                                                >
+                                                    {{ servicingPriceFootnote }}
+                                                </p>
+                                                <p
+                                                    class="text-sm text-gray-600 leading-snug"
+                                                >
+                                                    {{ tierLimitsLabel(tier) }}
+                                                </p>
+                                            </div>
+                                            <ul
+                                                v-if="
+                                                    (
+                                                        tier.marketing_features ??
+                                                        []
+                                                    ).length
+                                                "
+                                                class="mt-6 flex flex-1 flex-col gap-3 border-t border-gray-200 pt-6 text-sm text-gray-600 list-none m-0"
+                                            >
+                                                <li
+                                                    v-for="(
+                                                        line, fIdx
+                                                    ) in tier.marketing_features"
+                                                    :key="fIdx"
+                                                    class="flex gap-2"
+                                                >
+                                                    <IconCheck
+                                                        :size="20"
+                                                        :strokeWidth="1.75"
+                                                        class="mt-0.5 shrink-0 text-teal-600"
+                                                        aria-hidden="true"
+                                                    />
+                                                    <span>{{ line }}</span>
+                                                </li>
+                                            </ul>
                                         </div>
-                                        <p
-                                            class="mt-2 text-2xl font-semibold tabular-nums text-green-700"
-                                        >
-                                            {{ currencySymbol
-                                            }}{{
-                                                Number(tier.amount).toFixed(2)
-                                            }}
-                                        </p>
-                                        <p
-                                            class="mt-2 text-xs text-gray-600 leading-snug"
-                                        >
-                                            {{ tierLimitsLabel(tier) }}
-                                        </p>
                                     </div>
                                 </div>
                                 <p
+                                    class="mt-8 text-center text-sm text-gray-500"
+                                >
+                                    Servicing amounts in Philippine Pesos (PHP).
+                                </p>
+                                <p
                                     v-if="form.errors.service_tier_id"
-                                    class="text-red-500 text-sm mt-2"
+                                    class="text-red-500 text-sm mt-4 text-center"
                                 >
                                     {{ form.errors.service_tier_id }}
                                 </p>
-                                <p
-                                    v-if="qrphForm.errors.service_tier_id"
-                                    class="text-red-500 text-sm mt-2"
-                                >
-                                    {{ qrphForm.errors.service_tier_id }}
-                                </p>
-                            </div>
+                            </section>
 
-                            <div
-                                v-if="
-                                    hasTiers &&
-                                    form.service_tier_id &&
-                                    selectedTierUsesBundleQrPh
-                                "
-                                class="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-3"
-                            >
-                                <h2
-                                    class="text-base font-semibold text-gray-800"
-                                >
-                                    Pay with QR Ph
-                                </h2>
-                                <p class="text-sm text-gray-600">
-                                    Scan the code below with your bank or e-wallet
-                                    app. Send exactly
-                                    {{
-                                        currencySymbol
-                                    }}{{ Number(selectedTier.amount).toFixed(2) }} for
-                                    <strong>{{ selectedTier.name }}</strong>.
-                                </p>
+                            <div class="mt-10 space-y-8">
                                 <div
-                                    class="rounded-lg border border-emerald-100 bg-white p-4 flex flex-col items-center"
+                                    v-if="hasTiers && bundledQrTier"
+                                    :class="qrPhPanelClass"
                                 >
-                                    <img
-                                        src="@assets/qrph/qrph_basic.jpg"
-                                        alt="QR Ph Basic plan"
-                                        class="max-w-[280px] w-full h-auto rounded-md"
-                                    />
-                                </div>
-                            </div>
-                            <div
-                                v-else-if="paymongoConfigured"
-                                class="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-3"
-                            >
-                                <h2
-                                    class="text-base font-semibold text-gray-800"
-                                >
-                                    Pay instantly with QR Ph
-                                </h2>
-                                <p class="text-sm text-gray-600">
-                                    PayMongo generates a one-time QR Ph code for
-                                    your selected plan. Your plan activates
-                                    automatically after payment—no waiting for
-                                    manual approval.
-                                </p>
-                                <div class="flex flex-wrap gap-2">
-                                    <a-button
-                                        type="primary"
-                                        class="!bg-emerald-600 !border-emerald-600"
-                                        :loading="qrphForm.processing"
-                                        :disabled="
-                                            !form.service_tier_id ||
-                                            !hasTiers ||
-                                            selectedTierUsesBundleQrPh
-                                        "
-                                        @click="startPaymongoQrph"
+                                    <h2
+                                        class="text-xl font-bold tracking-tight text-gray-800"
                                     >
-                                        {{
-                                            paymongoQr
-                                                ? "Refresh QR Ph code"
-                                                : "Generate QR Ph code"
-                                        }}
-                                    </a-button>
-                                </div>
-                                <div
-                                    v-if="paymongoQr?.qr_image_data_url"
-                                    class="rounded-lg border border-emerald-100 bg-white p-4 flex flex-col items-center"
-                                >
-                                    <img
-                                        :src="paymongoQr.qr_image_data_url"
-                                        alt="QR Ph payment code"
-                                        class="max-w-[280px] w-full h-auto rounded-md"
-                                    />
+                                        Pay with QR Ph
+                                    </h2>
                                     <p
-                                        class="mt-3 text-xs text-gray-600 text-center max-w-sm"
+                                        v-if="form.service_tier_id"
+                                        class="text-sm text-gray-600"
                                     >
-                                        {{ paymongoExpiresLabel }}
+                                        Scan the code below with your bank or
+                                        e-wallet app. Send exactly
+                                        {{ currencySymbol
+                                        }}{{ selectedTierAmountFormatted }}
+                                        for
+                                        <strong>{{ selectedTier.name }}</strong
+                                        >.
                                     </p>
                                     <p
-                                        v-if="paymongoQr.tier_name"
-                                        class="mt-2 text-xs text-gray-500"
+                                        v-else
+                                        class="text-sm text-gray-600"
                                     >
-                                        Plan:
-                                        <strong>{{ paymongoQr.tier_name }}</strong>
-                                        · Status:
-                                        <span class="font-mono">{{
-                                            paymongoQr.payment_intent_status
-                                        }}</span>
+                                        Select a plan above, then send exactly
+                                        that amount when you scan—amounts
+                                        differ by tier.
                                     </p>
+                                    <div
+                                        class="rounded-xl border border-gray-100 bg-white p-5 flex flex-col items-center shadow-sm"
+                                    >
+                                        <img
+                                            src="@assets/qrph/qrph_basic.jpg"
+                                            alt="QR Ph merchant code"
+                                            class="max-w-[280px] w-full h-auto rounded-md"
+                                        />
+                                    </div>
                                 </div>
+                                <a-alert
+                                    v-if="hasTiers && !bundledQrTier"
+                                    type="warning"
+                                    show-icon
+                                    class="text-sm"
+                                    message="No Basic merchant QR available"
+                                    :description="
+                                        showManualGcash
+                                            ? 'The Basic bundled QR slug is missing or misconfigured. Use manual GCash below or contact your administrator.'
+                                            : 'Ask your administrator to configure the bundled Basic servicing tier so this page can display the merchant QR.'
+                                    "
+                                />
                             </div>
-                            <a-alert
-                                v-else-if="hasTiers"
-                                type="warning"
-                                show-icon
-                                class="text-sm"
-                                message="QR Ph checkout unavailable"
-                                :description="
-                                    showManualGcash
-                                        ? 'PayMongo is not configured on this server. Use manual GCash below or contact support.'
-                                        : 'PayMongo is not configured on this server. Contact your administrator.'
-                                "
-                            />
 
                             <ManualGcashPayment
                                 v-if="showManualGcash"
                                 :form="form"
                                 :currency-symbol="currencySymbol"
                                 :qr-src="qrSrc"
-                                :show-placeholder-qr-notice="showPlaceholderQrNotice"
+                                :show-placeholder-qr-notice="
+                                    showPlaceholderQrNotice
+                                "
                                 :reference-help="referenceHelp"
                                 :selected-tier="selectedTier"
                                 :has-tiers="hasTiers"
@@ -496,7 +625,9 @@ const referenceHelp = computed(() => {
                         <ManualGcashDesktopQrAside
                             v-if="showManualGcash"
                             :qr-src="qrSrc"
-                            :show-placeholder-qr-notice="showPlaceholderQrNotice"
+                            :show-placeholder-qr-notice="
+                                showPlaceholderQrNotice
+                            "
                         />
                     </div>
                 </div>

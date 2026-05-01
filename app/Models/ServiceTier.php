@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Facades\DB;
 
 class ServiceTier extends Model
 {
@@ -20,6 +22,32 @@ class ServiceTier extends Model
     public function manualPaymentRequests(): HasMany
     {
         return $this->hasMany(ManualPaymentRequest::class);
+    }
+
+    /** @return list<string> */
+    public static function billingHiddenSlugs(): array
+    {
+        return array_values(array_unique(array_filter(array_map(
+            static fn (mixed $slug): string => strtolower((string) $slug),
+            config('manual_billing.billing_hidden_tier_slugs', [])
+        ))));
+    }
+
+    public static function isHiddenFromBilling(self|string $tier): bool
+    {
+        $slug = $tier instanceof self ? (string) $tier->slug : (string) $tier;
+
+        return in_array(strtolower($slug), self::billingHiddenSlugs(), true);
+    }
+
+    /** @param Builder|\Illuminate\Database\Eloquent\Builder $query */
+    public static function constrainVisibleOnBillingTierPicker($query): void
+    {
+        $hidden = self::billingHiddenSlugs();
+
+        if ($hidden !== []) {
+            $query->whereNotIn(DB::raw('LOWER(slug)'), $hidden);
+        }
     }
 
     public function scopeActive($query)

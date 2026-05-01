@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Domains;
 use App\Http\Controllers\Controller;
 use App\Models\Domain;
 use App\Models\ManualPaymentRequest;
-use App\Models\PaymongoCheckout;
 use App\Models\ServiceTier;
 use App\Services\DomainSubscriptionService;
 use Illuminate\Http\Request;
@@ -21,25 +20,20 @@ class ManualBillingController extends Controller
     public function index(Request $request, Domain $domain)
     {
         $domain->load('currentServiceTier');
-        $tiers = ServiceTier::query()->active()->get();
-
-        $paymongoQr = session('paymongo_qr');
-        if (is_array($paymongoQr) && ! empty($paymongoQr['payment_intent_id'])) {
-            $paid = PaymongoCheckout::query()
-                ->where('payment_intent_id', $paymongoQr['payment_intent_id'])
-                ->where('status', PaymongoCheckout::STATUS_PAID)
-                ->exists();
-            if ($paid) {
-                session()->forget('paymongo_qr');
-                $paymongoQr = null;
-            }
-        }
+        $tiers = ServiceTier::query()
+            ->active()
+            ->get()
+            ->reject(fn (ServiceTier $tier) => ServiceTier::isHiddenFromBilling($tier))
+            ->values();
 
         $basicSlug = strtolower((string) config('manual_billing.servicing_basic_tier_slug'));
 
         $tierRows = $tiers->map(function (ServiceTier $tier) use ($basicSlug): array {
+            $slug = strtolower((string) $tier->slug);
+
             return array_merge($tier->toArray(), [
-                'uses_vite_bundle_qrph' => $basicSlug !== '' && strtolower((string) $tier->slug) === $basicSlug,
+                'uses_vite_bundle_qrph' => $basicSlug !== '' && $slug === $basicSlug,
+                'marketing_features' => config('manual_billing.tier_marketing_bullets.'.$slug, []),
             ]);
         })->values();
 
@@ -49,9 +43,11 @@ class ManualBillingController extends Controller
             'currencySymbol' => config('manual_billing.currency_symbol'),
             'currentDomain' => $domain->only(['id', 'name', 'name_slug']),
             'subscription' => $this->subscriptionService->subscriptionPropsForFrontend($domain),
-            'paymongoQr' => $paymongoQr,
-            'paymongoConfigured' => filled(config('paymongo.secret_key')),
             'showManualGcash' => (bool) config('manual_billing.show_manual_gcash_section'),
+            'freeTier' => [
+                'marketing_features' => config('manual_billing.free_tier_marketing_bullets', []),
+                'product_limit' => DomainSubscriptionService::FREE_TIER_MAX_PRODUCTS,
+            ],
         ]);
     }
 
@@ -65,7 +61,13 @@ class ManualBillingController extends Controller
         $request->merge(['gcash_reference' => $ref]);
 
         $validated = $request->validate([
-            'service_tier_id' => ['required', Rule::exists('service_tiers', 'id')->where('is_active', true)],
+            'service_tier_id' => [
+                'required',
+                Rule::exists('service_tiers', 'id')->where(function ($query): void {
+                    $query->where('is_active', true);
+                    ServiceTier::constrainVisibleOnBillingTierPicker($query);
+                }),
+            ],
             'gcash_reference' => [
                 'required',
                 'string',

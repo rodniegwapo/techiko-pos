@@ -33,7 +33,10 @@ class PayMongoQrPhController extends Controller
         $validated = $request->validate([
             'service_tier_id' => [
                 'required',
-                Rule::exists('service_tiers', 'id')->where(fn ($q) => $q->where('is_active', true)),
+                Rule::exists('service_tiers', 'id')->where(function ($query): void {
+                    $query->where('is_active', true);
+                    ServiceTier::constrainVisibleOnBillingTierPicker($query);
+                }),
             ],
         ]);
 
