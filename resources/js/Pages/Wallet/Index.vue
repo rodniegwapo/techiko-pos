@@ -27,6 +27,7 @@ const { hasPermission } = usePermissionsV2();
 const { formattedTotal } = useHelpers();
 
 const page = usePage();
+const todayYmd = new Date().toISOString().slice(0, 10);
 
 /** @param {string} url */
 function queryObjectFromPageUrl(url) {
@@ -378,6 +379,7 @@ const savingCountedCash = ref(false);
 const endingShift = ref(false);
 const reopeningShift = ref(false);
 const countedCardRef = ref(null);
+const endShiftAction = ref("cashout_now");
 
 const canManageCashControl = computed(
     () =>
@@ -488,7 +490,57 @@ function onEndShiftClick() {
         });
         return;
     }
-    endShift();
+    Modal.confirm({
+        title: "End Shift action",
+        icon: createVNode(ExclamationCircleOutlined),
+        content: createVNode("div", { class: "space-y-2" }, [
+            createVNode(
+                "p",
+                { class: "text-sm text-gray-700" },
+                "Choose what to do with counted cash before closing shift.",
+            ),
+            createVNode("div", { class: "flex flex-col gap-2" }, [
+                createVNode(
+                    "label",
+                    {
+                        class: "inline-flex items-center gap-2 text-sm text-gray-700",
+                    },
+                    [
+                        createVNode("input", {
+                            type: "radio",
+                            name: "endShiftAction",
+                            checked: endShiftAction.value === "cashout_now",
+                            onChange: () => {
+                                endShiftAction.value = "cashout_now";
+                            },
+                        }),
+                        "Cash out now",
+                    ],
+                ),
+                createVNode(
+                    "label",
+                    {
+                        class: "inline-flex items-center gap-2 text-sm text-gray-700",
+                    },
+                    [
+                        createVNode("input", {
+                            type: "radio",
+                            name: "endShiftAction",
+                            checked:
+                                endShiftAction.value === "save_as_opening_cash",
+                            onChange: () => {
+                                endShiftAction.value = "save_as_opening_cash";
+                            },
+                        }),
+                        "Save as opening cash",
+                    ],
+                ),
+            ]),
+        ]),
+        okText: "Confirm End Shift",
+        cancelText: "Cancel",
+        onOk: endShift,
+    });
 }
 
 function goToSubmitCountedCash() {
@@ -505,6 +557,7 @@ async function endShift() {
             location_id: activeLocationId.value,
             business_date:
                 cashControlForm.value.business_date || activeBusinessDate.value,
+            end_shift_action: endShiftAction.value,
         });
         notification.success({ message: "Shift closed." });
         reloadWalletForBusinessDate();
@@ -574,6 +627,7 @@ async function reopenShift() {
                         <input
                             v-model="cashControlForm.business_date"
                             type="date"
+                            :max="todayYmd"
                             class="w-full rounded border border-gray-300 px-2 py-2 text-sm"
                         />
                         <a-button @click="reloadWalletForBusinessDate">
@@ -759,6 +813,7 @@ async function reopenShift() {
                     v-else-if="cashControl.can_reopen"
                     :loading="reopeningShift"
                     @click="reopenShift"
+                    class="flex items-center gap-2"
                 >
                     <template #icon>
                         <IconLockOpen class="h-4 w-4" />

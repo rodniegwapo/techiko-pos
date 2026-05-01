@@ -67,25 +67,26 @@ class WalletCashControlTest extends TestCase
     public function test_set_opening_cash_creates_and_updates_for_location_date(): void
     {
         $ctx = $this->seedContext();
+        $date = now()->subDays(10)->toDateString();
         $url = route('domains.wallet-cash-ledger.opening-cash.store', ['domain' => $ctx['domain']->name_slug]);
 
         $this->actingAs($ctx['user'])->post($url, [
             'location_id' => $ctx['location']->id,
-            'business_date' => '2026-05-01',
+            'business_date' => $date,
             'opening_cash' => 1000,
         ])->assertRedirect();
 
         $this->assertDatabaseHas('wallet_cash_reconciliations', [
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
-            'business_date' => '2026-05-01',
+            'business_date' => $date,
             'opening_cash' => 1000.00,
             'opening_source' => 'manual',
         ]);
         $this->assertDatabaseHas('wallet_cash_opening_audits', [
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
-            'business_date' => '2026-05-01',
+            'business_date' => $date,
             'old_opening_cash' => null,
             'new_opening_cash' => 1000.00,
             'delta_amount' => 1000.00,
@@ -94,7 +95,7 @@ class WalletCashControlTest extends TestCase
 
         $this->actingAs($ctx['user'])->post($url, [
             'location_id' => $ctx['location']->id,
-            'business_date' => '2026-05-01',
+            'business_date' => $date,
             'opening_cash' => 1500,
             'reason' => 'Owner changed float after recount',
         ])->assertRedirect();
@@ -103,7 +104,7 @@ class WalletCashControlTest extends TestCase
         $this->assertDatabaseHas('wallet_cash_reconciliations', [
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
-            'business_date' => '2026-05-01',
+            'business_date' => $date,
             'opening_cash' => 1500.00,
             'opening_source' => 'manual',
         ]);
@@ -111,7 +112,7 @@ class WalletCashControlTest extends TestCase
         $this->assertDatabaseHas('wallet_cash_opening_audits', [
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
-            'business_date' => '2026-05-01',
+            'business_date' => $date,
             'old_opening_cash' => 1000.00,
             'new_opening_cash' => 1500.00,
             'delta_amount' => 500.00,
@@ -123,11 +124,12 @@ class WalletCashControlTest extends TestCase
     public function test_submit_counted_cash_records_user_and_timestamp(): void
     {
         $ctx = $this->seedContext();
+        $date = now()->subDays(9)->toDateString();
         $url = route('domains.wallet-cash-ledger.counted-cash.store', ['domain' => $ctx['domain']->name_slug]);
 
         $this->actingAs($ctx['user'])->post($url, [
             'location_id' => $ctx['location']->id,
-            'business_date' => '2026-05-01',
+            'business_date' => $date,
             'counted_cash' => 980,
             'notes' => 'Drawer count at close',
         ])->assertRedirect();
@@ -144,7 +146,7 @@ class WalletCashControlTest extends TestCase
     public function test_wallet_index_returns_cash_control_formula_values(): void
     {
         $ctx = $this->seedContext();
-        $date = '2026-05-01';
+        $date = now()->subDays(8)->toDateString();
 
         WalletCashReconciliation::query()->create([
             'domain' => $ctx['domain']->name_slug,
@@ -228,11 +230,13 @@ class WalletCashControlTest extends TestCase
     public function test_wallet_index_suggests_opening_from_previous_counted_cash_when_current_not_saved(): void
     {
         $ctx = $this->seedContext();
+        $previousDate = now()->subDay()->toDateString();
+        $selectedDate = now()->toDateString();
 
         WalletCashReconciliation::query()->create([
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
-            'business_date' => '2026-05-01',
+            'business_date' => $previousDate,
             'opening_cash' => 800,
             'counted_cash' => 900,
             'counted_by' => $ctx['user']->id,
@@ -242,17 +246,17 @@ class WalletCashControlTest extends TestCase
         $url = route('domains.payment-card-types.index', [
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
-            'business_date' => '2026-05-02',
+            'business_date' => $selectedDate,
         ]);
 
         $this->actingAs($ctx['user'])->get($url)
             ->assertOk()
             ->assertInertia(fn (Inertia $page) => $page
                 ->component('Wallet/Index')
-                ->where('cashControl.business_date', '2026-05-02')
+                ->where('cashControl.business_date', $selectedDate)
                 ->where('cashControl.opening_is_saved', false)
                 ->where('cashControl.opening_suggestion', 900)
-                ->where('cashControl.suggestion_source_date', '2026-05-01')
+                ->where('cashControl.suggestion_source_date', $previousDate)
                 ->where('cashControl.opening_cash', 900)
             );
     }
@@ -260,7 +264,7 @@ class WalletCashControlTest extends TestCase
     public function test_end_shift_is_blocked_when_counted_cash_is_missing(): void
     {
         $ctx = $this->seedContext();
-        $date = '2026-05-03';
+        $date = now()->toDateString();
 
         WalletCashReconciliation::query()->create([
             'domain' => $ctx['domain']->name_slug,
@@ -274,13 +278,14 @@ class WalletCashControlTest extends TestCase
         $this->actingAs($ctx['user'])->post($url, [
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
+            'end_shift_action' => 'cashout_now',
         ])->assertSessionHasErrors(['counted_cash']);
     }
 
-    public function test_end_shift_closes_shift_and_reopen_is_same_user_only(): void
+    public function test_end_shift_closes_shift_with_cashout_action_and_reopen_is_same_user_only(): void
     {
         $ctx = $this->seedContext();
-        $date = '2026-05-04';
+        $date = now()->subDays(2)->toDateString();
         /** @var User $otherUser */
         $otherUser = User::factory()->create([
             'domain' => $ctx['domain']->name_slug,
@@ -303,6 +308,7 @@ class WalletCashControlTest extends TestCase
         $this->actingAs($ctx['user'])->post($endUrl, [
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
+            'end_shift_action' => 'cashout_now',
         ])->assertRedirect();
 
         $this->assertDatabaseHas('wallet_cash_reconciliations', [
@@ -311,6 +317,14 @@ class WalletCashControlTest extends TestCase
             'business_date' => $date,
             'is_closed' => 1,
             'closed_by' => $ctx['user']->id,
+        ]);
+        $this->assertDatabaseHas('wallet_cash_movements', [
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'direction' => 'out',
+            'kind' => 'owner_draw',
+            'amount' => 250.00,
+            'movement_date' => $date,
         ]);
 
         $this->actingAs($otherUser)->post($reopenUrl, [
@@ -331,10 +345,79 @@ class WalletCashControlTest extends TestCase
         ]);
     }
 
+    public function test_end_shift_save_as_opening_cash_updates_opening_and_audits(): void
+    {
+        $ctx = $this->seedContext();
+        $date = now()->subDays(3)->toDateString();
+
+        WalletCashReconciliation::query()->create([
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'business_date' => $date,
+            'opening_cash' => 120,
+            'counted_cash' => 180,
+            'counted_by' => $ctx['user']->id,
+            'counted_at' => now(),
+        ]);
+
+        $endUrl = route('domains.wallet-cash-ledger.end-shift', ['domain' => $ctx['domain']->name_slug]);
+
+        $this->actingAs($ctx['user'])->post($endUrl, [
+            'location_id' => $ctx['location']->id,
+            'business_date' => $date,
+            'end_shift_action' => 'save_as_opening_cash',
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('wallet_cash_reconciliations', [
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'business_date' => $date,
+            'opening_cash' => 180.00,
+            'is_closed' => 1,
+        ]);
+        $this->assertDatabaseHas('wallet_cash_opening_audits', [
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'business_date' => $date,
+            'old_opening_cash' => 120.00,
+            'new_opening_cash' => 180.00,
+            'delta_amount' => 60.00,
+            'changed_by' => $ctx['user']->id,
+        ]);
+    }
+
+    public function test_end_shift_requires_valid_action(): void
+    {
+        $ctx = $this->seedContext();
+        $date = now()->subDays(4)->toDateString();
+        $url = route('domains.wallet-cash-ledger.end-shift', ['domain' => $ctx['domain']->name_slug]);
+
+        WalletCashReconciliation::query()->create([
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'business_date' => $date,
+            'opening_cash' => 100,
+            'counted_cash' => 100,
+            'counted_by' => $ctx['user']->id,
+            'counted_at' => now(),
+        ]);
+
+        $this->actingAs($ctx['user'])->post($url, [
+            'location_id' => $ctx['location']->id,
+            'business_date' => $date,
+        ])->assertSessionHasErrors(['end_shift_action']);
+
+        $this->actingAs($ctx['user'])->post($url, [
+            'location_id' => $ctx['location']->id,
+            'business_date' => $date,
+            'end_shift_action' => 'invalid',
+        ])->assertSessionHasErrors(['end_shift_action']);
+    }
+
     public function test_closed_shift_blocks_opening_counted_and_ledger_mutations(): void
     {
         $ctx = $this->seedContext();
-        $date = '2026-05-05';
+        $date = now()->subDays(5)->toDateString();
 
         WalletCashReconciliation::query()->create([
             'domain' => $ctx['domain']->name_slug,
@@ -377,7 +460,7 @@ class WalletCashControlTest extends TestCase
     public function test_wallet_index_exposes_shift_closed_flags_and_can_reopen_for_closer(): void
     {
         $ctx = $this->seedContext();
-        $date = '2026-05-06';
+        $date = now()->subDays(6)->toDateString();
 
         WalletCashReconciliation::query()->create([
             'domain' => $ctx['domain']->name_slug,
@@ -405,5 +488,49 @@ class WalletCashControlTest extends TestCase
                 ->where('cashControl.closed_by', $ctx['user']->id)
                 ->where('cashControl.can_reopen', true)
             );
+    }
+
+    public function test_wallet_index_rejects_future_business_date(): void
+    {
+        $ctx = $this->seedContext();
+        $futureDate = now()->addDay()->toDateString();
+
+        $url = route('domains.payment-card-types.index', [
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'business_date' => $futureDate,
+        ]);
+
+        $this->actingAs($ctx['user'])->get($url)
+            ->assertStatus(302)
+            ->assertSessionHasErrors(['business_date']);
+    }
+
+    public function test_opening_counted_and_end_shift_reject_future_business_date(): void
+    {
+        $ctx = $this->seedContext();
+        $futureDate = now()->addDay()->toDateString();
+
+        $openingUrl = route('domains.wallet-cash-ledger.opening-cash.store', ['domain' => $ctx['domain']->name_slug]);
+        $countedUrl = route('domains.wallet-cash-ledger.counted-cash.store', ['domain' => $ctx['domain']->name_slug]);
+        $endUrl = route('domains.wallet-cash-ledger.end-shift', ['domain' => $ctx['domain']->name_slug]);
+
+        $this->actingAs($ctx['user'])->post($openingUrl, [
+            'location_id' => $ctx['location']->id,
+            'business_date' => $futureDate,
+            'opening_cash' => 100,
+        ])->assertSessionHasErrors(['business_date']);
+
+        $this->actingAs($ctx['user'])->post($countedUrl, [
+            'location_id' => $ctx['location']->id,
+            'business_date' => $futureDate,
+            'counted_cash' => 100,
+        ])->assertSessionHasErrors(['business_date']);
+
+        $this->actingAs($ctx['user'])->post($endUrl, [
+            'location_id' => $ctx['location']->id,
+            'business_date' => $futureDate,
+            'end_shift_action' => 'cashout_now',
+        ])->assertSessionHasErrors(['business_date']);
     }
 }

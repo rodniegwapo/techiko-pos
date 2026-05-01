@@ -64,7 +64,7 @@ class PaymentCardTypeController extends Controller
     private function resolveBusinessDate(Request $request): string
     {
         $validated = $request->validate([
-            'business_date' => ['sometimes', 'date'],
+            'business_date' => ['sometimes', 'date', 'before_or_equal:today'],
         ]);
 
         return (string) ($validated['business_date'] ?? now()->toDateString());

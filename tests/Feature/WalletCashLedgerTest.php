@@ -288,4 +288,23 @@ class WalletCashLedgerTest extends TestCase
         $response->assertForbidden();
         $this->assertSame(0, WalletCashMovement::query()->count());
     }
+
+    public function test_store_movement_rejects_future_movement_date(): void
+    {
+        $s = $this->seedDomainsAndTypes();
+        $futureDate = now()->addDay()->toDateString();
+
+        $url = route('domains.wallet-cash-ledger.store', ['domain' => $s['domainA']->name_slug]);
+
+        $response = $this->actingAs($s['user'])->post($url, [
+            'location_id' => $s['locationA']->id,
+            'direction' => 'in',
+            'amount' => 75,
+            'kind' => 'adjustment',
+            'movement_date' => $futureDate,
+        ]);
+
+        $response->assertSessionHasErrors(['movement_date']);
+        $this->assertSame(0, WalletCashMovement::query()->count());
+    }
 }

@@ -67,7 +67,7 @@ class WalletCashMovementController extends Controller
                     && (string) $request->input('draw_source') === 'card_type'
                 ),
             ],
-            'movement_date' => ['required', 'date'],
+            'movement_date' => ['required', 'date', 'before_or_equal:today'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
         $this->ensureDateNotClosed($domain->name_slug, (int) $location->id, (string) $validated['movement_date']);
@@ -103,7 +103,7 @@ class WalletCashMovementController extends Controller
         $location = WalletLocationResolver::resolve($request, $domain);
 
         $validated = $request->validate([
-            'business_date' => ['required', 'date'],
+            'business_date' => ['required', 'date', 'before_or_equal:today'],
             'opening_cash' => ['required', 'numeric', 'min:0'],
             'reason' => ['nullable', 'string', 'max:2000'],
         ]);
@@ -143,7 +143,7 @@ class WalletCashMovementController extends Controller
         $location = WalletLocationResolver::resolve($request, $domain);
 
         $validated = $request->validate([
-            'business_date' => ['required', 'date'],
+            'business_date' => ['required', 'date', 'before_or_equal:today'],
             'counted_cash' => ['required', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
@@ -170,7 +170,8 @@ class WalletCashMovementController extends Controller
     {
         $location = WalletLocationResolver::resolve($request, $domain);
         $validated = $request->validate([
-            'business_date' => ['required', 'date'],
+            'business_date' => ['required', 'date', 'before_or_equal:today'],
+            'end_shift_action' => ['required', 'string', Rule::in(['cashout_now', 'save_as_opening_cash'])],
         ]);
 
         $recon = WalletCashReconciliation::query()
@@ -188,6 +189,44 @@ class WalletCashMovementController extends Controller
             return redirect()->back()->with('success', 'Shift is already closed.');
         }
 
+        $action = (string) $validated['end_shift_action'];
+        $countedCash = round((float) $recon->counted_cash, 2);
+
+        if ($action === 'cashout_now') {
+            WalletCashMovement::query()->create([
+                'domain' => $domain->name_slug,
+                'location_id' => $location->id,
+                'payment_card_type_id' => null,
+                'direction' => 'out',
+                'amount' => $countedCash,
+                'kind' => 'owner_draw',
+                'notes' => 'Auto cash-out on End Shift.',
+                'movement_date' => $validated['business_date'],
+                'user_id' => $request->user()->id,
+            ]);
+        }
+
+        if ($action === 'save_as_opening_cash') {
+            $oldOpening = $recon->opening_cash !== null ? (float) $recon->opening_cash : null;
+            $recon->opening_cash = $countedCash;
+            $recon->opening_source = 'manual';
+            $recon->opening_source_date = null;
+            $recon->save();
+
+            WalletCashOpeningAudit::query()->create([
+                'domain' => $domain->name_slug,
+                'location_id' => $location->id,
+                'business_date' => $validated['business_date'],
+                'reconciliation_id' => $recon->id,
+                'old_opening_cash' => $oldOpening,
+                'new_opening_cash' => $countedCash,
+                'delta_amount' => round($countedCash - (float) ($oldOpening ?? 0), 2),
+                'changed_by' => $request->user()->id,
+                'changed_at' => now(),
+                'reason' => 'Set from End Shift action: save_as_opening_cash.',
+            ]);
+        }
+
         $recon->is_closed = true;
         $recon->closed_at = now();
         $recon->closed_by = $request->user()->id;
@@ -200,7 +239,7 @@ class WalletCashMovementController extends Controller
     {
         $location = WalletLocationResolver::resolve($request, $domain);
         $validated = $request->validate([
-            'business_date' => ['required', 'date'],
+            'business_date' => ['required', 'date', 'before_or_equal:today'],
         ]);
 
         $recon = WalletCashReconciliation::query()
