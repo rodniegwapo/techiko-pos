@@ -177,6 +177,10 @@ Route::prefix('domains/{domain:name_slug}')
         Route::prefix('wallet/cash-ledger')->name('wallet-cash-ledger.')->group(function () {
             Route::get('/', [WalletCashMovementController::class, 'index'])->name('index');
             Route::post('/', [WalletCashMovementController::class, 'store'])->name('store');
+            Route::post('/opening-cash', [WalletCashMovementController::class, 'setOpeningCash'])->name('opening-cash.store');
+            Route::post('/counted-cash', [WalletCashMovementController::class, 'submitCountedCash'])->name('counted-cash.store');
+            Route::post('/end-shift', [WalletCashMovementController::class, 'endShift'])->name('end-shift');
+            Route::post('/reopen-shift', [WalletCashMovementController::class, 'reopenShift'])->name('reopen-shift');
         });
 
         // Credit Management (Organization-specific)

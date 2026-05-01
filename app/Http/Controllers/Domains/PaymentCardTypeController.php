@@ -7,6 +7,8 @@ use App\Models\Domain;
 use App\Models\InventoryLocation;
 use App\Models\PaymentCardType;
 use App\Models\Sale;
+use App\Models\WalletCashMovement;
+use App\Models\WalletCashReconciliation;
 use App\Support\Wallet\WalletLedgerViewData;
 use App\Support\Wallet\WalletLocationResolver;
 use Carbon\Carbon;
@@ -19,6 +21,7 @@ class PaymentCardTypeController extends Controller
     public function index(Request $request, Domain $domain)
     {
         $location = WalletLocationResolver::resolve($request, $domain);
+        $businessDate = $this->resolveBusinessDate($request);
 
         $types = PaymentCardType::query()
             ->forDomainLocation($domain->name_slug, $location->id)
@@ -39,6 +42,12 @@ class PaymentCardTypeController extends Controller
                 'id' => $location->id,
                 'name' => $location->name,
             ],
+            'cashControl' => $this->cashControlSnapshot(
+                $domain,
+                $location,
+                $businessDate,
+                (int) $request->user()->id
+            ),
         ];
 
         if ($request->user()->hasPermissionToRoute('wallet-cash-ledger.index')) {
@@ -50,6 +59,87 @@ class PaymentCardTypeController extends Controller
         }
 
         return Inertia::render('Wallet/Index', $props);
+    }
+
+    private function resolveBusinessDate(Request $request): string
+    {
+        $validated = $request->validate([
+            'business_date' => ['sometimes', 'date'],
+        ]);
+
+        return (string) ($validated['business_date'] ?? now()->toDateString());
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function cashControlSnapshot(Domain $domain, InventoryLocation $location, string $businessDate, int $viewerUserId): array
+    {
+        $recon = WalletCashReconciliation::query()
+            ->forWalletContext($domain->name_slug, $location->id)
+            ->whereDate('business_date', $businessDate)
+            ->first();
+
+        $openingIsSaved = $recon !== null;
+        $openingSuggestion = null;
+        $suggestionSourceDate = null;
+
+        if ($openingIsSaved) {
+            $openingCash = (float) $recon->opening_cash;
+        } else {
+            $prev = WalletCashReconciliation::query()
+                ->forWalletContext($domain->name_slug, $location->id)
+                ->whereDate('business_date', '<', $businessDate)
+                ->whereNotNull('counted_cash')
+                ->orderByDesc('business_date')
+                ->first();
+
+            $openingSuggestion = $prev ? (float) $prev->counted_cash : null;
+            $suggestionSourceDate = $prev?->business_date?->toDateString();
+            $openingCash = (float) ($openingSuggestion ?? 0);
+        }
+
+        $paidCashSales = (float) Sale::query()
+            ->where('domain', $domain->name_slug)
+            ->where('location_id', $location->id)
+            ->where('payment_status', 'paid')
+            ->where('payment_method', 'cash')
+            ->whereDate('transaction_date', $businessDate)
+            ->sum('grand_total');
+
+        $movementBase = WalletCashMovement::query()
+            ->forWalletContext($domain->name_slug, $location->id)
+            ->whereDate('movement_date', $businessDate);
+
+        $manualIn = (float) (clone $movementBase)->where('direction', 'in')->sum('amount');
+        $manualOut = (float) (clone $movementBase)->where('direction', 'out')->sum('amount');
+        $expectedCash = round($openingCash + $paidCashSales + $manualIn - $manualOut, 2);
+
+        $countedCash = $recon?->counted_cash !== null ? (float) $recon->counted_cash : null;
+        $variance = $countedCash === null ? null : round($countedCash - $expectedCash, 2);
+
+        return [
+            'business_date' => $businessDate,
+            'opening_cash' => $openingCash,
+            'paid_cash_sales' => $paidCashSales,
+            'manual_in' => $manualIn,
+            'manual_out' => $manualOut,
+            'expected_cash' => $expectedCash,
+            'counted_cash' => $countedCash,
+            'variance' => $variance,
+            'status' => $countedCash === null ? 'pending' : 'counted',
+            'notes' => $recon?->notes,
+            'counted_at' => $recon?->counted_at?->toIso8601String(),
+            'opening_is_saved' => $openingIsSaved,
+            'opening_suggestion' => $openingSuggestion,
+            'suggestion_source_date' => $suggestionSourceDate,
+            'is_closed' => (bool) ($recon?->is_closed ?? false),
+            'closed_at' => $recon?->closed_at?->toIso8601String(),
+            'closed_by' => $recon?->closed_by ? (int) $recon->closed_by : null,
+            'can_reopen' => $recon?->is_closed
+                ? (int) ($recon->closed_by ?? 0) === $viewerUserId
+                : false,
+        ];
     }
 
     /**

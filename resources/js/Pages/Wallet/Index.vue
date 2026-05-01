@@ -1,11 +1,13 @@
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import { Head, router, usePage } from "@inertiajs/vue3";
 import {
     IconPlus,
     IconReportMoney,
     IconEdit,
     IconTrash,
+    IconLock,
+    IconLockOpen,
 } from "@tabler/icons-vue";
 import axios from "axios";
 import { notification } from "ant-design-vue";
@@ -71,6 +73,10 @@ const props = defineProps({
         type: Object,
         default: () => null,
     },
+    cashControl: {
+        type: Object,
+        default: () => null,
+    },
 });
 
 const activeLocationId = computed(() => {
@@ -92,6 +98,18 @@ const activeLocationId = computed(() => {
     return null;
 });
 
+const activeBusinessDate = computed(() => {
+    const q = queryObjectFromPageUrl(page.url);
+    if (q.business_date) {
+        return String(q.business_date);
+    }
+
+    return (
+        props.cashControl?.business_date ||
+        new Date().toISOString().slice(0, 10)
+    );
+});
+
 const activeWalletTab = computed(() => {
     const q = queryObjectFromPageUrl(page.url);
     const tab = q.tab;
@@ -110,6 +128,7 @@ function onWalletTabChange(key) {
     if (activeLocationId.value) {
         base.location_id = activeLocationId.value;
     }
+    base.business_date = activeBusinessDate.value;
     router.get(getRoute("payment-card-types.index"), base, {
         preserveState: true,
         preserveScroll: true,
@@ -180,6 +199,7 @@ async function save() {
                 "walletCreditTotals",
                 "ledger",
                 "runningCashBalance",
+                "cashControl",
             ],
         });
     } catch (e) {
@@ -213,6 +233,7 @@ async function remove(row) {
                 "walletCreditTotals",
                 "ledger",
                 "runningCashBalance",
+                "cashControl",
             ],
         });
     } catch (e) {
@@ -301,6 +322,7 @@ async function loadMoneyDetails(page = 1) {
                     page,
                     per_page: historyPagination.value.pageSize,
                     location_id: activeLocationId.value,
+                    business_date: activeBusinessDate.value,
                 },
             },
         );
@@ -342,6 +364,172 @@ function onMoneyTableChange(pag) {
         loadMoneyDetails(pag.current);
     }
 }
+
+const cashControlForm = ref({
+    business_date: activeBusinessDate.value,
+    opening_cash: null,
+    opening_reason: "",
+    counted_cash: null,
+    notes: "",
+});
+const savingOpeningCash = ref(false);
+const savingCountedCash = ref(false);
+const endingShift = ref(false);
+const reopeningShift = ref(false);
+const showEndShiftWarning = ref(false);
+const countedCardRef = ref(null);
+
+const canManageCashControl = computed(
+    () =>
+        hasPermission("wallet-cash-ledger.opening-cash.store") ||
+        hasPermission("wallet-cash-ledger.counted-cash.store") ||
+        hasPermission("wallet-cash-ledger.store"),
+);
+const isShiftClosed = computed(() => !!props.cashControl?.is_closed);
+
+watch(
+    () => props.cashControl,
+    (v) => {
+        cashControlForm.value.business_date =
+            v?.business_date || activeBusinessDate.value;
+        if (v?.opening_is_saved) {
+            cashControlForm.value.opening_cash =
+                v?.opening_cash != null ? Number(v.opening_cash) : 0;
+        } else if (v?.opening_suggestion != null) {
+            cashControlForm.value.opening_cash = Number(v.opening_suggestion);
+        } else {
+            cashControlForm.value.opening_cash =
+                v?.opening_cash != null ? Number(v.opening_cash) : 0;
+        }
+        cashControlForm.value.opening_reason = "";
+        cashControlForm.value.counted_cash =
+            v?.counted_cash != null ? Number(v.counted_cash) : null;
+        cashControlForm.value.notes = v?.notes || "";
+    },
+    { immediate: true, deep: true },
+);
+
+function reloadWalletForBusinessDate() {
+    const q = queryObjectFromPageUrl(page.url);
+    q.business_date =
+        cashControlForm.value.business_date || activeBusinessDate.value;
+    if (activeLocationId.value) {
+        q.location_id = activeLocationId.value;
+    }
+    if (!q.tab && props.ledger) {
+        q.tab = activeWalletTab.value;
+    }
+    router.get(getRoute("payment-card-types.index"), q, {
+        preserveScroll: true,
+        preserveState: true,
+        replace: true,
+    });
+}
+
+async function saveOpeningCash() {
+    if (isShiftClosed.value) return;
+    savingOpeningCash.value = true;
+    try {
+        await axios.post(getRoute("wallet-cash-ledger.opening-cash.store"), {
+            location_id: activeLocationId.value,
+            business_date:
+                cashControlForm.value.business_date || activeBusinessDate.value,
+            opening_cash: Number(cashControlForm.value.opening_cash || 0),
+            reason: cashControlForm.value.opening_reason || null,
+        });
+        notification.success({ message: "Opening cash saved." });
+        reloadWalletForBusinessDate();
+    } catch (e) {
+        notification.error({
+            message:
+                firstValidationMessage(e) || "Could not save opening cash.",
+        });
+    } finally {
+        savingOpeningCash.value = false;
+    }
+}
+
+async function saveCountedCash() {
+    if (isShiftClosed.value) return;
+    savingCountedCash.value = true;
+    try {
+        await axios.post(getRoute("wallet-cash-ledger.counted-cash.store"), {
+            location_id: activeLocationId.value,
+            business_date:
+                cashControlForm.value.business_date || activeBusinessDate.value,
+            counted_cash: Number(cashControlForm.value.counted_cash || 0),
+            notes: cashControlForm.value.notes || null,
+        });
+        notification.success({ message: "Counted cash saved." });
+        reloadWalletForBusinessDate();
+    } catch (e) {
+        notification.error({
+            message:
+                firstValidationMessage(e) || "Could not save counted cash.",
+        });
+    } finally {
+        savingCountedCash.value = false;
+    }
+}
+
+function onEndShiftClick() {
+    if (
+        !props.cashControl?.counted_cash &&
+        props.cashControl?.counted_cash !== 0
+    ) {
+        showEndShiftWarning.value = true;
+        return;
+    }
+    endShift();
+}
+
+function goToSubmitCountedCash() {
+    showEndShiftWarning.value = false;
+    countedCardRef.value?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+    });
+}
+
+async function endShift() {
+    endingShift.value = true;
+    try {
+        await axios.post(getRoute("wallet-cash-ledger.end-shift"), {
+            location_id: activeLocationId.value,
+            business_date:
+                cashControlForm.value.business_date || activeBusinessDate.value,
+        });
+        notification.success({ message: "Shift closed." });
+        reloadWalletForBusinessDate();
+    } catch (e) {
+        notification.error({
+            message:
+                firstValidationMessage(e) ||
+                "Could not close shift. Submit counted cash first.",
+        });
+    } finally {
+        endingShift.value = false;
+    }
+}
+
+async function reopenShift() {
+    reopeningShift.value = true;
+    try {
+        await axios.post(getRoute("wallet-cash-ledger.reopen-shift"), {
+            location_id: activeLocationId.value,
+            business_date:
+                cashControlForm.value.business_date || activeBusinessDate.value,
+        });
+        notification.success({ message: "Shift reopened." });
+        reloadWalletForBusinessDate();
+    } catch (e) {
+        notification.error({
+            message: firstValidationMessage(e) || "Could not reopen shift.",
+        });
+    } finally {
+        reopeningShift.value = false;
+    }
+}
 </script>
 
 <template>
@@ -350,63 +538,255 @@ function onMoneyTableChange(pag) {
         <ContentHeader class="mb-8" title="Payment wallet" />
 
         <div
-            class="mb-6 grid max-w-7xl grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+            v-if="cashControl"
+            class="mb-6 max-w-7xl rounded-lg border border-gray-200 bg-white px-4 py-4 shadow-sm"
         >
             <div
-                class="rounded-lg border border-gray-200 bg-white px-4 py-4 shadow-sm"
+                class="mb-4 flex flex-wrap items-end justify-between gap-3 border-b border-gray-100 pb-3"
             >
-                <div class="text-base font-semibold text-gray-900">
-                    Paid cash sales
-                </div>
-                <div class="mb-3 text-xs text-gray-500">
-                    Paid cash sales (by transaction date)
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div
-                        class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2"
-                    >
-                        <div class="text-xs uppercase text-gray-500">Today</div>
-                        <div class="text-lg font-semibold text-green-700">
-                            {{
-                                formattedTotal(
-                                    Number(walletCashTotals.today_total) || 0,
-                                )
-                            }}
-                        </div>
+                <div>
+                    <div class="text-base font-semibold text-gray-900">
+                        Cash control
+                    </div>
+                    <div class="text-xs text-gray-500">
+                        Daily expected vs counted cash for this location
                     </div>
                     <div
-                        class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2"
+                        v-if="cashControl.is_closed"
+                        class="mt-2 inline-flex items-center gap-1 rounded bg-amber-100 px-2 py-1 text-[11px] font-medium text-amber-800"
                     >
-                        <div class="text-xs uppercase text-gray-500">
-                            Yesterday
-                        </div>
-                        <div class="text-lg font-semibold text-gray-800">
-                            {{
-                                formattedTotal(
-                                    Number(walletCashTotals.yesterday_total) ||
-                                        0,
-                                )
-                            }}
-                        </div>
+                        <IconLock class="h-3 w-3" />
+                        Shift closed for this date
+                    </div>
+                </div>
+                <div class="w-full max-w-[14rem]">
+                    <label class="mb-1 block text-xs font-medium text-gray-600">
+                        Business date
+                    </label>
+                    <div class="flex gap-2">
+                        <input
+                            v-model="cashControlForm.business_date"
+                            type="date"
+                            class="w-full rounded border border-gray-300 px-2 py-2 text-sm"
+                        />
+                        <a-button @click="reloadWalletForBusinessDate">
+                            Load
+                        </a-button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
+                <div
+                    class="rounded border border-gray-200 bg-gray-50 px-3 py-2"
+                >
+                    <div class="text-xs uppercase text-gray-500">Opening</div>
+                    <div class="text-lg font-semibold text-gray-900">
+                        {{
+                            formattedTotal(
+                                Number(cashControl.opening_cash) || 0,
+                            )
+                        }}
                     </div>
                 </div>
                 <div
-                    v-if="ledger"
-                    class="mt-4 border-t border-gray-100 pt-3 text-xs leading-relaxed text-gray-600"
+                    class="rounded border border-gray-200 bg-gray-50 px-3 py-2"
                 >
-                    <span class="font-medium text-gray-700"
-                        >Manual ledger net (today)</span
+                    <div class="text-xs uppercase text-gray-500">
+                        Paid cash sales
+                    </div>
+                    <div class="text-lg font-semibold text-green-700">
+                        {{
+                            formattedTotal(
+                                Number(cashControl.paid_cash_sales) || 0,
+                            )
+                        }}
+                    </div>
+                </div>
+                <div
+                    class="rounded border border-gray-200 bg-gray-50 px-3 py-2"
+                >
+                    <div class="text-xs uppercase text-gray-500">Manual in</div>
+                    <div class="text-lg font-semibold text-green-700">
+                        {{ formattedTotal(Number(cashControl.manual_in) || 0) }}
+                    </div>
+                </div>
+                <div
+                    class="rounded border border-gray-200 bg-gray-50 px-3 py-2"
+                >
+                    <div class="text-xs uppercase text-gray-500">
+                        Manual out
+                    </div>
+                    <div class="text-lg font-semibold text-rose-700">
+                        {{
+                            formattedTotal(Number(cashControl.manual_out) || 0)
+                        }}
+                    </div>
+                </div>
+                <div
+                    class="rounded border border-teal-200 bg-teal-50 px-3 py-2"
+                >
+                    <div class="text-xs uppercase text-teal-700">Expected</div>
+                    <div class="text-lg font-semibold text-teal-800">
+                        {{
+                            formattedTotal(
+                                Number(cashControl.expected_cash) || 0,
+                            )
+                        }}
+                    </div>
+                </div>
+                <div
+                    class="rounded border border-gray-200 bg-gray-50 px-3 py-2"
+                >
+                    <div class="text-xs uppercase text-gray-500">Variance</div>
+                    <div
+                        class="text-lg font-semibold"
+                        :class="
+                            Number(cashControl.variance || 0) === 0
+                                ? 'text-gray-800'
+                                : Number(cashControl.variance || 0) > 0
+                                  ? 'text-amber-700'
+                                  : 'text-red-700'
+                        "
                     >
-                    —
-                    <span class="tabular-nums font-semibold text-gray-900">{{
-                        formattedTotal(Number(ledger.todayManualNet) || 0)
-                    }}</span>
-                    <span class="mt-1 block text-[11px] text-gray-500">
-                        Ledger lines for today's calendar date only; not the
-                        same as paid cash sales above unless you reconcile.
-                    </span>
+                        {{
+                            cashControl.variance == null
+                                ? "—"
+                                : formattedTotal(
+                                      Number(cashControl.variance) || 0,
+                                  )
+                        }}
+                    </div>
                 </div>
             </div>
+
+            <div
+                v-if="canManageCashControl"
+                class="mt-4 grid grid-cols-1 gap-4 border-t border-gray-100 pt-4 lg:grid-cols-2"
+            >
+                <div class="space-y-2 rounded border border-gray-200 p-3">
+                    <div class="text-sm font-medium text-gray-800">
+                        Set opening cash
+                    </div>
+                    <p
+                        v-if="
+                            cashControl.opening_is_saved === false &&
+                            cashControl.suggestion_source_date
+                        "
+                        class="text-xs text-amber-700"
+                    >
+                        Suggested from previous counted cash on
+                        {{ cashControl.suggestion_source_date }}.
+                    </p>
+                    <a-input-number
+                        v-model:value="cashControlForm.opening_cash"
+                        :min="0"
+                        :step="0.01"
+                        class="w-full"
+                        placeholder="0.00"
+                        :disabled="isShiftClosed"
+                    />
+                    <a-textarea
+                        v-model:value="cashControlForm.opening_reason"
+                        :rows="2"
+                        placeholder="Optional reason for override/change"
+                        :disabled="isShiftClosed"
+                    />
+                    <a-button
+                        type="primary"
+                        :loading="savingOpeningCash"
+                        :disabled="isShiftClosed"
+                        @click="saveOpeningCash"
+                    >
+                        Save opening
+                    </a-button>
+                </div>
+                <div
+                    ref="countedCardRef"
+                    class="space-y-2 rounded border border-gray-200 p-3"
+                >
+                    <div class="text-sm font-medium text-gray-800">
+                        Submit counted cash
+                    </div>
+                    <a-input-number
+                        v-model:value="cashControlForm.counted_cash"
+                        :min="0"
+                        :step="0.01"
+                        class="w-full"
+                        placeholder="0.00"
+                        :disabled="isShiftClosed"
+                    />
+                    <a-textarea
+                        v-model:value="cashControlForm.notes"
+                        :rows="2"
+                        placeholder="Optional reconciliation notes"
+                        :disabled="isShiftClosed"
+                    />
+                    <a-button
+                        type="primary"
+                        :loading="savingCountedCash"
+                        :disabled="isShiftClosed"
+                        @click="saveCountedCash"
+                    >
+                        Save counted cash
+                    </a-button>
+                </div>
+            </div>
+            <div
+                v-if="canManageCashControl"
+                class="mt-4 flex items-center gap-2 border-t border-gray-100 pt-4"
+            >
+                <a-button
+                    v-if="!cashControl.is_closed"
+                    type="primary"
+                    :loading="endingShift"
+                    @click="onEndShiftClick"
+                    class="flex items-center gap-2"
+                >
+                    <template #icon>
+                        <IconLock class="h-4 w-4" />
+                    </template>
+                    End Shift
+                </a-button>
+                <a-button
+                    v-else-if="cashControl.can_reopen"
+                    :loading="reopeningShift"
+                    @click="reopenShift"
+                >
+                    <template #icon>
+                        <IconLockOpen class="h-4 w-4" />
+                    </template>
+                    Reopen Shift
+                </a-button>
+                <span
+                    v-else-if="cashControl.is_closed"
+                    class="text-xs text-gray-500"
+                >
+                    Only the user who closed this shift can reopen it.
+                </span>
+            </div>
+        </div>
+
+        <a-modal
+            v-model:visible="showEndShiftWarning"
+            title="Submit counted cash first"
+            ok-text="Go to Submit Counted Cash"
+            cancel-text="Cancel"
+            @ok="goToSubmitCountedCash"
+            @cancel="showEndShiftWarning = false"
+        >
+            <p class="text-sm text-gray-700">
+                End Shift requires counted cash first.
+            </p>
+            <p class="mt-2 text-xs text-gray-500">
+                There is no automatic fallback that sets expected cash as
+                opening cash.
+            </p>
+        </a-modal>
+
+        <div
+            class="mb-6 grid max-w-7xl grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-2"
+        >
             <div
                 class="rounded-lg border border-gray-200 bg-white px-4 py-4 shadow-sm"
             >
@@ -454,7 +834,8 @@ function onMoneyTableChange(pag) {
                     Running cash balance
                 </div>
                 <div class="mb-3 text-xs text-gray-500">
-                    Manual ledger running net (all time): cash in minus cash out
+                    All-time manual ledger net only (cash in minus cash out),
+                    not expected drawer cash for the selected business date.
                 </div>
                 <div
                     class="text-2xl font-bold tabular-nums"
@@ -467,8 +848,8 @@ function onMoneyTableChange(pag) {
                     {{ formattedTotal(Number(runningCashBalance) || 0) }}
                 </div>
                 <p class="mt-2 text-xs text-gray-500">
-                    Includes owner withdrawals and adjustments from Money
-                    Movement.
+                    Includes manual entries like owner withdrawals and
+                    adjustments from Money Movement.
                 </p>
             </div>
         </div>
@@ -488,6 +869,7 @@ function onMoneyTableChange(pag) {
                         :ledger-balance="ledger.ledgerBalance"
                         :rail-card-types="ledger.railCardTypes"
                         :active-location-id="activeLocationId"
+                        :is-shift-closed="isShiftClosed"
                     />
                 </a-tab-pane>
                 <a-tab-pane key="card-types" tab="Payment card types">
