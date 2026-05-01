@@ -213,7 +213,7 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
             $counter = 1;
             $originalDisplayName = $newDisplayName;
             while (in_array($newDisplayName, $usedNames)) {
-                $newDisplayName = $originalDisplayName." ({$counter})";
+                $newDisplayName = $originalDisplayName . " ({$counter})";
                 $counter++;
             }
 

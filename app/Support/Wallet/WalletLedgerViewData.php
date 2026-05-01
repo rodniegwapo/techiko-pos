@@ -3,6 +3,7 @@
 namespace App\Support\Wallet;
 
 use App\Models\Domain;
+use App\Models\InventoryLocation;
 use App\Models\PaymentCardType;
 use App\Models\WalletCashMovement;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -20,7 +21,7 @@ class WalletLedgerViewData
      *     railCardTypes: Collection<int, PaymentCardType>
      * }
      */
-    public static function buildPaginated(Request $request, Domain $domain): array
+    public static function buildPaginated(Request $request, Domain $domain, InventoryLocation $location): array
     {
         $validated = $request->validate([
             'page' => ['sometimes', 'integer', 'min:1'],
@@ -34,7 +35,7 @@ class WalletLedgerViewData
 
         $perPage = max(1, min(100, (int) $request->input('per_page', 20)));
 
-        $filtered = self::baseQuery($request, $domain, $validated);
+        $filtered = self::baseQuery($request, $domain, $location, $validated);
 
         $inSum = (clone $filtered)->where('direction', 'in')->sum('amount');
         $outSum = (clone $filtered)->where('direction', 'out')->sum('amount');
@@ -55,10 +56,11 @@ class WalletLedgerViewData
                     : null,
                 'rail' => $request->input('rail'),
                 'kind' => $validated['kind'] ?? null,
+                'location_id' => $location->id,
             ],
             'ledgerBalance' => $ledgerBalance,
             'railCardTypes' => PaymentCardType::query()
-                ->forDomain($domain->name_slug)
+                ->forDomainLocation($domain->name_slug, $location->id)
                 ->active()
                 ->orderBy('sort_order')
                 ->orderBy('name')
@@ -66,10 +68,10 @@ class WalletLedgerViewData
         ];
     }
 
-    public static function todayManualNet(Domain $domain, string $dateYmd): float
+    public static function todayManualNet(Domain $domain, InventoryLocation $location, string $dateYmd): float
     {
         $base = WalletCashMovement::query()
-            ->forDomain($domain->name_slug)
+            ->forWalletContext($domain->name_slug, $location->id)
             ->whereDate('movement_date', $dateYmd);
         $inSum = (clone $base)->where('direction', 'in')->sum('amount');
         $outSum = (clone $base)->where('direction', 'out')->sum('amount');
@@ -77,9 +79,9 @@ class WalletLedgerViewData
         return round(((float) $inSum - (float) $outSum), 2);
     }
 
-    public static function runningCashBalance(Domain $domain): float
+    public static function runningCashBalance(Domain $domain, InventoryLocation $location): float
     {
-        $base = WalletCashMovement::query()->forDomain($domain->name_slug);
+        $base = WalletCashMovement::query()->forWalletContext($domain->name_slug, $location->id);
         $inSum = (clone $base)->where('direction', 'in')->sum('amount');
         $outSum = (clone $base)->where('direction', 'out')->sum('amount');
 
@@ -89,9 +91,9 @@ class WalletLedgerViewData
     /**
      * @param  array<string, mixed>  $validated
      */
-    public static function baseQuery(Request $request, Domain $domain, array $validated): Builder
+    public static function baseQuery(Request $request, Domain $domain, InventoryLocation $location, array $validated): Builder
     {
-        $q = WalletCashMovement::query()->forDomain($domain->name_slug);
+        $q = WalletCashMovement::query()->forWalletContext($domain->name_slug, $location->id);
 
         if (! empty($validated['date_from'])) {
             $q->whereDate('movement_date', '>=', $validated['date_from']);
@@ -105,7 +107,7 @@ class WalletLedgerViewData
             $q->whereNull('payment_card_type_id');
         } elseif (! empty($validated['payment_card_type_id'])) {
             $type = PaymentCardType::query()->findOrFail($validated['payment_card_type_id']);
-            self::ensureCardTypeInDomain($domain, $type);
+            self::ensureCardTypeInDomainLocation($domain, $location, $type);
             $q->where('payment_card_type_id', $validated['payment_card_type_id']);
         }
 
@@ -116,9 +118,12 @@ class WalletLedgerViewData
         return $q;
     }
 
-    public static function ensureCardTypeInDomain(Domain $domain, PaymentCardType $paymentCardType): void
+    public static function ensureCardTypeInDomainLocation(Domain $domain, InventoryLocation $location, PaymentCardType $paymentCardType): void
     {
-        if ($paymentCardType->domain !== $domain->name_slug) {
+        if (
+            $paymentCardType->domain !== $domain->name_slug
+            || (int) $paymentCardType->location_id !== (int) $location->id
+        ) {
             abort(403);
         }
     }

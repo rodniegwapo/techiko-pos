@@ -67,6 +67,29 @@ const props = defineProps({
         type: Number,
         default: null,
     },
+    activeLocation: {
+        type: Object,
+        default: () => null,
+    },
+});
+
+const activeLocationId = computed(() => {
+    const q = queryObjectFromPageUrl(page.url);
+    if (q.location_id && /^[0-9]+$/.test(String(q.location_id))) {
+        return Number(q.location_id);
+    }
+
+    const fromWallet = props.activeLocation?.id;
+    if (fromWallet != null) {
+        return Number(fromWallet);
+    }
+
+    const fromShared = page.props?.currentLocation?.id;
+    if (fromShared != null) {
+        return Number(fromShared);
+    }
+
+    return null;
 });
 
 const activeWalletTab = computed(() => {
@@ -84,6 +107,9 @@ const activeWalletTab = computed(() => {
 function onWalletTabChange(key) {
     const base = queryObjectFromPageUrl(page.url);
     base.tab = key;
+    if (activeLocationId.value) {
+        base.location_id = activeLocationId.value;
+    }
     router.get(getRoute("payment-card-types.index"), base, {
         preserveState: true,
         preserveScroll: true,
@@ -132,6 +158,7 @@ async function save() {
                     paymentCardType: editing.value.id,
                 }),
                 {
+                    location_id: activeLocationId.value,
                     name,
                     is_active: formActive.value,
                 },
@@ -139,6 +166,7 @@ async function save() {
             notification.success({ message: "Card type updated." });
         } else {
             await axios.post(getRoute("payment-card-types.store"), {
+                location_id: activeLocationId.value,
                 name,
                 sort_order: 0,
             });
@@ -171,6 +199,11 @@ async function remove(row) {
             getRoute("payment-card-types.destroy", {
                 paymentCardType: row.id,
             }),
+            {
+                params: {
+                    location_id: activeLocationId.value,
+                },
+            },
         );
         notification.success({ message: "Done." });
         router.reload({
@@ -263,7 +296,13 @@ async function loadMoneyDetails(page = 1) {
             getRoute("payment-card-types.money", {
                 paymentCardType: moneyDetailsType.value.id,
             }),
-            { params: { page, per_page: historyPagination.value.pageSize } },
+            {
+                params: {
+                    page,
+                    per_page: historyPagination.value.pageSize,
+                    location_id: activeLocationId.value,
+                },
+            },
         );
         todayTotal.value = Number(data.today_total) || 0;
         yesterdayTotal.value = Number(data.yesterday_total) || 0;
@@ -448,15 +487,14 @@ function onMoneyTableChange(pag) {
                         :filters="ledger.filters"
                         :ledger-balance="ledger.ledgerBalance"
                         :rail-card-types="ledger.railCardTypes"
+                        :active-location-id="activeLocationId"
                     />
                 </a-tab-pane>
                 <a-tab-pane key="card-types" tab="Payment card types">
                     <ContentLayout title="Payment card types">
                         <template #filters>
                             <a-button
-                                v-if="
-                                    hasPermission('payment-card-types.store')
-                                "
+                                v-if="hasPermission('payment-card-types.store')"
                                 type="primary"
                                 class="bg-white border flex items-center border-green-500 text-green-500"
                                 @click="openCreate"
@@ -480,9 +518,7 @@ function onMoneyTableChange(pag) {
                                 }"
                             >
                                 <template #bodyCell="{ column, record }">
-                                    <template
-                                        v-if="column.key === 'is_active'"
-                                    >
+                                    <template v-if="column.key === 'is_active'">
                                         <a-tag
                                             :color="
                                                 record.is_active
@@ -492,8 +528,8 @@ function onMoneyTableChange(pag) {
                                         >
                                             {{
                                                 record.is_active
-                                                    ? 'Active'
-                                                    : 'Inactive'
+                                                    ? "Active"
+                                                    : "Inactive"
                                             }}
                                         </a-tag>
                                     </template>
@@ -598,8 +634,8 @@ function onMoneyTableChange(pag) {
                                     >
                                         {{
                                             record.is_active
-                                                ? 'Active'
-                                                : 'Inactive'
+                                                ? "Active"
+                                                : "Inactive"
                                         }}
                                     </a-tag>
                                 </template>

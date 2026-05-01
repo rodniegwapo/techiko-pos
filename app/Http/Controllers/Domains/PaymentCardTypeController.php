@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Domains;
 
 use App\Http\Controllers\Controller;
 use App\Models\Domain;
+use App\Models\InventoryLocation;
 use App\Models\PaymentCardType;
 use App\Models\Sale;
 use App\Support\Wallet\WalletLedgerViewData;
+use App\Support\Wallet\WalletLocationResolver;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Http\Request;
@@ -16,14 +18,16 @@ class PaymentCardTypeController extends Controller
 {
     public function index(Request $request, Domain $domain)
     {
+        $location = WalletLocationResolver::resolve($request, $domain);
+
         $types = PaymentCardType::query()
-            ->forDomain($domain->name_slug)
+            ->forDomainLocation($domain->name_slug, $location->id)
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get();
 
-        $walletCashTotals = $this->paidSalesTotalsByPaymentMethod($domain, 'cash');
-        $walletCreditTotals = $this->paidSalesTotalsByPaymentMethod($domain, 'credit');
+        $walletCashTotals = $this->paidSalesTotalsByPaymentMethod($domain, $location, 'cash');
+        $walletCreditTotals = $this->paidSalesTotalsByPaymentMethod($domain, $location, 'credit');
 
         $props = [
             'cardTypes' => $types,
@@ -31,14 +35,18 @@ class PaymentCardTypeController extends Controller
             'walletCreditTotals' => $walletCreditTotals,
             'ledger' => null,
             'runningCashBalance' => null,
+            'activeLocation' => [
+                'id' => $location->id,
+                'name' => $location->name,
+            ],
         ];
 
         if ($request->user()->hasPermissionToRoute('wallet-cash-ledger.index')) {
-            $ledger = WalletLedgerViewData::buildPaginated($request, $domain);
+            $ledger = WalletLedgerViewData::buildPaginated($request, $domain, $location);
             $today = now()->toDateString();
-            $ledger['todayManualNet'] = WalletLedgerViewData::todayManualNet($domain, $today);
+            $ledger['todayManualNet'] = WalletLedgerViewData::todayManualNet($domain, $location, $today);
             $props['ledger'] = $ledger;
-            $props['runningCashBalance'] = WalletLedgerViewData::runningCashBalance($domain);
+            $props['runningCashBalance'] = WalletLedgerViewData::runningCashBalance($domain, $location);
         }
 
         return Inertia::render('Wallet/Index', $props);
@@ -49,10 +57,11 @@ class PaymentCardTypeController extends Controller
      *
      * @return array{today_total: float, yesterday_total: float}
      */
-    private function paidSalesTotalsByPaymentMethod(Domain $domain, string $paymentMethod): array
+    private function paidSalesTotalsByPaymentMethod(Domain $domain, InventoryLocation $location, string $paymentMethod): array
     {
         $base = Sale::query()
             ->where('domain', $domain->name_slug)
+            ->where('location_id', $location->id)
             ->where('payment_status', 'paid')
             ->where('payment_method', $paymentMethod);
 
@@ -75,8 +84,10 @@ class PaymentCardTypeController extends Controller
      */
     public function list(Request $request, Domain $domain)
     {
+        $location = WalletLocationResolver::resolve($request, $domain);
+
         $types = PaymentCardType::query()
-            ->forDomain($domain->name_slug)
+            ->forDomainLocation($domain->name_slug, $location->id)
             ->active()
             ->orderBy('sort_order')
             ->orderBy('name')
@@ -87,6 +98,8 @@ class PaymentCardTypeController extends Controller
 
     public function store(Request $request, Domain $domain)
     {
+        $location = WalletLocationResolver::resolve($request, $domain);
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'sort_order' => ['nullable', 'integer', 'min:0', 'max:65535'],
@@ -94,6 +107,7 @@ class PaymentCardTypeController extends Controller
 
         $type = PaymentCardType::query()->create([
             'domain' => $domain->name_slug,
+            'location_id' => $location->id,
             'name' => $validated['name'],
             'is_active' => true,
             'sort_order' => $validated['sort_order'] ?? 0,
@@ -107,7 +121,8 @@ class PaymentCardTypeController extends Controller
 
     public function update(Request $request, Domain $domain, PaymentCardType $paymentCardType)
     {
-        $this->ensureInDomain($domain, $paymentCardType);
+        $location = WalletLocationResolver::resolve($request, $domain);
+        $this->ensureInDomainLocation($domain, $location, $paymentCardType);
 
         $validated = $request->validate([
             'name' => ['sometimes', 'required', 'string', 'max:255'],
@@ -128,7 +143,8 @@ class PaymentCardTypeController extends Controller
      */
     public function money(Request $request, Domain $domain, PaymentCardType $paymentCardType)
     {
-        $this->ensureInDomain($domain, $paymentCardType);
+        $location = WalletLocationResolver::resolve($request, $domain);
+        $this->ensureInDomainLocation($domain, $location, $paymentCardType);
 
         $request->validate([
             'page' => ['sometimes', 'integer', 'min:1'],
@@ -140,6 +156,7 @@ class PaymentCardTypeController extends Controller
 
         $base = Sale::query()
             ->where('domain', $domain->name_slug)
+            ->where('location_id', $location->id)
             ->where('payment_card_type_id', $paymentCardType->id)
             ->where('payment_status', 'paid')
             ->where('payment_method', 'card');
@@ -179,9 +196,10 @@ class PaymentCardTypeController extends Controller
         ]);
     }
 
-    public function destroy(Domain $domain, PaymentCardType $paymentCardType)
+    public function destroy(Request $request, Domain $domain, PaymentCardType $paymentCardType)
     {
-        $this->ensureInDomain($domain, $paymentCardType);
+        $location = WalletLocationResolver::resolve($request, $domain);
+        $this->ensureInDomainLocation($domain, $location, $paymentCardType);
 
         if ($paymentCardType->sales()->exists()) {
             $paymentCardType->update(['is_active' => false]);
@@ -200,9 +218,12 @@ class PaymentCardTypeController extends Controller
         ]);
     }
 
-    private function ensureInDomain(Domain $domain, PaymentCardType $paymentCardType): void
+    private function ensureInDomainLocation(Domain $domain, InventoryLocation $location, PaymentCardType $paymentCardType): void
     {
-        if ($paymentCardType->domain !== $domain->name_slug) {
+        if (
+            $paymentCardType->domain !== $domain->name_slug
+            || (int) $paymentCardType->location_id !== (int) $location->id
+        ) {
             abort(403);
         }
     }

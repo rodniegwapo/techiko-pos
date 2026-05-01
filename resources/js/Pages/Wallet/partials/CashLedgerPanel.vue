@@ -25,6 +25,10 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    activeLocationId: {
+        type: Number,
+        default: null,
+    },
 });
 
 const { getRoute } = useDomainRoutes();
@@ -45,11 +49,17 @@ function tabQueryFromUrl() {
     const params = Object.fromEntries(
         new URLSearchParams(url.slice(idx + 1)),
     );
+    const out = {};
     if (params.tab === "ledger" || params.tab === "card-types") {
-        return { tab: params.tab };
+        out.tab = params.tab;
+    }
+    if (params.location_id && /^[0-9]+$/.test(String(params.location_id))) {
+        out.location_id = Number(params.location_id);
+    } else if (props.activeLocationId) {
+        out.location_id = props.activeLocationId;
     }
 
-    return {};
+    return out;
 }
 
 const KIND_LABELS = {
@@ -245,6 +255,7 @@ function buildStorePayload() {
         kind: entryForm.kind,
         movement_date: entryForm.movement_date,
         notes: entryForm.notes || null,
+        location_id: props.activeLocationId,
     };
     if (entryForm.kind === "owner_draw") {
         base.draw_source = entryForm.drawSource;

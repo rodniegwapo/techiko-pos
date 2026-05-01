@@ -27,6 +27,18 @@ class WalletCashMovement extends Model
         return $query->where('domain', $domainSlug);
     }
 
+    public function scopeForWalletContext($query, string $domainSlug, int $locationId)
+    {
+        return $query
+            ->where('domain', $domainSlug)
+            ->where('location_id', $locationId);
+    }
+
+    public function location(): BelongsTo
+    {
+        return $this->belongsTo(InventoryLocation::class, 'location_id');
+    }
+
     public function paymentCardType(): BelongsTo
     {
         return $this->belongsTo(PaymentCardType::class);
