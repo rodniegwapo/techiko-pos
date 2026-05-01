@@ -152,6 +152,10 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
 
             'wallet-cash-ledger.index' => 'View cash ledger',
             'wallet-cash-ledger.store' => 'Record cash ledger entry',
+            'wallet-cash-ledger.opening-cash.store' => 'Set opening cash',
+            'wallet-cash-ledger.counted-cash.store' => 'Submit counted cash',
+            'wallet-cash-ledger.end-shift' => 'End shift',
+            'wallet-cash-ledger.reopen-shift' => 'Reopen shift',
 
             'vat-report.index' => 'View VAT Report',
 

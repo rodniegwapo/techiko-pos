@@ -29,6 +29,10 @@ const props = defineProps({
         type: Number,
         default: null,
     },
+    isShiftClosed: {
+        type: Boolean,
+        default: false,
+    },
 });
 
 const { getRoute } = useDomainRoutes();
@@ -52,6 +56,9 @@ function tabQueryFromUrl() {
     const out = {};
     if (params.tab === "ledger" || params.tab === "card-types") {
         out.tab = params.tab;
+    }
+    if (params.business_date) {
+        out.business_date = params.business_date;
     }
     if (params.location_id && /^[0-9]+$/.test(String(params.location_id))) {
         out.location_id = Number(params.location_id);
@@ -209,6 +216,10 @@ function resetDrawFields() {
 }
 
 function openModal(options = {}) {
+    if (props.isShiftClosed) {
+        antMessage.warning("Shift is closed for this date/location. Reopen to add entries.");
+        return;
+    }
     const direction = options.direction ?? "in";
     const kind = options.kind ?? "adjustment";
     const title = options.title ?? "Add ledger entry";
@@ -436,6 +447,7 @@ watch(
                     v-if="hasPermission('wallet-cash-ledger.store')"
                     type="primary"
                     class="flex items-center border border-teal-500 bg-white text-teal-600"
+                    :disabled="isShiftClosed"
                     @click="
                         openModal({
                             direction: 'in',
@@ -453,6 +465,7 @@ watch(
                     v-if="hasPermission('wallet-cash-ledger.store')"
                     type="primary"
                     class="flex items-center border border-rose-500 bg-white text-rose-600"
+                    :disabled="isShiftClosed"
                     @click="
                         openModal({
                             direction: 'out',
@@ -465,6 +478,7 @@ watch(
                 </a-button>
                 <a-button
                     v-if="hasPermission('wallet-cash-ledger.store')"
+                    :disabled="isShiftClosed"
                     @click="openModal({ title: 'Add ledger entry' })"
                 >
                     Other entry

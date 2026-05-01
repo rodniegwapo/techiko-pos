@@ -6,13 +6,31 @@ use App\Http\Controllers\Controller;
 use App\Models\Domain;
 use App\Models\PaymentCardType;
 use App\Models\WalletCashMovement;
+use App\Models\WalletCashOpeningAudit;
+use App\Models\WalletCashReconciliation;
 use App\Support\Wallet\WalletLedgerViewData;
 use App\Support\Wallet\WalletLocationResolver;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rule;
 
 class WalletCashMovementController extends Controller
 {
+    private function ensureDateNotClosed(string $domainSlug, int $locationId, string $dateYmd): void
+    {
+        $closed = WalletCashReconciliation::query()
+            ->forWalletContext($domainSlug, $locationId)
+            ->whereDate('business_date', $dateYmd)
+            ->where('is_closed', true)
+            ->exists();
+
+        if ($closed) {
+            throw ValidationException::withMessages([
+                'business_date' => 'Shift is closed for this date/location. Reopen to edit.',
+            ]);
+        }
+    }
+
     public function index(Request $request, Domain $domain)
     {
         $qs = $request->getQueryString();
@@ -52,6 +70,7 @@ class WalletCashMovementController extends Controller
             'movement_date' => ['required', 'date'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
+        $this->ensureDateNotClosed($domain->name_slug, (int) $location->id, (string) $validated['movement_date']);
 
         $paymentCardTypeId = $validated['payment_card_type_id'] ?? null;
 
@@ -77,5 +96,133 @@ class WalletCashMovementController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Ledger entry saved.');
+    }
+
+    public function setOpeningCash(Request $request, Domain $domain)
+    {
+        $location = WalletLocationResolver::resolve($request, $domain);
+
+        $validated = $request->validate([
+            'business_date' => ['required', 'date'],
+            'opening_cash' => ['required', 'numeric', 'min:0'],
+            'reason' => ['nullable', 'string', 'max:2000'],
+        ]);
+        $this->ensureDateNotClosed($domain->name_slug, (int) $location->id, (string) $validated['business_date']);
+
+        $newOpening = round((float) $validated['opening_cash'], 2);
+        $recon = WalletCashReconciliation::query()->firstOrNew([
+            'domain' => $domain->name_slug,
+            'location_id' => $location->id,
+            'business_date' => $validated['business_date'],
+        ]);
+        $oldOpening = $recon->exists ? (float) $recon->opening_cash : null;
+
+        $recon->opening_cash = $newOpening;
+        $recon->opening_source = 'manual';
+        $recon->opening_source_date = null;
+        $recon->save();
+
+        WalletCashOpeningAudit::query()->create([
+            'domain' => $domain->name_slug,
+            'location_id' => $location->id,
+            'business_date' => $validated['business_date'],
+            'reconciliation_id' => $recon->id,
+            'old_opening_cash' => $oldOpening,
+            'new_opening_cash' => $newOpening,
+            'delta_amount' => round($newOpening - (float) ($oldOpening ?? 0), 2),
+            'changed_by' => $request->user()->id,
+            'changed_at' => now(),
+            'reason' => $validated['reason'] ?? null,
+        ]);
+
+        return redirect()->back()->with('success', 'Opening cash saved.');
+    }
+
+    public function submitCountedCash(Request $request, Domain $domain)
+    {
+        $location = WalletLocationResolver::resolve($request, $domain);
+
+        $validated = $request->validate([
+            'business_date' => ['required', 'date'],
+            'counted_cash' => ['required', 'numeric', 'min:0'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+        $this->ensureDateNotClosed($domain->name_slug, (int) $location->id, (string) $validated['business_date']);
+
+        WalletCashReconciliation::query()->updateOrCreate(
+            [
+                'domain' => $domain->name_slug,
+                'location_id' => $location->id,
+                'business_date' => $validated['business_date'],
+            ],
+            [
+                'counted_cash' => round((float) $validated['counted_cash'], 2),
+                'notes' => $validated['notes'] ?? null,
+                'counted_by' => $request->user()->id,
+                'counted_at' => now(),
+            ]
+        );
+
+        return redirect()->back()->with('success', 'Counted cash saved.');
+    }
+
+    public function endShift(Request $request, Domain $domain)
+    {
+        $location = WalletLocationResolver::resolve($request, $domain);
+        $validated = $request->validate([
+            'business_date' => ['required', 'date'],
+        ]);
+
+        $recon = WalletCashReconciliation::query()
+            ->forWalletContext($domain->name_slug, $location->id)
+            ->whereDate('business_date', $validated['business_date'])
+            ->first();
+
+        if (! $recon || $recon->counted_cash === null) {
+            throw ValidationException::withMessages([
+                'counted_cash' => 'End Shift requires counted cash first. No automatic expected-to-opening fallback.',
+            ]);
+        }
+
+        if ($recon->is_closed) {
+            return redirect()->back()->with('success', 'Shift is already closed.');
+        }
+
+        $recon->is_closed = true;
+        $recon->closed_at = now();
+        $recon->closed_by = $request->user()->id;
+        $recon->save();
+
+        return redirect()->back()->with('success', 'Shift closed.');
+    }
+
+    public function reopenShift(Request $request, Domain $domain)
+    {
+        $location = WalletLocationResolver::resolve($request, $domain);
+        $validated = $request->validate([
+            'business_date' => ['required', 'date'],
+        ]);
+
+        $recon = WalletCashReconciliation::query()
+            ->forWalletContext($domain->name_slug, $location->id)
+            ->whereDate('business_date', $validated['business_date'])
+            ->firstOrFail();
+
+        if (! $recon->is_closed) {
+            return redirect()->back()->with('success', 'Shift is already open.');
+        }
+
+        if ((int) $recon->closed_by !== (int) $request->user()->id) {
+            abort(403);
+        }
+
+        $recon->is_closed = false;
+        $recon->reopened_at = now();
+        $recon->reopened_by = $request->user()->id;
+        $recon->closed_at = null;
+        $recon->closed_by = null;
+        $recon->save();
+
+        return redirect()->back()->with('success', 'Shift reopened.');
     }
 }
