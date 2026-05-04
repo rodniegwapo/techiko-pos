@@ -92,6 +92,15 @@ class WalletCashControlTest extends TestCase
             'delta_amount' => 1000.00,
             'changed_by' => $ctx['user']->id,
         ]);
+        $this->assertDatabaseHas('wallet_cash_movements', [
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'movement_date' => $date,
+            'direction' => 'in',
+            'kind' => 'adjustment',
+            'notes' => 'AUTO_CC_OPENING',
+            'amount' => 1000.00,
+        ]);
 
         $this->actingAs($ctx['user'])->post($url, [
             'location_id' => $ctx['location']->id,
@@ -119,6 +128,17 @@ class WalletCashControlTest extends TestCase
             'changed_by' => $ctx['user']->id,
             'reason' => 'Owner changed float after recount',
         ]);
+        $this->assertSame(
+            1,
+            WalletCashMovement::query()->where('notes', 'AUTO_CC_OPENING')->count()
+        );
+        $this->assertDatabaseHas('wallet_cash_movements', [
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'movement_date' => $date,
+            'notes' => 'AUTO_CC_OPENING',
+            'amount' => 1500.00,
+        ]);
     }
 
     public function test_submit_counted_cash_records_user_and_timestamp(): void
@@ -141,6 +161,78 @@ class WalletCashControlTest extends TestCase
         $this->assertSame($ctx['user']->id, $row->counted_by);
         $this->assertNotNull($row->counted_at);
         $this->assertSame(980.0, (float) $row->counted_cash);
+        $this->assertDatabaseHas('wallet_cash_movements', [
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'movement_date' => $date,
+            'notes' => 'AUTO_CC_COUNTED_VARIANCE',
+            'direction' => 'in',
+            'amount' => 980.00,
+        ]);
+    }
+
+    public function test_submit_counted_cash_zero_variance_creates_no_variance_ledger_entry(): void
+    {
+        $ctx = $this->seedContext();
+        $date = now()->subDays(7)->toDateString();
+        $url = route('domains.wallet-cash-ledger.counted-cash.store', ['domain' => $ctx['domain']->name_slug]);
+
+        WalletCashReconciliation::query()->create([
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'business_date' => $date,
+            'opening_cash' => 100,
+        ]);
+
+        $this->actingAs($ctx['user'])->post($url, [
+            'location_id' => $ctx['location']->id,
+            'business_date' => $date,
+            'counted_cash' => 100,
+        ])->assertRedirect();
+
+        $this->assertSame(
+            0,
+            WalletCashMovement::query()->where('notes', 'AUTO_CC_COUNTED_VARIANCE')->count()
+        );
+    }
+
+    public function test_submit_counted_cash_replaces_auto_variance_entry_instead_of_duplicating(): void
+    {
+        $ctx = $this->seedContext();
+        $date = now()->subDays(6)->toDateString();
+        $url = route('domains.wallet-cash-ledger.counted-cash.store', ['domain' => $ctx['domain']->name_slug]);
+
+        WalletCashReconciliation::query()->create([
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'business_date' => $date,
+            'opening_cash' => 100,
+        ]);
+
+        $this->actingAs($ctx['user'])->post($url, [
+            'location_id' => $ctx['location']->id,
+            'business_date' => $date,
+            'counted_cash' => 90,
+        ])->assertRedirect();
+
+        $this->actingAs($ctx['user'])->post($url, [
+            'location_id' => $ctx['location']->id,
+            'business_date' => $date,
+            'counted_cash' => 80,
+        ])->assertRedirect();
+
+        $this->assertSame(
+            1,
+            WalletCashMovement::query()->where('notes', 'AUTO_CC_COUNTED_VARIANCE')->count()
+        );
+        $this->assertDatabaseHas('wallet_cash_movements', [
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'movement_date' => $date,
+            'notes' => 'AUTO_CC_COUNTED_VARIANCE',
+            'direction' => 'out',
+            'amount' => 20.00,
+        ]);
     }
 
     public function test_wallet_index_returns_cash_control_formula_values(): void
@@ -325,7 +417,20 @@ class WalletCashControlTest extends TestCase
             'kind' => 'owner_draw',
             'amount' => 250.00,
             'movement_date' => $date,
+            'notes' => 'AUTO_CC_ENDSHIFT_CASHOUT',
         ]);
+
+        $walletUrl = route('domains.payment-card-types.index', [
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'business_date' => $date,
+        ]);
+        $this->actingAs($ctx['user'])->get($walletUrl)
+            ->assertOk()
+            ->assertInertia(fn (Inertia $page) => $page
+                ->where('cashControl.expected_cash', 200)
+                ->where('cashControl.manual_out', 0)
+            );
 
         $this->actingAs($otherUser)->post($reopenUrl, [
             'location_id' => $ctx['location']->id,
@@ -532,5 +637,183 @@ class WalletCashControlTest extends TestCase
             'business_date' => $futureDate,
             'end_shift_action' => 'cashout_now',
         ])->assertSessionHasErrors(['business_date']);
+    }
+
+    public function test_submit_counted_skips_daily_variance_when_bridge_matches_across_gap_days(): void
+    {
+        $ctx = $this->seedContext();
+        $anchorDate = now()->subDays(12)->toDateString();
+        $midDate = now()->subDays(11)->toDateString();
+        $targetDate = now()->subDays(10)->toDateString();
+
+        WalletCashReconciliation::query()->create([
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'business_date' => $anchorDate,
+            'opening_cash' => 0,
+            'counted_cash' => 400,
+            'counted_by' => $ctx['user']->id,
+            'counted_at' => now(),
+        ]);
+
+        Sale::query()->create([
+            'domain' => $ctx['domain']->name_slug,
+            'user_id' => $ctx['user']->id,
+            'invoice_number' => 'INV-BR-1-'.Str::random(6),
+            'payment_method' => 'cash',
+            'payment_status' => 'paid',
+            'location_id' => $ctx['location']->id,
+            'total_amount' => 100,
+            'discount_amount' => 0,
+            'tax_amount' => 0,
+            'grand_total' => 100,
+            'transaction_date' => $midDate.' 12:00:00',
+        ]);
+        Sale::query()->create([
+            'domain' => $ctx['domain']->name_slug,
+            'user_id' => $ctx['user']->id,
+            'invoice_number' => 'INV-BR-2-'.Str::random(6),
+            'payment_method' => 'cash',
+            'payment_status' => 'paid',
+            'location_id' => $ctx['location']->id,
+            'total_amount' => 100,
+            'discount_amount' => 0,
+            'tax_amount' => 0,
+            'grand_total' => 100,
+            'transaction_date' => $targetDate.' 12:00:00',
+        ]);
+
+        $countedUrl = route('domains.wallet-cash-ledger.counted-cash.store', ['domain' => $ctx['domain']->name_slug]);
+        $this->actingAs($ctx['user'])->post($countedUrl, [
+            'location_id' => $ctx['location']->id,
+            'business_date' => $targetDate,
+            'counted_cash' => 600,
+        ])->assertRedirect();
+
+        $this->assertSame(
+            0,
+            WalletCashMovement::query()
+                ->where('notes', 'AUTO_CC_COUNTED_VARIANCE')
+                ->whereDate('movement_date', $targetDate)
+                ->count()
+        );
+    }
+
+    public function test_wallet_index_bridge_expected_includes_end_shift_cashout_in_span(): void
+    {
+        $ctx = $this->seedContext();
+        $anchorDate = now()->subDays(20)->toDateString();
+        $midDate = now()->subDays(19)->toDateString();
+        $targetDate = now()->subDays(18)->toDateString();
+
+        WalletCashReconciliation::query()->create([
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'business_date' => $anchorDate,
+            'opening_cash' => 0,
+            'counted_cash' => 500,
+            'counted_by' => $ctx['user']->id,
+            'counted_at' => now(),
+        ]);
+
+        WalletCashMovement::query()->create([
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'direction' => 'out',
+            'amount' => 250,
+            'kind' => 'owner_draw',
+            'movement_date' => $midDate,
+            'user_id' => $ctx['user']->id,
+            'notes' => 'AUTO_CC_ENDSHIFT_CASHOUT',
+        ]);
+
+        $walletUrl = route('domains.payment-card-types.index', [
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'business_date' => $targetDate,
+        ]);
+
+        $this->actingAs($ctx['user'])->get($walletUrl)
+            ->assertOk()
+            ->assertInertia(fn (Inertia $page) => $page
+                ->component('Wallet/Index')
+                ->where('cashControl.bridge_anchor_business_date', $anchorDate)
+                ->where('cashControl.bridge_expected_cash', 250)
+            );
+    }
+
+    public function test_submit_counted_posts_variance_when_bridge_also_disagrees(): void
+    {
+        $ctx = $this->seedContext();
+        $anchorDate = now()->subDays(15)->toDateString();
+        $midDate = now()->subDays(14)->toDateString();
+        $targetDate = now()->subDays(13)->toDateString();
+
+        WalletCashReconciliation::query()->create([
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'business_date' => $anchorDate,
+            'opening_cash' => 0,
+            'counted_cash' => 400,
+            'counted_by' => $ctx['user']->id,
+            'counted_at' => now(),
+        ]);
+
+        Sale::query()->create([
+            'domain' => $ctx['domain']->name_slug,
+            'user_id' => $ctx['user']->id,
+            'invoice_number' => 'INV-BR3-1-'.Str::random(6),
+            'payment_method' => 'cash',
+            'payment_status' => 'paid',
+            'location_id' => $ctx['location']->id,
+            'total_amount' => 100,
+            'discount_amount' => 0,
+            'tax_amount' => 0,
+            'grand_total' => 100,
+            'transaction_date' => $midDate.' 10:00:00',
+        ]);
+        Sale::query()->create([
+            'domain' => $ctx['domain']->name_slug,
+            'user_id' => $ctx['user']->id,
+            'invoice_number' => 'INV-BR3-2-'.Str::random(6),
+            'payment_method' => 'cash',
+            'payment_status' => 'paid',
+            'location_id' => $ctx['location']->id,
+            'total_amount' => 100,
+            'discount_amount' => 0,
+            'tax_amount' => 0,
+            'grand_total' => 100,
+            'transaction_date' => $targetDate.' 10:00:00',
+        ]);
+
+        WalletCashReconciliation::query()->create([
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'business_date' => $targetDate,
+            'opening_cash' => 0,
+        ]);
+
+        $countedUrl = route('domains.wallet-cash-ledger.counted-cash.store', ['domain' => $ctx['domain']->name_slug]);
+        $this->actingAs($ctx['user'])->post($countedUrl, [
+            'location_id' => $ctx['location']->id,
+            'business_date' => $targetDate,
+            'counted_cash' => 400,
+        ])->assertRedirect();
+
+        $this->assertSame(
+            1,
+            WalletCashMovement::query()
+                ->where('notes', 'AUTO_CC_COUNTED_VARIANCE')
+                ->whereDate('movement_date', $targetDate)
+                ->count()
+        );
+        $this->assertDatabaseHas('wallet_cash_movements', [
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'movement_date' => $targetDate,
+            'notes' => 'AUTO_CC_COUNTED_VARIANCE',
+            'direction' => 'in',
+            'amount' => 300.00,
+        ]);
     }
 }

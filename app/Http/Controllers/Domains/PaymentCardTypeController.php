@@ -9,6 +9,7 @@ use App\Models\PaymentCardType;
 use App\Models\Sale;
 use App\Models\WalletCashMovement;
 use App\Models\WalletCashReconciliation;
+use App\Support\Wallet\WalletCashBridgeExpected;
 use App\Support\Wallet\WalletLedgerViewData;
 use App\Support\Wallet\WalletLocationResolver;
 use Carbon\Carbon;
@@ -109,7 +110,11 @@ class PaymentCardTypeController extends Controller
 
         $movementBase = WalletCashMovement::query()
             ->forWalletContext($domain->name_slug, $location->id)
-            ->whereDate('movement_date', $businessDate);
+            ->whereDate('movement_date', $businessDate)
+            ->where(function ($q) {
+                $q->whereNull('notes')
+                    ->orWhere('notes', 'not like', 'AUTO_CC_%');
+            });
 
         $manualIn = (float) (clone $movementBase)->where('direction', 'in')->sum('amount');
         $manualOut = (float) (clone $movementBase)->where('direction', 'out')->sum('amount');
@@ -117,6 +122,13 @@ class PaymentCardTypeController extends Controller
 
         $countedCash = $recon?->counted_cash !== null ? (float) $recon->counted_cash : null;
         $variance = $countedCash === null ? null : round($countedCash - $expectedCash, 2);
+
+        $bridge = WalletCashBridgeExpected::compute(
+            $domain->name_slug,
+            (int) $location->id,
+            $businessDate,
+            $countedCash
+        );
 
         return [
             'business_date' => $businessDate,
@@ -139,6 +151,12 @@ class PaymentCardTypeController extends Controller
             'can_reopen' => $recon?->is_closed
                 ? (int) ($recon->closed_by ?? 0) === $viewerUserId
                 : false,
+            'bridge_anchor_business_date' => $bridge['bridge_anchor_business_date'],
+            'bridge_anchor_counted_cash' => $bridge['bridge_anchor_counted_cash'],
+            'bridge_expected_cash' => $bridge['bridge_expected_cash'],
+            'bridge_variance' => $bridge['bridge_variance'],
+            'bridge_day_span' => $bridge['bridge_day_span'],
+            'bridge_span_warning' => $bridge['bridge_span_warning'],
         ];
     }
 
