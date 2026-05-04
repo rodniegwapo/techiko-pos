@@ -21,6 +21,8 @@ class DatabaseSeeder extends Seeder
             Roleseeder::class,
             ServiceTierSeeder::class,
 
+            InventoryLocationSeeder::class,
+
             // Product and category seeders
             CategorySeeder::class,
             ProductSeeder::class,
@@ -32,17 +34,16 @@ class DatabaseSeeder extends Seeder
             TierSeeder::class,
             LoyaltyProgramSeeder::class,
 
-            // Enhanced inventory seeders (must be before users)
+            // Product inventory rows (needs products)
             InventorySeeder::class,
+
+            // Users before movement/adjustment seeders (they assign user_id from seeded users)
+            UserSeeder::class,
+            UserPinSeeder::class,
+
             InventoryMovementSeeder::class,
             StockAdjustmentSeeder::class,
             InventoryTransferRecommendationSeeder::class,
-
-            // Users (after locations are created)
-            UserSeeder::class,
-
-            // User authentication
-            UserPinSeeder::class,
         ]);
     }
 }

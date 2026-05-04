@@ -2,12 +2,12 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use App\Models\InventoryMovement;
 use App\Models\InventoryLocation;
+use App\Models\InventoryMovement;
 use App\Models\Product\Product;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Database\Seeder;
 
 class InventoryMovementSeeder extends Seeder
 {
@@ -20,7 +20,7 @@ class InventoryMovementSeeder extends Seeder
         $jollibeeMain = InventoryLocation::where('code', 'JB-MAIN')->first();
         $jollibeeBranch = InventoryLocation::where('code', 'JB-BRANCH')->first();
         $jollibeeWarehouse = InventoryLocation::where('code', 'JB-WH')->first();
-        
+
         $mcdonaldsMain = InventoryLocation::where('code', 'MC-MAIN')->first();
         $mcdonaldsBranch = InventoryLocation::where('code', 'MC-BRANCH')->first();
         $mcdonaldsWarehouse = InventoryLocation::where('code', 'MC-WH')->first();
@@ -75,9 +75,13 @@ class InventoryMovementSeeder extends Seeder
 
     private function createMovementsForLocation($location, $products, $users, $domain, $movementTypes)
     {
+        if ($products->isEmpty() || $users->isEmpty()) {
+            return;
+        }
+
         $movementsPerLocation = 25;
         $startDate = Carbon::now()->subDays(30);
-        
+
         for ($i = 0; $i < $movementsPerLocation; $i++) {
             $product = $products->random();
             $user = $users->random();
@@ -85,10 +89,10 @@ class InventoryMovementSeeder extends Seeder
             $quantity = rand(1, 50);
             $unitCost = rand(10, 500);
             $totalCost = $quantity * $unitCost;
-            
+
             // Create random date within last 30 days
             $randomDate = $startDate->copy()->addDays(rand(0, 30))->addHours(rand(0, 23))->addMinutes(rand(0, 59));
-            
+
             $quantityChange = $movementType === 'sale' || $movementType === 'transfer_out' || $movementType === 'damage' || $movementType === 'theft' || $movementType === 'expired' ? -$quantity : $quantity;
             $quantityBefore = rand(0, 100); // Random starting quantity
             $quantityAfter = $quantityBefore + $quantityChange;
@@ -128,7 +132,8 @@ class InventoryMovementSeeder extends Seeder
         ];
 
         $prefix = $prefixes[$movementType] ?? 'MOV';
-        return $prefix . '-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
+
+        return $prefix.'-'.str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
     }
 
     private function generateNotes($movementType, $productName)

@@ -3,9 +3,8 @@
 namespace Database\Seeders;
 
 use App\Models\Domain;
-use App\Models\Product\Product;
 use App\Models\InventoryLocation;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Models\Product\Product;
 use Illuminate\Database\Seeder;
 
 class ProductSeeder extends Seeder
@@ -19,17 +18,20 @@ class ProductSeeder extends Seeder
         foreach ($domains as $slug) {
             // Get locations for this domain
             $locations = InventoryLocation::where('domain', $slug)->get();
-            
+
             if ($locations->isEmpty()) {
                 continue; // Skip if no locations exist
             }
-            
-            // Create products for each location
+
             foreach ($locations as $location) {
-                Product::factory()->count(4)->create([
-                    'domain' => $slug,
-                    'location_id' => $location->id,
-                ]);
+                Product::factory()
+                    ->count(9)
+                    ->create(['domain' => $slug])
+                    ->each(function (Product $product) use ($location) {
+                        $product->locations()->attach($location->id, [
+                            'is_active' => true,
+                        ]);
+                    });
             }
         }
     }

@@ -389,6 +389,21 @@ const canManageCashControl = computed(
 );
 const isShiftClosed = computed(() => !!props.cashControl?.is_closed);
 
+/** Daily expected is off, but counted cash matches bridge-from-last-count. */
+const bridgeOpeningHint = computed(() => {
+    const c = props.cashControl;
+    if (!c || c.bridge_expected_cash == null) {
+        return false;
+    }
+    if (c.variance == null || c.bridge_variance == null) {
+        return false;
+    }
+    const bridgeV = Number(c.bridge_variance);
+    const dailyV = Number(c.variance);
+
+    return Math.abs(bridgeV) <= 0.01 && Math.abs(dailyV) > 0.01;
+});
+
 watch(
     () => props.cashControl,
     (v) => {
@@ -719,6 +734,108 @@ async function reopenShift() {
                         }}
                     </div>
                 </div>
+            </div>
+
+            <div
+                v-if="cashControl"
+                class="mt-3 rounded border border-slate-200 bg-slate-50 px-3 py-3 text-sm"
+            >
+                <div class="text-xs font-semibold uppercase text-slate-600">
+                    Since last count
+                </div>
+                <template v-if="cashControl.bridge_anchor_business_date">
+                    <p class="mt-1 text-xs text-slate-600">
+                        Last counted
+                        {{
+                            formattedTotal(
+                                Number(cashControl.bridge_anchor_counted_cash) ||
+                                    0,
+                            )
+                        }}
+                        on {{ cashControl.bridge_anchor_business_date }}
+                        <span
+                            v-if="
+                                cashControl.bridge_day_span != null &&
+                                cashControl.bridge_day_span > 0
+                            "
+                        >
+                            ({{ cashControl.bridge_day_span }} day span)
+                        </span>
+                    </p>
+                    <div
+                        class="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:max-w-xl"
+                    >
+                        <div
+                            class="rounded border border-teal-100 bg-white px-3 py-2"
+                        >
+                            <div class="text-xs uppercase text-teal-700">
+                                Bridge expected
+                            </div>
+                            <div
+                                class="font-mono text-lg font-semibold text-teal-800 tabular-nums"
+                            >
+                                {{
+                                    formattedTotal(
+                                        Number(
+                                            cashControl.bridge_expected_cash,
+                                        ) || 0,
+                                    )
+                                }}
+                            </div>
+                        </div>
+                        <div
+                            class="rounded border border-gray-200 bg-white px-3 py-2"
+                        >
+                            <div class="text-xs uppercase text-gray-500">
+                                Bridge variance
+                            </div>
+                            <div
+                                class="font-mono text-lg font-semibold tabular-nums"
+                                :class="
+                                    cashControl.bridge_variance == null
+                                        ? 'text-gray-500'
+                                        : Number(cashControl.bridge_variance) ===
+                                            0
+                                          ? 'text-gray-800'
+                                          : Number(
+                                                  cashControl.bridge_variance,
+                                              ) > 0
+                                            ? 'text-amber-700'
+                                            : 'text-red-700'
+                                "
+                            >
+                                {{
+                                    cashControl.bridge_variance == null
+                                        ? "—"
+                                        : formattedTotal(
+                                              Number(
+                                                  cashControl.bridge_variance,
+                                              ) || 0,
+                                          )
+                                }}
+                            </div>
+                        </div>
+                    </div>
+                    <p
+                        v-if="cashControl.bridge_span_warning"
+                        class="mt-2 text-xs text-amber-800"
+                    >
+                        Span exceeds 366 days; review totals carefully.
+                    </p>
+                </template>
+                <p v-else class="mt-1 text-xs text-slate-600">
+                    No prior counted cash on file for this location.
+                </p>
+                <p
+                    v-if="bridgeOpeningHint"
+                    class="mt-2 rounded border border-amber-200 bg-amber-50 px-2 py-2 text-xs text-amber-900"
+                >
+                    Bridge matches your counted cash, but daily expected does
+                    not. Check
+                    <strong>Set opening cash</strong> for
+                    {{ cashControl.business_date }} so daily figures align next
+                    time.
+                </p>
             </div>
 
             <div
