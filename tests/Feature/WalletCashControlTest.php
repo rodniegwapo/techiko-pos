@@ -410,6 +410,9 @@ class WalletCashControlTest extends TestCase
             'business_date' => $date,
             'is_closed' => 1,
             'closed_by' => $ctx['user']->id,
+            'counted_cash' => 0.00,
+            'counted_by' => null,
+            'notes' => null,
         ]);
         $this->assertDatabaseHas('wallet_cash_movements', [
             'domain' => $ctx['domain']->name_slug,
@@ -427,6 +430,14 @@ class WalletCashControlTest extends TestCase
             'opening_cash' => 0,
         ]);
 
+        $reconRow = WalletCashReconciliation::query()
+            ->where('domain', $ctx['domain']->name_slug)
+            ->where('location_id', $ctx['location']->id)
+            ->whereDate('business_date', $date)
+            ->first();
+        $this->assertNotNull($reconRow);
+        $this->assertNull($reconRow->counted_at);
+
         $walletUrl = route('domains.payment-card-types.index', [
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
@@ -438,6 +449,7 @@ class WalletCashControlTest extends TestCase
                 ->where('cashControl.opening_cash', 0)
                 ->where('cashControl.expected_cash', 0)
                 ->where('cashControl.manual_out', 0)
+                ->where('cashControl.counted_at', null)
             );
 
         $this->actingAs($otherUser)->post($reopenUrl, [
