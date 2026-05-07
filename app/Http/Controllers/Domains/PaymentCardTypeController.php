@@ -7,9 +7,9 @@ use App\Models\Domain;
 use App\Models\InventoryLocation;
 use App\Models\PaymentCardType;
 use App\Models\Sale;
-use App\Models\WalletCashMovement;
 use App\Models\WalletCashReconciliation;
 use App\Support\Wallet\WalletCashBridgeExpected;
+use App\Support\Wallet\WalletCashDailyExpected;
 use App\Support\Wallet\WalletLedgerViewData;
 use App\Support\Wallet\WalletLocationResolver;
 use Carbon\Carbon;
@@ -100,27 +100,18 @@ class PaymentCardTypeController extends Controller
             $openingCash = (float) ($openingSuggestion ?? 0);
         }
 
-        $paidCashSales = (float) Sale::query()
-            ->where('domain', $domain->name_slug)
-            ->where('location_id', $location->id)
-            ->where('payment_status', 'paid')
-            ->where('payment_method', 'cash')
-            ->whereDate('transaction_date', $businessDate)
-            ->sum('grand_total');
+        $dailyExpected = WalletCashDailyExpected::compute(
+            $domain->name_slug,
+            (int) $location->id,
+            $businessDate,
+            $recon
+        );
+        $paidCashSales = $dailyExpected['paid_cash_sales'];
+        $manualIn = $dailyExpected['manual_in'];
+        $manualOut = $dailyExpected['manual_out'];
+        $expectedCash = $dailyExpected['expected_cash'];
 
-        $movementBase = WalletCashMovement::query()
-            ->forWalletContext($domain->name_slug, $location->id)
-            ->whereDate('movement_date', $businessDate)
-            ->where(function ($q) {
-                $q->whereNull('notes')
-                    ->orWhere('notes', 'not like', 'AUTO_CC_%');
-            });
-
-        $manualIn = (float) (clone $movementBase)->where('direction', 'in')->sum('amount');
-        $manualOut = (float) (clone $movementBase)->where('direction', 'out')->sum('amount');
-        $expectedCash = round($openingCash + $paidCashSales + $manualIn - $manualOut, 2);
-
-        $countedCash = $recon?->counted_cash !== null ? (float) $recon->counted_cash : null;
+        $countedCash = $recon?->counted_at !== null ? (float) $recon->counted_cash : null;
         $variance = $countedCash === null ? null : round($countedCash - $expectedCash, 2);
 
         $bridge = WalletCashBridgeExpected::compute(
