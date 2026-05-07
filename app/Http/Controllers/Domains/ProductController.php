@@ -45,8 +45,8 @@ class ProductController extends Controller
             'cost' => ['nullable', 'numeric', 'min:0'],
 
             'category_id' => ['required', 'exists:categories,id'],
-            'SKU' => ['nullable', 'string', 'max:255', 'unique:products,SKU,'.$productId],
-            'barcode' => ['nullable', 'string', 'max:255', 'unique:products,barcode,'.$productId],
+            'SKU' => ['required', 'string', 'max:255', 'unique:products,SKU,' . $productId],
+            'barcode' => ['required', 'string', 'max:255', 'unique:products,barcode,' . $productId],
 
             'representation_type' => ['nullable', 'string', 'in:image,color,text'],
             'representation' => ['nullable', 'string'],
@@ -100,7 +100,7 @@ class ProductController extends Controller
         return Product::query()
             ->with('category')
             ->where('domain', $domain->name_slug)
-            ->when($request->search, fn ($q, $s) => $q->search($s))
+            ->when($request->search, fn($q, $s) => $q->search($s))
             ->when($request->category, function ($query, $category) {
                 return $query->whereHas('category', function ($q) use ($category) {
                     $q->where('name', $category);
@@ -139,7 +139,7 @@ class ProductController extends Controller
         $query = $this->buildProductQuery($request, $domain)
             ->when($location, function ($q) use ($location) {
                 $q->with([
-                    'inventories' => fn ($iq) => $iq->where('location_id', $location->id),
+                    'inventories' => fn($iq) => $iq->where('location_id', $location->id),
                 ]);
             })
             ->latest();
