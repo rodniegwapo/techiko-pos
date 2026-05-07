@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Domains;
 
 use App\Http\Controllers\Controller;
 use App\Models\Domain;
+use App\Models\InventoryLocation;
 use App\Models\PaymentCardType;
+use App\Models\WalletCashCountSubmission;
 use App\Models\WalletCashMovement;
 use App\Models\WalletCashOpeningAudit;
 use App\Models\WalletCashReconciliation;
@@ -13,6 +15,7 @@ use App\Support\Wallet\WalletCashDailyExpected;
 use App\Support\Wallet\WalletLedgerViewData;
 use App\Support\Wallet\WalletLocationResolver;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -23,6 +26,30 @@ class WalletCashMovementController extends Controller
     private const AUTO_COUNTED_VARIANCE_LEDGER_NOTE = 'AUTO_CC_COUNTED_VARIANCE';
 
     private const AUTO_ENDSHIFT_CASHOUT_LEDGER_NOTE = 'AUTO_CC_ENDSHIFT_CASHOUT';
+
+    private function syncOpeningCashLedgerMovement(
+        string $domainSlug,
+        InventoryLocation $location,
+        string $movementDateYmd,
+        float $openingAmount,
+        int $userId
+    ): void {
+        WalletCashMovement::query()->updateOrCreate(
+            [
+                'domain' => $domainSlug,
+                'location_id' => $location->id,
+                'movement_date' => $movementDateYmd,
+                'kind' => 'adjustment',
+                'notes' => self::AUTO_OPENING_LEDGER_NOTE,
+            ],
+            [
+                'payment_card_type_id' => null,
+                'direction' => 'in',
+                'amount' => round($openingAmount, 2),
+                'user_id' => $userId,
+            ]
+        );
+    }
 
     private function ensureDateNotClosed(string $domainSlug, int $locationId, string $dateYmd): void
     {
@@ -143,20 +170,12 @@ class WalletCashMovementController extends Controller
             'reason' => $validated['reason'] ?? null,
         ]);
 
-        WalletCashMovement::query()->updateOrCreate(
-            [
-                'domain' => $domain->name_slug,
-                'location_id' => $location->id,
-                'movement_date' => $validated['business_date'],
-                'kind' => 'adjustment',
-                'notes' => self::AUTO_OPENING_LEDGER_NOTE,
-            ],
-            [
-                'payment_card_type_id' => null,
-                'direction' => 'in',
-                'amount' => $newOpening,
-                'user_id' => $request->user()->id,
-            ]
+        $this->syncOpeningCashLedgerMovement(
+            $domain->name_slug,
+            $location,
+            $validated['business_date'],
+            $newOpening,
+            (int) $request->user()->id
         );
 
         return redirect()->back()->with('success', 'Opening cash saved.');
@@ -173,62 +192,79 @@ class WalletCashMovementController extends Controller
         ]);
         $this->ensureDateNotClosed($domain->name_slug, (int) $location->id, (string) $validated['business_date']);
 
-        $recon = WalletCashReconciliation::query()->updateOrCreate(
-            [
+        DB::transaction(function () use ($request, $domain, $location, $validated) {
+            $countedAt = now();
+
+            $recon = WalletCashReconciliation::query()->updateOrCreate(
+                [
+                    'domain' => $domain->name_slug,
+                    'location_id' => $location->id,
+                    'business_date' => $validated['business_date'],
+                ],
+                [
+                    'counted_cash' => round((float) $validated['counted_cash'], 2),
+                    'notes' => $validated['notes'] ?? null,
+                    'counted_by' => $request->user()->id,
+                    'counted_at' => $countedAt,
+                ]
+            );
+
+            WalletCashMovement::query()
+                ->forWalletContext($domain->name_slug, $location->id)
+                ->whereDate('movement_date', $validated['business_date'])
+                ->where('notes', self::AUTO_COUNTED_VARIANCE_LEDGER_NOTE)
+                ->delete();
+
+            $dailyExpected = WalletCashDailyExpected::compute(
+                $domain->name_slug,
+                (int) $location->id,
+                (string) $validated['business_date'],
+                $recon
+            );
+            $expectedCash = $dailyExpected['expected_cash'];
+            $countedCash = round((float) $recon->counted_cash, 2);
+            $variance = round($countedCash - $expectedCash, 2);
+
+            $bridge = WalletCashBridgeExpected::compute(
+                $domain->name_slug,
+                (int) $location->id,
+                (string) $validated['business_date'],
+                $countedCash
+            );
+            $bridgeVariance = $bridge['bridge_variance'];
+            $bridgeExpected = $bridge['bridge_expected_cash'];
+            $skipDailyVarianceLedger = $bridgeExpected !== null
+                && $bridgeVariance !== null
+                && abs($bridgeVariance) <= 0.01
+                && abs($variance) > 0.01;
+
+            if (abs($variance) > 0 && ! $skipDailyVarianceLedger) {
+                WalletCashMovement::query()->create([
+                    'domain' => $domain->name_slug,
+                    'location_id' => $location->id,
+                    'payment_card_type_id' => null,
+                    'direction' => $variance > 0 ? 'in' : 'out',
+                    'amount' => abs($variance),
+                    'kind' => 'adjustment',
+                    'notes' => self::AUTO_COUNTED_VARIANCE_LEDGER_NOTE,
+                    'movement_date' => $validated['business_date'],
+                    'user_id' => $request->user()->id,
+                ]);
+            }
+
+            WalletCashCountSubmission::query()->create([
                 'domain' => $domain->name_slug,
                 'location_id' => $location->id,
+                'reconciliation_id' => $recon->id,
                 'business_date' => $validated['business_date'],
-            ],
-            [
-                'counted_cash' => round((float) $validated['counted_cash'], 2),
-                'notes' => $validated['notes'] ?? null,
+                'counted_cash' => $countedCash,
+                'expected_cash_snapshot' => $expectedCash,
+                'variance_snapshot' => $variance,
+                'notes' => $recon->notes,
                 'counted_by' => $request->user()->id,
-                'counted_at' => now(),
-            ]
-        );
-
-        WalletCashMovement::query()
-            ->forWalletContext($domain->name_slug, $location->id)
-            ->whereDate('movement_date', $validated['business_date'])
-            ->where('notes', self::AUTO_COUNTED_VARIANCE_LEDGER_NOTE)
-            ->delete();
-
-        $dailyExpected = WalletCashDailyExpected::compute(
-            $domain->name_slug,
-            (int) $location->id,
-            (string) $validated['business_date'],
-            $recon
-        );
-        $expectedCash = $dailyExpected['expected_cash'];
-        $countedCash = round((float) $recon->counted_cash, 2);
-        $variance = round($countedCash - $expectedCash, 2);
-
-        $bridge = WalletCashBridgeExpected::compute(
-            $domain->name_slug,
-            (int) $location->id,
-            (string) $validated['business_date'],
-            $countedCash
-        );
-        $bridgeVariance = $bridge['bridge_variance'];
-        $bridgeExpected = $bridge['bridge_expected_cash'];
-        $skipDailyVarianceLedger = $bridgeExpected !== null
-            && $bridgeVariance !== null
-            && abs($bridgeVariance) <= 0.01
-            && abs($variance) > 0.01;
-
-        if (abs($variance) > 0 && ! $skipDailyVarianceLedger) {
-            WalletCashMovement::query()->create([
-                'domain' => $domain->name_slug,
-                'location_id' => $location->id,
-                'payment_card_type_id' => null,
-                'direction' => $variance > 0 ? 'in' : 'out',
-                'amount' => abs($variance),
-                'kind' => 'adjustment',
-                'notes' => self::AUTO_COUNTED_VARIANCE_LEDGER_NOTE,
-                'movement_date' => $validated['business_date'],
-                'user_id' => $request->user()->id,
+                'counted_at' => $countedAt,
             ]);
-        }
+        });
 
         return redirect()->back()->with('success', 'Counted cash saved.');
     }
@@ -313,6 +349,14 @@ class WalletCashMovementController extends Controller
                 'changed_at' => now(),
                 'reason' => 'Set from End Shift action: save_as_opening_cash.',
             ]);
+
+            $this->syncOpeningCashLedgerMovement(
+                $domain->name_slug,
+                $location,
+                $validated['business_date'],
+                $countedCash,
+                (int) $request->user()->id
+            );
         }
 
         $recon->is_closed = true;
