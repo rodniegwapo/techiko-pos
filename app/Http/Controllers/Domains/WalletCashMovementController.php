@@ -270,6 +270,10 @@ class WalletCashMovementController extends Controller
             $recon->opening_source = 'manual';
             $recon->opening_source_date = null;
             $recon->opening_basis_at = now();
+            $recon->counted_cash = 0;
+            $recon->counted_by = null;
+            $recon->counted_at = null;
+            $recon->notes = null;
             $recon->save();
 
             WalletCashMovement::query()->create([
