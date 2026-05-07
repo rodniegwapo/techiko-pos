@@ -478,6 +478,10 @@ class WalletCashControlTest extends TestCase
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
             'opening_cash' => 180.00,
+            'counted_cash' => 0.00,
+            'counted_by' => null,
+            'counted_at' => null,
+            'notes' => null,
             'is_closed' => 1,
         ]);
         $this->assertDatabaseHas('wallet_cash_opening_audits', [
@@ -488,6 +492,67 @@ class WalletCashControlTest extends TestCase
             'new_opening_cash' => 180.00,
             'delta_amount' => 60.00,
             'changed_by' => $ctx['user']->id,
+        ]);
+    }
+
+    public function test_save_as_opening_cash_reset_allows_same_day_reopen_and_recount(): void
+    {
+        $ctx = $this->seedContext();
+        $date = now()->subDays(2)->toDateString();
+
+        WalletCashReconciliation::query()->create([
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'business_date' => $date,
+            'opening_cash' => 120,
+            'counted_cash' => 200,
+            'counted_by' => $ctx['user']->id,
+            'counted_at' => now(),
+            'notes' => 'Initial count',
+        ]);
+
+        $endUrl = route('domains.wallet-cash-ledger.end-shift', ['domain' => $ctx['domain']->name_slug]);
+        $reopenUrl = route('domains.wallet-cash-ledger.reopen-shift', ['domain' => $ctx['domain']->name_slug]);
+        $countedUrl = route('domains.wallet-cash-ledger.counted-cash.store', ['domain' => $ctx['domain']->name_slug]);
+
+        $this->actingAs($ctx['user'])->post($endUrl, [
+            'location_id' => $ctx['location']->id,
+            'business_date' => $date,
+            'end_shift_action' => 'save_as_opening_cash',
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('wallet_cash_reconciliations', [
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'business_date' => $date,
+            'opening_cash' => 200.00,
+            'counted_cash' => 0.00,
+            'counted_by' => null,
+            'counted_at' => null,
+            'is_closed' => 1,
+        ]);
+
+        $this->actingAs($ctx['user'])->post($reopenUrl, [
+            'location_id' => $ctx['location']->id,
+            'business_date' => $date,
+        ])->assertRedirect();
+
+        $this->actingAs($ctx['user'])->post($countedUrl, [
+            'location_id' => $ctx['location']->id,
+            'business_date' => $date,
+            'counted_cash' => 230,
+            'notes' => 'Recount after reopen',
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('wallet_cash_reconciliations', [
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'business_date' => $date,
+            'opening_cash' => 200.00,
+            'counted_cash' => 230.00,
+            'counted_by' => $ctx['user']->id,
+            'is_closed' => 0,
+            'notes' => 'Recount after reopen',
         ]);
     }
 
