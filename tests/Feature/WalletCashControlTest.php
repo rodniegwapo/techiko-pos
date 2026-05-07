@@ -101,6 +101,7 @@ class WalletCashControlTest extends TestCase
             'kind' => 'adjustment',
             'notes' => 'AUTO_CC_OPENING',
             'amount' => 1000.00,
+            'user_id' => $ctx['user']->id,
         ]);
 
         $this->actingAs($ctx['user'])->post($url, [
@@ -139,6 +140,7 @@ class WalletCashControlTest extends TestCase
             'movement_date' => $date,
             'notes' => 'AUTO_CC_OPENING',
             'amount' => 1500.00,
+            'user_id' => $ctx['user']->id,
         ]);
     }
 
@@ -169,6 +171,7 @@ class WalletCashControlTest extends TestCase
             'notes' => 'AUTO_CC_COUNTED_VARIANCE',
             'direction' => 'in',
             'amount' => 980.00,
+            'user_id' => $ctx['user']->id,
         ]);
     }
 
@@ -195,6 +198,21 @@ class WalletCashControlTest extends TestCase
             0,
             WalletCashMovement::query()->where('notes', 'AUTO_CC_COUNTED_VARIANCE')->count()
         );
+
+        $indexUrl = route('domains.payment-card-types.index', [
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'business_date' => $date,
+        ]);
+
+        $this->actingAs($ctx['user'])->get($indexUrl)
+            ->assertOk()
+            ->assertInertia(fn (Inertia $page) => $page
+                ->component('Wallet/Index')
+                ->where('cashControl.counted_by', $ctx['user']->id)
+                ->where('cashControl.counted_by_user.id', $ctx['user']->id)
+                ->where('cashControl.counted_by_user.name', $ctx['user']->name)
+            );
     }
 
     public function test_submit_counted_cash_replaces_auto_variance_entry_instead_of_duplicating(): void
@@ -241,7 +259,7 @@ class WalletCashControlTest extends TestCase
         $ctx = $this->seedContext();
         $date = now()->subDays(8)->toDateString();
 
-        WalletCashReconciliation::query()->create([
+        $recon = WalletCashReconciliation::query()->create([
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
@@ -250,6 +268,18 @@ class WalletCashControlTest extends TestCase
             'counted_by' => $ctx['user']->id,
             'counted_at' => now(),
             'notes' => 'Night count',
+        ]);
+
+        WalletCashOpeningAudit::query()->create([
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'business_date' => $date,
+            'reconciliation_id' => $recon->id,
+            'old_opening_cash' => null,
+            'new_opening_cash' => 1000,
+            'delta_amount' => 1000,
+            'changed_by' => $ctx['user']->id,
+            'changed_at' => now(),
         ]);
 
         Sale::query()->create([
@@ -317,6 +347,11 @@ class WalletCashControlTest extends TestCase
                 ->where('cashControl.counted_cash', 1210)
                 ->where('cashControl.variance', -20)
                 ->where('cashControl.status', 'counted')
+                ->where('cashControl.counted_by', $ctx['user']->id)
+                ->where('cashControl.counted_by_user.id', $ctx['user']->id)
+                ->where('cashControl.counted_by_user.name', $ctx['user']->name)
+                ->where('cashControl.opening_last_updated_by_user.id', $ctx['user']->id)
+                ->where('cashControl.opening_last_updated_by_user.name', $ctx['user']->name)
             );
     }
 

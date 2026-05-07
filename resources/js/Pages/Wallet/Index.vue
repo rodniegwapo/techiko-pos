@@ -311,6 +311,27 @@ function formatHistoryTime(iso) {
     }
 }
 
+/** User-facing timestamp for ISO strings from cash control snapshot props. */
+function formatCashControlDateTime(iso) {
+    if (!iso) return "";
+    try {
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) return "";
+        const dateStr = d.toLocaleDateString(undefined, {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+        });
+        const timeStr = d.toLocaleTimeString(undefined, {
+            hour: "2-digit",
+            minute: "2-digit",
+        });
+        return `${dateStr} · ${timeStr}`;
+    } catch {
+        return "";
+    }
+}
+
 async function loadMoneyDetails(page = 1) {
     if (!moneyDetailsType.value?.id) return;
     moneyLoading.value = true;
@@ -817,6 +838,55 @@ async function reopenShift() {
                         }}
                     </div>
                 </div>
+            </div>
+
+            <div
+                v-if="
+                    (cashControl.opening_is_saved &&
+                        cashControl.opening_last_updated_by_user) ||
+                    (cashControl.counted_at && cashControl.counted_by_user)
+                "
+                class="mt-3 space-y-1 text-xs text-gray-600"
+            >
+                <p
+                    v-if="
+                        cashControl.opening_is_saved &&
+                        cashControl.opening_last_updated_by_user
+                    "
+                >
+                    Opening last saved by
+                    <span class="font-medium text-gray-800">{{
+                        cashControl.opening_last_updated_by_user.name
+                    }}</span>
+                    <template
+                        v-if="
+                            formatCashControlDateTime(
+                                cashControl.opening_last_updated_at,
+                            )
+                        "
+                    >
+                        ·
+                        {{
+                            formatCashControlDateTime(
+                                cashControl.opening_last_updated_at,
+                            )
+                        }}
+                    </template>
+                </p>
+                <p v-if="cashControl.counted_at && cashControl.counted_by_user">
+                    Counted by
+                    <span class="font-medium text-gray-800">{{
+                        cashControl.counted_by_user.name
+                    }}</span>
+                    <template
+                        v-if="
+                            formatCashControlDateTime(cashControl.counted_at)
+                        "
+                    >
+                        ·
+                        {{ formatCashControlDateTime(cashControl.counted_at) }}
+                    </template>
+                </p>
             </div>
 
             <div

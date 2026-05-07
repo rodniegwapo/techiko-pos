@@ -7,6 +7,9 @@ use App\Models\Domain;
 use App\Models\InventoryLocation;
 use App\Models\PaymentCardType;
 use App\Models\Sale;
+use App\Models\User;
+use App\Models\WalletCashMovement;
+use App\Models\WalletCashOpeningAudit;
 use App\Models\WalletCashReconciliation;
 use App\Support\Wallet\WalletCashBridgeExpected;
 use App\Support\Wallet\WalletCashDailyExpected;
@@ -79,6 +82,7 @@ class PaymentCardTypeController extends Controller
         $recon = WalletCashReconciliation::query()
             ->forWalletContext($domain->name_slug, $location->id)
             ->whereDate('business_date', $businessDate)
+            ->with('countedBy:id,name')
             ->first();
 
         $openingIsSaved = $recon !== null;
@@ -121,6 +125,54 @@ class PaymentCardTypeController extends Controller
             $countedCash
         );
 
+        $countedByUser = null;
+        if ($recon?->counted_at !== null && $recon->counted_by) {
+            $cb = $recon->relationLoaded('countedBy') ? $recon->countedBy : User::query()->find((int) $recon->counted_by);
+            if ($cb) {
+                $countedByUser = [
+                    'id' => (int) $cb->id,
+                    'name' => (string) $cb->name,
+                ];
+            }
+        }
+
+        $openingLastUpdatedByUser = null;
+        $openingLastUpdatedAt = null;
+
+        if ($recon !== null) {
+            $lastOpeningAudit = WalletCashOpeningAudit::query()
+                ->where('reconciliation_id', $recon->id)
+                ->with('changedBy:id,name')
+                ->orderByDesc('changed_at')
+                ->first();
+
+            if ($lastOpeningAudit?->changedBy !== null) {
+                $openingLastUpdatedByUser = [
+                    'id' => (int) $lastOpeningAudit->changedBy->id,
+                    'name' => (string) $lastOpeningAudit->changedBy->name,
+                ];
+                $openingLastUpdatedAt = $lastOpeningAudit->changed_at?->toIso8601String();
+            }
+
+            if ($openingLastUpdatedByUser === null) {
+                $openingMovement = WalletCashMovement::query()
+                    ->forWalletContext($domain->name_slug, (int) $location->id)
+                    ->whereDate('movement_date', $businessDate)
+                    ->where('notes', WalletCashBridgeExpected::NOTE_OPENING)
+                    ->with('user:id,name')
+                    ->first();
+
+                if ($openingMovement?->user !== null) {
+                    $openingLastUpdatedByUser = [
+                        'id' => (int) $openingMovement->user->id,
+                        'name' => (string) $openingMovement->user->name,
+                    ];
+                    $openingLastUpdatedAt = $openingMovement->updated_at?->toIso8601String()
+                        ?? $openingMovement->created_at?->toIso8601String();
+                }
+            }
+        }
+
         return [
             'business_date' => $businessDate,
             'opening_cash' => $openingCash,
@@ -133,6 +185,12 @@ class PaymentCardTypeController extends Controller
             'status' => $countedCash === null ? 'pending' : 'counted',
             'notes' => $recon?->notes,
             'counted_at' => $recon?->counted_at?->toIso8601String(),
+            'counted_by' => ($recon?->counted_at !== null && $recon->counted_by)
+                ? (int) $recon->counted_by
+                : null,
+            'counted_by_user' => $countedByUser,
+            'opening_last_updated_by_user' => $openingLastUpdatedByUser,
+            'opening_last_updated_at' => $openingLastUpdatedAt,
             'opening_is_saved' => $openingIsSaved,
             'opening_suggestion' => $openingSuggestion,
             'suggestion_source_date' => $suggestionSourceDate,
