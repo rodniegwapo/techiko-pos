@@ -35,7 +35,6 @@ const form = useForm({
     SKU: "",
     barcode: "",
     sold_type: null,
-    representation_type: null,
     representation: "",
 });
 
@@ -230,42 +229,23 @@ useBarcodeScanner((code) => {
                             </a-radio-group>
                         </a-form-item>
 
-                        <div class="grid grid-cols-2 gap-4">
-                            <!-- Representation Type -->
-                            <a-form-item
-                                label="Reperesentation Type"
-                                :validate-status="
-                                    form.errors.representation_type
-                                        ? 'error'
-                                        : ''
-                                "
-                                :help="form.errors.representation_type || ''"
-                            >
-                                <a-select
-                                    v-model:value="form.representation_type"
-                                    :options="[
-                                        { label: 'Color', value: 'color' },
-                                    ]"
-                                    placeholder="Select representation type"
-                                    size="large"
-                                />
-                            </a-form-item>
-
-                            <!-- Representation -->
-                            <a-form-item
-                                label="Representation"
-                                :validate-status="
-                                    form.errors.representation ? 'error' : ''
-                                "
-                                :help="form.errors.representation || ''"
-                            >
-                                <a-input
-                                    v-model:value="form.representation"
-                                    placeholder="Enter representation (e.g., hex color code)"
-                                    size="large"
-                                />
-                            </a-form-item>
-                        </div>
+                        <!-- Optional custom color hex; server defaults type=color + neutral hex when empty -->
+                        <a-form-item
+                            label="Color (hex, optional)"
+                            :validate-status="
+                                form.errors.representation ? 'error' : ''
+                            "
+                            :help="
+                                form.errors.representation ||
+                                'Leave blank to use the default color'
+                            "
+                        >
+                            <a-input
+                                v-model:value="form.representation"
+                                placeholder="e.g. ff5733 (no #)"
+                                size="large"
+                            />
+                        </a-form-item>
 
                         <div class="flex justify-end gap-2 mt-4">
                             <Link :href="getRoute('products.index')">

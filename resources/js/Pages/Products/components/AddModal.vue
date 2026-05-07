@@ -254,8 +254,9 @@ const handleUpdate = () => {
         </a-radio-group>
       </a-form-item>
 
-      <!-- Representation Type -->
+      <!-- Representation Type (edit only; create uses server default color) -->
       <a-form-item
+        v-if="isEdit"
         label="Representation Type"
         :validate-status="errors.representation_type ? 'error' : ''"
         :help="errors.representation_type || ''"
