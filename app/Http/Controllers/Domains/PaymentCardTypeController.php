@@ -8,6 +8,7 @@ use App\Models\InventoryLocation;
 use App\Models\PaymentCardType;
 use App\Models\Sale;
 use App\Models\User;
+use App\Models\WalletCashCountSubmission;
 use App\Models\WalletCashMovement;
 use App\Models\WalletCashOpeningAudit;
 use App\Models\WalletCashReconciliation;
@@ -173,6 +174,62 @@ class PaymentCardTypeController extends Controller
             }
         }
 
+        $openingAuditHistory = [];
+        if ($recon !== null) {
+            $openingAuditHistory = WalletCashOpeningAudit::query()
+                ->where('reconciliation_id', $recon->id)
+                ->with('changedBy:id,name')
+                ->orderByDesc('changed_at')
+                ->orderByDesc('id')
+                ->limit(25)
+                ->get()
+                ->map(static function (WalletCashOpeningAudit $a): array {
+                    return [
+                        'id' => $a->id,
+                        'old_opening_cash' => $a->old_opening_cash !== null ? (float) $a->old_opening_cash : null,
+                        'new_opening_cash' => (float) $a->new_opening_cash,
+                        'delta_amount' => (float) $a->delta_amount,
+                        'reason' => $a->reason,
+                        'changed_at' => $a->changed_at?->toIso8601String(),
+                        'changed_by_user' => $a->changedBy !== null
+                            ? [
+                                'id' => (int) $a->changedBy->id,
+                                'name' => (string) $a->changedBy->name,
+                            ]
+                            : null,
+                    ];
+                })
+                ->values()
+                ->all();
+        }
+
+        $countSubmissionHistory = WalletCashCountSubmission::query()
+            ->forWalletContext($domain->name_slug, (int) $location->id)
+            ->whereDate('business_date', $businessDate)
+            ->with('countedBy:id,name')
+            ->orderByDesc('counted_at')
+            ->orderByDesc('id')
+            ->limit(50)
+            ->get()
+            ->map(static function (WalletCashCountSubmission $row): array {
+                return [
+                    'id' => $row->id,
+                    'counted_cash' => (float) $row->counted_cash,
+                    'expected_cash_snapshot' => $row->expected_cash_snapshot !== null ? (float) $row->expected_cash_snapshot : null,
+                    'variance_snapshot' => $row->variance_snapshot !== null ? (float) $row->variance_snapshot : null,
+                    'notes' => $row->notes,
+                    'counted_at' => $row->counted_at?->toIso8601String(),
+                    'counted_by_user' => $row->countedBy !== null
+                        ? [
+                            'id' => (int) $row->countedBy->id,
+                            'name' => (string) $row->countedBy->name,
+                        ]
+                        : null,
+                ];
+            })
+            ->values()
+            ->all();
+
         return [
             'business_date' => $businessDate,
             'opening_cash' => $openingCash,
@@ -206,6 +263,8 @@ class PaymentCardTypeController extends Controller
             'bridge_variance' => $bridge['bridge_variance'],
             'bridge_day_span' => $bridge['bridge_day_span'],
             'bridge_span_warning' => $bridge['bridge_span_warning'],
+            'count_submission_history' => $countSubmissionHistory,
+            'opening_audit_history' => $openingAuditHistory,
         ];
     }
 

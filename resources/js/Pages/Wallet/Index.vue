@@ -889,6 +889,142 @@ async function reopenShift() {
                 </p>
             </div>
 
+            <a-collapse
+                v-if="
+                    (cashControl.count_submission_history ?? []).length > 0 ||
+                    (cashControl.opening_audit_history ?? []).length > 0
+                "
+                ghost
+                size="small"
+                class="mt-3 border-t border-gray-100 pt-2"
+            >
+                <a-collapse-panel
+                    v-if="
+                        (cashControl.count_submission_history ?? []).length > 0
+                    "
+                    key="count-history"
+                    :header="`Count submissions for ${cashControl.business_date}`"
+                >
+                    <ul class="divide-y divide-gray-100 rounded border border-gray-100 bg-gray-50/80 text-xs text-gray-700">
+                        <li
+                            v-for="entry in cashControl.count_submission_history"
+                            :key="entry.id"
+                            class="px-2 py-2"
+                        >
+                            <span class="tabular-nums font-medium text-gray-900">{{
+                                formattedTotal(Number(entry.counted_cash) || 0)
+                            }}</span>
+                            counted
+                            <template v-if="entry.counted_by_user?.name">
+                                by
+                                <span class="font-medium text-gray-800">{{
+                                    entry.counted_by_user.name
+                                }}</span>
+                            </template>
+                            <template
+                                v-if="formatCashControlDateTime(entry.counted_at)"
+                            >
+                                ·
+                                {{
+                                    formatCashControlDateTime(entry.counted_at)
+                                }}
+                            </template>
+                            <div
+                                v-if="
+                                    entry.expected_cash_snapshot != null ||
+                                    entry.variance_snapshot != null
+                                "
+                                class="mt-0.5 tabular-nums text-gray-500"
+                            >
+                                <span v-if="entry.expected_cash_snapshot != null"
+                                    >Expected
+                                    {{
+                                        formattedTotal(
+                                            Number(entry.expected_cash_snapshot) ||
+                                                0,
+                                        )
+                                    }}</span
+                                >
+                                <span
+                                    v-if="
+                                        entry.expected_cash_snapshot != null &&
+                                        entry.variance_snapshot != null
+                                    "
+                                >
+                                    ·
+                                </span>
+                                <span v-if="entry.variance_snapshot != null"
+                                    >Variance at submit
+                                    {{
+                                        formattedTotal(
+                                            Number(entry.variance_snapshot) || 0,
+                                        )
+                                    }}</span
+                                >
+                            </div>
+                            <div
+                                v-if="entry.notes && String(entry.notes).trim()"
+                                class="mt-1 text-[11px] text-gray-500"
+                            >
+                                {{ entry.notes }}
+                            </div>
+                        </li>
+                    </ul>
+                </a-collapse-panel>
+
+                <a-collapse-panel
+                    v-if="
+                        (cashControl.opening_audit_history ?? []).length > 0
+                    "
+                    key="opening-audits"
+                    header="Opening cash change history"
+                >
+                    <ul class="divide-y divide-gray-100 rounded border border-gray-100 bg-gray-50/80 text-xs text-gray-700">
+                        <li
+                            v-for="audit in cashControl.opening_audit_history"
+                            :key="audit.id"
+                            class="px-2 py-2"
+                        >
+                            <template v-if="audit.old_opening_cash != null">
+                                {{
+                                    formattedTotal(Number(audit.old_opening_cash))
+                                }}
+                                →
+                            </template>
+                            {{
+                                formattedTotal(Number(audit.new_opening_cash))
+                            }}
+                            <span class="tabular-nums text-gray-500">
+                                (Δ
+                                {{
+                                    formattedTotal(Number(audit.delta_amount))
+                                }})
+                            </span>
+                            <template v-if="audit.changed_by_user?.name">
+                                ·
+                                {{ audit.changed_by_user.name }}
+                            </template>
+                            <template
+                                v-if="
+                                    formatCashControlDateTime(audit.changed_at)
+                                "
+                            >
+                                ·
+                                {{
+                                    formatCashControlDateTime(audit.changed_at)
+                                }}
+                            </template>
+                            <div
+                                v-if="audit.reason && String(audit.reason).trim()"
+                                class="mt-1 text-[11px] text-gray-500"
+                            >
+                                {{ audit.reason }}
+                            </div>
+                        </li>
+                    </ul>
+                </a-collapse-panel>
+            </a-collapse>
+
             <div
                 v-if="cashControl"
                 class="mt-3 rounded border border-slate-200 bg-slate-50 px-3 py-3 text-sm"
@@ -1149,8 +1285,11 @@ async function reopenShift() {
                     Running cash balance
                 </div>
                 <div class="mb-3 text-xs text-gray-500">
-                    All-time manual ledger net only (cash in minus cash out),
-                    not expected drawer cash for the selected business date.
+                    All-time net for this location (cash in minus cash out),
+                    excluding book-only opening and counted-variance lines;
+                    includes end-shift cash out and other manual entries. Not
+                    the same as expected drawer cash for the selected business
+                    date.
                 </div>
                 <div
                     class="text-2xl font-bold tabular-nums"
@@ -1163,8 +1302,8 @@ async function reopenShift() {
                     {{ formattedTotal(Number(runningCashBalance) || 0) }}
                 </div>
                 <p class="mt-2 text-xs text-gray-500">
-                    Includes manual entries like owner withdrawals and
-                    adjustments from Money Movement.
+                    See Money movement for individual lines including
+                    adjustments and withdrawals.
                 </p>
             </div>
         </div>

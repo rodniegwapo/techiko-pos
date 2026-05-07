@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\Wallet\WalletCashBridgeExpected;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -32,6 +34,19 @@ class WalletCashMovement extends Model
         return $query
             ->where('domain', $domainSlug)
             ->where('location_id', $locationId);
+    }
+
+    /**
+     * Same rule as {@see WalletCashDailyExpected}: exclude book-only AUTO_CC_OPENING and
+     * AUTO_CC_COUNTED_VARIANCE; still include end-shift cashout (cash left the drawer).
+     */
+    public function scopeForManualLedgerRunningBalance(Builder $query): Builder
+    {
+        return $query->where(function ($q) {
+            $q->whereNull('notes')
+                ->orWhere('notes', WalletCashBridgeExpected::NOTE_ENDSHIFT_CASHOUT)
+                ->orWhere('notes', 'not like', 'AUTO_CC_%');
+        });
     }
 
     public function location(): BelongsTo

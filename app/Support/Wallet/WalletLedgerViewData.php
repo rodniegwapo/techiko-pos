@@ -72,7 +72,8 @@ class WalletLedgerViewData
     {
         $base = WalletCashMovement::query()
             ->forWalletContext($domain->name_slug, $location->id)
-            ->whereDate('movement_date', $dateYmd);
+            ->whereDate('movement_date', $dateYmd)
+            ->forManualLedgerRunningBalance();
         $inSum = (clone $base)->where('direction', 'in')->sum('amount');
         $outSum = (clone $base)->where('direction', 'out')->sum('amount');
 
@@ -81,7 +82,9 @@ class WalletLedgerViewData
 
     public static function runningCashBalance(Domain $domain, InventoryLocation $location): float
     {
-        $base = WalletCashMovement::query()->forWalletContext($domain->name_slug, $location->id);
+        $base = WalletCashMovement::query()
+            ->forWalletContext($domain->name_slug, $location->id)
+            ->forManualLedgerRunningBalance();
         $inSum = (clone $base)->where('direction', 'in')->sum('amount');
         $outSum = (clone $base)->where('direction', 'out')->sum('amount');
 
