@@ -78,6 +78,39 @@ const KIND_LABELS = {
     adjustment: "Adjustment",
 };
 
+/** Stable backend tokens in `notes` for system-generated cash-control lines. */
+const AUTO_CC_NOTE_LABELS = {
+    AUTO_CC_OPENING: "Opening cash (saved)",
+    AUTO_CC_COUNTED_VARIANCE: "Counted cash variance",
+    AUTO_CC_ENDSHIFT_CASHOUT: "End shift cash out",
+};
+
+/** @param {string|null|undefined} notes */
+function autoLedgerNoteToken(notes) {
+    if (notes == null || typeof notes !== "string") {
+        return null;
+    }
+    const t = notes.trim();
+    return Object.prototype.hasOwnProperty.call(AUTO_CC_NOTE_LABELS, t)
+        ? t
+        : null;
+}
+
+/** @param {string|null|undefined} notes */
+function friendlyAutoLedgerNote(notes) {
+    const token = autoLedgerNoteToken(notes);
+    return token ? AUTO_CC_NOTE_LABELS[token] : null;
+}
+
+/** @param {Record<string, unknown>} record */
+function kindCellLabel(record) {
+    const fr = friendlyAutoLedgerNote(record.notes);
+    if (fr) {
+        return fr;
+    }
+    return KIND_LABELS[record.kind] ?? record.kind;
+}
+
 const directionLabels = {
     in: "Cash in",
     out: "Cash out",
@@ -497,7 +530,7 @@ watch(
                 >
                     <template #bodyCell="{ column, record }">
                         <template v-if="column.key === 'kind'">
-                            {{ KIND_LABELS[record.kind] ?? record.kind }}
+                            {{ kindCellLabel(record) }}
                         </template>
                         <template v-else-if="column.key === 'rail'">
                             {{ rowRail(record) }}
@@ -518,8 +551,24 @@ watch(
                                 formatMovementDate(record.movement_date)
                             }}</span>
                         </template>
+                        <template v-else-if="column.key === 'notes'">
+                            <span
+                                v-if="friendlyAutoLedgerNote(record.notes)"
+                                class="text-gray-800"
+                                :title="`System code: ${String(record.notes).trim()}`"
+                            >
+                                {{ friendlyAutoLedgerNote(record.notes) }}
+                            </span>
+                            <span v-else>{{
+                                record.notes != null && String(record.notes) !== ""
+                                    ? record.notes
+                                    : "—"
+                            }}</span>
+                        </template>
                         <template v-else-if="column.key === 'user'">
-                            {{ record.user?.name ?? "-" }}
+                            <span title="User who saved this ledger line.">{{
+                                record.user?.name ?? "-"
+                            }}</span>
                         </template>
                     </template>
                 </a-table>
