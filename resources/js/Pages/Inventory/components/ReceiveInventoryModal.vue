@@ -5,10 +5,30 @@ import { IconPlus, IconTrash, IconSearch, IconShoppingCart, IconAlertTriangle, I
 import { notification } from "ant-design-vue";
 import axios from "axios";
 import { usePage } from "@inertiajs/vue3";
-import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 
 const page = usePage();
-const { getRoute } = useDomainRoutes();
+
+// Global Sanctum API routes (not domain-prefixed in Ziggy; avoid useDomainRoutes which adds `domains.`).
+const inventoryApi = {
+  locationSummary: (locationId) => `/api/inventory/locations/${locationId}/summary`,
+  searchProducts: "/api/inventory/search/products",
+  receive: "/api/inventory/receive",
+};
+
+// Must match App\Models\InventoryMovement::getValidReferenceTypes()
+const REFERENCE_TYPES = [
+  "Sale",
+  "Purchase",
+  "StockAdjustment",
+  "InventoryTransfer",
+  "CustomerReturn",
+  "DamagedGoods",
+  "Theft",
+  "ExpiredProducts",
+  "PromotionalGiveaway",
+];
+
+const referenceTypeSelectOptions = REFERENCE_TYPES.map((t) => ({ label: t, value: t }));
 
 const emit = defineEmits(["success", "update:visible"]);
 
@@ -53,7 +73,9 @@ const loadStoreItemCount = async (locationId) => {
   
   storeLoading.value = true;
   try {
-    const response = await axios.get(getRoute('inventory.locations.summary', { location: locationId }));
+    const response = await axios.get(inventoryApi.locationSummary(locationId), {
+      params: form.domain ? { domain: form.domain } : {},
+    });
     selectedStore.value = response.data;
   } catch (error) {
     console.error('Failed to load store summary:', error);
@@ -93,8 +115,7 @@ const searchProducts = async () => {
   try {
     const params = { search: productSearch.value };
     
-    // Use getRoute for consistent route resolution
-    const response = await axios.get(getRoute('inventory.search.products'), {
+    const response = await axios.get(inventoryApi.searchProducts, {
       params,
     });
     searchResults.value = response.data.data || [];
@@ -169,8 +190,30 @@ const handleSubmit = async () => {
   loading.value = true;
 
   try {
-    // Use getRoute for consistent route resolution
-    const response = await axios.post(getRoute('inventory.receive'), form);
+    const payload = {
+      location_id: form.location_id,
+      items: form.items.map(
+        ({
+          product_id,
+          quantity,
+          unit_cost,
+          batch_number,
+          expiry_date,
+          notes,
+        }) => ({
+          product_id,
+          quantity,
+          unit_cost,
+          batch_number: batch_number || null,
+          expiry_date: expiry_date || null,
+          notes: notes || null,
+        })
+      ),
+      reference_type: form.reference_type || undefined,
+      reference_id: form.reference_id ?? undefined,
+    };
+
+    const response = await axios.post(inventoryApi.receive, payload);
 
     if (response.data.success) {
       notification.success({
@@ -316,10 +359,13 @@ watch(
           <label class="block text-sm font-medium text-gray-700 mb-2">
             Reference Type
           </label>
-          <a-input
+          <a-select
             v-model:value="form.reference_type"
-            placeholder="e.g., Purchase Order, Manual Entry"
+            placeholder="Leave empty for Purchase"
+            class="w-full"
+            allow-clear
             :disabled="loading"
+            :options="referenceTypeSelectOptions"
           />
         </div>
         <div>

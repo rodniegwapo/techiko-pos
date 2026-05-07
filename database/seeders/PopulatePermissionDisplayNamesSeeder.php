@@ -22,10 +22,11 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
             'users.store' => 'Create User',
             'users.edit' => 'Edit User',
             'users.update' => 'Update User',
+            'users.pin.update' => 'Set User PIN',
             'users.show' => 'View User',
             'users.destroy' => 'Delete User',
             'users.hierarchy' => 'View User Hierarchy',
-            
+
             // Roles
             'roles.index' => 'View Roles',
             'roles.create' => 'Create Role',
@@ -34,7 +35,7 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
             'roles.update' => 'Update Role',
             'roles.show' => 'View Role',
             'roles.destroy' => 'Delete Role',
-            
+
             // Permissions
             'permissions.index' => 'View Permissions',
             'permissions.create' => 'Create Permission',
@@ -43,7 +44,7 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
             'permissions.update' => 'Update Permission',
             'permissions.show' => 'View Permission',
             'permissions.destroy' => 'Delete Permission',
-            
+
             // Products
             'products.index' => 'View Products',
             'products.create' => 'Create Product',
@@ -52,7 +53,7 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
             'products.update' => 'Update Product',
             'products.show' => 'View Product',
             'products.destroy' => 'Delete Product',
-            
+
             // Categories
             'categories.index' => 'View Categories',
             'categories.create' => 'Create Category',
@@ -61,7 +62,7 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
             'categories.update' => 'Update Category',
             'categories.show' => 'View Category',
             'categories.destroy' => 'Delete Category',
-            
+
             // Inventory
             'inventory.index' => 'View Inventory',
             'inventory.dashboard' => 'Inventory Dashboard',
@@ -74,7 +75,7 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
             'inventory.locations.destroy' => 'Delete Location',
             'inventory.locations.set-default' => 'Set Default Location',
             'inventory.locations.toggle-status' => 'Toggle Location Status',
-            
+
             'inventory.products.index' => 'View Product Inventory',
             'inventory.products.create' => 'Create Product Inventory',
             'inventory.products.store' => 'Create Product Inventory',
@@ -82,7 +83,7 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
             'inventory.products.update' => 'Update Product Inventory',
             'inventory.products.show' => 'View Product Inventory',
             'inventory.products.destroy' => 'Delete Product Inventory',
-            
+
             'inventory.movements.index' => 'View Inventory Movements',
             'inventory.movements.create' => 'Create Inventory Movement',
             'inventory.movements.store' => 'Create Inventory Movement',
@@ -90,7 +91,7 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
             'inventory.movements.update' => 'Update Inventory Movement',
             'inventory.movements.show' => 'View Inventory Movement',
             'inventory.movements.destroy' => 'Delete Inventory Movement',
-            
+
             'inventory.adjustments.index' => 'View Stock Adjustments',
             'inventory.adjustments.create' => 'Create Stock Adjustment',
             'inventory.adjustments.store' => 'Create Stock Adjustment',
@@ -100,15 +101,18 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
             'inventory.adjustments.destroy' => 'Delete Stock Adjustment',
             'inventory.adjustments.approve' => 'Approve Stock Adjustment',
             'inventory.adjustments.reject' => 'Reject Stock Adjustment',
-            
+
             'inventory.valuation.index' => 'View Inventory Valuation',
             'inventory.valuation.export' => 'Export Inventory Valuation',
-            
+
             'inventory.low-stock.index' => 'View Low Stock Report',
             'inventory.low-stock.export' => 'Export Low Stock Report',
-            
+
             // Sales
             'sales.index' => 'View Sales',
+            'sales.offline-transactions' => 'Offline Sales Queue',
+            'sales.offline-sync' => 'Sync Offline Sales',
+            'sales.offline-catalog' => 'Sync Offline Product Catalog',
             'sales.create' => 'Create Sale',
             'sales.store' => 'Create Sale',
             'sales.edit' => 'Edit Sale',
@@ -117,7 +121,19 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
             'sales.destroy' => 'Delete Sale',
             'sales.dashboard' => 'Sales Dashboard',
             'sales.export' => 'Export Sales',
-            
+
+            'settings.index' => 'View Organization Settings',
+            'settings.update' => 'Update Organization Settings',
+
+            'payment-card-types.index' => 'View Payment Wallet',
+            'payment-card-types.list' => 'List Card Payment Types',
+            'payment-card-types.store' => 'Create Card Payment Type',
+            'payment-card-types.update' => 'Update Card Payment Type',
+            'payment-card-types.destroy' => 'Delete Card Payment Type',
+            'payment-card-types.money' => 'View Card Payment Money Details',
+
+            'vat-report.index' => 'View VAT Report',
+
             // Customers
             'customers.index' => 'View Customers',
             'customers.create' => 'Create Customer',
@@ -126,7 +142,7 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
             'customers.update' => 'Update Customer',
             'customers.show' => 'View Customer',
             'customers.destroy' => 'Delete Customer',
-            
+
             // Loyalty
             'loyalty.index' => 'View Loyalty',
             'loyalty.tiers.index' => 'View Loyalty Tiers',
@@ -136,7 +152,7 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
             'loyalty.tiers.update' => 'Update Loyalty Tier',
             'loyalty.tiers.show' => 'View Loyalty Tier',
             'loyalty.tiers.destroy' => 'Delete Loyalty Tier',
-            
+
             // Discounts
             'discounts.index' => 'View Discounts',
             'discounts.create' => 'Create Discount',
@@ -145,14 +161,14 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
             'discounts.update' => 'Update Discount',
             'discounts.show' => 'View Discount',
             'discounts.destroy' => 'Delete Discount',
-            
+
             // Reports
             'reports.index' => 'View Reports',
             'reports.sales' => 'Sales Reports',
             'reports.inventory' => 'Inventory Reports',
             'reports.customers' => 'Customer Reports',
             'reports.export' => 'Export Reports',
-            
+
             // Settings
             'settings.index' => 'View Settings',
             'settings.update' => 'Update Settings',
@@ -160,10 +176,10 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
 
         $updatedCount = 0;
         $usedNames = [];
-        
+
         foreach ($permissions as $permission) {
             $routeName = $permission->route_name ?? $permission->name;
-            
+
             // If we have a display name mapping for this route, use it
             if (isset($displayNameMap[$routeName])) {
                 $newDisplayName = $displayNameMap[$routeName];
@@ -171,20 +187,20 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
                 // Generate a display name from the route name
                 $newDisplayName = $this->generateDisplayName($routeName);
             }
-            
+
             // Check if this display name is already used
             $counter = 1;
             $originalDisplayName = $newDisplayName;
             while (in_array($newDisplayName, $usedNames)) {
-                $newDisplayName = $originalDisplayName . " ({$counter})";
+                $newDisplayName = $originalDisplayName." ({$counter})";
                 $counter++;
             }
-            
+
             // Only update if the name has changed
             if ($newDisplayName !== $permission->name) {
                 try {
                     $permission->update([
-                        'name' => $newDisplayName
+                        'name' => $newDisplayName,
                     ]);
                     $usedNames[] = $newDisplayName;
                     $updatedCount++;
@@ -205,13 +221,13 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
     private function generateDisplayName(string $routeName): string
     {
         $parts = explode('.', $routeName);
-        
+
         if (count($parts) >= 3) {
             // Handle nested resources (3+ parts: module.submodule.action)
             $module = $parts[0];
             $submodule = $parts[1];
             $action = $parts[2];
-            
+
             $actionLabels = [
                 'index' => 'View',
                 'create' => 'Create',
@@ -244,7 +260,7 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
                 'approve' => 'Approve',
                 'reject' => 'Reject',
             ];
-            
+
             $submoduleLabels = [
                 'locations' => 'Location',
                 'categories' => 'Category',
@@ -263,13 +279,13 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
                 'voids' => 'Void',
                 'terminals' => 'Terminal',
             ];
-            
+
             $actionLabel = $actionLabels[$action] ?? ucfirst($action);
             $submoduleLabel = $submoduleLabels[$submodule] ?? ucfirst($submodule);
-            
+
             return "{$actionLabel} {$submoduleLabel}";
         }
-        
+
         // Handle simple permissions (2 parts: module.action)
         if (count($parts) === 2) {
             $action = $parts[1];
@@ -303,7 +319,7 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
 
             return $actionLabels[$action] ?? ucfirst($action);
         }
-        
+
         return ucfirst($routeName);
     }
 }

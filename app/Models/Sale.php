@@ -2,10 +2,9 @@
 
 namespace App\Models;
 
-use App\Events\OrderUpdated;
 use App\Events\CustomerUpdated;
+use App\Events\OrderUpdated;
 use App\Models\Product\Discount;
-use App\Models\InventoryLocation;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -22,12 +21,14 @@ class Sale extends Model
     // }
 
     // Add scope for easy domain filtering
-    public function scopeForDomain($query, $domain) {
+    public function scopeForDomain($query, $domain)
+    {
         return $query->where('domain', $domain);
     }
 
     // Add scope for pending sales
-    public function scopePending($query) {
+    public function scopePending($query)
+    {
         return $query->where('payment_status', 'pending');
     }
 
@@ -56,6 +57,11 @@ class Sale extends Model
         return $this->belongsTo(InventoryLocation::class);
     }
 
+    public function paymentCardType()
+    {
+        return $this->belongsTo(PaymentCardType::class);
+    }
+
     public function recalcTotals(): void
     {
         $itemsTotal = $this->saleItems()
@@ -74,9 +80,38 @@ class Sale extends Model
         $orderDiscountTotal = $this->saleDiscounts()->sum('discount_amount');
         $this->discount_amount = $orderDiscountTotal;
 
-        $tax = $this->tax_amount ?? 0;
+        $netAfterDiscount = max(0, $this->total_amount - $this->discount_amount);
 
-        $this->grand_total = max(0, $this->total_amount - $this->discount_amount + $tax);
+        $vat = ['apply_vat_automatically' => false, 'vat_rate_percent' => 12];
+        if ($this->domain) {
+            $domainModel = Domain::where('name_slug', $this->domain)->first();
+            if ($domainModel) {
+                $vat = $domainModel->salesVatSettings();
+            }
+        }
+
+        $pricingMode = $vat['vat_pricing_mode'] ?? 'exclusive';
+        if (! in_array($pricingMode, ['exclusive', 'inclusive'], true)) {
+            $pricingMode = 'exclusive';
+        }
+
+        if (! empty($vat['apply_vat_automatically'])) {
+            $ratePercent = max(0, min(100, (float) ($vat['vat_rate_percent'] ?? 12)));
+            $r = $ratePercent / 100;
+            if ($pricingMode === 'inclusive') {
+                $this->tax_amount = round($netAfterDiscount * ($r / (1 + $r)), 2);
+            } else {
+                $this->tax_amount = round($netAfterDiscount * $r, 2);
+            }
+        } else {
+            $this->tax_amount = 0;
+        }
+
+        if (! empty($vat['apply_vat_automatically']) && $pricingMode === 'inclusive') {
+            $this->grand_total = max(0, $netAfterDiscount);
+        } else {
+            $this->grand_total = max(0, $netAfterDiscount + $this->tax_amount);
+        }
 
         $this->save();
 
@@ -85,7 +120,7 @@ class Sale extends Model
             'saleItems.product',
             'saleDiscounts',
             'saleItems.discounts',
-            'customer'
+            'customer',
         ])));
 
     }
@@ -95,18 +130,18 @@ class Sale extends Model
      */
     public function updateCustomer(?int $customerId): void
     {
-        \Log::info("Sale::updateCustomer called", [
+        \Log::info('Sale::updateCustomer called', [
             'sale_id' => $this->id,
-            'customer_id' => $customerId
+            'customer_id' => $customerId,
         ]);
-        
+
         $this->update(['customer_id' => $customerId]);
-        
-        \Log::info("CustomerUpdated event being fired", [
+
+        \Log::info('CustomerUpdated event being fired', [
             'sale_id' => $this->id,
-            'customer_id' => $customerId
+            'customer_id' => $customerId,
         ]);
-        
+
         // Trigger customer update event to notify frontend
         event(new CustomerUpdated($this));
     }
@@ -137,7 +172,7 @@ class Sale extends Model
         );
     }
 
-    public function applyMandatoryDiscount(\App\Models\MandatoryDiscount $mandatoryDiscount): SaleDiscount
+    public function applyMandatoryDiscount(MandatoryDiscount $mandatoryDiscount): SaleDiscount
     {
         // validate
         throw_if(! $mandatoryDiscount->is_active, \InvalidArgumentException::class, 'Mandatory discount is not active.');

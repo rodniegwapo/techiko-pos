@@ -1,6 +1,6 @@
 <script setup>
 import { PlusSquareOutlined } from "@ant-design/icons-vue";
-import { ref, inject } from "vue";
+import { ref, inject, computed } from "vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { usePage } from "@inertiajs/vue3";
 import axios from "axios";
@@ -27,32 +27,33 @@ const props = defineProps({
 const { getRoute } = useDomainRoutes();
 const page = usePage();
 
+const salesCartIsOnline = inject(
+    "isSalesOnline",
+    computed(() => true),
+);
+
 // Emit events to parent
-const emit = defineEmits(['cart-updated']);
+const emit = defineEmits(["cart-updated", "offline-add-product"]);
 
 // Handle adding items to cart with direct API call
 const loading = ref(false);
 const addToCart = async (product) => {
     try {
         loading.value = true;
-        console.log("addToCart called with:", {
-            product,
-            orderId: props.orderId,
-        });
+        if (!salesCartIsOnline.value) {
+            emit("offline-add-product", product);
+            return;
+        }
 
         const userId = page.props.auth.user.data.id;
         const route = getRoute("users.sales.cart.add", { user: userId });
-        console.log("Generated route:", route);
 
         await axios.post(route, {
             product_id: product.id,
             quantity: 1,
         });
 
-        console.log("Successfully added item to cart");
-        
-        // Emit event to parent to refresh cart data
-        emit('cart-updated');
+        emit("cart-updated");
     } catch (error) {
         console.error("Failed to add item to cart:", error);
     } finally {
@@ -79,7 +80,7 @@ const formattedTotal = (price) => {
             size="large"
         />
         <div
-            v-else
+            v-else-if="products.length"
             class="grid [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))] gap-4 mt-2"
         >
             <div
@@ -112,7 +113,14 @@ const formattedTotal = (price) => {
             </div>
         </div>
         <div
-            v-if="products.length == 0"
+            v-else-if="!salesCartIsOnline"
+            class="flex items-center justify-center h-full min-h-[200px] text-center text-gray-500 text-sm px-6"
+        >
+            No offline catalog loaded. While online, use &quot;Sync for offline&quot;
+            on Sales, or add items via barcode from a prior session.
+        </div>
+        <div
+            v-else
             class="text-[40px] text-nowrap uppercase font-bold text-gray-200 -rotate-45 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
         >
             No Item Found

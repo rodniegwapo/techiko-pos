@@ -107,8 +107,8 @@ const timeOpen = ref(false);
     <template v-for="field in fields" :key="field.key">
       <a-form-item
         :label="field.label"
-        :validate-status="errors[field.key] ? 'error' : ''"
-        :help="errors[field.key] || ''"
+        :validate-status="errors?.[field.key] ? 'error' : ''"
+        :help="errors?.[field.key] || ''"
       >
         <!-- text -->
         <a-input

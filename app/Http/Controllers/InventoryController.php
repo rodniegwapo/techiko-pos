@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\InventoryMovementResource;
 use App\Http\Resources\ProductInventoryResource;
+use App\Http\Resources\ProductResource;
 use App\Models\Category;
 use App\Models\Domain;
 use App\Models\InventoryLocation;
@@ -13,6 +14,7 @@ use App\Models\ProductInventory;
 use App\Services\InventoryService;
 use App\Traits\MovementTypes;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class InventoryController extends Controller
@@ -50,7 +52,7 @@ class InventoryController extends Controller
         }
 
         if ($request->search) {
-            $query->whereHas('product', fn($q) => $q->search($request->search));
+            $query->whereHas('product', fn ($q) => $q->search($request->search));
         }
 
         if ($request->stock_status) {
@@ -68,12 +70,12 @@ class InventoryController extends Controller
         }
 
         if ($request->category_id) {
-            $query->whereHas('product', fn($q) => $q->where('category_id', $request->category_id));
+            $query->whereHas('product', fn ($q) => $q->where('category_id', $request->category_id));
         }
 
         // Add domain filtering for global view
         if ($request->domain) {
-            $query->whereHas('product', fn($q) => $q->where('domain', $request->domain));
+            $query->whereHas('product', fn ($q) => $q->where('domain', $request->domain));
         }
 
         $inventories = $query->orderBy('quantity_available', 'asc')
@@ -102,6 +104,7 @@ class InventoryController extends Controller
         // Web response
         $inventories->getCollection()->transform(function ($inventory) {
             $inventory->location_stock_status = $inventory->getStockStatus();
+
             return $inventory;
         });
 
@@ -134,11 +137,11 @@ class InventoryController extends Controller
 
         $query = InventoryMovement::query()
             ->with(['product', 'location'])
-            ->when($locationId, fn($q) => $q->where('location_id', $locationId))
-            ->when($productId, fn($q) => $q->where('product_id', $productId))
-            ->when($movementType, fn($q) => $q->where('movement_type', $movementType))
-            ->when($dateFrom, fn($q) => $q->whereDate('created_at', '>=', $dateFrom))
-            ->when($dateTo, fn($q) => $q->whereDate('created_at', '<=', $dateTo))
+            ->when($locationId, fn ($q) => $q->where('location_id', $locationId))
+            ->when($productId, fn ($q) => $q->where('product_id', $productId))
+            ->when($movementType, fn ($q) => $q->where('movement_type', $movementType))
+            ->when($dateFrom, fn ($q) => $q->whereDate('created_at', '>=', $dateFrom))
+            ->when($dateTo, fn ($q) => $q->whereDate('created_at', '<=', $dateTo))
             ->orderByDesc('created_at');
 
         $movements = $query->paginate($request->per_page ?? 20);
@@ -187,15 +190,15 @@ class InventoryController extends Controller
     {
         $query = Product::query()
             ->with('category')
-            ->when($request->search, fn($q, $search) => $q->search($search))
-            ->when($request->domain, fn($q, $domain) => $q->where('domain', $domain))
-            ->when($request->category_id, fn($q, $categoryId) => $q->where('category_id', $categoryId));
+            ->when($request->search, fn ($q, $search) => $q->search($search))
+            ->when($request->domain, fn ($q, $domain) => $q->where('domain', $domain))
+            ->when($request->category_id, fn ($q, $categoryId) => $q->where('category_id', $categoryId));
 
         $products = $query->limit(20)->get();
 
         return response()->json([
             'success' => true,
-            'data' => \App\Http\Resources\ProductResource::collection($products)
+            'data' => ProductResource::collection($products),
         ]);
     }
 
@@ -204,6 +207,8 @@ class InventoryController extends Controller
      */
     public function receive(Request $request)
     {
+        $validReferenceTypes = InventoryMovement::getValidReferenceTypes();
+
         $validated = $request->validate([
             'location_id' => 'required|exists:inventory_locations,id',
             'items' => 'required|array|min:1',
@@ -213,18 +218,22 @@ class InventoryController extends Controller
             'items.*.batch_number' => 'nullable|string|max:255',
             'items.*.expiry_date' => 'nullable|date',
             'items.*.notes' => 'nullable|string|max:500',
-            'reference_type' => 'nullable|string',
+            'reference_type' => ['nullable', 'string', Rule::in($validReferenceTypes)],
             'reference_id' => 'nullable|integer',
         ]);
 
         $location = InventoryLocation::findOrFail($validated['location_id']);
 
+        // Receiving stock is modeled as a Purchase movement when not linked to another document.
+        $referenceType = $validated['reference_type'] ?? 'Purchase';
+        $referenceId = $validated['reference_id'] ?? null;
+
         $this->inventoryService->receiveInventory(
             $validated['items'],
             auth()->user(),
             $location,
-            $validated['reference_type'] ?? null,
-            $validated['reference_id'] ?? null
+            $referenceType,
+            $referenceId
         );
 
         return response()->json(['success' => true, 'message' => 'Inventory received successfully']);
@@ -257,5 +266,25 @@ class InventoryController extends Controller
         );
 
         return response()->json(['success' => true, 'message' => 'Inventory transferred successfully']);
+    }
+
+    /**
+     * JSON summary for a single location (used by stock adjustment create UI).
+     */
+    public function getLocationSummary(Request $request, InventoryLocation $location)
+    {
+        $domain = $request->query('domain');
+        $report = $this->inventoryService->getInventoryReport($location, $domain);
+        $summary = $report['summary'];
+
+        return response()->json([
+            'location_id' => $location->id,
+            'location_name' => $location->name,
+            'total_products_count' => $summary['total_products'],
+            'in_stock_products_count' => $summary['in_stock_products'],
+            'low_stock_products_count' => $summary['low_stock_products'],
+            'out_of_stock_products_count' => $summary['out_of_stock_products'],
+            'total_inventory_value' => $summary['total_inventory_value'],
+        ]);
     }
 }
