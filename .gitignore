@@ -1,5 +1,8 @@
 /.phpunit.cache
 /node_modules
+
+# NativePHP Electron — install with npm in nativephp/electron (contains electron.exe > GitHub limit)
+/nativephp/electron/node_modules/
 /public/build
 /public/hot
 /public/storage

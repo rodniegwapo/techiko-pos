@@ -12,6 +12,7 @@ use App\Models\Product\Product;
 use App\Models\Product\ProductSoldType;
 use App\Support\ProductPayloadNormalizer;
 use App\Traits\LocationCategoryScoping;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -92,24 +93,13 @@ class ProductController extends Controller
     }
 
     /**
-     * Build the base product query scoped by domain and optionally by location.
+     * Build the base product query scoped by domain (full catalog; not filtered by store).
      */
-    private function buildProductQuery(Request $request, Domain $domain, $location)
+    private function buildProductQuery(Request $request, Domain $domain): Builder
     {
-
-        logger($domain);
-        logger('domansssewe');
-        $query = Product::query()
+        return Product::query()
             ->with('category')
-            ->where('domain', $domain->name_slug);
-
-        if ($location) {
-            $query->whereHas('activeLocations', function ($q) use ($location) {
-                $q->where('location_id', $location->id);
-            });
-        }
-
-        return $query
+            ->where('domain', $domain->name_slug)
             ->when($request->search, fn ($q, $s) => $q->search($s))
             ->when($request->category, function ($query, $category) {
                 return $query->whereHas('category', function ($q) use ($category) {
@@ -146,11 +136,17 @@ class ProductController extends Controller
     public function index(Request $request, ?Domain $domain = null)
     {
         $location = $this->resolveActiveLocation($request, $domain);
-        $products = $this->buildProductQuery($request, $domain, $location)
-            ->latest()
-            ->paginate(15);
+        $query = $this->buildProductQuery($request, $domain)
+            ->when($location, function ($q) use ($location) {
+                $q->with([
+                    'inventories' => fn ($iq) => $iq->where('location_id', $location->id),
+                ]);
+            })
+            ->latest();
 
-        $categoriesQuery = $this->buildCategoriesQuery($domain, $location);
+        $products = $query->paginate(15);
+
+        $categoriesQuery = $this->buildCategoriesQuery($domain);
 
         return $this->respondWithIndex($products, $categoriesQuery, $location);
     }
@@ -228,7 +224,7 @@ class ProductController extends Controller
     public function create(Request $request, Domain $domain)
     {
         $location = $this->resolveActiveLocation($request, $domain);
-        $categoriesQuery = $this->buildCategoriesQuery($domain, $location);
+        $categoriesQuery = $this->buildCategoriesQuery($domain);
 
         return Inertia::render('Products/Create', [
             'categories' => $categoriesQuery->get(),
@@ -249,7 +245,7 @@ class ProductController extends Controller
         }
 
         $location = $this->resolveActiveLocation($request, $domain);
-        $categoriesQuery = $this->buildCategoriesQuery($domain, $location);
+        $categoriesQuery = $this->buildCategoriesQuery($domain);
 
         return Inertia::render('Products/Edit', [
             'product' => $product,

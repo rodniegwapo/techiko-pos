@@ -34,7 +34,7 @@ const handleSave = async () => {
     localStorage.setItem("device_id", response?.data?.uuid);
     location.reload();
   } catch (error) {
-    errors.value = error?.response?.data?.errors;
+    errors.value = error?.response?.data?.errors ?? {};
   } finally {
     loading.value = false;
   }

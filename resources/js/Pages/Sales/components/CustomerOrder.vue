@@ -1,6 +1,6 @@
 <script setup>
-import VerticalForm from "@/Components/Forms/VerticalForm.vue";
 import PrimaryButton from "@/Components/PrimaryButton.vue";
+import VoidProductModal from "./VoidProductModal.vue";
 import ApplyProductDiscountModal from "./ApplyProductDiscountModal.vue";
 import ApplyOrderDiscountModal from "./ApplyOrderDiscountModal.vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
@@ -37,6 +37,11 @@ const { checkCreditAvailability } = useCredit();
 const page = usePage();
 const creditInfo = ref(null);
 
+const salesCartIsOnline = inject(
+    "isSalesOnline",
+    computed(() => true),
+);
+
 // Loading states for each product to prevent multiple rapid clicks
 const loadingStates = ref({});
 
@@ -58,6 +63,8 @@ const props = defineProps({
     orderDiscountId: { type: String, default: "" },
     discountOptions: { type: Object, default: () => ({}) },
     loading: { type: Boolean, default: false },
+    /** Customers saved during "Sync for offline" (bounded sample). */
+    offlineCachedCustomers: { type: Array, default: () => [] },
 });
 
 const {
@@ -67,6 +74,7 @@ const {
     orderDiscountId,
     discountOptions,
     loading,
+    offlineCachedCustomers,
 } = toRefs(props);
 
 // Computed values
@@ -85,6 +93,11 @@ const totalAmount = computed(() => {
 
 // Direct API functions
 const handleAddOrder = async (product) => {
+    if (!salesCartIsOnline.value) {
+        emit("offline-cart-add", product);
+        return;
+    }
+
     if (!orderId.value) {
         console.error("No active order - cannot add item");
         return;
@@ -106,6 +119,11 @@ const handleAddOrder = async (product) => {
 };
 
 const handleSubtractOrder = async (product) => {
+    if (!salesCartIsOnline.value) {
+        emit("offline-cart-subtract", product);
+        return;
+    }
+
     if (!orderId.value) {
         console.error("No active order - cannot subtract item");
         return;
@@ -129,6 +147,11 @@ const handleSubtractOrder = async (product) => {
 };
 
 const handleUpdateQuantity = async (product, quantity) => {
+    if (!salesCartIsOnline.value) {
+        emit("offline-cart-set-qty", { product, quantity });
+        return;
+    }
+
     if (!orderId.value) {
         console.error("No active order - cannot update quantity");
         return;
@@ -152,6 +175,11 @@ const handleUpdateQuantity = async (product, quantity) => {
 };
 
 const removeOrder = async (product) => {
+    if (!salesCartIsOnline.value) {
+        emit("offline-cart-remove", product);
+        return;
+    }
+
     if (!orderId.value) {
         console.error("No active order - cannot remove item");
         return;
@@ -212,7 +240,7 @@ const onSubtractClick = async (product) => {
     }
     optimisticQuantities.value[product.id] = Math.max(
         0,
-        optimisticQuantities.value[product.id] - 1
+        optimisticQuantities.value[product.id] - 1,
     );
 
     try {
@@ -320,7 +348,7 @@ const finalizeOrder = async () => {
 
     try {
         const response = await axios.post(
-            getRoute("payment.store", { sale: orderId.value })
+            getRoute("payment.store", { sale: orderId.value }),
         );
         notification.success({
             message: "Order finalized successfully",
@@ -337,67 +365,79 @@ const finalizeOrder = async () => {
 
 const { formattedPercent, formattedTotal } = useHelpers();
 
-const formFields = [
-    { key: "amount", label: "Amount", type: "text", disabled: true },
-    { key: "sale_item", label: "Item", type: "text", disabled: true },
-    { key: "pin_code", label: "Enter Pin", type: "password" },
-    {
-        key: "reason",
-        label: "Reason",
-        type: "textarea",
-    },
-];
-
 const openvoidModal = ref(false);
+const voidLine = ref(null);
+
+watch(openvoidModal, (open) => {
+    if (!open) {
+        voidLine.value = null;
+    }
+});
 
 const showVoidItem = async (product) => {
     errors.value = {};
-    openvoidModal.value = true;
-    formData.value = {
+    voidLine.value = {
         ...product,
         sale_item: product.name,
         amount: product.price,
         product_id: product.id,
     };
+    openvoidModal.value = true;
 };
 
 const isLoadingVoid = ref(false);
-const handleSubmitVoid = async () => {
+const handleSubmitVoid = async ({ pin_code, reason }) => {
+    if (!voidLine.value) return;
     try {
         isLoadingVoid.value = true;
+        if (!salesCartIsOnline.value) {
+            emit("offline-cart-remove", {
+                id: voidLine.value.product_id,
+                name: voidLine.value.sale_item,
+            });
+            openvoidModal.value = false;
+            voidLine.value = null;
+            notification.success({
+                message: "Removed",
+                description: "Item removed from offline cart.",
+            });
+            return;
+        }
         await axios.post(
-            route("sales.items.void", {
+            getRoute("sales.items.void", {
                 sale: orderId.value,
             }),
-            formData.value
+            {
+                product_id: voidLine.value.product_id,
+                pin_code,
+                reason,
+            },
         );
-        removeOrder(formData.value);
+        removeOrder({ id: voidLine.value.product_id });
         openvoidModal.value = false;
-        clearForm();
+        voidLine.value = null;
+        errors.value = {};
         notification["success"]({
             message: "Success",
             description: "The item was successfully voided.",
         });
-    } catch ({ response }) {
-        errors.value = response?.data?.errors;
+    } catch (error) {
+        errors.value = error?.response?.data?.errors ?? {};
     } finally {
         isLoadingVoid.value = false;
     }
 };
 
-const clearForm = () => {
-    formData.value = {
-        amount: "",
-        sale_item: "",
-        pin_code: "",
-        reason: "",
-        product_id: null,
-    };
-};
-
 const currentProduct = ref({});
 const openApplyDiscountModal = ref(false);
 const handleShowProductDiscountModal = (product) => {
+    if (!salesCartIsOnline.value) {
+        notification.warning({
+            message: "Requires connection",
+            description: "Product discounts are not available offline.",
+        });
+        return;
+    }
     formData.value = {
         discount: product.discounts?.[0]?.id || null,
     };
@@ -416,10 +456,14 @@ watch(
     () => selectedCustomer.value,
     async (customer) => {
         if (customer && customer.id) {
+            if (!salesCartIsOnline.value) {
+                creditInfo.value = null;
+                return;
+            }
             try {
                 creditInfo.value = await checkCreditAvailability(
                     customer.id,
-                    0
+                    0,
                 );
             } catch (error) {
                 console.error("Error loading credit info:", error);
@@ -429,7 +473,7 @@ watch(
             creditInfo.value = null;
         }
     },
-    { immediate: true }
+    { immediate: true },
 );
 const customerSearchQuery = ref("");
 const customerOptions = ref([]);
@@ -449,6 +493,13 @@ const newCustomerForm = ref({
 const openOrderDicountModal = ref(false);
 
 const showDiscountOrder = async () => {
+    if (!salesCartIsOnline.value) {
+        notification.warning({
+            message: "Requires connection",
+            description: "Order discounts are not available offline.",
+        });
+        return;
+    }
     // Check if there's an active order/draft OR if there are items in the cart
     // (orderId might be null briefly while draft is being created)
     if (!orderId.value && orders.value.length === 0) return;
@@ -513,6 +564,28 @@ const handleCustomerSearch = useDebounceFn(async (query) => {
         return;
     }
 
+    if (!salesCartIsOnline.value) {
+        const q = String(query).trim().toLowerCase();
+        const list = offlineCachedCustomers.value || [];
+        const filtered = list
+            .filter(
+                (c) =>
+                    (c.name && c.name.toLowerCase().includes(q)) ||
+                    (c.phone && String(c.phone).toLowerCase().includes(q)) ||
+                    (c.email && c.email.toLowerCase().includes(q)) ||
+                    String(c.display_text || "")
+                        .toLowerCase()
+                        .includes(q),
+            )
+            .slice(0, 25);
+        customerOptions.value = filtered.map((customer) => ({
+            value: customer.id,
+            label: customer.display_text || customer.name,
+            customer,
+        }));
+        return;
+    }
+
     searchingCustomers.value = true;
 
     try {
@@ -543,7 +616,7 @@ const handleCustomerSelect = (customerId) => {
     console.log("Customer selected:", customerId); // Debug log
 
     const option = customerOptions.value.find(
-        (opt) => opt.value === customerId
+        (opt) => opt.value === customerId,
     );
     if (option) {
         selectedCustomer.value = option.customer;
@@ -554,7 +627,7 @@ const handleCustomerSelect = (customerId) => {
 
         notification.success({
             message: "Customer Selected",
-            description: `${option.customer.name} (${option.customer.tier_info.name} tier) selected`,
+            description: `${option.customer.name} (${option.customer.tier_info?.name ?? "offline cache"} tier) selected`,
             duration: 2,
         });
     } else {
@@ -585,6 +658,13 @@ const showCustomerDetails = () => {
 
 // Add new customer
 const handleAddCustomer = async () => {
+    if (!salesCartIsOnline.value) {
+        notification.warning({
+            message: "Requires connection",
+            description: "Adding customers needs a network connection.",
+        });
+        return;
+    }
     if (!newCustomerForm.value.name) {
         notification.error({
             message: "Validation Error",
@@ -598,7 +678,7 @@ const handleAddCustomer = async () => {
     try {
         const response = await axios.post(
             "/api/customers",
-            newCustomerForm.value
+            newCustomerForm.value,
         );
 
         selectedCustomer.value = response.data.customer;
@@ -632,6 +712,10 @@ const emit = defineEmits([
     "customerChanged",
     "discount-applied",
     "cart-updated",
+    "offline-cart-add",
+    "offline-cart-subtract",
+    "offline-cart-set-qty",
+    "offline-cart-remove",
 ]);
 
 // Reset optimistic quantities when orders data changes (cart refresh)
@@ -649,7 +733,7 @@ watch(
         selectedOrder.value = null;
         tempQuantity.value = 0;
     },
-    { deep: true }
+    { deep: true },
 );
 
 // Watch for customer changes and emit to parent
@@ -658,7 +742,7 @@ watch(
     (newCustomer) => {
         emit("customerChanged", newCustomer);
     },
-    { immediate: true }
+    { immediate: true },
 );
 
 // Export customer data for parent component
@@ -675,6 +759,7 @@ defineExpose({
             v-model:checked="isLoyalCustomer"
             checked-children="Loyal"
             un-checked-children="Walk-in"
+            :disabled="!salesCartIsOnline"
             @change="handleCustomerTypeChange"
         />
     </div>
@@ -687,7 +772,13 @@ defineExpose({
                 v-if="!selectedCustomer && customerSearchQuery.length < 2"
                 class="text-xs text-gray-500 mb-1"
             >
-                💡 Type at least 2 characters to search for existing customers
+                <template v-if="salesCartIsOnline">
+                    Type at least 2 characters to search for existing customers
+                </template>
+                <template v-else>
+                    Offline: search only customers saved with &quot;Sync for
+                    offline&quot;. Type 2+ characters.
+                </template>
             </div>
 
             <!-- Customer Search -->
@@ -807,7 +898,7 @@ defineExpose({
                                     {
                                         minimumFractionDigits: 2,
                                         maximumFractionDigits: 2,
-                                    }
+                                    },
                                 )
                             }}
                         </span>
@@ -821,7 +912,7 @@ defineExpose({
                                     {
                                         minimumFractionDigits: 2,
                                         maximumFractionDigits: 2,
-                                    }
+                                    },
                                 )
                             }}
                         </span>
@@ -848,7 +939,7 @@ defineExpose({
                                     {
                                         minimumFractionDigits: 2,
                                         maximumFractionDigits: 2,
-                                    }
+                                    },
                                 )
                             }}
                         </span>
@@ -861,6 +952,7 @@ defineExpose({
                 <a-button
                     type="primary"
                     size="small"
+                    :disabled="!salesCartIsOnline"
                     @click="showAddCustomerModal = true"
                 >
                     <div class="flex items-center gap-2">
@@ -1007,18 +1099,20 @@ defineExpose({
                             <div
                                 class="text-right flex flex-col py-1 items-end gap-1"
                             >
-                                <a-tooltip title="Remove item from order">
-                                    <a-button
-                                        type="text"
-                                        size="small"
-                                        @click.stop="showVoidItem(order)"
-                                        class="p-1 h-auto border-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                                    >
-                                        <template #icon>
-                                            <CloseOutlined />
-                                        </template>
-                                    </a-button>
-                                </a-tooltip>
+                                <template v-if="salesCartIsOnline">
+                                    <a-tooltip title="Remove item from order">
+                                        <a-button
+                                            type="text"
+                                            size="small"
+                                            @click.stop="showVoidItem(order)"
+                                            class="p-1 h-auto border-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                        >
+                                            <template #icon>
+                                                <CloseOutlined />
+                                            </template>
+                                        </a-button>
+                                    </a-tooltip>
+                                </template>
 
                                 <div
                                     class="text-xs"
@@ -1041,12 +1135,12 @@ defineExpose({
                                         Disc:
                                         {{
                                             parseFloat(
-                                                order.discounts[0].value
+                                                order.discounts[0].value,
                                             )
                                         }}% -
                                         {{
                                             formattedTotal(
-                                                parseFloat(order.discount) || 0
+                                                parseFloat(order.discount) || 0,
                                             )
                                         }}
                                     </div>
@@ -1060,13 +1154,13 @@ defineExpose({
                                     >
                                         Disc: ₱{{
                                             parseFloat(
-                                                order.discounts[0].value
+                                                order.discounts[0].value,
                                             ).toFixed(2)
                                         }}
                                         -
                                         {{
                                             formattedTotal(
-                                                parseFloat(order.discount) || 0
+                                                parseFloat(order.discount) || 0,
                                             )
                                         }}
                                     </div>
@@ -1077,7 +1171,7 @@ defineExpose({
                                         Disc: -
                                         {{
                                             formattedTotal(
-                                                parseFloat(order.discount) || 0
+                                                parseFloat(order.discount) || 0,
                                             )
                                         }}
                                     </div>
@@ -1095,7 +1189,7 @@ defineExpose({
                                 >
                                     {{
                                         formattedTotal(
-                                            parseFloat(order.subtotal) || 0
+                                            parseFloat(order.subtotal) || 0,
                                         )
                                     }}
                                 </div>
@@ -1107,7 +1201,7 @@ defineExpose({
                                         formattedTotal(
                                             (parseFloat(order.price) || 0) *
                                                 (parseFloat(order.quantity) ||
-                                                    0)
+                                                    0),
                                         )
                                     }}
                                 </div>
@@ -1119,26 +1213,14 @@ defineExpose({
         </Transition>
     </div>
 
-    <a-modal
+    <void-product-modal
         v-model:visible="openvoidModal"
-        title="Void Product"
-        @cancel="openvoidModal = false"
-        :maskClosable="false"
-        width="450px"
-    >
-        <vertical-form
-            v-model="formData"
-            :fields="formFields"
-            :errors="errors"
-        />
-        <template #footer>
-            <a-button @click="openvoidModal = false">Cancel</a-button>
-
-            <primary-button :loading="loading" @click="handleSubmitVoid"
-                >Submit
-            </primary-button>
-        </template>
-    </a-modal>
+        :submit-loading="isLoadingVoid"
+        :amount="voidLine?.amount"
+        :item-label="voidLine?.sale_item"
+        :errors="errors"
+        @submit="handleSubmitVoid"
+    />
 
     <apply-product-discount-modal
         :openModal="openApplyDiscountModal"
@@ -1255,7 +1337,7 @@ defineExpose({
                                 {
                                     minimumFractionDigits: 2,
                                     maximumFractionDigits: 2,
-                                }
+                                },
                             )
                         }}
                     </p>
@@ -1268,7 +1350,7 @@ defineExpose({
                                     {
                                         minimumFractionDigits: 2,
                                         maximumFractionDigits: 2,
-                                    }
+                                    },
                                 )
                             }}
                         </span>
@@ -1295,7 +1377,7 @@ defineExpose({
                                     {
                                         minimumFractionDigits: 2,
                                         maximumFractionDigits: 2,
-                                    }
+                                    },
                                 )
                             }}
                         </span>

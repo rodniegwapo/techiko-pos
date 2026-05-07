@@ -8,7 +8,7 @@ export function useDomainRoutes() {
     const isSuperUser = computed(
         () => !!page.props.auth?.user?.data?.is_super_user
     );
-    const currentDomain = computed(() => page.props.domain);
+    const currentDomain = computed(() => page.props.currentDomain);
 
     /*** === HELPERS === ***/
     const getCurrentDomainFromUrl = () => {

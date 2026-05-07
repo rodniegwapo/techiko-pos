@@ -86,10 +86,10 @@ class StockAdjustmentItem extends Model
         }
 
         $inventoryService = app(InventoryService::class);
-        
+
         // Determine movement type based on adjustment reason
         $movementType = $this->getMovementType();
-        
+
         // Create inventory movement
         $inventoryService->recordMovement([
             'product_id' => $this->product_id,
@@ -97,7 +97,7 @@ class StockAdjustmentItem extends Model
             'movement_type' => $movementType,
             'quantity_change' => $this->adjustment_quantity,
             'unit_cost' => $this->unit_cost,
-            'reference_type' => StockAdjustment::class,
+            'reference_type' => 'StockAdjustment',
             'reference_id' => $this->stock_adjustment_id,
             'batch_number' => $this->batch_number,
             'expiry_date' => $this->expiry_date,
@@ -114,7 +114,7 @@ class StockAdjustmentItem extends Model
     {
         // If it's a decrease, determine the specific reason
         if ($this->adjustment_quantity < 0) {
-            return match($this->stockAdjustment->reason) {
+            return match ($this->stockAdjustment->reason) {
                 'damaged_goods' => 'damage',
                 'expired_goods' => 'expired',
                 'theft_loss' => 'theft',
@@ -136,7 +136,7 @@ class StockAdjustmentItem extends Model
         } elseif ($this->adjustment_quantity < 0) {
             return 'Decrease';
         }
-        
+
         return 'No Change';
     }
 
@@ -146,6 +146,7 @@ class StockAdjustmentItem extends Model
     public function getAdjustmentQuantityWithSignAttribute()
     {
         $sign = $this->adjustment_quantity >= 0 ? '+' : '';
-        return $sign . number_format($this->adjustment_quantity);
+
+        return $sign.number_format($this->adjustment_quantity);
     }
 }

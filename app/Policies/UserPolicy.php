@@ -3,8 +3,6 @@
 namespace App\Policies;
 
 use App\Models\User;
-use Illuminate\Auth\Access\Response;
-use Illuminate\Support\Facades\Log;
 
 class UserPolicy
 {
@@ -17,7 +15,7 @@ class UserPolicy
         if ($user->isSuperUser()) {
             return true;
         }
-        
+
         return $user->hasAnyRole(['super admin', 'admin', 'manager', 'supervisor']);
     }
 
@@ -30,32 +28,32 @@ class UserPolicy
         if ($user->isSuperUser()) {
             return true;
         }
-        
+
         if ($user->hasAnyRole(['super admin', 'admin'])) {
             return true;
         }
-        
+
         // Manager can only view cashiers and supervisors
         if ($user->hasRole('manager')) {
             return $model->hasAnyRole(['cashier', 'supervisor']);
         }
-        
+
         // Supervisor can only view cashiers assigned to them
         if ($user->hasRole('supervisor')) {
             // Ensure both users have roles loaded
-            if (!$user->relationLoaded('roles')) {
+            if (! $user->relationLoaded('roles')) {
                 $user->load('roles');
             }
-            if (!$model->relationLoaded('roles')) {
+            if (! $model->relationLoaded('roles')) {
                 $model->load('roles');
             }
-            
+
             // Supervisor can only view cashiers that are specifically assigned to them
-            return $model->hasRole('cashier') && 
-                   $model->supervisor_id !== null && 
+            return $model->hasRole('cashier') &&
+                   $model->supervisor_id !== null &&
                    $model->supervisor_id === $user->id;
         }
-        
+
         return false;
     }
 
@@ -68,7 +66,7 @@ class UserPolicy
         if ($user->isSuperUser()) {
             return true;
         }
-        
+
         // Super Admin, Admin, and Manager can create users
         // Managers can only create cashiers and supervisors
         return $user->hasAnyRole(['super admin', 'admin', 'manager']);
@@ -83,7 +81,7 @@ class UserPolicy
         if ($user->isSuperUser()) {
             return true;
         }
-        
+
         // super admin can edit anyone
         if ($user->hasRole('super admin')) {
             return true;
@@ -91,7 +89,7 @@ class UserPolicy
 
         // admin can edit users except super admins
         if ($user->hasRole('admin')) {
-            return !$model->hasRole('super admin');
+            return ! $model->hasRole('super admin');
         }
 
         // managers can edit non-sensitive fields of cashiers and supervisors only
@@ -111,14 +109,14 @@ class UserPolicy
         if ($user->isSuperUser()) {
             return true;
         }
-        
+
         // Only Super Admin and Admin can update sensitive fields
         if ($user->hasRole('super admin')) {
             return true;
         }
 
         if ($user->hasRole('admin')) {
-            return !$model->hasRole('super admin');
+            return ! $model->hasRole('super admin');
         }
 
         // Managers cannot update sensitive fields
@@ -134,9 +132,9 @@ class UserPolicy
         if ($user->isSuperUser()) {
             return $user->id !== $model->id;
         }
-        
+
         // Only super admin can delete users
-        if (!$user->hasRole('super admin')) {
+        if (! $user->hasRole('super admin')) {
             return false;
         }
 
@@ -173,7 +171,7 @@ class UserPolicy
         if ($user->isSuperUser()) {
             return true;
         }
-        
+
         // Super Admin and Admin can assign supervisors to anyone
         if ($user->hasAnyRole(['super admin', 'admin'])) {
             return true;
@@ -194,5 +192,29 @@ class UserPolicy
     {
         // Same permissions as assign supervisor
         return $this->assignSupervisor($user, $model);
+    }
+
+    /**
+     * Set or reset POS PIN for another user (domain-scoped routes enforce domain match).
+     */
+    public function managePin(User $actor, User $target): bool
+    {
+        if ($actor->isSuperUser()) {
+            return true;
+        }
+
+        if ($target->is_super_user) {
+            return false;
+        }
+
+        if ($actor->hasRole('super admin')) {
+            return ! $target->hasRole('super admin');
+        }
+
+        if ($actor->hasRole('admin')) {
+            return ! $target->hasRole('super admin');
+        }
+
+        return false;
     }
 }

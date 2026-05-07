@@ -261,7 +261,7 @@ const getRoleIcon = (roleName) => {
 
     <!-- Modals -->
     <a-modal
-      v-model:open="showAssignModal"
+      v-model:visible="showAssignModal"
       :title="assignLabel"
       :footer="null"
       @cancel="() => { showAssignModal = false }"
