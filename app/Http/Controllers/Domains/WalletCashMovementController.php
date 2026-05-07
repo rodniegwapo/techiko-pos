@@ -260,6 +260,18 @@ class WalletCashMovementController extends Controller
         $countedCash = round((float) $recon->counted_cash, 2);
 
         if ($action === 'cashout_now') {
+            if ($countedCash <= 0) {
+                throw ValidationException::withMessages([
+                    'counted_cash' => 'Cash out requires counted cash greater than zero.',
+                ]);
+            }
+
+            $recon->opening_cash = 0;
+            $recon->opening_source = 'manual';
+            $recon->opening_source_date = null;
+            $recon->opening_basis_at = now();
+            $recon->save();
+
             WalletCashMovement::query()->create([
                 'domain' => $domain->name_slug,
                 'location_id' => $location->id,

@@ -33,17 +33,19 @@ final class WalletCashDailyExpected
             ->where('payment_method', 'cash')
             ->whereDate('transaction_date', $businessDate);
 
+        // Mirror physical ledger: exclude book-only AUTO_CC_* except end-shift cashout (cash leaves drawer).
         $movementBase = WalletCashMovement::query()
             ->forWalletContext($domainSlug, $locationId)
             ->whereDate('movement_date', $businessDate)
             ->where(function ($q) {
                 $q->whereNull('notes')
+                    ->orWhere('notes', WalletCashBridgeExpected::NOTE_ENDSHIFT_CASHOUT)
                     ->orWhere('notes', 'not like', 'AUTO_CC_%');
             });
 
         if ($openingBasisAt !== null) {
             $salesQuery->where('transaction_date', '>=', $openingBasisAt);
-            $movementBase->where('created_at', '>=', $openingBasisAt);
+            $movementBase->where('created_at', '>', $openingBasisAt);
         }
 
         $paidCashSales = round((float) $salesQuery->sum('grand_total'), 2);
