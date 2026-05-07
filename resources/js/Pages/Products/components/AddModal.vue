@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import PrimaryButton from "@/Components/PrimaryButton.vue";
 import { router } from "@inertiajs/vue3";
 import { useTable } from "@/Composables/useTable";
@@ -7,6 +7,10 @@ import { usePage } from "@inertiajs/vue3";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
+import {
+  validationHasError,
+  validationMessage,
+} from "@/Composables/useValidationMessage.js";
 
 const { spinning } = useTable();
 const page = usePage();
@@ -133,8 +137,9 @@ const handleUpdate = () => {
       <!-- Product Name -->
       <a-form-item
         label="Product Name"
-        :validate-status="errors.name ? 'error' : ''"
-        :help="errors.name || ''"
+        required
+        :validate-status="validationHasError(errors, 'name') ? 'error' : ''"
+        :help="validationMessage(errors, 'name')"
       >
         <a-input
           v-model:value="formData.name"
@@ -147,8 +152,9 @@ const handleUpdate = () => {
       <a-form-item
         v-if="page.props.isGlobalView"
         label="Domain"
-        :validate-status="errors.domain ? 'error' : ''"
-        :help="errors.domain || ''"
+        required
+        :validate-status="validationHasError(errors, 'domain') ? 'error' : ''"
+        :help="validationMessage(errors, 'domain')"
       >
         <a-select
           v-model:value="domainValue"
@@ -162,8 +168,8 @@ const handleUpdate = () => {
       <!-- Category -->
       <a-form-item
         label="Category (optional)"
-        :validate-status="errors.category_id ? 'error' : ''"
-        :help="errors.category_id || ''"
+        :validate-status="validationHasError(errors, 'category_id') ? 'error' : ''"
+        :help="validationMessage(errors, 'category_id')"
       >
         <a-select
           v-model:value="categoryIdValue"
@@ -180,8 +186,8 @@ const handleUpdate = () => {
       <!-- Cost -->
       <a-form-item
         label="Cost"
-        :validate-status="errors.cost ? 'error' : ''"
-        :help="errors.cost || ''"
+        :validate-status="validationHasError(errors, 'cost') ? 'error' : ''"
+        :help="validationMessage(errors, 'cost')"
       >
         <a-input-number
           v-model:value="formData.cost"
@@ -196,8 +202,9 @@ const handleUpdate = () => {
       <!-- Price -->
       <a-form-item
         label="Price"
-        :validate-status="errors.price ? 'error' : ''"
-        :help="errors.price || ''"
+        required
+        :validate-status="validationHasError(errors, 'price') ? 'error' : ''"
+        :help="validationMessage(errors, 'price')"
       >
         <a-input-number
           v-model:value="formData.price"
@@ -212,8 +219,9 @@ const handleUpdate = () => {
       <!-- SKU -->
       <a-form-item
         label="SKU"
-        :validate-status="errors.SKU ? 'error' : ''"
-        :help="errors.SKU || ''"
+        :required="page.props.isGlobalView"
+        :validate-status="validationHasError(errors, 'SKU') ? 'error' : ''"
+        :help="validationMessage(errors, 'SKU')"
       >
         <a-input
           v-model:value="formData.SKU"
@@ -225,8 +233,9 @@ const handleUpdate = () => {
       <!-- Barcode -->
       <a-form-item
         label="Barcode"
-        :validate-status="errors.barcode ? 'error' : ''"
-        :help="errors.barcode || ''"
+        :required="page.props.isGlobalView"
+        :validate-status="validationHasError(errors, 'barcode') ? 'error' : ''"
+        :help="validationMessage(errors, 'barcode')"
       >
         <a-input
           v-model:value="formData.barcode"
@@ -238,8 +247,9 @@ const handleUpdate = () => {
       <!-- Sold Type -->
       <a-form-item
         label="Sold Type"
-        :validate-status="errors.sold_type ? 'error' : ''"
-        :help="errors.sold_type || ''"
+        required
+        :validate-status="validationHasError(errors, 'sold_type') ? 'error' : ''"
+        :help="validationMessage(errors, 'sold_type')"
       >
         <a-radio-group
           v-model:value="formData.sold_type"
@@ -255,11 +265,12 @@ const handleUpdate = () => {
         </a-radio-group>
       </a-form-item>
 
-      <!-- Representation Type -->
+      <!-- Representation Type (edit only; create uses server default color) -->
       <a-form-item
+        v-if="isEdit"
         label="Representation Type"
-        :validate-status="errors.representation_type ? 'error' : ''"
-        :help="errors.representation_type || ''"
+        :validate-status="validationHasError(errors, 'representation_type') ? 'error' : ''"
+        :help="validationMessage(errors, 'representation_type')"
       >
         <a-select
           v-model:value="representationTypeValue"
@@ -273,8 +284,8 @@ const handleUpdate = () => {
       <!-- Representation -->
       <a-form-item
         label="Representation"
-        :validate-status="errors.representation ? 'error' : ''"
-        :help="errors.representation || ''"
+        :validate-status="validationHasError(errors, 'representation') ? 'error' : ''"
+        :help="validationMessage(errors, 'representation')"
       >
         <a-input
           v-model:value="formData.representation"

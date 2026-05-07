@@ -14,6 +14,7 @@ use App\Models\SharedProduct;
 use App\Models\SharedProductSuggestion;
 use App\Services\DomainSubscriptionService;
 use App\Support\BarcodeNormalizer;
+use App\Support\ProductPayloadNormalizer;
 use App\Traits\LocationCategoryScoping;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -63,6 +64,9 @@ class ProductController extends Controller
             'category_id' => ['nullable', 'exists:categories,id'],
             'SKU' => ['nullable', 'string', 'max:255', 'unique:products,SKU,'.$productId],
             'barcode' => $barcodeRules,
+
+            'representation_type' => ['nullable', 'string', 'in:image,color,text'],
+            'representation' => ['nullable', 'string'],
 
             'track_inventory' => ['boolean'],
             'reorder_level' => ['nullable', 'numeric', 'min:0'],
@@ -229,7 +233,9 @@ class ProductController extends Controller
             $this->subscriptionService->assertCanCreateProduct($domain);
         }
 
-        $validated = $this->validatedData($request, null, $domain);
+        $validated = ProductPayloadNormalizer::applyRepresentationAndCostDefaults(
+            $this->validatedData($request, null, $domain),
+        );
 
         if ($domain) {
             $validated['domain'] = $domain->name_slug;
@@ -262,7 +268,9 @@ class ProductController extends Controller
         }
 
         $this->validateProductUniqueness($request, $product, $domain);
-        $validated = $this->validatedData($request, $product, $domain);
+        $validated = ProductPayloadNormalizer::applyRepresentationAndCostDefaults(
+            $this->validatedData($request, $product, $domain),
+        );
         $product->update($validated);
         $product->refresh();
 

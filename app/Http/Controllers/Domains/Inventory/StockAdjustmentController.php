@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Domains\Inventory;
 
+use App\Helpers;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\StockAdjustmentController as GlobalStockAdjustmentController;
 use App\Http\Resources\StockAdjustmentResource;
@@ -10,7 +11,6 @@ use App\Models\InventoryLocation;
 use App\Models\Product\Product;
 use App\Models\StockAdjustment;
 use App\Services\InventoryService;
-use App\Helpers;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -28,10 +28,10 @@ class StockAdjustmentController extends Controller
         $query = StockAdjustment::with(['location', 'createdBy', 'approvedBy'])
             ->withCount('items')
             ->where('location_id', $location->id)
-            ->when($request->input('search'), fn($q, $s) => $q->search($s))
-            ->when($request->input('status'), fn($q, $status) => $q->where('status', $status))
-            ->when($request->input('date_from'), fn($q, $d) => $q->whereDate('created_at', '>=', $d))
-            ->when($request->input('date_to'), fn($q, $d) => $q->whereDate('created_at', '<=', $d))
+            ->when($request->input('search'), fn ($q, $s) => $q->search($s))
+            ->when($request->input('status'), fn ($q, $status) => $q->where('status', $status))
+            ->when($request->input('date_from'), fn ($q, $d) => $q->whereDate('created_at', '>=', $d))
+            ->when($request->input('date_to'), fn ($q, $d) => $q->whereDate('created_at', '<=', $d))
             ->orderBy('created_at', 'desc');
 
         $adjustments = $query->paginate($request->per_page ?? 20);
@@ -70,7 +70,7 @@ class StockAdjustmentController extends Controller
     public function show(Request $request, Domain $domain, StockAdjustment $adjustment)
     {
         // Ensure adjustment location belongs to domain
-        if (!$adjustment->location || $adjustment->location->domain !== $domain->name_slug) {
+        if (! $adjustment->location || $adjustment->location->domain !== $domain->name_slug) {
             abort(403, 'Adjustment does not belong to this domain');
         }
 
@@ -149,6 +149,7 @@ class StockAdjustmentController extends Controller
             return response()->json(['success' => false, 'message' => 'Only draft adjustments can be deleted'], 400);
         }
         $adjustment->delete();
+
         return response()->json(['success' => true, 'message' => 'Stock adjustment deleted successfully']);
     }
 
@@ -158,6 +159,7 @@ class StockAdjustmentController extends Controller
             abort(403, 'Adjustment does not belong to this domain');
         }
         $adjustment->submitForApproval();
+
         return response()->json(['success' => true, 'message' => 'Stock adjustment submitted for approval']);
     }
 
@@ -167,6 +169,7 @@ class StockAdjustmentController extends Controller
             abort(403, 'Adjustment does not belong to this domain');
         }
         $adjustment->approve(auth()->user());
+
         return response()->json(['success' => true, 'message' => 'Stock adjustment approved and processed']);
     }
 
@@ -176,6 +179,7 @@ class StockAdjustmentController extends Controller
             abort(403, 'Adjustment does not belong to this domain');
         }
         $adjustment->reject();
+
         return response()->json(['success' => true, 'message' => 'Stock adjustment rejected']);
     }
 
@@ -214,5 +218,3 @@ class StockAdjustmentController extends Controller
         return response()->json(['success' => true, 'data' => $products]);
     }
 }
-
-
