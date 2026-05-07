@@ -389,6 +389,12 @@ const canManageCashControl = computed(
 );
 const isShiftClosed = computed(() => !!props.cashControl?.is_closed);
 
+const canCashOutOnEndShift = computed(() => {
+    const c = props.cashControl;
+    if (!c?.counted_at) return false;
+    return Number(c.counted_cash || 0) > 0;
+});
+
 /** Daily expected is off, but counted cash matches bridge-from-last-count. */
 const bridgeOpeningHint = computed(() => {
     const c = props.cashControl;
@@ -424,6 +430,25 @@ watch(
         cashControlForm.value.notes = v?.notes || "";
     },
     { immediate: true, deep: true },
+);
+
+watch(
+    [
+        () => props.cashControl?.counted_at,
+        () => props.cashControl?.counted_cash,
+        endShiftAction,
+    ],
+    () => {
+        const c = props.cashControl;
+        if (
+            c?.counted_at &&
+            !(Number(c.counted_cash ?? 0) > 0) &&
+            endShiftAction.value === "cashout_now"
+        ) {
+            endShiftAction.value = "save_as_opening_cash";
+        }
+    },
+    { flush: "sync", deep: true },
 );
 
 function reloadWalletForBusinessDate() {
@@ -505,53 +530,77 @@ function onEndShiftClick() {
         });
         return;
     }
+    const modalBodyChildren = [
+        createVNode(
+            "p",
+            { class: "text-sm text-gray-700" },
+            "Choose what to do with counted cash before closing shift.",
+        ),
+    ];
+    if (!canCashOutOnEndShift.value) {
+        modalBodyChildren.push(
+            createVNode(
+                "p",
+                { class: "text-xs text-amber-800" },
+                "Cash out requires counted cash greater than zero. Save as opening is available.",
+            ),
+        );
+    }
+    modalBodyChildren.push(
+        createVNode("div", { class: "flex flex-col gap-2" }, [
+            createVNode(
+                "label",
+                {
+                    class: [
+                        "inline-flex items-center gap-2 text-sm",
+                        canCashOutOnEndShift.value
+                            ? "text-gray-700"
+                            : "cursor-not-allowed text-gray-400",
+                    ].join(" "),
+                },
+                [
+                    createVNode("input", {
+                        type: "radio",
+                        name: "endShiftAction",
+                        disabled: !canCashOutOnEndShift.value,
+                        checked: endShiftAction.value === "cashout_now",
+                        onChange: () => {
+                            if (!canCashOutOnEndShift.value) return;
+                            endShiftAction.value = "cashout_now";
+                        },
+                    }),
+                    "Cash out now",
+                ],
+            ),
+            createVNode(
+                "label",
+                {
+                    class: "inline-flex items-center gap-2 text-sm text-gray-700",
+                },
+                [
+                    createVNode("input", {
+                        type: "radio",
+                        name: "endShiftAction",
+                        checked:
+                            endShiftAction.value === "save_as_opening_cash",
+                        onChange: () => {
+                            endShiftAction.value = "save_as_opening_cash";
+                        },
+                    }),
+                    "Save as opening cash",
+                ],
+            ),
+        ]),
+    );
+
     Modal.confirm({
         title: "End Shift action",
         icon: createVNode(ExclamationCircleOutlined),
-        content: createVNode("div", { class: "space-y-2" }, [
-            createVNode(
-                "p",
-                { class: "text-sm text-gray-700" },
-                "Choose what to do with counted cash before closing shift.",
-            ),
-            createVNode("div", { class: "flex flex-col gap-2" }, [
-                createVNode(
-                    "label",
-                    {
-                        class: "inline-flex items-center gap-2 text-sm text-gray-700",
-                    },
-                    [
-                        createVNode("input", {
-                            type: "radio",
-                            name: "endShiftAction",
-                            checked: endShiftAction.value === "cashout_now",
-                            onChange: () => {
-                                endShiftAction.value = "cashout_now";
-                            },
-                        }),
-                        "Cash out now",
-                    ],
-                ),
-                createVNode(
-                    "label",
-                    {
-                        class: "inline-flex items-center gap-2 text-sm text-gray-700",
-                    },
-                    [
-                        createVNode("input", {
-                            type: "radio",
-                            name: "endShiftAction",
-                            checked:
-                                endShiftAction.value === "save_as_opening_cash",
-                            onChange: () => {
-                                endShiftAction.value = "save_as_opening_cash";
-                            },
-                        }),
-                        "Save as opening cash",
-                    ],
-                ),
-            ]),
-        ]),
+        content: createVNode(
+            "div",
+            { class: "space-y-2" },
+            modalBodyChildren,
+        ),
         okText: "Confirm End Shift",
         cancelText: "Cancel",
         onOk: endShift,
@@ -566,6 +615,16 @@ function goToSubmitCountedCash() {
 }
 
 async function endShift() {
+    if (
+        endShiftAction.value === "cashout_now" &&
+        !canCashOutOnEndShift.value
+    ) {
+        notification.warning({
+            message: "Cash out requires counted cash greater than zero.",
+        });
+
+        return;
+    }
     endingShift.value = true;
     try {
         await axios.post(getRoute("wallet-cash-ledger.end-shift"), {

@@ -420,6 +420,12 @@ class WalletCashControlTest extends TestCase
             'movement_date' => $date,
             'notes' => 'AUTO_CC_ENDSHIFT_CASHOUT',
         ]);
+        $this->assertDatabaseHas('wallet_cash_reconciliations', [
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'business_date' => $date,
+            'opening_cash' => 0,
+        ]);
 
         $walletUrl = route('domains.payment-card-types.index', [
             'domain' => $ctx['domain']->name_slug,
@@ -429,7 +435,8 @@ class WalletCashControlTest extends TestCase
         $this->actingAs($ctx['user'])->get($walletUrl)
             ->assertOk()
             ->assertInertia(fn (Inertia $page) => $page
-                ->where('cashControl.expected_cash', 200)
+                ->where('cashControl.opening_cash', 0)
+                ->where('cashControl.expected_cash', 0)
                 ->where('cashControl.manual_out', 0)
             );
 
@@ -637,6 +644,30 @@ class WalletCashControlTest extends TestCase
             );
 
         Carbon::setTestNow();
+    }
+
+    public function test_end_shift_cashout_requires_positive_counted_cash(): void
+    {
+        $ctx = $this->seedContext();
+        $date = now()->subDays(17)->toDateString();
+
+        WalletCashReconciliation::query()->create([
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'business_date' => $date,
+            'opening_cash' => 100,
+            'counted_cash' => 0,
+            'counted_by' => $ctx['user']->id,
+            'counted_at' => now(),
+        ]);
+
+        $endUrl = route('domains.wallet-cash-ledger.end-shift', ['domain' => $ctx['domain']->name_slug]);
+
+        $this->actingAs($ctx['user'])->post($endUrl, [
+            'location_id' => $ctx['location']->id,
+            'business_date' => $date,
+            'end_shift_action' => 'cashout_now',
+        ])->assertSessionHasErrors(['counted_cash']);
     }
 
     public function test_end_shift_requires_valid_action(): void
