@@ -389,6 +389,30 @@ const canManageCashControl = computed(
 );
 const isShiftClosed = computed(() => !!props.cashControl?.is_closed);
 
+/** Treat null/empty/non-finite/zero as unusable amounts for enabling save buttons. */
+function isCashInputNullOrZero(value) {
+    if (value === null || value === undefined || value === "") {
+        return true;
+    }
+    const n = Number(value);
+    if (!Number.isFinite(n)) {
+        return true;
+    }
+    return n === 0;
+}
+
+const disableSaveOpeningCashButton = computed(
+    () =>
+        isShiftClosed.value ||
+        isCashInputNullOrZero(cashControlForm.value.opening_cash),
+);
+
+const disableSaveCountedCashButton = computed(
+    () =>
+        isShiftClosed.value ||
+        isCashInputNullOrZero(cashControlForm.value.counted_cash),
+);
+
 const canCashOutOnEndShift = computed(() => {
     const c = props.cashControl;
     if (!c?.counted_at) return false;
@@ -469,7 +493,7 @@ function reloadWalletForBusinessDate() {
 }
 
 async function saveOpeningCash() {
-    if (isShiftClosed.value) return;
+    if (disableSaveOpeningCashButton.value) return;
     savingOpeningCash.value = true;
     try {
         await axios.post(getRoute("wallet-cash-ledger.opening-cash.store"), {
@@ -492,7 +516,7 @@ async function saveOpeningCash() {
 }
 
 async function saveCountedCash() {
-    if (isShiftClosed.value) return;
+    if (disableSaveCountedCashButton.value) return;
     savingCountedCash.value = true;
     try {
         await axios.post(getRoute("wallet-cash-ledger.counted-cash.store"), {
@@ -932,7 +956,7 @@ async function reopenShift() {
                     <a-button
                         type="primary"
                         :loading="savingOpeningCash"
-                        :disabled="isShiftClosed"
+                        :disabled="disableSaveOpeningCashButton || savingOpeningCash"
                         @click="saveOpeningCash"
                     >
                         Save opening
@@ -962,7 +986,7 @@ async function reopenShift() {
                     <a-button
                         type="primary"
                         :loading="savingCountedCash"
-                        :disabled="isShiftClosed"
+                        :disabled="disableSaveCountedCashButton || savingCountedCash"
                         @click="saveCountedCash"
                     >
                         Save counted cash
