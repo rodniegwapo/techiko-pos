@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from "vue";
+import { computed, ref } from "vue";
 import { Head, Link, useForm, usePage } from "@inertiajs/vue3";
 import { watchDebounced } from "@vueuse/core";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
@@ -7,6 +7,11 @@ import ContentHeader from "@/Components/ContentHeader.vue";
 import ContentLayout from "@/Components/ContentLayout.vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useSharedCatalogLookup } from "@/Composables/useSharedCatalogLookup";
+import {
+    validationHasError,
+    validationMessage,
+    validationSummaryNotice,
+} from "@/Composables/useValidationMessage.js";
 import { message } from "ant-design-vue";
 import { useBarcodeScanner } from "@/Composables/useBarcodeScanner";
 
@@ -41,7 +46,6 @@ const form = useForm({
     SKU: "",
     barcode: "",
     sold_type: null,
-    representation_type: null,
     representation: "",
 });
 
@@ -135,17 +139,22 @@ const domainOptions = computed(() => {
 const handleSave = () => {
     form.post(getRoute("products.store"), {
         onSuccess: () => {
-            message.success("Product created successfully");
             form.reset();
             form.clearErrors();
             sharedCategoryHint.value = "";
             barcodeLookupNonce.value += 1;
+            message.success("Product created successfully");
         },
-        onError: (errors) => {
-            const planMsg = errors?.plan;
-            message.error(
-                Array.isArray(planMsg) ? planMsg[0] : planMsg || "Failed to create product",
-            );
+        onError: (errs) => {
+            const bag = errs || form.errors;
+            const planMsg = bag?.plan;
+            if (planMsg !== undefined && planMsg !== null && planMsg !== "") {
+                message.error(
+                    Array.isArray(planMsg) ? planMsg[0] : planMsg || "Failed to create product",
+                );
+                return;
+            }
+            message.warning(validationSummaryNotice(bag));
         },
     });
 };
@@ -188,8 +197,13 @@ useBarcodeScanner((code) => {
                         <!-- Product Name -->
                         <a-form-item
                             label="Product Name"
-                            :validate-status="form.errors.name ? 'error' : ''"
-                            :help="form.errors.name || ''"
+                            required
+                            :validate-status="
+                                validationHasError(form.errors, 'name')
+                                    ? 'error'
+                                    : ''
+                            "
+                            :help="validationMessage(form.errors, 'name')"
                         >
                             <a-input
                                 v-model:value="form.name"
@@ -202,8 +216,13 @@ useBarcodeScanner((code) => {
                         <a-form-item
                             v-if="props.isGlobalView"
                             label="Domain"
-                            :validate-status="form.errors.domain ? 'error' : ''"
-                            :help="form.errors.domain || ''"
+                            required
+                            :validate-status="
+                                validationHasError(form.errors, 'domain')
+                                    ? 'error'
+                                    : ''
+                            "
+                            :help="validationMessage(form.errors, 'domain')"
                         >
                             <a-select
                                 v-model:value="form.domain"
@@ -217,9 +236,13 @@ useBarcodeScanner((code) => {
                         <a-form-item
                             label="Category (optional)"
                             :validate-status="
-                                form.errors.category_id ? 'error' : ''
+                                validationHasError(form.errors, 'category_id')
+                                    ? 'error'
+                                    : ''
                             "
-                            :help="form.errors.category_id || ''"
+                            :help="
+                                validationMessage(form.errors, 'category_id')
+                            "
                         >
                             <a-select
                                 v-model:value="form.category_id"
@@ -234,6 +257,7 @@ useBarcodeScanner((code) => {
                                             .includes(input.toLowerCase())
                                 "
                                 size="large"
+                                :allow-clear="true"
                             />
                         </a-form-item>
 
@@ -242,9 +266,11 @@ useBarcodeScanner((code) => {
                             <a-form-item
                                 label="Cost"
                                 :validate-status="
-                                    form.errors.cost ? 'error' : ''
+                                    validationHasError(form.errors, 'cost')
+                                        ? 'error'
+                                        : ''
                                 "
-                                :help="form.errors.cost || ''"
+                                :help="validationMessage(form.errors, 'cost')"
                             >
                                 <a-input-number
                                     v-model:value="form.cost"
@@ -260,10 +286,13 @@ useBarcodeScanner((code) => {
                             <!-- Price -->
                             <a-form-item
                                 label="Price"
+                                required
                                 :validate-status="
-                                    form.errors.price ? 'error' : ''
+                                    validationHasError(form.errors, 'price')
+                                        ? 'error'
+                                        : ''
                                 "
-                                :help="form.errors.price || ''"
+                                :help="validationMessage(form.errors, 'price')"
                             >
                                 <a-input-number
                                     v-model:value="form.price"
@@ -281,10 +310,13 @@ useBarcodeScanner((code) => {
                             <!-- SKU -->
                             <a-form-item
                                 label="SKU"
+                                :required="props.isGlobalView"
                                 :validate-status="
-                                    form.errors.SKU ? 'error' : ''
+                                    validationHasError(form.errors, 'SKU')
+                                        ? 'error'
+                                        : ''
                                 "
-                                :help="form.errors.SKU || ''"
+                                :help="validationMessage(form.errors, 'SKU')"
                             >
                                 <a-input
                                     v-model:value="form.SKU"
@@ -296,10 +328,15 @@ useBarcodeScanner((code) => {
                             <!-- Barcode -->
                             <a-form-item
                                 label="Barcode"
+                                :required="props.isGlobalView"
                                 :validate-status="
-                                    form.errors.barcode ? 'error' : ''
+                                    validationHasError(form.errors, 'barcode')
+                                        ? 'error'
+                                        : ''
                                 "
-                                :help="form.errors.barcode || ''"
+                                :help="
+                                    validationMessage(form.errors, 'barcode')
+                                "
                             >
                                 <a-input
                                     v-model:value="form.barcode"
@@ -331,10 +368,13 @@ useBarcodeScanner((code) => {
                         <!-- Sold Type -->
                         <a-form-item
                             label="Sold Type"
+                            required
                             :validate-status="
-                                form.errors.sold_type ? 'error' : ''
+                                validationHasError(form.errors, 'sold_type')
+                                    ? 'error'
+                                    : ''
                             "
-                            :help="form.errors.sold_type || ''"
+                            :help="validationMessage(form.errors, 'sold_type')"
                         >
                             <a-radio-group
                                 v-model:value="form.sold_type"
@@ -350,42 +390,30 @@ useBarcodeScanner((code) => {
                             </a-radio-group>
                         </a-form-item>
 
-                        <div class="grid grid-cols-2 gap-4">
-                            <!-- Representation Type -->
-                            <a-form-item
-                                label="Reperesentation Type"
-                                :validate-status="
-                                    form.errors.representation_type
-                                        ? 'error'
-                                        : ''
-                                "
-                                :help="form.errors.representation_type || ''"
-                            >
-                                <a-select
-                                    v-model:value="form.representation_type"
-                                    :options="[
-                                        { label: 'Color', value: 'color' },
-                                    ]"
-                                    placeholder="Select representation type"
-                                    size="large"
-                                />
-                            </a-form-item>
-
-                            <!-- Representation -->
-                            <a-form-item
-                                label="Representation"
-                                :validate-status="
-                                    form.errors.representation ? 'error' : ''
-                                "
-                                :help="form.errors.representation || ''"
-                            >
-                                <a-input
-                                    v-model:value="form.representation"
-                                    placeholder="Enter representation (e.g., hex color code)"
-                                    size="large"
-                                />
-                            </a-form-item>
-                        </div>
+                        <!-- Optional custom color hex; server defaults type=color + neutral hex when empty -->
+                        <a-form-item
+                            label="Color (hex, optional)"
+                            :validate-status="
+                                validationHasError(
+                                    form.errors,
+                                    'representation',
+                                )
+                                    ? 'error'
+                                    : ''
+                            "
+                            :help="
+                                validationMessage(
+                                    form.errors,
+                                    'representation',
+                                ) || 'Leave blank to use the default color'
+                            "
+                        >
+                            <a-input
+                                v-model:value="form.representation"
+                                placeholder="e.g. ff5733 (no #)"
+                                size="large"
+                            />
+                        </a-form-item>
 
                         <div class="flex justify-end gap-2 mt-4">
                             <Link :href="getRoute('products.index')">

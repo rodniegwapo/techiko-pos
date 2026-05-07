@@ -10,6 +10,7 @@ import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import isocalendar from "dayjs/plugin/isoWeek";
 import { Modal, notification } from "ant-design-vue";
+import { validationSummaryNotice } from "./useValidationMessage.js";
 dayjs.extend(utc);
 dayjs.extend(timezone);
 dayjs.extend(isocalendar);
@@ -62,9 +63,9 @@ export function useHelpers() {
         },
         onError: (error) => {
             errors.value = error;
-            notification.error({
-                message: "Error",
-                description: "Operation failed. Please try again.",
+            notification.warning({
+                message: "Please review the form",
+                description: validationSummaryNotice(error),
             });
         },
         onFinish: () => {

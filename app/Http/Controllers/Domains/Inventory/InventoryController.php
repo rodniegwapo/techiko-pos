@@ -2,19 +2,21 @@
 
 namespace App\Http\Controllers\Domains\Inventory;
 
+use App\Helpers;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\InventoryMovementResource;
 use App\Http\Resources\ProductInventoryResource;
+use App\Http\Resources\ProductResource;
+use App\Models\Category;
 use App\Models\Domain;
 use App\Models\InventoryLocation;
 use App\Models\InventoryMovement;
 use App\Models\Product\Product;
 use App\Models\ProductInventory;
 use App\Services\InventoryService;
-use App\Helpers;
-use App\Models\Category;
 use App\Traits\LocationCategoryScoping;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
@@ -43,7 +45,7 @@ class InventoryController extends Controller
         $slug = $domain->name_slug;
         $location = Helpers::getActiveLocation($domain);
 
-        if (!$location) {
+        if (! $location) {
             return Inertia::render('Inventory/Products', [
                 'inventories' => [],
                 'locations' => InventoryLocation::active()->forDomain($slug)->get(),
@@ -61,7 +63,7 @@ class InventoryController extends Controller
             });
 
         if ($request->search) {
-            $query->whereHas('product', fn($q) => $q->search($request->search));
+            $query->whereHas('product', fn ($q) => $q->search($request->search));
         }
 
         if ($request->stock_status) {
@@ -79,7 +81,7 @@ class InventoryController extends Controller
         }
 
         if ($request->category_id) {
-            $query->whereHas('product', fn($q) => $q->where('category_id', $request->category_id));
+            $query->whereHas('product', fn ($q) => $q->where('category_id', $request->category_id));
         }
 
         $inventories = $query->orderBy('quantity_available', 'asc')
@@ -106,6 +108,7 @@ class InventoryController extends Controller
 
         $inventories->getCollection()->transform(function ($inventory) {
             $inventory->location_stock_status = $inventory->getStockStatus();
+
             return $inventory;
         });
 
@@ -123,10 +126,10 @@ class InventoryController extends Controller
         $slug = $domain->name_slug;
         $location = Helpers::getActiveLocation($domain, $request->input('location_id'));
 
-        if (!$location) {
+        if (! $location) {
             return Inertia::render('Inventory/Movements', [
                 'movements' => InventoryMovementResource::collection(
-                    new \Illuminate\Pagination\LengthAwarePaginator([], 0, 50)
+                    new LengthAwarePaginator([], 0, 50)
                 ),
                 'locations' => InventoryLocation::active()->forDomain($slug)->get(),
                 'products' => Product::select('id', 'name', 'SKU')->where('domain', $slug)->get(),
@@ -224,7 +227,7 @@ class InventoryController extends Controller
         $slug = $domain->name_slug;
         $location = Helpers::getActiveLocation($domain);
 
-        if (!$location) {
+        if (! $location) {
             return response()->json([
                 'total_value' => 0,
                 'total_quantity' => 0,
@@ -341,14 +344,14 @@ class InventoryController extends Controller
             ->whereHas('activeLocations', function ($q) use ($location) {
                 $q->where('location_id', $location->id);
             })
-            ->when($request->search, fn($q, $search) => $q->search($search))
-            ->when($request->category_id, fn($q, $categoryId) => $q->where('category_id', $categoryId));
+            ->when($request->search, fn ($q, $search) => $q->search($search))
+            ->when($request->category_id, fn ($q, $categoryId) => $q->where('category_id', $categoryId));
 
         $products = $query->limit(20)->get();
 
         return response()->json([
             'success' => true,
-            'data' => \App\Http\Resources\ProductResource::collection($products)
+            'data' => ProductResource::collection($products),
         ]);
     }
 }

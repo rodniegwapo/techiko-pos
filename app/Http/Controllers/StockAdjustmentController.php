@@ -8,9 +8,11 @@ use App\Models\InventoryLocation;
 use App\Models\Product\Product;
 use App\Models\StockAdjustment;
 use App\Services\InventoryService;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Inertia\Inertia;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class StockAdjustmentController extends Controller
 {
@@ -45,7 +47,7 @@ class StockAdjustmentController extends Controller
     /**
      * Locations shown in adjustment forms: all stores for super users, org stores only otherwise.
      */
-    protected function adjustmentFormLocations(): \Illuminate\Database\Eloquent\Collection
+    protected function adjustmentFormLocations(): Collection
     {
         $user = auth()->user();
 
@@ -63,9 +65,9 @@ class StockAdjustmentController extends Controller
     /**
      * Domain options for global create (super = all; org user = single org or empty).
      *
-     * @return \Illuminate\Database\Eloquent\Collection<int, Domain>
+     * @return Collection<int, Domain>
      */
-    protected function adjustmentFormDomains(): \Illuminate\Database\Eloquent\Collection
+    protected function adjustmentFormDomains(): Collection
     {
         $user = auth()->user();
         $query = Domain::query()->select('id', 'name', 'name_slug');
@@ -123,7 +125,7 @@ class StockAdjustmentController extends Controller
                 return $query->whereDate('created_at', '<=', $dateTo);
             })
             ->when($request->input('domain'), function ($query, $domain) {
-                return $query->whereHas('location', fn($lq) => $lq->forDomain($domain));
+                return $query->whereHas('location', fn ($lq) => $lq->forDomain($domain));
             })
             ->orderBy('created_at', 'desc');
 
@@ -132,7 +134,7 @@ class StockAdjustmentController extends Controller
         return Inertia::render('Inventory/StockAdjustments/Index', [
             'adjustments' => StockAdjustmentResource::collection($adjustments),
             'locations' => InventoryLocation::active()->get(),
-            'domains' => \App\Models\Domain::select('id', 'name', 'name_slug')->get(),
+            'domains' => Domain::select('id', 'name', 'name_slug')->get(),
             'statuses' => [
                 'draft' => 'Draft',
                 'pending_approval' => 'Pending Approval',
@@ -506,7 +508,7 @@ class StockAdjustmentController extends Controller
                 'success' => true,
                 'data' => $products,
             ]);
-        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+        } catch (HttpException $e) {
             throw $e;
         } catch (\Exception $e) {
             \Log::error('Error in getProductsForAdjustment: '.$e->getMessage(), [

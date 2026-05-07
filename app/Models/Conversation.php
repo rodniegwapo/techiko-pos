@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -45,7 +46,7 @@ class Conversation extends Model
 
     /**
      * Count of distinct conversations with at least one customer message not yet read by staff.
-     * Matches the superuser "Messages" sidebar badge in {@see \App\Http\Middleware\HandleInertiaRequests}.
+     * Matches the superuser "Messages" sidebar badge in {@see HandleInertiaRequests}.
      */
     public static function unreadInboxConversationsForStaffCount(): int
     {

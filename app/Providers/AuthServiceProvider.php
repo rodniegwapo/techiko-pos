@@ -3,7 +3,13 @@
 namespace App\Providers;
 
 // use Illuminate\Support\Facades\Gate;
+use App\Models\Conversation;
+use App\Models\User;
+use App\Policies\ConversationPolicy;
+use App\Policies\RolePolicy;
+use App\Policies\UserPolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
+use Spatie\Permission\Models\Role;
 
 class AuthServiceProvider extends ServiceProvider
 {
@@ -13,9 +19,9 @@ class AuthServiceProvider extends ServiceProvider
      * @var array<class-string, class-string>
      */
     protected $policies = [
-        \App\Models\User::class => \App\Policies\UserPolicy::class,
-        \App\Models\Conversation::class => \App\Policies\ConversationPolicy::class,
-        \Spatie\Permission\Models\Role::class => \App\Policies\RolePolicy::class,
+        User::class => UserPolicy::class,
+        Conversation::class => ConversationPolicy::class,
+        Role::class => RolePolicy::class,
     ];
 
     /**

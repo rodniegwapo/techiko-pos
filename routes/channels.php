@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\Conversation;
+use App\Models\Sale;
 use Illuminate\Support\Facades\Broadcast;
 
 /*
@@ -25,7 +27,7 @@ Broadcast::channel('order', function () {
 // Private order channel for specific order updates
 Broadcast::channel('orders.{id}', function ($user, $orderId) {
     // Allow the user who created the order to listen
-    $sale = \App\Models\Sale::find($orderId);
+    $sale = Sale::find($orderId);
 
     return $sale && (int) $user->id === (int) $sale->user_id;
 });
@@ -35,7 +37,7 @@ Broadcast::channel('staff-inbox', function ($user) {
 });
 
 Broadcast::channel('conversations.{conversationId}', function ($user, $conversationId) {
-    $conversation = \App\Models\Conversation::find($conversationId);
+    $conversation = Conversation::find($conversationId);
     if (! $conversation) {
         return false;
     }

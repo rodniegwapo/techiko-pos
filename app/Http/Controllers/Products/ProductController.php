@@ -10,6 +10,7 @@ use App\Models\Product\Product;
 use App\Models\Product\ProductSoldType;
 use App\Services\DomainSubscriptionService;
 use App\Support\BarcodeNormalizer;
+use App\Support\ProductPayloadNormalizer;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -80,10 +81,12 @@ class ProductController extends Controller
 
     public function store(Request $request)
     {
-        $data = $this->validatedData($request, null);
+        $data = ProductPayloadNormalizer::applyRepresentationAndCostDefaults($this->validatedData($request, null));
+
         $domainModel = isset($data['domain'])
             ? Domain::where('name_slug', $data['domain'])->first()
             : null;
+
         if ($domainModel) {
             $this->subscriptionService->assertCanCreateProduct($domainModel);
         }
@@ -95,7 +98,7 @@ class ProductController extends Controller
 
     public function update(Request $request, Product $product)
     {
-        $data = $this->validatedData($request, $product);
+        $data = ProductPayloadNormalizer::applyRepresentationAndCostDefaults($this->validatedData($request, $product));
 
         $product->update($data);
 
@@ -125,9 +128,9 @@ class ProductController extends Controller
 
         $rules = [
             'name' => ['required', 'string', 'max:255'],
-            'sold_type' => ['required', 'exists:product_sold_types,name'], // must exist in table
-            'price' => ['required', 'integer', 'min:0'],
-            'cost' => ['required', 'integer', 'min:0'],
+            'sold_type' => ['required', 'exists:product_sold_types,name'],
+            'price' => ['required', 'numeric', 'min:0'],
+            'cost' => ['nullable', 'numeric', 'min:0'],
             'SKU' => ['required', 'string', 'max:100', 'unique:products,SKU,'.$productId],
             'barcode' => $barcodeRules,
             'representation_type' => ['nullable', 'string', 'in:image,color,text'],
@@ -135,7 +138,6 @@ class ProductController extends Controller
             'category_id' => ['nullable', 'exists:categories,id'],
         ];
 
-        // Add domain validation for global view
         if ($request->has('domain') && $request->domain) {
             $rules['domain'] = ['required', 'string', 'exists:domains,name_slug'];
         }

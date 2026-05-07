@@ -2,12 +2,16 @@
 
 namespace App\Services;
 
-use App\Events\OrderUpdated;
 use App\Jobs\SyncSaleDraft;
+use App\Models\InventoryLocation;
+use App\Models\Product\Discount;
+use App\Models\ProductInventory;
 use App\Models\Sale;
+use App\Models\StockAdjustment;
 use App\Models\UserPin;
 use App\Models\VoidLog;
-use App\Models\InventoryLocation;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -27,7 +31,7 @@ class SaleService
         // Determine location based on user role and context
         $currentUser = auth()->user();
         $userRole = $currentUser ? $currentUser->roles()->first() : null;
-        
+
         // Set location_id based on user role
         if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
             // Admin/Super Admin: Use provided location or current user's location
@@ -36,7 +40,7 @@ class SaleService
             // Regular users: Use their assigned location only
             $finalLocationId = $user->location_id;
         }
-        
+
         $sale = Sale::create([
             'user_id' => $user->id,
             'location_id' => $finalLocationId,
@@ -57,7 +61,7 @@ class SaleService
     public function syncDraftImmediate(Sale $sale, array $items)
     {
         // Validate items array
-        if (empty($items) || !is_array($items)) {
+        if (empty($items) || ! is_array($items)) {
             return;
         }
 
@@ -70,9 +74,9 @@ class SaleService
         })->toArray();
 
         $unavailableItems = $this->inventoryService->checkStockAvailability($inventoryItems);
-        
-        if (!empty($unavailableItems)) {
-            throw new \Exception('Some items are not available in sufficient quantities: ' . 
+
+        if (! empty($unavailableItems)) {
+            throw new \Exception('Some items are not available in sufficient quantities: '.
                 collect($unavailableItems)->pluck('product_name')->implode(', '));
         }
 
@@ -84,12 +88,12 @@ class SaleService
             ->values()
             ->toArray();
 
-        $discounts = empty($discountIds) ? collect() : \App\Models\Product\Discount::whereIn('id', $discountIds)->get()->keyBy('id');
+        $discounts = empty($discountIds) ? collect() : Discount::whereIn('id', $discountIds)->get()->keyBy('id');
 
-        \Illuminate\Support\Facades\DB::transaction(function () use ($sale, $items, $discounts) {
+        DB::transaction(function () use ($sale, $items, $discounts) {
             foreach ($items as $item) {
                 // Validate required item fields
-                if (!isset($item['id']) || !isset($item['quantity']) || !isset($item['price'])) {
+                if (! isset($item['id']) || ! isset($item['quantity']) || ! isset($item['price'])) {
                     continue;
                 }
 
@@ -102,14 +106,14 @@ class SaleService
                 );
 
                 // Handle discounts if provided
-                if (!empty($item['discount_id']) && $discounts->has($item['discount_id'])) {
+                if (! empty($item['discount_id']) && $discounts->has($item['discount_id'])) {
                     $discount = $discounts->get($item['discount_id']);
-                    
+
                     // Validate discount is active and applicable
-                    if ($discount->is_active && 
-                        (!$discount->start_date || now()->gte($discount->start_date)) &&
-                        (!$discount->end_date || now()->lte($discount->end_date))) {
-                        
+                    if ($discount->is_active &&
+                        (! $discount->start_date || now()->gte($discount->start_date)) &&
+                        (! $discount->end_date || now()->lte($discount->end_date))) {
+
                         $saleItem->setDiscountAmount($discount->type, (float) $discount->value);
                         $saleItem->discounts()->sync([$discount->id]);
                     } else {
@@ -202,13 +206,13 @@ class SaleService
     /**
      * Complete sale and process inventory
      */
-    public function completeSale(Sale $sale, $user, InventoryLocation $location = null)
+    public function completeSale(Sale $sale, $user, ?InventoryLocation $location = null)
     {
         if ($sale->payment_status === 'paid') {
             throw new \Exception('Sale is already completed');
         }
 
-        return \Illuminate\Support\Facades\DB::transaction(function () use ($sale, $user, $location) {
+        return DB::transaction(function () use ($sale, $user, $location) {
             // Prepare inventory items from sale items
             $inventoryItems = $sale->saleItems()->with('product')->get()->map(function ($saleItem) {
                 return [
@@ -234,7 +238,7 @@ class SaleService
     /**
      * Validate stock availability for sale items
      */
-    public function validateStockAvailability(Sale $sale, InventoryLocation $location = null): array
+    public function validateStockAvailability(Sale $sale, ?InventoryLocation $location = null): array
     {
         $inventoryItems = $sale->saleItems()->with('product')->get()->map(function ($saleItem) {
             return [
@@ -246,7 +250,7 @@ class SaleService
         return $this->inventoryService->checkStockAvailability($inventoryItems, $location);
     }
 
-    public function validateNewItemStockAvailability(array $newItem, InventoryLocation $location = null): array
+    public function validateNewItemStockAvailability(array $newItem, ?InventoryLocation $location = null): array
     {
         return $this->inventoryService->checkStockAvailability([$newItem], $location);
     }
@@ -269,7 +273,7 @@ class SaleService
         $oversoldItems = [];
 
         foreach ($sale->saleItems as $saleItem) {
-            $productInventory = \App\Models\ProductInventory::query()
+            $productInventory = ProductInventory::query()
                 ->where('product_id', $saleItem->product_id)
                 ->where('location_id', $sale->location_id)
                 ->first();
@@ -304,8 +308,8 @@ class SaleService
             ?? $sale->user?->domain
             ?? 'default';
 
-        $adjustment = \App\Models\StockAdjustment::create([
-            'adjustment_number' => \App\Models\StockAdjustment::generateAdjustmentNumber(),
+        $adjustment = StockAdjustment::create([
+            'adjustment_number' => StockAdjustment::generateAdjustmentNumber(),
             'type' => 'increase',
             'reason' => 'oversell_found',
             'description' => "Automatic adjustment for overselling in sale #{$sale->invoice_number}",
@@ -318,7 +322,7 @@ class SaleService
         ]);
 
         foreach ($oversoldItems as $item) {
-            $adjustment->items()->create(\Illuminate\Support\Arr::only($item, [
+            $adjustment->items()->create(Arr::only($item, [
                 'product_id',
                 'system_quantity',
                 'actual_quantity',
@@ -345,42 +349,42 @@ class SaleService
      */
     public function getOversellStatistics($startDate = null, $endDate = null, $domain = null)
     {
-        $query = \App\Models\StockAdjustment::where('reason', 'oversell_found');
-        
+        $query = StockAdjustment::where('reason', 'oversell_found');
+
         if ($startDate) {
             $query->where('created_at', '>=', $startDate);
         }
-        
+
         if ($endDate) {
             $query->where('created_at', '<=', $endDate);
         }
-        
+
         if ($domain) {
             $query->where('domain', $domain);
         }
-        
+
         $adjustments = $query->with('items.product')->get();
-        
+
         $statistics = [
             'total_oversells' => $adjustments->count(),
-            'total_items_oversold' => $adjustments->sum(function($adj) {
+            'total_items_oversold' => $adjustments->sum(function ($adj) {
                 return $adj->items->sum('adjustment_quantity');
             }),
             'total_value_oversold' => $adjustments->sum('total_value_change'),
-            'products_affected' => $adjustments->flatMap(function($adj) {
+            'products_affected' => $adjustments->flatMap(function ($adj) {
                 return $adj->items->pluck('product.name');
             })->unique()->count(),
-            'recent_oversells' => $adjustments->take(10)->map(function($adj) {
+            'recent_oversells' => $adjustments->take(10)->map(function ($adj) {
                 return [
                     'adjustment_number' => $adj->adjustment_number,
                     'created_at' => $adj->created_at,
                     'description' => $adj->description,
                     'items_count' => $adj->items->count(),
-                    'total_value' => $adj->total_value_change
+                    'total_value' => $adj->total_value_change,
                 ];
-            })
+            }),
         ];
-        
+
         return $statistics;
     }
 }

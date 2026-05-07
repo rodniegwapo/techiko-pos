@@ -3,11 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Http\Resources\RoleResource;
+use App\Models\Permission;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Spatie\Permission\Models\Role;
-use App\Models\Permission;
 
 class RoleController extends Controller
 {
@@ -59,7 +59,7 @@ class RoleController extends Controller
      */
     public function create()
     {
-        $this->authorize('create', new Role());
+        $this->authorize('create', new Role);
 
         // Get all permissions grouped by module
         $permissions = $this->getPermissionsGroupedByModule();
@@ -74,7 +74,7 @@ class RoleController extends Controller
      */
     public function store(Request $request)
     {
-        $this->authorize('create', new Role());
+        $this->authorize('create', new Role);
 
         $validated = $this->validateRole($request);
 
@@ -92,7 +92,7 @@ class RoleController extends Controller
             return redirect()->back();
         } catch (\Exception $e) {
 
-            return back()->withErrors(['error' => 'Failed to create role: ' . $e->getMessage()]);
+            return back()->withErrors(['error' => 'Failed to create role: '.$e->getMessage()]);
         }
     }
 
@@ -135,10 +135,9 @@ class RoleController extends Controller
             // Update permissions
             $this->syncRolePermissions($role, $validated['permissions'] ?? []);
 
-
             return redirect()->route('roles.index')->with('success', 'Role updated successfully');
         } catch (\Exception $e) {
-            return back()->withErrors(['error' => 'Failed to update role: ' . $e->getMessage()]);
+            return back()->withErrors(['error' => 'Failed to update role: '.$e->getMessage()]);
         }
     }
 
@@ -165,7 +164,7 @@ class RoleController extends Controller
     private function validateRole(Request $request, ?Role $role = null): array
     {
         return $request->validate([
-            'name' => ['required', 'string', 'max:255', 'unique:roles,name' . ($role ? ',' . $role->id : '')],
+            'name' => ['required', 'string', 'max:255', 'unique:roles,name'.($role ? ','.$role->id : '')],
             'description' => 'nullable|string|max:500',
             'level' => 'required|integer|min:1|max:99',
             'permissions' => 'array',
@@ -181,6 +180,7 @@ class RoleController extends Controller
         // If no permissions provided, clear all
         if (empty($permissionIds)) {
             $role->syncPermissions([]);
+
             return;
         }
 
@@ -205,12 +205,12 @@ class RoleController extends Controller
         if (str_starts_with($permissionName, 'roles.')) {
             return $permissionName;
         }
-        
+
         // Don't normalize permission management permissions
         if (str_starts_with($permissionName, 'permissions.')) {
             return $permissionName;
         }
-        
+
         // Expect format module.action, e.g., users.view
         $parts = explode('.', $permissionName, 2);
         if (count($parts) !== 2) {
@@ -224,7 +224,8 @@ class RoleController extends Controller
             'delete' => 'destroy',
         ];
         $normalizedAction = $map[$action] ?? $action;
-        return $module . '.' . $normalizedAction;
+
+        return $module.'.'.$normalizedAction;
     }
 
     /**
@@ -239,7 +240,7 @@ class RoleController extends Controller
         if (in_array(strtolower($role->name), $systemRoles)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Cannot delete system roles'
+                'message' => 'Cannot delete system roles',
             ], 422);
         }
 
@@ -247,7 +248,7 @@ class RoleController extends Controller
         if ($role->users()->count() > 0) {
             return response()->json([
                 'success' => false,
-                'message' => 'Cannot delete role that is assigned to users'
+                'message' => 'Cannot delete role that is assigned to users',
             ], 422);
         }
 
@@ -264,23 +265,23 @@ class RoleController extends Controller
                 'role_id' => $roleId,
                 'role_name' => $roleName,
                 'action' => 'delete_role',
-                'timestamp' => now()
+                'timestamp' => now(),
             ]);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Role deleted successfully'
+                'message' => 'Role deleted successfully',
             ]);
         } catch (\Exception $e) {
             Log::error('Role deletion failed', [
                 'user_id' => auth()->id(),
                 'role_id' => $role->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to delete role: ' . $e->getMessage()
+                'message' => 'Failed to delete role: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -328,7 +329,7 @@ class RoleController extends Controller
         });
 
         return response()->json([
-            'permissions' => $permissions
+            'permissions' => $permissions,
         ]);
     }
 }

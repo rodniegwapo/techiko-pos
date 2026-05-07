@@ -113,10 +113,7 @@ Route::middleware(['auth', 'user.permission'])->group(function () {
 
     Route::prefix('billing')->name('billing.')->group(function () {
         Route::get('/manual-payments', [AdminManualPaymentsController::class, 'index'])->name('manual-payments.index');
-        Route::post('/manual-payments/{manual_payment_re
-        
-        
-        uest}/approve', [AdminManualPaymentsController::class, 'approve'])->name('manual-payments.approve');
+        Route::post('/manual-payments/{manual_payment_request}/approve', [AdminManualPaymentsController::class, 'approve'])->name('manual-payments.approve');
         Route::post('/manual-payments/{manual_payment_request}/reject', [AdminManualPaymentsController::class, 'reject'])->name('manual-payments.reject');
     });
 
@@ -154,7 +151,7 @@ Route::get('/thank-you', function () {
 })->name('registration.thankyou');
 
 // Organization-specific routes extracted to routes/domains.php
-require __DIR__ . '/domains.php';
+require __DIR__.'/domains.php';
 
 // Domain Management Routes (for super users)
 Route::middleware(['auth', 'user.permission'])->prefix('domains')->name('domains.')->group(function () {
@@ -269,4 +266,4 @@ Route::middleware(['auth', 'check.super.user'])->group(function () {
     Route::post('/messages/{conversation}/messages', [ConversationController::class, 'storeStaff'])->name('messages.staff');
 });
 
-require __DIR__ . '/auth.php';
+require __DIR__.'/auth.php';
