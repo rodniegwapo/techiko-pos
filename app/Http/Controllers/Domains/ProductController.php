@@ -9,8 +9,11 @@ use App\Models\Category;
 use App\Models\Domain;
 use App\Models\InventoryLocation;
 use App\Models\Product\Product;
+use App\Models\Product\ProductSoldType;
+use App\Support\ProductPayloadNormalizer;
 use App\Traits\LocationCategoryScoping;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class ProductController extends Controller
@@ -41,8 +44,11 @@ class ProductController extends Controller
             'cost' => ['nullable', 'numeric', 'min:0'],
 
             'category_id' => ['required', 'exists:categories,id'],
-            'SKU' => ['nullable', 'string', 'max:255', 'unique:products,SKU,' . $productId],
-            'barcode' => ['nullable', 'string', 'max:255', 'unique:products,barcode,' . $productId],
+            'SKU' => ['nullable', 'string', 'max:255', 'unique:products,SKU,'.$productId],
+            'barcode' => ['nullable', 'string', 'max:255', 'unique:products,barcode,'.$productId],
+
+            'representation_type' => ['nullable', 'string', 'in:image,color,text'],
+            'representation' => ['nullable', 'string'],
 
             'track_inventory' => ['boolean'],
             'reorder_level' => ['nullable', 'numeric', 'min:0'],
@@ -79,7 +85,7 @@ class ProductController extends Controller
         $existingProduct = $query->first();
 
         if ($existingProduct) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
+            throw ValidationException::withMessages([
                 'name' => ['A product with this name already exists in the selected location for this domain.'],
             ]);
         }
@@ -104,7 +110,7 @@ class ProductController extends Controller
         }
 
         return $query
-            ->when($request->search, fn($q, $s) => $q->search($s))
+            ->when($request->search, fn ($q, $s) => $q->search($s))
             ->when($request->category, function ($query, $category) {
                 return $query->whereHas('category', function ($q) use ($category) {
                     $q->where('name', $category);
@@ -128,7 +134,7 @@ class ProductController extends Controller
         return Inertia::render('Products/Index', [
             'items' => ProductResource::collection($products),
             'categories' => $categoriesQuery->get(),
-            'sold_by_types' => \App\Models\Product\ProductSoldType::all(),
+            'sold_by_types' => ProductSoldType::all(),
             'isGlobalView' => false,
             'currentLocation' => $location,
         ]);
@@ -155,7 +161,9 @@ class ProductController extends Controller
     public function store(Request $request, ?Domain $domain = null)
     {
         $this->validateProductUniqueness($request, null, $domain);
-        $validated = $this->validatedData($request, null, $domain);
+        $validated = ProductPayloadNormalizer::applyRepresentationAndCostDefaults(
+            $this->validatedData($request, null, $domain),
+        );
 
         if ($domain) {
             $validated['domain'] = $domain->name_slug;
@@ -184,7 +192,9 @@ class ProductController extends Controller
         }
 
         $this->validateProductUniqueness($request, $product, $domain);
-        $validated = $this->validatedData($request, $product, $domain);
+        $validated = ProductPayloadNormalizer::applyRepresentationAndCostDefaults(
+            $this->validatedData($request, $product, $domain),
+        );
         $product->update($validated);
 
         if ($request->filled('location_id')) {
@@ -211,6 +221,7 @@ class ProductController extends Controller
 
         return redirect()->back()->with('success', 'Product deleted successfully');
     }
+
     /**
      * Show the form for creating a new product.
      */
@@ -221,7 +232,7 @@ class ProductController extends Controller
 
         return Inertia::render('Products/Create', [
             'categories' => $categoriesQuery->get(),
-            'sold_by_types' => \App\Models\Product\ProductSoldType::all(),
+            'sold_by_types' => ProductSoldType::all(),
             'isGlobalView' => false,
             'currentLocation' => $location,
         ]);
@@ -243,7 +254,7 @@ class ProductController extends Controller
         return Inertia::render('Products/Edit', [
             'product' => $product,
             'categories' => $categoriesQuery->get(),
-            'sold_by_types' => \App\Models\Product\ProductSoldType::all(),
+            'sold_by_types' => ProductSoldType::all(),
             'isGlobalView' => false,
             'currentLocation' => $location,
         ]);
