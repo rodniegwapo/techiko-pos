@@ -64,6 +64,7 @@ const isOrganizationProductForm = computed(() => !props.isGlobalView);
 const handleSave = () => {
     form.post(getRoute("products.store"), {
         onSuccess: () => {
+            form.reset();
             message.success("Product created successfully");
         },
         onError: (errs) => {
@@ -140,7 +141,9 @@ useBarcodeScanner((code) => {
                                     ? 'error'
                                     : ''
                             "
-                            :help="validationMessage(form.errors, 'category_id')"
+                            :help="
+                                validationMessage(form.errors, 'category_id')
+                            "
                         >
                             <a-select
                                 v-model:value="form.category_id"
@@ -154,6 +157,7 @@ useBarcodeScanner((code) => {
                                             .includes(input.toLowerCase())
                                 "
                                 size="large"
+                                :allow-clear="true"
                             />
                         </a-form-item>
 
@@ -228,7 +232,9 @@ useBarcodeScanner((code) => {
                                         ? 'error'
                                         : ''
                                 "
-                                :help="validationMessage(form.errors, 'barcode')"
+                                :help="
+                                    validationMessage(form.errors, 'barcode')
+                                "
                             >
                                 <a-input
                                     v-model:value="form.barcode"
@@ -278,8 +284,7 @@ useBarcodeScanner((code) => {
                                 validationMessage(
                                     form.errors,
                                     'representation',
-                                ) ||
-                                'Leave blank to use the default color'
+                                ) || 'Leave blank to use the default color'
                             "
                         >
                             <a-input
