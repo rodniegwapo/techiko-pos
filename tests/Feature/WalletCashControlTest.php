@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Models\WalletCashMovement;
 use App\Models\WalletCashOpeningAudit;
 use App\Models\WalletCashReconciliation;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Inertia;
@@ -484,6 +485,13 @@ class WalletCashControlTest extends TestCase
             'notes' => null,
             'is_closed' => 1,
         ]);
+        $this->assertNotNull(
+            WalletCashReconciliation::query()
+                ->where('domain', $ctx['domain']->name_slug)
+                ->where('location_id', $ctx['location']->id)
+                ->whereDate('business_date', $date)
+                ->value('opening_basis_at')
+        );
         $this->assertDatabaseHas('wallet_cash_opening_audits', [
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
@@ -554,6 +562,81 @@ class WalletCashControlTest extends TestCase
             'is_closed' => 0,
             'notes' => 'Recount after reopen',
         ]);
+    }
+
+    public function test_save_as_opening_cash_expected_uses_only_activity_after_basis_time(): void
+    {
+        $ctx = $this->seedContext();
+        Carbon::setTestNow(Carbon::parse('2026-01-15 12:00:00'));
+        $date = now()->toDateString();
+
+        WalletCashReconciliation::query()->create([
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'business_date' => $date,
+            'opening_cash' => 100,
+            'counted_cash' => 300,
+            'counted_by' => $ctx['user']->id,
+            'counted_at' => now(),
+        ]);
+
+        Sale::query()->create([
+            'domain' => $ctx['domain']->name_slug,
+            'user_id' => $ctx['user']->id,
+            'invoice_number' => 'INV-PRE-'.Str::random(6),
+            'payment_method' => 'cash',
+            'payment_status' => 'paid',
+            'location_id' => $ctx['location']->id,
+            'total_amount' => 200,
+            'discount_amount' => 0,
+            'tax_amount' => 0,
+            'grand_total' => 200,
+            'transaction_date' => $date.' 09:00:00',
+        ]);
+
+        $endUrl = route('domains.wallet-cash-ledger.end-shift', ['domain' => $ctx['domain']->name_slug]);
+        $reopenUrl = route('domains.wallet-cash-ledger.reopen-shift', ['domain' => $ctx['domain']->name_slug]);
+
+        $this->actingAs($ctx['user'])->post($endUrl, [
+            'location_id' => $ctx['location']->id,
+            'business_date' => $date,
+            'end_shift_action' => 'save_as_opening_cash',
+        ])->assertRedirect();
+
+        $this->actingAs($ctx['user'])->post($reopenUrl, [
+            'location_id' => $ctx['location']->id,
+            'business_date' => $date,
+        ])->assertRedirect();
+
+        Sale::query()->create([
+            'domain' => $ctx['domain']->name_slug,
+            'user_id' => $ctx['user']->id,
+            'invoice_number' => 'INV-POST-'.Str::random(6),
+            'payment_method' => 'cash',
+            'payment_status' => 'paid',
+            'location_id' => $ctx['location']->id,
+            'total_amount' => 50,
+            'discount_amount' => 0,
+            'tax_amount' => 0,
+            'grand_total' => 50,
+            'transaction_date' => $date.' 13:00:00',
+        ]);
+
+        $walletUrl = route('domains.payment-card-types.index', [
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'business_date' => $date,
+        ]);
+
+        $this->actingAs($ctx['user'])->get($walletUrl)
+            ->assertOk()
+            ->assertInertia(fn (Inertia $page) => $page
+                ->where('cashControl.opening_cash', 300)
+                ->where('cashControl.paid_cash_sales', 50)
+                ->where('cashControl.expected_cash', 350)
+            );
+
+        Carbon::setTestNow();
     }
 
     public function test_end_shift_requires_valid_action(): void

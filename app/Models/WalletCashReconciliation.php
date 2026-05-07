@@ -13,6 +13,7 @@ class WalletCashReconciliation extends Model
         'business_date' => 'date',
         'opening_cash' => 'float',
         'opening_source_date' => 'date',
+        'opening_basis_at' => 'datetime',
         'counted_cash' => 'float',
         'is_closed' => 'boolean',
         'closed_at' => 'datetime',

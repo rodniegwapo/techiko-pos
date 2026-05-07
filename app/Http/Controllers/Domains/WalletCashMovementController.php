@@ -5,11 +5,11 @@ namespace App\Http\Controllers\Domains;
 use App\Http\Controllers\Controller;
 use App\Models\Domain;
 use App\Models\PaymentCardType;
-use App\Models\Sale;
 use App\Models\WalletCashMovement;
 use App\Models\WalletCashOpeningAudit;
 use App\Models\WalletCashReconciliation;
 use App\Support\Wallet\WalletCashBridgeExpected;
+use App\Support\Wallet\WalletCashDailyExpected;
 use App\Support\Wallet\WalletLedgerViewData;
 use App\Support\Wallet\WalletLocationResolver;
 use Illuminate\Http\Request;
@@ -193,26 +193,13 @@ class WalletCashMovementController extends Controller
             ->where('notes', self::AUTO_COUNTED_VARIANCE_LEDGER_NOTE)
             ->delete();
 
-        $paidCashSales = (float) Sale::query()
-            ->where('domain', $domain->name_slug)
-            ->where('location_id', $location->id)
-            ->where('payment_status', 'paid')
-            ->where('payment_method', 'cash')
-            ->whereDate('transaction_date', $validated['business_date'])
-            ->sum('grand_total');
-
-        $movementBase = WalletCashMovement::query()
-            ->forWalletContext($domain->name_slug, $location->id)
-            ->whereDate('movement_date', $validated['business_date'])
-            ->where(function ($q) {
-                $q->whereNull('notes')
-                    ->orWhere('notes', 'not like', 'AUTO_CC_%');
-            });
-
-        $manualIn = (float) (clone $movementBase)->where('direction', 'in')->sum('amount');
-        $manualOut = (float) (clone $movementBase)->where('direction', 'out')->sum('amount');
-        $openingCash = round((float) ($recon->opening_cash ?? 0), 2);
-        $expectedCash = round($openingCash + $paidCashSales + $manualIn - $manualOut, 2);
+        $dailyExpected = WalletCashDailyExpected::compute(
+            $domain->name_slug,
+            (int) $location->id,
+            (string) $validated['business_date'],
+            $recon
+        );
+        $expectedCash = $dailyExpected['expected_cash'];
         $countedCash = round((float) $recon->counted_cash, 2);
         $variance = round($countedCash - $expectedCash, 2);
 
@@ -291,6 +278,7 @@ class WalletCashMovementController extends Controller
             $recon->opening_cash = $countedCash;
             $recon->opening_source = 'manual';
             $recon->opening_source_date = null;
+            $recon->opening_basis_at = now();
             $recon->counted_cash = 0;
             $recon->counted_by = null;
             $recon->counted_at = null;
