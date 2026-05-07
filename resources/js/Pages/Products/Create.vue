@@ -1,10 +1,15 @@
 <script setup>
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import { Link, useForm, usePage } from "@inertiajs/vue3";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
 import ContentLayout from "@/Components/ContentLayout.vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
+import {
+    validationHasError,
+    validationMessage,
+    validationSummaryNotice,
+} from "@/Composables/useValidationMessage.js";
 import { message } from "ant-design-vue";
 import { useBarcodeScanner } from "@/Composables/useBarcodeScanner";
 
@@ -54,13 +59,15 @@ const domainOptions = computed(() => {
     return list.map((item) => ({ label: item.name, value: item.name_slug }));
 });
 
+const isOrganizationProductForm = computed(() => !props.isGlobalView);
+
 const handleSave = () => {
     form.post(getRoute("products.store"), {
         onSuccess: () => {
             message.success("Product created successfully");
         },
-        onError: () => {
-            message.error("Failed to create product");
+        onError: (errs) => {
+            message.warning(validationSummaryNotice(errs || form.errors));
         },
     });
 };
@@ -89,8 +96,13 @@ useBarcodeScanner((code) => {
                         <!-- Product Name -->
                         <a-form-item
                             label="Product Name"
-                            :validate-status="form.errors.name ? 'error' : ''"
-                            :help="form.errors.name || ''"
+                            required
+                            :validate-status="
+                                validationHasError(form.errors, 'name')
+                                    ? 'error'
+                                    : ''
+                            "
+                            :help="validationMessage(form.errors, 'name')"
                         >
                             <a-input
                                 v-model:value="form.name"
@@ -103,8 +115,13 @@ useBarcodeScanner((code) => {
                         <a-form-item
                             v-if="props.isGlobalView"
                             label="Domain"
-                            :validate-status="form.errors.domain ? 'error' : ''"
-                            :help="form.errors.domain || ''"
+                            required
+                            :validate-status="
+                                validationHasError(form.errors, 'domain')
+                                    ? 'error'
+                                    : ''
+                            "
+                            :help="validationMessage(form.errors, 'domain')"
                         >
                             <a-select
                                 v-model:value="form.domain"
@@ -117,10 +134,13 @@ useBarcodeScanner((code) => {
                         <!-- Category -->
                         <a-form-item
                             label="Category"
+                            :required="isOrganizationProductForm"
                             :validate-status="
-                                form.errors.category_id ? 'error' : ''
+                                validationHasError(form.errors, 'category_id')
+                                    ? 'error'
+                                    : ''
                             "
-                            :help="form.errors.category_id || ''"
+                            :help="validationMessage(form.errors, 'category_id')"
                         >
                             <a-select
                                 v-model:value="form.category_id"
@@ -142,9 +162,11 @@ useBarcodeScanner((code) => {
                             <a-form-item
                                 label="Cost"
                                 :validate-status="
-                                    form.errors.cost ? 'error' : ''
+                                    validationHasError(form.errors, 'cost')
+                                        ? 'error'
+                                        : ''
                                 "
-                                :help="form.errors.cost || ''"
+                                :help="validationMessage(form.errors, 'cost')"
                             >
                                 <a-input-number
                                     v-model:value="form.cost"
@@ -159,10 +181,13 @@ useBarcodeScanner((code) => {
                             <!-- Price -->
                             <a-form-item
                                 label="Price"
+                                required
                                 :validate-status="
-                                    form.errors.price ? 'error' : ''
+                                    validationHasError(form.errors, 'price')
+                                        ? 'error'
+                                        : ''
                                 "
-                                :help="form.errors.price || ''"
+                                :help="validationMessage(form.errors, 'price')"
                             >
                                 <a-input-number
                                     v-model:value="form.price"
@@ -179,10 +204,13 @@ useBarcodeScanner((code) => {
                             <!-- SKU -->
                             <a-form-item
                                 label="SKU"
+                                :required="props.isGlobalView"
                                 :validate-status="
-                                    form.errors.SKU ? 'error' : ''
+                                    validationHasError(form.errors, 'SKU')
+                                        ? 'error'
+                                        : ''
                                 "
-                                :help="form.errors.SKU || ''"
+                                :help="validationMessage(form.errors, 'SKU')"
                             >
                                 <a-input
                                     v-model:value="form.SKU"
@@ -194,10 +222,13 @@ useBarcodeScanner((code) => {
                             <!-- Barcode -->
                             <a-form-item
                                 label="Barcode"
+                                :required="props.isGlobalView"
                                 :validate-status="
-                                    form.errors.barcode ? 'error' : ''
+                                    validationHasError(form.errors, 'barcode')
+                                        ? 'error'
+                                        : ''
                                 "
-                                :help="form.errors.barcode || ''"
+                                :help="validationMessage(form.errors, 'barcode')"
                             >
                                 <a-input
                                     v-model:value="form.barcode"
@@ -210,10 +241,13 @@ useBarcodeScanner((code) => {
                         <!-- Sold Type -->
                         <a-form-item
                             label="Sold Type"
+                            required
                             :validate-status="
-                                form.errors.sold_type ? 'error' : ''
+                                validationHasError(form.errors, 'sold_type')
+                                    ? 'error'
+                                    : ''
                             "
-                            :help="form.errors.sold_type || ''"
+                            :help="validationMessage(form.errors, 'sold_type')"
                         >
                             <a-radio-group
                                 v-model:value="form.sold_type"
@@ -233,10 +267,18 @@ useBarcodeScanner((code) => {
                         <a-form-item
                             label="Color (hex, optional)"
                             :validate-status="
-                                form.errors.representation ? 'error' : ''
+                                validationHasError(
+                                    form.errors,
+                                    'representation',
+                                )
+                                    ? 'error'
+                                    : ''
                             "
                             :help="
-                                form.errors.representation ||
+                                validationMessage(
+                                    form.errors,
+                                    'representation',
+                                ) ||
                                 'Leave blank to use the default color'
                             "
                         >
