@@ -207,6 +207,7 @@ class WalletCashControlTest extends TestCase
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
+            'tab' => 'card-types',
         ]);
 
         $this->actingAs($ctx['user'])->get($indexUrl)
@@ -292,6 +293,7 @@ class WalletCashControlTest extends TestCase
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
+            'tab' => 'card-types',
         ]);
 
         $this->actingAs($ctx['user'])->get($indexUrl)
@@ -439,6 +441,7 @@ class WalletCashControlTest extends TestCase
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
+            'tab' => 'card-types',
         ]);
 
         $this->actingAs($ctx['user'])->get($url)
@@ -483,6 +486,7 @@ class WalletCashControlTest extends TestCase
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
             'business_date' => $selectedDate,
+            'tab' => 'card-types',
         ]);
 
         $this->actingAs($ctx['user'])->get($url)
@@ -585,6 +589,7 @@ class WalletCashControlTest extends TestCase
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
+            'tab' => 'card-types',
         ]);
         $this->actingAs($ctx['user'])->get($walletUrl)
             ->assertOk()
@@ -797,6 +802,7 @@ class WalletCashControlTest extends TestCase
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
+            'tab' => 'card-types',
         ]);
 
         $this->actingAs($ctx['user'])->get($walletUrl)
@@ -927,6 +933,7 @@ class WalletCashControlTest extends TestCase
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
+            'tab' => 'card-types',
         ]);
 
         $this->actingAs($ctx['user'])->get($url)
@@ -947,6 +954,7 @@ class WalletCashControlTest extends TestCase
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
             'business_date' => $futureDate,
+            'tab' => 'card-types',
         ]);
 
         $this->actingAs($ctx['user'])->get($url)
@@ -1074,6 +1082,7 @@ class WalletCashControlTest extends TestCase
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
             'business_date' => $targetDate,
+            'tab' => 'card-types',
         ]);
 
         $this->actingAs($ctx['user'])->get($walletUrl)

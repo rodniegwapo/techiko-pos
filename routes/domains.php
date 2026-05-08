@@ -164,6 +164,9 @@ Route::prefix('domains/{domain:name_slug}')
         Route::get('/vat-report/export', [VatReportController::class, 'export'])->name('vat-report.export');
         Route::get('/vat-report', [VatReportController::class, 'index'])->name('vat-report.index');
 
+        // Wallet — money movement (cash control + ledger); distinct URL from card-type setup
+        Route::get('/wallet/money-movement', [PaymentCardTypeController::class, 'moneyMovement'])->name('wallet.money-movement');
+
         // Payment card types (Wallet) — domain-scoped
         Route::prefix('payment-card-types')->name('payment-card-types.')->group(function () {
             Route::get('/', [PaymentCardTypeController::class, 'index'])->name('index');

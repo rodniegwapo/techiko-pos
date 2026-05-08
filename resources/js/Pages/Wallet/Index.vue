@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, createVNode } from "vue";
+import { ref, computed, watch, createVNode, nextTick } from "vue";
 import { Head, router, usePage } from "@inertiajs/vue3";
 import { ExclamationCircleOutlined } from "@ant-design/icons-vue";
 import {
@@ -79,7 +79,71 @@ const props = defineProps({
         type: Object,
         default: () => null,
     },
+    walletPageMode: {
+        type: String,
+        default: "card-types",
+    },
+    canViewMoneyMovement: {
+        type: Boolean,
+        default: false,
+    },
+    canViewCardTypes: {
+        type: Boolean,
+        default: true,
+    },
 });
+
+const isMoneyMovementPage = computed(
+    () => props.walletPageMode === "money-movement",
+);
+
+const pageTitle = computed(() =>
+    isMoneyMovementPage.value ? "Money movement" : "Card terminals",
+);
+
+const headTitle = computed(() => pageTitle.value);
+
+/** Inertia / primary navigation route for this page (reload, date load). */
+function walletPageRouteName() {
+    return isMoneyMovementPage.value
+        ? "wallet.money-movement"
+        : "payment-card-types.index";
+}
+
+function visitWalletPage(query) {
+    const q = { ...query };
+    if (!isMoneyMovementPage.value && props.canViewCardTypes) {
+        q.tab = "card-types";
+    } else {
+        delete q.tab;
+    }
+    router.get(getRoute(walletPageRouteName()), q, {
+        preserveScroll: true,
+        preserveState: true,
+        replace: true,
+    });
+}
+
+function goToCardTypes() {
+    const q = {
+        business_date: activeBusinessDate.value,
+        tab: "card-types",
+    };
+    if (activeLocationId.value) {
+        q.location_id = activeLocationId.value;
+    }
+    router.get(getRoute("payment-card-types.index"), q);
+}
+
+function goToMoneyMovement() {
+    const q = {
+        business_date: activeBusinessDate.value,
+    };
+    if (activeLocationId.value) {
+        q.location_id = activeLocationId.value;
+    }
+    router.get(getRoute("wallet.money-movement"), q);
+}
 
 const activeLocationId = computed(() => {
     const q = queryObjectFromPageUrl(page.url);
@@ -112,30 +176,44 @@ const activeBusinessDate = computed(() => {
     );
 });
 
-const activeWalletTab = computed(() => {
-    const q = queryObjectFromPageUrl(page.url);
-    const tab = q.tab;
-    if (!props.ledger) {
-        return "card-types";
+/** Money movement page defaults to collapsed cash control; card terminals page expands it. */
+const cashControlExpanded = ref(true);
+
+function syncCashControlExpandedToPage() {
+    if (isMoneyMovementPage.value && props.ledger) {
+        cashControlExpanded.value = false;
+        return;
     }
-    if (tab === "card-types") {
-        return "card-types";
+    cashControlExpanded.value = true;
+}
+
+watch(
+    [() => props.walletPageMode, () => props.ledger],
+    () => {
+        syncCashControlExpandedToPage();
+    },
+    { immediate: true },
+);
+
+const showCashControlFullDetail = computed(() => {
+    if (!isMoneyMovementPage.value || !props.ledger) {
+        return true;
     }
-    return "ledger";
+    return cashControlExpanded.value;
 });
 
-function onWalletTabChange(key) {
-    const base = queryObjectFromPageUrl(page.url);
-    base.tab = key;
-    if (activeLocationId.value) {
-        base.location_id = activeLocationId.value;
-    }
-    base.business_date = activeBusinessDate.value;
-    router.get(getRoute("payment-card-types.index"), base, {
-        preserveState: true,
-        preserveScroll: true,
-        replace: true,
-    });
+function toggleCashControlDetail() {
+    cashControlExpanded.value = !cashControlExpanded.value;
+}
+
+/** One-line expected formula for disclosure / expanded section. */
+function cashControlBreakdownLine(c) {
+    if (!c) return "";
+    const opening = formattedTotal(Number(c.opening_cash) || 0);
+    const sales = formattedTotal(Number(c.paid_cash_sales) || 0);
+    const min = formattedTotal(Number(c.manual_in) || 0);
+    const mout = formattedTotal(Number(c.manual_out) || 0);
+    return `${opening} opening + ${sales} cash sales + ${min} manual in − ${mout} manual out = ${formattedTotal(Number(c.expected_cash) || 0)} expected`;
 }
 
 const rows = computed(() => props.cardTypes ?? []);
@@ -503,14 +581,7 @@ function reloadWalletForBusinessDate() {
     if (activeLocationId.value) {
         q.location_id = activeLocationId.value;
     }
-    if (!q.tab && props.ledger) {
-        q.tab = activeWalletTab.value;
-    }
-    router.get(getRoute("payment-card-types.index"), q, {
-        preserveScroll: true,
-        preserveState: true,
-        replace: true,
-    });
+    visitWalletPage(q);
 }
 
 async function saveOpeningCash() {
@@ -653,9 +724,12 @@ function onEndShiftClick() {
 }
 
 function goToSubmitCountedCash() {
-    countedCardRef.value?.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
+    cashControlExpanded.value = true;
+    nextTick(() => {
+        countedCardRef.value?.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+        });
     });
 }
 
@@ -713,15 +787,33 @@ async function reopenShift() {
 
 <template>
     <AuthenticatedLayout>
-        <Head title="Payment wallet" />
-        <ContentHeader class="mb-8" title="Payment wallet" />
+        <Head :title="headTitle" />
+        <ContentHeader class="mb-4" :title="pageTitle" />
+        <div class="mb-6 max-w-7xl flex flex-wrap items-center gap-3 text-sm">
+            <template v-if="isMoneyMovementPage && canViewCardTypes">
+                <span class="text-gray-600">Need to edit card rails?</span>
+                <a-button type="link" class="h-auto p-0" @click="goToCardTypes">
+                    Open card terminals
+                </a-button>
+            </template>
+            <template v-else-if="!isMoneyMovementPage && canViewMoneyMovement">
+                <span class="text-gray-600">Daily cash and ledger</span>
+                <a-button
+                    type="link"
+                    class="h-auto p-0"
+                    @click="goToMoneyMovement"
+                >
+                    Open money movement
+                </a-button>
+            </template>
+        </div>
 
         <div
             v-if="cashControl"
             class="mb-6 max-w-7xl rounded-lg border border-gray-200 bg-white px-4 py-4 shadow-sm"
         >
             <div
-                class="mb-4 flex flex-wrap items-end justify-between gap-3 border-b border-gray-100 pb-3"
+                class="mb-3 flex flex-wrap items-end justify-between gap-3 border-b border-gray-100 pb-3"
             >
                 <div>
                     <div class="text-base font-semibold text-gray-900">
@@ -730,84 +822,47 @@ async function reopenShift() {
                     <div class="text-xs text-gray-500">
                         Daily expected vs counted cash for this location
                     </div>
-                    <div
-                        v-if="cashControl.is_closed"
-                        class="mt-2 inline-flex items-center gap-1 rounded bg-amber-100 px-2 py-1 text-[11px] font-medium text-amber-800"
-                    >
-                        <IconLock class="h-3 w-3" />
-                        Shift closed for this date
-                    </div>
                 </div>
-                <div class="w-full max-w-[14rem]">
-                    <label class="mb-1 block text-xs font-medium text-gray-600">
-                        Business date
-                    </label>
-                    <div class="flex gap-2">
-                        <input
-                            v-model="cashControlForm.business_date"
-                            type="date"
-                            :max="todayYmd"
-                            class="w-full rounded border border-gray-300 px-2 py-2 text-sm"
-                        />
-                        <a-button @click="reloadWalletForBusinessDate">
-                            Load
-                        </a-button>
+                <div class="flex flex-wrap items-end gap-3">
+                    <a-button
+                        v-if="ledger && isMoneyMovementPage"
+                        type="link"
+                        class="h-auto px-0 text-teal-700"
+                        @click="toggleCashControlDetail"
+                    >
+                        {{
+                            showCashControlFullDetail
+                                ? "Hide full cash control"
+                                : "Full cash control"
+                        }}
+                    </a-button>
+                    <div class="w-full max-w-[14rem] sm:w-[14rem]">
+                        <label class="mb-1 block text-xs font-medium text-gray-600">
+                            Business date
+                        </label>
+                        <div class="flex gap-2">
+                            <input
+                                v-model="cashControlForm.business_date"
+                                type="date"
+                                :max="todayYmd"
+                                class="w-full rounded border border-gray-300 px-2 py-2 text-sm"
+                            />
+                            <a-button @click="reloadWalletForBusinessDate">
+                                Load
+                            </a-button>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
-                <div
-                    class="rounded border border-gray-200 bg-gray-50 px-3 py-2"
-                >
-                    <div class="text-xs uppercase text-gray-500">Opening</div>
-                    <div class="text-lg font-semibold text-gray-900">
-                        {{
-                            formattedTotal(
-                                Number(cashControl.opening_cash) || 0,
-                            )
-                        }}
+            <div
+                class="flex flex-wrap items-end gap-x-8 gap-y-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3"
+            >
+                <div>
+                    <div class="text-xs font-medium uppercase text-gray-500">
+                        Expected
                     </div>
-                </div>
-                <div
-                    class="rounded border border-gray-200 bg-gray-50 px-3 py-2"
-                >
-                    <div class="text-xs uppercase text-gray-500">
-                        Paid cash sales
-                    </div>
-                    <div class="text-lg font-semibold text-green-700">
-                        {{
-                            formattedTotal(
-                                Number(cashControl.paid_cash_sales) || 0,
-                            )
-                        }}
-                    </div>
-                </div>
-                <div
-                    class="rounded border border-gray-200 bg-gray-50 px-3 py-2"
-                >
-                    <div class="text-xs uppercase text-gray-500">Manual in</div>
-                    <div class="text-lg font-semibold text-green-700">
-                        {{ formattedTotal(Number(cashControl.manual_in) || 0) }}
-                    </div>
-                </div>
-                <div
-                    class="rounded border border-gray-200 bg-gray-50 px-3 py-2"
-                >
-                    <div class="text-xs uppercase text-gray-500">
-                        Manual out
-                    </div>
-                    <div class="text-lg font-semibold text-rose-700">
-                        {{
-                            formattedTotal(Number(cashControl.manual_out) || 0)
-                        }}
-                    </div>
-                </div>
-                <div
-                    class="rounded border border-teal-200 bg-teal-50 px-3 py-2"
-                >
-                    <div class="text-xs uppercase text-teal-700">Expected</div>
-                    <div class="text-lg font-semibold text-teal-800">
+                    <div class="text-lg font-semibold tabular-nums text-gray-900">
                         {{
                             formattedTotal(
                                 Number(cashControl.expected_cash) || 0,
@@ -815,12 +870,26 @@ async function reopenShift() {
                         }}
                     </div>
                 </div>
-                <div
-                    class="rounded border border-gray-200 bg-gray-50 px-3 py-2"
-                >
-                    <div class="text-xs uppercase text-gray-500">Variance</div>
+                <div>
+                    <div class="text-xs font-medium uppercase text-gray-500">
+                        Counted
+                    </div>
+                    <div class="text-lg font-semibold tabular-nums text-gray-900">
+                        {{
+                            cashControl.counted_cash == null
+                                ? "—"
+                                : formattedTotal(
+                                      Number(cashControl.counted_cash) || 0,
+                                  )
+                        }}
+                    </div>
+                </div>
+                <div>
+                    <div class="text-xs font-medium uppercase text-gray-500">
+                        Variance
+                    </div>
                     <div
-                        class="text-lg font-semibold"
+                        class="text-lg font-semibold tabular-nums"
                         :class="
                             Number(cashControl.variance || 0) === 0
                                 ? 'text-gray-800'
@@ -838,16 +907,40 @@ async function reopenShift() {
                         }}
                     </div>
                 </div>
+                <div
+                    v-if="cashControl.is_closed"
+                    class="inline-flex items-center gap-1 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-900"
+                >
+                    <IconLock class="h-3 w-3 shrink-0" />
+                    Shift closed for this date
+                </div>
             </div>
 
             <div
-                v-if="
-                    (cashControl.opening_is_saved &&
-                        cashControl.opening_last_updated_by_user) ||
-                    (cashControl.counted_at && cashControl.counted_by_user)
-                "
-                class="mt-3 space-y-1 text-xs text-gray-600"
+                v-show="showCashControlFullDetail"
+                class="mt-4 space-y-4 border-t border-gray-100 pt-4"
             >
+                <details
+                    class="rounded border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800"
+                >
+                    <summary
+                        class="cursor-pointer select-none font-medium text-gray-800"
+                    >
+                        How expected cash is calculated
+                    </summary>
+                    <p class="mt-2 text-xs leading-relaxed text-gray-600">
+                        {{ cashControlBreakdownLine(cashControl) }}
+                    </p>
+                </details>
+
+                <div
+                    v-if="
+                        (cashControl.opening_is_saved &&
+                            cashControl.opening_last_updated_by_user) ||
+                        (cashControl.counted_at && cashControl.counted_by_user)
+                    "
+                    class="space-y-1 text-xs text-gray-600"
+                >
                 <p
                     v-if="
                         cashControl.opening_is_saved &&
@@ -1025,107 +1118,116 @@ async function reopenShift() {
                 </a-collapse-panel>
             </a-collapse>
 
-            <div
-                v-if="cashControl"
-                class="mt-3 rounded border border-slate-200 bg-slate-50 px-3 py-3 text-sm"
+            <a-collapse
+                ghost
+                size="small"
+                class="mt-3 rounded border border-gray-200 bg-gray-50/80"
             >
-                <div class="text-xs font-semibold uppercase text-slate-600">
-                    Since last count
-                </div>
-                <template v-if="cashControl.bridge_anchor_business_date">
-                    <p class="mt-1 text-xs text-slate-600">
-                        Last counted
-                        {{
-                            formattedTotal(
-                                Number(cashControl.bridge_anchor_counted_cash) ||
-                                    0,
-                            )
-                        }}
-                        on {{ cashControl.bridge_anchor_business_date }}
-                        <span
-                            v-if="
-                                cashControl.bridge_day_span != null &&
-                                cashControl.bridge_day_span > 0
-                            "
+                <a-collapse-panel
+                    key="bridge-from-count"
+                    header="Bridge from last count"
+                >
+                    <div class="px-1 pb-1 text-sm">
+                        <template
+                            v-if="cashControl.bridge_anchor_business_date"
                         >
-                            ({{ cashControl.bridge_day_span }} day span)
-                        </span>
-                    </p>
-                    <div
-                        class="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:max-w-xl"
-                    >
-                        <div
-                            class="rounded border border-teal-100 bg-white px-3 py-2"
-                        >
-                            <div class="text-xs uppercase text-teal-700">
-                                Bridge expected
-                            </div>
-                            <div
-                                class="font-mono text-lg font-semibold text-teal-800 tabular-nums"
-                            >
+                            <p class="text-xs text-gray-600">
+                                Last counted
                                 {{
                                     formattedTotal(
                                         Number(
-                                            cashControl.bridge_expected_cash,
+                                            cashControl.bridge_anchor_counted_cash,
                                         ) || 0,
                                     )
                                 }}
-                            </div>
-                        </div>
-                        <div
-                            class="rounded border border-gray-200 bg-white px-3 py-2"
-                        >
-                            <div class="text-xs uppercase text-gray-500">
-                                Bridge variance
-                            </div>
+                                on {{ cashControl.bridge_anchor_business_date }}
+                                <span
+                                    v-if="
+                                        cashControl.bridge_day_span != null &&
+                                        cashControl.bridge_day_span > 0
+                                    "
+                                >
+                                    ({{ cashControl.bridge_day_span }} day span)
+                                </span>
+                            </p>
                             <div
-                                class="font-mono text-lg font-semibold tabular-nums"
-                                :class="
-                                    cashControl.bridge_variance == null
-                                        ? 'text-gray-500'
-                                        : Number(cashControl.bridge_variance) ===
-                                            0
-                                          ? 'text-gray-800'
-                                          : Number(
-                                                  cashControl.bridge_variance,
-                                              ) > 0
-                                            ? 'text-amber-700'
-                                            : 'text-red-700'
-                                "
+                                class="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:max-w-xl"
                             >
-                                {{
-                                    cashControl.bridge_variance == null
-                                        ? "—"
-                                        : formattedTotal(
-                                              Number(
-                                                  cashControl.bridge_variance,
-                                              ) || 0,
-                                          )
-                                }}
+                                <div
+                                    class="rounded border border-gray-200 bg-white px-3 py-2"
+                                >
+                                    <div class="text-xs uppercase text-gray-500">
+                                        Bridge expected
+                                    </div>
+                                    <div
+                                        class="font-mono text-lg font-semibold text-gray-900 tabular-nums"
+                                    >
+                                        {{
+                                            formattedTotal(
+                                                Number(
+                                                    cashControl.bridge_expected_cash,
+                                                ) || 0,
+                                            )
+                                        }}
+                                    </div>
+                                </div>
+                                <div
+                                    class="rounded border border-gray-200 bg-white px-3 py-2"
+                                >
+                                    <div class="text-xs uppercase text-gray-500">
+                                        Bridge variance
+                                    </div>
+                                    <div
+                                        class="font-mono text-lg font-semibold tabular-nums"
+                                        :class="
+                                            cashControl.bridge_variance == null
+                                                ? 'text-gray-500'
+                                                : Number(
+                                                        cashControl.bridge_variance,
+                                                    ) === 0
+                                                  ? 'text-gray-800'
+                                                  : Number(
+                                                          cashControl.bridge_variance,
+                                                      ) > 0
+                                                    ? 'text-amber-700'
+                                                    : 'text-red-700'
+                                        "
+                                    >
+                                        {{
+                                            cashControl.bridge_variance == null
+                                                ? "—"
+                                                : formattedTotal(
+                                                      Number(
+                                                          cashControl.bridge_variance,
+                                                      ) || 0,
+                                                  )
+                                        }}
+                                    </div>
+                                </div>
                             </div>
-                        </div>
+                            <p
+                                v-if="cashControl.bridge_span_warning"
+                                class="mt-2 text-xs text-amber-800"
+                            >
+                                Span exceeds 366 days; review totals carefully.
+                            </p>
+                        </template>
+                        <p v-else class="text-xs text-gray-600">
+                            No prior counted cash on file for this location.
+                        </p>
+                        <p
+                            v-if="bridgeOpeningHint"
+                            class="mt-2 rounded border border-amber-200 bg-amber-50 px-2 py-2 text-xs text-amber-900"
+                        >
+                            Bridge matches your counted cash, but daily
+                            expected does not. Check
+                            <strong>Set opening cash</strong> for
+                            {{ cashControl.business_date }} so daily figures
+                            align next time.
+                        </p>
                     </div>
-                    <p
-                        v-if="cashControl.bridge_span_warning"
-                        class="mt-2 text-xs text-amber-800"
-                    >
-                        Span exceeds 366 days; review totals carefully.
-                    </p>
-                </template>
-                <p v-else class="mt-1 text-xs text-slate-600">
-                    No prior counted cash on file for this location.
-                </p>
-                <p
-                    v-if="bridgeOpeningHint"
-                    class="mt-2 rounded border border-amber-200 bg-amber-50 px-2 py-2 text-xs text-amber-900"
-                >
-                    Bridge matches your counted cash, but daily expected does
-                    not. Check
-                    <strong>Set opening cash</strong> for
-                    {{ cashControl.business_date }} so daily figures align next
-                    time.
-                </p>
-            </div>
+                </a-collapse-panel>
+            </a-collapse>
 
             <div
                 v-if="canManageCashControl"
@@ -1233,100 +1335,65 @@ async function reopenShift() {
                     Only the user who closed this shift can reopen it.
                 </span>
             </div>
-        </div>
-
-        <div
-            class="mb-6 grid max-w-7xl grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-2"
-        >
-            <div
-                class="rounded-lg border border-gray-200 bg-white px-4 py-4 shadow-sm"
-            >
-                <div class="text-base font-semibold text-gray-900">Credit</div>
-                <div class="mb-3 text-xs text-gray-500">
-                    Paid credit sales (charge to account)
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div
-                        class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2"
-                    >
-                        <div class="text-xs uppercase text-gray-500">Today</div>
-                        <div class="text-lg font-semibold text-green-700">
-                            {{
-                                formattedTotal(
-                                    Number(walletCreditTotals.today_total) || 0,
-                                )
-                            }}
-                        </div>
-                    </div>
-                    <div
-                        class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2"
-                    >
-                        <div class="text-xs uppercase text-gray-500">
-                            Yesterday
-                        </div>
-                        <div class="text-lg font-semibold text-gray-800">
-                            {{
-                                formattedTotal(
-                                    Number(
-                                        walletCreditTotals.yesterday_total,
-                                    ) || 0,
-                                )
-                            }}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div
-                v-if="ledger && runningCashBalance !== null"
-                class="rounded-lg border border-gray-200 bg-white px-4 py-4 shadow-sm"
-            >
-                <div class="text-base font-semibold text-gray-900">
-                    Running cash balance
-                </div>
-                <div class="mb-3 text-xs text-gray-500">
-                    All-time net for this location (cash in minus cash out),
-                    excluding book-only opening and counted-variance lines;
-                    includes end-shift cash out and other manual entries. Not
-                    the same as expected drawer cash for the selected business
-                    date.
-                </div>
-                <div
-                    class="text-2xl font-bold tabular-nums"
-                    :class="
-                        Number(runningCashBalance) >= 0
-                            ? 'text-green-700'
-                            : 'text-red-700'
-                    "
-                >
-                    {{ formattedTotal(Number(runningCashBalance) || 0) }}
-                </div>
-                <p class="mt-2 text-xs text-gray-500">
-                    See Money movement for individual lines including
-                    adjustments and withdrawals.
-                </p>
             </div>
         </div>
 
-        <div class="mt-10 max-w-7xl">
-            <a-tabs
-                v-if="ledger"
-                :activeKey="activeWalletTab"
-                size="large"
-                class="wallet-main-tabs"
-                @change="onWalletTabChange"
-            >
-                <a-tab-pane key="ledger" tab="Money movement">
-                    <CashLedgerPanel
-                        :movements="ledger.movements"
-                        :filters="ledger.filters"
-                        :ledger-balance="ledger.ledgerBalance"
-                        :rail-card-types="ledger.railCardTypes"
-                        :active-location-id="activeLocationId"
-                        :is-shift-closed="isShiftClosed"
-                    />
-                </a-tab-pane>
-                <a-tab-pane key="card-types" tab="Payment card types">
+        <div class="mt-6 max-w-7xl">
+            <CashLedgerPanel
+                v-if="isMoneyMovementPage && ledger"
+                :movements="ledger.movements"
+                :filters="ledger.filters"
+                :ledger-balance="ledger.ledgerBalance"
+                :rail-card-types="ledger.railCardTypes"
+                :active-location-id="activeLocationId"
+                :is-shift-closed="isShiftClosed"
+                :running-cash-balance="runningCashBalance"
+            />
+            <div v-else class="space-y-4">
+                    <div
+                        class="mb-4 max-w-7xl rounded-lg border border-gray-200 bg-white px-4 py-4 shadow-sm"
+                    >
+                        <div class="text-base font-semibold text-gray-900">
+                            Credit
+                        </div>
+                        <div class="mb-3 text-xs text-gray-500">
+                            Paid credit sales (charge to account)
+                        </div>
+                        <div class="grid max-w-md grid-cols-2 gap-3">
+                            <div
+                                class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2"
+                            >
+                                <div class="text-xs uppercase text-gray-500">
+                                    Today
+                                </div>
+                                <div class="text-lg font-semibold text-green-700">
+                                    {{
+                                        formattedTotal(
+                                            Number(
+                                                walletCreditTotals.today_total,
+                                            ) || 0,
+                                        )
+                                    }}
+                                </div>
+                            </div>
+                            <div
+                                class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2"
+                            >
+                                <div class="text-xs uppercase text-gray-500">
+                                    Yesterday
+                                </div>
+                                <div class="text-lg font-semibold text-gray-800">
+                                    {{
+                                        formattedTotal(
+                                            Number(
+                                                walletCreditTotals.yesterday_total,
+                                            ) || 0,
+                                        )
+                                    }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     <ContentLayout title="Payment card types">
                         <template #filters>
                             <a-button
@@ -1429,106 +1496,6 @@ async function reopenShift() {
                             </a-table>
                         </template>
                     </ContentLayout>
-                </a-tab-pane>
-            </a-tabs>
-
-            <div v-else>
-                <ContentLayout title="Payment card types">
-                    <template #filters>
-                        <a-button
-                            v-if="hasPermission('payment-card-types.store')"
-                            type="primary"
-                            class="bg-white border flex items-center border-green-500 text-green-500"
-                            @click="openCreate"
-                        >
-                            <template #icon>
-                                <IconPlus class="w-4 h-4" />
-                            </template>
-                            Add card type
-                        </a-button>
-                    </template>
-
-                    <template #table>
-                        <a-table
-                            :columns="columns"
-                            :data-source="rows"
-                            :pagination="false"
-                            row-key="id"
-                            :locale="{
-                                emptyText:
-                                    'No card types yet. Add one to use Pay in Card on Sales.',
-                            }"
-                        >
-                            <template #bodyCell="{ column, record }">
-                                <template v-if="column.key === 'is_active'">
-                                    <a-tag
-                                        :color="
-                                            record.is_active
-                                                ? 'green'
-                                                : 'default'
-                                        "
-                                    >
-                                        {{
-                                            record.is_active
-                                                ? "Active"
-                                                : "Inactive"
-                                        }}
-                                    </a-tag>
-                                </template>
-                                <template v-else-if="column.key === 'actions'">
-                                    <a-space>
-                                        <IconTooltipButton
-                                            v-if="
-                                                hasPermission(
-                                                    'payment-card-types.money',
-                                                )
-                                            "
-                                            name="View money details"
-                                            hover="hover:bg-emerald-600"
-                                            @click="openMoneyDetails(record)"
-                                        >
-                                            <IconReportMoney
-                                                size="20"
-                                                class="mx-auto"
-                                            />
-                                        </IconTooltipButton>
-                                        <IconTooltipButton
-                                            v-if="
-                                                hasPermission(
-                                                    'payment-card-types.update',
-                                                )
-                                            "
-                                            name="Edit card type"
-                                            hover="hover:bg-blue-500"
-                                            @click="openEdit(record)"
-                                        >
-                                            <IconEdit
-                                                size="20"
-                                                class="mx-auto"
-                                            />
-                                        </IconTooltipButton>
-                                        <IconTooltipButton
-                                            v-if="
-                                                hasPermission(
-                                                    'payment-card-types.destroy',
-                                                )
-                                            "
-                                            name="Remove card type"
-                                            hover="hover:bg-red-600"
-                                            :loading="deletingId === record.id"
-                                            @click="remove(record)"
-                                        >
-                                            <IconTrash
-                                                size="20"
-                                                class="mx-auto"
-                                            />
-                                        </IconTooltipButton>
-                                    </a-space>
-                                </template>
-                            </template>
-                        </a-table>
-                    </template>
-                </ContentLayout>
             </div>
         </div>
 

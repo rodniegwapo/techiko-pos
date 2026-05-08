@@ -156,7 +156,7 @@ class WalletCashLedgerTest extends TestCase
 
         $response->assertRedirect();
         $location = (string) $response->headers->get('Location');
-        $target = route('domains.payment-card-types.index', ['domain' => $s['domainA']->name_slug]).'?page=2&rail=cash_register';
+        $target = route('domains.wallet.money-movement', ['domain' => $s['domainA']->name_slug]).'?page=2&rail=cash_register';
         $this->assertSame($target, $location);
     }
 

@@ -23,8 +23,52 @@ use Inertia\Inertia;
 
 class PaymentCardTypeController extends Controller
 {
+    /**
+     * Money movement: cash control + manual cash ledger (clear URL).
+     */
+    public function moneyMovement(Request $request, Domain $domain)
+    {
+        if (! $request->user()->hasPermissionToRoute('wallet.money-movement')) {
+            abort(403);
+        }
+
+        return Inertia::render(
+            'Wallet/Index',
+            $this->buildWalletPageProps($request, $domain, true, 'money-movement')
+        );
+    }
+
+    /**
+     * Card types and related wallet summaries (no ledger table).
+     * Ledger permission: redirect to money-movement unless ?tab=card-types.
+     */
     public function index(Request $request, Domain $domain)
     {
+        if ($request->user()->hasPermissionToRoute('wallet.money-movement')
+            && $request->query('tab') !== 'card-types') {
+            $query = $request->query();
+            unset($query['tab']);
+            $url = route('domains.wallet.money-movement', ['domain' => $domain], false);
+            $qs = http_build_query($query);
+
+            return redirect()->to($url.($qs !== '' ? '?'.$qs : ''));
+        }
+
+        return Inertia::render(
+            'Wallet/Index',
+            $this->buildWalletPageProps($request, $domain, false, 'card-types')
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildWalletPageProps(
+        Request $request,
+        Domain $domain,
+        bool $includeLedger,
+        string $walletPageMode
+    ): array {
         $location = WalletLocationResolver::resolve($request, $domain);
         $businessDate = $this->resolveBusinessDate($request);
 
@@ -53,9 +97,12 @@ class PaymentCardTypeController extends Controller
                 $businessDate,
                 (int) $request->user()->id
             ),
+            'walletPageMode' => $walletPageMode,
+            'canViewMoneyMovement' => $request->user()->hasPermissionToRoute('wallet.money-movement'),
+            'canViewCardTypes' => $request->user()->hasPermissionToRoute('payment-card-types.index'),
         ];
 
-        if ($request->user()->hasPermissionToRoute('wallet-cash-ledger.index')) {
+        if ($includeLedger && $request->user()->hasPermissionToRoute('wallet-cash-ledger.index')) {
             $ledger = WalletLedgerViewData::buildPaginated($request, $domain, $location);
             $today = now()->toDateString();
             $ledger['todayManualNet'] = WalletLedgerViewData::todayManualNet($domain, $location, $today);
@@ -63,7 +110,7 @@ class PaymentCardTypeController extends Controller
             $props['runningCashBalance'] = WalletLedgerViewData::runningCashBalance($domain, $location);
         }
 
-        return Inertia::render('Wallet/Index', $props);
+        return $props;
     }
 
     private function resolveBusinessDate(Request $request): string
