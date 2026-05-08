@@ -78,7 +78,7 @@ class WalletCashControlTest extends TestCase
         $this->actingAs($ctx['user'])->get($url)
             ->assertOk()
             ->assertInertia(fn (Inertia $page) => $page
-                ->component('Wallet/Index')
+                ->component('Wallet/CardTerminals')
                 ->where('walletPageMode', 'card-types')
             );
     }
@@ -228,7 +228,7 @@ class WalletCashControlTest extends TestCase
         $this->actingAs($ctx['user'])->get($indexUrl)
             ->assertOk()
             ->assertInertia(fn (Inertia $page) => $page
-                ->component('Wallet/Index')
+                ->component('Wallet/CardTerminals')
                 ->where('cashControl.counted_by', $ctx['user']->id)
                 ->where('cashControl.counted_by_user.id', $ctx['user']->id)
                 ->where('cashControl.counted_by_user.name', $ctx['user']->name)
@@ -314,7 +314,7 @@ class WalletCashControlTest extends TestCase
         $this->actingAs($ctx['user'])->get($indexUrl)
             ->assertOk()
             ->assertInertia(fn (Inertia $page) => $page
-                ->component('Wallet/Index')
+                ->component('Wallet/CardTerminals')
                 ->where('cashControl.count_submission_history.0.counted_cash', 90)
                 ->where('cashControl.count_submission_history.1.counted_cash', 95)
             );
@@ -462,7 +462,7 @@ class WalletCashControlTest extends TestCase
         $this->actingAs($ctx['user'])->get($url)
             ->assertOk()
             ->assertInertia(fn (Inertia $page) => $page
-                ->component('Wallet/Index')
+                ->component('Wallet/CardTerminals')
                 ->where('cashControl.business_date', $date)
                 ->where('cashControl.opening_cash', 1000)
                 ->where('cashControl.paid_cash_sales', 200)
@@ -507,7 +507,7 @@ class WalletCashControlTest extends TestCase
         $this->actingAs($ctx['user'])->get($url)
             ->assertOk()
             ->assertInertia(fn (Inertia $page) => $page
-                ->component('Wallet/Index')
+                ->component('Wallet/CardTerminals')
                 ->where('cashControl.business_date', $selectedDate)
                 ->where('cashControl.opening_is_saved', false)
                 ->where('cashControl.opening_suggestion', 900)
@@ -1103,7 +1103,7 @@ class WalletCashControlTest extends TestCase
         $this->actingAs($ctx['user'])->get($walletUrl)
             ->assertOk()
             ->assertInertia(fn (Inertia $page) => $page
-                ->component('Wallet/Index')
+                ->component('Wallet/CardTerminals')
                 ->where('cashControl.bridge_anchor_business_date', $anchorDate)
                 ->where('cashControl.bridge_expected_cash', 250)
             );
