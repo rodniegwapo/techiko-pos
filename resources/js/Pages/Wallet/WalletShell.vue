@@ -93,6 +93,10 @@ const props = defineProps({
 
 const isMoneyMovementPage = computed(() => props.isMoneyMovementPage);
 
+const hideCashControlPanel = computed(
+    () => props.moneyDetailsCardType != null,
+);
+
 const pageTitle = computed(() => {
     if (isMoneyMovementPage.value) {
         return "Money movement";
@@ -561,7 +565,10 @@ async function reopenShift() {
     <AuthenticatedLayout>
         <Head :title="headTitle" />
         <ContentHeader class="mb-4" :title="pageTitle" />
-        <div class="mb-6 max-w-7xl flex flex-wrap items-center gap-3 text-sm">
+        <div
+            v-if="!hideCashControlPanel"
+            class="mb-6 max-w-7xl flex flex-wrap items-center gap-3 text-sm"
+        >
             <template v-if="isMoneyMovementPage && canViewCardTypes">
                 <span class="text-gray-600">Need to edit card rails?</span>
                 <a-button type="link" class="h-auto p-0" @click="goToCardTypes">
@@ -581,7 +588,7 @@ async function reopenShift() {
         </div>
 
         <div
-            v-if="cashControl"
+            v-if="cashControl && !hideCashControlPanel"
             class="mb-6 max-w-7xl rounded-lg border border-gray-200 bg-white px-4 py-4 shadow-sm"
         >
             <div
