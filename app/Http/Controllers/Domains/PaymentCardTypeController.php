@@ -39,21 +39,10 @@ class PaymentCardTypeController extends Controller
     }
 
     /**
-     * Card types and related wallet summaries (no ledger table).
-     * Ledger permission: redirect to money-movement unless ?tab=card-types.
+     * Card terminals: card types and related wallet summaries (no ledger table).
      */
     public function index(Request $request, Domain $domain)
     {
-        if ($request->user()->hasPermissionToRoute('wallet.money-movement')
-            && $request->query('tab') !== 'card-types') {
-            $query = $request->query();
-            unset($query['tab']);
-            $url = route('domains.wallet.money-movement', ['domain' => $domain], false);
-            $qs = http_build_query($query);
-
-            return redirect()->to($url.($qs !== '' ? '?'.$qs : ''));
-        }
-
         return Inertia::render(
             'Wallet/Index',
             $this->buildWalletPageProps($request, $domain, false, 'card-types')

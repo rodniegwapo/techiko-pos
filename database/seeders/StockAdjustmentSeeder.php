@@ -97,7 +97,6 @@ class StockAdjustmentSeeder extends Seeder
             $randomDate = $startDate->copy()->addDays(rand(0, 20))->addHours(rand(0, 23))->addMinutes(rand(0, 59));
 
             $adjustment = StockAdjustment::create([
-                'adjustment_number' => $this->generateAdjustmentNumber(),
                 'location_id' => $location->id,
                 'created_by' => $user->id,
                 'approved_by' => $approvedBy,
@@ -158,10 +157,5 @@ class StockAdjustmentSeeder extends Seeder
         ];
 
         return $notes[$reason] ?? "Stock adjustment at {$locationName}";
-    }
-
-    private function generateAdjustmentNumber()
-    {
-        return 'ADJ-'.str_pad(rand(1000, 9999), 4, '0', STR_PAD_LEFT).'-'.time();
     }
 }

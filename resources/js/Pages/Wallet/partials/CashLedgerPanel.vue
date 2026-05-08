@@ -65,8 +65,6 @@ function tabQueryFromUrl() {
     }
     if (params.location_id && /^[0-9]+$/.test(String(params.location_id))) {
         out.location_id = Number(params.location_id);
-    } else if (props.activeLocationId) {
-        out.location_id = props.activeLocationId;
     }
 
     return out;

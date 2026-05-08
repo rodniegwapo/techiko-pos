@@ -37,9 +37,10 @@ class StockAdjustment extends Model
     {
         parent::boot();
 
-        // Auto-generate adjustment number
+        // Auto-generate adjustment number (use raw attributes — accessor would fake a value before persist)
         static::creating(function (StockAdjustment $adjustment) {
-            if (! $adjustment->adjustment_number) {
+            $raw = $adjustment->getAttributes()['adjustment_number'] ?? null;
+            if ($raw === null || $raw === '') {
                 $adjustment->adjustment_number = static::generateAdjustmentNumber();
             }
         });
@@ -237,9 +238,10 @@ class StockAdjustment extends Model
     public function getAdjustmentNumberAttribute($value)
     {
         if (! $value) {
-            // Generate and save adjustment number if missing
             $generated = static::generateAdjustmentNumber();
-            $this->updateQuietly(['adjustment_number' => $generated]);
+            if ($this->exists) {
+                $this->updateQuietly(['adjustment_number' => $generated]);
+            }
 
             return $generated;
         }
