@@ -132,12 +132,24 @@ const menuItems = [
         domainOnly: true,
     },
     {
-        key: "payment-wallet",
-        title: "Payment wallet",
+        key: "wallet-group",
+        title: "Cash & wallet",
         icon: IconWallet,
-        routeName: "payment-card-types.index",
-        path: "/payment-card-types",
         domainOnly: true,
+        children: [
+            {
+                key: "wallet-money-movement",
+                title: "Money movement",
+                routeName: "wallet.money-movement",
+                path: "/wallet/money-movement",
+            },
+            {
+                key: "wallet-card-terminals",
+                title: "Card terminals",
+                routeName: "payment-card-types.index",
+                path: "/payment-card-types",
+            },
+        ],
     },
     {
         key: "domains",

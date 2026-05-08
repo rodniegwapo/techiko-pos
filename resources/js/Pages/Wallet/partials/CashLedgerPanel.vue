@@ -1,6 +1,7 @@
 <script setup>
 import { computed, reactive, ref, watch } from "vue";
 import { router, usePage } from "@inertiajs/vue3";
+import { DownOutlined } from "@ant-design/icons-vue";
 import { message as antMessage } from "ant-design-vue";
 import ContentLayout from "@/Components/ContentLayout.vue";
 import { IconPlus } from "@tabler/icons-vue";
@@ -33,6 +34,10 @@ const props = defineProps({
         type: Boolean,
         default: false,
     },
+    runningCashBalance: {
+        type: Number,
+        default: null,
+    },
 });
 
 const { getRoute } = useDomainRoutes();
@@ -55,9 +60,6 @@ function tabQueryFromUrl() {
         new URLSearchParams(url.slice(idx + 1)),
     );
     const out = {};
-    if (params.tab === "ledger" || params.tab === "card-types") {
-        out.tab = params.tab;
-    }
     if (params.business_date) {
         out.business_date = params.business_date;
     }
@@ -111,11 +113,6 @@ function kindCellLabel(record) {
     return KIND_LABELS[record.kind] ?? record.kind;
 }
 
-const directionLabels = {
-    in: "Cash in",
-    out: "Cash out",
-};
-
 const filterForm = reactive({
     date_from: props.filters.date_from ?? "",
     date_to: props.filters.date_to ?? "",
@@ -162,7 +159,7 @@ function visitWithFilters(overrides = {}) {
         ...railQueryParams.value,
         ...overrides,
     };
-    router.get(getRoute("payment-card-types.index"), q, {
+    router.get(getRoute("wallet.money-movement"), q, {
         preserveScroll: true,
         preserveState: true,
         replace: true,
@@ -174,14 +171,70 @@ function applyFilters() {
 }
 
 const columns = [
-    { title: "Date", dataIndex: "movement_date", key: "movement_date" },
-    { title: "Kind", key: "kind" },
-    { title: "Rail", key: "rail" },
-    { title: "Direction", key: "direction" },
-    { title: "Amount", key: "amount" },
-    { title: "Notes", dataIndex: "notes", key: "notes", ellipsis: true },
-    { title: "Recorded by", key: "user" },
+    {
+        title: "Date",
+        dataIndex: "movement_date",
+        key: "movement_date",
+        width: 200,
+    },
+    {
+        title: "Kind / notes",
+        key: "kind_notes",
+        ellipsis: true,
+    },
+    { title: "Rail", key: "rail", width: 140 },
+    { title: "Amount", key: "amount", align: "right", width: 130 },
+    { title: "By", key: "user", width: 110 },
 ];
+
+/** Free-text notes line under kind (excludes system auto tokens). */
+function secondaryNoteLine(record) {
+    if (record.notes == null || String(record.notes).trim() === "") {
+        return null;
+    }
+    if (autoLedgerNoteToken(record.notes)) {
+        return null;
+    }
+    return String(record.notes).trim();
+}
+
+function signedAmountParts(record) {
+    const n = Math.abs(Number(record.amount) || 0);
+    const isOut = record.direction === "out";
+    return {
+        className: isOut ? "text-red-700" : "text-green-700",
+        prefix: isOut ? "−" : "+",
+        formatted: formattedTotal(n),
+    };
+}
+
+function onAddEntryMenu({ key }) {
+    if (props.isShiftClosed) {
+        antMessage.warning(
+            "Shift is closed for this date/location. Reopen to add entries.",
+        );
+        return;
+    }
+    if (key === "cash_in") {
+        openModal({
+            direction: "in",
+            kind: "cash_sale_topup",
+            title: "Add cash in entry",
+        });
+        return;
+    }
+    if (key === "cash_out") {
+        openModal({
+            direction: "out",
+            kind: "owner_draw",
+            title: "Add cash out entry",
+        });
+        return;
+    }
+    if (key === "other") {
+        openModal({ title: "Add ledger entry" });
+    }
+}
 
 function rowRail(m) {
     return m.payment_card_type?.name ?? "Cash register";
@@ -382,38 +435,21 @@ watch(
 </script>
 
 <template>
-    <div id="cash-ledger" class="space-y-4">
-        <p class="max-w-none text-sm text-gray-600">
-            Record cash in and cash out manually (owner draws, float,
-            adjustments). Ledger balance is from entries below, not POS sales
-            totals.
-        </p>
-
-        <div class="grid max-w-none gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div id="cash-ledger" class="max-w-7xl space-y-4">
+        <div
+            class="rounded-lg border border-gray-200 bg-white px-4 py-4 shadow-sm"
+        >
+            <p class="mb-3 text-xs text-gray-600">
+                Manual cash in/out only — table rows are not POS sales. Ledger
+                net follows filters below; running cash is all-time for this
+                location.
+            </p>
             <div
-                class="rounded-lg border border-gray-200 bg-white px-4 py-4 shadow-sm sm:col-span-2 lg:col-span-1"
+                class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between"
             >
-                <div class="text-xs font-semibold uppercase text-gray-500">
-                    Ledger net (manual only)
-                </div>
                 <div
-                    class="mt-1 font-mono text-2xl font-bold tabular-nums"
-                    :class="
-                        Number(ledgerBalance) >= 0
-                            ? 'text-green-700'
-                            : 'text-red-700'
-                    "
+                    class="grid min-w-0 flex-1 grid-cols-2 gap-x-4 gap-y-3 lg:max-w-2xl"
                 >
-                    {{ formattedTotal(Number(ledgerBalance)) }}
-                </div>
-                <p class="mt-2 text-xs text-gray-500">
-                    Filtered period and rail/kind above.
-                </p>
-            </div>
-            <div
-                class="flex flex-wrap gap-4 rounded-lg border border-gray-200 bg-white px-4 py-4 shadow-sm lg:col-span-2"
-            >
-                <div class="grid min-w-0 flex-1 grid-cols-2 gap-x-6 gap-y-3">
                     <div>
                         <label
                             class="mb-1 block text-xs font-medium text-gray-600"
@@ -467,7 +503,44 @@ watch(
                         />
                     </div>
                 </div>
-                <div class="flex min-w-[8rem] items-end gap-2">
+                <div
+                    class="flex flex-wrap items-end justify-end gap-x-6 gap-y-2 border-t border-gray-100 pt-3 xl:border-0 xl:pt-0"
+                >
+                    <div>
+                        <div class="text-xs font-medium uppercase text-gray-500">
+                            Ledger net
+                        </div>
+                        <div
+                            class="font-mono text-xl font-bold tabular-nums leading-tight"
+                            :class="
+                                Number(ledgerBalance) >= 0
+                                    ? 'text-green-700'
+                                    : 'text-red-700'
+                            "
+                        >
+                            {{ formattedTotal(Number(ledgerBalance)) }}
+                        </div>
+                    </div>
+                    <div v-if="runningCashBalance != null">
+                        <div
+                            class="text-xs font-medium uppercase text-gray-500"
+                            title="All-time cash in minus cash out for this location; not expected drawer cash for the selected business date."
+                        >
+                            Running cash
+                        </div>
+                        <div
+                            class="font-mono text-xl font-bold tabular-nums leading-tight"
+                            :class="
+                                Number(runningCashBalance) >= 0
+                                    ? 'text-green-700'
+                                    : 'text-red-700'
+                            "
+                        >
+                            {{
+                                formattedTotal(Number(runningCashBalance) || 0)
+                            }}
+                        </div>
+                    </div>
                     <a-button type="primary" @click="applyFilters">
                         Apply
                     </a-button>
@@ -477,92 +550,71 @@ watch(
 
         <ContentLayout title="Ledger movements">
             <template #filters>
-                <a-button
+                <a-dropdown
                     v-if="hasPermission('wallet-cash-ledger.store')"
-                    type="primary"
-                    class="flex items-center border border-teal-500 bg-white text-teal-600"
-                    :disabled="isShiftClosed"
-                    @click="
-                        openModal({
-                            direction: 'in',
-                            kind: 'cash_sale_topup',
-                            title: 'Add cash in entry',
-                        })
-                    "
                 >
-                    <template #icon>
+                    <a-button
+                        type="primary"
+                        class="flex items-center gap-1"
+                        :disabled="isShiftClosed"
+                    >
                         <IconPlus class="h-4 w-4" />
+                        Add entry
+                        <DownOutlined class="text-[10px] opacity-70" />
+                    </a-button>
+                    <template #overlay>
+                        <a-menu @click="onAddEntryMenu">
+                            <a-menu-item key="cash_in">Cash in</a-menu-item>
+                            <a-menu-item key="cash_out">Cash out</a-menu-item>
+                            <a-menu-item key="other">Other entry</a-menu-item>
+                        </a-menu>
                     </template>
-                    Cash in
-                </a-button>
-                <a-button
-                    v-if="hasPermission('wallet-cash-ledger.store')"
-                    type="primary"
-                    class="flex items-center border border-rose-500 bg-white text-rose-600"
-                    :disabled="isShiftClosed"
-                    @click="
-                        openModal({
-                            direction: 'out',
-                            kind: 'owner_draw',
-                            title: 'Add cash out entry',
-                        })
-                    "
-                >
-                    Cash out
-                </a-button>
-                <a-button
-                    v-if="hasPermission('wallet-cash-ledger.store')"
-                    :disabled="isShiftClosed"
-                    @click="openModal({ title: 'Add ledger entry' })"
-                >
-                    Other entry
-                </a-button>
+                </a-dropdown>
             </template>
             <template #table>
                 <a-table
                     :columns="columns"
                     :data-source="movements.data"
                     :pagination="paginationConfig"
-                    :scroll="{ x: 900 }"
+                    :scroll="{ x: 720 }"
                     row-key="id"
                     :locale="{ emptyText: 'No ledger entries yet.' }"
                     @change="onTableChange"
                 >
                     <template #bodyCell="{ column, record }">
-                        <template v-if="column.key === 'kind'">
-                            {{ kindCellLabel(record) }}
+                        <template v-if="column.key === 'kind_notes'">
+                            <div class="min-w-0">
+                                <div class="font-medium text-gray-900">
+                                    {{ kindCellLabel(record) }}
+                                </div>
+                                <div
+                                    v-if="secondaryNoteLine(record)"
+                                    class="mt-0.5 truncate text-xs text-gray-500"
+                                    :title="secondaryNoteLine(record)"
+                                >
+                                    {{ secondaryNoteLine(record) }}
+                                </div>
+                            </div>
                         </template>
                         <template v-else-if="column.key === 'rail'">
                             {{ rowRail(record) }}
                         </template>
-                        <template v-else-if="column.key === 'direction'">
-                            {{
-                                directionLabels[record.direction] ??
-                                record.direction
-                            }}
-                        </template>
                         <template v-else-if="column.key === 'amount'">
-                            <span class="font-medium tabular-nums">
-                                {{ formattedTotal(Number(record.amount) || 0) }}
+                            <span
+                                class="inline-flex items-baseline gap-px font-semibold tabular-nums"
+                                :class="signedAmountParts(record).className"
+                            >
+                                <span>{{
+                                    signedAmountParts(record).prefix
+                                }}</span>
+                                <span>{{
+                                    signedAmountParts(record).formatted
+                                }}</span>
                             </span>
                         </template>
                         <template v-else-if="column.key === 'movement_date'">
                             <span class="text-sm text-gray-900">{{
                                 formatMovementDate(record.movement_date)
-                            }}</span>
-                        </template>
-                        <template v-else-if="column.key === 'notes'">
-                            <span
-                                v-if="friendlyAutoLedgerNote(record.notes)"
-                                class="text-gray-800"
-                                :title="`System code: ${String(record.notes).trim()}`"
-                            >
-                                {{ friendlyAutoLedgerNote(record.notes) }}
-                            </span>
-                            <span v-else>{{
-                                record.notes != null && String(record.notes) !== ""
-                                    ? record.notes
-                                    : "—"
                             }}</span>
                         </template>
                         <template v-else-if="column.key === 'user'">
