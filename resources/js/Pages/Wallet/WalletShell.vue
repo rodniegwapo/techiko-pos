@@ -81,6 +81,10 @@ const props = defineProps({
         type: Boolean,
         default: true,
     },
+    moneyDetailsCardType: {
+        type: Object,
+        default: null,
+    },
     isMoneyMovementPage: {
         type: Boolean,
         required: true,
@@ -89,23 +93,40 @@ const props = defineProps({
 
 const isMoneyMovementPage = computed(() => props.isMoneyMovementPage);
 
-const pageTitle = computed(() =>
-    isMoneyMovementPage.value ? "Money movement" : "Card terminals",
-);
+const pageTitle = computed(() => {
+    if (isMoneyMovementPage.value) {
+        return "Money movement";
+    }
+    if (props.moneyDetailsCardType?.name) {
+        return `Money — ${props.moneyDetailsCardType.name}`;
+    }
+    return "Card terminals";
+});
 
 const headTitle = computed(() => pageTitle.value);
 
 /** Inertia / primary navigation route for this page (reload, date load). */
 function walletPageRouteName() {
-    return isMoneyMovementPage.value
-        ? "wallet.money-movement"
-        : "payment-card-types.index";
+    if (isMoneyMovementPage.value) {
+        return "wallet.money-movement";
+    }
+    if (props.moneyDetailsCardType?.id != null) {
+        return "payment-card-types.details";
+    }
+    return "payment-card-types.index";
+}
+
+function walletPageRouteParams() {
+    if (props.moneyDetailsCardType?.id != null) {
+        return { paymentCardType: props.moneyDetailsCardType.id };
+    }
+    return {};
 }
 
 function visitWalletPage(query) {
     const q = { ...query };
     delete q.tab;
-    router.get(getRoute(walletPageRouteName()), q, {
+    router.get(getRoute(walletPageRouteName(), walletPageRouteParams()), q, {
         preserveScroll: true,
         preserveState: true,
         replace: true,

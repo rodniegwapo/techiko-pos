@@ -6,6 +6,7 @@ use App\Http\Middleware\RoleBasedAccessControl;
 use App\Http\Middleware\UserPermissionCheckMiddleware;
 use App\Models\Domain;
 use App\Models\InventoryLocation;
+use App\Models\PaymentCardType;
 use App\Models\Sale;
 use App\Models\User;
 use App\Models\WalletCashCountSubmission;
@@ -1182,5 +1183,213 @@ class WalletCashControlTest extends TestCase
             'direction' => 'in',
             'amount' => 300.00,
         ]);
+    }
+
+    public function test_payment_card_type_money_filters_history_by_search(): void
+    {
+        $ctx = $this->seedContext();
+        $ctx['user']->update(['is_super_user' => true]);
+
+        $cardType = PaymentCardType::query()->create([
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'name' => 'Terminal search',
+            'is_active' => true,
+            'sort_order' => 0,
+        ]);
+
+        $day = now()->subDays(6)->toDateString();
+
+        foreach (['INV-SEARCH-ALPHA', 'INV-SEARCH-BETA'] as $inv) {
+            Sale::query()->create([
+                'domain' => $ctx['domain']->name_slug,
+                'user_id' => $ctx['user']->id,
+                'invoice_number' => $inv,
+                'payment_method' => 'card',
+                'payment_status' => 'paid',
+                'payment_card_type_id' => $cardType->id,
+                'location_id' => $ctx['location']->id,
+                'total_amount' => 10,
+                'discount_amount' => 0,
+                'tax_amount' => 0,
+                'grand_total' => 10,
+                'transaction_date' => $day,
+            ]);
+        }
+
+        $url = route('domains.payment-card-types.money', [
+            'domain' => $ctx['domain']->name_slug,
+            'paymentCardType' => $cardType->id,
+        ]);
+
+        $this->actingAs($ctx['user'])
+            ->getJson($url.'?'.http_build_query([
+                'location_id' => $ctx['location']->id,
+                'search' => 'ALPHA',
+                'per_page' => 50,
+            ]))
+            ->assertOk()
+            ->assertJsonPath('history.total', 1)
+            ->assertJsonPath('history.data.0.invoice_number', 'INV-SEARCH-ALPHA');
+    }
+
+    public function test_payment_card_type_money_filters_history_by_date_range(): void
+    {
+        $ctx = $this->seedContext();
+        $ctx['user']->update(['is_super_user' => true]);
+
+        $cardType = PaymentCardType::query()->create([
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'name' => 'Terminal dates',
+            'is_active' => true,
+            'sort_order' => 0,
+        ]);
+
+        $d1 = now()->subDays(10)->toDateString();
+        $d2 = now()->subDays(9)->toDateString();
+
+        Sale::query()->create([
+            'domain' => $ctx['domain']->name_slug,
+            'user_id' => $ctx['user']->id,
+            'invoice_number' => 'INV-DAY-ONE',
+            'payment_method' => 'card',
+            'payment_status' => 'paid',
+            'payment_card_type_id' => $cardType->id,
+            'location_id' => $ctx['location']->id,
+            'total_amount' => 5,
+            'discount_amount' => 0,
+            'tax_amount' => 0,
+            'grand_total' => 5,
+            'transaction_date' => $d1,
+        ]);
+        Sale::query()->create([
+            'domain' => $ctx['domain']->name_slug,
+            'user_id' => $ctx['user']->id,
+            'invoice_number' => 'INV-DAY-TWO',
+            'payment_method' => 'card',
+            'payment_status' => 'paid',
+            'payment_card_type_id' => $cardType->id,
+            'location_id' => $ctx['location']->id,
+            'total_amount' => 7,
+            'discount_amount' => 0,
+            'tax_amount' => 0,
+            'grand_total' => 7,
+            'transaction_date' => $d2,
+        ]);
+
+        $url = route('domains.payment-card-types.money', [
+            'domain' => $ctx['domain']->name_slug,
+            'paymentCardType' => $cardType->id,
+        ]);
+
+        $this->actingAs($ctx['user'])
+            ->getJson($url.'?'.http_build_query([
+                'location_id' => $ctx['location']->id,
+                'history_from' => $d2,
+                'history_to' => $d2,
+                'per_page' => 50,
+            ]))
+            ->assertOk()
+            ->assertJsonPath('history.total', 1)
+            ->assertJsonPath('history.data.0.invoice_number', 'INV-DAY-TWO');
+
+        $this->actingAs($ctx['user'])
+            ->getJson($url.'?'.http_build_query([
+                'location_id' => $ctx['location']->id,
+                'history_from' => $d1,
+                'history_to' => $d1,
+                'per_page' => 50,
+            ]))
+            ->assertOk()
+            ->assertJsonPath('history.total', 1)
+            ->assertJsonPath('history.data.0.invoice_number', 'INV-DAY-ONE');
+    }
+
+    public function test_payment_card_type_money_rejects_history_range_when_from_after_to(): void
+    {
+        $ctx = $this->seedContext();
+        $ctx['user']->update(['is_super_user' => true]);
+
+        $cardType = PaymentCardType::query()->create([
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'name' => 'Terminal validate',
+            'is_active' => true,
+            'sort_order' => 0,
+        ]);
+
+        $later = now()->subDays(3)->toDateString();
+        $earlier = now()->subDays(5)->toDateString();
+
+        $url = route('domains.payment-card-types.money', [
+            'domain' => $ctx['domain']->name_slug,
+            'paymentCardType' => $cardType->id,
+        ]);
+
+        $this->actingAs($ctx['user'])
+            ->getJson($url.'?'.http_build_query([
+                'location_id' => $ctx['location']->id,
+                'history_from' => $later,
+                'history_to' => $earlier,
+            ]))
+            ->assertStatus(422);
+    }
+
+    public function test_payment_card_type_details_page_renders_inertia(): void
+    {
+        $ctx = $this->seedContext();
+        $ctx['user']->update(['is_super_user' => true]);
+
+        $cardType = PaymentCardType::query()->create([
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'name' => 'Detail page terminal',
+            'is_active' => true,
+            'sort_order' => 0,
+        ]);
+
+        $date = now()->subDay()->toDateString();
+
+        $url = route('domains.payment-card-types.details', [
+            'domain' => $ctx['domain']->name_slug,
+            'paymentCardType' => $cardType->id,
+        ]);
+
+        $this->actingAs($ctx['user'])
+            ->get($url.'?'.http_build_query([
+                'location_id' => $ctx['location']->id,
+                'business_date' => $date,
+            ]))
+            ->assertOk()
+            ->assertInertia(fn (Inertia $page) => $page
+                ->component('Wallet/CardTerminalMoneyDetails')
+                ->where('moneyDetailsCardType.id', (int) $cardType->id)
+                ->where('moneyDetailsCardType.name', 'Detail page terminal')
+            );
+    }
+
+    public function test_payment_card_type_details_page_forbidden_without_money_permission(): void
+    {
+        $ctx = $this->seedContext();
+
+        $cardType = PaymentCardType::query()->create([
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'name' => 'No money user',
+            'is_active' => true,
+            'sort_order' => 0,
+        ]);
+
+        $url = route('domains.payment-card-types.details', [
+            'domain' => $ctx['domain']->name_slug,
+            'paymentCardType' => $cardType->id,
+        ]);
+
+        $this->actingAs($ctx['user'])
+            ->get($url.'?'.http_build_query([
+                'location_id' => $ctx['location']->id,
+            ]))
+            ->assertForbidden();
     }
 }

@@ -236,115 +236,20 @@ const columns = [
     { title: "", key: "actions", width: 220 },
 ];
 
-const moneyModalVisible = ref(false);
-const moneyDetailsType = ref(null);
-const moneyLoading = ref(false);
-const todayTotal = ref(0);
-const yesterdayTotal = ref(0);
-const historyRows = ref([]);
-const historyPagination = ref({
-    current: 1,
-    pageSize: 20,
-    total: 0,
-});
-
-const moneyHistoryColumns = [
-    {
-        title: "Invoice",
-        dataIndex: "invoice_number",
-        key: "invoice_number",
-        width: 130,
-    },
-    { title: "Date", key: "date", width: 200 },
-    { title: "Time", key: "time", width: 120 },
-    {
-        title: "Amount",
-        dataIndex: "grand_total",
-        key: "grand_total",
-        align: "right",
-    },
-];
-
-function formatHistoryDate(iso) {
-    if (!iso) return "—";
-    try {
-        return new Date(iso).toLocaleDateString(undefined, {
-            weekday: "short",
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-        });
-    } catch {
-        return "—";
+function goToMoneyDetailsPage(record) {
+    const q = {};
+    if (activeLocationId.value != null) {
+        q.location_id = activeLocationId.value;
     }
-}
-
-function formatHistoryTime(iso) {
-    if (!iso) return "—";
-    try {
-        return new Date(iso).toLocaleTimeString(undefined, {
-            hour: "2-digit",
-            minute: "2-digit",
-        });
-    } catch {
-        return "—";
+    if (activeBusinessDate.value) {
+        q.business_date = activeBusinessDate.value;
     }
-}
-
-async function loadMoneyDetails(p = 1) {
-    if (!moneyDetailsType.value?.id) return;
-    moneyLoading.value = true;
-    try {
-        const { data } = await axios.get(
-            getRoute("payment-card-types.money", {
-                paymentCardType: moneyDetailsType.value.id,
-            }),
-            {
-                params: {
-                    page: p,
-                    per_page: historyPagination.value.pageSize,
-                    location_id: activeLocationId.value,
-                    business_date: activeBusinessDate.value,
-                },
-            },
-        );
-        todayTotal.value = Number(data.today_total) || 0;
-        yesterdayTotal.value = Number(data.yesterday_total) || 0;
-        const h = data.history;
-        historyRows.value = h?.data ?? [];
-        historyPagination.value = {
-            current: h?.current_page ?? 1,
-            pageSize: h?.per_page ?? 20,
-            total: h?.total ?? 0,
-        };
-    } catch (e) {
-        notification.error({
-            message:
-                firstValidationMessage(e) || "Could not load money details.",
-        });
-    } finally {
-        moneyLoading.value = false;
-    }
-}
-
-function openMoneyDetails(record) {
-    moneyDetailsType.value = record;
-    moneyModalVisible.value = true;
-    loadMoneyDetails(1);
-}
-
-function closeMoneyModal() {
-    moneyModalVisible.value = false;
-    moneyDetailsType.value = null;
-    historyRows.value = [];
-    todayTotal.value = 0;
-    yesterdayTotal.value = 0;
-}
-
-function onMoneyTableChange(pag) {
-    if (pag?.current) {
-        loadMoneyDetails(pag.current);
-    }
+    router.get(
+        getRoute("payment-card-types.details", {
+            paymentCardType: record.id,
+        }),
+        q,
+    );
 }
 </script>
 
@@ -449,10 +354,12 @@ function onMoneyTableChange(pag) {
                                                         'payment-card-types.money',
                                                     )
                                                 "
-                                                name="View money details"
+                                                name="View payment details"
                                                 hover="hover:bg-emerald-600"
                                                 @click="
-                                                    openMoneyDetails(record)
+                                                    goToMoneyDetailsPage(
+                                                        record,
+                                                    )
                                                 "
                                             >
                                                 <IconReportMoney
@@ -531,99 +438,6 @@ function onMoneyTableChange(pag) {
                         <a-switch v-model:checked="formActive" />
                     </div>
                 </div>
-            </a-modal>
-
-            <a-modal
-                v-model:visible="moneyModalVisible"
-                :title="
-                    moneyDetailsType
-                        ? `Money — ${moneyDetailsType.name}`
-                        : 'Money details'
-                "
-                width="800px"
-                :footer="null"
-                destroy-on-close
-                @cancel="closeMoneyModal"
-            >
-                <a-spin :spinning="moneyLoading">
-                    <div v-if="moneyDetailsType" class="space-y-4">
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div
-                                class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3"
-                            >
-                                <div class="text-xs text-gray-500 uppercase">
-                                    Today
-                                </div>
-                                <div
-                                    class="text-xl font-semibold text-green-700"
-                                >
-                                    {{ formattedTotal(todayTotal) }}
-                                </div>
-                            </div>
-                            <div
-                                class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3"
-                            >
-                                <div class="text-xs text-gray-500 uppercase">
-                                    Yesterday
-                                </div>
-                                <div
-                                    class="text-xl font-semibold text-gray-800"
-                                >
-                                    {{ formattedTotal(yesterdayTotal) }}
-                                </div>
-                            </div>
-                        </div>
-                        <div>
-                            <div
-                                class="text-sm font-medium text-gray-700 mb-2"
-                            >
-                                Transaction history (paid card sales)
-                            </div>
-                            <a-table
-                                size="small"
-                                :columns="moneyHistoryColumns"
-                                :data-source="historyRows"
-                                :pagination="{
-                                    current: historyPagination.current,
-                                    pageSize: historyPagination.pageSize,
-                                    total: historyPagination.total,
-                                    showSizeChanger: false,
-                                    hideOnSinglePage: false,
-                                }"
-                                row-key="id"
-                                :locale="{
-                                    emptyText:
-                                        'No transactions for this card type yet.',
-                                }"
-                                @change="onMoneyTableChange"
-                            >
-                                <template #bodyCell="{ column, record }">
-                                    <template v-if="column.key === 'date'">
-                                        {{
-                                            formatHistoryDate(
-                                                record.transaction_date,
-                                            )
-                                        }}
-                                    </template>
-                                    <template v-else-if="column.key === 'time'">
-                                        {{
-                                            formatHistoryTime(
-                                                record.transaction_date,
-                                            )
-                                        }}
-                                    </template>
-                                    <template
-                                        v-else-if="column.key === 'grand_total'"
-                                    >
-                                        {{
-                                            formattedTotal(record.grand_total)
-                                        }}
-                                    </template>
-                                </template>
-                            </a-table>
-                        </div>
-                    </div>
-                </a-spin>
             </a-modal>
         </template>
     </WalletShell>

@@ -19,6 +19,7 @@ use App\Support\Wallet\WalletLocationResolver;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class PaymentCardTypeController extends Controller
@@ -47,6 +48,29 @@ class PaymentCardTypeController extends Controller
             'Wallet/CardTerminals',
             $this->buildWalletPageProps($request, $domain, false, 'card-types')
         );
+    }
+
+    /**
+     * Full-page paid card sales detail for one terminal (Inertia).
+     */
+    public function details(Request $request, Domain $domain, PaymentCardType $paymentCardType)
+    {
+        if (! $request->user()->hasPermissionToRoute('payment-card-types.money')) {
+            abort(403);
+        }
+
+        $location = WalletLocationResolver::resolve($request, $domain);
+        $this->ensureInDomainLocation($domain, $location, $paymentCardType);
+
+        $props = $this->buildWalletPageProps($request, $domain, false, 'card-types');
+
+        $props['moneyDetailsCardType'] = [
+            'id' => (int) $paymentCardType->id,
+            'name' => (string) $paymentCardType->name,
+            'is_active' => (bool) $paymentCardType->is_active,
+        ];
+
+        return Inertia::render('Wallet/CardTerminalMoneyDetails', $props);
     }
 
     /**
@@ -398,10 +422,21 @@ class PaymentCardTypeController extends Controller
         $location = WalletLocationResolver::resolve($request, $domain);
         $this->ensureInDomainLocation($domain, $location, $paymentCardType);
 
-        $request->validate([
+        $validated = $request->validate([
             'page' => ['sometimes', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
+            'search' => ['nullable', 'string', 'max:100'],
+            'history_from' => ['nullable', 'date', 'before_or_equal:today'],
+            'history_to' => ['nullable', 'date', 'before_or_equal:today'],
         ]);
+
+        $historyFrom = $validated['history_from'] ?? null;
+        $historyTo = $validated['history_to'] ?? null;
+        if ($historyFrom !== null && $historyTo !== null && $historyFrom > $historyTo) {
+            throw ValidationException::withMessages([
+                'history_to' => [__('The history end date must be on or after the start date.')],
+            ]);
+        }
 
         $perPage = max(1, min(100, (int) $request->input('per_page', 20)));
         $page = max(1, (int) $request->input('page', 1));
@@ -421,7 +456,21 @@ class PaymentCardTypeController extends Controller
             ->whereDate('transaction_date', now()->subDay()->toDateString())
             ->sum('grand_total');
 
-        $history = (clone $base)
+        $historyBase = clone $base;
+
+        $search = trim((string) ($validated['search'] ?? ''));
+        if ($search !== '') {
+            $like = '%'.addcslashes($search, '%_\\').'%';
+            $historyBase->where('invoice_number', 'like', $like);
+        }
+        if ($historyFrom !== null) {
+            $historyBase->whereDate('transaction_date', '>=', $historyFrom);
+        }
+        if ($historyTo !== null) {
+            $historyBase->whereDate('transaction_date', '<=', $historyTo);
+        }
+
+        $history = $historyBase
             ->orderByDesc('transaction_date')
             ->paginate($perPage, ['*'], 'page', $page);
 
