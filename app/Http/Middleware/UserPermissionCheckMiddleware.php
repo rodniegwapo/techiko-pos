@@ -70,6 +70,10 @@ class UserPermissionCheckMiddleware
 
         $permissions = $user->getAllPermissions();
 
+        if ($permissionRoute === 'payment-card-types.details') {
+            return $permissions->contains('route_name', 'payment-card-types.money');
+        }
+
         return $permissions->contains('route_name', $permissionRoute);
     }
 
