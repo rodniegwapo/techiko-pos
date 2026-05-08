@@ -33,7 +33,7 @@ class PaymentCardTypeController extends Controller
         }
 
         return Inertia::render(
-            'Wallet/Index',
+            'Wallet/MoneyMovement',
             $this->buildWalletPageProps($request, $domain, true, 'money-movement')
         );
     }
@@ -44,7 +44,7 @@ class PaymentCardTypeController extends Controller
     public function index(Request $request, Domain $domain)
     {
         return Inertia::render(
-            'Wallet/Index',
+            'Wallet/CardTerminals',
             $this->buildWalletPageProps($request, $domain, false, 'card-types')
         );
     }
