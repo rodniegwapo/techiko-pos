@@ -434,6 +434,23 @@ const menus = computed(() => {
 });
 
 // ===================
+// WALLET MENU QUERY (optional business_date from current URL only)
+// ===================
+function walletMenuQuery() {
+    const url = page.url || "";
+    const idx = url.indexOf("?");
+    if (idx === -1) {
+        return {};
+    }
+    const params = new URLSearchParams(url.slice(idx + 1));
+    const bd = params.get("business_date");
+    if (bd) {
+        return { business_date: bd };
+    }
+    return {};
+}
+
+// ===================
 // MENU CLICK HANDLER
 // ===================
 const handleClick = (menu) => {
@@ -443,6 +460,24 @@ const handleClick = (menu) => {
     }
 
     try {
+        if (menu.key === "wallet-money-movement") {
+            const routePath = getRoute("wallet.money-movement");
+            if (routePath && routePath !== "#") {
+                selectedKeys.value = [menu.key];
+                router.get(routePath, walletMenuQuery());
+            }
+            return;
+        }
+
+        if (menu.key === "wallet-card-terminals") {
+            const routePath = getRoute("payment-card-types.index");
+            if (routePath && routePath !== "#") {
+                selectedKeys.value = [menu.key];
+                router.get(routePath, walletMenuQuery());
+            }
+            return;
+        }
+
         const routePath = getRoute(menu.routeName);
 
         if (routePath && routePath !== "#") {
@@ -572,7 +607,8 @@ const safeMenus = computed(() => {
                         </span>
                         <span
                             v-else-if="
-                                menu.key === 'messages' && inquiryUnreadCount > 0
+                                menu.key === 'messages' &&
+                                inquiryUnreadCount > 0
                             "
                             class="ml-1 min-w-[1.1rem] rounded-full bg-red-500 px-1.5 text-center text-[10px] leading-tight text-white"
                         >

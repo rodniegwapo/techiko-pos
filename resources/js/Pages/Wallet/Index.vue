@@ -112,11 +112,7 @@ function walletPageRouteName() {
 
 function visitWalletPage(query) {
     const q = { ...query };
-    if (!isMoneyMovementPage.value && props.canViewCardTypes) {
-        q.tab = "card-types";
-    } else {
-        delete q.tab;
-    }
+    delete q.tab;
     router.get(getRoute(walletPageRouteName()), q, {
         preserveScroll: true,
         preserveState: true,
@@ -125,22 +121,17 @@ function visitWalletPage(query) {
 }
 
 function goToCardTypes() {
-    const q = {
-        business_date: activeBusinessDate.value,
-        tab: "card-types",
-    };
-    if (activeLocationId.value) {
-        q.location_id = activeLocationId.value;
+    const q = {};
+    if (activeBusinessDate.value) {
+        q.business_date = activeBusinessDate.value;
     }
     router.get(getRoute("payment-card-types.index"), q);
 }
 
 function goToMoneyMovement() {
-    const q = {
-        business_date: activeBusinessDate.value,
-    };
-    if (activeLocationId.value) {
-        q.location_id = activeLocationId.value;
+    const q = {};
+    if (activeBusinessDate.value) {
+        q.business_date = activeBusinessDate.value;
     }
     router.get(getRoute("wallet.money-movement"), q);
 }
@@ -578,9 +569,6 @@ function reloadWalletForBusinessDate() {
     const q = queryObjectFromPageUrl(page.url);
     q.business_date =
         cashControlForm.value.business_date || activeBusinessDate.value;
-    if (activeLocationId.value) {
-        q.location_id = activeLocationId.value;
-    }
     visitWalletPage(q);
 }
 

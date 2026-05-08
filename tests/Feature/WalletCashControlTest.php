@@ -68,6 +68,21 @@ class WalletCashControlTest extends TestCase
         return compact('domain', 'location', 'location2', 'user');
     }
 
+    public function test_payment_card_types_index_without_query_returns_card_types_wallet_page(): void
+    {
+        $ctx = $this->seedContext();
+        $url = route('domains.payment-card-types.index', [
+            'domain' => $ctx['domain']->name_slug,
+        ]);
+
+        $this->actingAs($ctx['user'])->get($url)
+            ->assertOk()
+            ->assertInertia(fn (Inertia $page) => $page
+                ->component('Wallet/Index')
+                ->where('walletPageMode', 'card-types')
+            );
+    }
+
     public function test_set_opening_cash_creates_and_updates_for_location_date(): void
     {
         $ctx = $this->seedContext();
