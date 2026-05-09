@@ -3,9 +3,10 @@
 namespace App\Models;
 
 use App\Models\Product\Product;
+use App\Traits\Searchable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use App\Traits\Searchable;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Category extends Model
 {
@@ -15,13 +16,24 @@ class Category extends Model
 
     protected $searchable = ['name', 'description'];
 
-    public function products(){
+    public function products()
+    {
         return $this->hasMany(Product::class);
     }
 
-    public function location()
+    /**
+     * Locations where this category is available (see category_location pivot).
+     */
+    public function locations(): BelongsToMany
     {
-        return $this->belongsTo(InventoryLocation::class);
+        return $this->belongsToMany(
+            InventoryLocation::class,
+            'category_location',
+            'category_id',
+            'location_id'
+        )
+            ->withPivot('is_active')
+            ->withTimestamps();
     }
 
     // Remove domain relationship - now using domain string column
@@ -30,7 +42,8 @@ class Category extends Model
     // }
 
     // Add scope for easy domain filtering
-    public function scopeForDomain($query, $domain) {
+    public function scopeForDomain($query, $domain)
+    {
         return $query->where('domain', $domain);
     }
 }

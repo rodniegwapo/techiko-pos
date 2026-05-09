@@ -10,16 +10,25 @@ use App\Models\Domain;
 use App\Models\InventoryLocation;
 use App\Models\Product\Product;
 use App\Models\Product\ProductSoldType;
+use App\Models\SharedProduct;
+use App\Models\SharedProductSuggestion;
+use App\Services\DomainSubscriptionService;
+use App\Support\BarcodeNormalizer;
 use App\Support\ProductPayloadNormalizer;
 use App\Traits\LocationCategoryScoping;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class ProductController extends Controller
 {
     use LocationCategoryScoping;
+
+    public function __construct(
+        private DomainSubscriptionService $subscriptionService
+    ) {}
 
     /**
      * Resolve active location for the given domain and request.
@@ -36,8 +45,16 @@ class ProductController extends Controller
     {
         $productId = $product?->id;
         $domainSlug = $domain?->name_slug;
+        $barcodeRules = ['nullable', 'string', 'max:255'];
+        if ($domainSlug) {
+            $barcodeRules[] = Rule::unique('products', 'barcode')
+                ->where(fn ($q) => $q->where('domain', $domainSlug))
+                ->ignore($productId);
+        } else {
+            $barcodeRules[] = Rule::unique('products', 'barcode')->ignore($productId);
+        }
 
-        return $request->validate([
+        $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'sold_type' => ['required', 'string', 'max:255', 'exists:product_sold_types,name'],
@@ -45,8 +62,8 @@ class ProductController extends Controller
             'cost' => ['nullable', 'numeric', 'min:0'],
 
             'category_id' => ['nullable', 'exists:categories,id'],
-            'SKU' => ['required', 'string', 'max:255', 'unique:products,SKU,' . $productId],
-            'barcode' => ['required', 'string', 'max:255', 'unique:products,barcode,' . $productId],
+            'SKU' => ['nullable', 'string', 'max:255', 'unique:products,SKU,'.$productId],
+            'barcode' => $barcodeRules,
 
             'representation_type' => ['nullable', 'string', 'in:image,color,text'],
             'representation' => ['nullable', 'string'],
@@ -62,6 +79,60 @@ class ProductController extends Controller
             'sold_type' => 'sold type',
             'category_id' => 'category',
             'location_id' => 'location',
+        ]);
+
+        if (array_key_exists('category_id', $validated) && $validated['category_id'] === '') {
+            $validated['category_id'] = null;
+        }
+        if (! empty($validated['barcode'])) {
+            $validated['barcode'] = BarcodeNormalizer::normalize($validated['barcode']);
+        } else {
+            $validated['barcode'] = $validated['barcode'] ?? '';
+        }
+
+        return $validated;
+    }
+
+    /**
+     * When a tenant saves a product with a barcode not yet in the global shared catalog,
+     * queue a pending suggestion for super review (snapshot only — no pricing).
+     */
+    private function queueSharedCatalogSuggestionIfNeeded(Request $request, Domain $domain, Product $product): void
+    {
+        $norm = BarcodeNormalizer::normalize((string) $product->barcode);
+        if ($norm === '') {
+            return;
+        }
+
+        if (SharedProduct::query()->where('barcode', $norm)->exists()) {
+            return;
+        }
+
+        $alreadyPending = SharedProductSuggestion::query()
+            ->pending()
+            ->forDomain($domain->name_slug)
+            ->where('barcode', $norm)
+            ->exists();
+
+        if ($alreadyPending) {
+            return;
+        }
+
+        $categoryLabel = $product->category_id
+            ? Category::find($product->category_id)?->name
+            : null;
+
+        SharedProductSuggestion::create([
+            'domain' => $domain->name_slug,
+            'barcode' => $norm,
+            'snapshot' => [
+                'name' => $product->name,
+                'sold_type' => $product->sold_type,
+                'category_label' => $categoryLabel,
+            ],
+            'submitted_product_id' => $product->id,
+            'submitted_by' => $request->user()?->id,
+            'status' => SharedProductSuggestion::STATUS_PENDING,
         ]);
     }
 
@@ -100,7 +171,7 @@ class ProductController extends Controller
         return Product::query()
             ->with('category')
             ->where('domain', $domain->name_slug)
-            ->when($request->search, fn($q, $s) => $q->search($s))
+            ->when($request->search, fn ($q, $s) => $q->search($s))
             ->when($request->category, function ($query, $category) {
                 return $query->whereHas('category', function ($q) use ($category) {
                     $q->where('name', $category);
@@ -119,7 +190,7 @@ class ProductController extends Controller
     /**
      * Standard response for products index.
      */
-    private function respondWithIndex($products, $categoriesQuery, $location)
+    private function respondWithIndex($products, $categoriesQuery, $location, Domain $domain)
     {
         return Inertia::render('Products/Index', [
             'items' => ProductResource::collection($products),
@@ -127,6 +198,7 @@ class ProductController extends Controller
             'sold_by_types' => ProductSoldType::all(),
             'isGlobalView' => false,
             'currentLocation' => $location,
+            'subscription' => $this->subscriptionService->subscriptionPropsForFrontend($domain),
         ]);
     }
 
@@ -139,7 +211,7 @@ class ProductController extends Controller
         $query = $this->buildProductQuery($request, $domain)
             ->when($location, function ($q) use ($location) {
                 $q->with([
-                    'inventories' => fn($iq) => $iq->where('location_id', $location->id),
+                    'inventories' => fn ($iq) => $iq->where('location_id', $location->id),
                 ]);
             })
             ->latest();
@@ -148,7 +220,7 @@ class ProductController extends Controller
 
         $categoriesQuery = $this->buildCategoriesQuery($domain);
 
-        return $this->respondWithIndex($products, $categoriesQuery, $location);
+        return $this->respondWithIndex($products, $categoriesQuery, $location, $domain);
     }
 
     /**
@@ -157,6 +229,10 @@ class ProductController extends Controller
     public function store(Request $request, ?Domain $domain = null)
     {
         $this->validateProductUniqueness($request, null, $domain);
+        if ($domain) {
+            $this->subscriptionService->assertCanCreateProduct($domain);
+        }
+
         $validated = ProductPayloadNormalizer::applyRepresentationAndCostDefaults(
             $this->validatedData($request, null, $domain),
         );
@@ -172,6 +248,10 @@ class ProductController extends Controller
 
         if ($location) {
             $product->addToLocation($location, true);
+        }
+
+        if ($domain) {
+            $this->queueSharedCatalogSuggestionIfNeeded($request, $domain, $product);
         }
 
         return redirect()->back()->with('success', 'Product created successfully');
@@ -192,6 +272,7 @@ class ProductController extends Controller
             $this->validatedData($request, $product, $domain),
         );
         $product->update($validated);
+        $product->refresh();
 
         if ($request->filled('location_id')) {
             $location = InventoryLocation::find($request->input('location_id'));
@@ -199,6 +280,8 @@ class ProductController extends Controller
                 $product->addToLocation($location, true);
             }
         }
+
+        $this->queueSharedCatalogSuggestionIfNeeded($request, $domain, $product);
 
         return redirect()->back()->with('success', 'Product updated successfully');
     }
@@ -231,6 +314,7 @@ class ProductController extends Controller
             'sold_by_types' => ProductSoldType::all(),
             'isGlobalView' => false,
             'currentLocation' => $location,
+            'subscription' => $this->subscriptionService->subscriptionPropsForFrontend($domain),
         ]);
     }
 

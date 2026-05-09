@@ -124,6 +124,12 @@ const tableFilters = { search, sold_type, price, category, cost };
 const { pagination, handleTableChange } = useTable("items", tableFilters, {
     preserveQueryKeys: ["location_id"],
 });
+
+const subscription = computed(() => page.props.subscription ?? null);
+
+const productsAtCapacity = computed(
+    () => subscription.value?.products_at_capacity === true,
+);
 </script>
 
 <template>
@@ -140,7 +146,7 @@ const { pagination, handleTableChange } = useTable("items", tableFilters, {
                     class="min-w-[100px] max-w-[300px]"
                 />
 
-                <Link :href="getRoute('products.create')">
+                <Link v-if="!productsAtCapacity" :href="getRoute('products.create')">
                     <a-button
                         type="primary"
                         class="bg-white border flex items-center border-green-500 text-green-500"
@@ -151,6 +157,23 @@ const { pagination, handleTableChange } = useTable("items", tableFilters, {
                         Create Product
                     </a-button>
                 </Link>
+                <a-tooltip
+                    v-else
+                    title="Free plan is limited to 10 products. Open Servicing Payment to subscribe."
+                >
+                    <span class="inline-block">
+                        <a-button
+                            type="primary"
+                            disabled
+                            class="bg-white border flex items-center border-gray-300 text-gray-400"
+                        >
+                            <template #icon>
+                                <PlusSquareOutlined />
+                            </template>
+                            Create Product
+                        </a-button>
+                    </span>
+                </a-tooltip>
                 <FilterDropdown v-model="filters" :filters="filtersConfig" />
             </template>
 

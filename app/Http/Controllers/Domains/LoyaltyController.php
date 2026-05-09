@@ -49,6 +49,7 @@ class LoyaltyController extends Controller
 
         $data = $customers->getCollection()->map(function ($customer) {
             $tierInfo = $customer->getTierInfo();
+
             return [
                 'id' => $customer->id,
                 'name' => $customer->name,
@@ -70,7 +71,7 @@ class LoyaltyController extends Controller
                 'last_page' => $customers->lastPage(),
                 'per_page' => $customers->perPage(),
                 'total' => $customers->total(),
-            ]
+            ],
         ]);
     }
 
@@ -83,10 +84,11 @@ class LoyaltyController extends Controller
             ->get();
 
         $totalCustomers = Customer::where('domain', $domain->name_slug)->count();
-        $tierColors = ['bronze' => '#CD7F32','silver' => '#C0C0C0','gold' => '#FFD700','platinum' => '#E5E4E2'];
+        $tierColors = ['bronze' => '#CD7F32', 'silver' => '#C0C0C0', 'gold' => '#FFD700', 'platinum' => '#E5E4E2'];
 
         $tierDistribution = $tierStats->map(function ($stat) use ($totalCustomers, $tierColors) {
             $percentage = $totalCustomers > 0 ? round(($stat->count / $totalCustomers) * 100, 1) : 0;
+
             return [
                 'tier' => $stat->tier,
                 'name' => ucfirst($stat->tier),
@@ -97,7 +99,10 @@ class LoyaltyController extends Controller
         });
 
         $totalPointsIssued = Customer::where('domain', $domain->name_slug)->sum('loyalty_points') ?? 0;
-        $totalPointsRedeemed = 0;
+        $totalPointsRedeemed = (int) (Sale::query()
+            ->where('payment_status', 'paid')
+            ->where('domain', $domain->name_slug)
+            ->sum('loyalty_points_redeemed') ?? 0);
         $activePoints = $totalPointsIssued - $totalPointsRedeemed;
 
         $loyaltyMemberSales = Sale::whereNotNull('customer_id')->where('payment_status', 'paid')->sum('grand_total') ?? 0;
@@ -131,7 +136,7 @@ class LoyaltyController extends Controller
         $validated = $request->validate([
             'type' => 'required|in:add,subtract,set',
             'amount' => 'required|integer|min:0',
-            'reason' => 'nullable|string|max:255'
+            'reason' => 'nullable|string|max:255',
         ]);
 
         DB::transaction(function () use ($customer, $validated) {
@@ -155,10 +160,7 @@ class LoyaltyController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Points adjusted successfully',
-            'new_points' => $customer->fresh()->loyalty_points
+            'new_points' => $customer->fresh()->loyalty_points,
         ]);
     }
 }
-
-
-

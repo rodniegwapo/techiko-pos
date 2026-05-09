@@ -1,10 +1,12 @@
 <script setup>
-import { computed } from "vue";
-import { Link, useForm, usePage } from "@inertiajs/vue3";
+import { computed, ref } from "vue";
+import { Head, Link, useForm, usePage } from "@inertiajs/vue3";
+import { watchDebounced } from "@vueuse/core";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
 import ContentLayout from "@/Components/ContentLayout.vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
+import { useSharedCatalogLookup } from "@/Composables/useSharedCatalogLookup";
 import {
     validationHasError,
     validationMessage,
@@ -29,6 +31,10 @@ const props = defineProps({
         type: Boolean,
         default: false,
     },
+    subscription: {
+        type: Object,
+        default: null,
+    },
 });
 
 const form = useForm({
@@ -43,6 +49,59 @@ const form = useForm({
     representation: "",
 });
 
+const domainSlug = computed(() => {
+    if (props.isGlobalView) {
+        return null;
+    }
+    const m =
+        typeof window !== "undefined"
+            ? window.location.pathname.match(/\/domains\/([^/]+)/)
+            : null;
+    if (m) {
+        return m[1];
+    }
+    return page.props.currentDomain?.name_slug ?? null;
+});
+
+const domainLookupEnabled = computed(
+    () => !props.isGlobalView && !!domainSlug.value,
+);
+
+const sharedCategoryHint = ref("");
+const barcodeLookupNonce = ref(0);
+
+function assignSharedCatalogFields(data) {
+    if (data.name) {
+        form.name = data.name;
+    }
+    sharedCategoryHint.value = data.category_label || "";
+    if (
+        data.sold_type &&
+        props.sold_by_types.some((s) => s.name === data.sold_type)
+    ) {
+        form.sold_type = data.sold_type;
+    }
+}
+
+const { lookupLoading, catalogFound, lookup } = useSharedCatalogLookup({
+    enabled: domainLookupEnabled,
+    getDomainSlug: () => domainSlug.value,
+});
+
+async function runBarcodeLookup() {
+    barcodeLookupNonce.value += 1;
+    const nonce = barcodeLookupNonce.value;
+    sharedCategoryHint.value = "";
+    await lookup(form.barcode, assignSharedCatalogFields);
+    if (nonce !== barcodeLookupNonce.value) {
+        return;
+    }
+}
+
+watchDebounced(() => form.barcode, runBarcodeLookup, {
+    debounce: 450,
+});
+
 const categoriesOption = computed(() => {
     return props.categories.map((item) => ({
         label: item.name,
@@ -54,21 +113,48 @@ const soltTypeOptions = computed(() => {
     return props.sold_by_types.map((item) => item.name);
 });
 
+const productsAtCapacity = computed(
+    () => props.subscription?.products_at_capacity === true,
+);
+
+/**
+ * Allow only digits and a single decimal point.
+ * This prevents characters like letters, spaces, and scientific notation.
+ */
+function decimalParser(value) {
+    const raw = String(value ?? "");
+    const cleaned = raw.replace(/[^\d.]/g, "");
+    const parts = cleaned.split(".");
+    if (parts.length <= 1) {
+        return cleaned;
+    }
+    return `${parts[0]}.${parts.slice(1).join("")}`;
+}
+
 const domainOptions = computed(() => {
     const list = Array.isArray(page?.props?.domains) ? page.props.domains : [];
     return list.map((item) => ({ label: item.name, value: item.name_slug }));
 });
 
-const isOrganizationProductForm = computed(() => !props.isGlobalView);
-
 const handleSave = () => {
     form.post(getRoute("products.store"), {
         onSuccess: () => {
             form.reset();
+            form.clearErrors();
+            sharedCategoryHint.value = "";
+            barcodeLookupNonce.value += 1;
             message.success("Product created successfully");
         },
         onError: (errs) => {
-            message.warning(validationSummaryNotice(errs || form.errors));
+            const bag = errs || form.errors;
+            const planMsg = bag?.plan;
+            if (planMsg !== undefined && planMsg !== null && planMsg !== "") {
+                message.error(
+                    Array.isArray(planMsg) ? planMsg[0] : planMsg || "Failed to create product",
+                );
+                return;
+            }
+            message.warning(validationSummaryNotice(bag));
         },
     });
 };
@@ -76,6 +162,7 @@ const handleSave = () => {
 useBarcodeScanner((code) => {
     form.barcode = code;
     message.success("Barcode Scanned: " + code);
+    runBarcodeLookup();
 });
 </script>
 
@@ -92,7 +179,20 @@ useBarcodeScanner((code) => {
             </template>
 
             <template #table>
-                <div class="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow">
+                <div class="space-y-4">
+                    <a-alert
+                        v-if="productsAtCapacity && subscription?.billing_url"
+                        type="warning"
+                        show-icon
+                        message="Product limit reached"
+                    >
+                        <template #description>
+                            <span class="mr-1">Subscribe for unlimited products on this domain.</span>
+                            <a :href="subscription.billing_url">Open servicing payment</a>
+                        </template>
+                    </a-alert>
+
+                    <div class="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow">
                     <a-form layout="vertical">
                         <!-- Product Name -->
                         <a-form-item
@@ -134,8 +234,7 @@ useBarcodeScanner((code) => {
 
                         <!-- Category -->
                         <a-form-item
-                            label="Category"
-                            :required="isOrganizationProductForm"
+                            label="Category (optional)"
                             :validate-status="
                                 validationHasError(form.errors, 'category_id')
                                     ? 'error'
@@ -148,7 +247,8 @@ useBarcodeScanner((code) => {
                             <a-select
                                 v-model:value="form.category_id"
                                 :options="categoriesOption"
-                                placeholder="Select category"
+                                placeholder="Select category or leave blank"
+                                allow-clear
                                 show-search
                                 :filter-option="
                                     (input, option) =>
@@ -177,6 +277,7 @@ useBarcodeScanner((code) => {
                                     placeholder="Enter cost"
                                     :min="0"
                                     :precision="2"
+                                    :parser="decimalParser"
                                     style="width: 100%"
                                     size="large"
                                 />
@@ -198,6 +299,7 @@ useBarcodeScanner((code) => {
                                     placeholder="Enter price"
                                     :min="0"
                                     :precision="2"
+                                    :parser="decimalParser"
                                     style="width: 100%"
                                     size="large"
                                 />
@@ -242,6 +344,25 @@ useBarcodeScanner((code) => {
                                     size="large"
                                 />
                             </a-form-item>
+                        </div>
+
+                        <div v-if="domainLookupEnabled" class="space-y-2 mb-4">
+                            <a-alert
+                                v-if="lookupLoading"
+                                type="info"
+                                message="Checking shared catalog…"
+                            />
+                            <a-alert
+                                v-else-if="catalogFound"
+                                type="success"
+                                message=" Review prefilled fields before saving."
+                                show-icon
+                            />
+                            <a-alert
+                                v-if="domainLookupEnabled && sharedCategoryHint"
+                                type="info"
+                                :message="`Suggested category (hint only): ${sharedCategoryHint}`"
+                            />
                         </div>
 
                         <!-- Sold Type -->
@@ -301,11 +422,13 @@ useBarcodeScanner((code) => {
                             <a-button
                                 type="primary"
                                 :loading="form.processing"
+                                :disabled="productsAtCapacity"
                                 @click="handleSave"
                                 >Create Product</a-button
                             >
                         </div>
                     </a-form>
+                </div>
                 </div>
             </template>
         </ContentLayout>

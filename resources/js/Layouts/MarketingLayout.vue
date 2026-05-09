@@ -1,19 +1,27 @@
 <script setup>
-import { ref, watch } from "vue";
+import { ref, watch, computed } from "vue";
 import ApplicationLogo from "@/Components/ApplicationLogo.vue";
 import { Link, usePage } from "@inertiajs/vue3";
 
-const nav = [
-    { name: "Home", href: "marketing.home" },
+const navItems = [
+    { name: "Home", href: "home" },
     { name: "Services", href: "marketing.services" },
     { name: "About", href: "marketing.about" },
     { name: "Pricing", href: "marketing.pricing" },
     { name: "Contact", href: "marketing.contact" },
 ];
 
+const page = usePage();
+
+const nav = computed(() => {
+    if (page.props.features?.marketing_pricing_visible) {
+        return navItems;
+    }
+    return navItems.filter((item) => item.href !== "marketing.pricing");
+});
+
 const isNavActive = (name) => route().current(name);
 
-const page = usePage();
 const mobileNavOpen = ref(false);
 
 watch(
@@ -41,7 +49,7 @@ watch(
                         class="flex w-full items-center justify-between md:w-auto"
                     >
                         <Link
-                            :href="route('marketing.home')"
+                            :href="route('home')"
                             class="flex items-center gap-2 font-semibold text-gray-800 transition hover:opacity-90"
                         >
                             <ApplicationLogo class="!w-[88px]" />

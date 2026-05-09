@@ -10,26 +10,44 @@ use App\Http\Controllers\Domains\Inventory\InventoryLocationController;
 use App\Http\Controllers\Domains\Inventory\StockAdjustmentController;
 use App\Http\Controllers\Domains\LoyaltyController;
 use App\Http\Controllers\Domains\LoyaltyTierController;
+use App\Http\Controllers\Domains\ManualBillingController;
 use App\Http\Controllers\Domains\PaymentCardTypeController;
+use App\Http\Controllers\Domains\PayMongoQrPhController;
 use App\Http\Controllers\Domains\ProductController;
 use App\Http\Controllers\Domains\SaleController;
 use App\Http\Controllers\Domains\SaleDiscountController;
+use App\Http\Controllers\Domains\SharedCatalogLookupController;
 use App\Http\Controllers\Domains\UserController;
 use App\Http\Controllers\Domains\UserPinController;
 use App\Http\Controllers\Domains\VatReportController;
+use App\Http\Controllers\Domains\WalletCashMovementController;
 use App\Http\Controllers\MandatoryDiscountController;
 use App\Http\Controllers\Products\DiscountController;
 use App\Http\Controllers\TerminalController;
 use App\Http\Controllers\VoidLogController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('domains/{domain:name_slug}')
-    ->middleware(['auth', 'user.permission', 'role.access'])
+    ->middleware(['auth', 'verified', 'user.permission', 'role.access'])
     ->name('domains.')
     ->group(function () {
         // Organization settings (Sales VAT, etc.)
         Route::get('/settings', [DomainSettingsController::class, 'index'])->name('settings.index');
         Route::patch('/settings', [DomainSettingsController::class, 'update'])->name('settings.update');
+
+        Route::get('/billing/gcash', function (Request $request) {
+            $domain = $request->route('domain');
+
+            return redirect()->route('domains.billing.servicing.index', [
+                'domain' => is_string($domain) ? $domain : $domain->name_slug,
+            ], 302);
+        })->name('billing.gcash.legacy');
+
+        Route::get('/billing/servicing', [ManualBillingController::class, 'index'])->name('billing.servicing.index');
+        Route::post('/billing/servicing/manual-gcash', [ManualBillingController::class, 'store'])->name('billing.servicing.manual_gcash');
+        Route::post('/billing/paymongo/qrph', [PayMongoQrPhController::class, 'store'])->name('billing.paymongo.qrph.store');
+        Route::get('/billing/paymongo/status', [PayMongoQrPhController::class, 'status'])->name('billing.paymongo.status');
 
         // Dashboard (Organization-specific)
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
@@ -73,6 +91,7 @@ Route::prefix('domains/{domain:name_slug}')
             Route::scopeBindings()->group(function () {
                 Route::post('/{sale}/sales-items/void', [SaleController::class, 'voidItem'])->name('items.void');
                 Route::post('/{sale}/payments', [SaleController::class, 'proceedPayment'])->name('payment.store');
+                Route::patch('/{sale}/loyalty-redemption', [SaleController::class, 'patchLoyaltyRedemption'])->name('loyalty-redemption');
                 // Cart management - database-driven
                 Route::post('/{sale}/cart/add', [SaleController::class, 'addItemToCart'])->name('cart.add');
                 Route::delete('/{sale}/cart/remove', [SaleController::class, 'removeItemFromCart'])->name('cart.remove');
@@ -93,6 +112,9 @@ Route::prefix('domains/{domain:name_slug}')
                 Route::post('/{sale}/test-order-event', [SaleController::class, 'testOrderEvent'])->name('sales.testOrderEvent');
             });
         });
+
+        // Shared catalog barcode lookup (JSON)
+        Route::get('/shared-catalog/lookup', [SharedCatalogLookupController::class, 'lookup'])->name('shared-catalog.lookup');
 
         // Products (Organization-specific)
         Route::resource('products', ProductController::class)
@@ -138,16 +160,31 @@ Route::prefix('domains/{domain:name_slug}')
             ->names('customers');
 
         // VAT summary (output VAT from paid sales)
+        Route::get('/vat-report/export-json', [VatReportController::class, 'exportJson'])->name('vat-report.export-json');
+        Route::get('/vat-report/export', [VatReportController::class, 'export'])->name('vat-report.export');
         Route::get('/vat-report', [VatReportController::class, 'index'])->name('vat-report.index');
+
+        // Wallet — money movement (cash control + ledger); distinct URL from card-type setup
+        Route::get('/wallet/money-movement', [PaymentCardTypeController::class, 'moneyMovement'])->name('wallet.money-movement');
 
         // Payment card types (Wallet) — domain-scoped
         Route::prefix('payment-card-types')->name('payment-card-types.')->group(function () {
             Route::get('/', [PaymentCardTypeController::class, 'index'])->name('index');
             Route::get('/list', [PaymentCardTypeController::class, 'list'])->name('list');
             Route::post('/', [PaymentCardTypeController::class, 'store'])->name('store');
+            Route::get('/{paymentCardType}/details', [PaymentCardTypeController::class, 'details'])->name('details');
             Route::get('/{paymentCardType}/money', [PaymentCardTypeController::class, 'money'])->name('money');
             Route::put('/{paymentCardType}', [PaymentCardTypeController::class, 'update'])->name('update');
             Route::delete('/{paymentCardType}', [PaymentCardTypeController::class, 'destroy'])->name('destroy');
+        });
+
+        Route::prefix('wallet/cash-ledger')->name('wallet-cash-ledger.')->group(function () {
+            Route::get('/', [WalletCashMovementController::class, 'index'])->name('index');
+            Route::post('/', [WalletCashMovementController::class, 'store'])->name('store');
+            Route::post('/opening-cash', [WalletCashMovementController::class, 'setOpeningCash'])->name('opening-cash.store');
+            Route::post('/counted-cash', [WalletCashMovementController::class, 'submitCountedCash'])->name('counted-cash.store');
+            Route::post('/end-shift', [WalletCashMovementController::class, 'endShift'])->name('end-shift');
+            Route::post('/reopen-shift', [WalletCashMovementController::class, 'reopenShift'])->name('reopen-shift');
         });
 
         // Credit Management (Organization-specific)
@@ -155,6 +192,7 @@ Route::prefix('domains/{domain:name_slug}')
             Route::get('/', [CreditController::class, 'index'])->name('index');
             Route::get('/overdue', [CreditController::class, 'overdue'])->name('overdue');
             Route::get('/customers/{customer}', [CreditController::class, 'show'])->name('show');
+            Route::get('/customers/{customer}/outstanding-invoices', [CreditController::class, 'outstandingInvoices'])->name('outstanding-invoices');
             Route::post('/customers/{customer}/transactions', [CreditController::class, 'storeTransaction'])->name('transactions.store');
             Route::put('/transactions/{transaction}', [CreditController::class, 'updateTransaction'])->name('transactions.update');
             Route::get('/customers/{customer}/history', [CreditController::class, 'history'])->name('history');
