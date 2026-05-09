@@ -92,9 +92,12 @@ class UserPermissionCheckMiddleware
             return str_replace('domains.', '', $routeName);
         }
 
-        // API customer JSON routes named api.customers.* → match permissions as customers.*
-        if (str_starts_with($routeName, 'api.customers.')) {
-            return substr($routeName, strlen('api.'));
+        // API route names prefixed api.<namespace>.* → match permissions without the leading "api."
+        $apiPermissionPrefixes = ['api.customers.', 'api.inventory.', 'api.users.'];
+        foreach ($apiPermissionPrefixes as $prefix) {
+            if (str_starts_with($routeName, $prefix)) {
+                return substr($routeName, strlen('api.'));
+            }
         }
 
         return $routeName;
