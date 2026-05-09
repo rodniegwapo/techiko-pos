@@ -4,11 +4,8 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Providers\RouteServiceProvider;
-use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules;
 use Inertia\Inertia;
@@ -51,19 +48,19 @@ class RegisteredUserController extends Controller
                 'name' => $request->name,
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
-                'status' => 'inactive',
+                'status' => 'active',
                 'role_level' => 2, // Admin level by default for registrants
                 'can_switch_locations' => true,
             ]);
 
-            // 2) Create an organization (domain) in pending state
+            // 2) Create an organization (domain), active immediately
             $domainName = $request->input('organization') ?: (explode(' ', trim($request->name))[0] . " Organization");
 
             $domain = Domain::create([
                 'name' => $domainName,
                 'timezone' => $request->input('timezone') ?: 'Asia/Manila',
                 'country_code' => strtoupper($request->input('country_code') ?: 'PH'),
-                'is_active' => false, // Pending approval
+                'is_active' => true,
             ]);
 
             // 3) Associate user with the new domain
@@ -117,7 +114,7 @@ class RegisteredUserController extends Controller
             return back()->withErrors(['registration' => 'Registration failed. Please try again later.']);
         }
 
-        // 5) Do NOT auto-login; send to a public thank-you page
+        // Do NOT auto-login; send to a public thank-you page
         return redirect()->route('registration.thankyou');
     }
 }
