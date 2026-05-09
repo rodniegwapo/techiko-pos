@@ -28,6 +28,18 @@ class RouteServiceProvider extends ServiceProvider
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
         });
 
+        RateLimiter::for('register-page', function (Request $request) {
+            $max = max(1, (int) config('registration.throttle.page_per_minute', 60));
+
+            return Limit::perMinute($max)->by($request->ip());
+        });
+
+        RateLimiter::for('register-submit', function (Request $request) {
+            $max = max(1, (int) config('registration.throttle.submit_per_minute', 10));
+
+            return Limit::perMinute($max)->by($request->ip());
+        });
+
         // Configure route model binding for domain-scoped models
         Route::bind('sale', function ($value, $route) {
             $domain = $route->parameter('domain');

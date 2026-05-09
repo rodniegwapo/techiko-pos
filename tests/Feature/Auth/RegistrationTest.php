@@ -38,4 +38,29 @@ class RegistrationTest extends TestCase
         $this->assertNotNull($domain);
         $this->assertTrue((bool) $domain->is_active);
     }
+
+    public function test_registration_submission_is_rate_limited(): void
+    {
+        config(['registration.throttle.submit_per_minute' => 2]);
+
+        for ($i = 0; $i < 2; $i++) {
+            $response = $this->post('/register', [
+                'name' => 'Test User '.$i,
+                'email' => 'throttle-test-'.$i.'@example.com',
+                'password' => 'password',
+                'password_confirmation' => 'password',
+                'organization' => 'Throttle Org '.$i,
+            ]);
+            $response->assertRedirect(route('registration.thankyou'));
+        }
+
+        $response = $this->post('/register', [
+            'name' => 'Test User Over',
+            'email' => 'throttle-test-over@example.com',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+            'organization' => 'Throttle Org Over',
+        ]);
+        $response->assertStatus(429);
+    }
 }
