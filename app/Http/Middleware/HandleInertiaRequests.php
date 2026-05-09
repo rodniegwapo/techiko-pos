@@ -56,6 +56,7 @@ class HandleInertiaRequests extends Middleware
             'availableLocations' => $this->getAvailableLocations($request),
             'default_store' => $request->user() ? $this->getDefaultStore($request) : null,
             'impersonation' => $impersonationService->getImpersonationData(),
+            'features' => config('features'),
         ];
     }
 
