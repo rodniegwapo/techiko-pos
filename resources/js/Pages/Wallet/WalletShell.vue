@@ -614,11 +614,11 @@ async function reopenShift() {
                                 Business date
                             </label>
                             <div class="flex gap-2">
-                                <input
+                                <a-date-picker
                                     v-model="cashControlForm.business_date"
                                     type="date"
                                     :max="todayYmd"
-                                    class="w-full rounded border border-gray-300 px-2 py-2 text-sm"
+                                    class="w-full rounded border border-gray-300 px-2 text-sm"
                                 />
                                 <a-button @click="reloadWalletForBusinessDate">
                                     Load
@@ -634,7 +634,7 @@ async function reopenShift() {
                                 type="primary"
                                 :loading="endingShift"
                                 @click="onEndShiftClick"
-                                class="flex items-center gap-2"
+                                class="flex items-center gap-2 mt-2"
                             >
                                 <template #icon>
                                     <IconLock class="h-4 w-4" />
