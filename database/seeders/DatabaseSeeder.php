@@ -26,7 +26,7 @@ class DatabaseSeeder extends Seeder
             // Product and category seeders
             // CategorySeeder::class,
             // ProductSeeder::class,
-            // ProductSoldTypeSeeder::class,
+            ProductSoldTypeSeeder::class,
 
             // Discount and loyalty seeders
             // DiscountSeeder::class,

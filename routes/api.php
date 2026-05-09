@@ -55,7 +55,7 @@ Route::middleware(['auth:sanctum', 'user.permission'])->group(function () {
      * -----------------------
      */
     Route::prefix('customers')->group(function () {
-        Route::get('/', [CustomerController::class, 'index'])->name('customers.index');
+        Route::get('/', [CustomerController::class, 'index'])->name('api.customers.index');
         Route::get('/search', [CustomerController::class, 'search'])->name('customers.search');
         Route::get('/tier-options', [CustomerController::class, 'getTierOptions'])->name('customers.tier-options');
         Route::post('/', [CustomerController::class, 'store'])->name('customers.store');

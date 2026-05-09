@@ -305,7 +305,7 @@ onMounted(() => {
                                 v-model="businessDateInput"
                                 type="date"
                                 :max="todayYmd"
-                                class="w-full rounded border border-gray-300 px-2 py-2 text-sm"
+                                class="w-full rounded border border-gray-300 px-2 text-sm"
                             />
                             <a-button
                                 type="primary"
@@ -321,9 +321,7 @@ onMounted(() => {
                     <div
                         class="rounded-lg border border-gray-200 bg-white px-4 py-4 shadow-sm"
                     >
-                        <div
-                            class="text-sm font-medium text-gray-700 mb-2"
-                        >
+                        <div class="text-sm font-medium text-gray-700 mb-2">
                             Transaction history (paid card sales)
                         </div>
                         <div
@@ -412,9 +410,7 @@ onMounted(() => {
                                 <template
                                     v-else-if="column.key === 'grand_total'"
                                 >
-                                    {{
-                                        formattedTotal(record.grand_total)
-                                    }}
+                                    {{ formattedTotal(record.grand_total) }}
                                 </template>
                             </template>
                         </a-table>
