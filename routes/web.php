@@ -68,7 +68,7 @@ Route::middleware('auth')->group(function () {
 // ===================================
 // GLOBAL ROUTES (Super Users Only)
 // ===================================
-Route::middleware(['auth', 'user.permission'])->group(function () {
+Route::middleware(['auth', 'verified', 'user.permission'])->group(function () {
     // Sales (Global - All Organizations)
     Route::get('/sales', [SaleController::class, 'index'])->name('sales.index');
 
@@ -154,7 +154,7 @@ Route::get('/thank-you', function () {
 require __DIR__.'/domains.php';
 
 // Domain Management Routes (for super users)
-Route::middleware(['auth', 'user.permission'])->prefix('domains')->name('domains.')->group(function () {
+Route::middleware(['auth', 'verified', 'user.permission'])->prefix('domains')->name('domains.')->group(function () {
     Route::get('/', [DomainController::class, 'index'])->name('index');
     Route::get('/create', [DomainController::class, 'create'])->name('create');
     Route::post('/', [DomainController::class, 'store'])->name('store');
@@ -166,7 +166,7 @@ Route::middleware(['auth', 'user.permission'])->prefix('domains')->name('domains
 });
 
 // Global routes (not domain-specific)
-Route::middleware(['auth', 'user.permission'])->group(function () {
+Route::middleware(['auth', 'verified', 'user.permission'])->group(function () {
     // User Management (global - not domain specific)
     Route::get('/users', [UserController::class, 'index'])->name('users.index');
     Route::get('/users/hierarchy', [UserController::class, 'hierarchy'])->name('users.hierarchy');
@@ -189,10 +189,8 @@ Route::middleware(['auth', 'user.permission'])->group(function () {
 
     // Cascading Assignment Routes
     Route::get('/supervisors/cascading-options', [SupervisorAssignmentController::class, 'cascadingOptions'])
-        ->middleware('auth')
         ->name('supervisors.cascading-options');
     Route::post('/supervisors/{supervisor}/cascading-assign', [SupervisorAssignmentController::class, 'cascadingAssign'])
-        ->middleware('auth')
         ->name('supervisors.cascading-assign');
 
     // Role Management (Only for super user)
@@ -226,7 +224,7 @@ Route::get('/debug-super-user', function () {
         'isSuperUser_method' => $user->isSuperUser(),
         'method_exists' => method_exists($user, 'isSuperUser'),
     ]);
-})->middleware('auth');
+})->middleware(['auth', 'verified']);
 
 Route::get('/debug-role-hierarchy', function () {
     $hierarchy = UserHierarchyService::getRoleHierarchyInfo();
@@ -250,9 +248,9 @@ Route::get('/debug-role-hierarchy', function () {
         'role_hierarchy' => $hierarchy,
         'users_without_supervisors' => $usersWithoutSupervisors,
     ]);
-})->middleware('auth');
+})->middleware(['auth', 'verified']);
 
-Route::middleware(['auth'])->group(function () {
+Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/inquiries', [ConversationController::class, 'store'])
         ->middleware('throttle:20,1')
         ->name('inquiries.store');
@@ -260,7 +258,7 @@ Route::middleware(['auth'])->group(function () {
         ->name('conversations.messages');
 });
 
-Route::middleware(['auth', 'check.super.user'])->group(function () {
+Route::middleware(['auth', 'verified', 'check.super.user'])->group(function () {
     Route::get('/messages', [ConversationController::class, 'index'])->name('messages.index');
     Route::post('/messages/{conversation}/read', [ConversationController::class, 'markRead'])->name('messages.read');
     Route::post('/messages/{conversation}/messages', [ConversationController::class, 'storeStaff'])->name('messages.staff');

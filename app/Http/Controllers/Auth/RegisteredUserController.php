@@ -3,16 +3,18 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rules;
-use Inertia\Inertia;
-use Inertia\Response;
 use App\Models\Domain;
 use App\Models\InventoryLocation;
+use App\Models\User;
+use Illuminate\Auth\Events\Registered;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rules;
+use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class RegisteredUserController extends Controller
 {
@@ -27,13 +29,13 @@ class RegisteredUserController extends Controller
     /**
      * Handle an incoming registration request.
      *
-     * @throws \Illuminate\Validation\ValidationException
+     * @throws ValidationException
      */
     public function store(Request $request): RedirectResponse
     {
         $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|string|lowercase|email|max:255|unique:' . User::class,
+            'email' => 'required|string|lowercase|email|max:255|unique:'.User::class,
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'organization' => 'nullable|string|max:255',
             'country_code' => 'nullable|string|size:2',
@@ -54,7 +56,7 @@ class RegisteredUserController extends Controller
             ]);
 
             // 2) Create an organization (domain), active immediately
-            $domainName = $request->input('organization') ?: (explode(' ', trim($request->name))[0] . " Organization");
+            $domainName = $request->input('organization') ?: (explode(' ', trim($request->name))[0].' Organization');
 
             $domain = Domain::create([
                 'name' => $domainName,
@@ -76,26 +78,26 @@ class RegisteredUserController extends Controller
 
             // 5) Create a default inventory location for the domain
             // Generate a unique code (max 10 chars, must be unique globally)
-            $baseCode = strtoupper(substr(preg_replace('/[^a-z0-9]/i', '', $domain->name_slug), 0, 5)) . '-MAIN';
+            $baseCode = strtoupper(substr(preg_replace('/[^a-z0-9]/i', '', $domain->name_slug), 0, 5)).'-MAIN';
             $locationCode = $baseCode;
             $counter = 1;
-            
+
             // Ensure code uniqueness
             while (InventoryLocation::where('code', $locationCode)->exists()) {
-                $suffix = str_pad((string)$counter, 2, '0', STR_PAD_LEFT);
-                $locationCode = substr($baseCode, 0, 8) . $suffix;
+                $suffix = str_pad((string) $counter, 2, '0', STR_PAD_LEFT);
+                $locationCode = substr($baseCode, 0, 8).$suffix;
                 $counter++;
-                
+
                 // Safety check to prevent infinite loop
                 if ($counter > 99) {
                     // Fallback to timestamp-based code if too many conflicts
-                    $locationCode = strtoupper(substr(preg_replace('/[^a-z0-9]/i', '', $domain->name_slug), 0, 3)) . '-' . substr(time(), -4);
+                    $locationCode = strtoupper(substr(preg_replace('/[^a-z0-9]/i', '', $domain->name_slug), 0, 3)).'-'.substr(time(), -4);
                     break;
                 }
             }
 
             InventoryLocation::create([
-                'name' => $domainName . ' - Main Store',
+                'name' => $domainName.' - Main Store',
                 'code' => $locationCode,
                 'type' => 'store',
                 'address' => null,
@@ -111,8 +113,11 @@ class RegisteredUserController extends Controller
             DB::commit();
         } catch (\Throwable $e) {
             DB::rollBack();
+
             return back()->withErrors(['registration' => 'Registration failed. Please try again later.']);
         }
+
+        event(new Registered($user->fresh()));
 
         // Do NOT auto-login; send to a public thank-you page
         return redirect()->route('registration.thankyou');
