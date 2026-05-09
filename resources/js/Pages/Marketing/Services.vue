@@ -4,7 +4,8 @@ import MarketingHeroOrbit from "@/Components/Marketing/MarketingHeroOrbit.vue";
 import MarketingPageHero from "@/Components/Marketing/MarketingPageHero.vue";
 import MarketingSeoHead from "@/Components/MarketingSeoHead.vue";
 import MarketingLayout from "@/Layouts/MarketingLayout.vue";
-import { Link } from "@inertiajs/vue3";
+import { Link, usePage } from "@inertiajs/vue3";
+import { computed } from "vue";
 import {
     IconChartBar,
     IconHeartHandshake,
@@ -18,6 +19,11 @@ defineProps({
         required: true,
     },
 });
+
+const page = usePage();
+const showMarketingPricing = computed(
+    () => !!page.props.features?.marketing_pricing_visible,
+);
 
 const blocks = [
     {
@@ -143,14 +149,17 @@ const blocks = [
                     >
                         Get in touch
                     </Link>
-                    — or explore
-                    <Link
-                        :href="route('marketing.pricing')"
-                        class="font-semibold text-blue-600 transition hover:text-teal-600"
-                    >
-                        pricing &amp; plans
-                    </Link>
-                    to get started.
+                    <template v-if="showMarketingPricing">
+                        — or explore
+                        <Link
+                            :href="route('marketing.pricing')"
+                            class="font-semibold text-blue-600 transition hover:text-teal-600"
+                        >
+                            pricing &amp; plans
+                        </Link>
+                        to get started.
+                    </template>
+                    <template v-else> to get started.</template>
                 </p>
             </div>
         </div>

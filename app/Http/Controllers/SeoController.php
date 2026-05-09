@@ -63,6 +63,12 @@ class SeoController extends Controller
         $lastmod = Carbon::now()->toIso8601String();
         $urls = [];
         foreach (self::SITEMAP_PATHS as $row) {
+            if (
+                ($row['path'] ?? '') === '/pricing'
+                && ! config('features.marketing_pricing_visible')
+            ) {
+                continue;
+            }
             $loc = $base.$row['path'];
             $urls[] = sprintf(
                 '  <url><loc>%s</loc><lastmod>%s</lastmod><changefreq>%s</changefreq><priority>%s</priority></url>',

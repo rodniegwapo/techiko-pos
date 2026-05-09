@@ -400,6 +400,13 @@ const menus = computed(() => {
                     return false;
                 }
 
+                if (
+                    item.key === "billing-servicing" &&
+                    !page.props.features?.domain_servicing_sidebar_visible
+                ) {
+                    return false;
+                }
+
                 // Check permission for items with routeName
                 if (item.routeName && !hasPermission(item.routeName)) {
                     // Special case: Dashboard should always be available if user is authenticated
