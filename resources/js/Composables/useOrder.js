@@ -32,7 +32,7 @@ export function useOrders() {
             action,
             old_quantity: oldQty,
             new_quantity: newQty,
-            cashier_id: user.value.id,
+            cashier_id: user.value?.id ?? null,
             timestamp: new Date().toISOString(),
         });
         persist("order_logs", logs.value);

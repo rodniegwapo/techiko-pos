@@ -106,8 +106,8 @@ const columns = computed(() => {
     return baseColumns;
 });
 
-// Current user
-const currentUser = computed(() => page.props.auth.user?.data);
+// Current user (auth may not be hydrated on first paint)
+const currentUser = computed(() => page.props.auth?.user?.data ?? null);
 
 // Methods
 const handleChange = (pagination, filters, sorter) => {
@@ -132,8 +132,12 @@ const canSetPin = (user) => {
     if (isSuperUser.value) {
         return true;
     }
+    const actor = currentUser.value;
+    if (!actor) {
+        return false;
+    }
     const actorRoles =
-        currentUser.value.roles?.map((r) => r.name.toLowerCase()) || [];
+        actor.roles?.map((r) => r.name.toLowerCase()) || [];
     const targetRoles =
         userData.roles?.map((r) => r.name.toLowerCase()) || [];
     const targetHasSuperAdminRole = targetRoles.includes("super admin");
@@ -162,8 +166,8 @@ const canEdit = (user) => {
 
     // admin can edit users except super users
     if (
-        currentUser.value.roles?.some(
-            (role) => role.name.toLowerCase() === "admin"
+        currentUser.value?.roles?.some(
+            (role) => role.name.toLowerCase() === "admin",
         )
     ) {
         return !userData.is_super_user;
@@ -178,7 +182,11 @@ const canDelete = (user) => {
 
     // Super user can delete anyone (except themselves)
     if (isSuperUser.value) {
-        return userData.id !== currentUser.value.id;
+        const actor = currentUser.value;
+        if (!actor) {
+            return false;
+        }
+        return userData.id !== actor.id;
     }
 
     // Only users with manage permissions can delete
@@ -187,7 +195,7 @@ const canDelete = (user) => {
     }
 
     // Cannot delete yourself
-    if (userData.id === currentUser.value.id) {
+    if (userData.id === currentUser.value?.id) {
         return false;
     }
 
@@ -314,9 +322,10 @@ const statusLoading = ref({});
 
 const canToggleStatus = (user) => {
     const userData = user.data || user;
+    const actor = currentUser.value;
 
     // Cannot toggle your own status
-    if (userData.id === currentUser.value.id) {
+    if (actor && userData.id === actor.id) {
         return false;
     }
 
@@ -325,13 +334,17 @@ const canToggleStatus = (user) => {
         return true;
     }
 
+    if (!actor) {
+        return false;
+    }
+
     // Users with manage permissions can toggle
     if (!hasPermission("users.update")) {
         return false;
     }
 
     // Cannot toggle super users unless you're a super user
-    if (userData.is_super_user && !currentUser.value.is_super_user) {
+    if (userData.is_super_user && !actor.is_super_user) {
         return false;
     }
 
@@ -372,6 +385,10 @@ const canImpersonate = (user) => {
 
     // Only super users can impersonate
     if (!isSuperUser.value) {
+        return false;
+    }
+
+    if (!currentUser.value) {
         return false;
     }
 

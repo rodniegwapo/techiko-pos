@@ -71,7 +71,8 @@ export function usePermissions() {
         'sales.items.void',
         'sales.payment.store',
         'sales.items.discount.apply',
-        'sales.discounts.order.apply'
+        'sales.discounts.sale',
+        'sales.discounts.update'
     ]))
 
     // Inventory

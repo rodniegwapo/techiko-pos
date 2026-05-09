@@ -2,7 +2,8 @@
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import ApplyOrderDiscountModal from "./ApplyOrderDiscountModal.vue";
 import CardPaymentTypeModal from "./CardPaymentTypeModal.vue";
-import { IconDiscount, IconArrowRightToArc } from "@tabler/icons-vue";
+import LoyaltyRedemptionModal from "./LoyaltyRedemptionModal.vue";
+import { IconDiscount, IconGift, IconArrowRightToArc } from "@tabler/icons-vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useHelpers } from "@/Composables/useHelpers";
@@ -48,6 +49,14 @@ const props = defineProps({
             vat_pricing_mode: "exclusive",
         }),
     },
+    loyaltyRedemptionSettings: {
+        type: Object,
+        default: () => ({
+            points_per_currency_unit: 100,
+            max_redemption_percent_of_eligible_net: 50,
+            min_points_redemption: 1,
+        }),
+    },
 });
 
 const {
@@ -88,6 +97,126 @@ const salesSettingsResolved = computed(
             vat_pricing_mode: "exclusive",
         },
 );
+
+const loyaltyCfg = computed(
+    () =>
+        props.loyaltyRedemptionSettings ?? {
+            points_per_currency_unit: 100,
+            max_redemption_percent_of_eligible_net: 50,
+            min_points_redemption: 1,
+        },
+);
+
+const loyaltyPointsDraft = ref(0);
+const loyaltyPatching = ref(false);
+const loyaltyRedemptionModalOpen = ref(false);
+
+watch(
+    () =>
+        [
+            currentSale.value,
+            currentSale.value?.loyalty_points_redeemed,
+        ],
+    () => {
+        if (!currentSale.value) {
+            loyaltyPointsDraft.value = 0;
+            loyaltyRedemptionModalOpen.value = false;
+            return;
+        }
+        const v = currentSale.value.loyalty_points_redeemed;
+        if (v !== undefined && v !== null) {
+            loyaltyPointsDraft.value = Number(v) || 0;
+        } else {
+            loyaltyPointsDraft.value = 0;
+        }
+    },
+    { immediate: true },
+);
+
+const maxRedeemablePoints = computed(() => {
+    if (!props.selectedCustomer?.loyalty_points) return 0;
+    const ppcu = Number(loyaltyCfg.value.points_per_currency_unit) || 100;
+    const maxPct =
+        (Number(
+            loyaltyCfg.value.max_redemption_percent_of_eligible_net,
+        ) || 50) / 100;
+    const net = Number(netAfterOrderDiscount.value) || 0;
+    if (net <= 0) return 0;
+    const maxPeso = Math.min(net * maxPct, net);
+    const maxPts = Math.floor(maxPeso * ppcu);
+    return Math.min(
+        maxPts,
+        Number(props.selectedCustomer.loyalty_points) || 0,
+    );
+});
+
+const syncLoyaltyRedemptionPatch = async () => {
+    if (!salesCartIsOnline.value || !orderId.value) return;
+    if (!props.selectedCustomer?.id) return;
+    const ruleCap = maxRedeemablePoints.value;
+    const onSalePts =
+        Number(currentSale.value?.loyalty_points_redeemed) || 0;
+    const upperBound = Math.max(ruleCap, onSalePts);
+    let clamped = Math.max(
+        0,
+        Math.min(Number(loyaltyPointsDraft.value) || 0, upperBound),
+    );
+    if (
+        clamped > 0 &&
+        clamped < (Number(loyaltyCfg.value.min_points_redemption) || 1)
+    ) {
+        clamped = 0;
+        loyaltyPointsDraft.value = 0;
+    }
+
+    const onSale =
+        Number(currentSale.value?.loyalty_points_redeemed) || 0;
+    if (clamped === onSale) {
+        return;
+    }
+
+    loyaltyPatching.value = true;
+    try {
+        await axios.patch(
+            getRoute("sales.loyalty-redemption", {
+                sale: orderId.value,
+            }),
+            {
+                loyalty_points: clamped,
+                customer_id: props.selectedCustomer.id,
+            },
+        );
+        emit("cart-updated");
+    } catch (e) {
+        const msg =
+            e.response?.data?.message ||
+            Object.values(e.response?.data?.errors || {})[0]?.[0] ||
+            "Could not update loyalty redemption.";
+        notification.error({ message: "Loyalty redemption", description: msg });
+    } finally {
+        loyaltyPatching.value = false;
+    }
+};
+
+/** Sale already has redeemed points locked to the order (still open modal to adjust/clear when caps shrink). */
+const saleHasActiveRedemption = computed(
+    () => (Number(currentSale.value?.loyalty_points_redeemed) || 0) > 0,
+);
+
+const loyaltyRedemptionIconEnabled = computed(
+    () =>
+        !loyaltyPatching.value &&
+        (maxRedeemablePoints.value > 0 || saleHasActiveRedemption.value),
+);
+
+async function onLoyaltyModalApply(points) {
+    loyaltyPointsDraft.value = Math.max(
+        0,
+        Math.floor(Number(points) || 0),
+    );
+    loyaltyRedemptionModalOpen.value = false;
+    await syncLoyaltyRedemptionPatch();
+}
 
 const isInclusive = computed(
     () => salesSettingsResolved.value.vat_pricing_mode === "inclusive",
@@ -421,6 +550,7 @@ const handleProceedPayment = async () => {
             customer_id: props.selectedCustomer?.id || null,
             sale_amount: grandTotalDisplay.value,
             payment_method: paymentMethod.value,
+            loyalty_points_to_redeem: Number(loyaltyPointsDraft.value ?? 0),
         };
         if (paymentMethod.value === "card" && selectedPaymentCardTypeId.value) {
             body.payment_card_type_id = selectedPaymentCardTypeId.value;
@@ -611,7 +741,7 @@ const creditLimitSufficient = computed(() => {
                     <span class="font-medium">{{
                         formattedTotal(orderDiscountAmount)
                     }}</span>
-                    <icon-tooltip-button
+                    <IconTooltipButton
                         name="Apply Order Discount"
                         :class="{
                             'hover:bg-green-700 p-1': orders.length !== 0,
@@ -620,7 +750,7 @@ const creditLimitSufficient = computed(() => {
                         @click="showDiscountOrder"
                     >
                         <IconDiscount size="20" class="mx-auto" />
-                    </icon-tooltip-button>
+                    </IconTooltipButton>
                 </div>
 
                 <!-- Subtotal -->
@@ -665,6 +795,39 @@ const creditLimitSufficient = computed(() => {
                     <span class="font-medium">{{
                         formattedTotal(netExVatDisplay)
                     }}</span>
+                </div>
+
+                <!-- Loyalty redemption (configured in modal; synced via PATCH) -->
+                <div
+                    v-if="
+                        salesCartIsOnline &&
+                        props.selectedCustomer &&
+                        orderId
+                    "
+                    class="flex shrink-0 items-center gap-2"
+                >
+                    <span class="text-gray-700 whitespace-nowrap"
+                        >Loyalty redemption:</span
+                    >
+                    <span class="font-medium">{{
+                        formattedTotal(
+                            currentSale?.loyalty_discount_amount ?? 0,
+                        )
+                    }}</span>
+                    <IconTooltipButton
+                        name="Apply loyalty redemption"
+                        :class="{
+                            'hover:bg-amber-600 p-1': loyaltyRedemptionIconEnabled,
+                        }"
+                        :disabled="!loyaltyRedemptionIconEnabled"
+                        @click="loyaltyRedemptionModalOpen = true"
+                    >
+                        <IconGift
+                            size="20"
+                            class="mx-auto"
+                            aria-hidden="true"
+                        />
+                    </IconTooltipButton>
                 </div>
 
                 <!-- Total -->
@@ -845,6 +1008,18 @@ const creditLimitSufficient = computed(() => {
                 :initial-selected-id="selectedPaymentCardTypeId"
                 @confirm="onCardTypeModalConfirm"
                 @cancel="onCardTypeModalCancel"
+            />
+
+            <loyalty-redemption-modal
+                :open-modal="loyaltyRedemptionModalOpen"
+                :selected-customer="selectedCustomer"
+                :loyalty-cfg="loyaltyCfg"
+                :max-redeemable-points="maxRedeemablePoints"
+                :eligible-net-peso="netAfterOrderDiscount"
+                :initial-points="loyaltyPointsDraft"
+                :patching="loyaltyPatching"
+                @close="loyaltyRedemptionModalOpen = false"
+                @apply="onLoyaltyModalApply"
             />
         </div>
     </div>

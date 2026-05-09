@@ -27,6 +27,7 @@ class Domain extends Model
     protected $casts = [
         'settings' => 'array',
         'is_active' => 'boolean',
+        'subscription_started_at' => 'datetime',
     ];
 
     protected $attributes = [
@@ -98,6 +99,11 @@ class Domain extends Model
     public function sales()
     {
         return $this->hasMany(Sale::class);
+    }
+
+    public function currentServiceTier()
+    {
+        return $this->belongsTo(ServiceTier::class, 'current_service_tier_id');
     }
 
     /**

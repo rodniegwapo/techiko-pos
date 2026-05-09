@@ -16,6 +16,12 @@ class ProductResource extends JsonResource
     {
         $data = parent::toArray($request);
 
+        if ($this->relationLoaded('category')) {
+            $data['category'] = $this->category
+                ? $this->category->only(['id', 'name'])
+                : null;
+        }
+
         if ($this->resource->relationLoaded('inventories')) {
             if ($this->track_inventory) {
                 $row = $this->inventories->first();

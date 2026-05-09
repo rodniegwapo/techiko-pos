@@ -32,7 +32,7 @@ export default defineConfig({
           less: {
             javascriptEnabled: true,
             modifyVars: {
-              'font-family': 'Inter var, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+              'font-family': 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
             }
           }
         }

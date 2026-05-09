@@ -157,6 +157,22 @@ class PermissionModuleSeeder extends Seeder
                 'sort_order' => 18,
                 'is_active' => true,
             ],
+            [
+                'name' => 'domains',
+                'display_name' => 'Domains',
+                'icon' => 'world',
+                'description' => 'Organization scoped features',
+                'sort_order' => 19,
+                'is_active' => true,
+            ],
+            [
+                'name' => 'billing',
+                'display_name' => 'Billing',
+                'icon' => 'wallet',
+                'description' => 'Manual servicing payments and review',
+                'sort_order' => 20,
+                'is_active' => true,
+            ],
         ];
 
         foreach ($modules as $module) {

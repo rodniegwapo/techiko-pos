@@ -9,6 +9,8 @@ import { ZiggyVue } from '../../vendor/tightenco/ziggy';
 import AntDesignVue from 'ant-design-vue';
 import 'ant-design-vue/dist/antd.css'
 
+import printNb from 'vue3-print-nb';
+
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
 createInertiaApp({
@@ -19,6 +21,7 @@ createInertiaApp({
             .use(plugin)
             .use(AntDesignVue)
             .use(ZiggyVue)
+            .use(printNb)
             .mount(el);
     },
     progress: {

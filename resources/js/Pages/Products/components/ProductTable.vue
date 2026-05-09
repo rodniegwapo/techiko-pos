@@ -152,7 +152,7 @@ const showDetails = (product) => {
             </template>
 
             <template v-if="column.key == 'category'">
-                {{ record.category?.name }}
+                {{ record.category?.name || "Uncategorized" }}
             </template>
 
             <template v-if="column.key == 'price'">
@@ -315,7 +315,7 @@ const showDetails = (product) => {
                         <div class="flex justify-between">
                             <span class="text-sm text-gray-600">Category:</span>
                             <span class="font-semibold">{{
-                                selectedProduct.category?.name || "No category"
+                                selectedProduct.category?.name || "Uncategorized"
                             }}</span>
                         </div>
                         <div class="flex justify-between">

@@ -20,10 +20,12 @@ use App\Models\Sale;
 use App\Models\User;
 use App\Services\CreditService;
 use App\Services\InventoryService;
+use App\Services\LoyaltyRedemptionService;
 use App\Services\SaleService;
 use App\Traits\LocationCategoryScoping;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -63,6 +65,11 @@ class SaleController extends Controller
                 'apply_vat_automatically' => $vat['apply_vat_automatically'],
                 'vat_rate_percent' => $vat['vat_rate_percent'],
                 'vat_pricing_mode' => $vat['vat_pricing_mode'],
+            ],
+            'loyaltyRedemptionSettings' => [
+                'points_per_currency_unit' => (float) config('loyalty.points_per_currency_unit', 100),
+                'max_redemption_percent_of_eligible_net' => (float) config('loyalty.max_redemption_percent_of_eligible_net', 50),
+                'min_points_redemption' => (int) config('loyalty.min_points_redemption', 1),
             ],
         ]);
     }
@@ -144,11 +151,59 @@ class SaleController extends Controller
         ]);
     }
 
+    public function patchLoyaltyRedemption(Request $request, Domain $domain, Sale $sale): JsonResponse
+    {
+        $this->ensureSaleBelongsToDomain($sale, $domain);
+
+        $validated = $request->validate([
+            'loyalty_points' => ['required', 'integer', 'min:0'],
+            'customer_id' => [
+                'nullable',
+                'exists:customers,id',
+            ],
+        ]);
+
+        $points = (int) $validated['loyalty_points'];
+        $customer = null;
+
+        if ($points > 0) {
+            if (empty($validated['customer_id'])) {
+                throw ValidationException::withMessages([
+                    'customer_id' => __('Select a customer to redeem loyalty points.'),
+                ]);
+            }
+
+            $customer = Customer::query()->findOrFail($validated['customer_id']);
+
+            if ($customer->domain !== $domain->name_slug) {
+                abort(403, 'Customer does not belong to this organization.');
+            }
+        }
+
+        try {
+            app(LoyaltyRedemptionService::class)->syncPendingRedemption($domain, $sale, $customer, $points);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'errors' => $e->errors(),
+                'message' => collect($e->errors())->flatten()->first(),
+            ], 422);
+        }
+
+        $sale->refresh();
+
+        return response()->json([
+            'success' => true,
+            'sale' => $sale->fresh(),
+        ]);
+    }
+
     public function proceedPayment(Request $request, Domain $domain, Sale $sale)
     {
         $validated = $request->validate([
             'customer_id' => 'nullable|exists:customers,id',
             'sale_amount' => 'nullable|numeric|min:0',
+            'loyalty_points_to_redeem' => 'nullable|integer|min:0',
             'payment_method' => 'required|string|in:cash,card,e-wallet,credit',
         ]);
 
@@ -170,10 +225,54 @@ class SaleController extends Controller
         $creditResults = null;
 
         $location = Helpers::getActiveLocation($domain);
+        $redemptionService = app(LoyaltyRedemptionService::class);
 
         try {
-            DB::transaction(function () use ($sale, $validated, &$loyaltyResults, &$creditResults, $location) {
+            DB::transaction(function () use (
+                $sale,
+                $validated,
+                &$loyaltyResults,
+                &$creditResults,
+                $location,
+                $domain,
+                $redemptionService,
+            ) {
+                $sale->refresh();
+
+                $redeemPoints = (int) ($validated['loyalty_points_to_redeem'] ?? 0);
+
+                if ($sale->payment_status !== 'pending') {
+                    throw new \Exception('Sale is not pending.');
+                }
+
+                // Planned loyalty redemption (updates sale totals) before deducting inventory
+                if ($redeemPoints > 0) {
+                    if (empty($validated['customer_id'])) {
+                        throw new \Exception('Customer is required to redeem loyalty points.');
+                    }
+
+                    $customerForRedemption = Customer::query()->findOrFail($validated['customer_id']);
+                    if ($customerForRedemption->domain !== $domain->name_slug) {
+                        throw new \Exception('Customer does not belong to this organization.');
+                    }
+
+                    $redemptionService->applyPendingForCheckout($sale, $customerForRedemption, $redeemPoints);
+
+                    $sale->refresh();
+
+                    if ((int) $sale->loyalty_points_redeemed > 0) {
+                        $customerForRedemption->redeemPoints((int) $sale->loyalty_points_redeemed);
+                    }
+                } elseif ((int) $sale->loyalty_points_redeemed > 0) {
+                    $sale->update([
+                        'loyalty_points_redeemed' => 0,
+                        'loyalty_discount_amount' => 0,
+                    ]);
+                    $sale->recalcTotals();
+                }
+
                 // 1. Complete sale and process inventory
+                $sale->refresh();
                 $this->saleService->completeSale($sale, auth()->user());
 
                 // 2. Handle overselling situations (create automatic stock adjustments)
@@ -187,8 +286,9 @@ class SaleController extends Controller
 
                     $customer = Customer::findOrFail($validated['customer_id']);
 
+                    $saleAmount = (float) $sale->fresh()->grand_total;
+
                     // Validate credit limit
-                    $saleAmount = $validated['sale_amount'] ?? $sale->grand_total;
                     $this->creditService->checkCreditLimit($customer, $saleAmount);
 
                     // Process credit sale
@@ -206,6 +306,8 @@ class SaleController extends Controller
 
                     // Link customer to sale
                     $sale->updateCustomer($customer->id);
+
+                    $loyaltyResults = $customer->processLoyaltyForSale($saleAmount);
                 } else {
                     // 4. Update payment details for non-credit payments (preserve grand_total incl. VAT)
                     $sale->refresh();
@@ -216,18 +318,25 @@ class SaleController extends Controller
                         'payment_status' => 'paid',
                     ]);
 
-                    // 5. Process loyalty if customer is provided
+                    // 5. Process loyalty if customer is provided (earn points on net amount paid)
                     if ($validated['customer_id']) {
                         $customer = Customer::findOrFail($validated['customer_id']);
 
                         // Link customer to sale and trigger order update event
                         $sale->updateCustomer($customer->id);
 
-                        // Process loyalty rewards (amount should match amount charged incl. VAT)
-                        $loyaltyResults = $customer->processLoyaltyForSale($validated['sale_amount'] ?? $sale->grand_total);
+                        $earnAmount = (float) $sale->fresh()->grand_total;
+
+                        $loyaltyResults = $customer->processLoyaltyForSale($earnAmount);
                     }
                 }
             });
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'errors' => $e->errors(),
+                'message' => collect($e->errors())->flatten()->first(),
+            ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -245,6 +354,13 @@ class SaleController extends Controller
             'loyalty_results' => $loyaltyResults,
             'credit_results' => $creditResults,
         ]);
+    }
+
+    protected function ensureSaleBelongsToDomain(Sale $sale, Domain $domain): void
+    {
+        if ($sale->domain && $sale->domain !== $domain->name_slug) {
+            abort(404);
+        }
     }
 
     public function storeDraft(Request $request, Domain $domain)

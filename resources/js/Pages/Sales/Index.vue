@@ -68,6 +68,14 @@ const salesSettings = computed(
             vat_pricing_mode: "exclusive",
         },
 );
+const loyaltyRedemptionSettings = computed(
+    () =>
+        page.props.loyaltyRedemptionSettings ?? {
+            points_per_currency_unit: 100,
+            max_redemption_percent_of_eligible_net: 50,
+            min_points_redemption: 1,
+        },
+);
 const activeLocationId = computed(() => page.props.currentLocation?.id);
 const cashierUserId = computed(() => page.props.auth?.user?.data?.id);
 
@@ -618,12 +626,14 @@ const loadCurrentPendingSale = async () => {
             orders.value = [];
             orderDiscountAmount.value = 0;
             orderDiscountId.value = "";
+            currentSale.value = null;
         }
     } catch (error) {
         orderId.value = null;
         orders.value = [];
         orderDiscountAmount.value = 0;
         orderDiscountId.value = "";
+        currentSale.value = null;
     } finally {
         isLoadingCart.value = false;
     }
@@ -1176,6 +1186,7 @@ watch(
                 :orderId="orderId"
                 :discountOptions="discountOptions"
                 :sales-settings="salesSettings"
+                :loyalty-redemption-settings="loyaltyRedemptionSettings"
                 :offline-payment-method="offlinePaymentMethod"
                 :cached-payment-card-types="cachedPaymentCardTypes"
                 :offline-payment-card-type-id="offlinePaymentCardTypeId"

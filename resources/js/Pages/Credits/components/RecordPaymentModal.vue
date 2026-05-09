@@ -17,8 +17,7 @@
                 ]"
             >
                 <a-input-number
-                    :value="formData.amount"
-                    @change="(val) => (formData.amount = val)"
+                    v-model:value="formData.amount"
                     :min="0.01"
                     :max="maxAmount"
                     :precision="2"
@@ -42,8 +41,7 @@
             <!-- Payment Method -->
             <a-form-item label="Payment Method" name="payment_method">
                 <a-select
-                    :value="formData.payment_method"
-                    @change="(val) => (formData.payment_method = val)"
+                    v-model:value="formData.payment_method"
                     placeholder="Select payment method"
                 >
                     <a-select-option value="cash">Cash</a-select-option>
@@ -54,10 +52,7 @@
 
             <!-- Apply to Invoices -->
             <a-form-item label="Apply to Invoices (Optional)">
-                <a-checkbox-group
-                    :value="formData.transaction_ids"
-                    @change="(val) => (formData.transaction_ids = val)"
-                >
+                <a-checkbox-group v-model:value="formData.transaction_ids">
                     <div class="space-y-2 max-h-48 overflow-y-auto">
                         <a-checkbox
                             v-for="invoice in outstandingInvoices"
@@ -137,8 +132,10 @@ const formData = ref({
     notes: "",
 });
 
-// Max amount computed
-const maxAmount = computed(() => props.customer?.credit_balance || 0);
+// Max amount computed (coerce balance for min/max + comparisons)
+const maxAmount = computed(() =>
+    Math.max(0, Number(props.customer?.credit_balance ?? 0))
+);
 
 // Reset form when modal opens
 watch(
@@ -161,7 +158,7 @@ const handleSubmit = async () => {
     try {
         await formRef.value.validate();
 
-        if (formData.value.amount > maxAmount.value) {
+        if (Number(formData.value.amount) > maxAmount.value + 1e-6) {
             notification.error({
                 message: "Error",
                 description: `Payment amount cannot exceed current balance of ₱${maxAmount.value.toLocaleString(
@@ -177,11 +174,11 @@ const handleSubmit = async () => {
 
         await recordPayment(props.customer.id, {
             transaction_type: "payment",
-            amount: formData.value.amount,
+            amount: Number(formData.value.amount),
             payment_method: formData.value.payment_method,
             transaction_ids:
                 formData.value.transaction_ids.length > 0
-                    ? formData.value.transaction_ids
+                    ? formData.value.transaction_ids.map((id) => Number(id))
                     : undefined,
             reference_number: formData.value.reference_number || undefined,
             notes: formData.value.notes || undefined,
