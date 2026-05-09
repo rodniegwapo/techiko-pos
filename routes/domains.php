@@ -29,7 +29,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('domains/{domain:name_slug}')
-    ->middleware(['auth', 'user.permission', 'role.access'])
+    ->middleware(['auth', 'verified', 'user.permission', 'role.access'])
     ->name('domains.')
     ->group(function () {
         // Organization settings (Sales VAT, etc.)

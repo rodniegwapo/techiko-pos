@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -21,6 +20,7 @@ class userSuperUserSeeder extends Seeder
                 'password' => Hash::make(env('SUPER_USER_PASSWORD')),
                 'is_super_user' => true,
                 'role_level' => 1,
+                'email_verified_at' => now(),
             ]
         );
     }
