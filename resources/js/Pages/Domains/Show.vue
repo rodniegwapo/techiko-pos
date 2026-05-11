@@ -27,7 +27,7 @@ const formatDate = (dateString) => {
 
 // Methods
 const handleEdit = () => {
-    router.visit(route('domains.edit', domain.value.id));
+    router.visit(route('domains.edit', { domain: domain.value.name_slug }));
 };
 
 const handleBack = () => {
