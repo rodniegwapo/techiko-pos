@@ -16,32 +16,7 @@ class SeoController extends Controller
     ];
 
     /**
-     * Disallow app areas that should not be indexed; allow marketing and auth pages.
-     */
-    private const DISALLOW_PREFIXES = [
-        '/api/',
-        '/dashboard',
-        '/profile',
-        '/sales',
-        '/products',
-        '/categories',
-        '/discounts',
-        '/mandatory-discounts',
-        '/loyalty',
-        '/customers',
-        '/void-logs',
-        '/inventory',
-        '/domains',
-        '/users',
-        '/roles',
-        '/permissions',
-        '/impersonate',
-        '/stop-impersonating',
-        '/debug-',
-    ];
-
-    /**
-     * Canonical HTTPS base for robots.txt Sitemap directive and sitemap.xml <loc>.
+     * Canonical HTTPS base for sitemap.xml <loc>.
      * Uses seo.canonical_url if set; otherwise APP_URL. In production, http:// gets upgraded.
      */
     private function seoAbsoluteBase(): string
@@ -54,23 +29,6 @@ class SeoController extends Controller
         }
 
         return $base;
-    }
-
-    public function robots(): Response
-    {
-        $base = $this->seoAbsoluteBase();
-        $sitemap = $base.'/sitemap.xml';
-        $lines = ['User-agent: *', 'Allow: /', ''];
-        foreach (self::DISALLOW_PREFIXES as $prefix) {
-            $lines[] = 'Disallow: '.$prefix;
-        }
-        $lines[] = '';
-        $lines[] = 'Sitemap: '.$sitemap;
-        $lines[] = '';
-
-        return response(implode("\n", $lines), 200, [
-            'Content-Type' => 'text/plain; charset=UTF-8',
-        ]);
     }
 
     public function sitemap(): Response
