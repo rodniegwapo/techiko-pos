@@ -96,7 +96,9 @@ const loadStoreItemCount = async (locationId, storeRef) => {
   
   storeLoading.value = true;
   try {
-    const response = await axios.get(`/api/inventory/locations/${locationId}/summary`);
+    const response = await axios.get(`/api/inventory/locations/${locationId}/summary`, {
+      params: form.domain ? { domain: form.domain } : {},
+    });
     storeRef.value = response.data;
   } catch (error) {
     console.error('Failed to load store summary:', error);

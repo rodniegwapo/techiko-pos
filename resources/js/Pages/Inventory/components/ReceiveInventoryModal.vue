@@ -114,7 +114,13 @@ const searchProducts = async () => {
   searchLoading.value = true;
   try {
     const params = { search: productSearch.value };
-    
+    if (form.domain) {
+      params.domain = form.domain;
+    }
+    if (form.location_id) {
+      params.location_id = form.location_id;
+    }
+
     const response = await axios.get(inventoryApi.searchProducts, {
       params,
     });

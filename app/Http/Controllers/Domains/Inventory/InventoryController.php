@@ -29,7 +29,7 @@ class InventoryController extends Controller
     public function index(Request $request, Domain $domain)
     {
         $slug = $domain->name_slug;
-        $location = Helpers::getActiveLocation($domain);
+        $location = Helpers::getActiveLocation($domain, $request->input('location_id'));
 
         $report = $this->inventoryService->getInventoryReport($location, $slug);
 
@@ -37,13 +37,14 @@ class InventoryController extends Controller
             'report' => $report,
             'locations' => InventoryLocation::active()->forDomain($slug)->get(),
             'isGlobalView' => false,
+            'current_location' => $location,
         ]);
     }
 
     public function products(Request $request, Domain $domain)
     {
         $slug = $domain->name_slug;
-        $location = Helpers::getActiveLocation($domain);
+        $location = Helpers::getActiveLocation($domain, $request->input('location_id'));
 
         if (! $location) {
             return Inertia::render('Inventory/Products', [
@@ -118,6 +119,7 @@ class InventoryController extends Controller
             'categories' => $this->getCategoriesForLocation($slug, $location)->get(),
             'filters' => $request->only(['search', 'stock_status', 'category_id']),
             'isGlobalView' => false,
+            'current_location' => $location,
         ]);
     }
 
@@ -225,13 +227,19 @@ class InventoryController extends Controller
     public function valuation(Request $request, Domain $domain)
     {
         $slug = $domain->name_slug;
-        $location = Helpers::getActiveLocation($domain);
+        $location = Helpers::getActiveLocation($domain, $request->input('location_id'));
 
         if (! $location) {
-            return response()->json([
-                'total_value' => 0,
-                'total_quantity' => 0,
-                'inventories' => [],
+            return Inertia::render('Inventory/Valuation', [
+                'location' => null,
+                'summary' => [
+                    'total_value' => 0,
+                    'total_quantity' => 0,
+                    'total_products' => 0,
+                ],
+                'items' => [],
+                'locations' => InventoryLocation::active()->forDomain($slug)->get(),
+                'filters' => $request->only(['location_id']),
             ]);
         }
 
@@ -336,13 +344,20 @@ class InventoryController extends Controller
      */
     public function searchProducts(Request $request, Domain $domain)
     {
-        $location = Helpers::getActiveLocation($domain);
+        $location = Helpers::getActiveLocation($domain, $request->input('location_id'));
+
+        if (! $location) {
+            return response()->json([
+                'success' => true,
+                'data' => ProductResource::collection(collect()),
+            ]);
+        }
 
         $query = Product::query()
             ->where('domain', $domain->name_slug)
             ->with('category')
             ->whereHas('activeLocations', function ($q) use ($location) {
-                $q->where('location_id', $location->id);
+                $q->where('inventory_locations.id', $location->id);
             })
             ->when($request->search, fn ($q, $search) => $q->search($search))
             ->when($request->category_id, fn ($q, $categoryId) => $q->where('category_id', $categoryId));
