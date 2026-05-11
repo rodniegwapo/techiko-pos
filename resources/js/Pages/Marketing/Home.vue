@@ -19,18 +19,40 @@ const page = usePage();
 const appUrl = computed(() => page.props.appUrl);
 const brand = import.meta.env.VITE_APP_NAME || "Techiko POS";
 
-const jsonLd = computed(() =>
-    JSON.stringify({
+const jsonLd = computed(() => {
+    const url = appUrl.value;
+    const logo = props.seo.ogImage || `${url}/images/og-default.png`;
+    return JSON.stringify({
         "@context": "https://schema.org",
-        "@type": "SoftwareApplication",
-        name: brand,
-        applicationCategory: "BusinessApplication",
-        applicationSubCategory: "Point of sale",
-        operatingSystem: "Web",
-        url: appUrl.value,
-        description: props.seo.description,
-    }),
-);
+        "@graph": [
+            {
+                "@type": "WebSite",
+                "@id": `${url}/#website`,
+                url,
+                name: brand,
+                description: props.seo.description,
+                publisher: { "@id": `${url}/#organization` },
+            },
+            {
+                "@type": "Organization",
+                "@id": `${url}/#organization`,
+                name: brand,
+                url,
+                logo,
+            },
+            {
+                "@type": "SoftwareApplication",
+                name: brand,
+                applicationCategory: "BusinessApplication",
+                applicationSubCategory: "Point of sale",
+                operatingSystem: "Web",
+                url,
+                description: props.seo.description,
+                provider: { "@id": `${url}/#organization` },
+            },
+        ],
+    });
+});
 </script>
 
 <template>
