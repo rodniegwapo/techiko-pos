@@ -40,9 +40,25 @@ class SeoController extends Controller
         '/debug-',
     ];
 
+    /**
+     * Canonical HTTPS base for robots.txt Sitemap directive and sitemap.xml <loc>.
+     * Uses seo.canonical_url if set; otherwise APP_URL. In production, http:// gets upgraded.
+     */
+    private function seoAbsoluteBase(): string
+    {
+        $raw = trim((string) (config('seo.canonical_url') ?: config('app.url')));
+        $base = rtrim($raw, '/');
+
+        if (app()->environment('production') && str_starts_with($base, 'http://')) {
+            $base = 'https://'.substr($base, strlen('http://'));
+        }
+
+        return $base;
+    }
+
     public function robots(): Response
     {
-        $base = rtrim((string) config('app.url'), '/');
+        $base = $this->seoAbsoluteBase();
         $sitemap = $base.'/sitemap.xml';
         $lines = ['User-agent: *', 'Allow: /', ''];
         foreach (self::DISALLOW_PREFIXES as $prefix) {
@@ -59,7 +75,7 @@ class SeoController extends Controller
 
     public function sitemap(): Response
     {
-        $base = rtrim((string) config('app.url'), '/');
+        $base = $this->seoAbsoluteBase();
         $lastmod = Carbon::now()->toIso8601String();
         $urls = [];
         foreach (self::SITEMAP_PATHS as $row) {
