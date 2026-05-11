@@ -15,35 +15,35 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             // Core system seeders
-            // DomainSeeder::class,
+            DomainSeeder::class,
             PermissionModuleSeeder::class,
             RolePermissionSeeder::class,
             Roleseeder::class,
-            // ServiceTierSeeder::class,
+            ServiceTierSeeder::class,
 
-            // InventoryLocationSeeder::class,
+            InventoryLocationSeeder::class,
 
             // Product and category seeders
-            // CategorySeeder::class,
-            // ProductSeeder::class,
+            CategorySeeder::class,
+            ProductSeeder::class,
             ProductSoldTypeSeeder::class,
 
             // Discount and loyalty seeders
-            // DiscountSeeder::class,
-            // MandatoryDiscountSeeder::class,
-            // TierSeeder::class,
-            // LoyaltyProgramSeeder::class,
+            DiscountSeeder::class,
+            MandatoryDiscountSeeder::class,
+            TierSeeder::class,
+            LoyaltyProgramSeeder::class,
 
             // Product inventory rows (needs products)
-            // InventorySeeder::class,
+            InventorySeeder::class,
 
             // Users before movement/adjustment seeders (they assign user_id from seeded users)
-            // UserSeeder::class,
-            // UserPinSeeder::class,
+            UserSeeder::class,
+            UserPinSeeder::class,
 
-            // InventoryMovementSeeder::class,
-            // StockAdjustmentSeeder::class,
-            // InventoryTransferRecommendationSeeder::class,
+            InventoryMovementSeeder::class,
+            StockAdjustmentSeeder::class,
+            InventoryTransferRecommendationSeeder::class,
         ]);
     }
 }
