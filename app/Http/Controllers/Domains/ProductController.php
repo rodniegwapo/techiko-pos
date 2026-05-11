@@ -164,7 +164,7 @@ class ProductController extends Controller
     }
 
     /**
-     * Build the base product query scoped by domain (full catalog; not filtered by store).
+     * Build the base product query scoped by domain (optionally narrowed to a store in {@see index}).
      */
     private function buildProductQuery(Request $request, Domain $domain): Builder
     {
@@ -180,11 +180,15 @@ class ProductController extends Controller
     }
 
     /**
-     * Build categories query derived from location if present; otherwise domain-scoped.
+     * Categories for filters: at the active store only, or empty when no store context.
      */
-    private function buildCategoriesQuery(Domain $domain)
+    private function buildCategoriesQuery(Domain $domain, ?InventoryLocation $location)
     {
-        return Category::where('domain', $domain->name_slug);
+        if ($location) {
+            return $this->getCategoriesForLocation($domain->name_slug, $location);
+        }
+
+        return Category::where('domain', $domain->name_slug)->whereRaw('0 = 1');
     }
 
     /**
@@ -208,17 +212,24 @@ class ProductController extends Controller
     public function index(Request $request, ?Domain $domain = null)
     {
         $location = $this->resolveActiveLocation($request, $domain);
-        $query = $this->buildProductQuery($request, $domain)
-            ->when($location, function ($q) use ($location) {
-                $q->with([
+        $query = $this->buildProductQuery($request, $domain);
+
+        if ($location) {
+            $query->whereHas('activeLocations', function ($q) use ($location) {
+                $q->where('inventory_locations.id', $location->id);
+            })
+                ->with([
                     'inventories' => fn ($iq) => $iq->where('location_id', $location->id),
                 ]);
-            })
-            ->latest();
+        } else {
+            $query->whereRaw('0 = 1');
+        }
+
+        $query->latest();
 
         $products = $query->paginate(15);
 
-        $categoriesQuery = $this->buildCategoriesQuery($domain);
+        $categoriesQuery = $this->buildCategoriesQuery($domain, $location);
 
         return $this->respondWithIndex($products, $categoriesQuery, $location, $domain);
     }
