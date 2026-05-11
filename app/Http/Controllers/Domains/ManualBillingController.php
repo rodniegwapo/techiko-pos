@@ -46,7 +46,9 @@ class ManualBillingController extends Controller
             'showManualGcash' => (bool) config('manual_billing.show_manual_gcash_section'),
             'freeTier' => [
                 'marketing_features' => config('manual_billing.free_tier_marketing_bullets', []),
-                'product_limit' => DomainSubscriptionService::FREE_TIER_MAX_PRODUCTS,
+                'product_limit' => config('features.unlimited_products', true)
+                    ? null
+                    : DomainSubscriptionService::FREE_TIER_MAX_PRODUCTS,
             ],
         ]);
     }

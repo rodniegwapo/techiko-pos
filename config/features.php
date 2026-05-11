@@ -22,4 +22,16 @@ return [
         env('FEATURE_MARKETING_PRICING_VISIBLE', false),
         FILTER_VALIDATE_BOOLEAN
     ),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Unlimited product catalog (temporary bypass of tier / free-tier caps)
+    |--------------------------------------------------------------------------
+    | When true, effectiveMaxProducts is always unlimited and create limits
+    | are not enforced. Set FEATURE_UNLIMITED_PRODUCTS=false to restore caps.
+    */
+    'unlimited_products' => filter_var(
+        env('FEATURE_UNLIMITED_PRODUCTS', true),
+        FILTER_VALIDATE_BOOLEAN
+    ),
 ];

@@ -21,7 +21,7 @@ import LocationInfoAlert from "@/Components/LocationInfoAlert.vue";
 const page = usePage();
 // const { showModal } = useHelpers(); // Removed as we navigate to page now
 const { spinning } = useGlobalVariables();
-const { getRoute } = useDomainRoutes();
+const { getRoute, hrefWithPreservedLocationId } = useDomainRoutes();
 
 const search = ref("");
 const sold_type = ref(null);
@@ -146,7 +146,10 @@ const productsAtCapacity = computed(
                     class="min-w-[100px] max-w-[300px]"
                 />
 
-                <Link v-if="!productsAtCapacity" :href="getRoute('products.create')">
+                <Link
+                    v-if="!productsAtCapacity"
+                    :href="hrefWithPreservedLocationId(getRoute('products.create'))"
+                >
                     <a-button
                         type="primary"
                         class="bg-white border flex items-center border-green-500 text-green-500"

@@ -80,6 +80,37 @@ export function useDomainRoutes() {
         }
     };
 
+    /**
+     * Read location_id from Inertia page.url (path + query).
+     * Keeps the selected store when navigating under /domains/{slug}/...
+     */
+    const getLocationQueryFromPage = () => {
+        const raw = page.url ?? "";
+        const idx = raw.indexOf("?");
+        if (idx === -1) {
+            return {};
+        }
+        const id = new URLSearchParams(raw.slice(idx + 1)).get("location_id");
+        if (id === null || id === "") {
+            return {};
+        }
+        return { location_id: id };
+    };
+
+    /** Append ?location_id= when current page URL includes it (GET / form action hrefs). */
+    const hrefWithPreservedLocationId = (path) => {
+        const q = getLocationQueryFromPage();
+        if (
+            !path ||
+            path === "#" ||
+            Object.keys(q).length === 0
+        ) {
+            return path;
+        }
+        const sep = path.includes("?") ? "&" : "?";
+        return `${path}${sep}${new URLSearchParams(q).toString()}`;
+    };
+
     /*** === RETURN API === ***/
     return {
         getRoute,
@@ -87,5 +118,7 @@ export function useDomainRoutes() {
         isInDomainContext,
         currentDomain,
         isSuperUser,
+        getLocationQueryFromPage,
+        hrefWithPreservedLocationId,
     };
 }
