@@ -42,7 +42,7 @@ Route::get('/', [MarketingController::class, 'home'])->name('home');
 Route::get('/services', [MarketingController::class, 'services'])->name('marketing.services');
 Route::get('/about', [MarketingController::class, 'about'])->name('marketing.about');
 Route::get('/contact', [MarketingController::class, 'contact'])->name('marketing.contact');
-Route::get('/pricing', [MarketingController::class, 'pricing'])->name('marketing.pricing');
+//Route::get('/pricing', [MarketingController::class, 'pricing'])->name('marketing.pricing');
 
 Route::get('/sitemap.xml', [SeoController::class, 'sitemap'])->name('sitemap');
 // Source of truth is public/robots.txt (nginx often serves it before PHP). Route keeps tests / non-nginx stacks working.
@@ -161,7 +161,7 @@ Route::get('/thank-you', function () {
 })->name('registration.thankyou');
 
 // Organization-specific routes extracted to routes/domains.php
-require __DIR__.'/domains.php';
+require __DIR__ . '/domains.php';
 
 // Domain Management Routes (for super users)
 Route::middleware(['auth', 'verified', 'user.permission'])->prefix('domains')->name('domains.')->group(function () {
@@ -274,4 +274,4 @@ Route::middleware(['auth', 'verified', 'check.super.user'])->group(function () {
     Route::post('/messages/{conversation}/messages', [ConversationController::class, 'storeStaff'])->name('messages.staff');
 });
 
-require __DIR__.'/auth.php';
+require __DIR__ . '/auth.php';
