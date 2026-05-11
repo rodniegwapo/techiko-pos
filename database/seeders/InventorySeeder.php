@@ -43,6 +43,15 @@ class InventorySeeder extends Seeder
 
         foreach ($products as $product) {
             foreach ($locations as $location) {
+                if (($product->domain ?? null) !== ($location->domain ?? null)) {
+                    continue;
+                }
+
+                // Only inventory for locations carrying this SKU (location_product pivot)
+                if (! $product->locations()->whereKey($location->id)->exists()) {
+                    continue;
+                }
+
                 // Skip if inventory already exists
                 if (ProductInventory::where('product_id', $product->id)
                     ->where('location_id', $location->id)

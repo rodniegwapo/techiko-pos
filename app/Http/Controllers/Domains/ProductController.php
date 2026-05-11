@@ -318,7 +318,9 @@ class ProductController extends Controller
     public function create(Request $request, Domain $domain)
     {
         $location = $this->resolveActiveLocation($request, $domain);
-        $categoriesQuery = $this->buildCategoriesQuery($domain);
+        $categoriesQuery = $location !== null
+            ? $this->buildCategoriesQuery($domain, $location)
+            : Category::where('domain', $domain->name_slug);
 
         return Inertia::render('Products/Create', [
             'categories' => $categoriesQuery->get(),
@@ -340,7 +342,9 @@ class ProductController extends Controller
         }
 
         $location = $this->resolveActiveLocation($request, $domain);
-        $categoriesQuery = $this->buildCategoriesQuery($domain);
+        $categoriesQuery = $location !== null
+            ? $this->buildCategoriesQuery($domain, $location)
+            : Category::where('domain', $domain->name_slug);
 
         return Inertia::render('Products/Edit', [
             'product' => $product,

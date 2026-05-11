@@ -319,6 +319,11 @@ const referenceHelp = computed(() => {
                                 <strong>{{ subscription.tier_name }}</strong
                                 >.
                             </span>
+                            <span v-else-if="subscription.products_unlimited">
+                                Product catalog is currently unlimited for this
+                                organization. You can still upgrade to a paid
+                                servicing tier for other benefits below.
+                            </span>
                             <span v-else>
                                 Free tier: up to
                                 <strong>{{
@@ -410,11 +415,23 @@ const referenceHelp = computed(() => {
                                                 class="text-xs text-gray-500 pt-1"
                                             >
                                                 Cap:
-                                                {{
-                                                    freeTier.product_limit ??
-                                                    subscription?.free_product_limit
-                                                }}
-                                                products · utang/wallet basics
+                                                <template
+                                                    v-if="
+                                                        subscription?.products_unlimited ||
+                                                        freeTier?.product_limit ==
+                                                            null
+                                                    "
+                                                >
+                                                    Unlimited products
+                                                </template>
+                                                <template v-else>
+                                                    {{
+                                                        freeTier.product_limit ??
+                                                        subscription?.free_product_limit
+                                                    }}
+                                                    products
+                                                </template>
+                                                · utang/wallet basics
                                             </p>
                                         </div>
                                         <ul
