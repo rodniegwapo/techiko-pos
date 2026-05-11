@@ -45,7 +45,17 @@ Route::get('/contact', [MarketingController::class, 'contact'])->name('marketing
 Route::get('/pricing', [MarketingController::class, 'pricing'])->name('marketing.pricing');
 
 Route::get('/sitemap.xml', [SeoController::class, 'sitemap'])->name('sitemap');
-Route::get('/robots.txt', [SeoController::class, 'robots'])->name('robots');
+// Source of truth is public/robots.txt (nginx often serves it before PHP). Route keeps tests / non-nginx stacks working.
+Route::get('/robots.txt', function () {
+    $path = public_path('robots.txt');
+    abort_unless(file_exists($path), 404);
+
+    return response(
+        file_get_contents($path),
+        200,
+        ['Content-Type' => 'text/plain; charset=UTF-8'],
+    );
+})->name('robots');
 
 Route::post('/webhooks/paymongo', [PayMongoWebhookController::class, 'handle'])->name('webhooks.paymongo');
 
