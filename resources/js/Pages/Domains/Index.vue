@@ -162,7 +162,7 @@ const handleEdit = (domain) => {
 };
 
 const handleView = (domain) => {
-    router.visit(route("domains.show", domain.id));
+    router.visit(route("domains.show", { domain: domain.name_slug }));
 };
 
 const handleDelete = (domain) => {
@@ -171,7 +171,7 @@ const handleDelete = (domain) => {
             `Are you sure you want to delete "${domain.name}"? This action cannot be undone.`
         )
     ) {
-        router.delete(route("domains.destroy", domain.id), {
+        router.delete(route("domains.destroy", { domain: domain.name_slug }), {
             onStart: () => (spinning.value = true),
             onSuccess: () => {
                 notification.success({
