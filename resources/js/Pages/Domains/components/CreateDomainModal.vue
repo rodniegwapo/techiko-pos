@@ -188,7 +188,7 @@ const handleSubmit = async () => {
         await formRef.value.validate();
         
         const routeName = props.isEdit ? 'domains.update' : 'domains.store';
-        const routeParams = props.isEdit ? { domain: props.domain.id } : {};
+        const routeParams = props.isEdit ? { domain: props.domain.name_slug } : {};
         
         if (props.isEdit) {
             form.put(route(routeName, routeParams), {
