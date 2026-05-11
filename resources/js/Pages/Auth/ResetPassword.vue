@@ -9,7 +9,7 @@ import { Head, useForm } from '@inertiajs/vue3';
 const props = defineProps({
     email: {
         type: String,
-        required: true,
+        default: "",
     },
     token: {
         type: String,
@@ -83,7 +83,12 @@ const submit = () => {
             </div>
 
             <div class="flex items-center justify-end mt-4">
-                <PrimaryButton :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
+                <PrimaryButton
+                    html-type="submit"
+                    :loading="form.processing"
+                    :class="{ 'opacity-25': form.processing }"
+                    :disabled="form.processing"
+                >
                     Reset Password
                 </PrimaryButton>
             </div>

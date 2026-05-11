@@ -1,16 +1,23 @@
 <script setup>
 import InputError from "@/Components/InputError.vue";
 import { Head, Link, useForm } from "@inertiajs/vue3";
-import { ref } from "vue";
+import { notification } from "ant-design-vue";
+import { onMounted, ref } from "vue";
 import ApplicationLogo from "@/Components/ApplicationLogo.vue";
 
-defineProps({
+const props = defineProps({
     canResetPassword: {
         type: Boolean,
     },
     status: {
         type: String,
     },
+});
+
+onMounted(() => {
+    if (props.status) {
+        notification.success({ message: props.status });
+    }
 });
 
 const form = useForm({
@@ -168,14 +175,6 @@ const submit = () => {
                         <p class="text-gray-600">
                             Sign in to your Techiko account to continue
                         </p>
-                    </div>
-
-                    <!-- Status Message -->
-                    <div
-                        v-if="status"
-                        class="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg"
-                    >
-                        <p class="text-green-800 text-sm">{{ status }}</p>
                     </div>
 
                     <!-- Login Form -->
