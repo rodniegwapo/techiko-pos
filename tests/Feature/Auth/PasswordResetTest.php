@@ -25,7 +25,10 @@ class PasswordResetTest extends TestCase
 
         $user = User::factory()->create();
 
-        $this->post('/forgot-password', ['email' => $user->email]);
+        $this->post('/forgot-password', ['email' => $user->email])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('login'))
+            ->assertSessionHas('status');
 
         Notification::assertSentTo($user, ResetPassword::class);
     }
@@ -38,8 +41,8 @@ class PasswordResetTest extends TestCase
 
         $this->post('/forgot-password', ['email' => $user->email]);
 
-        Notification::assertSentTo($user, ResetPassword::class, function ($notification) {
-            $response = $this->get('/reset-password/'.$notification->token);
+        Notification::assertSentTo($user, ResetPassword::class, function ($notification) use ($user) {
+            $response = $this->get('/reset-password/'.$notification->token.'?email='.urlencode($user->email));
 
             $response->assertStatus(200);
 
@@ -69,5 +72,17 @@ class PasswordResetTest extends TestCase
 
             return true;
         });
+    }
+
+    public function test_reset_password_link_request_does_not_reveal_unknown_email_and_sends_no_notification(): void
+    {
+        Notification::fake();
+
+        $this->post('/forgot-password', ['email' => 'nonexistent-password-reset@example.com'])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('login'))
+            ->assertSessionHas('status');
+
+        Notification::assertNothingSent();
     }
 }
