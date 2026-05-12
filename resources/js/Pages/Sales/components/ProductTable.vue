@@ -15,6 +15,22 @@ const props = defineProps({
         type: Boolean,
         default: false,
     },
+    loadingMore: {
+        type: Boolean,
+        default: false,
+    },
+    hasMoreProducts: {
+        type: Boolean,
+        default: false,
+    },
+    productsTotal: {
+        type: Number,
+        default: 0,
+    },
+    salesCartIsOnline: {
+        type: Boolean,
+        default: true,
+    },
     orders: {
         type: Array,
         default: () => [],
@@ -28,20 +44,24 @@ const props = defineProps({
 const { getRoute } = useDomainRoutes();
 const page = usePage();
 
-const salesCartIsOnline = inject(
+const salesCartIsOnlineInject = inject(
     "isSalesOnline",
     computed(() => true),
 );
 
-// Emit events to parent
-const emit = defineEmits(["cart-updated", "offline-add-product"]);
+const online = computed(() =>
+    typeof props.salesCartIsOnline === "boolean"
+        ? props.salesCartIsOnline
+        : salesCartIsOnlineInject.value,
+);
 
-// Handle adding items to cart with direct API call
-const loading = ref(false);
+const emit = defineEmits(["cart-updated", "offline-add-product", "load-more"]);
+
+const addingItem = ref(false);
 const addToCart = async (product) => {
     try {
-        loading.value = true;
-        if (!salesCartIsOnline.value) {
+        addingItem.value = true;
+        if (!online.value) {
             emit("offline-add-product", product);
             return;
         }
@@ -59,11 +79,10 @@ const addToCart = async (product) => {
         notifyInsufficientStock(error);
         console.error("Failed to add item to cart:", error);
     } finally {
-        loading.value = false;
+        addingItem.value = false;
     }
 };
 
-//  Formatted total with commas (Philippine Peso example)
 const formattedTotal = (price) => {
     return new Intl.NumberFormat("en-PH", {
         style: "currency",
@@ -73,59 +92,85 @@ const formattedTotal = (price) => {
 </script>
 
 <template>
-    <div
-        class="overflow-y-auto overflow-x-hidden h-[calc(100vh-430px)] relative"
-    >
-        <a-spin
-            v-if="loading"
-            class="-rotate-45 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
-            size="large"
-        />
-        <div
-            v-else-if="products.length"
-            class="grid [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))] gap-4 mt-2"
-        >
+    <div class="flex flex-col min-h-0 h-[calc(100vh-430px)]">
+        <div class="overflow-y-auto overflow-x-hidden flex-1 min-h-0 relative">
+            <a-spin
+                v-if="props.loading"
+                class="-rotate-45 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+                size="large"
+            />
             <div
-                v-for="(product, index) in products"
-                :key="index"
-                class="flex justify-between items-start border px-4 py-3 rounded-lg bg-white hover:shadow cursor-pointer"
+                v-else-if="products.length"
+                class="grid [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))] gap-4 mt-2"
             >
-                <div>
-                    <div class="text-sm font-semibold">{{ product.name }}</div>
-                    <div
-                        class="text-[10px] text-gray-300 bg-gray-600 w-fit px-2 py-[1px] rounded-full mt-1"
-                    >
-                        {{ product?.category?.name }}
+                <div
+                    v-for="product in products"
+                    :key="product.id"
+                    class="flex justify-between items-start border px-4 py-3 rounded-lg bg-white hover:shadow cursor-pointer"
+                >
+                    <div>
+                        <div class="text-sm font-semibold">{{ product.name }}</div>
+                        <div
+                            class="text-[10px] text-gray-400 w-fit mt-0.5"
+                            v-if="product.SKU"
+                        >
+                            SKU {{ product.SKU }}
+                        </div>
+                        <div
+                            class="text-[10px] text-gray-300 bg-gray-600 w-fit px-2 py-[1px] rounded-full mt-1"
+                        >
+                            {{ product?.category?.name }}
+                        </div>
                     </div>
-                </div>
-                <div class="text-right">
-                    <div class="text-md text-green-700 font-bold">
-                        {{ formattedTotal(product.price) }}
+                    <div class="text-right">
+                        <div class="text-md text-green-700 font-bold">
+                            {{ formattedTotal(product.price) }}
+                        </div>
+                        <a-button
+                            type="primary"
+                            class="text-xs flex items-center p-0 mt-1 bg-transparent text-gray-800 border-none shadow-none"
+                            size="small"
+                            @click="addToCart(product)"
+                            :disabled="addingItem"
+                        >
+                            <PlusSquareOutlined /> Add to Cart
+                        </a-button>
                     </div>
-                    <a-button
-                        type="primary"
-                        class="text-xs flex items-center p-0 mt-1 bg-transparent text-gray-800 border-none shadow-none"
-                        size="small"
-                        @click="addToCart(product)"
-                        :disabled="loading"
-                    >
-                        <PlusSquareOutlined /> Add to Cart
-                    </a-button>
                 </div>
             </div>
+            <div
+                v-else-if="!online"
+                class="flex items-center justify-center h-full min-h-[200px] text-center text-gray-500 text-sm px-6"
+            >
+                No offline catalog loaded. While online, use &quot;Sync for offline&quot;
+                on Sales, or add items via barcode from a prior session.
+            </div>
+            <div
+                v-else
+                class="text-[40px] text-nowrap uppercase font-bold text-gray-200 -rotate-45 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+            >
+                No Item Found
+            </div>
+        </div>
+
+        <div
+            v-if="online && products.length && props.productsTotal > 0"
+            class="shrink-0 pt-3 pb-1 text-xs text-gray-500 text-center border-t border-gray-100"
+        >
+            Showing {{ products.length }} of {{ props.productsTotal }}
         </div>
         <div
-            v-else-if="!salesCartIsOnline"
-            class="flex items-center justify-center h-full min-h-[200px] text-center text-gray-500 text-sm px-6"
+            v-if="online && props.hasMoreProducts && products.length"
+            class="shrink-0 pb-2 flex justify-center"
         >
-            No offline catalog loaded. While online, use &quot;Sync for offline&quot;
-            on Sales, or add items via barcode from a prior session.
-        </div>
-        <div
-            v-else
-            class="text-[40px] text-nowrap uppercase font-bold text-gray-200 -rotate-45 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
-        >
-            No Item Found
+            <a-button
+                type="default"
+                :loading="props.loadingMore"
+                :disabled="props.loading"
+                @click="emit('load-more')"
+            >
+                Load more
+            </a-button>
         </div>
     </div>
 </template>

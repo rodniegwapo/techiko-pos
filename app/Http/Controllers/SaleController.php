@@ -42,10 +42,20 @@ class SaleController extends Controller
 
     public function products(Request $request)
     {
+        $validated = $request->validate([
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'search' => ['nullable', 'string'],
+            'category' => ['nullable', 'string'],
+        ]);
+
+        $perPage = min((int) ($validated['per_page'] ?? 30), 100);
+        $page = max(1, (int) ($validated['page'] ?? 1));
+
         $domain = $request->route('domain');
         $isDomainRoute = $request->route()->named('domains.*');
 
-        $query = Product::query()
+        $base = Product::query()
             ->when($request->input('search'), fn ($q, $search) => $q->search($search))
             ->when($request->input('category'), function ($q, $category) {
                 $q->whereHas('category', fn ($q) => $q->where('name', $category));
@@ -54,18 +64,35 @@ class SaleController extends Controller
 
         // Filter by domain if this is a domain-specific route
         if ($isDomainRoute && $domain) {
-            $query->where('domain', $domain);
+            $domainSlug = is_object($domain) ? $domain->name_slug : $domain;
+            $base->where('domain', $domainSlug);
         } elseif ($isDomainRoute) {
-            // If domain route but no domain, return empty
-            return ProductResource::collection(collect());
+            return ProductResource::collection(collect())->additional([
+                'meta' => [
+                    'current_page' => 1,
+                    'per_page' => $perPage,
+                    'total' => 0,
+                    'last_page' => 1,
+                ],
+            ]);
         }
 
-        $products = $query->when(
-            ! $request->input('search') && ! $request->input('category'),
-            fn ($q) => $q->limit(30)
-        )->get();
+        $total = (clone $base)->count();
+        $lastPage = max(1, (int) ceil($total / $perPage));
 
-        return ProductResource::collection($products);
+        $products = (clone $base)
+            ->orderBy('id')
+            ->forPage($page, $perPage)
+            ->get();
+
+        return ProductResource::collection($products)->additional([
+            'meta' => [
+                'current_page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'last_page' => $lastPage,
+            ],
+        ]);
     }
 
     public function proceedPayment(Request $request, Domain $domain, Sale $sale)
