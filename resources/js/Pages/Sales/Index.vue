@@ -1014,6 +1014,10 @@ onBeforeUnmount(() => {
     }
 });
 
+function displayCategoryNameForSales(product) {
+    return product?.category?.name ?? "Uncategorized";
+}
+
 const getProducts = async ({ append = false } = {}) => {
     if (!salesCartIsOnline.value) {
         loading.value = true;
@@ -1026,7 +1030,7 @@ const getProducts = async ({ append = false } = {}) => {
             let filtered = [...list];
             if (category.value) {
                 filtered = filtered.filter(
-                    (p) => p.category?.name === category.value,
+                    (p) => displayCategoryNameForSales(p) === category.value,
                 );
             }
             const q = String(search.value || "")
