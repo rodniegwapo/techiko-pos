@@ -2,6 +2,7 @@
 import { PlusSquareOutlined } from "@ant-design/icons-vue";
 import { ref, inject, computed } from "vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
+import { notifyInsufficientStock } from "@/Composables/useCartStockNotification";
 import { usePage } from "@inertiajs/vue3";
 import axios from "axios";
 
@@ -55,6 +56,7 @@ const addToCart = async (product) => {
 
         emit("cart-updated");
     } catch (error) {
+        notifyInsufficientStock(error);
         console.error("Failed to add item to cart:", error);
     } finally {
         loading.value = false;
