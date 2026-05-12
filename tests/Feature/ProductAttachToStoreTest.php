@@ -113,6 +113,65 @@ class ProductAttachToStoreTest extends TestCase
         $this->assertContains($p->id, $this->assignableIdsFromResponse($response));
     }
 
+    public function test_assignable_excludes_never_attached_products(): void
+    {
+        $ctx = $this->seedContext();
+
+        $orphan = Product::factory()->create([
+            'domain' => $ctx['domain']->name_slug,
+            'category_id' => $ctx['category']->id,
+            'sold_type' => 'Piece',
+            'barcode' => 'ORPHAN-NO-PVT',
+            'SKU' => 'SKU-ORPHAN',
+            'name' => 'Never Attached Catalog Row',
+        ]);
+
+        $url = route('domains.products.assignable', ['domain' => $ctx['domain']->name_slug]);
+        $query = http_build_query(['location_id' => $ctx['locB']->id]);
+
+        $response = $this->actingAs($ctx['user'])->getJson($url.'?'.$query);
+        $response->assertOk();
+        $this->assertNotContains($orphan->id, $this->assignableIdsFromResponse($response));
+    }
+
+    public function test_assignable_search_excludes_never_attached_even_when_name_matches(): void
+    {
+        $ctx = $this->seedContext();
+
+        $needle = 'MatchTokXy7';
+
+        $orphan = Product::factory()->create([
+            'domain' => $ctx['domain']->name_slug,
+            'category_id' => $ctx['category']->id,
+            'sold_type' => 'Piece',
+            'barcode' => 'ORPHAN-SEARCH',
+            'SKU' => 'SKU-O-SEARCH',
+            'name' => "Orphan label {$needle} zzz",
+        ]);
+
+        $atOther = Product::factory()->create([
+            'domain' => $ctx['domain']->name_slug,
+            'category_id' => $ctx['category']->id,
+            'sold_type' => 'Piece',
+            'barcode' => 'ELSEWHERE-SRCH',
+            'SKU' => 'SKU-E-SEARCH',
+            'name' => "Stocked {$needle} elsewhere",
+        ]);
+        $atOther->activeLocations()->sync([$ctx['locA']->id => ['is_active' => true]]);
+
+        $url = route('domains.products.assignable', ['domain' => $ctx['domain']->name_slug]);
+        $query = http_build_query([
+            'location_id' => $ctx['locB']->id,
+            'search' => $needle,
+        ]);
+
+        $response = $this->actingAs($ctx['user'])->getJson($url.'?'.$query);
+        $response->assertOk();
+        $ids = $this->assignableIdsFromResponse($response);
+        $this->assertNotContains($orphan->id, $ids);
+        $this->assertContains($atOther->id, $ids);
+    }
+
     public function test_attach_adds_pivot_and_inventory_row(): void
     {
         $ctx = $this->seedContext();

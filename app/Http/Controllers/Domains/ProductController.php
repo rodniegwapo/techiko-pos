@@ -200,7 +200,7 @@ class ProductController extends Controller
     }
 
     /**
-     * JSON: products in the domain not yet actively assigned to the given store (for attach flow).
+     * JSON: domain products already active at another store, not yet active at the given store (attach flow).
      */
     public function assignable(Request $request, Domain $domain): JsonResponse
     {
@@ -216,6 +216,9 @@ class ProductController extends Controller
             ->where('domain', $domain->name_slug)
             ->whereDoesntHave('activeLocations', function ($q) use ($location) {
                 $q->where('inventory_locations.id', $location->id);
+            })
+            ->whereHas('activeLocations', function ($q) use ($location) {
+                $q->where('inventory_locations.id', '!=', $location->id);
             })
             ->when(
                 filled($validated['search'] ?? null),
