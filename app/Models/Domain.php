@@ -202,13 +202,13 @@ class Domain extends Model
     }
 
     /**
-     * When true (default): sales may deduct below available stock; reconcile via adjustments.
-     * When false: checkout rejects insufficient stock at the sale's inventory location.
+     * When true: sales may deduct below available stock; reconcile via adjustments.
+     * When false (default when unset): checkout rejects insufficient stock at the sale's inventory location.
      */
     public function salesAllowsOverselling(): bool
     {
         $s = $this->settings['sales'] ?? [];
 
-        return (bool) ($s['allow_overselling'] ?? true);
+        return (bool) ($s['allow_overselling'] ?? false);
     }
 }

@@ -20,7 +20,7 @@ class DomainSettingsController extends Controller
                 'vat_pricing_mode' => in_array(data_get($settings, 'sales.vat_pricing_mode'), ['exclusive', 'inclusive'], true)
                     ? data_get($settings, 'sales.vat_pricing_mode')
                     : 'exclusive',
-                'allow_overselling' => (bool) data_get($settings, 'sales.allow_overselling', true),
+                'allow_overselling' => (bool) data_get($settings, 'sales.allow_overselling', false),
             ],
         ]);
     }
