@@ -6,7 +6,7 @@ import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { message } from "ant-design-vue";
 
 const props = defineProps({
-    open: {
+    visible: {
         type: Boolean,
         default: false,
     },
@@ -16,7 +16,7 @@ const props = defineProps({
     },
 });
 
-const emit = defineEmits(["update:open", "attached"]);
+const emit = defineEmits(["update:visible", "attached"]);
 
 const { getRoute } = useDomainRoutes();
 
@@ -38,7 +38,7 @@ function assignableRowsFromResponse(resData) {
 }
 
 async function fetchAssignable() {
-    if (!props.open || props.locationId == null || props.locationId === "") {
+    if (!props.visible || props.locationId == null || props.locationId === "") {
         return;
     }
     loading.value = true;
@@ -62,16 +62,29 @@ async function fetchAssignable() {
     }
 }
 
-watchDebounced(modalSearch, fetchAssignable, { debounce: 350 });
+function syncAssignableResultsIfOpen() {
+    if (!props.visible || props.locationId == null || props.locationId === "") {
+        return;
+    }
+    return fetchAssignable();
+}
+
+watchDebounced(
+    () => modalSearch.value,
+    () => {
+        syncAssignableResultsIfOpen();
+    },
+    { debounce: 350, flush: "post" },
+);
 
 watch(
-    () => [props.open, props.locationId],
-    ([isOpen]) => {
-        if (isOpen && props.locationId != null && props.locationId !== "") {
+    () => [props.visible, props.locationId],
+    ([isVisible]) => {
+        if (isVisible && props.locationId != null && props.locationId !== "") {
             modalSearch.value = "";
-            fetchAssignable();
+            syncAssignableResultsIfOpen();
         }
-        if (!isOpen) {
+        if (!isVisible) {
             modalSearch.value = "";
             results.value = [];
         }
@@ -79,7 +92,7 @@ watch(
 );
 
 function close() {
-    emit("update:open", false);
+    emit("update:visible", false);
 }
 
 async function attach(row) {
@@ -126,17 +139,18 @@ function categoryLabel(p) {
 
 <template>
     <a-modal
-        :open="open"
+        :visible="visible"
         title="Add existing product to this store"
         destroy-on-close
         width="640px"
         :footer="null"
         @cancel="close"
-        @update:open="(v) => emit('update:open', v)"
+        @update:visible="(v) => emit('update:visible', v)"
     >
         <p class="text-gray-600 text-sm mb-3">
-            Search your organization catalog for items not yet offered at this
-            location. This does not create a duplicate SKU.
+            Show products already offered at another store in your organization but
+            not at this location. Search by name, SKU, or barcode. This does not
+            create a duplicate SKU.
         </p>
         <a-input-search
             v-model:value="modalSearch"
@@ -151,8 +165,9 @@ function categoryLabel(p) {
                 v-if="!results.length && !loading"
                 class="text-gray-500 text-sm py-6 text-center"
             >
-                No matching products available to attach. Either every match is
-                already at this store, or try another search.
+                No matching products. Either nothing is offered elsewhere yet that
+                matches your search, or every match is already at this store. Try a
+                different search.
             </div>
             <div v-else class="flex flex-col gap-2 max-h-[360px] overflow-y-auto">
                 <div
