@@ -18,7 +18,7 @@ const page = usePage();
 
 const { confirmDelete, formatCurrency, formatDate } = useHelpers();
 const { formData, openModal, isEdit, spinning } = useGlobalVariables();
-const { getRoute } = useDomainRoutes();
+const { getRoute, getLocationQueryFromPage } = useDomainRoutes();
 
 // Modal state for product details
 const detailsModalVisible = ref(false);
@@ -103,7 +103,10 @@ const handleDeleteCategory = (record) => {
 };
 
 const handleClickEdit = (record) => {
-    router.visit(getRoute("products.edit", { product: record.id }));
+    router.get(
+        getRoute("products.edit", { product: record.id }),
+        getLocationQueryFromPage(),
+    );
 };
 
 const showDetails = (product) => {

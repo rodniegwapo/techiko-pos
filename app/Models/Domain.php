@@ -200,4 +200,15 @@ class Domain extends Model
             'vat_pricing_mode' => $mode,
         ];
     }
+
+    /**
+     * When true: sales may deduct below available stock; reconcile via adjustments.
+     * When false (default when unset): checkout rejects insufficient stock at the sale's inventory location.
+     */
+    public function salesAllowsOverselling(): bool
+    {
+        $s = $this->settings['sales'] ?? [];
+
+        return (bool) ($s['allow_overselling'] ?? false);
+    }
 }

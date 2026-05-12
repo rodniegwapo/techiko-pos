@@ -42,9 +42,10 @@ import { usePage, Head, Link } from "@inertiajs/vue3";
 import { useFilters, toLabel } from "@/Composables/useFilters";
 import { watchDebounced } from "@vueuse/core";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
+import { notifyInsufficientStock } from "@/Composables/useCartStockNotification";
 
 const page = usePage();
-const { getRoute } = useDomainRoutes();
+const { getRoute, getLocationQueryFromPage } = useDomainRoutes();
 
 const isOnline = ref(
     typeof navigator !== "undefined" ? navigator.onLine : true,
@@ -461,13 +462,27 @@ const handleScanAndAdd = async () => {
             return;
         }
 
-        const items = await axios.get(
-            getRoute("sales.products", {
-                category: category.value,
-                search: search.value,
-            }),
-        );
-        const results = items.data.data;
+        const locQ = getLocationQueryFromPage();
+        const locationId = locQ.location_id ?? activeLocationId.value ?? undefined;
+        const items = await axios.get(getRoute("sales.products"), {
+            params: {
+                page: 1,
+                per_page: 100,
+                search: search.value || undefined,
+                category: category.value || undefined,
+                ...(locationId != null && locationId !== ""
+                    ? { location_id: locationId }
+                    : {}),
+            },
+        });
+        const results = items.data.data ?? [];
+
+        const meta = items.data.meta;
+        if (meta) {
+            productsLastPage.value = meta.last_page ?? 1;
+            productsTotal.value = meta.total ?? 0;
+            productsPage.value = meta.current_page ?? 1;
+        }
 
         products.value = results;
         mergeProductLookup(results);
@@ -543,6 +558,7 @@ const addToCart = async (product) => {
 
         await loadCurrentPendingSale();
     } catch (error) {
+        notifyInsufficientStock(error);
         console.error("Failed to add item to cart:", error);
     } finally {
         loading.value = false;
@@ -956,6 +972,16 @@ const filtersConfig = [
 
 const products = ref([]);
 const loading = ref(false);
+const loadingMore = ref(false);
+const productsPage = ref(1);
+const productsLastPage = ref(1);
+const productsTotal = ref(0);
+const PRODUCTS_PER_PAGE = 30;
+
+const hasMoreProducts = computed(
+    () =>
+        salesCartIsOnline.value && productsPage.value < productsLastPage.value,
+);
 
 onMounted(async () => {
     if (typeof window !== "undefined") {
@@ -988,10 +1014,14 @@ onBeforeUnmount(() => {
     }
 });
 
-const getProducts = async () => {
-    loading.value = true;
-    try {
-        if (!salesCartIsOnline.value) {
+function displayCategoryNameForSales(product) {
+    return product?.category?.name ?? "Uncategorized";
+}
+
+const getProducts = async ({ append = false } = {}) => {
+    if (!salesCartIsOnline.value) {
+        loading.value = true;
+        try {
             const row = await getOfflineCatalogSnapshot(
                 domainSlug.value,
                 activeLocationId.value,
@@ -1000,7 +1030,7 @@ const getProducts = async () => {
             let filtered = [...list];
             if (category.value) {
                 filtered = filtered.filter(
-                    (p) => p.category?.name === category.value,
+                    (p) => displayCategoryNameForSales(p) === category.value,
                 );
             }
             const q = String(search.value || "")
@@ -1019,19 +1049,54 @@ const getProducts = async () => {
                 );
             }
             products.value = filtered.slice(0, 500);
-            return;
+        } finally {
+            loading.value = false;
         }
-        const items = await axios.get(
-            getRoute("sales.products", {
-                category: category.value,
-                search: search.value,
-            }),
-        );
-        products.value = items.data.data;
-        mergeProductLookup(products.value);
+        return;
+    }
+
+    const nextPage = append ? productsPage.value + 1 : 1;
+    if (append) {
+        loadingMore.value = true;
+    } else {
+        loading.value = true;
+    }
+    try {
+        const locQ = getLocationQueryFromPage();
+        const locationId = locQ.location_id ?? activeLocationId.value ?? undefined;
+        const res = await axios.get(getRoute("sales.products"), {
+            params: {
+                page: nextPage,
+                per_page: PRODUCTS_PER_PAGE,
+                search: search.value || undefined,
+                category: category.value || undefined,
+                ...(locationId != null && locationId !== ""
+                    ? { location_id: locationId }
+                    : {}),
+            },
+        });
+        const rows = res.data.data ?? [];
+        const meta = res.data.meta;
+        if (meta) {
+            productsLastPage.value = meta.last_page ?? 1;
+            productsTotal.value = meta.total ?? 0;
+            productsPage.value = meta.current_page ?? nextPage;
+        }
+        if (append) {
+            products.value = [...products.value, ...rows];
+        } else {
+            products.value = rows;
+        }
+        mergeProductLookup(rows);
     } finally {
         loading.value = false;
+        loadingMore.value = false;
     }
+};
+
+const loadMoreProducts = () => {
+    if (!hasMoreProducts.value || loadingMore.value || loading.value) return;
+    return getProducts({ append: true });
 };
 const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
     getItems: getProducts,
@@ -1149,10 +1214,15 @@ watch(
                 <ProductTable
                     :products="products"
                     :loading="loading"
+                    :loading-more="loadingMore"
+                    :has-more-products="hasMoreProducts"
+                    :products-total="productsTotal"
+                    :sales-cart-is-online="salesCartIsOnline"
                     :orders="orders"
                     :orderId="orderId"
                     @cart-updated="loadCurrentPendingSale"
                     @offline-add-product="addToCart"
+                    @load-more="loadMoreProducts"
                 />
             </template>
             <template #right-side-content>

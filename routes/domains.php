@@ -117,6 +117,11 @@ Route::prefix('domains/{domain:name_slug}')
         Route::get('/shared-catalog/lookup', [SharedCatalogLookupController::class, 'lookup'])->name('shared-catalog.lookup');
 
         // Products (Organization-specific)
+        Route::get('products/assignable', [ProductController::class, 'assignable'])
+            ->name('products.assignable');
+        Route::post('products/{product}/attach-location', [ProductController::class, 'attachLocation'])
+            ->name('products.attach-location');
+
         Route::resource('products', ProductController::class)
             ->only(['index', 'store', 'update', 'destroy', 'create', 'edit'])
             ->names('products');

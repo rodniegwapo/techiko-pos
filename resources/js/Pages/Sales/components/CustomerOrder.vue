@@ -26,6 +26,7 @@ import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useCredit } from "@/Composables/useCredit";
+import { notifyInsufficientStock } from "@/Composables/useCartStockNotification";
 import axios from "axios";
 import { Modal, notification } from "ant-design-vue";
 import { usePage } from "@inertiajs/vue3";
@@ -114,7 +115,8 @@ const handleAddOrder = async (product) => {
         // Emit event to parent to refresh cart data
         emit("cart-updated");
     } catch (error) {
-        console.error("Failed to add item:", error);
+        notifyInsufficientStock(error);
+        throw error;
     }
 };
 
@@ -170,7 +172,8 @@ const handleUpdateQuantity = async (product, quantity) => {
         // Emit event to parent to refresh cart data
         emit("cart-updated");
     } catch (error) {
-        console.error("Failed to update quantity:", error);
+        notifyInsufficientStock(error);
+        throw error;
     }
 };
 
@@ -320,10 +323,12 @@ const saveQuantity = async () => {
         optimisticQuantities.value[selectedOrder.value.id] =
             selectedOrder.value.quantity;
 
-        notification.error({
-            message: "Update failed",
-            description: "Failed to update quantity. Please try again.",
-        });
+        if (!notifyInsufficientStock(error)) {
+            notification.error({
+                message: "Update failed",
+                description: "Failed to update quantity. Please try again.",
+            });
+        }
     } finally {
         // Clear loading state
         loadingStates.value[selectedOrder.value.id] = false;

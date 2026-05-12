@@ -16,7 +16,7 @@ import { message } from "ant-design-vue";
 import { useBarcodeScanner } from "@/Composables/useBarcodeScanner";
 
 const page = usePage();
-const { getRoute } = useDomainRoutes();
+const { getRoute, hrefWithPreservedLocationId } = useDomainRoutes();
 
 const props = defineProps({
     categories: {
@@ -137,7 +137,7 @@ const domainOptions = computed(() => {
 });
 
 const handleSave = () => {
-    form.post(getRoute("products.store"), {
+    form.post(hrefWithPreservedLocationId(getRoute("products.store")), {
         onSuccess: () => {
             form.reset();
             form.clearErrors();
@@ -173,7 +173,7 @@ useBarcodeScanner((code) => {
 
         <ContentLayout title="Create Product">
             <template #filters>
-                <Link :href="getRoute('products.index')">
+                <Link :href="hrefWithPreservedLocationId(getRoute('products.index'))">
                     <a-button>Back to Products</a-button>
                 </Link>
             </template>
@@ -416,7 +416,7 @@ useBarcodeScanner((code) => {
                         </a-form-item>
 
                         <div class="flex justify-end gap-2 mt-4">
-                            <Link :href="getRoute('products.index')">
+                            <Link :href="hrefWithPreservedLocationId(getRoute('products.index'))">
                                 <a-button>Cancel</a-button>
                             </Link>
                             <a-button

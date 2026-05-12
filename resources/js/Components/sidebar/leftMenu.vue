@@ -28,7 +28,7 @@ import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 const page = usePage();
 const { hasPermission } = usePermissionsV2();
 const { selectedKeys, openKeys } = useGlobalVariables();
-const { getRoute } = useDomainRoutes();
+const { getRoute, getLocationQueryFromPage } = useDomainRoutes();
 
 // Ensure selectedKeys and openKeys are arrays
 if (!Array.isArray(selectedKeys.value)) {
@@ -471,7 +471,10 @@ const handleClick = (menu) => {
             const routePath = getRoute("wallet.money-movement");
             if (routePath && routePath !== "#") {
                 selectedKeys.value = [menu.key];
-                router.get(routePath, walletMenuQuery());
+                router.get(routePath, {
+                    ...getLocationQueryFromPage(),
+                    ...walletMenuQuery(),
+                });
             }
             return;
         }
@@ -480,7 +483,10 @@ const handleClick = (menu) => {
             const routePath = getRoute("payment-card-types.index");
             if (routePath && routePath !== "#") {
                 selectedKeys.value = [menu.key];
-                router.get(routePath, walletMenuQuery());
+                router.get(routePath, {
+                    ...getLocationQueryFromPage(),
+                    ...walletMenuQuery(),
+                });
             }
             return;
         }
@@ -489,7 +495,12 @@ const handleClick = (menu) => {
 
         if (routePath && routePath !== "#") {
             selectedKeys.value = [menu.key];
-            router.visit(routePath);
+            const slug = getCurrentDomainFromUrl();
+            if (slug) {
+                router.get(routePath, getLocationQueryFromPage());
+            } else {
+                router.visit(routePath);
+            }
         } else {
             console.error(
                 "Invalid route generated for menu:",

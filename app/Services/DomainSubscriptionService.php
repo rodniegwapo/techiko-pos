@@ -14,6 +14,10 @@ class DomainSubscriptionService
 
     public function effectiveMaxProducts(Domain $domain): ?int
     {
+        if (config('features.unlimited_products', true)) {
+            return null;
+        }
+
         $domain->loadMissing('currentServiceTier');
         $tier = $domain->currentServiceTier;
 
@@ -88,11 +92,14 @@ class DomainSubscriptionService
         $maxProducts = $this->effectiveMaxProducts($domain);
         $maxUsers = $this->effectiveMaxUsers($domain);
 
+        $productsUnlimited = (bool) config('features.unlimited_products', true);
+
         return [
             'is_paid' => (bool) $domain->current_service_tier_id,
             'tier_name' => $domain->currentServiceTier?->name,
             'product_count' => $productCount,
             'max_products' => $maxProducts,
+            'products_unlimited' => $productsUnlimited,
             'products_at_capacity' => $maxProducts !== null && $productCount >= $maxProducts,
             'user_count' => $userCount,
             'max_users' => $maxUsers,
