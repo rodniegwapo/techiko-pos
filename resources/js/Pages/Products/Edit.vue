@@ -16,7 +16,7 @@ import {
 import { message } from "ant-design-vue";
 
 const page = usePage();
-const { getRoute } = useDomainRoutes();
+const { getRoute, hrefWithPreservedLocationId } = useDomainRoutes();
 
 const props = defineProps({
     product: {
@@ -121,22 +121,27 @@ const domainOptions = computed(() => {
 });
 
 const handleUpdate = () => {
-    form.put(getRoute("products.update", { product: props.product.id }), {
-        onSuccess: () => {
-            message.success("Product updated successfully");
+    form.put(
+        hrefWithPreservedLocationId(
+            getRoute("products.update", { product: props.product.id }),
+        ),
+        {
+            onSuccess: () => {
+                message.success("Product updated successfully");
+            },
+            onError: (errs) => {
+                const bag = errs || form.errors;
+                const planMsg = bag?.plan;
+                if (planMsg !== undefined && planMsg !== null && planMsg !== "") {
+                    message.error(
+                        Array.isArray(planMsg) ? planMsg[0] : planMsg || "Failed to update product",
+                    );
+                    return;
+                }
+                message.warning(validationSummaryNotice(bag));
+            },
         },
-        onError: (errs) => {
-            const bag = errs || form.errors;
-            const planMsg = bag?.plan;
-            if (planMsg !== undefined && planMsg !== null && planMsg !== "") {
-                message.error(
-                    Array.isArray(planMsg) ? planMsg[0] : planMsg || "Failed to update product",
-                );
-                return;
-            }
-            message.warning(validationSummaryNotice(bag));
-        },
-    });
+    );
 };
 
 useBarcodeScanner((code) => {
@@ -153,7 +158,7 @@ useBarcodeScanner((code) => {
 
         <ContentLayout title="Edit Product">
             <template #filters>
-                <Link :href="getRoute('products.index')">
+                <Link :href="hrefWithPreservedLocationId(getRoute('products.index'))">
                     <a-button>Back to Products</a-button>
                 </Link>
             </template>
@@ -417,7 +422,7 @@ useBarcodeScanner((code) => {
                         </div>
 
                         <div class="flex justify-end gap-2 mt-4">
-                            <Link :href="getRoute('products.index')">
+                            <Link :href="hrefWithPreservedLocationId(getRoute('products.index'))">
                                 <a-button>Cancel</a-button>
                             </Link>
                             <a-button

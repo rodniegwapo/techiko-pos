@@ -2,13 +2,21 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\CustomerUpdated;
+use App\Events\OrderUpdated;
+use App\Events\PaymentCompleted;
+use App\Exceptions\InsufficientStockException;
+use App\Helpers;
 use App\Http\Resources\ProductResource;
 use App\Models\Customer;
 use App\Models\Domain;
+use App\Models\MandatoryDiscount;
 use App\Models\Product\Discount;
 use App\Models\Product\Product;
 use App\Models\Sale;
+use App\Models\User;
 use App\Services\InventoryService;
+use App\Services\SaleDiscountService;
 use App\Services\SaleService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -34,10 +42,20 @@ class SaleController extends Controller
 
     public function products(Request $request)
     {
+        $validated = $request->validate([
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'search' => ['nullable', 'string'],
+            'category' => ['nullable', 'string'],
+        ]);
+
+        $perPage = min((int) ($validated['per_page'] ?? 30), 100);
+        $page = max(1, (int) ($validated['page'] ?? 1));
+
         $domain = $request->route('domain');
         $isDomainRoute = $request->route()->named('domains.*');
 
-        $query = Product::query()
+        $base = Product::query()
             ->when($request->input('search'), fn ($q, $search) => $q->search($search))
             ->when($request->input('category'), function ($q, $category) {
                 $q->whereHas('category', fn ($q) => $q->where('name', $category));
@@ -46,18 +64,35 @@ class SaleController extends Controller
 
         // Filter by domain if this is a domain-specific route
         if ($isDomainRoute && $domain) {
-            $query->where('domain', $domain);
+            $domainSlug = is_object($domain) ? $domain->name_slug : $domain;
+            $base->where('domain', $domainSlug);
         } elseif ($isDomainRoute) {
-            // If domain route but no domain, return empty
-            return ProductResource::collection(collect());
+            return ProductResource::collection(collect())->additional([
+                'meta' => [
+                    'current_page' => 1,
+                    'per_page' => $perPage,
+                    'total' => 0,
+                    'last_page' => 1,
+                ],
+            ]);
         }
 
-        $products = $query->when(
-            ! $request->input('search') && ! $request->input('category'),
-            fn ($q) => $q->limit(30)
-        )->get();
+        $total = (clone $base)->count();
+        $lastPage = max(1, (int) ceil($total / $perPage));
 
-        return ProductResource::collection($products);
+        $products = (clone $base)
+            ->orderBy('id')
+            ->forPage($page, $perPage)
+            ->get();
+
+        return ProductResource::collection($products)->additional([
+            'meta' => [
+                'current_page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'last_page' => $lastPage,
+            ],
+        ]);
     }
 
     public function proceedPayment(Request $request, Domain $domain, Sale $sale)
@@ -81,7 +116,10 @@ class SaleController extends Controller
                 $this->saleService->completeSale($sale, auth()->user());
 
                 // 2. Handle overselling situations (create automatic stock adjustments)
-                $oversoldItems = $this->saleService->handleOverselling($sale);
+                $oversoldItems = [];
+                if ($this->saleService->oversellingAdjustmentEnabled($sale->domain)) {
+                    $oversoldItems = $this->saleService->handleOverselling($sale);
+                }
                 if (! empty($oversoldItems)) {
                     \Log::info('Oversell detected during sale completion', [
                         'sale_id' => $sale->id,
@@ -114,6 +152,14 @@ class SaleController extends Controller
                     ]);
                 }
             });
+        } catch (InsufficientStockException $e) {
+            $names = collect($e->getUnavailableItems())->pluck('product_name')->implode(', ');
+
+            return response()->json([
+                'success' => false,
+                'errors' => ['stock' => ["Insufficient stock for: {$names}"]],
+                'message' => "Insufficient stock for: {$names}",
+            ], 422);
         } catch (\Exception $e) {
             \Log::error('Payment processing failed', [
                 'sale_id' => $sale->id,
@@ -128,7 +174,7 @@ class SaleController extends Controller
         }
 
         // Trigger payment completed event to clear the order view
-        event(new \App\Events\PaymentCompleted($sale));
+        event(new PaymentCompleted($sale));
 
         // Return response with loyalty results
         return response()->json([
@@ -146,7 +192,7 @@ class SaleController extends Controller
 
         if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
             // Admin/Super Admin: Use Helpers::getActiveLocation()
-            $location = \App\Helpers::getActiveLocation($domain);
+            $location = Helpers::getActiveLocation($domain);
             $locationId = $location?->id;
         } else {
             // Regular users: Use their assigned location
@@ -355,7 +401,7 @@ class SaleController extends Controller
             ->get();
 
         // Get active mandatory discounts
-        $mandatoryDiscounts = \App\Models\MandatoryDiscount::where('is_active', true)
+        $mandatoryDiscounts = MandatoryDiscount::where('is_active', true)
             ->when($domain, function ($query, $domain) {
                 $query->where('domain', $domain);
             })
@@ -408,7 +454,7 @@ class SaleController extends Controller
         ]);
 
         try {
-            $saleDiscountService = app(\App\Services\SaleDiscountService::class);
+            $saleDiscountService = app(SaleDiscountService::class);
             $result = $saleDiscountService->applyOrderDiscounts(
                 $sale,
                 $validated['regular_discount_ids'] ?? [],
@@ -434,7 +480,7 @@ class SaleController extends Controller
     public function removeSaleDiscounts(Request $request, Sale $sale)
     {
         try {
-            $saleDiscountService = app(\App\Services\SaleDiscountService::class);
+            $saleDiscountService = app(SaleDiscountService::class);
             $sale = $saleDiscountService->removeOrderDiscounts($sale);
 
             return response()->json([
@@ -522,7 +568,7 @@ class SaleController extends Controller
 
         // If customer is assigned, include customer data in response
         if ($validated['customer_id']) {
-            $customer = \App\Models\Customer::findOrFail($validated['customer_id']);
+            $customer = Customer::findOrFail($validated['customer_id']);
             $response['customer'] = [
                 'id' => $customer->id,
                 'name' => $customer->name,
@@ -553,7 +599,7 @@ class SaleController extends Controller
         ]);
 
         // Manually trigger the CustomerUpdated event
-        event(new \App\Events\CustomerUpdated($sale));
+        event(new CustomerUpdated($sale));
 
         return response()->json([
             'success' => true,
@@ -620,7 +666,7 @@ class SaleController extends Controller
         ]);
 
         // Manually trigger the OrderUpdated event
-        event(new \App\Events\OrderUpdated($sale->fresh([
+        event(new OrderUpdated($sale->fresh([
             'saleItems.product',
             'saleDiscounts',
             'saleItems.discounts',
@@ -653,7 +699,7 @@ class SaleController extends Controller
         // Apply location-based filtering based on user role
         if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
             // Admin/Super Admin: Use Helpers::getActiveLocation()
-            $location = \App\Helpers::getActiveLocation($domain);
+            $location = Helpers::getActiveLocation($domain);
             if ($location) {
                 $query->where('location_id', $location->id);
             }
@@ -691,7 +737,7 @@ class SaleController extends Controller
         // Explicitly get the 'user' parameter from the route
         $userId = $request->route('user');
         // Verify the user exists and is accessible
-        $user = \App\Models\User::findOrFail($userId);
+        $user = User::findOrFail($userId);
 
         // Determine location based on current user's role
         $currentUser = auth()->user();
@@ -699,7 +745,7 @@ class SaleController extends Controller
 
         if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
             // Admin/Super Admin: Use Helpers::getActiveLocation()
-            $location = \App\Helpers::getActiveLocation($domain);
+            $location = Helpers::getActiveLocation($domain);
             $locationId = $location?->id;
         } else {
             // Regular users: Use their assigned location
@@ -735,7 +781,7 @@ class SaleController extends Controller
             'all_parameters' => $request->all(),
         ]);
 
-        $user = \App\Models\User::findOrFail($userId);
+        $user = User::findOrFail($userId);
 
         // Get or create latest pending sale for this user, scoped by location
         $currentUser = auth()->user();
@@ -749,7 +795,7 @@ class SaleController extends Controller
         // Apply location-based filtering based on user role
         if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
             // Admin/Super Admin: Use Helpers::getActiveLocation()
-            $location = \App\Helpers::getActiveLocation($domain);
+            $location = Helpers::getActiveLocation($domain);
             if ($location) {
                 $query->where('location_id', $location->id);
             }
@@ -767,7 +813,7 @@ class SaleController extends Controller
 
             if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
                 // Admin/Super Admin: Use Helpers::getActiveLocation()
-                $location = \App\Helpers::getActiveLocation($domain);
+                $location = Helpers::getActiveLocation($domain);
                 $locationId = $location?->id;
             } else {
                 // Regular users: Use their assigned location
@@ -833,7 +879,7 @@ class SaleController extends Controller
         // Apply location-based filtering based on user role
         if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
             // Admin/Super Admin: Use Helpers::getActiveLocation()
-            $location = \App\Helpers::getActiveLocation($domain);
+            $location = Helpers::getActiveLocation($domain);
             if ($location) {
                 $query->where('location_id', $location->id);
             }
@@ -881,7 +927,7 @@ class SaleController extends Controller
         // Apply location-based filtering based on user role
         if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
             // Admin/Super Admin: Use Helpers::getActiveLocation()
-            $location = \App\Helpers::getActiveLocation($domain);
+            $location = Helpers::getActiveLocation($domain);
             if ($location) {
                 $query->where('location_id', $location->id);
             }
@@ -945,7 +991,7 @@ class SaleController extends Controller
         // Apply location-based filtering based on user role
         if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
             // Admin/Super Admin: Use Helpers::getActiveLocation()
-            $location = \App\Helpers::getActiveLocation($domain);
+            $location = Helpers::getActiveLocation($domain);
             if ($location) {
                 $query->where('location_id', $location->id);
             }
@@ -1004,7 +1050,7 @@ class SaleController extends Controller
         // Apply location-based filtering based on user role
         if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
             // Admin/Super Admin: Use Helpers::getActiveLocation()
-            $location = \App\Helpers::getActiveLocation($domain);
+            $location = Helpers::getActiveLocation($domain);
             if ($location) {
                 $query->where('location_id', $location->id);
             }

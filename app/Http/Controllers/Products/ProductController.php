@@ -131,7 +131,7 @@ class ProductController extends Controller
             'sold_type' => ['required', 'exists:product_sold_types,name'],
             'price' => ['required', 'numeric', 'min:0'],
             'cost' => ['nullable', 'numeric', 'min:0'],
-            'SKU' => ['required', 'string', 'max:100', 'unique:products,SKU,'.$productId],
+            'SKU' => ['nullable', 'string', 'max:255', 'unique:products,SKU,'.$productId],
             'barcode' => $barcodeRules,
             'representation_type' => ['nullable', 'string', 'in:image,color,text'],
             'representation' => ['nullable', 'string'],
@@ -146,6 +146,10 @@ class ProductController extends Controller
 
         if (array_key_exists('category_id', $data) && $data['category_id'] === '') {
             $data['category_id'] = null;
+        }
+        if (array_key_exists('SKU', $data)) {
+            $trim = isset($data['SKU']) ? trim((string) $data['SKU']) : '';
+            $data['SKU'] = $trim === '' ? null : $trim;
         }
         if (! empty($data['barcode'])) {
             $data['barcode'] = BarcodeNormalizer::normalize($data['barcode']);

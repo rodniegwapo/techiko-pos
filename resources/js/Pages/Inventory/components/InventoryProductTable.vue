@@ -11,7 +11,6 @@ import {
 } from "@tabler/icons-vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { useHelpers } from "@/Composables/useHelpers";
-import { router } from "@inertiajs/vue3";
 
 const { formatCurrency, formatDate } = useHelpers();
 const page = usePage();
@@ -46,7 +45,12 @@ const columns = computed(() => {
             key: "product",
             align: "left",
         },
-        { title: "Stock", dataIndex: "stock", key: "stock", align: "left" },
+        {
+            title: "Qty (store)",
+            dataIndex: "available",
+            key: "stock",
+            align: "left",
+        },
         { title: "Status", dataIndex: "status", key: "status", align: "left" },
         { title: "Value", dataIndex: "value", key: "value", align: "left" },
     ];
@@ -125,9 +129,10 @@ const dataSource = computed(() => {
             id: inventory.id,
             product: inventory.product,
             sku: inventory.product?.SKU || "N/A",
-            stock: inventory.quantity_on_hand,
-            available: inventory.quantity_available,
-            reserved: inventory.quantity_reserved,
+            /** Sellable qty — matches Products catalog "Qty (store)" */
+            available: inventory.quantity_available ?? 0,
+            onHand: inventory.quantity_on_hand ?? 0,
+            reserved: inventory.quantity_reserved ?? 0,
             status:
                 inventory.location_stock_status ||
                 inventory.product?.stock_status ||
@@ -205,14 +210,28 @@ const dataSource = computed(() => {
                 </div>
             </template>
 
-            <!-- Stock Column -->
+            <!-- Qty (store): sellable quantity; subline when on-hand differs (e.g. reserved) -->
             <template v-else-if="column.key === 'stock'">
-                <div class="flex items-center gap-2">
-                    <div class="font-semibold text-lg">
-                        {{ Math.floor(record.stock) }}
+                <div class="flex flex-col gap-0.5">
+                    <div class="flex items-center gap-2">
+                        <div class="font-semibold text-lg">
+                            {{ Math.floor(record.available) }}
+                        </div>
+                        <div class="text-xs text-gray-500">
+                            {{ record.product?.unit_of_measure || "pcs" }} (s)
+                        </div>
                     </div>
-                    <div class="text-xs text-gray-500">
-                        {{ record.product?.unit_of_measure || "pcs" }} (s)
+                    <div
+                        v-if="
+                            Math.floor(record.onHand) !==
+                            Math.floor(record.available)
+                        "
+                        class="text-xs text-gray-500"
+                    >
+                        On hand {{ Math.floor(record.onHand)
+                        }}<span v-if="record.reserved > 0">
+                            · Reserved {{ Math.floor(record.reserved) }}
+                        </span>
                     </div>
                 </div>
             </template>
