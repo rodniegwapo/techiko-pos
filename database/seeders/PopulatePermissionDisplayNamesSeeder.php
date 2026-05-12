@@ -53,6 +53,8 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
             'products.update' => 'Update Product',
             'products.show' => 'View Product',
             'products.destroy' => 'Delete Product',
+            'products.assignable' => 'Search products to assign to store',
+            'products.attach-location' => 'Attach product to store',
 
             'shared-catalog.lookup' => 'Shared catalog barcode lookup',
 
@@ -218,7 +220,7 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
             $counter = 1;
             $originalDisplayName = $newDisplayName;
             while (in_array($newDisplayName, $usedNames)) {
-                $newDisplayName = $originalDisplayName . " ({$counter})";
+                $newDisplayName = $originalDisplayName." ({$counter})";
                 $counter++;
             }
 

@@ -13,10 +13,13 @@ use App\Models\Product\ProductSoldType;
 use App\Models\SharedProduct;
 use App\Models\SharedProductSuggestion;
 use App\Services\DomainSubscriptionService;
+use App\Services\InventoryService;
 use App\Support\BarcodeNormalizer;
 use App\Support\ProductPayloadNormalizer;
 use App\Traits\LocationCategoryScoping;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -27,7 +30,8 @@ class ProductController extends Controller
     use LocationCategoryScoping;
 
     public function __construct(
-        private DomainSubscriptionService $subscriptionService
+        private DomainSubscriptionService $subscriptionService,
+        private InventoryService $inventoryService
     ) {}
 
     /**
@@ -193,6 +197,99 @@ class ProductController extends Controller
         }
 
         return Category::where('domain', $domain->name_slug)->whereRaw('0 = 1');
+    }
+
+    /**
+     * JSON: products in the domain not yet actively assigned to the given store (for attach flow).
+     */
+    public function assignable(Request $request, Domain $domain): JsonResponse
+    {
+        $validated = $request->validate([
+            'location_id' => ['required', 'integer', 'exists:inventory_locations,id'],
+            'search' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $location = $this->resolveLocationForDomainOrFail((int) $validated['location_id'], $domain);
+
+        $query = Product::query()
+            ->with('category')
+            ->where('domain', $domain->name_slug)
+            ->whereDoesntHave('activeLocations', function ($q) use ($location) {
+                $q->where('inventory_locations.id', $location->id);
+            })
+            ->when(
+                filled($validated['search'] ?? null),
+                fn ($q) => $q->search($validated['search'])
+            )
+            ->orderBy('name')
+            ->limit(20);
+
+        return response()->json([
+            'data' => ProductResource::collection($query->get()),
+        ]);
+    }
+
+    /**
+     * Attach an existing catalog product to a store (pivot); optional zero inventory row.
+     */
+    public function attachLocation(Request $request, Domain $domain, Product $product): JsonResponse
+    {
+        if ($product->domain !== $domain->name_slug) {
+            abort(403, 'Product does not belong to this organization.');
+        }
+
+        $validated = $request->validate([
+            'location_id' => ['required', 'integer', 'exists:inventory_locations,id'],
+        ]);
+
+        $location = $this->resolveLocationForDomainOrFail((int) $validated['location_id'], $domain);
+
+        if ($product->isAvailableAt($location)) {
+            return response()->json([
+                'success' => true,
+                'already_attached' => true,
+            ]);
+        }
+
+        $this->assertNoConflictingProductNameAtLocation($product, $location);
+
+        $product->addToLocation($location, true);
+        $this->inventoryService->getOrCreateInventory($product, $location);
+
+        return response()->json([
+            'success' => true,
+            'already_attached' => false,
+        ]);
+    }
+
+    /**
+     * @throws ModelNotFoundException
+     */
+    private function resolveLocationForDomainOrFail(int $locationId, Domain $domain): InventoryLocation
+    {
+        return InventoryLocation::query()
+            ->whereKey($locationId)
+            ->where('domain', $domain->name_slug)
+            ->where('is_active', true)
+            ->firstOrFail();
+    }
+
+    private function assertNoConflictingProductNameAtLocation(Product $product, InventoryLocation $location): void
+    {
+        $exists = Product::query()
+            ->where('domain', $product->domain)
+            ->where('id', '!=', $product->id)
+            ->where('name', $product->name)
+            ->whereHas('activeLocations', function ($q) use ($location) {
+                $q->where('inventory_locations.id', $location->id);
+            })
+            ->exists();
+
+        if ($exists) {
+            throw ValidationException::withMessages([
+                'product_id' => [__('Another product with the same name is already assigned to this store.')],
+            ]);
+        }
     }
 
     /**

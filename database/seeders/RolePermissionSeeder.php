@@ -112,6 +112,8 @@ class RolePermissionSeeder extends Seeder
             'products.destroy',
             'products.create',
             'products.edit',
+            'products.assignable',
+            'products.attach-location',
 
             'shared-catalog.lookup',
 
@@ -298,7 +300,7 @@ class RolePermissionSeeder extends Seeder
             // If we already have a permission with this name, make it unique by adding route info
             $existingPermission = Permission::where('name', $uniqueName)->where('guard_name', 'web')->first();
             if ($existingPermission) {
-                $uniqueName = $uniqueName . ' (' . $permission . ')';
+                $uniqueName = $uniqueName.' ('.$permission.')';
             }
 
             Permission::firstOrCreate([
@@ -415,6 +417,8 @@ class RolePermissionSeeder extends Seeder
             'products.destroy',
             'products.create',
             'products.edit',
+            'products.assignable',
+            'products.attach-location',
 
             'shared-catalog.lookup',
 
@@ -617,6 +621,8 @@ class RolePermissionSeeder extends Seeder
             'products.update',
             'products.create',
             'products.edit',
+            'products.assignable',
+            'products.attach-location',
 
             'shared-catalog.lookup',
 
@@ -769,6 +775,8 @@ class RolePermissionSeeder extends Seeder
             'products.update',
             'products.create',
             'products.edit',
+            'products.assignable',
+            'products.attach-location',
 
             'shared-catalog.lookup',
 
