@@ -426,6 +426,59 @@ class InventoryService
     }
 
     /**
+     * Tracked catalog products explicitly assigned (active) to the given store — used for
+     * category chart and KPI stock counts so they match store assortment semantics.
+     */
+    private function queryTrackedProductsAssignedToLocation(InventoryLocation $location, ?string $domain)
+    {
+        $query = Product::tracked()
+            ->whereHas('activeLocations', function ($q) use ($location) {
+                $q->where('inventory_locations.id', $location->id);
+            })
+            ->with(['category', 'inventories' => function ($q) use ($location) {
+                $q->where('location_id', $location->id);
+            }]);
+
+        if ($domain) {
+            $query->forDomain($domain);
+        }
+
+        return $query;
+    }
+
+    /**
+     * @return array{in_stock: int, low_stock: int, out_of_stock: int}
+     */
+    private function countAssignedStockStatusesAtLocation(InventoryLocation $location, ?string $domain): array
+    {
+        $products = $this->queryTrackedProductsAssignedToLocation($location, $domain)->get();
+
+        $inStock = 0;
+        $lowStock = 0;
+        $outOfStock = 0;
+
+        foreach ($products as $product) {
+            switch ($product->getStockStatus($location)) {
+                case 'in_stock':
+                    $inStock++;
+                    break;
+                case 'low_stock':
+                    $lowStock++;
+                    break;
+                default:
+                    $outOfStock++;
+                    break;
+            }
+        }
+
+        return [
+            'in_stock' => $inStock,
+            'low_stock' => $lowStock,
+            'out_of_stock' => $outOfStock,
+        ];
+    }
+
+    /**
      * Get inventory report data
      */
     public function getInventoryReport(?InventoryLocation $location = null, ?string $domain = null): array
@@ -438,12 +491,6 @@ class InventoryService
             $location = $locationQuery->first() ?? InventoryLocation::getDefault();
         }
 
-        // Filter products by domain if provided
-        $productQuery = Product::tracked();
-        if ($domain) {
-            $productQuery->forDomain($domain);
-        }
-
         // Count products directly from product_inventory table for this location
         $totalProducts = ProductInventory::where('location_id', $location->id)
             ->whereHas('product', function ($query) use ($domain) {
@@ -453,9 +500,10 @@ class InventoryService
             })
             ->count();
 
-        $inStockProducts = $productQuery->inStock($location)->count();
-        $lowStockProducts = $productQuery->lowStock($location)->count();
-        $outOfStockProducts = $productQuery->outOfStock($location)->count();
+        $assignedStatuses = $this->countAssignedStockStatusesAtLocation($location, $domain);
+        $inStockProducts = $assignedStatuses['in_stock'];
+        $lowStockProducts = $assignedStatuses['low_stock'];
+        $outOfStockProducts = $assignedStatuses['out_of_stock'];
         $totalInventoryValue = $location->getTotalInventoryValue();
 
         // Get category stock data
@@ -480,19 +528,18 @@ class InventoryService
      */
     public function getCategoryStockData(?InventoryLocation $location = null, ?string $domain = null): array
     {
-        $query = Product::tracked()
-            ->with(['category', 'inventories' => function ($q) use ($location) {
-                if ($location) {
-                    $q->where('location_id', $location->id);
-                }
-            }]);
+        if ($location) {
+            $products = $this->queryTrackedProductsAssignedToLocation($location, $domain)->get();
+        } else {
+            $query = Product::tracked()
+                ->with(['category', 'inventories']);
 
-        // Filter by domain if provided
-        if ($domain) {
-            $query->forDomain($domain);
+            if ($domain) {
+                $query->forDomain($domain);
+            }
+
+            $products = $query->get();
         }
-
-        $products = $query->get();
 
         // Group by category and calculate stock levels
         $categoryData = $products->groupBy('category.name')->map(function ($categoryProducts) use ($location) {
