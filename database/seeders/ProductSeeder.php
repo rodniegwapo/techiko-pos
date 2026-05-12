@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Category;
 use App\Models\Domain;
 use App\Models\InventoryLocation;
 use App\Models\Product\Product;
@@ -10,11 +11,8 @@ use Illuminate\Support\Str;
 
 class ProductSeeder extends Seeder
 {
-    /**
-     * Products per catalog = 9 × (number of domain locations). Keeps seeded volume comparable
-     * to the legacy per-location loop while sharing one SKU set across all stores in the domain.
-     */
-    private const PRODUCTS_PER_LOCATION_MULTIPLIER = 9;
+    /** Number of SKU rows seeded for each inventory location (distinct catalog per store). */
+    private const PRODUCTS_PER_LOCATION = 3;
 
     /**
      * Run the database seeds.
@@ -29,25 +27,32 @@ class ProductSeeder extends Seeder
                 continue;
             }
 
-            $catalogSize = max(1, $locations->count() * self::PRODUCTS_PER_LOCATION_MULTIPLIER);
             $skuBase = Str::upper(Str::limit(preg_replace('/[^A-Za-z0-9]/', '', Str::ascii($slug)), 24, ''));
 
             if ($skuBase === '') {
                 $skuBase = 'PRD';
             }
 
-            $pivotIds = $locations->mapWithKeys(fn (InventoryLocation $loc) => [
-                $loc->id => ['is_active' => true],
-            ])->all();
+            $productIndex = 0;
 
-            for ($index = 1; $index <= $catalogSize; $index++) {
-                $product = Product::factory()->create([
-                    'domain' => $slug,
-                    'SKU' => $this->skuForIndex($skuBase, $index),
-                    'barcode' => $this->seededBarcode($slug, $index),
-                ]);
+            foreach ($locations as $location) {
+                for ($k = 1; $k <= self::PRODUCTS_PER_LOCATION; $k++) {
+                    $productIndex++;
 
-                $product->locations()->syncWithoutDetaching($pivotIds);
+                    $product = Product::factory()->create([
+                        'domain' => $slug,
+                        'category_id' => Category::query()
+                            ->where('domain', $slug)
+                            ->inRandomOrder()
+                            ->value('id'),
+                        'SKU' => $this->skuForIndex($skuBase, $productIndex),
+                        'barcode' => $this->seededBarcode($slug, $productIndex),
+                    ]);
+
+                    $product->locations()->syncWithoutDetaching([
+                        $location->id => ['is_active' => true],
+                    ]);
+                }
             }
         }
     }
