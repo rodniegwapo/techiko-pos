@@ -119,7 +119,7 @@ const formattedTotal = (price) => {
                         <div
                             class="text-[10px] text-gray-300 bg-gray-600 w-fit px-2 py-[1px] rounded-full mt-1"
                         >
-                            {{ product?.category?.name }}
+                            {{ product?.category?.name ?? "Uncategorized" }}
                         </div>
                     </div>
                     <div class="text-right">
