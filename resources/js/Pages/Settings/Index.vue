@@ -15,7 +15,7 @@ const props = defineProps({
             apply_vat_automatically: false,
             vat_rate_percent: 12,
             vat_pricing_mode: "exclusive",
-            allow_overselling: true,
+            allow_overselling: false,
         }),
     },
 });
@@ -107,12 +107,10 @@ const domainName =
                                 v-model:checked="form.allow_overselling"
                             />
                             <span class="ml-2 text-sm text-gray-600">
-                                When on, unpaid stock is optional and can be
-                                reconciled automatically. When off, checkout is
-                                blocked if available quantity would go below zero.
-                                If you never configured this before, saving
-                                elsewhere keeps overselling allowed until you
-                                turn this off here.
+                                Off by default: checkout blocks selling below
+                                available quantity at this location. Turn on to
+                                allow overselling and reconcile via automatic
+                                adjustments.
                             </span>
                         </a-form-item>
                         <a-form-item>

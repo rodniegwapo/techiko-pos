@@ -134,7 +134,7 @@ class StockEnforcementTest extends TestCase
 
     public function test_permissive_checkout_succeeds_when_insufficient_stock(): void
     {
-        $ctx = $this->seedBasics([]);
+        $ctx = $this->seedBasics(['allow_overselling' => true]);
         $this->inventoryFor($ctx['product'], $ctx['location'], 2);
         $sale = $this->createPendingSale($ctx['user'], $ctx['domain'], $ctx['location'], $ctx['product'], 99);
 
@@ -223,7 +223,7 @@ class StockEnforcementTest extends TestCase
 
     public function test_offline_sync_permissive_succeeds_when_stock_insufficient(): void
     {
-        $ctx = $this->seedBasics([]);
+        $ctx = $this->seedBasics(['allow_overselling' => true]);
         $this->inventoryFor($ctx['product'], $ctx['location'], 1);
 
         $mutationId = (string) Str::uuid();
