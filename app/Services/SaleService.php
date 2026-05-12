@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Jobs\SyncSaleDraft;
+use App\Models\Domain;
 use App\Models\InventoryLocation;
 use App\Models\Product\Discount;
 use App\Models\ProductInventory;
@@ -236,6 +237,10 @@ class SaleService
         return DB::transaction(function () use ($sale, $user, $location) {
             $inventoryLocation = $this->resolveInventoryLocationForSale($sale, $location);
 
+            $inventoryLocation = $inventoryLocation
+                ?? InventoryLocation::getDefault($sale->domain)
+                ?? InventoryLocation::getDefault();
+
             // Prepare inventory items from sale items
             $inventoryItems = $sale->saleItems()->with('product')->get()->map(function ($saleItem) {
                 return [
@@ -244,6 +249,23 @@ class SaleService
                     'unit_price' => $saleItem->unit_price,
                 ];
             })->toArray();
+
+            $allowsOverselling = true;
+            if ($sale->domain) {
+                $domainModel = Domain::findBySlug($sale->domain);
+                if ($domainModel) {
+                    $allowsOverselling = $domainModel->salesAllowsOverselling();
+                }
+            }
+
+            if (! $allowsOverselling && $inventoryLocation) {
+                $qtyItems = collect($inventoryItems)->map(fn (array $row) => [
+                    'product_id' => $row['product_id'],
+                    'quantity' => $row['quantity'],
+                ])->all();
+
+                $this->inventoryService->assertSufficientStockWithLocks($qtyItems, $inventoryLocation);
+            }
 
             // Process inventory deduction
             $this->inventoryService->processSaleInventory($inventoryItems, $sale->id, $user, $inventoryLocation);
@@ -276,6 +298,49 @@ class SaleService
     public function validateNewItemStockAvailability(array $newItem, ?InventoryLocation $location = null): array
     {
         return $this->inventoryService->checkStockAvailability([$newItem], $location);
+    }
+
+    public function oversellingAdjustmentEnabled(?string $domainSlug): bool
+    {
+        if (! $domainSlug) {
+            return true;
+        }
+
+        return Domain::findBySlug($domainSlug)?->salesAllowsOverselling() ?? true;
+    }
+
+    /**
+     * Block cart mutations when the domain disallows overselling and lines exceed available qty.
+     */
+    public function enforceNoOversellForPendingSale(Domain $domain, Sale $sale): void
+    {
+        if ($domain->salesAllowsOverselling()) {
+            return;
+        }
+
+        $location = $this->resolveInventoryLocationForSale($sale);
+
+        if (! $location) {
+            return;
+        }
+
+        $aggregated = $sale->saleItems()->get()
+            ->groupBy('product_id')
+            ->map(fn ($rows) => [
+                'product_id' => (int) $rows->first()->product_id,
+                'quantity' => (int) $rows->sum('quantity'),
+            ])
+            ->values()
+            ->all();
+
+        $short = $this->inventoryService->checkStockAvailability($aggregated, $location);
+
+        if (! empty($short)) {
+            $names = collect($short)->pluck('product_name')->implode(', ');
+            throw ValidationException::withMessages([
+                'stock' => ["Insufficient stock for: {$names}"],
+            ]);
+        }
     }
 
     /**

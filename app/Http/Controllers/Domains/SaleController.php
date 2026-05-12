@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Domains;
 use App\Events\CustomerUpdated;
 use App\Events\OrderUpdated;
 use App\Events\PaymentCompleted;
+use App\Exceptions\InsufficientStockException;
 use App\Helpers;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ProductResource;
@@ -221,6 +222,8 @@ class SaleController extends Controller
             $validated['payment_card_type_id'] = null;
         }
 
+        $validated['customer_id'] ??= null;
+
         $loyaltyResults = null;
         $creditResults = null;
 
@@ -276,7 +279,17 @@ class SaleController extends Controller
                 $this->saleService->completeSale($sale, auth()->user());
 
                 // 2. Handle overselling situations (create automatic stock adjustments)
-                $oversoldItems = $this->saleService->handleOverselling($sale);
+                $oversoldItems = [];
+                if ($this->saleService->oversellingAdjustmentEnabled($sale->domain)) {
+                    $oversoldItems = $this->saleService->handleOverselling($sale);
+                }
+                if (! empty($oversoldItems)) {
+                    \Log::info('Oversell detected during sale completion', [
+                        'sale_id' => $sale->id,
+                        'invoice_number' => $sale->invoice_number,
+                        'oversold_count' => count($oversoldItems),
+                    ]);
+                }
 
                 // 3. Handle credit payment if selected
                 if ($validated['payment_method'] === 'credit') {
@@ -331,6 +344,14 @@ class SaleController extends Controller
                     }
                 }
             });
+        } catch (InsufficientStockException $e) {
+            $names = collect($e->getUnavailableItems())->pluck('product_name')->implode(', ');
+
+            return response()->json([
+                'success' => false,
+                'errors' => ['stock' => ["Insufficient stock for: {$names}"]],
+                'message' => "Insufficient stock for: {$names}",
+            ], 422);
         } catch (ValidationException $e) {
             return response()->json([
                 'success' => false,
@@ -392,32 +413,38 @@ class SaleController extends Controller
             'quantity' => 'required|integer|min:1',
         ]);
 
-        // Fetch product price from database for security and data integrity
-        $product = Product::findOrFail($validated['product_id']);
-        $unitPrice = $product->price;
+        $this->ensureSaleBelongsToDomain($sale, $domain);
 
-        // Find existing item or create new one
+        $saleId = $sale->id;
+
+        DB::transaction(function () use ($validated, $domain, $saleId) {
+            $sale = Sale::query()->whereKey($saleId)->lockForUpdate()->firstOrFail();
+            $this->ensureSaleBelongsToDomain($sale, $domain);
+
+            // Fetch product price from database for security and data integrity
+            $product = Product::findOrFail($validated['product_id']);
+            $unitPrice = $product->price;
+
+            $saleItem = $sale->saleItems()->where('product_id', $validated['product_id'])->first();
+
+            if ($saleItem) {
+                $saleItem->increment('quantity', $validated['quantity']);
+            } else {
+                $sale->saleItems()->create([
+                    'product_id' => $validated['product_id'],
+                    'quantity' => $validated['quantity'],
+                    'unit_price' => $unitPrice,
+                ]);
+            }
+
+            $sale->recalcTotals();
+
+            $this->saleService->enforceNoOversellForPendingSale($domain, $sale->fresh());
+        });
+
+        $sale->refresh()->load(['saleItems.product', 'saleDiscounts']);
         $saleItem = $sale->saleItems()->where('product_id', $validated['product_id'])->first();
-
-        if ($saleItem) {
-            // Item exists - increment quantity
-            $saleItem->increment('quantity', $validated['quantity']);
-        } else {
-            // Item doesn't exist - create new one
-            $saleItem = $sale->saleItems()->create([
-                'product_id' => $validated['product_id'],
-                'quantity' => $validated['quantity'],
-                'unit_price' => $unitPrice,
-            ]);
-        }
-
-        $sale->recalcTotals();
-
-        // Load the product relationship for the saleItem
-        $saleItem->load('product');
-
-        // Refresh the sale with all relationships
-        $sale->load(['saleItems.product', 'saleDiscounts']);
+        $saleItem?->load('product');
 
         return response()->json([
             'success' => true,
@@ -463,18 +490,28 @@ class SaleController extends Controller
             'quantity' => 'required|integer|min:1',
         ]);
 
+        $this->ensureSaleBelongsToDomain($sale, $domain);
+        $saleId = $sale->id;
+
+        DB::transaction(function () use ($validated, $domain, $saleId) {
+            $sale = Sale::query()->whereKey($saleId)->lockForUpdate()->firstOrFail();
+            $this->ensureSaleBelongsToDomain($sale, $domain);
+
+            $saleItem = $sale->saleItems()
+                ->where('product_id', $validated['product_id'])
+                ->firstOrFail();
+
+            $saleItem->update(['quantity' => $validated['quantity']]);
+            $sale->recalcTotals();
+
+            $this->saleService->enforceNoOversellForPendingSale($domain, $sale->fresh());
+        });
+
+        $sale->refresh()->load(['saleItems.product', 'saleDiscounts']);
         $saleItem = $sale->saleItems()
             ->where('product_id', $validated['product_id'])
             ->firstOrFail();
-
-        $saleItem->update(['quantity' => $validated['quantity']]);
-        $sale->recalcTotals();
-
-        // Load the product relationship for the saleItem
         $saleItem->load('product');
-
-        // Refresh the sale with all relationships
-        $sale->load(['saleItems.product', 'saleDiscounts']);
 
         return response()->json([
             'success' => true,
@@ -816,25 +853,35 @@ class SaleController extends Controller
             'quantity' => 'required|integer|min:1',
         ]);
 
-        // Fetch product price from database for security and data integrity
-        $product = Product::findOrFail($validated['product_id']);
-        $unitPrice = $product->price;
+        $saleId = $sale->id;
 
-        // Add item to cart logic here...
-        $saleItem = $sale->saleItems()->where('product_id', $validated['product_id'])->first();
+        DB::transaction(function () use ($validated, $domain, $saleId) {
+            $saleLocked = Sale::query()->whereKey($saleId)->lockForUpdate()->firstOrFail();
 
-        if ($saleItem) {
-            $saleItem->increment('quantity', $validated['quantity']);
-        } else {
-            $saleItem = $sale->saleItems()->create([
-                'product_id' => $validated['product_id'],
-                'quantity' => $validated['quantity'],
-                'unit_price' => $unitPrice,
-            ]);
-        }
+            $product = Product::findOrFail($validated['product_id']);
+            $unitPrice = $product->price;
 
-        $sale->recalcTotals();
-        $sale->load(['saleItems.product', 'saleDiscounts']);
+            $saleItem = $saleLocked->saleItems()->where('product_id', $validated['product_id'])->first();
+
+            if ($saleItem) {
+                $saleItem->increment('quantity', $validated['quantity']);
+            } else {
+                $saleLocked->saleItems()->create([
+                    'product_id' => $validated['product_id'],
+                    'quantity' => $validated['quantity'],
+                    'unit_price' => $unitPrice,
+                ]);
+            }
+
+            $saleLocked->recalcTotals();
+
+            $this->saleService->enforceNoOversellForPendingSale($domain, $saleLocked->fresh());
+        });
+
+        $sale = Sale::query()
+            ->whereKey($saleId)
+            ->with(['saleItems.product', 'saleDiscounts'])
+            ->firstOrFail();
 
         return response()->json([
             'success' => true,
@@ -984,14 +1031,22 @@ class SaleController extends Controller
             'quantity' => 'required|integer|min:1',
         ]);
 
-        $saleItem = $sale->saleItems()
-            ->where('product_id', $validated['product_id'])
-            ->firstOrFail();
+        $saleId = $sale->id;
 
-        $saleItem->update(['quantity' => $validated['quantity']]);
-        $sale->recalcTotals();
+        DB::transaction(function () use ($validated, $domain, $saleId) {
+            $saleLocked = Sale::query()->whereKey($saleId)->lockForUpdate()->firstOrFail();
 
-        $sale->load(['saleItems.product', 'saleDiscounts']);
+            $saleItem = $saleLocked->saleItems()
+                ->where('product_id', $validated['product_id'])
+                ->firstOrFail();
+
+            $saleItem->update(['quantity' => $validated['quantity']]);
+            $saleLocked->recalcTotals();
+
+            $this->saleService->enforceNoOversellForPendingSale($domain, $saleLocked->fresh());
+        });
+
+        $sale->refresh()->load(['saleItems.product', 'saleDiscounts']);
 
         return response()->json([
             'success' => true,
@@ -1236,20 +1291,22 @@ class SaleController extends Controller
             ])->validate();
         }
 
-        $stockItems = collect($payload['items'])->map(function (array $row) {
-            return [
-                'product_id' => (int) $row['product_id'],
-                'quantity' => (int) $row['quantity'],
-            ];
-        })->all();
+        if (! $domain->salesAllowsOverselling()) {
+            $stockItems = collect($payload['items'])->map(function (array $row) {
+                return [
+                    'product_id' => (int) $row['product_id'],
+                    'quantity' => (int) $row['quantity'],
+                ];
+            })->all();
 
-        $short = $this->inventoryService->checkStockAvailability($stockItems, $location);
-        if (! empty($short)) {
-            $names = collect($short)->pluck('product_name')->implode(', ');
+            $short = $this->inventoryService->checkStockAvailability($stockItems, $location);
+            if (! empty($short)) {
+                $names = collect($short)->pluck('product_name')->implode(', ');
 
-            throw ValidationException::withMessages([
-                'stock' => ["Insufficient stock for: {$names}"],
-            ]);
+                throw ValidationException::withMessages([
+                    'stock' => ["Insufficient stock for: {$names}"],
+                ]);
+            }
         }
 
         return DB::transaction(function () use ($domain, $clientMutationId, $payload, $location, $cashier) {
@@ -1318,7 +1375,9 @@ class SaleController extends Controller
                 $sale->recalcTotals();
 
                 $this->saleService->completeSale($sale, $cashier, $location);
-                $this->saleService->handleOverselling($sale);
+                if ($this->saleService->oversellingAdjustmentEnabled($domain->name_slug)) {
+                    $this->saleService->handleOverselling($sale);
+                }
 
                 $sale->refresh();
                 $sale->update([

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\InsufficientStockException;
 use App\Models\InventoryLocation;
 use App\Models\InventoryMovement;
 use App\Models\Product\Product;
@@ -66,6 +67,76 @@ class InventoryService
         }
 
         return $unavailableItems;
+    }
+
+    /**
+     * Aggregate lines, lock product_inventory rows in stable order (same transaction),
+     * then enforce available quantity sufficient for deduction.
+     *
+     * @param  array<int, array{product_id: int, quantity?: int}>  $items
+     *
+     * @throws InsufficientStockException
+     */
+    public function assertSufficientStockWithLocks(array $items, InventoryLocation $location): void
+    {
+        $aggregated = [];
+        foreach ($items as $item) {
+            $pid = (int) $item['product_id'];
+            $qty = (int) ($item['quantity'] ?? 1);
+            if ($qty < 1) {
+                $qty = 1;
+            }
+            $aggregated[$pid] = ($aggregated[$pid] ?? 0) + $qty;
+        }
+
+        $sortedProductIds = collect($aggregated)->keys()->sort()->values()->all();
+
+        foreach ($sortedProductIds as $productId) {
+            $product = Product::find($productId);
+
+            if (! $product || ! $product->track_inventory) {
+                continue;
+            }
+
+            $this->getOrCreateInventory($product, $location);
+
+            ProductInventory::query()
+                ->where('product_id', $productId)
+                ->where('location_id', $location->id)
+                ->lockForUpdate()
+                ->first();
+        }
+
+        $unavailableItems = [];
+
+        foreach ($aggregated as $productId => $requestedQuantity) {
+            $product = Product::find($productId);
+
+            if (! $product || ! $product->track_inventory) {
+                continue;
+            }
+
+            $inventory = ProductInventory::query()
+                ->where('product_id', $productId)
+                ->where('location_id', $location->id)
+                ->first();
+
+            $available = $inventory ? (int) $inventory->quantity_available : 0;
+
+            if ($available < $requestedQuantity) {
+                $unavailableItems[] = [
+                    'product_id' => $product->id,
+                    'product_name' => $product->name,
+                    'requested_quantity' => $requestedQuantity,
+                    'available_quantity' => max(0, $available),
+                    'shortage' => $requestedQuantity - max(0, $available),
+                ];
+            }
+        }
+
+        if (! empty($unavailableItems)) {
+            throw new InsufficientStockException($unavailableItems);
+        }
     }
 
     /**
