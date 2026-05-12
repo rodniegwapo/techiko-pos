@@ -77,9 +77,34 @@ class SaleController extends Controller
 
     public function products(Request $request, Domain $domain)
     {
-        $location = Helpers::getActiveLocation($domain, $request->input('location_id'));
+        $validated = $request->validate([
+            'location_id' => ['nullable', 'integer', 'exists:inventory_locations,id'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'search' => ['nullable', 'string'],
+            'category' => ['nullable', 'string'],
+        ]);
 
-        $query = Product::query()
+        $perPage = min((int) ($validated['per_page'] ?? 30), 100);
+        $page = max(1, (int) ($validated['page'] ?? 1));
+
+        $location = Helpers::getActiveLocation(
+            $domain,
+            $validated['location_id'] ?? $request->input('location_id')
+        );
+
+        if (! $location) {
+            return ProductResource::collection(collect())->additional([
+                'meta' => [
+                    'current_page' => 1,
+                    'per_page' => $perPage,
+                    'total' => 0,
+                    'last_page' => 1,
+                ],
+            ]);
+        }
+
+        $base = Product::query()
             ->where('domain', $domain->name_slug)
             ->whereHas('activeLocations', function ($q) use ($location) {
                 $q->where('location_id', $location->id);
@@ -90,13 +115,22 @@ class SaleController extends Controller
             })
             ->with('category');
 
-        // Default cap: 30 rows when not filtering (full catalog sync uses offlineCatalog).
-        $products = $query->when(
-            ! $request->input('search') && ! $request->input('category'),
-            fn ($q) => $q->limit(30)
-        )->get();
+        $total = (clone $base)->count();
+        $lastPage = max(1, (int) ceil($total / $perPage));
 
-        return ProductResource::collection($products);
+        $products = (clone $base)
+            ->orderBy('id')
+            ->forPage($page, $perPage)
+            ->get();
+
+        return ProductResource::collection($products)->additional([
+            'meta' => [
+                'current_page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'last_page' => $lastPage,
+            ],
+        ]);
     }
 
     /**

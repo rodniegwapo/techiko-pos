@@ -84,6 +84,10 @@ class ProductController extends Controller
         if (array_key_exists('category_id', $validated) && $validated['category_id'] === '') {
             $validated['category_id'] = null;
         }
+        if (array_key_exists('SKU', $validated)) {
+            $trim = isset($validated['SKU']) ? trim((string) $validated['SKU']) : '';
+            $validated['SKU'] = $trim === '' ? null : $trim;
+        }
         if (! empty($validated['barcode'])) {
             $validated['barcode'] = BarcodeNormalizer::normalize($validated['barcode']);
         } else {
