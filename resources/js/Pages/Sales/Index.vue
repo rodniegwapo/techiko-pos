@@ -42,6 +42,7 @@ import { usePage, Head, Link } from "@inertiajs/vue3";
 import { useFilters, toLabel } from "@/Composables/useFilters";
 import { watchDebounced } from "@vueuse/core";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
+import { notifyInsufficientStock } from "@/Composables/useCartStockNotification";
 
 const page = usePage();
 const { getRoute } = useDomainRoutes();
@@ -543,6 +544,7 @@ const addToCart = async (product) => {
 
         await loadCurrentPendingSale();
     } catch (error) {
+        notifyInsufficientStock(error);
         console.error("Failed to add item to cart:", error);
     } finally {
         loading.value = false;
