@@ -36,6 +36,12 @@ const { formData, errors } = useGlobalVariables();
 const { getRoute } = useDomainRoutes();
 const { checkCreditAvailability } = useCredit();
 const page = usePage();
+const domainSlug = computed(
+    () =>
+        page.props.domain?.name_slug ??
+        page.props.domain?.nameSlug ??
+        null
+);
 const creditInfo = ref(null);
 
 const salesCartIsOnline = inject(
@@ -682,10 +688,11 @@ const handleAddCustomer = async () => {
     addingCustomer.value = true;
 
     try {
-        const response = await axios.post(
-            "/api/customers",
-            newCustomerForm.value,
-        );
+        const payload = { ...newCustomerForm.value };
+        if (domainSlug.value) {
+            payload.domain = domainSlug.value;
+        }
+        const response = await axios.post("/api/customers", payload);
 
         selectedCustomer.value = response.data.customer;
         showAddCustomerModal.value = false;
