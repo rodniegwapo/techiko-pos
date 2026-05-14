@@ -30,7 +30,7 @@ const { getRoute } = useDomainRoutes();
 
 // Use permission composable
 const isSuperUser = computed(
-    () => usePage().props.auth?.user?.data?.is_super_user || false
+    () => usePage().props.auth?.user?.data?.is_super_user || false,
 );
 
 const props = defineProps({
@@ -46,9 +46,7 @@ const props = defineProps({
 });
 
 const usersAtCapacity = computed(
-    () =>
-        !!props.subscription &&
-        props.subscription.users_at_capacity === true,
+    () => !!props.subscription && props.subscription.users_at_capacity === true,
 );
 
 // Filter state
@@ -85,11 +83,11 @@ const getItems = () => {
 watchDebounced(search, getItems, { debounce: 300 });
 
 // Domain options
-const domainOptions = computed(() => 
-  (props.domains || []).map(domain => ({ 
-    label: domain.name, 
-    value: domain.name_slug 
-  }))
+const domainOptions = computed(() =>
+    (props.domains || []).map((domain) => ({
+        label: domain.name,
+        value: domain.name_slug,
+    })),
 );
 
 // Filters setup
@@ -105,8 +103,8 @@ const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
                     props.roles.map((r) => ({
                         label: r.name,
                         value: r.name,
-                    }))
-                )
+                    })),
+                ),
             ),
         },
         {
@@ -117,15 +115,19 @@ const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
                 computed(() => [
                     { label: "Active", value: "active" },
                     { label: "Inactive", value: "inactive" },
-                ])
+                ]),
             ),
         },
-        ...(props.isGlobalView ? [{
-            label: "Domain",
-            key: "domain",
-            ref: domain,
-            getLabel: toLabel(computed(() => domainOptions.value)),
-        }] : []),
+        ...(props.isGlobalView
+            ? [
+                  {
+                      label: "Domain",
+                      key: "domain",
+                      ref: domain,
+                      getLabel: toLabel(computed(() => domainOptions.value)),
+                  },
+              ]
+            : []),
     ],
 });
 
@@ -168,12 +170,12 @@ const filtersConfig = computed(() => {
 // Table composable
 const tableFilters = computed(() => {
     const baseFilters = { search, role, status };
-    
+
     // Add domain filter if in global view
     if (props.isGlobalView) {
         baseFilters.domain = domain;
     }
-    
+
     return baseFilters;
 });
 const { pagination, handleTableChange } = useTable("items", tableFilters);
@@ -267,7 +269,7 @@ const getRoleColorHex = (level) => {
         <ContentHeader class="mb-8" title="User Management" />
         <ContentLayout title="User Management">
             <template #filters>
-                <a-alert
+                <!-- <a-alert
                     v-if="
                         props.subscription?.users_at_capacity &&
                         props.subscription?.billing_url &&
@@ -283,41 +285,44 @@ const getRoleColorHex = (level) => {
                         <a class="ml-1" :href="props.subscription.billing_url">Servicing payment</a>
                         for a higher tier.
                     </template>
-                </a-alert>
+                </a-alert> -->
 
-                <div class="flex flex-wrap gap-2 items-center w-full">
-                <RefreshButton :loading="spinning" @click="getItems" />
-                <a-input-search
-                    v-model:value="search"
-                    placeholder="Search users by name or email..."
-                    class="min-w-[100px] max-w-[400px]"
-                />
-                <a-button
-                    v-if="isSuperUser || hasPermission('users.store')"
-                    :disabled="usersAtCapacity && !props.isGlobalView"
-                    @click="handleAddUser"
-                    type="primary"
-                    class="bg-white border flex items-center border-green-500 text-green-500"
-                >
-                    <template #icon>
-                        <IconPlus />
-                    </template>
-                    Add User
-                </a-button>
+                <div class="flex gap-2 items-center justify-endw-full">
+                    <RefreshButton :loading="spinning" @click="getItems" />
+                    <a-input-search
+                        v-model:value="search"
+                        placeholder="Search users by name or email..."
+                        class="min-w-[100px] max-w-[400px]"
+                    />
+                    <a-button
+                        v-if="isSuperUser || hasPermission('users.store')"
+                        :disabled="usersAtCapacity && !props.isGlobalView"
+                        @click="handleAddUser"
+                        type="primary"
+                        class="bg-white border flex items-center border-green-500 text-green-500"
+                    >
+                        <template #icon>
+                            <IconPlus />
+                        </template>
+                        Add User
+                    </a-button>
 
-                <a-button
-                    v-if="hasPermission('users.hierarchy')"
-                    @click="router.visit(getRoute('users.hierarchy'))"
-                    type="default"
-                    class="bg-white border flex items-center border-purple-500 text-purple-500"
-                >
-                    <template #icon>
-                        <IconHierarchy />
-                    </template>
-                    User Hierarchy
-                </a-button>
+                    <a-button
+                        v-if="hasPermission('users.hierarchy')"
+                        @click="router.visit(getRoute('users.hierarchy'))"
+                        type="default"
+                        class="bg-white border flex items-center border-purple-500 text-purple-500"
+                    >
+                        <template #icon>
+                            <IconHierarchy />
+                        </template>
+                        User Hierarchy
+                    </a-button>
 
-                <FilterDropdown v-model="filters" :filters="filtersConfig" />
+                    <FilterDropdown
+                        v-model="filters"
+                        :filters="filtersConfig"
+                    />
                 </div>
             </template>
 
@@ -329,7 +334,7 @@ const getRoleColorHex = (level) => {
                     @clear-all="
                         () =>
                             Object.keys(filters).forEach(
-                                (k) => (filters[k] = null)
+                                (k) => (filters[k] = null),
                             )
                     "
                 />
