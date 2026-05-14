@@ -445,13 +445,16 @@ const handleScanAndAdd = async () => {
                 (p) => p.code === q || p.barcode === q,
             );
             if (exactMatch) {
-                await addToCart({
+                const added = await addToCart({
                     id: exactMatch.id,
                     name: exactMatch.name,
                     price: exactMatch.price,
                     barcode: exactMatch.barcode,
                     code: exactMatch.code,
                 });
+                if (!added) {
+                    return;
+                }
                 message.success(`Added ${exactMatch.name} to cart`);
                 search.value = "";
             } else {
@@ -489,7 +492,10 @@ const handleScanAndAdd = async () => {
 
         if (results.length === 1) {
             const product = results[0];
-            await addToCart(product);
+            const added = await addToCart(product);
+            if (!added) {
+                return;
+            }
             message.success(`Added ${product.name} to cart`);
             search.value = "";
             getProducts();
@@ -499,7 +505,10 @@ const handleScanAndAdd = async () => {
             );
 
             if (exactMatch) {
-                await addToCart(exactMatch);
+                const added = await addToCart(exactMatch);
+                if (!added) {
+                    return;
+                }
                 message.success(`Added ${exactMatch.name} to cart`);
                 search.value = "";
                 getProducts();
@@ -545,7 +554,7 @@ const addToCart = async (product) => {
                 o.subtotal = (parseFloat(o.price) || 0) * o.quantity;
             }
             await persistOfflineCartToDexie();
-            return;
+            return true;
         }
 
         const userId = page.props.auth.user.data.id;
@@ -557,9 +566,11 @@ const addToCart = async (product) => {
         });
 
         await loadCurrentPendingSale();
+        return true;
     } catch (error) {
         notifyInsufficientStock(error);
         console.error("Failed to add item to cart:", error);
+        return false;
     } finally {
         loading.value = false;
     }
