@@ -57,6 +57,12 @@ class HandleInertiaRequests extends Middleware
             'default_store' => $request->user() ? $this->getDefaultStore($request) : null,
             'impersonation' => $impersonationService->getImpersonationData(),
             'features' => config('features'),
+            'flash' => [
+                'success' => fn () => $request->session()->get('success'),
+                'error' => fn () => $request->session()->get('error'),
+                's3_path' => fn () => $request->session()->get('s3_path'),
+                's3_url' => fn () => $request->session()->get('s3_url'),
+            ],
         ];
     }
 

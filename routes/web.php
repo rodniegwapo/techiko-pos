@@ -7,6 +7,7 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ConversationController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Dev\S3TestUploadController;
 use App\Http\Controllers\DomainController;
 use App\Http\Controllers\ImpersonationController;
 use App\Http\Controllers\InventoryController;
@@ -282,5 +283,14 @@ Route::middleware(['auth', 'verified', 'check.super.user'])->group(function () {
     Route::post('/messages/{conversation}/read', [ConversationController::class, 'markRead'])->name('messages.read');
     Route::post('/messages/{conversation}/messages', [ConversationController::class, 'storeStaff'])->name('messages.staff');
 });
+
+if (app()->environment('local', 'development') || filter_var(env('FEATURE_S3_UPLOAD_TEST', false), FILTER_VALIDATE_BOOLEAN)) {
+    Route::middleware(['auth', 'verified'])->group(function () {
+        Route::get('/dev/s3-upload-test', [S3TestUploadController::class, 'show'])->name('dev.s3-upload-test');
+        Route::post('/dev/s3-upload-test', [S3TestUploadController::class, 'store'])
+            ->middleware('throttle:10,1')
+            ->name('dev.s3-upload-test.store');
+    });
+}
 
 require __DIR__.'/auth.php';
