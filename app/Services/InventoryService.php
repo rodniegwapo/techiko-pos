@@ -2,13 +2,15 @@
 
 namespace App\Services;
 
-use App\Models\Product\Product;
-use App\Models\ProductInventory;
+use App\Exceptions\InsufficientStockException;
 use App\Models\InventoryLocation;
 use App\Models\InventoryMovement;
+use App\Models\Product\Product;
+use App\Models\ProductInventory;
 use App\Models\StockAdjustment;
 use App\Models\StockAdjustmentItem;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -38,22 +40,22 @@ class InventoryService
     /**
      * Check if sufficient stock is available for a sale
      */
-    public function checkStockAvailability(array $items, InventoryLocation $location = null): array
+    public function checkStockAvailability(array $items, ?InventoryLocation $location = null): array
     {
         $location = $location ?? InventoryLocation::getDefault();
         $unavailableItems = [];
 
         foreach ($items as $item) {
             $product = Product::find($item['product_id']);
-            
-            if (!$product || !$product->track_inventory) {
+
+            if (! $product || ! $product->track_inventory) {
                 continue; // Skip non-tracked items
             }
 
             $inventory = $this->getOrCreateInventory($product, $location);
             $requestedQuantity = $item['quantity'] ?? 1;
 
-            if (!$inventory->isInStock($requestedQuantity)) {
+            if (! $inventory->isInStock($requestedQuantity)) {
                 $unavailableItems[] = [
                     'product_id' => $product->id,
                     'product_name' => $product->name,
@@ -68,17 +70,87 @@ class InventoryService
     }
 
     /**
+     * Aggregate lines, lock product_inventory rows in stable order (same transaction),
+     * then enforce available quantity sufficient for deduction.
+     *
+     * @param  array<int, array{product_id: int, quantity?: int}>  $items
+     *
+     * @throws InsufficientStockException
+     */
+    public function assertSufficientStockWithLocks(array $items, InventoryLocation $location): void
+    {
+        $aggregated = [];
+        foreach ($items as $item) {
+            $pid = (int) $item['product_id'];
+            $qty = (int) ($item['quantity'] ?? 1);
+            if ($qty < 1) {
+                $qty = 1;
+            }
+            $aggregated[$pid] = ($aggregated[$pid] ?? 0) + $qty;
+        }
+
+        $sortedProductIds = collect($aggregated)->keys()->sort()->values()->all();
+
+        foreach ($sortedProductIds as $productId) {
+            $product = Product::find($productId);
+
+            if (! $product || ! $product->track_inventory) {
+                continue;
+            }
+
+            $this->getOrCreateInventory($product, $location);
+
+            ProductInventory::query()
+                ->where('product_id', $productId)
+                ->where('location_id', $location->id)
+                ->lockForUpdate()
+                ->first();
+        }
+
+        $unavailableItems = [];
+
+        foreach ($aggregated as $productId => $requestedQuantity) {
+            $product = Product::find($productId);
+
+            if (! $product || ! $product->track_inventory) {
+                continue;
+            }
+
+            $inventory = ProductInventory::query()
+                ->where('product_id', $productId)
+                ->where('location_id', $location->id)
+                ->first();
+
+            $available = $inventory ? (int) $inventory->quantity_available : 0;
+
+            if ($available < $requestedQuantity) {
+                $unavailableItems[] = [
+                    'product_id' => $product->id,
+                    'product_name' => $product->name,
+                    'requested_quantity' => $requestedQuantity,
+                    'available_quantity' => max(0, $available),
+                    'shortage' => $requestedQuantity - max(0, $available),
+                ];
+            }
+        }
+
+        if (! empty($unavailableItems)) {
+            throw new InsufficientStockException($unavailableItems);
+        }
+    }
+
+    /**
      * Reserve inventory for pending orders
      */
-    public function reserveInventory(array $items, InventoryLocation $location = null): bool
+    public function reserveInventory(array $items, ?InventoryLocation $location = null): bool
     {
         $location = $location ?? InventoryLocation::getDefault();
 
         return DB::transaction(function () use ($items, $location) {
             foreach ($items as $item) {
                 $product = Product::find($item['product_id']);
-                
-                if (!$product || !$product->track_inventory) {
+
+                if (! $product || ! $product->track_inventory) {
                     continue;
                 }
 
@@ -92,7 +164,7 @@ class InventoryService
                         'product_id' => $product->id,
                         'quantity' => $quantity,
                         'available' => $inventory->quantity_available,
-                        'error' => $e->getMessage()
+                        'error' => $e->getMessage(),
                     ]);
                     throw $e;
                 }
@@ -105,15 +177,15 @@ class InventoryService
     /**
      * Release reserved inventory
      */
-    public function releaseReservedInventory(array $items, InventoryLocation $location = null): bool
+    public function releaseReservedInventory(array $items, ?InventoryLocation $location = null): bool
     {
         $location = $location ?? InventoryLocation::getDefault();
 
         return DB::transaction(function () use ($items, $location) {
             foreach ($items as $item) {
                 $product = Product::find($item['product_id']);
-                
-                if (!$product || !$product->track_inventory) {
+
+                if (! $product || ! $product->track_inventory) {
                     continue;
                 }
 
@@ -130,15 +202,15 @@ class InventoryService
     /**
      * Process inventory for completed sale
      */
-    public function processSaleInventory(array $items, $saleId, User $user, InventoryLocation $location = null): bool
+    public function processSaleInventory(array $items, $saleId, User $user, ?InventoryLocation $location = null): bool
     {
         $location = $location ?? InventoryLocation::getDefault();
 
         return DB::transaction(function () use ($items, $saleId, $user, $location) {
             foreach ($items as $item) {
                 $product = Product::find($item['product_id']);
-                
-                if (!$product || !$product->track_inventory) {
+
+                if (! $product || ! $product->track_inventory) {
                     continue;
                 }
 
@@ -171,7 +243,7 @@ class InventoryService
         return DB::transaction(function () use ($data) {
             $product = Product::findOrFail($data['product_id']);
             $location = InventoryLocation::findOrFail($data['location_id']);
-            
+
             // Get or create inventory record
             $inventory = $this->getOrCreateInventory($product, $location);
 
@@ -181,13 +253,13 @@ class InventoryService
 
             // Create the movement record (domain required for domain-scoped movements listing)
             $movement = InventoryMovement::createMovement($movementPayload);
-            
+
             // Update inventory levels
             $this->updateInventoryLevels($inventory, $movement);
-            
+
             // Update product stock status
             $this->updateProductStockStatus($product);
-            
+
             Log::info('Inventory movement recorded', [
                 'product_id' => $product->id,
                 'location_id' => $location->id,
@@ -195,7 +267,7 @@ class InventoryService
                 'quantity_change' => $movement->quantity_change,
                 'new_quantity' => $inventory->fresh()->quantity_on_hand,
             ]);
-            
+
             return $movement;
         });
     }
@@ -214,16 +286,16 @@ class InventoryService
         }
 
         $inventory->quantity_on_hand = max(0, $newQuantity);
-        
+
         // Update timestamps
         $inventory->last_movement_at = now();
-        
+
         if ($movement->movement_type === 'purchase') {
             $inventory->last_restock_at = now();
         } elseif ($movement->movement_type === 'sale') {
             $inventory->last_sale_at = now();
         }
-        
+
         $inventory->save();
     }
 
@@ -232,27 +304,27 @@ class InventoryService
      */
     protected function updateProductStockStatus(Product $product): void
     {
-        if (!$product->track_inventory) {
+        if (! $product->track_inventory) {
             $product->stock_status = 'in_stock';
         } else {
             $product->stock_status = $product->getStockStatus();
         }
-        
+
         $product->save();
     }
 
     /**
      * Receive inventory from purchase/supplier
      */
-    public function receiveInventory(array $items, User $user, InventoryLocation $location = null, string $referenceType = null, int $referenceId = null): bool
+    public function receiveInventory(array $items, User $user, ?InventoryLocation $location = null, ?string $referenceType = null, ?int $referenceId = null): bool
     {
         $location = $location ?? InventoryLocation::getDefault();
 
         return DB::transaction(function () use ($items, $user, $location, $referenceType, $referenceId) {
             foreach ($items as $item) {
                 $product = Product::find($item['product_id']);
-                
-                if (!$product) {
+
+                if (! $product) {
                     continue;
                 }
 
@@ -297,11 +369,11 @@ class InventoryService
             foreach ($items as $itemData) {
                 $product = Product::findOrFail($itemData['product_id']);
                 $location = InventoryLocation::findOrFail($data['location_id']);
-                
+
                 // Get current system quantity
                 $inventory = $this->getOrCreateInventory($product, $location);
                 $systemQuantity = $inventory->quantity_on_hand;
-                
+
                 StockAdjustmentItem::create([
                     'stock_adjustment_id' => $adjustment->id,
                     'product_id' => $product->id,
@@ -324,7 +396,7 @@ class InventoryService
     /**
      * Get low stock products
      */
-    public function getLowStockProducts(InventoryLocation $location = null, string $domain = null): \Illuminate\Database\Eloquent\Collection
+    public function getLowStockProducts(?InventoryLocation $location = null, ?string $domain = null): Collection
     {
         $query = Product::tracked()
             ->lowStock($location)
@@ -346,6 +418,7 @@ class InventoryService
             $inventory = $product->inventories->where('location_id', $location->id ?? null)->first();
             $product->current_stock = $inventory ? $inventory->quantity_available : 0;
             $product->min_stock_level = $inventory ? $inventory->getEffectiveReorderLevel() : $product->reorder_level;
+
             return $product;
         });
 
@@ -353,11 +426,64 @@ class InventoryService
     }
 
     /**
+     * Tracked catalog products explicitly assigned (active) to the given store — used for
+     * category chart and KPI stock counts so they match store assortment semantics.
+     */
+    private function queryTrackedProductsAssignedToLocation(InventoryLocation $location, ?string $domain)
+    {
+        $query = Product::tracked()
+            ->whereHas('activeLocations', function ($q) use ($location) {
+                $q->where('inventory_locations.id', $location->id);
+            })
+            ->with(['category', 'inventories' => function ($q) use ($location) {
+                $q->where('location_id', $location->id);
+            }]);
+
+        if ($domain) {
+            $query->forDomain($domain);
+        }
+
+        return $query;
+    }
+
+    /**
+     * @return array{in_stock: int, low_stock: int, out_of_stock: int}
+     */
+    private function countAssignedStockStatusesAtLocation(InventoryLocation $location, ?string $domain): array
+    {
+        $products = $this->queryTrackedProductsAssignedToLocation($location, $domain)->get();
+
+        $inStock = 0;
+        $lowStock = 0;
+        $outOfStock = 0;
+
+        foreach ($products as $product) {
+            switch ($product->getStockStatus($location)) {
+                case 'in_stock':
+                    $inStock++;
+                    break;
+                case 'low_stock':
+                    $lowStock++;
+                    break;
+                default:
+                    $outOfStock++;
+                    break;
+            }
+        }
+
+        return [
+            'in_stock' => $inStock,
+            'low_stock' => $lowStock,
+            'out_of_stock' => $outOfStock,
+        ];
+    }
+
+    /**
      * Get inventory report data
      */
-    public function getInventoryReport(InventoryLocation $location = null, string $domain = null): array
+    public function getInventoryReport(?InventoryLocation $location = null, ?string $domain = null): array
     {
-        if (!$location) {
+        if (! $location) {
             $locationQuery = InventoryLocation::active();
             if ($domain) {
                 $locationQuery->forDomain($domain);
@@ -365,24 +491,19 @@ class InventoryService
             $location = $locationQuery->first() ?? InventoryLocation::getDefault();
         }
 
-        // Filter products by domain if provided
-        $productQuery = Product::tracked();
-        if ($domain) {
-            $productQuery->forDomain($domain);
-        }
-
         // Count products directly from product_inventory table for this location
         $totalProducts = ProductInventory::where('location_id', $location->id)
-            ->whereHas('product', function($query) use ($domain) {
+            ->whereHas('product', function ($query) use ($domain) {
                 if ($domain) {
                     $query->forDomain($domain);
                 }
             })
             ->count();
-        
-        $inStockProducts = $productQuery->inStock($location)->count();
-        $lowStockProducts = $productQuery->lowStock($location)->count();
-        $outOfStockProducts = $productQuery->outOfStock($location)->count();
+
+        $assignedStatuses = $this->countAssignedStockStatusesAtLocation($location, $domain);
+        $inStockProducts = $assignedStatuses['in_stock'];
+        $lowStockProducts = $assignedStatuses['low_stock'];
+        $outOfStockProducts = $assignedStatuses['out_of_stock'];
         $totalInventoryValue = $location->getTotalInventoryValue();
 
         // Get category stock data
@@ -405,21 +526,20 @@ class InventoryService
     /**
      * Get category stock data for chart
      */
-    public function getCategoryStockData(InventoryLocation $location = null, string $domain = null): array
+    public function getCategoryStockData(?InventoryLocation $location = null, ?string $domain = null): array
     {
-        $query = Product::tracked()
-            ->with(['category', 'inventories' => function ($q) use ($location) {
-                if ($location) {
-                    $q->where('location_id', $location->id);
-                }
-            }]);
+        if ($location) {
+            $products = $this->queryTrackedProductsAssignedToLocation($location, $domain)->get();
+        } else {
+            $query = Product::tracked()
+                ->with(['category', 'inventories']);
 
-        // Filter by domain if provided
-        if ($domain) {
-            $query->forDomain($domain);
+            if ($domain) {
+                $query->forDomain($domain);
+            }
+
+            $products = $query->get();
         }
-
-        $products = $query->get();
 
         // Group by category and calculate stock levels
         $categoryData = $products->groupBy('category.name')->map(function ($categoryProducts) use ($location) {
@@ -429,7 +549,7 @@ class InventoryService
 
             foreach ($categoryProducts as $product) {
                 $stockStatus = $product->getStockStatus($location);
-                
+
                 switch ($stockStatus) {
                     case 'in_stock':
                         $inStock++;
@@ -457,13 +577,13 @@ class InventoryService
     /**
      * Transfer inventory between locations
      */
-    public function transferInventory(Product $product, InventoryLocation $fromLocation, InventoryLocation $toLocation, float $quantity, User $user, string $notes = null): bool
+    public function transferInventory(Product $product, InventoryLocation $fromLocation, InventoryLocation $toLocation, float $quantity, User $user, ?string $notes = null): bool
     {
         return DB::transaction(function () use ($product, $fromLocation, $toLocation, $quantity, $user, $notes) {
             // Check if source has enough stock
             $fromInventory = $this->getOrCreateInventory($product, $fromLocation);
-            
-            if (!$fromInventory->isInStock($quantity)) {
+
+            if (! $fromInventory->isInStock($quantity)) {
                 throw new \Exception("Insufficient stock at source location. Available: {$fromInventory->quantity_available}");
             }
 

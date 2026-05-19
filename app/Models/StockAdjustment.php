@@ -37,9 +37,10 @@ class StockAdjustment extends Model
     {
         parent::boot();
 
-        // Auto-generate adjustment number
+        // Auto-generate adjustment number (use raw attributes — accessor would fake a value before persist)
         static::creating(function (StockAdjustment $adjustment) {
-            if (!$adjustment->adjustment_number) {
+            $raw = $adjustment->getAttributes()['adjustment_number'] ?? null;
+            if ($raw === null || $raw === '') {
                 $adjustment->adjustment_number = static::generateAdjustmentNumber();
             }
         });
@@ -56,7 +57,8 @@ class StockAdjustment extends Model
     // }
 
     // Add scope for easy domain filtering
-    public function scopeForDomain($query, $domain) {
+    public function scopeForDomain($query, $domain)
+    {
         return $query->where('domain', $domain);
     }
 
@@ -121,8 +123,8 @@ class StockAdjustment extends Model
      */
     public function approve(User $approver)
     {
-        if (!$this->canBeApproved()) {
-            throw new \Exception('Adjustment cannot be approved in current status: ' . $this->status);
+        if (! $this->canBeApproved()) {
+            throw new \Exception('Adjustment cannot be approved in current status: '.$this->status);
         }
 
         $this->update([
@@ -142,11 +144,12 @@ class StockAdjustment extends Model
      */
     public function reject()
     {
-        if (!in_array($this->status, ['draft', 'pending_approval'])) {
-            throw new \Exception('Adjustment cannot be rejected in current status: ' . $this->status);
+        if (! in_array($this->status, ['draft', 'pending_approval'])) {
+            throw new \Exception('Adjustment cannot be rejected in current status: '.$this->status);
         }
 
         $this->update(['status' => 'rejected']);
+
         return $this;
     }
 
@@ -160,6 +163,7 @@ class StockAdjustment extends Model
         }
 
         $this->update(['status' => 'pending_approval']);
+
         return $this;
     }
 
@@ -170,6 +174,7 @@ class StockAdjustment extends Model
     {
         $total = $this->items()->sum('total_cost_change');
         $this->update(['total_value_change' => $total]);
+
         return $total;
     }
 
@@ -218,7 +223,7 @@ class StockAdjustment extends Model
      */
     public function getStatusDisplayAttribute()
     {
-        return match($this->status) {
+        return match ($this->status) {
             'draft' => 'Draft',
             'pending_approval' => 'Pending Approval',
             'approved' => 'Approved',
@@ -232,12 +237,15 @@ class StockAdjustment extends Model
      */
     public function getAdjustmentNumberAttribute($value)
     {
-        if (!$value) {
-            // Generate and save adjustment number if missing
+        if (! $value) {
             $generated = static::generateAdjustmentNumber();
-            $this->updateQuietly(['adjustment_number' => $generated]);
+            if ($this->exists) {
+                $this->updateQuietly(['adjustment_number' => $generated]);
+            }
+
             return $generated;
         }
+
         return $value;
     }
 
@@ -246,7 +254,7 @@ class StockAdjustment extends Model
      */
     public function getReasonDisplayAttribute()
     {
-        return match($this->reason) {
+        return match ($this->reason) {
             'physical_count' => 'Physical Count',
             'damaged_goods' => 'Damaged Goods',
             'expired_goods' => 'Expired Goods',

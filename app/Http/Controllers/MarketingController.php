@@ -61,7 +61,7 @@ class MarketingController extends Controller
                 'title' => $title,
                 'description' => $description,
                 'path' => $path,
-                'ogImage' => $base.'/images/og-default.svg',
+                'ogImage' => $base.'/images/og-default.png',
             ],
         ]);
     }

@@ -1,0 +1,27 @@
+# Crawler rules for techiko-pos.com (static file; served by nginx before PHP when possible).
+# Sitemap URL is the public production host; update if the domain changes.
+
+User-agent: *
+Allow: /
+
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /profile
+Disallow: /sales
+Disallow: /products
+Disallow: /categories
+Disallow: /discounts
+Disallow: /mandatory-discounts
+Disallow: /loyalty
+Disallow: /customers
+Disallow: /void-logs
+Disallow: /inventory
+Disallow: /domains
+Disallow: /users
+Disallow: /roles
+Disallow: /permissions
+Disallow: /impersonate
+Disallow: /stop-impersonating
+Disallow: /debug-
+
+Sitemap: https://techiko-pos.com/sitemap.xml

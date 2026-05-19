@@ -2,8 +2,8 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Models\Domain;
 use App\Models\User;
-use App\Providers\RouteServiceProvider;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -20,8 +20,17 @@ class AuthenticationTest extends TestCase
 
     public function test_users_can_authenticate_using_the_login_screen(): void
     {
+        $domain = Domain::create([
+            'name' => 'Login Test Org',
+            'timezone' => 'Asia/Manila',
+            'country_code' => 'PH',
+            'is_active' => true,
+        ]);
+
         $user = User::factory()->create([
-            'is_super_user' => true,
+            'domain' => $domain->name_slug,
+            'status' => 'active',
+            'is_super_user' => false,
         ]);
 
         $response = $this->post('/login', [
@@ -30,7 +39,9 @@ class AuthenticationTest extends TestCase
         ]);
 
         $this->assertAuthenticated();
-        $response->assertRedirect(RouteServiceProvider::HOME);
+        $response->assertRedirect(
+            route('domains.sales.index', ['domain' => $user->domain]),
+        );
     }
 
     public function test_users_can_not_authenticate_with_invalid_password(): void
@@ -43,6 +54,36 @@ class AuthenticationTest extends TestCase
         ]);
 
         $this->assertGuest();
+    }
+
+    public function test_unverified_users_can_login_but_redirected_from_verified_routes(): void
+    {
+        $domain = Domain::create([
+            'name' => 'Unverified Org Test',
+            'timezone' => 'Asia/Manila',
+            'country_code' => 'PH',
+            'is_active' => true,
+        ]);
+
+        $user = User::factory()->unverified()->create([
+            'domain' => $domain->name_slug,
+            'status' => 'active',
+        ]);
+
+        $this->post('/login', [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+        $this->assertAuthenticatedAs($user);
+
+        $this->get('/dashboard')->assertRedirect(route('verification.notice'));
+
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'email' => $user->email,
+            'email_verified_at' => null,
+        ]);
     }
 
     public function test_users_can_logout(): void

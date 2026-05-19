@@ -53,6 +53,26 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
             'products.update' => 'Update Product',
             'products.show' => 'View Product',
             'products.destroy' => 'Delete Product',
+            'products.assignable' => 'Search products to assign to store',
+            'products.attach-location' => 'Attach product to store',
+
+            'shared-catalog.lookup' => 'Shared catalog barcode lookup',
+
+            'catalog.shared-products.index' => 'View shared catalog products',
+            'catalog.shared-products.store' => 'Create shared catalog product',
+            'catalog.shared-products.update' => 'Update shared catalog product',
+            'catalog.shared-products.destroy' => 'Delete shared catalog product',
+
+            'catalog.shared-product-suggestions.index' => 'View catalog suggestions',
+            'catalog.shared-product-suggestions.accept' => 'Accept catalog suggestion',
+            'catalog.shared-product-suggestions.reject' => 'Reject catalog suggestion',
+
+            'billing.servicing.index' => 'View servicing billing',
+            'billing.servicing.manual_gcash' => 'Submit manual GCash payment reference',
+
+            'billing.manual-payments.index' => 'View manual payment queue',
+            'billing.manual-payments.approve' => 'Approve manual GCash payment',
+            'billing.manual-payments.reject' => 'Reject manual GCash payment',
 
             // Categories
             'categories.index' => 'View Categories',
@@ -131,6 +151,14 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
             'payment-card-types.update' => 'Update Card Payment Type',
             'payment-card-types.destroy' => 'Delete Card Payment Type',
             'payment-card-types.money' => 'View Card Payment Money Details',
+
+            'wallet.money-movement' => 'View money movement',
+            'wallet-cash-ledger.index' => 'View cash ledger',
+            'wallet-cash-ledger.store' => 'Record cash ledger entry',
+            'wallet-cash-ledger.opening-cash.store' => 'Set opening cash',
+            'wallet-cash-ledger.counted-cash.store' => 'Submit counted cash',
+            'wallet-cash-ledger.end-shift' => 'End shift',
+            'wallet-cash-ledger.reopen-shift' => 'Reopen shift',
 
             'vat-report.index' => 'View VAT Report',
 

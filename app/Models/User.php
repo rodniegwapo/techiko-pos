@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Services\UserHierarchyService;
 use App\Traits\Searchable;
+use Illuminate\Auth\MustVerifyEmail as MustVerifyEmailTrait;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -11,9 +13,9 @@ use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasPermissions;
 use Spatie\Permission\Traits\HasRoles;
 
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
-    use HasApiTokens, HasFactory, HasPermissions, HasRoles, Notifiable, Searchable;
+    use HasApiTokens, HasFactory, HasPermissions, HasRoles, MustVerifyEmailTrait, Notifiable, Searchable;
 
     /**
      * The guard name for Spatie Permission.
@@ -162,7 +164,7 @@ class User extends Authenticatable
      */
     public function canManageUser(User $user): bool
     {
-        return \App\Services\UserHierarchyService::canManageUser($this, $user);
+        return UserHierarchyService::canManageUser($this, $user);
     }
 
     /**
@@ -170,7 +172,7 @@ class User extends Authenticatable
      */
     public function canViewUser(User $user): bool
     {
-        return \App\Services\UserHierarchyService::canViewUser($this, $user);
+        return UserHierarchyService::canViewUser($this, $user);
     }
 
     /**
@@ -178,7 +180,7 @@ class User extends Authenticatable
      */
     public function getManagedUsers()
     {
-        return \App\Services\UserHierarchyService::getUsersInHierarchy($this);
+        return UserHierarchyService::getUsersInHierarchy($this);
     }
 
     /**
@@ -186,7 +188,7 @@ class User extends Authenticatable
      */
     public function getHierarchyLevel(): int
     {
-        return \App\Services\UserHierarchyService::getUserLevel($this);
+        return UserHierarchyService::getUserLevel($this);
     }
 
     /**
@@ -208,10 +210,10 @@ class User extends Authenticatable
             return true;
         }
 
-        return $this->permissions()
-            ->where('route_name', $routeName)
-            ->orWhere('name', $routeName) // Fallback for backward compatibility
-            ->exists();
+        return $this->getAllPermissions()->contains(function ($permission) use ($routeName) {
+            return $permission->route_name === $routeName
+                || $permission->name === $routeName; // Fallback for backward compatibility
+        });
     }
 
     /**
@@ -310,6 +312,6 @@ class User extends Authenticatable
      */
     public function location()
     {
-        return $this->belongsTo(\App\Models\InventoryLocation::class);
+        return $this->belongsTo(InventoryLocation::class);
     }
 }

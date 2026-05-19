@@ -15,6 +15,7 @@ const props = defineProps({
             apply_vat_automatically: false,
             vat_rate_percent: 12,
             vat_pricing_mode: "exclusive",
+            allow_overselling: false,
         }),
     },
 });
@@ -26,6 +27,8 @@ const form = useForm({
         props.salesSettings?.vat_pricing_mode === "inclusive"
             ? "inclusive"
             : "exclusive",
+    allow_overselling:
+        props.salesSettings?.allow_overselling !== false,
 });
 
 function submit() {
@@ -96,6 +99,19 @@ const domainName =
                                 :precision="2"
                                 class="w-full max-w-xs"
                             />
+                        </a-form-item>
+                        <a-form-item
+                            label="Allow selling when out of stock at the location"
+                        >
+                            <a-switch
+                                v-model:checked="form.allow_overselling"
+                            />
+                            <span class="ml-2 text-sm text-gray-600">
+                                Off by default: checkout blocks selling below
+                                available quantity at this location. Turn on to
+                                allow overselling and reconcile via automatic
+                                adjustments.
+                            </span>
                         </a-form-item>
                         <a-form-item>
                             <a-button

@@ -39,7 +39,8 @@ class Customer extends Model
     // }
 
     // Add scope for easy domain filtering
-    public function scopeForDomain($query, $domain) {
+    public function scopeForDomain($query, $domain)
+    {
         return $query->where('domain', $domain);
     }
 
@@ -75,11 +76,11 @@ class Customer extends Model
     public function getTierInfo(): array
     {
         // Get tier from database instead of hardcoded values
-        $tierModel = \App\Models\LoyaltyTier::where('name', $this->tier ?? 'bronze')->first();
+        $tierModel = LoyaltyTier::where('name', $this->tier ?? 'bronze')->first();
 
         if (! $tierModel) {
             // Fallback to bronze if tier not found
-            $tierModel = \App\Models\LoyaltyTier::where('name', 'bronze')->first();
+            $tierModel = LoyaltyTier::where('name', 'bronze')->first();
         }
 
         if (! $tierModel) {
@@ -117,7 +118,7 @@ class Customer extends Model
         $previousTier = $this->tier;
 
         // Get appropriate tier based on spending from database
-        $newTierModel = \App\Models\LoyaltyTier::getTierForSpending($this->lifetime_spent);
+        $newTierModel = LoyaltyTier::getTierForSpending($this->lifetime_spent);
 
         if ($newTierModel && $previousTier !== $newTierModel->name) {
             $this->update([
@@ -198,7 +199,7 @@ class Customer extends Model
 
     public function canPurchaseOnCredit(float $amount): bool
     {
-        if (!$this->credit_enabled) {
+        if (! $this->credit_enabled) {
             return false;
         }
 
@@ -207,7 +208,7 @@ class Customer extends Model
 
     public function addCreditTransaction(string $type, float $amount, ?int $saleId = null, ?string $referenceNumber = null, ?string $notes = null, ?\DateTime $dueDate = null): CreditTransaction
     {
-        $balanceBefore = $this->credit_balance;
+        $balanceBefore = (float) $this->credit_balance;
 
         // Calculate new balance based on transaction type
         // For adjustment, amount can be positive (increase) or negative (decrease)
@@ -227,6 +228,11 @@ class Customer extends Model
         // For other types, store absolute value
         $transactionAmount = $type === 'adjustment' ? $amount : abs($amount);
 
+        $userId = auth()->id();
+        if ($userId === null) {
+            throw new \RuntimeException('You must be signed in to record credit transactions.');
+        }
+
         $transaction = CreditTransaction::create([
             'customer_id' => $this->id,
             'sale_id' => $saleId,
@@ -237,7 +243,7 @@ class Customer extends Model
             'due_date' => $dueDate ?? ($type === 'credit' ? now()->addDays($this->credit_terms_days) : null),
             'reference_number' => $referenceNumber,
             'notes' => $notes,
-            'user_id' => auth()->id(),
+            'user_id' => $userId,
             'domain' => $this->domain ?? null,
         ]);
 

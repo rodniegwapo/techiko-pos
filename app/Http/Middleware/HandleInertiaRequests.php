@@ -2,12 +2,14 @@
 
 namespace App\Http\Middleware;
 
+use App\Helpers;
 use App\Http\Resources\AuthUserResource;
 use App\Models\Conversation;
 use App\Models\ConversationMessage;
 use App\Models\Domain;
 use App\Models\InventoryLocation;
 use App\Services\ImpersonationService;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -54,6 +56,7 @@ class HandleInertiaRequests extends Middleware
             'availableLocations' => $this->getAvailableLocations($request),
             'default_store' => $request->user() ? $this->getDefaultStore($request) : null,
             'impersonation' => $impersonationService->getImpersonationData(),
+            'features' => config('features'),
         ];
     }
 
@@ -95,7 +98,7 @@ class HandleInertiaRequests extends Middleware
         }
 
         // Use the centralized helper function
-        return \App\Helpers::getActiveLocation($domain, $request->input('location_id'));
+        return Helpers::getActiveLocation($domain, $request->input('location_id'));
     }
 
     /**
@@ -127,7 +130,7 @@ class HandleInertiaRequests extends Middleware
     /**
      * @return array{id: int|null, messages: array<int, array<string, mixed>>}
      */
-    private function myConversationPayload(?\Illuminate\Contracts\Auth\Authenticatable $user): array
+    private function myConversationPayload(?Authenticatable $user): array
     {
         if ($user === null) {
             return ['id' => null, 'messages' => []];

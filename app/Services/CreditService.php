@@ -53,8 +53,10 @@ class CreditService
      */
     public function processPayment(Customer $customer, float $amount, array $transactionIds = [], ?string $paymentMethod = null, ?string $referenceNumber = null, ?string $notes = null, string $transactionType = 'payment'): CreditTransaction
     {
+        $balance = (float) $customer->credit_balance;
+
         // For payment and refund types, validate amount doesn't exceed balance
-        if (in_array($transactionType, ['payment', 'refund']) && abs($amount) > $customer->credit_balance) {
+        if (in_array($transactionType, ['payment', 'refund'], true) && abs((float) $amount) > $balance) {
             throw new \Exception('Payment amount cannot exceed credit balance.');
         }
 

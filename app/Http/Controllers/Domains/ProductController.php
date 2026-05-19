@@ -9,13 +9,30 @@ use App\Models\Category;
 use App\Models\Domain;
 use App\Models\InventoryLocation;
 use App\Models\Product\Product;
+use App\Models\Product\ProductSoldType;
+use App\Models\SharedProduct;
+use App\Models\SharedProductSuggestion;
+use App\Services\DomainSubscriptionService;
+use App\Services\InventoryService;
+use App\Support\BarcodeNormalizer;
+use App\Support\ProductPayloadNormalizer;
 use App\Traits\LocationCategoryScoping;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class ProductController extends Controller
 {
     use LocationCategoryScoping;
+
+    public function __construct(
+        private DomainSubscriptionService $subscriptionService,
+        private InventoryService $inventoryService
+    ) {}
 
     /**
      * Resolve active location for the given domain and request.
@@ -32,17 +49,28 @@ class ProductController extends Controller
     {
         $productId = $product?->id;
         $domainSlug = $domain?->name_slug;
+        $barcodeRules = ['nullable', 'string', 'max:255'];
+        if ($domainSlug) {
+            $barcodeRules[] = Rule::unique('products', 'barcode')
+                ->where(fn ($q) => $q->where('domain', $domainSlug))
+                ->ignore($productId);
+        } else {
+            $barcodeRules[] = Rule::unique('products', 'barcode')->ignore($productId);
+        }
 
-        return $request->validate([
+        $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'sold_type' => ['required', 'string', 'max:255', 'exists:product_sold_types,name'],
             'price' => ['required', 'numeric', 'min:0'],
             'cost' => ['nullable', 'numeric', 'min:0'],
 
-            'category_id' => ['required', 'exists:categories,id'],
-            'SKU' => ['nullable', 'string', 'max:255', 'unique:products,SKU,' . $productId],
-            'barcode' => ['nullable', 'string', 'max:255', 'unique:products,barcode,' . $productId],
+            'category_id' => ['nullable', 'exists:categories,id'],
+            'SKU' => ['nullable', 'string', 'max:255', 'unique:products,SKU,'.$productId],
+            'barcode' => $barcodeRules,
+
+            'representation_type' => ['nullable', 'string', 'in:image,color,text'],
+            'representation' => ['nullable', 'string'],
 
             'track_inventory' => ['boolean'],
             'reorder_level' => ['nullable', 'numeric', 'min:0'],
@@ -55,6 +83,64 @@ class ProductController extends Controller
             'sold_type' => 'sold type',
             'category_id' => 'category',
             'location_id' => 'location',
+        ]);
+
+        if (array_key_exists('category_id', $validated) && $validated['category_id'] === '') {
+            $validated['category_id'] = null;
+        }
+        if (array_key_exists('SKU', $validated)) {
+            $trim = isset($validated['SKU']) ? trim((string) $validated['SKU']) : '';
+            $validated['SKU'] = $trim === '' ? null : $trim;
+        }
+        if (! empty($validated['barcode'])) {
+            $validated['barcode'] = BarcodeNormalizer::normalize($validated['barcode']);
+        } else {
+            $validated['barcode'] = $validated['barcode'] ?? '';
+        }
+
+        return $validated;
+    }
+
+    /**
+     * When a tenant saves a product with a barcode not yet in the global shared catalog,
+     * queue a pending suggestion for super review (snapshot only — no pricing).
+     */
+    private function queueSharedCatalogSuggestionIfNeeded(Request $request, Domain $domain, Product $product): void
+    {
+        $norm = BarcodeNormalizer::normalize((string) $product->barcode);
+        if ($norm === '') {
+            return;
+        }
+
+        if (SharedProduct::query()->where('barcode', $norm)->exists()) {
+            return;
+        }
+
+        $alreadyPending = SharedProductSuggestion::query()
+            ->pending()
+            ->forDomain($domain->name_slug)
+            ->where('barcode', $norm)
+            ->exists();
+
+        if ($alreadyPending) {
+            return;
+        }
+
+        $categoryLabel = $product->category_id
+            ? Category::find($product->category_id)?->name
+            : null;
+
+        SharedProductSuggestion::create([
+            'domain' => $domain->name_slug,
+            'barcode' => $norm,
+            'snapshot' => [
+                'name' => $product->name,
+                'sold_type' => $product->sold_type,
+                'category_label' => $categoryLabel,
+            ],
+            'submitted_product_id' => $product->id,
+            'submitted_by' => $request->user()?->id,
+            'status' => SharedProductSuggestion::STATUS_PENDING,
         ]);
     }
 
@@ -79,16 +165,16 @@ class ProductController extends Controller
         $existingProduct = $query->first();
 
         if ($existingProduct) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
+            throw ValidationException::withMessages([
                 'name' => ['A product with this name already exists in the selected location for this domain.'],
             ]);
         }
     }
 
     /**
-     * Build the base product query scoped by domain (full catalog; not filtered by store).
+     * Build the base product query scoped by domain (optionally narrowed to a store in {@see index}).
      */
-    private function buildProductQuery(Request $request, Domain $domain): \Illuminate\Database\Eloquent\Builder
+    private function buildProductQuery(Request $request, Domain $domain): Builder
     {
         return Product::query()
             ->with('category')
@@ -102,24 +188,125 @@ class ProductController extends Controller
     }
 
     /**
-     * Build categories query derived from location if present; otherwise domain-scoped.
+     * Categories for filters: at the active store only, or empty when no store context.
      */
-    private function buildCategoriesQuery(Domain $domain)
+    private function buildCategoriesQuery(Domain $domain, ?InventoryLocation $location)
     {
-        return Category::where('domain', $domain->name_slug);
+        if ($location) {
+            return $this->getCategoriesForLocation($domain->name_slug, $location);
+        }
+
+        return Category::where('domain', $domain->name_slug)->whereRaw('0 = 1');
+    }
+
+    /**
+     * JSON: domain products already active at another store, not yet active at the given store (attach flow).
+     */
+    public function assignable(Request $request, Domain $domain): JsonResponse
+    {
+        $validated = $request->validate([
+            'location_id' => ['required', 'integer', 'exists:inventory_locations,id'],
+            'search' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $location = $this->resolveLocationForDomainOrFail((int) $validated['location_id'], $domain);
+
+        $query = Product::query()
+            ->with('category')
+            ->where('domain', $domain->name_slug)
+            ->whereDoesntHave('activeLocations', function ($q) use ($location) {
+                $q->where('inventory_locations.id', $location->id);
+            })
+            ->whereHas('activeLocations', function ($q) use ($location) {
+                $q->where('inventory_locations.id', '!=', $location->id);
+            })
+            ->when(
+                filled($validated['search'] ?? null),
+                fn ($q) => $q->search($validated['search'])
+            )
+            ->orderBy('name')
+            ->limit(20);
+
+        return response()->json([
+            'data' => ProductResource::collection($query->get()),
+        ]);
+    }
+
+    /**
+     * Attach an existing catalog product to a store (pivot); optional zero inventory row.
+     */
+    public function attachLocation(Request $request, Domain $domain, Product $product): JsonResponse
+    {
+        if ($product->domain !== $domain->name_slug) {
+            abort(403, 'Product does not belong to this organization.');
+        }
+
+        $validated = $request->validate([
+            'location_id' => ['required', 'integer', 'exists:inventory_locations,id'],
+        ]);
+
+        $location = $this->resolveLocationForDomainOrFail((int) $validated['location_id'], $domain);
+
+        if ($product->isAvailableAt($location)) {
+            return response()->json([
+                'success' => true,
+                'already_attached' => true,
+            ]);
+        }
+
+        $this->assertNoConflictingProductNameAtLocation($product, $location);
+
+        $product->addToLocation($location, true);
+        $this->inventoryService->getOrCreateInventory($product, $location);
+
+        return response()->json([
+            'success' => true,
+            'already_attached' => false,
+        ]);
+    }
+
+    /**
+     * @throws ModelNotFoundException
+     */
+    private function resolveLocationForDomainOrFail(int $locationId, Domain $domain): InventoryLocation
+    {
+        return InventoryLocation::query()
+            ->whereKey($locationId)
+            ->where('domain', $domain->name_slug)
+            ->where('is_active', true)
+            ->firstOrFail();
+    }
+
+    private function assertNoConflictingProductNameAtLocation(Product $product, InventoryLocation $location): void
+    {
+        $exists = Product::query()
+            ->where('domain', $product->domain)
+            ->where('id', '!=', $product->id)
+            ->where('name', $product->name)
+            ->whereHas('activeLocations', function ($q) use ($location) {
+                $q->where('inventory_locations.id', $location->id);
+            })
+            ->exists();
+
+        if ($exists) {
+            throw ValidationException::withMessages([
+                'product_id' => [__('Another product with the same name is already assigned to this store.')],
+            ]);
+        }
     }
 
     /**
      * Standard response for products index.
      */
-    private function respondWithIndex($products, $categoriesQuery, $location)
+    private function respondWithIndex($products, $categoriesQuery, $location, Domain $domain)
     {
         return Inertia::render('Products/Index', [
             'items' => ProductResource::collection($products),
             'categories' => $categoriesQuery->get(),
-            'sold_by_types' => \App\Models\Product\ProductSoldType::all(),
+            'sold_by_types' => ProductSoldType::all(),
             'isGlobalView' => false,
             'currentLocation' => $location,
+            'subscription' => $this->subscriptionService->subscriptionPropsForFrontend($domain),
         ]);
     }
 
@@ -129,19 +316,26 @@ class ProductController extends Controller
     public function index(Request $request, ?Domain $domain = null)
     {
         $location = $this->resolveActiveLocation($request, $domain);
-        $query = $this->buildProductQuery($request, $domain)
-            ->when($location, function ($q) use ($location) {
-                $q->with([
+        $query = $this->buildProductQuery($request, $domain);
+
+        if ($location) {
+            $query->whereHas('activeLocations', function ($q) use ($location) {
+                $q->where('inventory_locations.id', $location->id);
+            })
+                ->with([
                     'inventories' => fn ($iq) => $iq->where('location_id', $location->id),
                 ]);
-            })
-            ->latest();
+        } else {
+            $query->whereRaw('0 = 1');
+        }
+
+        $query->latest();
 
         $products = $query->paginate(15);
 
-        $categoriesQuery = $this->buildCategoriesQuery($domain);
+        $categoriesQuery = $this->buildCategoriesQuery($domain, $location);
 
-        return $this->respondWithIndex($products, $categoriesQuery, $location);
+        return $this->respondWithIndex($products, $categoriesQuery, $location, $domain);
     }
 
     /**
@@ -150,7 +344,13 @@ class ProductController extends Controller
     public function store(Request $request, ?Domain $domain = null)
     {
         $this->validateProductUniqueness($request, null, $domain);
-        $validated = $this->validatedData($request, null, $domain);
+        if ($domain) {
+            $this->subscriptionService->assertCanCreateProduct($domain);
+        }
+
+        $validated = ProductPayloadNormalizer::applyRepresentationAndCostDefaults(
+            $this->validatedData($request, null, $domain),
+        );
 
         if ($domain) {
             $validated['domain'] = $domain->name_slug;
@@ -163,6 +363,10 @@ class ProductController extends Controller
 
         if ($location) {
             $product->addToLocation($location, true);
+        }
+
+        if ($domain) {
+            $this->queueSharedCatalogSuggestionIfNeeded($request, $domain, $product);
         }
 
         return redirect()->back()->with('success', 'Product created successfully');
@@ -179,8 +383,11 @@ class ProductController extends Controller
         }
 
         $this->validateProductUniqueness($request, $product, $domain);
-        $validated = $this->validatedData($request, $product, $domain);
+        $validated = ProductPayloadNormalizer::applyRepresentationAndCostDefaults(
+            $this->validatedData($request, $product, $domain),
+        );
         $product->update($validated);
+        $product->refresh();
 
         if ($request->filled('location_id')) {
             $location = InventoryLocation::find($request->input('location_id'));
@@ -188,6 +395,8 @@ class ProductController extends Controller
                 $product->addToLocation($location, true);
             }
         }
+
+        $this->queueSharedCatalogSuggestionIfNeeded($request, $domain, $product);
 
         return redirect()->back()->with('success', 'Product updated successfully');
     }
@@ -206,19 +415,23 @@ class ProductController extends Controller
 
         return redirect()->back()->with('success', 'Product deleted successfully');
     }
+
     /**
      * Show the form for creating a new product.
      */
     public function create(Request $request, Domain $domain)
     {
         $location = $this->resolveActiveLocation($request, $domain);
-        $categoriesQuery = $this->buildCategoriesQuery($domain);
+        $categoriesQuery = $location !== null
+            ? $this->buildCategoriesQuery($domain, $location)
+            : Category::where('domain', $domain->name_slug);
 
         return Inertia::render('Products/Create', [
             'categories' => $categoriesQuery->get(),
-            'sold_by_types' => \App\Models\Product\ProductSoldType::all(),
+            'sold_by_types' => ProductSoldType::all(),
             'isGlobalView' => false,
             'currentLocation' => $location,
+            'subscription' => $this->subscriptionService->subscriptionPropsForFrontend($domain),
         ]);
     }
 
@@ -233,12 +446,14 @@ class ProductController extends Controller
         }
 
         $location = $this->resolveActiveLocation($request, $domain);
-        $categoriesQuery = $this->buildCategoriesQuery($domain);
+        $categoriesQuery = $location !== null
+            ? $this->buildCategoriesQuery($domain, $location)
+            : Category::where('domain', $domain->name_slug);
 
         return Inertia::render('Products/Edit', [
             'product' => $product,
             'categories' => $categoriesQuery->get(),
-            'sold_by_types' => \App\Models\Product\ProductSoldType::all(),
+            'sold_by_types' => ProductSoldType::all(),
             'isGlobalView' => false,
             'currentLocation' => $location,
         ]);

@@ -20,6 +20,7 @@ class DomainSettingsController extends Controller
                 'vat_pricing_mode' => in_array(data_get($settings, 'sales.vat_pricing_mode'), ['exclusive', 'inclusive'], true)
                     ? data_get($settings, 'sales.vat_pricing_mode')
                     : 'exclusive',
+                'allow_overselling' => (bool) data_get($settings, 'sales.allow_overselling', false),
             ],
         ]);
     }
@@ -30,6 +31,7 @@ class DomainSettingsController extends Controller
             'apply_vat_automatically' => ['sometimes', 'boolean'],
             'vat_rate_percent' => ['sometimes', 'numeric', 'min:0', 'max:100'],
             'vat_pricing_mode' => ['sometimes', 'string', 'in:exclusive,inclusive'],
+            'allow_overselling' => ['sometimes', 'boolean'],
         ]);
 
         $current = $domain->settings ?? [];
@@ -43,6 +45,9 @@ class DomainSettingsController extends Controller
         }
         if (array_key_exists('vat_pricing_mode', $validated)) {
             $sales['vat_pricing_mode'] = $validated['vat_pricing_mode'];
+        }
+        if (array_key_exists('allow_overselling', $validated)) {
+            $sales['allow_overselling'] = (bool) $validated['allow_overselling'];
         }
 
         $current['sales'] = $sales;

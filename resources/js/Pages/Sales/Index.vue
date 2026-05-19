@@ -42,9 +42,10 @@ import { usePage, Head, Link } from "@inertiajs/vue3";
 import { useFilters, toLabel } from "@/Composables/useFilters";
 import { watchDebounced } from "@vueuse/core";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
+import { notifyInsufficientStock } from "@/Composables/useCartStockNotification";
 
 const page = usePage();
-const { getRoute } = useDomainRoutes();
+const { getRoute, getLocationQueryFromPage } = useDomainRoutes();
 
 const isOnline = ref(
     typeof navigator !== "undefined" ? navigator.onLine : true,
@@ -66,6 +67,14 @@ const salesSettings = computed(
             apply_vat_automatically: false,
             vat_rate_percent: 12,
             vat_pricing_mode: "exclusive",
+        },
+);
+const loyaltyRedemptionSettings = computed(
+    () =>
+        page.props.loyaltyRedemptionSettings ?? {
+            points_per_currency_unit: 100,
+            max_redemption_percent_of_eligible_net: 50,
+            min_points_redemption: 1,
         },
 );
 const activeLocationId = computed(() => page.props.currentLocation?.id);
@@ -411,40 +420,71 @@ async function onReconnectPrompt() {
 }
 
 const search = ref("");
+/** Skip next debounced search-triggered getProducts (scan-driven search updates). */
+const skipNextSearchWatchFetch = ref(false);
 const category = ref();
 const spinning = ref(false);
 import { useBarcodeScanner } from "@/Composables/useBarcodeScanner";
 
 // ... (other refs)
 
+const clearSearchWithoutProductFetch = () => {
+    skipNextSearchWatchFetch.value = true;
+    search.value = "";
+};
+
 const processScan = (code) => {
-    search.value = code;
-    // Call getProducts and then try to add to cart
-    handleScanAndAdd();
+    const trimmed = String(code ?? "").trim();
+    skipNextSearchWatchFetch.value = true;
+    search.value = trimmed;
+    handleScanAndAdd(trimmed);
 };
 
 useBarcodeScanner(processScan);
 
-const handleScanAndAdd = async () => {
-    loading.value = true;
+const handleScanAndAdd = async (scannedCode) => {
+    const code = String(scannedCode ?? "").trim();
     const hide = message.loading("Processing scan...", 0);
     try {
+        if (!code) {
+            message.warning("Empty scan");
+            return;
+        }
+
         if (!salesCartIsOnline.value) {
-            const q = String(search.value || "").trim();
+            const localOffline = findProductForScan(code);
+            if (localOffline) {
+                const added = await addToCart(localOffline, {
+                    suppressPageLoading: true,
+                });
+                if (!added) {
+                    return;
+                }
+                message.success(`Added ${localOffline.name} to cart`);
+                clearSearchWithoutProductFetch();
+                return;
+            }
+
             const pool = await getOfflineScanProductPool();
             const exactMatch = pool.find(
-                (p) => p.code === q || p.barcode === q,
+                (p) => p.code === code || p.barcode === code,
             );
             if (exactMatch) {
-                await addToCart({
-                    id: exactMatch.id,
-                    name: exactMatch.name,
-                    price: exactMatch.price,
-                    barcode: exactMatch.barcode,
-                    code: exactMatch.code,
-                });
+                const added = await addToCart(
+                    {
+                        id: exactMatch.id,
+                        name: exactMatch.name,
+                        price: exactMatch.price,
+                        barcode: exactMatch.barcode,
+                        code: exactMatch.code,
+                    },
+                    { suppressPageLoading: true },
+                );
+                if (!added) {
+                    return;
+                }
                 message.success(`Added ${exactMatch.name} to cart`);
-                search.value = "";
+                clearSearchWithoutProductFetch();
             } else {
                 message.error(
                     "Product not found in your offline catalog. While online, use “Sync for offline” on Sales to download products, then try again.",
@@ -453,38 +493,74 @@ const handleScanAndAdd = async () => {
             return;
         }
 
-        const items = await axios.get(
-            getRoute("sales.products", {
-                category: category.value,
-                search: search.value,
-            }),
-        );
-        const results = items.data.data;
+        const localOnline = findProductForScan(code);
+        if (localOnline) {
+            const added = await addToCart(localOnline, {
+                suppressPageLoading: true,
+            });
+            if (!added) {
+                return;
+            }
+            message.success(`Added ${localOnline.name} to cart`);
+            clearSearchWithoutProductFetch();
+            return;
+        }
+
+        loading.value = true;
+        const locQ = getLocationQueryFromPage();
+        const locationId = locQ.location_id ?? activeLocationId.value ?? undefined;
+        const items = await axios.get(getRoute("sales.products"), {
+            params: {
+                page: 1,
+                per_page: 100,
+                search: code || undefined,
+                category: category.value || undefined,
+                ...(locationId != null && locationId !== ""
+                    ? { location_id: locationId }
+                    : {}),
+            },
+        });
+        const results = items.data.data ?? [];
+
+        const meta = items.data.meta;
+        if (meta) {
+            productsLastPage.value = meta.last_page ?? 1;
+            productsTotal.value = meta.total ?? 0;
+            productsPage.value = meta.current_page ?? 1;
+        }
 
         products.value = results;
         mergeProductLookup(results);
 
         if (results.length === 1) {
             const product = results[0];
-            await addToCart(product);
+            const added = await addToCart(product, {
+                suppressPageLoading: true,
+            });
+            if (!added) {
+                return;
+            }
             message.success(`Added ${product.name} to cart`);
-            search.value = "";
-            getProducts();
+            clearSearchWithoutProductFetch();
         } else if (results.length > 1) {
             const exactMatch = results.find(
-                (p) => p.code === search.value || p.barcode === search.value,
+                (p) => p.code === code || p.barcode === code,
             );
 
             if (exactMatch) {
-                await addToCart(exactMatch);
+                const added = await addToCart(exactMatch, {
+                    suppressPageLoading: true,
+                });
+                if (!added) {
+                    return;
+                }
                 message.success(`Added ${exactMatch.name} to cart`);
-                search.value = "";
-                getProducts();
+                clearSearchWithoutProductFetch();
             } else {
                 message.warning("Multiple products found, please select one.");
             }
         } else {
-            message.error(`Product not found: ${search.value}`);
+            message.error(`Product not found: ${code}`);
         }
     } catch (e) {
         console.error("Scan error:", e);
@@ -495,9 +571,12 @@ const handleScanAndAdd = async () => {
     }
 };
 
-const addToCart = async (product) => {
+const addToCart = async (product, options = {}) => {
+    const suppressPageLoading = options.suppressPageLoading === true;
     try {
-        loading.value = true;
+        if (!suppressPageLoading) {
+            loading.value = true;
+        }
         mergeProductLookup([product]);
 
         if (!salesCartIsOnline.value) {
@@ -522,7 +601,7 @@ const addToCart = async (product) => {
                 o.subtotal = (parseFloat(o.price) || 0) * o.quantity;
             }
             await persistOfflineCartToDexie();
-            return;
+            return true;
         }
 
         const userId = page.props.auth.user.data.id;
@@ -534,10 +613,15 @@ const addToCart = async (product) => {
         });
 
         await loadCurrentPendingSale();
+        return true;
     } catch (error) {
+        notifyInsufficientStock(error);
         console.error("Failed to add item to cart:", error);
+        return false;
     } finally {
-        loading.value = false;
+        if (!suppressPageLoading) {
+            loading.value = false;
+        }
     }
 };
 
@@ -618,12 +702,14 @@ const loadCurrentPendingSale = async () => {
             orders.value = [];
             orderDiscountAmount.value = 0;
             orderDiscountId.value = "";
+            currentSale.value = null;
         }
     } catch (error) {
         orderId.value = null;
         orders.value = [];
         orderDiscountAmount.value = 0;
         orderDiscountId.value = "";
+        currentSale.value = null;
     } finally {
         isLoadingCart.value = false;
     }
@@ -946,6 +1032,47 @@ const filtersConfig = [
 
 const products = ref([]);
 const loading = ref(false);
+const loadingMore = ref(false);
+const productsPage = ref(1);
+const productsLastPage = ref(1);
+const productsTotal = ref(0);
+const PRODUCTS_PER_PAGE = 30;
+
+const hasMoreProducts = computed(
+    () =>
+        salesCartIsOnline.value && productsPage.value < productsLastPage.value,
+);
+
+function matchesScanCode(p, code) {
+    const q = String(code ?? "").trim();
+    if (!q || !p) {
+        return false;
+    }
+    const bc = String(p.barcode ?? "").trim();
+    const cd = String(p.code ?? "").trim();
+
+    return bc === q || cd === q;
+}
+
+/** Exact barcode/SKU match on current grid or merged lookup cache (no network). */
+function findProductForScan(code) {
+    const q = String(code ?? "").trim();
+    if (!q) {
+        return null;
+    }
+    for (const p of products.value || []) {
+        if (matchesScanCode(p, q)) {
+            return p;
+        }
+    }
+    for (const p of offlineProductLookup.value || []) {
+        if (matchesScanCode(p, q)) {
+            return p;
+        }
+    }
+
+    return null;
+}
 
 onMounted(async () => {
     if (typeof window !== "undefined") {
@@ -978,10 +1105,14 @@ onBeforeUnmount(() => {
     }
 });
 
-const getProducts = async () => {
-    loading.value = true;
-    try {
-        if (!salesCartIsOnline.value) {
+function displayCategoryNameForSales(product) {
+    return product?.category?.name ?? "Uncategorized";
+}
+
+const getProducts = async ({ append = false } = {}) => {
+    if (!salesCartIsOnline.value) {
+        loading.value = true;
+        try {
             const row = await getOfflineCatalogSnapshot(
                 domainSlug.value,
                 activeLocationId.value,
@@ -990,7 +1121,7 @@ const getProducts = async () => {
             let filtered = [...list];
             if (category.value) {
                 filtered = filtered.filter(
-                    (p) => p.category?.name === category.value,
+                    (p) => displayCategoryNameForSales(p) === category.value,
                 );
             }
             const q = String(search.value || "")
@@ -1009,19 +1140,54 @@ const getProducts = async () => {
                 );
             }
             products.value = filtered.slice(0, 500);
-            return;
+        } finally {
+            loading.value = false;
         }
-        const items = await axios.get(
-            getRoute("sales.products", {
-                category: category.value,
-                search: search.value,
-            }),
-        );
-        products.value = items.data.data;
-        mergeProductLookup(products.value);
+        return;
+    }
+
+    const nextPage = append ? productsPage.value + 1 : 1;
+    if (append) {
+        loadingMore.value = true;
+    } else {
+        loading.value = true;
+    }
+    try {
+        const locQ = getLocationQueryFromPage();
+        const locationId = locQ.location_id ?? activeLocationId.value ?? undefined;
+        const res = await axios.get(getRoute("sales.products"), {
+            params: {
+                page: nextPage,
+                per_page: PRODUCTS_PER_PAGE,
+                search: search.value || undefined,
+                category: category.value || undefined,
+                ...(locationId != null && locationId !== ""
+                    ? { location_id: locationId }
+                    : {}),
+            },
+        });
+        const rows = res.data.data ?? [];
+        const meta = res.data.meta;
+        if (meta) {
+            productsLastPage.value = meta.last_page ?? 1;
+            productsTotal.value = meta.total ?? 0;
+            productsPage.value = meta.current_page ?? nextPage;
+        }
+        if (append) {
+            products.value = [...products.value, ...rows];
+        } else {
+            products.value = rows;
+        }
+        mergeProductLookup(rows);
     } finally {
         loading.value = false;
+        loadingMore.value = false;
     }
+};
+
+const loadMoreProducts = () => {
+    if (!hasMoreProducts.value || loadingMore.value || loading.value) return;
+    return getProducts({ append: true });
 };
 const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
     getItems: getProducts,
@@ -1044,6 +1210,11 @@ const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
 watchDebounced(
     search,
     () => {
+        if (skipNextSearchWatchFetch.value) {
+            skipNextSearchWatchFetch.value = false;
+
+            return;
+        }
         getProducts();
     },
     { debounce: 300 },
@@ -1139,10 +1310,15 @@ watch(
                 <ProductTable
                     :products="products"
                     :loading="loading"
+                    :loading-more="loadingMore"
+                    :has-more-products="hasMoreProducts"
+                    :products-total="productsTotal"
+                    :sales-cart-is-online="salesCartIsOnline"
                     :orders="orders"
                     :orderId="orderId"
                     @cart-updated="loadCurrentPendingSale"
                     @offline-add-product="addToCart"
+                    @load-more="loadMoreProducts"
                 />
             </template>
             <template #right-side-content>
@@ -1176,6 +1352,7 @@ watch(
                 :orderId="orderId"
                 :discountOptions="discountOptions"
                 :sales-settings="salesSettings"
+                :loyalty-redemption-settings="loyaltyRedemptionSettings"
                 :offline-payment-method="offlinePaymentMethod"
                 :cached-payment-card-types="cachedPaymentCardTypes"
                 :offline-payment-card-type-id="offlinePaymentCardTypeId"

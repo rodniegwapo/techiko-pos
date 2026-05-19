@@ -78,7 +78,7 @@ class OfflineSaleSyncTest extends TestCase
         return compact('domain', 'location', 'user', 'product');
     }
 
-    private function syncPayload(\App\Models\InventoryLocation $location, User $cashier, Product $product): array
+    private function syncPayload(InventoryLocation $location, User $cashier, Product $product): array
     {
         return [
             'items' => [

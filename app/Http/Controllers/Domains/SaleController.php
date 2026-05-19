@@ -2,6 +2,10 @@
 
 namespace App\Http\Controllers\Domains;
 
+use App\Events\CustomerUpdated;
+use App\Events\OrderUpdated;
+use App\Events\PaymentCompleted;
+use App\Exceptions\InsufficientStockException;
 use App\Helpers;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ProductResource;
@@ -9,6 +13,7 @@ use App\Models\Category;
 use App\Models\Customer;
 use App\Models\Domain;
 use App\Models\InventoryLocation;
+use App\Models\MandatoryDiscount;
 use App\Models\OfflineSaleSync;
 use App\Models\Product\Discount;
 use App\Models\Product\Product;
@@ -16,10 +21,12 @@ use App\Models\Sale;
 use App\Models\User;
 use App\Services\CreditService;
 use App\Services\InventoryService;
+use App\Services\LoyaltyRedemptionService;
 use App\Services\SaleService;
 use App\Traits\LocationCategoryScoping;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -60,14 +67,44 @@ class SaleController extends Controller
                 'vat_rate_percent' => $vat['vat_rate_percent'],
                 'vat_pricing_mode' => $vat['vat_pricing_mode'],
             ],
+            'loyaltyRedemptionSettings' => [
+                'points_per_currency_unit' => (float) config('loyalty.points_per_currency_unit', 100),
+                'max_redemption_percent_of_eligible_net' => (float) config('loyalty.max_redemption_percent_of_eligible_net', 50),
+                'min_points_redemption' => (int) config('loyalty.min_points_redemption', 1),
+            ],
         ]);
     }
 
     public function products(Request $request, Domain $domain)
     {
-        $location = Helpers::getActiveLocation($domain, $request->input('location_id'));
+        $validated = $request->validate([
+            'location_id' => ['nullable', 'integer', 'exists:inventory_locations,id'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'search' => ['nullable', 'string'],
+            'category' => ['nullable', 'string'],
+        ]);
 
-        $query = Product::query()
+        $perPage = min((int) ($validated['per_page'] ?? 30), 100);
+        $page = max(1, (int) ($validated['page'] ?? 1));
+
+        $location = Helpers::getActiveLocation(
+            $domain,
+            $validated['location_id'] ?? $request->input('location_id')
+        );
+
+        if (! $location) {
+            return ProductResource::collection(collect())->additional([
+                'meta' => [
+                    'current_page' => 1,
+                    'per_page' => $perPage,
+                    'total' => 0,
+                    'last_page' => 1,
+                ],
+            ]);
+        }
+
+        $base = Product::query()
             ->where('domain', $domain->name_slug)
             ->whereHas('activeLocations', function ($q) use ($location) {
                 $q->where('location_id', $location->id);
@@ -78,13 +115,22 @@ class SaleController extends Controller
             })
             ->with('category');
 
-        // Default cap: 30 rows when not filtering (full catalog sync uses offlineCatalog).
-        $products = $query->when(
-            ! $request->input('search') && ! $request->input('category'),
-            fn ($q) => $q->limit(30)
-        )->get();
+        $total = (clone $base)->count();
+        $lastPage = max(1, (int) ceil($total / $perPage));
 
-        return ProductResource::collection($products);
+        $products = (clone $base)
+            ->orderBy('id')
+            ->forPage($page, $perPage)
+            ->get();
+
+        return ProductResource::collection($products)->additional([
+            'meta' => [
+                'current_page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'last_page' => $lastPage,
+            ],
+        ]);
     }
 
     /**
@@ -140,11 +186,59 @@ class SaleController extends Controller
         ]);
     }
 
+    public function patchLoyaltyRedemption(Request $request, Domain $domain, Sale $sale): JsonResponse
+    {
+        $this->ensureSaleBelongsToDomain($sale, $domain);
+
+        $validated = $request->validate([
+            'loyalty_points' => ['required', 'integer', 'min:0'],
+            'customer_id' => [
+                'nullable',
+                'exists:customers,id',
+            ],
+        ]);
+
+        $points = (int) $validated['loyalty_points'];
+        $customer = null;
+
+        if ($points > 0) {
+            if (empty($validated['customer_id'])) {
+                throw ValidationException::withMessages([
+                    'customer_id' => __('Select a customer to redeem loyalty points.'),
+                ]);
+            }
+
+            $customer = Customer::query()->findOrFail($validated['customer_id']);
+
+            if ($customer->domain !== $domain->name_slug) {
+                abort(403, 'Customer does not belong to this organization.');
+            }
+        }
+
+        try {
+            app(LoyaltyRedemptionService::class)->syncPendingRedemption($domain, $sale, $customer, $points);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'errors' => $e->errors(),
+                'message' => collect($e->errors())->flatten()->first(),
+            ], 422);
+        }
+
+        $sale->refresh();
+
+        return response()->json([
+            'success' => true,
+            'sale' => $sale->fresh(),
+        ]);
+    }
+
     public function proceedPayment(Request $request, Domain $domain, Sale $sale)
     {
         $validated = $request->validate([
             'customer_id' => 'nullable|exists:customers,id',
             'sale_amount' => 'nullable|numeric|min:0',
+            'loyalty_points_to_redeem' => 'nullable|integer|min:0',
             'payment_method' => 'required|string|in:cash,card,e-wallet,credit',
         ]);
 
@@ -162,18 +256,74 @@ class SaleController extends Controller
             $validated['payment_card_type_id'] = null;
         }
 
+        $validated['customer_id'] ??= null;
+
         $loyaltyResults = null;
         $creditResults = null;
 
         $location = Helpers::getActiveLocation($domain);
+        $redemptionService = app(LoyaltyRedemptionService::class);
 
         try {
-            DB::transaction(function () use ($sale, $validated, &$loyaltyResults, &$creditResults, $location) {
+            DB::transaction(function () use (
+                $sale,
+                $validated,
+                &$loyaltyResults,
+                &$creditResults,
+                $location,
+                $domain,
+                $redemptionService,
+            ) {
+                $sale->refresh();
+
+                $redeemPoints = (int) ($validated['loyalty_points_to_redeem'] ?? 0);
+
+                if ($sale->payment_status !== 'pending') {
+                    throw new \Exception('Sale is not pending.');
+                }
+
+                // Planned loyalty redemption (updates sale totals) before deducting inventory
+                if ($redeemPoints > 0) {
+                    if (empty($validated['customer_id'])) {
+                        throw new \Exception('Customer is required to redeem loyalty points.');
+                    }
+
+                    $customerForRedemption = Customer::query()->findOrFail($validated['customer_id']);
+                    if ($customerForRedemption->domain !== $domain->name_slug) {
+                        throw new \Exception('Customer does not belong to this organization.');
+                    }
+
+                    $redemptionService->applyPendingForCheckout($sale, $customerForRedemption, $redeemPoints);
+
+                    $sale->refresh();
+
+                    if ((int) $sale->loyalty_points_redeemed > 0) {
+                        $customerForRedemption->redeemPoints((int) $sale->loyalty_points_redeemed);
+                    }
+                } elseif ((int) $sale->loyalty_points_redeemed > 0) {
+                    $sale->update([
+                        'loyalty_points_redeemed' => 0,
+                        'loyalty_discount_amount' => 0,
+                    ]);
+                    $sale->recalcTotals();
+                }
+
                 // 1. Complete sale and process inventory
+                $sale->refresh();
                 $this->saleService->completeSale($sale, auth()->user());
 
                 // 2. Handle overselling situations (create automatic stock adjustments)
-                $oversoldItems = $this->saleService->handleOverselling($sale);
+                $oversoldItems = [];
+                if ($this->saleService->oversellingAdjustmentEnabled($sale->domain)) {
+                    $oversoldItems = $this->saleService->handleOverselling($sale);
+                }
+                if (! empty($oversoldItems)) {
+                    \Log::info('Oversell detected during sale completion', [
+                        'sale_id' => $sale->id,
+                        'invoice_number' => $sale->invoice_number,
+                        'oversold_count' => count($oversoldItems),
+                    ]);
+                }
 
                 // 3. Handle credit payment if selected
                 if ($validated['payment_method'] === 'credit') {
@@ -183,8 +333,9 @@ class SaleController extends Controller
 
                     $customer = Customer::findOrFail($validated['customer_id']);
 
+                    $saleAmount = (float) $sale->fresh()->grand_total;
+
                     // Validate credit limit
-                    $saleAmount = $validated['sale_amount'] ?? $sale->grand_total;
                     $this->creditService->checkCreditLimit($customer, $saleAmount);
 
                     // Process credit sale
@@ -202,6 +353,8 @@ class SaleController extends Controller
 
                     // Link customer to sale
                     $sale->updateCustomer($customer->id);
+
+                    $loyaltyResults = $customer->processLoyaltyForSale($saleAmount);
                 } else {
                     // 4. Update payment details for non-credit payments (preserve grand_total incl. VAT)
                     $sale->refresh();
@@ -212,18 +365,33 @@ class SaleController extends Controller
                         'payment_status' => 'paid',
                     ]);
 
-                    // 5. Process loyalty if customer is provided
+                    // 5. Process loyalty if customer is provided (earn points on net amount paid)
                     if ($validated['customer_id']) {
                         $customer = Customer::findOrFail($validated['customer_id']);
 
                         // Link customer to sale and trigger order update event
                         $sale->updateCustomer($customer->id);
 
-                        // Process loyalty rewards (amount should match amount charged incl. VAT)
-                        $loyaltyResults = $customer->processLoyaltyForSale($validated['sale_amount'] ?? $sale->grand_total);
+                        $earnAmount = (float) $sale->fresh()->grand_total;
+
+                        $loyaltyResults = $customer->processLoyaltyForSale($earnAmount);
                     }
                 }
             });
+        } catch (InsufficientStockException $e) {
+            $names = collect($e->getUnavailableItems())->pluck('product_name')->implode(', ');
+
+            return response()->json([
+                'success' => false,
+                'errors' => ['stock' => ["Insufficient stock for: {$names}"]],
+                'message' => "Insufficient stock for: {$names}",
+            ], 422);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'errors' => $e->errors(),
+                'message' => collect($e->errors())->flatten()->first(),
+            ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -232,7 +400,7 @@ class SaleController extends Controller
         }
 
         // Trigger payment completed event to clear the order view
-        event(new \App\Events\PaymentCompleted($sale));
+        event(new PaymentCompleted($sale));
 
         // Return response with loyalty and credit results
         return response()->json([
@@ -243,6 +411,13 @@ class SaleController extends Controller
         ]);
     }
 
+    protected function ensureSaleBelongsToDomain(Sale $sale, Domain $domain): void
+    {
+        if ($sale->domain && $sale->domain !== $domain->name_slug) {
+            abort(404);
+        }
+    }
+
     public function storeDraft(Request $request, Domain $domain)
     {
         $user = $request->user();
@@ -250,7 +425,7 @@ class SaleController extends Controller
 
         if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
             // Admin/Super Admin: Use Helpers::getActiveLocation()
-            $location = \App\Helpers::getActiveLocation($domain);
+            $location = Helpers::getActiveLocation($domain);
             $locationId = $location?->id;
         } else {
             // Regular users: Use their assigned location
@@ -272,32 +447,38 @@ class SaleController extends Controller
             'quantity' => 'required|integer|min:1',
         ]);
 
-        // Fetch product price from database for security and data integrity
-        $product = Product::findOrFail($validated['product_id']);
-        $unitPrice = $product->price;
+        $this->ensureSaleBelongsToDomain($sale, $domain);
 
-        // Find existing item or create new one
+        $saleId = $sale->id;
+
+        DB::transaction(function () use ($validated, $domain, $saleId) {
+            $sale = Sale::query()->whereKey($saleId)->lockForUpdate()->firstOrFail();
+            $this->ensureSaleBelongsToDomain($sale, $domain);
+
+            // Fetch product price from database for security and data integrity
+            $product = Product::findOrFail($validated['product_id']);
+            $unitPrice = $product->price;
+
+            $saleItem = $sale->saleItems()->where('product_id', $validated['product_id'])->first();
+
+            if ($saleItem) {
+                $saleItem->increment('quantity', $validated['quantity']);
+            } else {
+                $sale->saleItems()->create([
+                    'product_id' => $validated['product_id'],
+                    'quantity' => $validated['quantity'],
+                    'unit_price' => $unitPrice,
+                ]);
+            }
+
+            $sale->recalcTotals();
+
+            $this->saleService->enforceNoOversellForPendingSale($domain, $sale->fresh());
+        });
+
+        $sale->refresh()->load(['saleItems.product', 'saleDiscounts']);
         $saleItem = $sale->saleItems()->where('product_id', $validated['product_id'])->first();
-
-        if ($saleItem) {
-            // Item exists - increment quantity
-            $saleItem->increment('quantity', $validated['quantity']);
-        } else {
-            // Item doesn't exist - create new one
-            $saleItem = $sale->saleItems()->create([
-                'product_id' => $validated['product_id'],
-                'quantity' => $validated['quantity'],
-                'unit_price' => $unitPrice,
-            ]);
-        }
-
-        $sale->recalcTotals();
-
-        // Load the product relationship for the saleItem
-        $saleItem->load('product');
-
-        // Refresh the sale with all relationships
-        $sale->load(['saleItems.product', 'saleDiscounts']);
+        $saleItem?->load('product');
 
         return response()->json([
             'success' => true,
@@ -343,18 +524,28 @@ class SaleController extends Controller
             'quantity' => 'required|integer|min:1',
         ]);
 
+        $this->ensureSaleBelongsToDomain($sale, $domain);
+        $saleId = $sale->id;
+
+        DB::transaction(function () use ($validated, $domain, $saleId) {
+            $sale = Sale::query()->whereKey($saleId)->lockForUpdate()->firstOrFail();
+            $this->ensureSaleBelongsToDomain($sale, $domain);
+
+            $saleItem = $sale->saleItems()
+                ->where('product_id', $validated['product_id'])
+                ->firstOrFail();
+
+            $saleItem->update(['quantity' => $validated['quantity']]);
+            $sale->recalcTotals();
+
+            $this->saleService->enforceNoOversellForPendingSale($domain, $sale->fresh());
+        });
+
+        $sale->refresh()->load(['saleItems.product', 'saleDiscounts']);
         $saleItem = $sale->saleItems()
             ->where('product_id', $validated['product_id'])
             ->firstOrFail();
-
-        $saleItem->update(['quantity' => $validated['quantity']]);
-        $sale->recalcTotals();
-
-        // Load the product relationship for the saleItem
         $saleItem->load('product');
-
-        // Refresh the sale with all relationships
-        $sale->load(['saleItems.product', 'saleDiscounts']);
 
         return response()->json([
             'success' => true,
@@ -417,7 +608,7 @@ class SaleController extends Controller
             ->get();
 
         // Get active mandatory discounts
-        $mandatoryDiscounts = \App\Models\MandatoryDiscount::where('is_active', true)
+        $mandatoryDiscounts = MandatoryDiscount::where('is_active', true)
             ->where('domain', $domain->name_slug)
             ->get();
 
@@ -474,7 +665,7 @@ class SaleController extends Controller
 
         // If customer is assigned, include customer data in response
         if ($validated['customer_id']) {
-            $customer = \App\Models\Customer::findOrFail($validated['customer_id']);
+            $customer = Customer::findOrFail($validated['customer_id']);
             $response['customer'] = [
                 'id' => $customer->id,
                 'name' => $customer->name,
@@ -496,7 +687,7 @@ class SaleController extends Controller
         ]);
 
         // Manually trigger the CustomerUpdated event
-        event(new \App\Events\CustomerUpdated($sale));
+        event(new CustomerUpdated($sale));
 
         return response()->json([
             'success' => true,
@@ -545,7 +736,7 @@ class SaleController extends Controller
         ]);
 
         // Manually trigger the OrderUpdated event
-        event(new \App\Events\OrderUpdated($sale->fresh([
+        event(new OrderUpdated($sale->fresh([
             'saleItems.product',
             'saleDiscounts',
             'saleItems.discounts',
@@ -577,7 +768,7 @@ class SaleController extends Controller
         // Apply location-based filtering based on user role
         if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
             // Admin/Super Admin: Use active location
-            $location = \App\Helpers::getActiveLocation($domain);
+            $location = Helpers::getActiveLocation($domain);
             if ($location) {
                 $query->where('location_id', $location->id);
             }
@@ -606,7 +797,7 @@ class SaleController extends Controller
         // Explicitly get the 'user' parameter from the route
         $userId = $request->route('user');
         // Verify the user exists and is accessible
-        $user = \App\Models\User::findOrFail($userId);
+        $user = User::findOrFail($userId);
 
         // Determine location based on current user's role
         $currentUser = auth()->user();
@@ -614,7 +805,7 @@ class SaleController extends Controller
 
         if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
             // Admin/Super Admin: Use Helpers::getActiveLocation()
-            $location = \App\Helpers::getActiveLocation($domain);
+            $location = Helpers::getActiveLocation($domain);
             $locationId = $location?->id;
         } else {
             // Regular users: Use their assigned location
@@ -648,7 +839,7 @@ class SaleController extends Controller
             'all_parameters' => $request->all(),
         ]);
 
-        $user = \App\Models\User::findOrFail($userId);
+        $user = User::findOrFail($userId);
 
         $currentUser = auth()->user();
         $userRole = $currentUser->roles()->first();
@@ -661,7 +852,7 @@ class SaleController extends Controller
         // Apply location-based filtering based on user role
         if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
             // Admin/Super Admin: Use active location
-            $location = \App\Helpers::getActiveLocation($domain);
+            $location = Helpers::getActiveLocation($domain);
             if ($location) {
                 $query->where('location_id', $location->id);
             }
@@ -680,7 +871,7 @@ class SaleController extends Controller
 
             if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
                 // Admin/Super Admin: Use Helpers::getActiveLocation()
-                $location = \App\Helpers::getActiveLocation($domain);
+                $location = Helpers::getActiveLocation($domain);
                 $locationId = $location?->id;
             } else {
                 // Regular users: Use their assigned location
@@ -696,25 +887,35 @@ class SaleController extends Controller
             'quantity' => 'required|integer|min:1',
         ]);
 
-        // Fetch product price from database for security and data integrity
-        $product = Product::findOrFail($validated['product_id']);
-        $unitPrice = $product->price;
+        $saleId = $sale->id;
 
-        // Add item to cart logic here...
-        $saleItem = $sale->saleItems()->where('product_id', $validated['product_id'])->first();
+        DB::transaction(function () use ($validated, $domain, $saleId) {
+            $saleLocked = Sale::query()->whereKey($saleId)->lockForUpdate()->firstOrFail();
 
-        if ($saleItem) {
-            $saleItem->increment('quantity', $validated['quantity']);
-        } else {
-            $saleItem = $sale->saleItems()->create([
-                'product_id' => $validated['product_id'],
-                'quantity' => $validated['quantity'],
-                'unit_price' => $unitPrice,
-            ]);
-        }
+            $product = Product::findOrFail($validated['product_id']);
+            $unitPrice = $product->price;
 
-        $sale->recalcTotals();
-        $sale->load(['saleItems.product', 'saleDiscounts']);
+            $saleItem = $saleLocked->saleItems()->where('product_id', $validated['product_id'])->first();
+
+            if ($saleItem) {
+                $saleItem->increment('quantity', $validated['quantity']);
+            } else {
+                $saleLocked->saleItems()->create([
+                    'product_id' => $validated['product_id'],
+                    'quantity' => $validated['quantity'],
+                    'unit_price' => $unitPrice,
+                ]);
+            }
+
+            $saleLocked->recalcTotals();
+
+            $this->saleService->enforceNoOversellForPendingSale($domain, $saleLocked->fresh());
+        });
+
+        $sale = Sale::query()
+            ->whereKey($saleId)
+            ->with(['saleItems.product', 'saleDiscounts'])
+            ->firstOrFail();
 
         return response()->json([
             'success' => true,
@@ -744,7 +945,7 @@ class SaleController extends Controller
         // Apply location-based filtering based on user role
         if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
             // Admin/Super Admin: Use active location
-            $location = \App\Helpers::getActiveLocation($domain);
+            $location = Helpers::getActiveLocation($domain);
             if ($location) {
                 $query->where('location_id', $location->id);
             }
@@ -786,7 +987,7 @@ class SaleController extends Controller
             ->where('domain', $domain->name_slug)
             ->get();
 
-        $mandatoryDiscounts = \App\Models\MandatoryDiscount::where('is_active', true)
+        $mandatoryDiscounts = MandatoryDiscount::where('is_active', true)
             ->where('domain', $domain->name_slug)
             ->get();
 
@@ -840,7 +1041,7 @@ class SaleController extends Controller
         // Apply location-based filtering based on user role
         if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
             // Admin/Super Admin: Use active location
-            $location = \App\Helpers::getActiveLocation($domain);
+            $location = Helpers::getActiveLocation($domain);
             if ($location) {
                 $query->where('location_id', $location->id);
             }
@@ -864,14 +1065,22 @@ class SaleController extends Controller
             'quantity' => 'required|integer|min:1',
         ]);
 
-        $saleItem = $sale->saleItems()
-            ->where('product_id', $validated['product_id'])
-            ->firstOrFail();
+        $saleId = $sale->id;
 
-        $saleItem->update(['quantity' => $validated['quantity']]);
-        $sale->recalcTotals();
+        DB::transaction(function () use ($validated, $domain, $saleId) {
+            $saleLocked = Sale::query()->whereKey($saleId)->lockForUpdate()->firstOrFail();
 
-        $sale->load(['saleItems.product', 'saleDiscounts']);
+            $saleItem = $saleLocked->saleItems()
+                ->where('product_id', $validated['product_id'])
+                ->firstOrFail();
+
+            $saleItem->update(['quantity' => $validated['quantity']]);
+            $saleLocked->recalcTotals();
+
+            $this->saleService->enforceNoOversellForPendingSale($domain, $saleLocked->fresh());
+        });
+
+        $sale->refresh()->load(['saleItems.product', 'saleDiscounts']);
 
         return response()->json([
             'success' => true,
@@ -954,7 +1163,7 @@ class SaleController extends Controller
         // Apply location-based filtering based on user role
         if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
             // Admin/Super Admin: Use active location
-            $location = \App\Helpers::getActiveLocation($domain);
+            $location = Helpers::getActiveLocation($domain);
             if ($location) {
                 $query->where('location_id', $location->id);
             }
@@ -1116,20 +1325,22 @@ class SaleController extends Controller
             ])->validate();
         }
 
-        $stockItems = collect($payload['items'])->map(function (array $row) {
-            return [
-                'product_id' => (int) $row['product_id'],
-                'quantity' => (int) $row['quantity'],
-            ];
-        })->all();
+        if (! $domain->salesAllowsOverselling()) {
+            $stockItems = collect($payload['items'])->map(function (array $row) {
+                return [
+                    'product_id' => (int) $row['product_id'],
+                    'quantity' => (int) $row['quantity'],
+                ];
+            })->all();
 
-        $short = $this->inventoryService->checkStockAvailability($stockItems, $location);
-        if (! empty($short)) {
-            $names = collect($short)->pluck('product_name')->implode(', ');
+            $short = $this->inventoryService->checkStockAvailability($stockItems, $location);
+            if (! empty($short)) {
+                $names = collect($short)->pluck('product_name')->implode(', ');
 
-            throw ValidationException::withMessages([
-                'stock' => ["Insufficient stock for: {$names}"],
-            ]);
+                throw ValidationException::withMessages([
+                    'stock' => ["Insufficient stock for: {$names}"],
+                ]);
+            }
         }
 
         return DB::transaction(function () use ($domain, $clientMutationId, $payload, $location, $cashier) {
@@ -1198,7 +1409,9 @@ class SaleController extends Controller
                 $sale->recalcTotals();
 
                 $this->saleService->completeSale($sale, $cashier, $location);
-                $this->saleService->handleOverselling($sale);
+                if ($this->saleService->oversellingAdjustmentEnabled($domain->name_slug)) {
+                    $this->saleService->handleOverselling($sale);
+                }
 
                 $sale->refresh();
                 $sale->update([
@@ -1214,7 +1427,7 @@ class SaleController extends Controller
                     ->whereKey($syncRow->id)
                     ->update(['sale_id' => $sale->id]);
 
-                event(new \App\Events\PaymentCompleted($sale));
+                event(new PaymentCompleted($sale));
 
                 return [
                     'client_mutation_id' => $clientMutationId,

@@ -1,18 +1,16 @@
 <?php
 
+use App\Http\Controllers\Api\OrderViewController;
+use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\InventoryLocationController;
+use App\Http\Controllers\LoyaltyController;
+use App\Http\Controllers\LoyaltyTierController;
+use App\Http\Controllers\StockAdjustmentController;
+use App\Http\Controllers\UserController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\{
-    SaleController,
-    SaleDiscountController,
-    CustomerController,
-    LoyaltyController,
-    LoyaltyTierController,
-    UserController,
-    InventoryController,
-    StockAdjustmentController,
-    InventoryLocationController
-};
 
 /*
 |--------------------------------------------------------------------------
@@ -30,8 +28,8 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
  * -----------------------
  */
 Route::prefix('orders')->group(function () {
-    Route::get('/{orderId}/view', [\App\Http\Controllers\Api\OrderViewController::class, 'show'])->name('orders.view');
-    Route::get('/recent-pending', [\App\Http\Controllers\Api\OrderViewController::class, 'getRecentPending'])->name('orders.recent-pending');
+    Route::get('/{orderId}/view', [OrderViewController::class, 'show'])->name('orders.view');
+    Route::get('/recent-pending', [OrderViewController::class, 'getRecentPending'])->name('orders.recent-pending');
 });
 
 Route::middleware(['auth:sanctum', 'user.permission'])->group(function () {
@@ -43,11 +41,10 @@ Route::middleware(['auth:sanctum', 'user.permission'])->group(function () {
      */
     // Global Dashboard API routes
     Route::prefix('dashboard')->name('dashboard.')->group(function () {
-        Route::post('/sales-chart', [\App\Http\Controllers\DashboardController::class, 'getSalesChartData'])->name('sales-chart');
+        Route::post('/sales-chart', [DashboardController::class, 'getSalesChartData'])->name('sales-chart');
     });
-    
-    // Note: Sales routes are now domain-specific and handled in routes/domains.php
 
+    // Note: Sales routes are now domain-specific and handled in routes/domains.php
 
     /**
      * -----------------------
@@ -55,14 +52,13 @@ Route::middleware(['auth:sanctum', 'user.permission'])->group(function () {
      * -----------------------
      */
     Route::prefix('customers')->group(function () {
-        Route::get('/', [CustomerController::class, 'index'])->name('customers.index');
+        Route::get('/', [CustomerController::class, 'index'])->name('api.customers.index');
         Route::get('/search', [CustomerController::class, 'search'])->name('customers.search');
         Route::get('/tier-options', [CustomerController::class, 'getTierOptions'])->name('customers.tier-options');
         Route::post('/', [CustomerController::class, 'store'])->name('customers.store');
         Route::get('/{customer}', [CustomerController::class, 'show'])->name('customers.show');
         Route::put('/{customer}', [CustomerController::class, 'update'])->name('customers.update');
     });
-
 
     /**
      * -----------------------
@@ -77,40 +73,36 @@ Route::middleware(['auth:sanctum', 'user.permission'])->group(function () {
 
         // Tier Management
         Route::apiResource('tiers', LoyaltyTierController::class)->names([
-            'index'   => 'loyalty.tiers.index',
-            'store'   => 'loyalty.tiers.store',
-            'show'    => 'loyalty.tiers.show',
-            'update'  => 'loyalty.tiers.update',
+            'index' => 'loyalty.tiers.index',
+            'store' => 'loyalty.tiers.store',
+            'show' => 'loyalty.tiers.show',
+            'update' => 'loyalty.tiers.update',
             'destroy' => 'loyalty.tiers.destroy',
         ]);
     });
-
 
     /**
      * -----------------------
      * User Management Routes
      * -----------------------
      */
-    Route::get('/users/roles', [UserController::class, 'getRoles'])->name('users.roles');
-    Route::patch('/users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
+    Route::get('/users/roles', [UserController::class, 'getRoles'])->name('api.users.roles');
+    Route::patch('/users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('api.users.toggle-status');
 
     Route::apiResource('users', UserController::class)->names([
-        'index'   => 'users.index',
-        'store'   => 'users.store',
-        'show'    => 'users.show',
-        'update'  => 'users.update',
-        'destroy' => 'users.destroy',
+        'index' => 'api.users.index',
+        'store' => 'api.users.store',
+        'show' => 'api.users.show',
+        'update' => 'api.users.update',
+        'destroy' => 'api.users.destroy',
     ]);
-
-
-
 
     /**
      * -----------------------
      * Inventory Routes
      * -----------------------
      */
-    Route::prefix('inventory')->name('inventory.')->group(function () {
+    Route::prefix('inventory')->name('api.inventory.')->group(function () {
         // Core Inventory
         Route::get('/products', [InventoryController::class, 'products'])->name('products');
         Route::get('/movements', [InventoryController::class, 'movements'])->name('movements');
@@ -129,10 +121,10 @@ Route::middleware(['auth:sanctum', 'user.permission'])->group(function () {
         Route::get('/locations/by-domain', [InventoryController::class, 'getLocationsByDomain'])->name('locations.by-domain');
         Route::get('/locations/{location}/summary', [InventoryController::class, 'getLocationSummary'])->name('locations.summary');
         Route::apiResource('locations', InventoryLocationController::class)->names([
-            'index'   => 'locations.index',
-            'store'   => 'locations.store',
-            'show'    => 'locations.show',
-            'update'  => 'locations.update',
+            'index' => 'locations.index',
+            'store' => 'locations.store',
+            'show' => 'locations.show',
+            'update' => 'locations.update',
             'destroy' => 'locations.destroy',
         ]);
         Route::get('/search/locations', [InventoryLocationController::class, 'search'])->name('search.locations');
