@@ -31,6 +31,7 @@ import ProductTable from "./components/ProductTable.vue";
 import CustomerOrder from "./components/CustomerOrder.vue";
 import TotalAmountSection from "./components/TotalAmountSection.vue";
 import SalesMobileCheckoutBar from "./components/SalesMobileCheckoutBar.vue";
+import SalesMobileOrderPreview from "./components/SalesMobileOrderPreview.vue";
 import SalesCartDrawer from "./components/SalesCartDrawer.vue";
 import { useMediaQuery } from "@vueuse/core";
 import { useSalesCartDrawer } from "@/Composables/useSalesCartDrawer";
@@ -1416,6 +1417,12 @@ watch(
                 />
             </template>
             <template #mobile-actions>
+                <SalesMobileOrderPreview
+                    :orders="orders"
+                    :order-discount-amount="orderDiscountAmount"
+                    :sales-settings="salesSettings"
+                    :current-sale="currentSale"
+                />
                 <SalesMobileCheckoutBar
                     :orders="orders"
                     :order-discount-amount="orderDiscountAmount"

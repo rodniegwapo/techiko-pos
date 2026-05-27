@@ -41,12 +41,19 @@ const { itemCount, grandTotalDisplay } = useSaleTotals({
                     {{ formattedTotal(grandTotalDisplay) }}
                 </p>
             </div>
-            <a-button type="primary" class="shrink-0" @click="openCartDrawer">
-                <template #icon>
-                    <ShoppingCartOutlined />
-                </template>
-                Cart ({{ itemCount }})
-            </a-button>
+            <a-badge
+                :count="itemCount"
+                :overflow-count="99"
+                :show-zero="false"
+                class="inline-flex shrink-0"
+            >
+                <a-button type="primary" @click="openCartDrawer">
+                    <template #icon>
+                        <ShoppingCartOutlined />
+                    </template>
+                    Cart
+                </a-button>
+            </a-badge>
         </div>
     </div>
 </template>
