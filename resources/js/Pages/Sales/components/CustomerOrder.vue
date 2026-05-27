@@ -21,16 +21,21 @@ import {
     MinusSquareOutlined,
     ExclamationCircleOutlined,
     PlusOutlined,
+    UpOutlined,
+    DownOutlined,
 } from "@ant-design/icons-vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useCredit } from "@/Composables/useCredit";
 import { notifyInsufficientStock } from "@/Composables/useCartStockNotification";
+import { useSaleTotals } from "@/Composables/useSaleTotals";
 import axios from "axios";
 import { Modal, notification } from "ant-design-vue";
 import { usePage } from "@inertiajs/vue3";
-import { useDebounceFn } from "@vueuse/core";
+import { useDebounceFn, useStorage } from "@vueuse/core";
+
+const DRAWER_ORDER_LINES_ID = "sales-drawer-order-lines";
 
 const { formData, errors } = useGlobalVariables();
 const { getRoute } = useDomainRoutes();
@@ -77,6 +82,12 @@ const props = defineProps({
         default: "sidebar",
         validator: (value) => ["sidebar", "drawer"].includes(value),
     },
+    /** Server sale row (VAT / grand_total) when cart is online — used by drawer order summary */
+    currentSale: { type: Object, default: null },
+    salesSettings: {
+        type: Object,
+        default: () => ({}),
+    },
 });
 
 const {
@@ -90,6 +101,30 @@ const {
 } = toRefs(props);
 
 const isDrawerLayout = computed(() => props.layout === "drawer");
+
+const drawerOrderItemsExpanded = useStorage(
+    "sales_drawer_order_items_expanded",
+    true,
+);
+
+const { itemCount: saleItemCount, grandTotalDisplay } = useSaleTotals({
+    orders,
+    orderDiscountAmount,
+    salesSettings: computed(() => props.salesSettings ?? {}),
+    currentSale: computed(() => props.currentSale),
+    salesCartIsOnline,
+});
+
+function toggleDrawerOrderItems() {
+    drawerOrderItemsExpanded.value = !drawerOrderItemsExpanded.value;
+}
+
+function onDrawerOrderItemsKeydown(event) {
+    if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        toggleDrawerOrderItems();
+    }
+}
 
 // Computed values
 const totalAmount = computed(() => {
@@ -781,8 +816,19 @@ defineExpose({
                 : ''
         "
     >
-    <div class="flex items-center justify-between">
-        <div class="font-semibold text-lg">Current Order</div>
+    <div class="flex shrink-0 items-center justify-between">
+        <div
+            v-if="!isDrawerLayout"
+            class="font-semibold text-lg"
+        >
+            Current Order
+        </div>
+        <span
+            v-else
+            class="text-sm font-medium text-gray-600"
+        >
+            Customer
+        </span>
         <a-switch
             v-model:checked="isLoyalCustomer"
             checked-children="Loyal"
@@ -793,7 +839,7 @@ defineExpose({
     </div>
 
     <!-- Customer Search/Display -->
-    <div class="mt-1">
+    <div :class="['mt-1', isDrawerLayout && 'shrink-0']">
         <div v-if="isLoyalCustomer" class="space-y-2 max-h-52 overflow-y-auto">
             <!-- Search Instructions -->
             <div
@@ -1014,17 +1060,85 @@ defineExpose({
     </div>
   </div> -->
 
-    <div class="relative">
+    <div
+        :class="[
+            isDrawerLayout &&
+                'relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden',
+            !isDrawerLayout && 'relative',
+        ]"
+    >
+        <!-- Flex shim: Transition alone may not behave as flex child in all cases -->
+        <div
+            :class="
+                isDrawerLayout
+                    ? 'flex min-h-0 flex-1 flex-col overflow-hidden'
+                    : ''
+            "
+        >
         <!-- Transition wrapper -->
         <Transition name="slide-x" mode="out-in">
             <!-- 🟥 ORDER SUMMARY PAGE -->
-            <div v-if="!showPayment" key="order">
+            <div
+                v-if="!showPayment"
+                key="order"
+                :class="
+                    isDrawerLayout
+                        ? 'flex min-h-0 flex-1 flex-col overflow-hidden'
+                        : ''
+                "
+            >
                 <div
+                    v-if="isDrawerLayout"
+                    class="mt-4 flex shrink-0 cursor-pointer items-center justify-between gap-2 rounded-t border border-b-0 border-gray-200 bg-gray-50 px-3 py-2"
+                    role="button"
+                    tabindex="0"
+                    :aria-expanded="drawerOrderItemsExpanded"
+                    :aria-controls="DRAWER_ORDER_LINES_ID"
+                    :aria-label="
+                        drawerOrderItemsExpanded
+                            ? 'Collapse current order'
+                            : 'Expand current order'
+                    "
+                    @click="toggleDrawerOrderItems"
+                    @keydown="onDrawerOrderItemsKeydown"
+                >
+                    <div class="min-w-0">
+                        <span class="text-sm font-semibold text-gray-700">
+                            Current order
+                        </span>
+                        <span class="ml-2 text-xs text-gray-500">
+                            <template v-if="!drawerOrderItemsExpanded">
+                                {{ saleItemCount }} item{{
+                                    saleItemCount === 1 ? "" : "s"
+                                }}
+                                · {{ formattedTotal(grandTotalDisplay) }}
+                            </template>
+                            <template v-else>
+                                {{ saleItemCount }} item{{
+                                    saleItemCount === 1 ? "" : "s"
+                                }}
+                                <template v-if="orders.length">
+                                    · {{ orders.length }} line{{
+                                        orders.length === 1 ? "" : "s"
+                                    }}
+                                </template>
+                            </template>
+                        </span>
+                    </div>
+                    <span class="shrink-0 text-gray-600">
+                        <UpOutlined v-if="drawerOrderItemsExpanded" />
+                        <DownOutlined v-else />
+                    </span>
+                </div>
+                <div
+                    v-show="!isDrawerLayout || drawerOrderItemsExpanded"
+                    :id="isDrawerLayout ? DRAWER_ORDER_LINES_ID : undefined"
                     :class="[
-                        'scrollable-orders relative flex flex-col gap-2 mt-4 overflow-auto overflow-x-hidden transition-all duration-300',
+                        'scrollable-orders relative flex flex-col gap-2 overflow-x-hidden transition-all duration-300',
                         isDrawerLayout
-                            ? 'max-h-[45dvh] min-h-0 flex-1'
-                            : {
+                            ? 'min-h-0 flex-1 overflow-y-auto border border-t-0 border-gray-200'
+                            : 'mt-4 overflow-auto',
+                        !isDrawerLayout && {
                                   'h-[calc(100vh-430px)]': !isLoyalCustomer,
                                   'h-[calc(100vh-480px)]':
                                       isLoyalCustomer && !selectedCustomer,
@@ -1241,6 +1355,7 @@ defineExpose({
                 </div>
             </div>
         </Transition>
+        </div>
     </div>
 
     </div>
