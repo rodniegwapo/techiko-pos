@@ -72,6 +72,11 @@ const props = defineProps({
     loading: { type: Boolean, default: false },
     /** Customers saved during "Sync for offline" (bounded sample). */
     offlineCachedCustomers: { type: Array, default: () => [] },
+    layout: {
+        type: String,
+        default: "sidebar",
+        validator: (value) => ["sidebar", "drawer"].includes(value),
+    },
 });
 
 const {
@@ -83,6 +88,8 @@ const {
     loading,
     offlineCachedCustomers,
 } = toRefs(props);
+
+const isDrawerLayout = computed(() => props.layout === "drawer");
 
 // Computed values
 const totalAmount = computed(() => {
@@ -767,6 +774,13 @@ defineExpose({
 </script>
 
 <template>
+    <div
+        :class="
+            isDrawerLayout
+                ? 'flex h-full min-h-0 flex-col overflow-hidden px-3 pt-2'
+                : ''
+        "
+    >
     <div class="flex items-center justify-between">
         <div class="font-semibold text-lg">Current Order</div>
         <a-switch
@@ -1008,19 +1022,21 @@ defineExpose({
                 <div
                     :class="[
                         'scrollable-orders relative flex flex-col gap-2 mt-4 overflow-auto overflow-x-hidden transition-all duration-300',
-                        {
-                            'h-[calc(100vh-430px)]': !isLoyalCustomer,
-                            'h-[calc(100vh-480px)]':
-                                isLoyalCustomer && !selectedCustomer,
-                            'h-[calc(100vh-570px)]':
-                                isLoyalCustomer &&
-                                selectedCustomer &&
-                                totalAmount <= 0,
-                            'h-[calc(100vh-540px)]':
-                                isLoyalCustomer &&
-                                selectedCustomer &&
-                                totalAmount > 0,
-                        },
+                        isDrawerLayout
+                            ? 'max-h-[45dvh] min-h-0 flex-1'
+                            : {
+                                  'h-[calc(100vh-430px)]': !isLoyalCustomer,
+                                  'h-[calc(100vh-480px)]':
+                                      isLoyalCustomer && !selectedCustomer,
+                                  'h-[calc(100vh-570px)]':
+                                      isLoyalCustomer &&
+                                      selectedCustomer &&
+                                      totalAmount <= 0,
+                                  'h-[calc(100vh-540px)]':
+                                      isLoyalCustomer &&
+                                      selectedCustomer &&
+                                      totalAmount > 0,
+                              },
                     ]"
                 >
                     <div
@@ -1225,6 +1241,8 @@ defineExpose({
                 </div>
             </div>
         </Transition>
+    </div>
+
     </div>
 
     <void-product-modal

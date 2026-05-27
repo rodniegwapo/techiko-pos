@@ -8,6 +8,7 @@ import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useCredit } from "@/Composables/useCredit";
+import { useSaleTotals } from "@/Composables/useSaleTotals";
 import { ref, computed, createVNode, toRefs, watch, inject } from "vue";
 import { Modal, notification } from "ant-design-vue";
 import { ExclamationCircleOutlined } from "@ant-design/icons-vue";
@@ -57,6 +58,11 @@ const props = defineProps({
             min_points_redemption: 1,
         }),
     },
+    layout: {
+        type: String,
+        default: "footer",
+        validator: (value) => ["footer", "compact"].includes(value),
+    },
 });
 
 const {
@@ -73,30 +79,26 @@ const emit = defineEmits([
     "discount-applied",
     "cart-updated",
     "save-offline-sale",
+    "payment-success",
     "update:offlinePaymentMethod",
     "update:offlinePaymentCardTypeId",
 ]);
 
-// Computed values
-const totalAmount = computed(() => {
-    return orders.value.reduce((sum, order) => {
-        const price = parseFloat(order.price) || 0;
-        const quantity = parseInt(order.quantity) || 0;
-        const subtotal = !isNaN(price * quantity)
-            ? price * quantity
-            : quantity * price;
-        return sum + subtotal;
-    }, 0);
+const {
+    salesSettingsResolved,
+    totalAmount,
+    isInclusive,
+    netAfterOrderDiscount,
+    taxAmountDisplay,
+    grandTotalDisplay,
+    netExVatDisplay,
+} = useSaleTotals({
+    orders,
+    orderDiscountAmount,
+    salesSettings: computed(() => props.salesSettings),
+    currentSale,
+    salesCartIsOnline,
 });
-
-const salesSettingsResolved = computed(
-    () =>
-        props.salesSettings ?? {
-            apply_vat_automatically: false,
-            vat_rate_percent: 12,
-            vat_pricing_mode: "exclusive",
-        },
-);
 
 const loyaltyCfg = computed(
     () =>
@@ -217,68 +219,6 @@ async function onLoyaltyModalApply(points) {
     loyaltyRedemptionModalOpen.value = false;
     await syncLoyaltyRedemptionPatch();
 }
-
-const isInclusive = computed(
-    () => salesSettingsResolved.value.vat_pricing_mode === "inclusive",
-);
-
-const netAfterOrderDiscount = computed(() =>
-    Math.max(
-        0,
-        Number(totalAmount.value) -
-            (parseFloat(orderDiscountAmount.value) || 0),
-    ),
-);
-
-const taxAmountDisplay = computed(() => {
-    if (!salesSettingsResolved.value.apply_vat_automatically) {
-        return 0;
-    }
-    if (
-        salesCartIsOnline.value &&
-        currentSale.value &&
-        currentSale.value.tax_amount != null
-    ) {
-        return Number(currentSale.value.tax_amount) || 0;
-    }
-    const rate =
-        (Number(salesSettingsResolved.value.vat_rate_percent) || 12) / 100;
-    const net = netAfterOrderDiscount.value;
-    if (isInclusive.value) {
-        return Math.round(net * (rate / (1 + rate)) * 100) / 100;
-    }
-    return Math.round(net * rate * 100) / 100;
-});
-
-const grandTotalDisplay = computed(() => {
-    if (
-        salesCartIsOnline.value &&
-        currentSale.value &&
-        currentSale.value.grand_total != null
-    ) {
-        return Number(currentSale.value.grand_total) || 0;
-    }
-    if (
-        salesSettingsResolved.value.apply_vat_automatically &&
-        isInclusive.value
-    ) {
-        return netAfterOrderDiscount.value;
-    }
-    return netAfterOrderDiscount.value + taxAmountDisplay.value;
-});
-
-const netExVatDisplay = computed(() => {
-    if (!salesSettingsResolved.value.apply_vat_automatically) {
-        return 0;
-    }
-    if (!isInclusive.value) {
-        return 0;
-    }
-    return Math.max(
-        0,
-        Number(grandTotalDisplay.value) - Number(taxAmountDisplay.value),
-    );
-});
 
 // Using formattedTotal from useHelpers composable
 
@@ -605,6 +545,7 @@ const handleProceedPayment = async () => {
 
         // Refresh current pending sale data to show updated state
         emit("cart-updated");
+        emit("payment-success");
 
         localStorage.setItem("order_discount_amount", 0);
         localStorage.setItem("order_discount_ids", "");
@@ -730,9 +671,20 @@ const creditLimitSufficient = computed(() => {
 
 <template>
     <div class="bg-white">
-        <div class="px-6 max-w-7xl mx-auto py-4 shadow-sm">
-            <!-- Horizontal Layout - Single Row -->
-            <div class="flex items-center justify-between gap-6">
+        <div
+            :class="
+                layout === 'compact'
+                    ? 'px-3 py-3'
+                    : 'px-6 max-w-7xl mx-auto py-4 shadow-sm'
+            "
+        >
+            <div
+                :class="
+                    layout === 'compact'
+                        ? 'flex flex-col gap-3'
+                        : 'flex items-center justify-between gap-6'
+                "
+            >
                 <!-- Order Discount -->
                 <div class="flex items-center gap-2">
                     <span class="text-gray-700 whitespace-nowrap"
@@ -853,7 +805,13 @@ const creditLimitSufficient = computed(() => {
             </div>
 
             <hr class="mt-4" />
-            <div class="p-2 flex gap-8">
+            <div
+                :class="
+                    layout === 'compact'
+                        ? 'flex flex-col gap-4 p-2'
+                        : 'p-2 flex gap-8'
+                "
+            >
                 <!-- Payment Method -->
                 <div class="flex items-start flex-col gap-2">
                     <span class="text-gray-700 whitespace-nowrap"
@@ -955,8 +913,10 @@ const creditLimitSufficient = computed(() => {
                     <a-button
                         v-if="salesCartIsOnline"
                         type="primary"
-                        class="w-[300px]"
-                        :class="disabledPaymentButtonColor"
+                        :class="[
+                            layout === 'compact' ? 'w-full' : 'w-[300px]',
+                            disabledPaymentButtonColor,
+                        ]"
                         @click="handleProceedPaymentConfirmation"
                         :disabled="
                             proceedPaymentLoading ||
@@ -975,7 +935,11 @@ const creditLimitSufficient = computed(() => {
                     <a-button
                         v-else
                         type="primary"
-                        class="w-[300px] bg-amber-700 border-amber-700 hover:bg-amber-600"
+                        :class="
+                            layout === 'compact'
+                                ? 'w-full bg-amber-700 border-amber-700 hover:bg-amber-600'
+                                : 'w-[300px] bg-amber-700 border-amber-700 hover:bg-amber-600'
+                        "
                         :disabled="
                             orders.length == 0 ||
                             (paymentMethod === 'card' &&
