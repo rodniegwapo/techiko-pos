@@ -12,6 +12,7 @@ class EncryptCookies extends Middleware
      * @var array<int, string>
      */
     protected $except = [
-        //
+        // Required for Axios `X-XSRF-TOKEN` header (plaintext cookie Laravel sets for CSRF)
+        'XSRF-TOKEN',
     ];
 }

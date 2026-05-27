@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests\Desktop;
 
-use App\Models\Domain;
+use App\Support\Desktop\DesktopPostLoginValidator;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Validation\Rule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -41,37 +41,9 @@ class DesktopLoginRequest extends FormRequest
             $this->throwValidationError(trans('auth.failed'));
         }
 
-        $user = Auth::user();
-
-        if ($user && $user->isSuperUser() && config('nativephp-internal.running')) {
-            $this->logoutAndFail('The desktop app is for organization accounts. Use the web app for administrator access.');
-        }
-
-        if ($user && ! $user->isSuperUser()) {
-            $this->validateDomainAndUser($user);
-        }
+        DesktopPostLoginValidator::validate(Auth::user());
 
         RateLimiter::clear($this->throttleKey());
-    }
-
-    /**
-     * @throws ValidationException
-     */
-    protected function validateDomainAndUser($user): void
-    {
-        if (! $user->domain) {
-            $this->logoutAndFail('Your organization is not registered yet. Please contact support.');
-        }
-
-        $domain = Domain::where('name_slug', $user->domain)->first();
-
-        if (! $domain || ! $domain->is_active) {
-            $this->logoutAndFail('Your organization is pending approval or inactive. Please wait for admin activation.');
-        }
-
-        if ($user->status !== 'active') {
-            $this->logoutAndFail('Your account has been deactivated. Please contact an administrator.');
-        }
     }
 
     /**
@@ -103,16 +75,6 @@ class DesktopLoginRequest extends FormRequest
     protected function hitRateLimiter(): void
     {
         RateLimiter::hit($this->throttleKey());
-    }
-
-    /**
-     * @throws ValidationException
-     */
-    protected function logoutAndFail(string $message): void
-    {
-        Auth::logout();
-        $this->hitRateLimiter();
-        $this->throwValidationError($message);
     }
 
     /**

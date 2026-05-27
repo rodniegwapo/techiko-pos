@@ -43,6 +43,17 @@ return [
             'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
         ],
 
+        /*
+        | Dedicated file for RUNTIME_DB_SWITCH_ENABLED offline mode (not tests :memory:).
+        | Migrate with: php artisan migrate --database=offline_sqlite
+        */
+        'offline_sqlite' => [
+            'driver' => 'sqlite',
+            'database' => env('DB_OFFLINE_DATABASE', storage_path('app/offline/database.sqlite')),
+            'prefix' => '',
+            'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
+        ],
+
         'mysql' => [
             'driver' => 'mysql',
             'url' => env('DATABASE_URL'),

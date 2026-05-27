@@ -39,6 +39,10 @@ use Inertia\Inertia;
 |--------------------------------------------------------------------------
 */
 
+Route::get('/health', fn () => response('OK', 200, [
+    'Content-Type' => 'text/plain; charset=UTF-8',
+]))->name('health');
+
 // Public marketing (web only). NativePHP desktop: no marketing; `/` → login or dashboard.
 // `/login` is the canonical auth entry (see routes/auth.php).
 $nativeDesktopRoutes = config('nativephp-internal.running')

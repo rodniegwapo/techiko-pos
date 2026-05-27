@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Desktop;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Desktop\DesktopLoginRequest;
-use App\Models\User;
 use App\Providers\RouteServiceProvider;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -24,11 +23,6 @@ class DesktopAuthController extends Controller
 
     public function store(DesktopLoginRequest $request): RedirectResponse|JsonResponse
     {
-        logger('testss');
-        logger($request->all());
-        logger(User::where('email', $request->email)->first());
-
-
         $request->authenticate();
 
         $request->session()->regenerate();

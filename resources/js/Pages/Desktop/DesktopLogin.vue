@@ -1,6 +1,6 @@
 <script setup>
 import InputError from "@/Components/InputError.vue";
-import { Head, Link, router } from "@inertiajs/vue3";
+import { Head, Link, router, usePage } from "@inertiajs/vue3";
 import axios from "axios";
 import { reactive, ref } from "vue";
 import ApplicationLogo from "@/Components/ApplicationLogo.vue";
@@ -14,6 +14,18 @@ defineProps({
     },
 });
 
+const page = usePage();
+
+function csrfHeaders() {
+    const token =
+        page.props.csrf_token ||
+        document
+            .querySelector('meta[name="csrf-token"]')
+            ?.getAttribute("content") ||
+        "";
+    return token ? { "X-CSRF-TOKEN": token } : {};
+}
+
 const form = reactive({
     email: "",
     password: "",
@@ -22,6 +34,7 @@ const form = reactive({
 
 const errors = ref({});
 const spinning = ref(false);
+const submitError = ref("");
 
 function validationMessage(field) {
     const bag = errors.value[field];
@@ -34,6 +47,7 @@ function validationMessage(field) {
 
 async function submit() {
     errors.value = {};
+    submitError.value = "";
     spinning.value = true;
 
     try {
@@ -49,6 +63,7 @@ async function submit() {
                     Accept: "application/json",
                     "Content-Type": "application/json",
                     "X-Requested-With": "XMLHttpRequest",
+                    ...csrfHeaders(),
                 },
                 withCredentials: true,
             },
@@ -56,9 +71,27 @@ async function submit() {
 
         router.visit(data.redirect);
     } catch (e) {
-        if (e.response?.status === 422 && e.response.data?.errors) {
+        const status = e.response?.status;
+        if (status === 422 && e.response.data?.errors) {
             errors.value = e.response.data.errors;
+            return;
         }
+        if (status === 419) {
+            submitError.value =
+                "Your session expired or could not be verified (CSRF). Refresh this page and try again.";
+            return;
+        }
+        if (status === 404) {
+            submitError.value =
+                "Desktop sign-in is not available in this environment. Use NativePHP, set APP_ENV=local for Laragon, or contact support.";
+            return;
+        }
+        if (typeof e.response?.data?.message === "string") {
+            submitError.value = e.response.data.message;
+            return;
+        }
+        submitError.value =
+            "Unable to sign in. Check your connection and try again.";
     } finally {
         spinning.value = false;
         form.password = "";
@@ -211,6 +244,13 @@ async function submit() {
                         class="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg"
                     >
                         <p class="text-green-800 text-sm">{{ status }}</p>
+                    </div>
+
+                    <div
+                        v-if="submitError"
+                        class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg"
+                    >
+                        <p class="text-red-800 text-sm">{{ submitError }}</p>
                     </div>
 
                     <!-- Login Form -->

@@ -2,16 +2,19 @@
 
 namespace App\Http;
 
+use App\Http\Middleware\AlignApplicationUrlWithRequest;
 use App\Http\Middleware\Authenticate;
 use App\Http\Middleware\CheckPermission;
 use App\Http\Middleware\CheckSuperUser;
 use App\Http\Middleware\EncryptCookies;
+use App\Http\Middleware\EnsureDesktopRoutesAllowed;
 use App\Http\Middleware\EnsureDomainLicenseValid;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\PreventRequestsDuringMaintenance;
 use App\Http\Middleware\RedirectIfAuthenticated;
 use App\Http\Middleware\RedirectNativeGlobalDashboardToDomain;
 use App\Http\Middleware\RoleBasedAccessControl;
+use App\Http\Middleware\SelectRuntimeDatabaseConnection;
 use App\Http\Middleware\TrimStrings;
 use App\Http\Middleware\TrustProxies;
 use App\Http\Middleware\UserPermissionCheckMiddleware;
@@ -51,6 +54,7 @@ class Kernel extends HttpKernel
     protected $middleware = [
         // \App\Http\Middleware\TrustHosts::class,
         TrustProxies::class,
+        AlignApplicationUrlWithRequest::class,
         HandleCors::class,
         PreventRequestsDuringMaintenance::class,
         ValidatePostSize::class,
@@ -68,6 +72,7 @@ class Kernel extends HttpKernel
             EncryptCookies::class,
             AddQueuedCookiesToResponse::class,
             StartSession::class,
+            SelectRuntimeDatabaseConnection::class,
             ShareErrorsFromSession::class,
             VerifyCsrfToken::class,
             SubstituteBindings::class,
@@ -77,11 +82,13 @@ class Kernel extends HttpKernel
 
         'api' => [
             EnsureFrontendRequestsAreStateful::class,
+            SelectRuntimeDatabaseConnection::class,
             'throttle:api',
             SubstituteBindings::class,
         ],
         'api-session' => [
             StartSession::class,
+            SelectRuntimeDatabaseConnection::class,
         ],
     ];
 
@@ -117,5 +124,6 @@ class Kernel extends HttpKernel
         'role.access' => RoleBasedAccessControl::class,
         'license.domain' => EnsureDomainLicenseValid::class,
         'native.global-dashboard' => RedirectNativeGlobalDashboardToDomain::class,
+        'desktop.routes_allowed' => EnsureDesktopRoutesAllowed::class,
     ];
 }

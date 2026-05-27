@@ -71,6 +71,27 @@ The Laravel framework is open-sourced software licensed under the [MIT license](
 - **PHP 8.3+** with extensions: **openssl**, **sodium**, **zip**, and **gmp** (required by [laravel-licensing](https://github.com/masterix21/laravel-licensing) / PASETO; enable `extension=gmp` in `php.ini`).
 - **Node.js 22+** for [NativePHP Desktop](https://nativephp.com/docs/desktop/2/getting-started/installation) builds and dev tooling.
 
+## Offline SQLite (runtime DB switch)
+
+When `RUNTIME_DB_SWITCH_ENABLED=true`, middleware probes `ONLINE_HEALTHCHECK_URL`, or **`{APP_URL}/health`** when that is blank, caches the outcome, and switches Laravel’s **default** DB connection between `mysql` (`RUNTIME_DB_ONLINE_CONNECTION`) and `offline_sqlite` (`config/database.php`). See **`config/runtime_database.php`** and **`.env.example`**.
+
+**Session driver:** Prefer **`SESSION_DRIVER=file`** while the default DB can flip. If you stay on **`SESSION_DRIVER=database`**, pin **`SESSION_CONNECTION`** to a **fixed** connection that never switches, or session lookups can silently miss rows after a mode flip. The app also **auto-pins** `session.connection` to **`RUNTIME_DB_ONLINE_CONNECTION`** when the runtime switch is enabled, the session driver is `database`, and **`SESSION_CONNECTION`** is unset (fully-offline installs with no MySQL should still use **file** sessions).
+
+### 419 Page Expired on login (CSRF)
+
+Laravel **419** after `POST /login` usually means the **CSRF token** no longer matches the **session** (cookie).
+
+1. **Same host as `APP_URL`:** Open the app at the same origin Ziggy/Inertia uses. If you browse `http://techiko-pos.test` but **`.env`** has **`APP_URL=http://localhost`**, the POST may go to `localhost` while the session cookie was set for `techiko-pos.test` → **419**. Set **`APP_URL`** to the URL you actually use, then run **`php artisan config:clear`**.
+2. **`SESSION_SECURE_COOKIE`:** On plain **`http://`**, use **`false`** (or use HTTPS everywhere).
+3. **`SESSION_DOMAIN`:** Leave empty for typical local dev unless you know the correct domain pattern.
+4. **Runtime DB switch + `SESSION_DRIVER=database`:** Without a stable session connection, mode flips break sessions—use **`SESSION_DRIVER=file`** or set **`SESSION_CONNECTION`** (see [`.env.example`](.env.example) and above).
+
+**Offline lifecycle:** Migrate the local file explicitly: `php artisan migrate --database=offline_sqlite` (seed optional users if you require offline username/password parity). Ensuring **`storage/app/offline/`** stays writable matters for packaged NativePHP builds. Syncing catalogue or sales history between MySQL and SQLite is a separate undertaking.
+
+When the switch is enabled, Inertia receives **`db_mode`** (`online` | `offline`) for UI messaging (`HandleInertiaRequests`).
+
+Development helpers (`RUNTIME_DB_FORCE_ONLINE` / `RUNTIME_DB_FORCE_OFFLINE`) apply only when `APP_DEBUG`/local **`or`** `RUNTIME_DB_ALLOW_FORCE_FLAGS=true` (README / `.env.example`).
+
 ## Laravel licensing (server + client)
 
 This app can act as the licensing authority using [masterix21/laravel-licensing](https://github.com/masterix21/laravel-licensing). Optional offline validation uses [laravel-licensing-client](https://github.com/masterix21/laravel-licensing-client).
@@ -97,9 +118,13 @@ php artisan native:build
 
 When the embedded app runs, `NATIVEPHP_RUNNING` is set and the app root URL is aligned to the local server from the request (see `App\Providers\NativeAppServiceProvider`). Public marketing pages (`/`, `/about`, and related routes) are **not** registered in the desktop build; `GET /` redirects guests to **`/desktop/login`** and signed-in users to the **global** dashboard route (`/dashboard`) for routing purposes (`App\Http\Controllers\NativeDesktopHomeController`). The browser build keeps full marketing routes as before.
 
-**Desktop sign-in** uses dedicated `web` routes in `routes/desktop.php` (`App\Http\Controllers\Desktop\DesktopAuthController`) and the Inertia page `resources/js/Pages/Desktop/DesktopLogin.vue`. The standard **web** login at `/login` remains for the browser. Super users are blocked from the desktop sign-in when running under NativePHP; use the **web** app for administrator access. Organization users are redirected to the **domain dashboard** after `POST /desktop/login`, and the global `/dashboard` URL redirects to `/domains/{slug}/dashboard` on desktop. `App\Http\Middleware\RedirectNativeGlobalDashboardToDomain` enforces this for the global dashboard route.
+**Desktop sign-in** uses dedicated `web` routes in `routes/desktop.php` (`App\Http\Controllers\Desktop\DesktopAuthController`) and the Inertia page `resources/js/Pages/Desktop/DesktopLogin.vue`. The standard **web** login at `/login` remains for the browser. **`/desktop/*` routes return 404 unless** NativePHP is running (`config('nativephp-internal.running')`), PHPUnit boots with **`TEST_NATIVE_DESKTOP_ROUTES=1`**, or **`APP_ENV=local`** (typical Laragon / local browser testing). Super users are blocked from the desktop sign-in when running under NativePHP; use the **web** app for administrator access. Organization users are redirected to the **domain dashboard** after `POST /desktop/login`, and the global `/dashboard` URL redirects to `/domains/{slug}/dashboard` on desktop. `App\Http\Middleware\RedirectNativeGlobalDashboardToDomain` enforces this for the global dashboard route.
 
-**API and Sanctum:** `POST /desktop/login` establishes a normal **web session** (same as Breeze). Existing `api/*` routes that use `auth:sanctum` with `EnsureFrontendRequestsAreStateful` continue to authenticate from that session for first-party (same-origin) clients. For raw HTTP clients, call `GET /sanctum/csrf-cookie` first, then post credentials with credentials and the CSRF header, as in the Laravel + Sanctum SPA documentation.
+**Session + CSRF (bundled desktop):** The desktop login page sends Laravel’s session CSRF token on **`POST /desktop/login`** using the **`X-CSRF-TOKEN`** header (`csrf_token()` shared via Inertia props and mirrored in `app.blade.php`’s `<meta name="csrf-token">`). Avoid relying on **`GET /sanctum/csrf-cookie`** here; Sanctum stateful domains must match your browser host when using that endpoint (common mismatch when `APP_URL` uses `localhost` but you browse `*.test`).
+
+**API and Sanctum:** **`POST /desktop/login`** establishes a normal **web session**. Existing **`api/*`** routes that use `auth:sanctum` with `EnsureFrontendRequestsAreStateful` continue to authenticate from that session for first-party same-origin requests. Thin-client scaffolding: **`POST /api/desktop/login`** (JSON) validates the same eligibility rules (`App\Support\Desktop\DesktopPostLoginValidator`) and returns a **Bearer** Sanctum personal access token; it does **not** keep the browser session authenticated.
+
+For production-packaged desktops, **`APP_URL`** is the canonical public site URL for links/email; **`LICENSING_SERVER_URL`** (see `config/licensing-client.php`) should point at your licensing API base—often the same HTTPS host as production when validating online—and is **not** a MySQL connection (the app continues to use `DB_*` on the server only).
 
 To inspect the desktop route table locally: `NATIVEPHP_RUNNING=1 php artisan route:list` (Windows: `set NATIVEPHP_RUNNING=1` then `php artisan route:list`).
 

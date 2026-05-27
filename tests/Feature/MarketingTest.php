@@ -34,6 +34,7 @@ class MarketingTest extends TestCase
 
         $response->assertOk();
         $response->assertHeader('Content-Type', 'text/plain; charset=UTF-8');
-        $response->assertSee('Sitemap: '.rtrim(config('app.url'), '/').'/sitemap.xml', false);
+        // Matches public/robots.txt (static production sitemap URL; nginx may serve before PHP).
+        $response->assertSee('Sitemap: https://techiko-pos.com/sitemap.xml', false);
     }
 }

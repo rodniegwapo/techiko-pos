@@ -57,6 +57,10 @@ class HandleInertiaRequests extends Middleware
             'default_store' => $request->user() ? $this->getDefaultStore($request) : null,
             'impersonation' => $impersonationService->getImpersonationData(),
             'features' => config('features'),
+            'db_mode' => fn () => config('runtime_database.enabled')
+                ? ($request->attributes->get(SelectRuntimeDatabaseConnection::ATTRIBUTE_DB_MODE, 'online'))
+                : 'online',
+            'csrf_token' => csrf_token(),
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),

@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Controllers\Api\OrderViewController;
+use App\Http\Controllers\Api\DesktopAuthTokenController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InventoryController;
@@ -21,6 +21,15 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 })->name('user');
+
+/**
+ * Thin-client scaffold: Bearer token (Sanctum) after credential check.
+ * Uses the same eligibility rules as `POST /desktop/login` session flow.
+ *
+ * Typical client: Authorization: Bearer {token}. Not used by bundled Inertia NativePHP desktop.
+ */
+Route::post('desktop/login', [DesktopAuthTokenController::class, 'store'])
+    ->middleware('throttle:10,1');
 
 /**
  * -----------------------
