@@ -1,13 +1,21 @@
 <script setup>
 import { computed } from "vue";
+import { useMediaQuery } from "@vueuse/core";
 import VueApexCharts from "vue3-apexcharts";
 
-const props = defineProps({
+defineProps({
     options: Object,
     series: Array,
 });
 
 const graphFilter = defineModel("graphFilter");
+
+/** Below Tailwind md (768px): compact controls + chart height */
+const isBelowMd = useMediaQuery("(max-width: 767px)");
+
+const chartHeight = computed(() => (isBelowMd.value ? 300 : 400));
+
+const radioSize = computed(() => (isBelowMd.value ? "small" : "middle"));
 
 // Dynamic time range labels
 const timeRangeLabels = computed(() => {
@@ -41,9 +49,11 @@ const timeRangeLabels = computed(() => {
 </script>
 
 <template>
-    <div class="bg-white rounded-lg border p-6 shadow-sm">
-        <div class="flex items-center justify-between mb-4">
-            <div>
+    <div class="bg-white rounded-lg border p-6 shadow-sm min-w-0">
+        <div
+            class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+        >
+            <div class="min-w-0">
                 <h3 class="text-lg font-semibold text-gray-900">
                     {{ timeRangeLabels.title }}
                 </h3>
@@ -51,7 +61,12 @@ const timeRangeLabels = computed(() => {
                     {{ timeRangeLabels.subtitle }}
                 </p>
             </div>
-            <a-radio-group v-model:value="graphFilter" button-style="solid">
+            <a-radio-group
+                v-model:value="graphFilter"
+                button-style="solid"
+                :size="radioSize"
+                class="shrink-0 max-w-full"
+            >
                 <a-radio-button
                     v-for="(label, index) in timeRangeLabels.buttonLabels"
                     :key="index"
@@ -63,12 +78,12 @@ const timeRangeLabels = computed(() => {
         </div>
 
         <!-- Chart Container -->
-        <div class="relative">
+        <div class="relative w-full max-w-full min-w-0 overflow-x-auto">
             <VueApexCharts
                 :options="options"
                 :series="series"
                 type="line"
-                height="400"
+                :height="chartHeight"
             />
 
             <!-- Loading indicator for dynamic updates -->
@@ -82,9 +97,9 @@ const timeRangeLabels = computed(() => {
 
         <!-- Chart Info -->
         <div
-            class="mt-4 flex items-center justify-between text-sm text-gray-500"
+            class="mt-4 flex flex-col gap-2 text-sm text-gray-500 sm:flex-row sm:items-center sm:justify-between"
         >
-            <div class="flex items-center space-x-4">
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
                 <div class="flex items-center">
                     <div class="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
                     <span>Sales Revenue (₱)</span>

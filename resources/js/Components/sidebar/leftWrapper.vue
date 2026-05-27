@@ -1,18 +1,26 @@
 <script setup>
 import TechikoLogo from "@/Components/TechikoLogo.vue";
 import TLogo from "@/Components/TLogo.vue";
+import LeftMenu from "@/Components/sidebar/leftMenu.vue";
+import LeftAccountSettings from "@/Components/sidebar/leftAccountSettings.vue";
 import { IconLayoutSidebarLeftCollapse } from "@tabler/icons-vue";
 import { useSidebar } from "@/Composables/useSidebar";
 
-const props = defineProps({
+defineProps({
     impersonator: Boolean,
+    user: {
+        type: Object,
+        default: null,
+    },
 });
 
-const { isCollapsed, toggle, setCollapsed } = useSidebar();
+const { isCollapsed, toggle, mobileDrawerOpen, closeMobileDrawer } =
+    useSidebar();
 </script>
 
 <template>
-    <div class="lg:block md:block sm:hidden">
+    <!-- md+: fixed sidebar -->
+    <div class="hidden md:block">
         <a-layout-sider
             :width="280"
             v-model:collapsed="isCollapsed"
@@ -54,8 +62,37 @@ const { isCollapsed, toggle, setCollapsed } = useSidebar();
                     </a>
                 </div>
 
-                <slot />
+                <left-menu />
+                <left-account-settings
+                    :user="user"
+                    :leftSidebatdCollapsed="isCollapsed"
+                />
             </div>
         </a-layout-sider>
     </div>
+
+    <!-- below md: slide-out drawer -->
+    <a-drawer
+        v-model:visible="mobileDrawerOpen"
+        placement="left"
+        :width="280"
+        :closable="true"
+        destroy-on-close
+        :body-style="{ padding: 0, display: 'flex', flexDirection: 'column' }"
+        wrap-class-name="mobile-nav-drawer-wrap"
+        @close="closeMobileDrawer"
+    >
+        <div class="flex flex-col h-full min-h-0">
+            <div class="flex items-center px-6 py-4 border-b border-gray-100">
+                <TechikoLogo :height="30" />
+            </div>
+            <div class="flex-1 min-h-0 overflow-y-auto">
+                <left-menu />
+            </div>
+            <left-account-settings
+                :user="user"
+                :leftSidebatdCollapsed="false"
+            />
+        </div>
+    </a-drawer>
 </template>

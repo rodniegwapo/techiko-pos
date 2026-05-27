@@ -50,14 +50,14 @@ const {
 
         <SummaryCards :cards="summaryCards" />
 
-        <div class="flex w-full gap-6 mb-8">
+        <div class="flex w-full flex-col gap-6 mb-8 lg:flex-row">
             <SalesOverview
-                class="w-[60%]"
+                class="w-full min-w-0 lg:flex-[3]"
                 :options="salesChartOptions"
                 :series="salesChartSeries"
                 v-model:graphFilter="graphFilter"
             />
-            <TopProducts class="w-[40%]" :products="topProducts" />
+            <TopProducts class="w-full min-w-0 lg:flex-[2]" :products="topProducts" />
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
