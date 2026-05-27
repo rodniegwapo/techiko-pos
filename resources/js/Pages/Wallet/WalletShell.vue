@@ -606,21 +606,28 @@ async function reopenShift() {
                                 : "Full cash control"
                         }}
                     </a-button>
-                    <div class="flex flex-wrap items-center gap-3">
+                    <div
+                        class="flex min-w-0 flex-wrap items-center gap-3"
+                    >
                         <div class="w-full min-w-0 max-w-[14rem] sm:w-[14rem]">
                             <label
                                 class="mb-1 block text-xs font-medium text-gray-600"
                             >
                                 Business date
                             </label>
-                            <div class="flex gap-2">
+                            <div
+                                class="flex flex-col gap-2 sm:flex-row sm:items-stretch"
+                            >
                                 <a-date-picker
                                     v-model="cashControlForm.business_date"
                                     type="date"
                                     :max="todayYmd"
-                                    class="w-full rounded border border-gray-300 px-2 text-sm"
+                                    class="w-full min-w-0 rounded border border-gray-300 px-2 text-sm"
                                 />
-                                <a-button @click="reloadWalletForBusinessDate">
+                                <a-button
+                                    class="shrink-0 sm:self-end"
+                                    @click="reloadWalletForBusinessDate"
+                                >
                                     Load
                                 </a-button>
                             </div>
