@@ -39,6 +39,11 @@ const props = defineProps({
         type: [String, Number],
         default: null,
     },
+    layout: {
+        type: String,
+        default: "desktop",
+        validator: (value) => ["desktop", "mobile"].includes(value),
+    },
 });
 
 const { getRoute } = useDomainRoutes();
@@ -92,7 +97,14 @@ const formattedTotal = (price) => {
 </script>
 
 <template>
-    <div class="flex flex-col min-h-0 h-[calc(100vh-430px)]">
+    <div
+        class="flex flex-col min-h-0"
+        :class="
+            layout === 'mobile'
+                ? 'h-[calc(100dvh-12rem)]'
+                : 'h-[calc(100vh-430px)]'
+        "
+    >
         <div class="overflow-y-auto overflow-x-hidden flex-1 min-h-0 relative">
             <a-spin
                 v-if="props.loading"
