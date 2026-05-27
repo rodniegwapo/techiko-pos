@@ -101,7 +101,7 @@ const formattedTotal = (price) => {
         class="flex flex-col min-h-0"
         :class="
             layout === 'mobile'
-                ? 'h-[calc(100dvh-12rem)]'
+                ? 'h-[calc(100dvh-16rem)]'
                 : 'h-[calc(100vh-430px)]'
         "
     >

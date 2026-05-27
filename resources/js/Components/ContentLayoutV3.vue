@@ -22,7 +22,7 @@ defineProps({
             <slot name="offline-info" />
         </div>
         <div
-            class="w-full rounded-lg bg-white p-3 shadow sm:p-4 min-w-0 pb-20"
+            class="w-full rounded-lg bg-white p-3 shadow sm:p-4 min-w-0 pb-44"
         >
             <div :class="filterMainClass">
                 <h1 class="text-lg font-semibold">{{ title }}</h1>
