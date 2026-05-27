@@ -31,10 +31,11 @@ import ProductTable from "./components/ProductTable.vue";
 import CustomerOrder from "./components/CustomerOrder.vue";
 import TotalAmountSection from "./components/TotalAmountSection.vue";
 import SalesMobileCheckoutBar from "./components/SalesMobileCheckoutBar.vue";
-import SalesMobileOrderPreview from "./components/SalesMobileOrderPreview.vue";
 import SalesCartDrawer from "./components/SalesCartDrawer.vue";
 import { useMediaQuery } from "@vueuse/core";
 import { useSalesCartDrawer } from "@/Composables/useSalesCartDrawer";
+import { useHelpers } from "@/Composables/useHelpers";
+import { useSaleTotals } from "@/Composables/useSaleTotals";
 
 import {
     CloseOutlined,
@@ -53,7 +54,7 @@ import { notifyInsufficientStock } from "@/Composables/useCartStockNotification"
 const page = usePage();
 const { getRoute, getLocationQueryFromPage } = useDomainRoutes();
 const isMdUp = useMediaQuery("(min-width: 768px)");
-const { closeCartDrawer } = useSalesCartDrawer();
+const { closeCartDrawer, goToPaymentStep } = useSalesCartDrawer();
 
 watch(isMdUp, (matches) => {
     if (matches) {
@@ -115,6 +116,15 @@ const currentSale = ref(null);
 const orderDiscountAmount = ref(0);
 const orderDiscountId = ref("");
 const selectedCustomer = ref(null);
+
+const { formattedTotal } = useHelpers();
+const { grandTotalDisplay } = useSaleTotals({
+    orders,
+    orderDiscountAmount,
+    salesSettings,
+    currentSale,
+    salesCartIsOnline,
+});
 
 const offlineCatalogSyncedAt = ref(null);
 const offlineCustomersCache = ref([]);
@@ -1417,12 +1427,6 @@ watch(
                 />
             </template>
             <template #mobile-actions>
-                <SalesMobileOrderPreview
-                    :orders="orders"
-                    :order-discount-amount="orderDiscountAmount"
-                    :sales-settings="salesSettings"
-                    :current-sale="currentSale"
-                />
                 <SalesMobileCheckoutBar
                     :orders="orders"
                     :order-discount-amount="orderDiscountAmount"
@@ -1436,6 +1440,8 @@ watch(
             <template #cart>
                 <customer-order
                     layout="drawer"
+                    :current-sale="currentSale"
+                    :sales-settings="salesSettings"
                     @customer-changed="handleCustomerChanged"
                     @discount-applied="loadCurrentPendingSale"
                     @cart-updated="loadCurrentPendingSale"
@@ -1454,7 +1460,7 @@ watch(
                     :offline-cached-customers="offlineCustomersCache"
                 />
             </template>
-            <template #checkout>
+            <template #payment>
                 <total-amount-section
                     layout="compact"
                     :selected-customer="selectedCustomer"
@@ -1478,6 +1484,34 @@ watch(
                     "
                     @save-offline-sale="completeOfflineSale"
                 />
+            </template>
+            <template #drawer-footer>
+                <div
+                    class="flex items-center justify-between gap-3 px-3 py-3"
+                    style="
+                        padding-bottom: max(
+                            0.75rem,
+                            env(safe-area-inset-bottom, 0px)
+                        );
+                    "
+                >
+                    <div class="min-w-0">
+                        <p class="text-xs text-gray-500">Total</p>
+                        <p class="truncate text-lg font-bold text-green-600">
+                            {{ formattedTotal(grandTotalDisplay) }}
+                        </p>
+                    </div>
+                    <a-button
+                        type="primary"
+                        size="large"
+                        class="shrink-0"
+                        :disabled="orders.length === 0"
+                        aria-label="Continue to checkout"
+                        @click="goToPaymentStep"
+                    >
+                        Pay
+                    </a-button>
+                </div>
             </template>
         </SalesCartDrawer>
 
