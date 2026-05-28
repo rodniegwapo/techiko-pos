@@ -239,7 +239,7 @@ async function syncOfflineDataForSales() {
 
         let discount_snapshot = null;
         try {
-            const d = await axios.get("/api/sales/discounts/current");
+            const d = await axios.get(getRoute("sales.discounts.current"));
             if (d.data?.success) {
                 discount_snapshot = {
                     regular_discounts: d.data.regular_discounts ?? [],

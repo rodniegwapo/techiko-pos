@@ -78,8 +78,8 @@ const { isCollapsed, toggle, mobileDrawerOpen, closeMobileDrawer } =
         :width="280"
         :closable="true"
         destroy-on-close
+        class="mobile-nav-drawer-wrap"
         :body-style="{ padding: 0, display: 'flex', flexDirection: 'column' }"
-        wrap-class-name="mobile-nav-drawer-wrap"
         @close="closeMobileDrawer"
     >
         <div class="flex flex-col h-full min-h-0">

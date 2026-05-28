@@ -245,23 +245,9 @@ const showDiscountOrder = async () => {
     let currentMandatoryDiscount = null;
 
     try {
-        // Use consolidated discount data from props instead of API call
-        console.log(
-            "TotalAmountSection - discountOptions:",
-            discountOptions.value,
-        );
         const { promotional_discount_options, mandatory_discount_options } =
             discountOptions.value;
-        console.log(
-            "TotalAmountSection - promotional_discount_options:",
-            promotional_discount_options,
-        );
-        console.log(
-            "TotalAmountSection - mandatory_discount_options:",
-            mandatory_discount_options,
-        );
 
-        // Convert database discounts to option objects for the select components
         regularDiscountOptions = (promotional_discount_options || []).map(
             (discount) => ({
                 label: `${discount.name} (${
@@ -296,9 +282,7 @@ const showDiscountOrder = async () => {
                 const saleResponse = await axios.get(
                     getRoute("sales.discounts.sale", { sale: orderId.value }),
                 );
-                console.log("Sale discounts response:", saleResponse.data);
 
-                // Handle different response structures - backend returns 'discounts'
                 const sale_discounts =
                     saleResponse.data?.discounts ||
                     saleResponse.data?.sale_discounts ||
@@ -322,12 +306,6 @@ const showDiscountOrder = async () => {
                         }),
                     );
 
-                    console.log(
-                        "Current promotional discounts loaded:",
-                        currentPromotionalDiscounts,
-                    );
-
-                    // Get currently applied mandatory discount
                     const appliedMandatory = sale_discounts.filter(
                         (item) => item.discount_type === "mandatory",
                     );
@@ -347,18 +325,9 @@ const showDiscountOrder = async () => {
                             type: mandatory.mandatoryDiscount?.type,
                         };
                     }
-
-                    console.log(
-                        "Current mandatory discount loaded:",
-                        currentMandatoryDiscount,
-                    );
                 }
-            } catch (saleError) {
-                console.log(
-                    "No current discounts found or error loading sale discounts:",
-                    saleError,
-                );
-                // This is not an error - just means no discounts are currently applied
+            } catch {
+                // No discounts currently applied
             }
         }
     } catch (error) {
@@ -436,9 +405,7 @@ const handleProceedPaymentConfirmation = () => {
                 }
             });
         },
-        onCancel() {
-            console.log("Cancel");
-        },
+        onCancel() {},
     });
 };
 
@@ -958,8 +925,6 @@ const creditLimitSufficient = computed(() => {
                 :orderId="orderId"
                 :orders="orders"
                 :currentSale="currentSale"
-                :orderDiscountAmount="orderDiscountAmount"
-                :orderDiscountId="orderDiscountId"
                 :discountOptions="discountOptions"
                 @close="openOrderDicountModal = false"
                 @discount-applied="emit('discount-applied')"
