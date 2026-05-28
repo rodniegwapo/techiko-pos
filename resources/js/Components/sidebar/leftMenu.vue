@@ -468,6 +468,7 @@ const handleClick = (menu) => {
         return;
     }
 
+    localStorage.setItem("selectedMenuForMobile", menu.title);
     try {
         if (menu.key === "wallet-money-movement") {
             const routePath = getRoute("wallet.money-movement");
