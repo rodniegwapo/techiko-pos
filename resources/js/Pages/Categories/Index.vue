@@ -50,20 +50,22 @@ const { pagination, handleTableChange ,spinning} = useTable("items", tableFilter
 <template>
   <AuthenticatedLayout>
     <Head title="Categories" />
-    <ContentHeader class="mb-8" title="Categories" />
-    <ContentLayout title="Categories">
+    <ContentHeader class="mb-4 md:mb-8" title="Categories" />
+    <ContentLayout
+      title="Categories"
+      filter-class="flex flex-wrap items-center justify-end gap-2 w-full min-w-0"
+    >
       <template #filters>
         <refresh-button :loading="spinning" @click="getItems" />
         <a-input-search
           v-model:value="search"
           placeholder="Input search text"
-          style="width: 100%"
-          class="min-w-[100px] max-w-[300px]"
+          class="w-full min-w-0 md:max-w-[300px]"
         />
         <a-button
           @click="showModal"
           type="primary"
-          class="bg-white border flex items-center border-green-500 text-green-500"
+          class="flex w-full items-center justify-center border border-green-500 bg-white text-green-500 md:inline-flex md:w-auto"
         >
           <template #icon>
             <PlusSquareOutlined />
