@@ -15,7 +15,7 @@ const isBelowMd = useMediaQuery("(max-width: 767px)");
 
 const chartHeight = computed(() => (isBelowMd.value ? 300 : 400));
 
-const radioSize = computed(() => (isBelowMd.value ? "small" : "middle"));
+const radioSize = computed(() => (isBelowMd.value ? "small" : "default"));
 
 // Dynamic time range labels
 const timeRangeLabels = computed(() => {

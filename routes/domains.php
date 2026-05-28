@@ -83,6 +83,7 @@ Route::prefix('domains/{domain:name_slug}')
         Route::prefix('sales')->name('sales.')->group(function () {
             Route::get('/offline-transactions', [SaleController::class, 'offlineTransactionsPage'])->name('offline-transactions');
             Route::post('/offline-sync', [SaleController::class, 'offlineSync'])->name('offline-sync');
+            Route::get('/discounts/current', [SaleController::class, 'getCurrentDiscounts'])->name('discounts.current');
 
             Route::post('/draft', [SaleController::class, 'storeDraft'])->name('drafts.store');
             Route::get('/oversell-statistics', [SaleController::class, 'getOversellStatistics'])->name('oversell.statistics');

@@ -101,6 +101,7 @@ const {
 } = toRefs(props);
 
 const isDrawerLayout = computed(() => props.layout === "drawer");
+const currentSale = computed(() => props.currentSale);
 
 const drawerOrderItemsExpanded = useStorage(
     "sales_drawer_order_items_expanded",
@@ -111,7 +112,7 @@ const { itemCount: saleItemCount, grandTotalDisplay } = useSaleTotals({
     orders,
     orderDiscountAmount,
     salesSettings: computed(() => props.salesSettings ?? {}),
-    currentSale: computed(() => props.currentSale),
+    currentSale,
     salesCartIsOnline,
 });
 
@@ -560,7 +561,7 @@ const showDiscountOrder = async () => {
 
     try {
         // Load current discounts from database instead of localStorage
-        const response = await axios.get("/api/sales/discounts/current");
+        const response = await axios.get(getRoute("sales.discounts.current"));
         const { regular_discounts, mandatory_discounts } = response.data;
 
         // Convert database discounts to option objects for the select components
@@ -1384,10 +1385,10 @@ defineExpose({
         :product="currentProduct"
         :orderId="orderId"
         :orders="orders"
-        :orderDiscountAmount="orderDiscountAmount"
-        :orderDiscountId="orderDiscountId"
+        :currentSale="currentSale"
         :discountOptions="discountOptions"
         @close="openOrderDicountModal = false"
+        @discount-applied="emit('discount-applied')"
     />
 
     <!-- Add Customer Modal -->

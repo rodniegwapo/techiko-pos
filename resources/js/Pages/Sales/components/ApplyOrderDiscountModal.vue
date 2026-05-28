@@ -1,6 +1,6 @@
 <script setup>
 import PrimaryButton from "@/Components/PrimaryButton.vue";
-import { computed, ref, toRefs, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import axios from "axios";
@@ -18,21 +18,20 @@ const props = defineProps({
     orderId: { type: [String, Number], default: null },
     orders: { type: Array, default: () => [] },
     currentSale: { type: Object, default: () => null },
-    orderDiscountAmount: { type: Number, default: 0 },
-    orderDiscountId: { type: String, default: "" },
     discountOptions: { type: Object, default: () => ({}) },
 });
 
-const {
-    openModal,
-    product,
-    orderId,
-    orders,
-    currentSale,
-    orderDiscountAmount,
-    orderDiscountId,
-    discountOptions,
-} = toRefs(props);
+const modalVisible = computed({
+    get: () => props.openModal,
+    set: (value) => {
+        if (!value) emit("close");
+    },
+});
+
+const orderId = computed(() => props.orderId);
+const orders = computed(() => props.orders);
+const currentSale = computed(() => props.currentSale);
+const discountOptions = computed(() => props.discountOptions);
 
 // Use consolidated discount data
 const discounts = computed(
@@ -43,29 +42,13 @@ const mandatoryDiscounts = computed(
 );
 
 // Watch for modal opening to clear previous errors and load current discounts
-watch(openModal, async (newValue) => {
+watch(
+    () => props.openModal,
+    (newValue) => {
     if (newValue) {
-        console.log("Modal opened, orderId:", orderId.value);
-        console.log("Current sale data:", currentSale.value);
-        console.log(
-            "Available promotional discounts:",
-            availableDiscounts.value
-        );
-        console.log(
-            "Available mandatory discounts:",
-            availableMandatoryDiscounts.value
-        );
-
         errors.value = {};
 
-        // Use sale_discounts from the currentSale prop directly
-        if (currentSale.value && currentSale.value.sale_discounts) {
-            console.log(
-                "Found sale_discounts:",
-                currentSale.value.sale_discounts
-            );
-
-            // Extract discount IDs from sale_discounts array
+        if (currentSale.value?.sale_discounts) {
             const promotionalIds = currentSale.value.sale_discounts
                 .filter((discount) => discount.discount_type === "regular")
                 .map((discount) => discount.discount_id);
@@ -74,29 +57,16 @@ watch(openModal, async (newValue) => {
                 .filter((discount) => discount.discount_type === "mandatory")
                 .map((discount) => discount.discount_id);
 
-            console.log("Extracted discount IDs:", {
-                promotional: promotionalIds,
-                mandatory: mandatoryIds,
-            });
-
-            // Pre-populate form fields
             selectedPromotionalDiscounts.value = promotionalIds;
             selectedMandatoryDiscount.value =
                 mandatoryIds.length > 0 ? mandatoryIds[0] : null;
-
-            console.log("Form populated with:", {
-                promotional: selectedPromotionalDiscounts.value,
-                mandatory: selectedMandatoryDiscount.value,
-            });
         } else {
-            console.log(
-                "No currentSale or sale_discounts found, clearing form"
-            );
             selectedPromotionalDiscounts.value = [];
             selectedMandatoryDiscount.value = null;
         }
     }
-});
+},
+);
 
 const loading = ref(false);
 
@@ -125,95 +95,38 @@ const handleSave = async () => {
               )
             : [];
 
-        // Debug logging
-        console.log(
-            "Selected promotional discounts:",
-            selectedPromotionalDiscounts.value
-        );
-        console.log(
-            "Selected mandatory discount:",
-            selectedMandatoryDiscount.value
-        );
-        console.log("Selected regular IDs:", selectedRegularIds);
-        console.log("Selected mandatory IDs:", selectedMandatoryIds);
-
         const payload = {
             regular_discount_ids: selectedRegularIds,
             mandatory_discount_ids: selectedMandatoryIds,
         };
         loading.value = true;
-        // Use composable for proper domain detection
-        const { currentDomain, getCurrentDomainFromUrl } = useDomainRoutes();
-        const domain =
-            currentDomain.value?.name_slug || getCurrentDomainFromUrl();
-        const route = `/domains/${domain}/sales/${orderId.value}/discounts`;
-        console.log("Discount update route:", route);
+
+        const route = getRoute("sales.discounts.update", {
+            sale: orderId.value,
+        });
 
         const { data: sale } = await axios.patch(route, payload);
 
-        console.log("Discount API response:", sale);
-        console.log("Sale object structure:", {
-            sale: sale?.sale,
-            discount_amount: sale?.discount_amount,
-            sale_discounts: sale?.sale_discounts,
-            discounts: sale?.discounts,
-        });
-        console.log("Sale discount amount:", sale?.sale?.discount_amount);
-        console.log("Sale discounts array:", sale?.discounts);
-
-        // Handle different response structures - backend returns 'discounts'
         const sale_discounts = sale?.discounts || sale?.sale_discounts || [];
 
         if (!Array.isArray(sale_discounts)) {
-            console.error("sale_discounts is not an array:", sale_discounts);
             throw new Error("Invalid response structure from discount API");
         }
 
-        // Update local state with database response
-        const regularDiscounts = sale_discounts.filter(
-            (item) => item.discount_type === "regular"
-        );
-        const mandatoryDiscounts = sale_discounts.filter(
-            (item) => item.discount_type === "mandatory"
-        );
-
-        // Update local state with correct discount amount
-        const discountAmount =
-            sale?.discount_amount ?? sale?.sale?.discount_amount ?? 0;
-        orderDiscountAmount.value = discountAmount;
-
-        // Update discount IDs
-        const allDiscountIds = sale_discounts
-            .map((item) => item.discount_id)
-            .join(",");
-        orderDiscountId.value = allDiscountIds;
-
-        console.log(
-            "Discount applied - Amount:",
-            discountAmount,
-            "IDs:",
-            allDiscountIds
-        );
-
-        // Clear form fields
         selectedPromotionalDiscounts.value = [];
         selectedMandatoryDiscount.value = null;
-
-        // Clear any previous errors on success
         errors.value = {};
 
-        // Show appropriate success message based on whether discounts were applied
-        const hasDiscounts = selectedRegularIds.length > 0 || selectedMandatoryIds.length > 0;
+        const hasDiscounts =
+            selectedRegularIds.length > 0 || selectedMandatoryIds.length > 0;
         notification["success"]({
             message: "Success",
-            description: hasDiscounts 
-                ? "Discount(s) applied successfully" 
+            description: hasDiscounts
+                ? "Discount(s) applied successfully"
                 : "Order updated successfully",
         });
 
-        // Emit event to parent to refresh data
         emit("discount-applied");
-
         emit("close");
     } catch (error) {
         console.error("Error applying discount:", error);
@@ -256,20 +169,12 @@ const handleClearDiscount = async () => {
     try {
         discountLoading.value = true;
 
-        // backend remove - use composable for proper domain detection
-        const { currentDomain, getCurrentDomainFromUrl } = useDomainRoutes();
-        const domain =
-            currentDomain.value?.name_slug || getCurrentDomainFromUrl();
-        const route = `/domains/${domain}/sales/${orderId.value}/discounts`;
-        console.log("Discount remove route:", route);
+        const route = getRoute("sales.discounts.remove", {
+            sale: orderId.value,
+        });
 
         await axios.delete(route);
 
-        // Update local state instead of localStorage
-        orderDiscountAmount.value = 0;
-        orderDiscountId.value = "";
-
-        // Clear any previous errors on success
         errors.value = {};
 
         notification["success"]({
@@ -381,7 +286,7 @@ const selectedMandatoryDiscount = ref(null);
 </script>
 <template>
     <a-modal
-        v-model:visible="openModal"
+        v-model:visible="modalVisible"
         :title="`Apply Order Discount`"
         @cancel="$emit('close')"
         width="500px"
