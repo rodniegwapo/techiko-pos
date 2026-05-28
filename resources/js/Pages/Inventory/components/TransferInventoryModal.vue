@@ -391,6 +391,7 @@ watch(
     v-model:visible="visible"
     :width="modalWidth"
     :style="modalRootStyle"
+    wrap-class-name="modal-footer-full-mobile"
     centered
     :confirm-loading="loading"
     @ok="handleSubmit"
@@ -700,17 +701,20 @@ watch(
     </div>
 
     <template #footer>
-      <div class="flex justify-between">
+      <div class="modal-footer-actions flex w-full flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <span v-if="selectedProduct" class="text-sm text-gray-500">
             {{ selectedProduct.product?.name }} • {{ form.quantity }}
             {{ selectedProduct.product?.unit_of_measure || "pcs" }}
           </span>
         </div>
-        <div class="space-x-2">
-          <a-button @click="closeModal" :disabled="loading"> Cancel </a-button>
+        <div class="flex w-full flex-col gap-2 md:w-auto md:flex-row">
+          <a-button class="w-full md:w-auto" @click="closeModal" :disabled="loading">
+            Cancel
+          </a-button>
           <a-button
             type="primary"
+            class="w-full md:w-auto"
             @click="handleSubmit"
             :loading="loading"
             :disabled="

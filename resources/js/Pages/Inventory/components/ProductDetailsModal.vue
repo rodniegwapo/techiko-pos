@@ -141,9 +141,9 @@ const allLocations = computed(() => props.product?.product?.locations || []);
     :width="modalWidth"
     :style="modalRootStyle"
     :body-style="modalBodyStyle"
+    wrap-class-name="modal-footer-full-mobile"
     centered
     @cancel="handleClose"
-    :footer="null"
   >
     <template #title>
       <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
@@ -487,5 +487,11 @@ const allLocations = computed(() => props.product?.product?.locations || []);
     <div v-else class="text-center py-8">
       <p class="text-gray-500">No product selected</p>
     </div>
+
+    <template #footer>
+      <div class="modal-footer-actions flex w-full flex-col gap-2 md:flex-row md:justify-end">
+        <a-button class="w-full md:w-auto" @click="handleClose">Close</a-button>
+      </div>
+    </template>
   </a-modal>
 </template>
