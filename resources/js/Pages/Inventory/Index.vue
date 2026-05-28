@@ -15,6 +15,7 @@ import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useFilters, toLabel } from "@/Composables/useFilters";
 import { useHelpers } from "@/Composables/useHelpers";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
+import { useMediaQuery } from "@vueuse/core";
 import VueApexCharts from "vue3-apexcharts";
 
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
@@ -256,6 +257,8 @@ const stockLevelChart = computed(() => {
 
 const apexchart = VueApexCharts;
 const chartLoaded = ref(false);
+const isMdUp = useMediaQuery("(min-width: 768px)");
+const chartHeight = computed(() => (isMdUp.value ? 350 : 280));
 onMounted(() => setTimeout(() => (chartLoaded.value = true), 400));
 </script>
 
@@ -263,19 +266,29 @@ onMounted(() => setTimeout(() => (chartLoaded.value = true), 400));
     <Head title="Inventory Dashboard" />
 
     <AuthenticatedLayout>
-        <ContentHeader title="Inventory Dashboard" :isDashboard="true">
+        <div class="w-full min-w-0">
+        <ContentHeader
+            class="mb-4 md:mb-8"
+            title="Inventory Dashboard"
+            :isDashboard="true"
+        >
             <template #actions>
-                <FilterDropdown
-                    :filters="filtersConfig"
-                    :selectedValues="{ location_id: selectedLocation }"
-                    @update:selectedValues="
-                        (values) => {
-                            selectedLocation = values.location_id;
-                            getItems();
-                        }
-                    "
-                />
-                <RefreshButton @click="getItems" />
+                <div
+                    class="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center md:justify-end"
+                >
+                    <FilterDropdown
+                        class="w-full min-w-0 md:w-auto"
+                        :filters="filtersConfig"
+                        :selectedValues="{ location_id: selectedLocation }"
+                        @update:selectedValues="
+                            (values) => {
+                                selectedLocation = values.location_id;
+                                getItems();
+                            }
+                        "
+                    />
+                    <RefreshButton class="w-full md:w-auto" @click="getItems" />
+                </div>
             </template>
         </ContentHeader>
 
@@ -294,7 +307,7 @@ onMounted(() => setTimeout(() => (chartLoaded.value = true), 400));
                         <p class="text-2xl font-bold text-gray-900 mb-2">
                             {{ card.value }}
                         </p>
-                        <div class="flex items-center">
+                        <div class="flex flex-wrap items-center gap-y-1">
                             <component
                                 :is="
                                     card.trend === 'up'
@@ -346,10 +359,10 @@ onMounted(() => setTimeout(() => (chartLoaded.value = true), 400));
         </div>
 
         <!-- Charts and Analytics Section -->
-        <div class="w-full flex gap-6 pb-8">
+        <div class="flex w-full min-w-0 flex-col gap-6 pb-8 md:flex-row">
             <!-- Stock Level Chart -->
-            <div class="bg-white rounded-lg border p-6 shadow-sm w-[60%]">
-                <div class="flex items-center justify-between mb-4">
+            <div class="w-full min-w-0 rounded-lg border bg-white p-6 shadow-sm md:w-[60%]">
+                <div class="mb-4 flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
                     <h3 class="text-lg font-semibold text-gray-900">
                         Stock Level by Category
                     </h3>
@@ -379,24 +392,24 @@ onMounted(() => setTimeout(() => (chartLoaded.value = true), 400));
                     :options="stockLevelChart.chartOptions"
                     :series="stockLevelChart.series"
                     type="bar"
-                    height="350"
+                    :height="chartHeight"
                 />
             </div>
 
             <!-- Inventory Value + Location Info (Original Design) -->
             <div
-                class="flex flex-col border rounded-lg p-6 hover:shadow-lg bg-white transition-shadow w-[40%]"
+                class="flex w-full min-w-0 flex-col rounded-lg border bg-white p-6 transition-shadow hover:shadow-lg md:w-[40%]"
             >
                 <div>
                     <div class="flex items-center">
-                        <div class="px-4 py-4 rounded-lg bg-indigo-100 mr-4">
+                        <div class="mr-4 shrink-0 rounded-lg bg-indigo-100 px-4 py-4">
                             <BoxPlotOutlined class="text-3xl text-indigo-600" />
                         </div>
-                        <div>
-                            <div class="text-3xl font-semibold text-gray-800">
+                        <div class="min-w-0">
+                            <div class="text-2xl font-semibold text-gray-800 md:text-3xl">
                                 {{ location.name || "All Locations" }}
                             </div>
-                            <div class="text-sm text-gray-600">
+                            <div class="break-words text-sm text-gray-600">
                                 {{
                                     location.type
                                         ? location.type
@@ -416,7 +429,7 @@ onMounted(() => setTimeout(() => (chartLoaded.value = true), 400));
 
                     <div class="mt-8">
                         <p>Total Inventory Value</p>
-                        <p class="text-4xl font-bold text-green-700">
+                        <p class="text-3xl font-bold text-green-700 md:text-4xl">
                             {{ formattedTotal(summary.total_inventory_value) }}
                         </p>
                     </div>
@@ -498,17 +511,17 @@ onMounted(() => setTimeout(() => (chartLoaded.value = true), 400));
                     <div
                         v-for="product in lowStockProducts.slice(0, 6)"
                         :key="product.id"
-                        class="flex items-center justify-between p-3 bg-orange-50 rounded-lg border border-orange-200"
+                        class="flex items-center justify-between gap-2 rounded-lg border border-orange-200 bg-orange-50 p-3"
                     >
-                        <div>
-                            <p class="font-medium text-gray-900">
+                        <div class="min-w-0">
+                            <p class="truncate font-medium text-gray-900">
                                 {{ product.name }}
                             </p>
                             <p class="text-sm text-gray-500">
                                 SKU: {{ product.SKU }}
                             </p>
                         </div>
-                        <div class="text-right">
+                        <div class="shrink-0 text-right">
                             <p class="text-sm font-medium text-orange-600">
                                 {{ product.current_stock }} left
                             </p>
@@ -529,6 +542,7 @@ onMounted(() => setTimeout(() => (chartLoaded.value = true), 400));
                     </a-button>
                 </div>
             </div>
+        </div>
         </div>
     </AuthenticatedLayout>
 </template>
