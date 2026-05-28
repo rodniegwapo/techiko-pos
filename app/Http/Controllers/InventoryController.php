@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\InsufficientStockException;
 use App\Http\Resources\InventoryMovementResource;
 use App\Http\Resources\ProductInventoryResource;
 use App\Http\Resources\ProductResource;
@@ -50,6 +51,10 @@ class InventoryController extends Controller
 
         if ($location) {
             $query->where('location_id', $location->id);
+        }
+
+        if ($request->product_id) {
+            $query->where('product_id', $request->product_id);
         }
 
         if ($request->search) {
@@ -202,14 +207,25 @@ class InventoryController extends Controller
             ]);
         }
 
-        $query = Product::query()->with('category');
+        $location = null;
 
         if (! empty($validated['domain']) && ! empty($validated['location_id'])) {
             $location = InventoryLocation::query()
                 ->whereKey($validated['location_id'])
                 ->where('domain', $validated['domain'])
                 ->firstOrFail();
+        }
 
+        $query = Product::query()->with(
+            $location
+                ? [
+                    'category',
+                    'inventories' => fn ($q) => $q->where('location_id', $location->id),
+                ]
+                : ['category']
+        );
+
+        if ($location) {
             $query->where('domain', $validated['domain'])
                 ->whereHas('activeLocations', function ($q) use ($location) {
                     $q->where('inventory_locations.id', $location->id);
@@ -302,14 +318,26 @@ class InventoryController extends Controller
             ]);
         }
 
-        $this->inventoryService->transferInventory(
-            $product,
-            $fromLocation,
-            $toLocation,
-            $validated['quantity'],
-            auth()->user(),
-            $validated['notes'] ?? null
-        );
+        try {
+            $this->inventoryService->transferInventory(
+                $product,
+                $fromLocation,
+                $toLocation,
+                $validated['quantity'],
+                auth()->user(),
+                $validated['notes'] ?? null
+            );
+        } catch (InsufficientStockException $e) {
+            $item = $e->getUnavailableItems()[0] ?? null;
+            $available = $item['available_quantity'] ?? 0;
+            $message = "Only {$available} units available at source location";
+
+            return response()->json([
+                'success' => false,
+                'errors' => ['quantity' => [$message]],
+                'message' => $message,
+            ], 422);
+        }
 
         return response()->json(['success' => true, 'message' => 'Inventory transferred successfully']);
     }

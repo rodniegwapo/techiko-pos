@@ -22,6 +22,7 @@ const { openModal } = useGlobalVariables();
 // Global Sanctum inventory API (Ziggy does not expose domain-only `sales.products` on this page).
 const inventoryApi = {
   searchProducts: "/api/inventory/search/products",
+  products: "/api/inventory/products",
 };
 
 const emit = defineEmits(["success", "update:visible"]);
@@ -56,6 +57,33 @@ const fromStore = ref(null);
 const toStore = ref(null);
 const storeLoading = ref(false);
 
+const maxTransferQty = computed(() => Math.max(0, Number(availableStock.value) || 0));
+
+const selectedProductName = computed(
+  () => selectedProduct.value?.product?.name ?? selectedProduct.value?.name ?? "",
+);
+
+const selectedProductSku = computed(
+  () => selectedProduct.value?.product?.SKU ?? selectedProduct.value?.SKU ?? "",
+);
+
+const selectedProductUnit = computed(
+  () =>
+    selectedProduct.value?.product?.unit_of_measure ??
+    selectedProduct.value?.unit_of_measure ??
+    "pcs",
+);
+
+const canSubmitTransfer = computed(
+  () =>
+    !!selectedProduct.value &&
+    !!form.from_location_id &&
+    !!form.to_location_id &&
+    form.quantity > 0 &&
+    maxTransferQty.value > 0 &&
+    form.quantity <= maxTransferQty.value,
+);
+
 // Domain options
 const domainOptions = computed(() => {
   const list = Array.isArray(props.domains)
@@ -79,8 +107,12 @@ const initializeForm = () => {
     searchResults.value = [];
     selectedProduct.value = props.selectedProduct;
 
-    // Set the available stock from the selected inventory
+    // Set the available stock from the selected inventory (refreshed via API on open)
     availableStock.value = props.selectedProduct.quantity_available || 0;
+
+    if (form.product_id && form.from_location_id) {
+      getAvailableStock();
+    }
   } else {
     // Default initialization when no product is selected
     form.product_id = null;
@@ -197,7 +229,8 @@ const selectProduct = async (product) => {
   productSearch.value = product.name;
   searchResults.value = [];
 
-  // Get available stock for this product at from_location
+  availableStock.value = product.location_quantity_available ?? 0;
+
   await getAvailableStock();
 };
 
@@ -209,74 +242,40 @@ const getAvailableStock = async () => {
   }
 
   try {
-    // Get the product info to use for search
-    let searchTerm = "";
-    if (selectedProduct.value) {
-      // If we have selectedProduct, get the search term from the right place
-      if (selectedProduct.value.product) {
-        // This is from inventory table (pre-selected product)
-        searchTerm =
-          selectedProduct.value.product.SKU ||
-          selectedProduct.value.product.name;
-      } else if (selectedProduct.value.SKU || selectedProduct.value.name) {
-        // This is from product search
-        searchTerm = selectedProduct.value.SKU || selectedProduct.value.name;
-      }
+    const params = {
+      product_id: form.product_id,
+      location_id: form.from_location_id,
+      per_page: 1,
+    };
+
+    if (form.domain) {
+      params.domain = form.domain;
     }
 
-    // Check if we're making the right API call
-    const apiUrl = route("inventory.products");
+    const response = await axios.get(inventoryApi.products, { params });
+    const inventory = response.data.data?.[0];
 
-    // First try with search term
-    let response = await axios.get(apiUrl, {
-      params: {
-        location_id: form.from_location_id,
-        search: searchTerm,
-        per_page: 100,
-      },
-    });
-
-    // Check if response is HTML (error case)
-    if (
-      typeof response.data === "string" &&
-      response.data.includes("<!DOCTYPE html>")
-    ) {
-      availableStock.value = 0;
-      return;
-    }
-
-    let inventory = response.data.data?.find(
-      (inv) => inv.product_id === form.product_id
-    );
-
-    // If not found with search term, try without search (get all products for this location)
-    if (!inventory && searchTerm) {
-      response = await axios.get(apiUrl, {
-        params: {
-          location_id: form.from_location_id,
-          per_page: 1000, // Get more results
-        },
-      });
-
-      // Check if response is HTML (error case)
-      if (
-        typeof response.data === "string" &&
-        response.data.includes("<!DOCTYPE html>")
-      ) {
-        availableStock.value = 0;
-        return;
-      }
-
-      inventory = response.data.data?.find(
-        (inv) => inv.product_id === form.product_id
-      );
-    }
-
-    availableStock.value = inventory?.quantity_available || 0;
+    availableStock.value = inventory?.quantity_available ?? 0;
   } catch (error) {
+    console.error("Failed to fetch available stock:", error);
     availableStock.value = 0;
   }
 };
+
+watch(availableStock, (stock) => {
+  const max = Math.max(0, Number(stock) || 0);
+
+  if (max <= 0) {
+    form.quantity = 1;
+    return;
+  }
+
+  if (form.quantity > max) {
+    form.quantity = max;
+  } else if (form.quantity < 1) {
+    form.quantity = 1;
+  }
+});
 
 // Watch from_location change to update available stock
 watch(
@@ -335,10 +334,10 @@ const handleSubmit = async () => {
     return;
   }
 
-  if (form.quantity > availableStock.value) {
+  if (form.quantity > maxTransferQty.value) {
     notification.warning({
       message: "Insufficient Stock",
-      description: `Only ${availableStock.value} units available`,
+      description: `Only ${maxTransferQty.value} units available`,
     });
     return;
   }
@@ -356,8 +355,11 @@ const handleSubmit = async () => {
     emit("success");
   } catch (error) {
     console.error("Submit error:", error);
+    const data = error.response?.data;
     const errorMessage =
-      error.response?.data?.message || "An unexpected error occurred";
+      data?.errors?.quantity?.[0] ||
+      data?.message ||
+      "An unexpected error occurred";
     notification.error({
       message: "Transfer Failed",
       description: errorMessage,
@@ -398,6 +400,10 @@ watch(
   (isOpen) => {
     if (isOpen) {
       initializeForm();
+
+      if (form.from_location_id) {
+        loadStoreItemCount(form.from_location_id, fromStore);
+      }
     }
   }
 );
@@ -411,7 +417,7 @@ watch(
     wrap-class-name="modal-footer-full-mobile"
     centered
     :confirm-loading="loading"
-    @ok="handleSubmit"
+    @ok="(e) => { e.preventDefault(); handleSubmit(); }"
     @cancel="closeModal"
   >
     <template #title>
@@ -451,14 +457,14 @@ watch(
           <div class="flex items-center justify-between">
             <div>
               <p class="font-semibold text-blue-900">
-                {{ selectedProduct.product?.name }}
+                {{ selectedProductName }}
               </p>
               <p class="text-sm text-blue-700">
-                SKU: {{ selectedProduct.product?.SKU }}
+                SKU: {{ selectedProductSku }}
               </p>
               <p class="text-sm text-blue-700">
                 Available: {{ availableStock }}
-                {{ selectedProduct.product?.unit_of_measure || "pcs" }}
+                {{ selectedProductUnit }}
               </p>
             </div>
             <a-button type="link" size="small" @click="clearSelectedProduct">
@@ -501,6 +507,17 @@ watch(
                   </p>
                   <p class="text-xs text-gray-500">
                     {{ product.category?.name || "No Category" }}
+                  </p>
+                  <p
+                    v-if="product.location_quantity_available != null"
+                    class="text-xs font-medium"
+                    :class="
+                      product.location_quantity_available > 0
+                        ? 'text-green-600'
+                        : 'text-red-600'
+                    "
+                  >
+                    Available: {{ product.location_quantity_available }}
                   </p>
                 </div>
               </div>
@@ -654,16 +671,22 @@ watch(
         </label>
         <a-input-number
           v-model:value="form.quantity"
-          :min="1"
-          :max="availableStock"
+          :min="maxTransferQty > 0 ? 1 : 0"
+          :max="maxTransferQty > 0 ? maxTransferQty : undefined"
           :step="1"
           :precision="0"
           class="w-full"
-          :disabled="loading || !selectedProduct"
+          :disabled="loading || !selectedProduct || maxTransferQty <= 0"
         />
-        <p v-if="availableStock > 0" class="text-sm text-gray-500 mt-1">
-          Maximum available: {{ availableStock }}
-          {{ selectedProduct?.unit_of_measure || "pcs" }}
+        <p v-if="maxTransferQty > 0" class="text-sm text-gray-500 mt-1">
+          Maximum available: {{ maxTransferQty }}
+          {{ selectedProductUnit }}
+        </p>
+        <p
+          v-if="form.quantity > maxTransferQty && maxTransferQty > 0"
+          class="text-sm text-red-600 mt-1"
+        >
+          Quantity exceeds available stock (max {{ maxTransferQty }}).
         </p>
       </div>
 
@@ -682,7 +705,7 @@ watch(
 
       <!-- Stock Warning -->
       <div
-        v-if="selectedProduct && availableStock <= 0"
+        v-if="selectedProduct && maxTransferQty <= 0"
         class="p-4 bg-red-50 border border-red-200 rounded-lg"
       >
         <div class="flex items-center">
@@ -701,8 +724,8 @@ watch(
       <div class="modal-footer-actions flex w-full flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <span v-if="selectedProduct" class="text-sm text-gray-500">
-            {{ selectedProduct.product?.name }} • {{ form.quantity }}
-            {{ selectedProduct.product?.unit_of_measure || "pcs" }}
+            {{ selectedProductName }} • {{ form.quantity }}
+            {{ selectedProductUnit }}
           </span>
         </div>
         <div class="flex w-full flex-col gap-2 md:w-auto md:flex-row">
@@ -714,13 +737,7 @@ watch(
             class="w-full md:w-auto"
             @click="handleSubmit"
             :loading="loading"
-            :disabled="
-              !selectedProduct ||
-              !form.from_location_id ||
-              !form.to_location_id ||
-              form.quantity <= 0 ||
-              form.quantity > availableStock
-            "
+            :disabled="!canSubmitTransfer"
           >
             Transfer Inventory
           </a-button>
