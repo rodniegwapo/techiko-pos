@@ -128,6 +128,15 @@ watch(
   () => form.from_location_id,
   (newLocationId) => {
     loadStoreItemCount(newLocationId, fromStore);
+
+    if (!newLocationId) {
+      searchResults.value = [];
+      return;
+    }
+
+    if (productSearch.value.length >= 2) {
+      searchProducts();
+    }
   }
 );
 
@@ -145,11 +154,19 @@ const searchProducts = async () => {
     return;
   }
 
+  if (form.domain && !form.from_location_id) {
+    searchResults.value = [];
+    return;
+  }
+
   searchLoading.value = true;
   try {
     const params = { search: productSearch.value };
     if (form.domain) {
       params.domain = form.domain;
+    }
+    if (form.from_location_id) {
+      params.location_id = form.from_location_id;
     }
     const response = await axios.get(inventoryApi.searchProducts, { params });
     const collection = response.data.data;
