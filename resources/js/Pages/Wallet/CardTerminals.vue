@@ -261,6 +261,12 @@ function goToMoneyDetailsPage(record) {
         q,
     );
 }
+
+const showMobileSecondaryActions = computed(
+    () =>
+        hasPermission("payment-card-types.update") ||
+        hasPermission("payment-card-types.destroy"),
+);
 </script>
 
 <template>
@@ -269,7 +275,7 @@ function goToMoneyDetailsPage(record) {
             <div class="mt-6 w-full min-w-0 max-w-7xl">
                 <div class="space-y-4">
                     <div
-                        class="mb-4 max-w-full min-w-0 rounded-lg border border-gray-200 bg-white px-4 py-4 shadow-sm sm:max-w-7xl"
+                        class="mb-4 max-w-full min-w-0 rounded-lg border border-gray-200 bg-white px-4 py-4 shadow-sm md:max-w-7xl"
                     >
                         <div class="text-base font-semibold text-gray-900">
                             Credit
@@ -278,7 +284,7 @@ function goToMoneyDetailsPage(record) {
                             Paid credit sales (charge to account)
                         </div>
                         <div
-                            class="grid min-w-0 max-w-full grid-cols-1 gap-3 sm:max-w-md sm:grid-cols-2"
+                            class="grid min-w-0 max-w-full grid-cols-1 gap-3 md:max-w-md md:grid-cols-2"
                         >
                             <div
                                 class="min-w-0 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2"
@@ -314,7 +320,10 @@ function goToMoneyDetailsPage(record) {
                             </div>
                         </div>
                     </div>
-                    <ContentLayout title="Payment card types">
+                    <ContentLayout
+                        title="Payment card types"
+                        filter-class="flex flex-wrap items-center justify-end gap-2 w-full min-w-0"
+                    >
                         <template #filters>
                             <div
                                 v-if="hasPermission('payment-card-types.store')"
@@ -422,104 +431,126 @@ function goToMoneyDetailsPage(record) {
                                 </template>
                             </a-table>
 
-                            <div v-else class="px-2 py-2 sm:px-4 md:px-0">
-                                <div
-                                    v-if="!rows.length"
-                                    class="py-12 text-center text-sm text-gray-500"
-                                >
-                                    No card types yet. Add one to use Pay in
-                                    Card on Sales.
-                                </div>
-                                <div v-else class="flex flex-col gap-3">
-                                    <a-card
-                                        v-for="record in rows"
-                                        :key="record.id"
-                                        size="small"
-                                        class="shadow-sm"
+                            <div v-else class="px-2 py-2 md:px-0">
+                                <a-spin :spinning="deletingId != null">
+                                    <div
+                                        v-if="!rows.length"
+                                        class="py-12 text-center text-sm text-gray-500"
                                     >
+                                        No card types yet. Add one to use Pay in
+                                        Card on Sales.
+                                    </div>
+                                    <div v-else class="flex flex-col gap-3">
                                         <div
-                                            class="flex flex-wrap items-start justify-between gap-2"
+                                            v-for="record in rows"
+                                            :key="record.id"
+                                            class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm"
                                         >
-                                            <div class="min-w-0 flex-1">
+                                            <div class="px-4 py-3">
                                                 <div
-                                                    class="text-sm font-semibold text-gray-900"
+                                                    class="truncate text-base font-semibold text-gray-900"
                                                 >
                                                     {{ record.name }}
                                                 </div>
-                                                <a-tag
-                                                    class="mt-2"
-                                                    :color="
-                                                        record.is_active
-                                                            ? 'green'
-                                                            : 'default'
-                                                    "
+                                                <div
+                                                    class="mt-2 flex flex-wrap items-center gap-2"
                                                 >
-                                                    {{
-                                                        record.is_active
-                                                            ? "Active"
-                                                            : "Inactive"
-                                                    }}
-                                                </a-tag>
+                                                    <a-tag
+                                                        :color="
+                                                            record.is_active
+                                                                ? 'green'
+                                                                : 'default'
+                                                        "
+                                                        class="m-0 text-xs"
+                                                    >
+                                                        {{
+                                                            record.is_active
+                                                                ? "Active"
+                                                                : "Inactive"
+                                                        }}
+                                                    </a-tag>
+                                                </div>
                                             </div>
+
                                             <div
-                                                class="flex shrink-0 flex-wrap items-center justify-end gap-2"
+                                                class="border-t border-gray-100 px-4 py-3"
                                             >
-                                                <IconTooltipButton
-                                                    v-if="
-                                                        hasPermission(
-                                                            'payment-card-types.money',
-                                                        )
-                                                    "
-                                                    name="View payment details"
-                                                    hover="hover:bg-emerald-600"
-                                                    @click="
-                                                        goToMoneyDetailsPage(
-                                                            record,
-                                                        )
-                                                    "
+                                                <div
+                                                    class="flex flex-col gap-2"
                                                 >
-                                                    <IconReportMoney
-                                                        size="20"
-                                                        class="mx-auto"
-                                                    />
-                                                </IconTooltipButton>
-                                                <IconTooltipButton
-                                                    v-if="
-                                                        hasPermission(
-                                                            'payment-card-types.update',
-                                                        )
-                                                    "
-                                                    name="Edit card type"
-                                                    hover="hover:bg-blue-500"
-                                                    @click="openEdit(record)"
-                                                >
-                                                    <IconEdit
-                                                        size="20"
-                                                        class="mx-auto"
-                                                    />
-                                                </IconTooltipButton>
-                                                <IconTooltipButton
-                                                    v-if="
-                                                        hasPermission(
-                                                            'payment-card-types.destroy',
-                                                        )
-                                                    "
-                                                    name="Remove card type"
-                                                    hover="hover:bg-red-600"
-                                                    :loading="
-                                                        deletingId === record.id
-                                                    "
-                                                    @click="remove(record)"
-                                                >
-                                                    <IconTrash
-                                                        size="20"
-                                                        class="mx-auto"
-                                                    />
-                                                </IconTooltipButton>
+                                                    <a-button
+                                                        v-if="
+                                                            hasPermission(
+                                                                'payment-card-types.money',
+                                                            )
+                                                        "
+                                                        class="flex items-center justify-center gap-2"
+                                                        @click="
+                                                            goToMoneyDetailsPage(
+                                                                record,
+                                                            )
+                                                        "
+                                                    >
+                                                        <template #icon>
+                                                            <IconReportMoney
+                                                                size="18"
+                                                            />
+                                                        </template>
+                                                        View payment details
+                                                    </a-button>
+                                                    <div
+                                                        v-if="
+                                                            showMobileSecondaryActions
+                                                        "
+                                                        class="grid grid-cols-2 gap-2"
+                                                    >
+                                                        <a-button
+                                                            v-if="
+                                                                hasPermission(
+                                                                    'payment-card-types.update',
+                                                                )
+                                                            "
+                                                            class="flex items-center justify-center gap-2"
+                                                            @click="
+                                                                openEdit(record)
+                                                            "
+                                                        >
+                                                            <template #icon>
+                                                                <IconEdit
+                                                                    size="18"
+                                                                />
+                                                            </template>
+                                                            Edit
+                                                        </a-button>
+                                                        <a-button
+                                                            v-if="
+                                                                hasPermission(
+                                                                    'payment-card-types.destroy',
+                                                                )
+                                                            "
+                                                            class="flex items-center justify-center gap-2"
+                                                            danger
+                                                            :loading="
+                                                                deletingId ===
+                                                                record.id
+                                                            "
+                                                            @click="
+                                                                remove(record)
+                                                            "
+                                                        >
+                                                            <template #icon>
+                                                                <IconTrash
+                                                                    size="18"
+                                                                />
+                                                            </template>
+                                                            Remove
+                                                        </a-button>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
-                                    </a-card>
-                                </div>
+                                    </div>
+                                </a-spin>
                             </div>
                         </template>
                     </ContentLayout>
