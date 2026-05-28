@@ -1,9 +1,21 @@
 <script setup>
 import { ref, reactive, computed } from 'vue';
+import { useMediaQuery } from '@vueuse/core';
 import {
   PlusOutlined,
   MinusOutlined
 } from '@ant-design/icons-vue';
+
+const isMdUp = useMediaQuery('(min-width: 768px)');
+const modalWidth = computed(() =>
+  isMdUp.value ? 500 : 'calc(100vw - 24px)',
+);
+const modalRootStyle = computed(() =>
+  isMdUp.value ? {} : { maxWidth: '100vw', top: '12px', paddingBottom: 0 },
+);
+const modalBodyStyle = computed(() =>
+  isMdUp.value ? {} : { maxHeight: 'calc(100vh - 120px)', overflowY: 'auto' },
+);
 
 // Props
 const props = defineProps({
@@ -86,9 +98,13 @@ const handleSave = async () => {
     :visible="visible"
     title="Adjust Customer Points"
     :confirm-loading="adjusting"
+    :width="modalWidth"
+    :style="modalRootStyle"
+    :body-style="modalBodyStyle"
+    wrap-class-name="modal-footer-full-mobile"
+    centered
     @ok="handleSave"
     @cancel="$emit('close')"
-    width="500px"
   >
     <div v-if="customer" class="space-y-4 max-h-[450px] overflow-scroll overflow-x-hidden">
       <!-- Customer Info -->
