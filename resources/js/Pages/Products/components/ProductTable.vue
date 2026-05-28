@@ -43,8 +43,7 @@ const props = defineProps({
 const products = computed(() => page.props?.items?.data ?? []);
 
 const showSuperUserDomain = computed(
-    () =>
-        page.props.auth?.user?.data?.is_super_user && props.isGlobalView,
+    () => page.props.auth?.user?.data?.is_super_user && props.isGlobalView,
 );
 
 const showStoreQty = computed(
@@ -127,6 +126,19 @@ function storeQtyLabel(record) {
     return String(record.location_quantity_available ?? 0);
 }
 
+function profitMargin(record) {
+    if (!record.cost || !record.price) return null;
+    return (((record.price - record.cost) / record.price) * 100).toFixed(1);
+}
+
+function productSubtitle(record) {
+    const parts = [categoryName(record)];
+    if (record.sold_type) {
+        parts.push(record.sold_type);
+    }
+    return parts.join(" · ");
+}
+
 const handleDeleteCategory = (record) => {
     confirmDelete(
         "products.destroy",
@@ -170,7 +182,11 @@ function onMobilePaginationChange(pageNum) {
     >
         <template #bodyCell="{ column, record }">
             <template v-if="column.key == 'avatar'">
-                <a-avatar shape="circle" size="large" :src="avatarSrc(record)" />
+                <a-avatar
+                    shape="circle"
+                    size="large"
+                    :src="avatarSrc(record)"
+                />
             </template>
 
             <template v-if="column.key == 'domain'">
@@ -238,7 +254,7 @@ function onMobilePaginationChange(pageNum) {
         </template>
     </a-table>
 
-    <div v-else class="px-2 py-2 sm:px-4 md:px-0">
+    <div v-else class="px-2 py-2 md:px-0">
         <a-spin :spinning="spinning">
             <div
                 v-if="!products.length"
@@ -247,91 +263,136 @@ function onMobilePaginationChange(pageNum) {
                 No products found.
             </div>
             <div v-else class="flex flex-col gap-3">
-                <a-card
+                <div
                     v-for="record in products"
                     :key="record.id"
-                    size="small"
-                    class="shadow-sm"
+                    class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm"
                 >
-                    <div class="flex gap-3">
+                    <div class="flex gap-3 px-4 py-3">
                         <a-avatar
                             shape="circle"
                             size="large"
                             :src="avatarSrc(record)"
                         />
                         <div class="min-w-0 flex-1">
-                            <div class="font-semibold text-gray-900">
+                            <div
+                                class="truncate text-base font-semibold text-gray-900"
+                            >
                                 {{ record.name }}
                             </div>
                             <div class="mt-1 text-sm text-gray-600">
-                                {{ categoryName(record) }}
+                                {{ productSubtitle(record) }}
                             </div>
-                            <div
-                                v-if="showSuperUserDomain"
-                                class="mt-1 flex items-center text-sm text-gray-600"
-                            >
-                                <IconWorld class="mr-1 shrink-0" size="16" />
-                                <span class="truncate">{{
-                                    record.domain || "N/A"
-                                }}</span>
-                            </div>
-                            <div
-                                class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm"
-                            >
-                                <span class="inline-flex items-center">
-                                    <IconCurrencyPeso class="mr-0.5" />
-                                    {{ record.price }}
-                                </span>
-                                <span class="inline-flex items-center text-gray-600">
-                                    <IconCurrencyPeso class="mr-0.5" />
-                                    {{ record.cost }}
-                                </span>
-                                <a-tag color="blue" class="m-0">{{
-                                    record.SKU
-                                }}</a-tag>
-                            </div>
-                            <div
-                                v-if="showStoreQty"
-                                class="mt-1 text-sm text-gray-600"
-                            >
-                                Qty (store):
-                                <span
-                                    :class="
-                                        record.track_inventory
-                                            ? 'font-medium text-gray-900'
-                                            : 'text-gray-400'
-                                    "
-                                    >{{ storeQtyLabel(record) }}</span
+                            <div class="mt-2 flex flex-wrap items-center gap-2">
+                                <a-tag
+                                    v-if="record.SKU"
+                                    color="blue"
+                                    class="m-0 text-xs"
                                 >
+                                    {{ record.SKU }}
+                                </a-tag>
+                                <a-tag
+                                    v-if="record.track_inventory"
+                                    color="green"
+                                    class="m-0 text-xs"
+                                >
+                                    Tracked
+                                </a-tag>
+                                <a-tag
+                                    v-else
+                                    color="orange"
+                                    class="m-0 text-xs"
+                                >
+                                    Not tracked
+                                </a-tag>
                             </div>
                         </div>
                     </div>
-                    <div
-                        class="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-gray-100 pt-3"
-                    >
-                        <IconTooltipButton
-                            hover="hover:bg-green-500"
-                            name="View Details"
-                            @click="showDetails(record)"
+
+                    <div class="mx-4 mb-3 rounded-lg bg-gray-50 p-3">
+                        <div
+                            class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-sm"
                         >
-                            <IconEye size="20" class="mx-auto" />
-                        </IconTooltipButton>
-                        <IconTooltipButton
-                            hover="hover:bg-blue-500"
-                            name="Edit Product"
-                            @click="handleClickEdit(record)"
-                        >
-                            <IconEdit size="20" class="mx-auto" />
-                        </IconTooltipButton>
-                        <IconTooltipButton
-                            hover="hover:bg-red-500"
-                            name="Delete Product"
-                            @click="handleDeleteCategory(record)"
-                        >
-                            <IconTrash size="20" class="mx-auto" />
-                        </IconTooltipButton>
+                            <span class="text-gray-500">Price</span>
+                            <span
+                                class="text-right font-semibold text-green-600"
+                            >
+                                {{ formatCurrency(record.price) }}
+                            </span>
+                            <span class="text-gray-500">Cost</span>
+                            <span
+                                class="text-right font-semibold text-blue-600"
+                            >
+                                {{ formatCurrency(record.cost || 0) }}
+                            </span>
+                            <template v-if="profitMargin(record) !== null">
+                                <span class="text-gray-500">Margin</span>
+                                <span
+                                    class="text-right font-semibold text-purple-600"
+                                >
+                                    {{ profitMargin(record) }}%
+                                </span>
+                            </template>
+                            <template v-if="showStoreQty">
+                                <span class="text-gray-500">Qty (store)</span>
+                                <span
+                                    class="text-right font-medium"
+                                    :class="
+                                        record.track_inventory
+                                            ? 'text-gray-900'
+                                            : 'text-gray-400'
+                                    "
+                                >
+                                    {{ storeQtyLabel(record) }}
+                                </span>
+                            </template>
+                            <template v-if="showSuperUserDomain">
+                                <span class="text-gray-500">Domain</span>
+                                <span
+                                    class="min-w-0 truncate text-right font-medium text-gray-900"
+                                >
+                                    {{ record.domain || "N/A" }}
+                                </span>
+                            </template>
+                        </div>
                     </div>
-                </a-card>
+
+                    <div class="border-t border-gray-100 px-4 py-3">
+                        <div class="flex flex-col gap-2">
+                            <a-button
+                                class="flex item-center gap-2 justify-center"
+                                @click="showDetails(record)"
+                            >
+                                <template #icon>
+                                    <IconEye size="18" />
+                                </template>
+
+                                View details
+                            </a-button>
+                            <div class="grid grid-cols-2 gap-2">
+                                <a-button
+                                    class="flex item-center gap-2 justify-center"
+                                    @click="handleClickEdit(record)"
+                                >
+                                    <template #icon>
+                                        <IconEdit size="18" />
+                                    </template>
+                                    Edit
+                                </a-button>
+                                <a-button
+                                    class="flex item-center gap-2 justify-center"
+                                    danger
+                                    @click="handleDeleteCategory(record)"
+                                >
+                                    <template #icon>
+                                        <IconTrash size="18" />
+                                    </template>
+                                    Delete
+                                </a-button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
             <a-pagination
                 v-if="
