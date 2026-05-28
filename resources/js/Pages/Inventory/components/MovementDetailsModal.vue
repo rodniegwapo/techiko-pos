@@ -1,5 +1,6 @@
 <script setup>
 import { computed, toRefs } from "vue";
+import { useMediaQuery } from "@vueuse/core";
 import {
   IconArrowUp,
   IconArrowDown,
@@ -13,6 +14,16 @@ import {
 import { useHelpers } from "@/Composables/useHelpers";
 
 const { formatCurrency, formatDate, formatDateTime } = useHelpers();
+const isMdUp = useMediaQuery("(min-width: 768px)");
+const modalWidth = computed(() =>
+  isMdUp.value ? 700 : "calc(100vw - 24px)",
+);
+const modalRootStyle = computed(() =>
+  isMdUp.value ? {} : { maxWidth: "100vw", top: "12px", paddingBottom: 0 },
+);
+const modalBodyStyle = computed(() =>
+  isMdUp.value ? {} : { maxHeight: "calc(100vh - 120px)", overflowY: "auto" },
+);
 
 const props = defineProps({
   visible: {
@@ -81,13 +92,17 @@ const isDecrease = computed(() => {
   <a-modal
     v-model:visible="visible"
     title="Movement Details"
-    width="700px"
+    :width="modalWidth"
+    :style="modalRootStyle"
+    :body-style="modalBodyStyle"
     @cancel="handleClose"
     :footer="null"
   >
     <div v-if="movement" class="space-y-6">
       <!-- Movement Header -->
-      <div class="flex items-start justify-between pb-4 border-b">
+      <div
+        class="flex flex-col gap-3 border-b pb-4 md:flex-row md:items-start md:justify-between"
+      >
         <div class="flex items-center space-x-3">
           <div
             class="p-2 rounded-lg"
@@ -122,7 +137,7 @@ const isDecrease = computed(() => {
           Product Information
         </h4>
         <div class="bg-gray-50 p-4 rounded-lg border">
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <p class="text-sm text-gray-600">Product Name</p>
               <p class="font-semibold">
@@ -152,7 +167,7 @@ const isDecrease = computed(() => {
       <!-- Quantity Changes -->
       <div>
         <h4 class="text-md font-semibold mb-3">Quantity Changes</h4>
-        <div class="grid grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div class="bg-blue-50 p-3 rounded-lg text-center border">
             <p class="text-sm text-gray-600">Before</p>
             <p class="text-xl font-bold text-blue-600">
@@ -187,7 +202,7 @@ const isDecrease = computed(() => {
       </div>
 
       <!-- Location & Cost Information -->
-      <div class="grid grid-cols-2 gap-6">
+      <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
         <!-- Location -->
         <div>
           <h4 class="text-md font-semibold mb-3 flex items-center">
@@ -240,7 +255,7 @@ const isDecrease = computed(() => {
           Reference Information
         </h4>
         <div class="bg-gray-50 p-3 rounded-lg border">
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div v-if="movement.reference_type">
               <p class="text-sm text-gray-600">Reference Type</p>
               <p class="font-semibold">{{ movement.reference_type }}</p>
@@ -254,7 +269,7 @@ const isDecrease = computed(() => {
       </div>
 
       <!-- Additional Details -->
-      <div class="grid grid-cols-2 gap-6">
+      <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
         <!-- Batch & Expiry -->
         <div v-if="movement.batch_number || movement.expiry_date">
           <h4 class="text-md font-semibold mb-3">Batch Information</h4>
