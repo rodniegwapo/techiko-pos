@@ -1,6 +1,6 @@
 <template>
-  <div class="px-8">
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+  <div class="px-4 md:px-8">
+    <div class="grid grid-cols-1 gap-6 md:gap-8 lg:grid-cols-2">
       <!-- Points System -->
       <div class="border p-4 rounded-lg">
         <h3 class="text-lg font-medium text-gray-900 mb-4">

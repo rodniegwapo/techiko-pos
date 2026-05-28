@@ -153,26 +153,30 @@ const hasMultipleStores = computed(() => {
 <template>
     <AuthenticatedLayout>
         <Head title="Products" />
-        <ContentHeader class="mb-8" title="Products" />
-        <ContentLayout title="Products">
+        <ContentHeader class="mb-4 md:mb-8" title="Products" />
+        <ContentLayout
+            title="Products"
+            filter-class="flex flex-wrap items-center justify-end gap-2 w-full min-w-0"
+        >
             <!-- Filters -->
             <template #filters>
                 <RefreshButton :loading="spinning" @click="getItems" />
                 <a-input-search
                     v-model:value="search"
                     placeholder="Search products"
-                    class="min-w-[100px] max-w-[300px]"
+                    class="w-full min-w-0 md:max-w-[300px]"
                 />
 
                 <Link
                     v-if="!productsAtCapacity"
+                    class="block w-full md:w-auto"
                     :href="
                         hrefWithPreservedLocationId(getRoute('products.create'))
                     "
                 >
                     <a-button
                         type="primary"
-                        class="bg-white border flex items-center border-green-500 text-green-500"
+                        class="flex w-full items-center justify-center border border-green-500 bg-white text-green-500 md:inline-flex md:w-auto"
                     >
                         <template #icon>
                             <PlusSquareOutlined />
@@ -184,11 +188,11 @@ const hasMultipleStores = computed(() => {
                     v-else
                     title="Free plan is limited to 10 products. Open Servicing Payment to subscribe."
                 >
-                    <span class="inline-block">
+                    <span class="block w-full md:inline-block md:w-auto">
                         <a-button
                             type="primary"
                             disabled
-                            class="bg-white border flex items-center border-gray-300 text-gray-400"
+                            class="flex w-full items-center justify-center border border-gray-300 bg-white text-gray-400 md:inline-flex md:w-auto"
                         >
                             <template #icon>
                                 <PlusSquareOutlined />
@@ -204,7 +208,7 @@ const hasMultipleStores = computed(() => {
                         effectiveLocationId !== ''
                     "
                     type="default"
-                    class="flex items-center border-blue-500 text-blue-600"
+                    class="flex w-full items-center justify-center border-blue-500 text-blue-600 md:inline-flex md:w-auto"
                     @click="attachModalOpen = true"
                 >
                     <template #icon>

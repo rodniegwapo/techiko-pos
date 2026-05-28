@@ -13,6 +13,7 @@ import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useNetworkInfo } from "@/Composables/useNetworkInfo";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
+import { useMediaQuery } from "@vueuse/core";
 import {
     addPendingSale,
     listNeedsAttentionForDomain,
@@ -27,6 +28,22 @@ const page = usePage();
 const { getRoute } = useDomainRoutes();
 const { spinning } = useGlobalVariables();
 const { hasPermission } = usePermissionsV2();
+
+const isMdUp = useMediaQuery("(min-width: 768px)");
+
+const {
+    connectionType,
+    isNetworkInfoSupported,
+    connectionLabel,
+    effectiveTypeLabel,
+} = useNetworkInfo();
+
+const captureModalWidth = computed(() =>
+    isMdUp.value ? 720 : "calc(100vw - 24px)",
+);
+const captureModalRootStyle = computed(() =>
+    isMdUp.value ? {} : { maxWidth: "100vw", top: "12px", paddingBottom: 0 },
+);
 
 const domainSlug = computed(
     () => page.props.domain?.name_slug ?? page.props.domain?.nameSlug,
@@ -445,7 +462,7 @@ function tableRowClassName(_record, index) {
     <Head title="Offline transactions" />
 
     <AuthenticatedLayout>
-        <ContentHeader class="mb-8" title="Offline transactions">
+        <ContentHeader class="mb-4 md:mb-8" title="Offline transactions">
             <template #description>
                 Record sales locally when there is no network, then accept or
                 reject each row. Accepted rows sync automatically when online.
@@ -524,6 +541,7 @@ function tableRowClassName(_record, index) {
 
             <template #table>
                 <a-table
+                    v-if="isMdUp"
                     class="ant-table-striped"
                     :columns="columns"
                     :data-source="queue"
@@ -596,13 +614,105 @@ function tableRowClassName(_record, index) {
                         >
                     </template>
                 </a-table>
+
+                <div v-else class="px-2 py-2 sm:px-4">
+                    <a-spin :spinning="loadingQueue">
+                        <div
+                            v-if="!queue.length && !loadingQueue"
+                            class="py-12 text-center text-sm text-gray-500"
+                        >
+                            No pending offline sales for this organization.
+                        </div>
+                        <div v-else class="flex flex-col gap-3">
+                            <a-card
+                                v-for="(record, idx) in queue"
+                                :key="record.client_mutation_id"
+                                size="small"
+                                class="shadow-sm"
+                                :class="{
+                                    'bg-gray-50/80': idx % 2 === 1,
+                                }"
+                            >
+                                <div
+                                    class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm"
+                                >
+                                    <span class="text-gray-500">Created</span>
+                                    <span class="min-w-0 break-all text-right">{{
+                                        record.created_at
+                                    }}</span>
+                                    <span class="text-gray-500">Location</span>
+                                    <span class="min-w-0 break-words text-right">{{
+                                        locationNameById[record.location_id] ||
+                                        `#${record.location_id}`
+                                    }}</span>
+                                    <span class="text-gray-500">Lines</span>
+                                    <span
+                                        class="min-w-0 break-words text-right"
+                                        :title="lineSummary(record)"
+                                        >{{ lineSummary(record) }}</span
+                                    >
+                                    <span class="text-gray-500">Total</span>
+                                    <span class="text-right font-medium">{{
+                                        formatMoney(
+                                            lineTotals(record.payload?.items),
+                                        )
+                                    }}</span>
+                                    <span class="text-gray-500">Payment</span>
+                                    <span
+                                        class="min-w-0 break-words text-right"
+                                        >{{ paymentDisplay(record) }}</span
+                                    >
+                                    <span class="text-gray-500">Status</span>
+                                    <div class="text-right">
+                                        <span class="capitalize">{{
+                                            record.status.replaceAll("_", " ")
+                                        }}</span>
+                                        <div
+                                            v-if="
+                                                record.status === 'failed' &&
+                                                record.error_message
+                                            "
+                                            class="mt-1 text-xs leading-snug text-red-600"
+                                        >
+                                            {{ record.error_message }}
+                                        </div>
+                                    </div>
+                                </div>
+                                <a-space
+                                    direction="vertical"
+                                    size="small"
+                                    class="mt-4 w-full"
+                                >
+                                    <a-button
+                                        type="primary"
+                                        block
+                                        :disabled="rowActionsDisabled(record)"
+                                        @click="onAccept(record)"
+                                    >
+                                        Accept
+                                    </a-button>
+                                    <a-button
+                                        danger
+                                        block
+                                        :disabled="rowActionsDisabled(record)"
+                                        @click="onReject(record)"
+                                    >
+                                        Reject
+                                    </a-button>
+                                </a-space>
+                            </a-card>
+                        </div>
+                    </a-spin>
+                </div>
             </template>
         </ContentLayout>
 
         <a-modal
             v-model:visible="captureModalVisible"
             title="Add offline sale"
-            width="720px"
+            :width="captureModalWidth"
+            :style="captureModalRootStyle"
+            centered
             @cancel="closeCaptureModal"
         >
             <div class="grid gap-4 md:grid-cols-2">
@@ -706,24 +816,28 @@ function tableRowClassName(_record, index) {
                     <div
                         v-for="(row, idx) in lineItems"
                         :key="idx"
-                        class="flex flex-wrap items-end gap-2"
+                        class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end"
                     >
                         <a-input
                             v-model:value="row.product_id"
-                            class="w-32"
+                            class="w-full min-w-0 sm:w-32"
                             placeholder="Product ID"
                         />
                         <a-input-number
                             v-model:value="row.quantity"
                             :min="1"
-                            class="w-28"
+                            class="w-full min-w-0 sm:w-28"
                         />
                         <a-input
                             v-model:value="row.unit_price"
-                            class="w-32"
+                            class="w-full min-w-0 sm:w-32"
                             placeholder="Unit price"
                         />
-                        <a-button danger type="link" @click="removeLineRow(idx)"
+                        <a-button
+                            danger
+                            type="link"
+                            class="shrink-0 self-end sm:self-auto"
+                            @click="removeLineRow(idx)"
                             >Remove</a-button
                         >
                     </div>
@@ -733,14 +847,22 @@ function tableRowClassName(_record, index) {
                 >
             </div>
             <template #footer>
-                <a-button @click="closeCaptureModal">Cancel</a-button>
-                <a-button
-                    type="primary"
-                    :disabled="captureDisabled"
-                    @click="saveOfflineSale"
+                <div
+                    class="flex w-full flex-col gap-2 sm:flex-row sm:justify-end"
                 >
-                    Save locally
-                </a-button>
+                    <a-button block class="sm:!inline-block sm:w-auto" @click="closeCaptureModal">
+                        Cancel
+                    </a-button>
+                    <a-button
+                        type="primary"
+                        block
+                        class="sm:!inline-block sm:w-auto"
+                        :disabled="captureDisabled"
+                        @click="saveOfflineSale"
+                    >
+                        Save locally
+                    </a-button>
+                </div>
             </template>
         </a-modal>
     </AuthenticatedLayout>

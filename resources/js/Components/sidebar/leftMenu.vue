@@ -24,11 +24,13 @@ import { router, usePage } from "@inertiajs/vue3";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
+import { useSidebar } from "@/Composables/useSidebar";
 
 const page = usePage();
 const { hasPermission } = usePermissionsV2();
 const { selectedKeys, openKeys } = useGlobalVariables();
 const { getRoute, getLocationQueryFromPage } = useDomainRoutes();
+const { closeMobileDrawer } = useSidebar();
 
 // Ensure selectedKeys and openKeys are arrays
 if (!Array.isArray(selectedKeys.value)) {
@@ -466,6 +468,7 @@ const handleClick = (menu) => {
         return;
     }
 
+    localStorage.setItem("selectedMenuForMobile", menu.title);
     try {
         if (menu.key === "wallet-money-movement") {
             const routePath = getRoute("wallet.money-movement");
@@ -475,6 +478,7 @@ const handleClick = (menu) => {
                     ...getLocationQueryFromPage(),
                     ...walletMenuQuery(),
                 });
+                closeMobileDrawer();
             }
             return;
         }
@@ -487,6 +491,7 @@ const handleClick = (menu) => {
                     ...getLocationQueryFromPage(),
                     ...walletMenuQuery(),
                 });
+                closeMobileDrawer();
             }
             return;
         }
@@ -501,6 +506,7 @@ const handleClick = (menu) => {
             } else {
                 router.visit(routePath);
             }
+            closeMobileDrawer();
         } else {
             console.error(
                 "Invalid route generated for menu:",

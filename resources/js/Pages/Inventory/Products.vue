@@ -79,7 +79,7 @@ const domainOptions = computed(() =>
     (props.domains || []).map((domain) => ({
         label: domain.name,
         value: domain.name_slug,
-    }))
+    })),
 );
 
 // Remove unused computed properties since we're using single filter approach
@@ -173,65 +173,32 @@ const handleTransferStock = (inventory) => {
     <Head title="Inventory Products" />
 
     <AuthenticatedLayout>
-        <ContentHeader title="Inventory Products">
-            <template #actions>
-                <a-select
-                    v-model:value="location_id"
-                    placeholder="Select Location"
-                    style="width: 200px; margin-right: 8px"
-                    @change="changeLocation"
-                >
-                    <a-select-option
-                        v-for="location in locations"
-                        :key="location.id"
-                        :value="location.id"
-                    >
-                        {{ location.name }}
-                    </a-select-option>
-                </a-select>
-
-                <a-button @click="exportInventory" style="margin-right: 8px">
-                    <template #icon>
-                        <DownloadOutlined />
-                    </template>
-                    Export
-                </a-button>
-
-                <a-button
-                    type="primary"
-                    @click="showTransferModal"
-                    style="margin-right: 8px"
-                >
-                    Transfer Stock
-                </a-button>
-
-                <a-button
-                    type="primary"
-                    @click="showReceiveModal"
-                    style="margin-right: 8px"
-                >
-                    <template #icon>
-                        <PlusSquareOutlined />
-                    </template>
-                    Receive Inventory
-                </a-button>
-
-                <RefreshButton @click="getItems" />
-            </template>
+        <ContentHeader class="mb-4 md:mb-8" title="Inventory Products">
+            <template #actions> </template>
         </ContentHeader>
 
-        <ContentLayout title="Inventory Products">
+        <ContentLayout
+            title="Inventory Products"
+            filter-class="flex flex-wrap items-center justify-end gap-2 w-full min-w-0"
+        >
             <template #filters>
                 <RefreshButton :loading="spinning" @click="getItems" />
                 <a-input-search
                     v-model:value="search"
                     placeholder="Search products, SKU, or barcode..."
-                    class="min-w-[100px] max-w-[300px]"
+                    class="w-full min-w-0 md:max-w-[300px]"
                 />
+                <a-button
+                    type="primary"
+                    class="w-full md:w-auto"
+                    @click="showTransferModal"
+                >
+                    Transfer Stock
+                </a-button>
                 <a-button
                     @click="showReceiveModal"
                     type="primary"
-                    class="bg-white border flex items-center border-green-500 text-green-500"
+                    class="flex w-full items-center justify-center border border-green-500 bg-white text-green-500 md:inline-flex md:w-auto"
                 >
                     <template #icon>
                         <PlusSquareOutlined />
@@ -248,7 +215,7 @@ const handleTransferStock = (inventory) => {
                     @clear-all="
                         () =>
                             Object.keys(filters).forEach(
-                                (k) => (filters[k] = null)
+                                (k) => (filters[k] = null),
                             )
                     "
                 />

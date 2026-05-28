@@ -1,7 +1,19 @@
 <script setup>
-import { ref, watch } from "vue";
+import { ref, watch, computed } from "vue";
+import { useMediaQuery } from "@vueuse/core";
 import { useCredit } from "@/Composables/useCredit";
 import { notification } from "ant-design-vue";
+
+const isMdUp = useMediaQuery("(min-width: 768px)");
+const modalWidth = computed(() =>
+    isMdUp.value ? 520 : "calc(100vw - 24px)",
+);
+const modalRootStyle = computed(() =>
+    isMdUp.value ? {} : { maxWidth: "100vw", top: "12px", paddingBottom: 0 },
+);
+const modalBodyStyle = computed(() =>
+    isMdUp.value ? {} : { maxHeight: "calc(100vh - 120px)", overflowY: "auto" },
+);
 
 const props = defineProps({
     visible: Boolean,
@@ -66,10 +78,15 @@ const handleCancel = () => {
         :visible="localVisible"
         title="Credit Settings"
         :confirm-loading="loading"
+        :width="modalWidth"
+        :style="modalRootStyle"
+        :body-style="modalBodyStyle"
+        centered
         @ok="handleSubmit"
         @cancel="handleCancel"
     >
         <a-form :model="formData" layout="vertical">
+            <div class="grid grid-cols-1 gap-0 md:grid-cols-2 md:gap-x-4">
             <a-form-item label="Credit Limit" required>
                 <a-input-number
                     v-model:value="formData.credit_limit"
@@ -91,11 +108,12 @@ const handleCancel = () => {
                 />
             </a-form-item>
 
-            <a-form-item>
+            <a-form-item class="md:col-span-2">
                 <a-checkbox v-model:checked="formData.credit_enabled">
                     Enable Credit for this Customer
                 </a-checkbox>
             </a-form-item>
+            </div>
         </a-form>
     </a-modal>
 </template>

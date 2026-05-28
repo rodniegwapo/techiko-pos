@@ -22,6 +22,7 @@ import {
 
 import ContentHeader from "@/Components/ContentHeader.vue";
 import ContentLayoutV2 from "@/Components/ContentLayoutV2.vue";
+import ContentLayoutV3 from "@/Components/ContentLayoutV3.vue";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import RefreshButton from "@/Components/buttons/Refresh.vue";
 import FilterDropdown from "@/Components/filters/FilterDropdown.vue";
@@ -29,6 +30,12 @@ import ActiveFilters from "@/Components/filters/ActiveFilters.vue";
 import ProductTable from "./components/ProductTable.vue";
 import CustomerOrder from "./components/CustomerOrder.vue";
 import TotalAmountSection from "./components/TotalAmountSection.vue";
+import SalesMobileCheckoutBar from "./components/SalesMobileCheckoutBar.vue";
+import SalesCartDrawer from "./components/SalesCartDrawer.vue";
+import { useMediaQuery } from "@vueuse/core";
+import { useSalesCartDrawer } from "@/Composables/useSalesCartDrawer";
+import { useHelpers } from "@/Composables/useHelpers";
+import { useSaleTotals } from "@/Composables/useSaleTotals";
 
 import {
     CloseOutlined,
@@ -46,6 +53,14 @@ import { notifyInsufficientStock } from "@/Composables/useCartStockNotification"
 
 const page = usePage();
 const { getRoute, getLocationQueryFromPage } = useDomainRoutes();
+const isMdUp = useMediaQuery("(min-width: 768px)");
+const { closeCartDrawer, goToPaymentStep } = useSalesCartDrawer();
+
+watch(isMdUp, (matches) => {
+    if (matches) {
+        closeCartDrawer();
+    }
+});
 
 const isOnline = ref(
     typeof navigator !== "undefined" ? navigator.onLine : true,
@@ -101,6 +116,15 @@ const currentSale = ref(null);
 const orderDiscountAmount = ref(0);
 const orderDiscountId = ref("");
 const selectedCustomer = ref(null);
+
+const { formattedTotal } = useHelpers();
+const { grandTotalDisplay } = useSaleTotals({
+    orders,
+    orderDiscountAmount,
+    salesSettings,
+    currentSale,
+    salesCartIsOnline,
+});
 
 const offlineCatalogSyncedAt = ref(null);
 const offlineCustomersCache = ref([]);
@@ -215,7 +239,7 @@ async function syncOfflineDataForSales() {
 
         let discount_snapshot = null;
         try {
-            const d = await axios.get("/api/sales/discounts/current");
+            const d = await axios.get(getRoute("sales.discounts.current"));
             if (d.data?.success) {
                 discount_snapshot = {
                     regular_discounts: d.data.regular_discounts ?? [],
@@ -937,6 +961,7 @@ async function completeOfflineSale() {
         offlineProductLookup.value = [];
         forceOfflineCartMode.value = false;
         message.success("Saved locally. Review under Offline transactions.");
+        closeCartDrawer();
     } catch (e) {
         console.error(e);
         message.error("Could not save offline sale.");
@@ -1263,14 +1288,13 @@ watch(
 <template>
     <AuthenticatedLayout>
         <Head title="Sales" />
-        <ContentHeader title="Sales" />
-
-        <ContentLayoutV2 title="Create Transaction">
-            <template #offline-info>
-                <div>
-                    <span> Last offline sync: {{ lastOfflineSyncLabel }} </span>
-                </div>
+        <ContentHeader title="Sales">
+            <template v-if="lastOfflineSyncLabel" #meta>
+                Last offline sync: {{ lastOfflineSyncLabel }}
             </template>
+        </ContentHeader>
+
+        <ContentLayoutV2 v-if="isMdUp" title="Create Transaction">
             <template #filters>
                 <a-input-search
                     v-model:value="search"
@@ -1316,6 +1340,7 @@ watch(
                     :sales-cart-is-online="salesCartIsOnline"
                     :orders="orders"
                     :orderId="orderId"
+                    layout="desktop"
                     @cart-updated="loadCurrentPendingSale"
                     @offline-add-product="addToCart"
                     @load-more="loadMoreProducts"
@@ -1342,7 +1367,149 @@ watch(
                 />
             </template>
         </ContentLayoutV2>
-        <template #content-footer>
+
+        <ContentLayoutV3 v-else title="Create Transaction">
+            <template #filters>
+                <a-input-search
+                    v-model:value="search"
+                    placeholder="Search Product"
+                    class="min-w-[100px] max-w-[300px]"
+                />
+                <RefreshButton :loading="loading" @click="getProducts" />
+                <a-button
+                    type="default"
+                    :loading="syncingOffline"
+                    :disabled="!salesCartIsOnline || !activeLocationId"
+                    @click="syncOfflineDataForSales"
+                >
+                    <template #icon>
+                        <CloudDownloadOutlined />
+                    </template>
+                    Sync for offline
+                </a-button>
+
+                <FilterDropdown v-model="filters" :filters="filtersConfig" />
+            </template>
+            <template #activeFilters>
+                <ActiveFilters
+                    :filters="activeFilters"
+                    @remove-filter="handleClearSelectedFilter"
+                    @clear-all="
+                        () =>
+                            Object.keys(filters).forEach(
+                                (k) => (filters[k] = null),
+                            )
+                    "
+                    :always-show="true"
+                />
+            </template>
+
+            <template #table>
+                <ProductTable
+                    :products="products"
+                    :loading="loading"
+                    :loading-more="loadingMore"
+                    :has-more-products="hasMoreProducts"
+                    :products-total="productsTotal"
+                    :sales-cart-is-online="salesCartIsOnline"
+                    :orders="orders"
+                    :orderId="orderId"
+                    layout="mobile"
+                    @cart-updated="loadCurrentPendingSale"
+                    @offline-add-product="addToCart"
+                    @load-more="loadMoreProducts"
+                />
+            </template>
+            <template #mobile-actions>
+                <SalesMobileCheckoutBar
+                    :orders="orders"
+                    :order-discount-amount="orderDiscountAmount"
+                    :sales-settings="salesSettings"
+                    :current-sale="currentSale"
+                />
+            </template>
+        </ContentLayoutV3>
+
+        <SalesCartDrawer v-if="!isMdUp">
+            <template #cart>
+                <customer-order
+                    layout="drawer"
+                    :current-sale="currentSale"
+                    :sales-settings="salesSettings"
+                    @customer-changed="handleCustomerChanged"
+                    @discount-applied="loadCurrentPendingSale"
+                    @cart-updated="loadCurrentPendingSale"
+                    @offline-cart-add="onOfflineCartAdd"
+                    @offline-cart-subtract="onOfflineCartSubtract"
+                    @offline-cart-set-qty="
+                        (e) => onOfflineCartSetQty(e.product, e.quantity)
+                    "
+                    @offline-cart-remove="onOfflineCartRemove"
+                    :loading="isLoadingCart"
+                    :orders="orders"
+                    :orderId="orderId"
+                    :orderDiscountAmount="orderDiscountAmount"
+                    :orderDiscountId="orderDiscountId"
+                    :discountOptions="discountOptions"
+                    :offline-cached-customers="offlineCustomersCache"
+                />
+            </template>
+            <template #payment>
+                <total-amount-section
+                    layout="compact"
+                    :selected-customer="selectedCustomer"
+                    :orders="orders"
+                    :currentSale="currentSale"
+                    :orderDiscountAmount="orderDiscountAmount"
+                    :orderDiscountId="orderDiscountId"
+                    :orderId="orderId"
+                    :discountOptions="discountOptions"
+                    :sales-settings="salesSettings"
+                    :loyalty-redemption-settings="loyaltyRedemptionSettings"
+                    :offline-payment-method="offlinePaymentMethod"
+                    :cached-payment-card-types="cachedPaymentCardTypes"
+                    :offline-payment-card-type-id="offlinePaymentCardTypeId"
+                    @discount-applied="loadCurrentPendingSale"
+                    @cart-updated="loadCurrentPendingSale"
+                    @payment-success="closeCartDrawer"
+                    @update:offline-payment-method="syncOfflinePaymentMethod"
+                    @update:offline-payment-card-type-id="
+                        syncOfflinePaymentCardTypeId
+                    "
+                    @save-offline-sale="completeOfflineSale"
+                />
+            </template>
+            <template #drawer-footer>
+                <div
+                    class="flex items-center justify-between gap-3 px-3 py-3"
+                    style="
+                        padding-bottom: max(
+                            0.75rem,
+                            env(safe-area-inset-bottom, 0px)
+                        );
+                    "
+                >
+                    <div class="min-w-0">
+                        <p class="text-xs text-gray-500">Total</p>
+                        <p class="truncate text-lg font-bold text-green-600">
+                            {{ formattedTotal(grandTotalDisplay) }}
+                        </p>
+                    </div>
+                    <a-button
+                        type="primary"
+                        size="large"
+                        class="shrink-0"
+                        :disabled="orders.length === 0"
+                        aria-label="Continue to checkout"
+                        @click="goToPaymentStep"
+                    >
+                        Pay
+                    </a-button>
+                </div>
+            </template>
+        </SalesCartDrawer>
+
+        <template v-if="isMdUp" #content-footer>
             <total-amount-section
                 :selected-customer="selectedCustomer"
                 :orders="orders"

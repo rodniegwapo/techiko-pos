@@ -1,5 +1,6 @@
 <script setup>
 import { ref, reactive, computed, watch,toRefs } from "vue";
+import { useMediaQuery } from "@vueuse/core";
 import { router } from "@inertiajs/vue3";
 import { IconPlus, IconTrash, IconSearch, IconShoppingCart, IconAlertTriangle, IconX } from "@tabler/icons-vue";
 import { notification } from "ant-design-vue";
@@ -7,6 +8,13 @@ import axios from "axios";
 import { usePage } from "@inertiajs/vue3";
 
 const page = usePage();
+const isMdUp = useMediaQuery("(min-width: 768px)");
+const modalWidth = computed(() =>
+  isMdUp.value ? 900 : "calc(100vw - 24px)",
+);
+const modalRootStyle = computed(() =>
+  isMdUp.value ? {} : { maxWidth: "100vw", top: "12px", paddingBottom: 0 },
+);
 
 // Global Sanctum API routes (not domain-prefixed in Ziggy; avoid useDomainRoutes which adds `domains.`).
 const inventoryApi = {
@@ -267,13 +275,16 @@ watch(
 <template>
   <a-modal
     v-model:visible="visible"
-    width="900px"
+    :width="modalWidth"
+    :style="modalRootStyle"
+    wrap-class-name="modal-footer-full-mobile"
+    centered
     :confirm-loading="loading"
     @ok="handleSubmit"
     @cancel="closeModal"
   >
     <template #title>
-      <div class="flex items-center justify-between">
+      <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <span>Receive Inventory</span>
         <div v-if="selectedStore" class="flex items-center space-x-2">
           <a-tag color="blue" size="small">
@@ -317,7 +328,7 @@ watch(
         
         <!-- Store Summary -->
         <div v-if="selectedStore" class="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-          <div class="grid grid-cols-4 gap-3 text-center">
+          <div class="grid grid-cols-2 gap-3 text-center md:grid-cols-4">
             <div>
               <p class="text-sm font-bold text-blue-600">{{ selectedStore.total_products_count || 0 }}</p>
               <p class="text-xs text-gray-600">Total</p>
@@ -360,7 +371,7 @@ watch(
       </div>
 
       <!-- Reference Information -->
-      <div class="grid grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">
             Reference Type
@@ -538,7 +549,7 @@ watch(
     </div>
 
     <template #footer>
-      <div class="flex justify-between">
+      <div class="modal-footer-actions flex w-full flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <span class="text-sm text-gray-500">
             {{ form.items.length }} item(s) • Total: ₱{{
@@ -546,10 +557,13 @@ watch(
             }}
           </span>
         </div>
-        <div class="space-x-2">
-          <a-button @click="closeModal" :disabled="loading"> Cancel </a-button>
+        <div class="flex w-full flex-col gap-2 md:w-auto md:flex-row">
+          <a-button class="w-full md:w-auto" @click="closeModal" :disabled="loading">
+            Cancel
+          </a-button>
           <a-button
             type="primary"
+            class="w-full md:w-auto"
             @click="handleSubmit"
             :loading="loading"
             :disabled="form.items.length === 0"

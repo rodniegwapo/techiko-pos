@@ -285,9 +285,10 @@ function onComposerKeydown(e) {
             </div>
         </a-drawer>
 
+        <!-- Floating launcher: tablet/desktop only — avoids overlapping mobile POS/checkout UI -->
         <div
             v-show="!open"
-            class="fixed bottom-2 right-6 z-[100] flex h-12 w-12 items-center justify-center"
+            class="fixed bottom-2 right-6 z-[100] max-md:hidden flex h-12 w-12 items-center justify-center"
         >
             <a-badge
                 v-if="floatReplyUnread > 0"

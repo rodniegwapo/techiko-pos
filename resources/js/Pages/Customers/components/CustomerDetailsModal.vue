@@ -2,13 +2,16 @@
   <a-modal
     :visible="visible"
     :title="`Customer Details - ${customer?.name || 'Unknown'}`"
+    :width="modalWidth"
+    :style="modalRootStyle"
+    :body-style="modalBodyStyle"
+    centered
     @cancel="$emit('close')"
-    width="800px"
     :footer="null"
   >
     <div v-if="customer" class="space-y-6">
       <!-- Customer Header -->
-      <div class="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+      <div class="flex flex-col gap-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200 md:flex-row md:items-center md:justify-between">
         <div class="flex items-center space-x-4">
           <a-avatar 
             :size="64"
@@ -22,8 +25,8 @@
             <p class="text-gray-600">{{ customer.phone || 'No phone provided' }}</p>
           </div>
         </div>
-        <div class="text-right">
-          <a-button type="primary" @click="$emit('edit', customer)">
+        <div class="md:text-right">
+          <a-button class="w-full md:w-auto" type="primary" @click="$emit('edit', customer)">
             <edit-outlined class="mr-1" />
             Edit Customer
           </a-button>
@@ -144,12 +147,25 @@
 </template>
 
 <script setup>
+import { computed } from "vue";
+import { useMediaQuery } from "@vueuse/core";
 import { 
   UserOutlined, 
   EditOutlined, 
   GiftOutlined, 
   ShoppingCartOutlined 
 } from "@ant-design/icons-vue";
+
+const isMdUp = useMediaQuery("(min-width: 768px)");
+const modalWidth = computed(() =>
+  isMdUp.value ? 800 : "calc(100vw - 24px)",
+);
+const modalRootStyle = computed(() =>
+  isMdUp.value ? {} : { maxWidth: "100vw", top: "12px", paddingBottom: 0 },
+);
+const modalBodyStyle = computed(() =>
+  isMdUp.value ? {} : { maxHeight: "calc(100vh - 120px)", overflowY: "auto" },
+);
 
 // Props
 const props = defineProps({

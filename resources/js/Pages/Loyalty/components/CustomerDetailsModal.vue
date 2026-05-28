@@ -3,8 +3,12 @@
     :visible="visible"
     title="Customer Details"
     :footer="null"
+    :width="modalWidth"
+    :style="modalRootStyle"
+    :body-style="modalBodyStyle"
+    wrap-class-name="modal-footer-full-mobile"
+    centered
     @cancel="$emit('close')"
-    width="600px"
   >
     <div v-if="customer" class="space-y-6  max-h-[500px] overflow-scroll overflow-x-hidden">
       <!-- Customer Info -->
@@ -95,6 +99,18 @@
 
 <script setup>
 import { computed } from 'vue';
+import { useMediaQuery } from '@vueuse/core';
+
+const isMdUp = useMediaQuery('(min-width: 768px)');
+const modalWidth = computed(() =>
+  isMdUp.value ? 600 : 'calc(100vw - 24px)',
+);
+const modalRootStyle = computed(() =>
+  isMdUp.value ? {} : { maxWidth: '100vw', top: '12px', paddingBottom: 0 },
+);
+const modalBodyStyle = computed(() =>
+  isMdUp.value ? {} : { maxHeight: 'calc(100vh - 120px)', overflowY: 'auto' },
+);
 
 // Props
 const props = defineProps({
