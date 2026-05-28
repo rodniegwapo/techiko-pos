@@ -18,9 +18,6 @@ defineProps({
 
 <template>
     <div class="w-full min-w-0">
-        <div>
-            <slot name="offline-info" />
-        </div>
         <div
             class="w-full rounded-lg bg-white p-3 shadow sm:p-4 min-w-0 pb-24"
         >

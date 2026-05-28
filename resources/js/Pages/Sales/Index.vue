@@ -1288,14 +1288,13 @@ watch(
 <template>
     <AuthenticatedLayout>
         <Head title="Sales" />
-        <ContentHeader title="Sales" />
+        <ContentHeader title="Sales">
+            <template v-if="lastOfflineSyncLabel" #meta>
+                Last offline sync: {{ lastOfflineSyncLabel }}
+            </template>
+        </ContentHeader>
 
         <ContentLayoutV2 v-if="isMdUp" title="Create Transaction">
-            <template #offline-info>
-                <div>
-                    <span> Last offline sync: {{ lastOfflineSyncLabel }} </span>
-                </div>
-            </template>
             <template #filters>
                 <a-input-search
                     v-model:value="search"
@@ -1370,11 +1369,6 @@ watch(
         </ContentLayoutV2>
 
         <ContentLayoutV3 v-else title="Create Transaction">
-            <template #offline-info>
-                <div>
-                    <span> Last offline sync: {{ lastOfflineSyncLabel }} </span>
-                </div>
-            </template>
             <template #filters>
                 <a-input-search
                     v-model:value="search"
