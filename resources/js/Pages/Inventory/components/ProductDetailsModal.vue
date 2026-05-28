@@ -23,6 +23,9 @@ const modalWidth = computed(() =>
 const modalRootStyle = computed(() =>
   isMdUp.value ? {} : { maxWidth: "100vw", top: "12px", paddingBottom: 0 },
 );
+const modalBodyStyle = computed(() =>
+  isMdUp.value ? {} : { maxHeight: "calc(100vh - 120px)", overflowY: "auto" },
+);
 
 const props = defineProps({
   visible: {
@@ -137,6 +140,7 @@ const allLocations = computed(() => props.product?.product?.locations || []);
     v-model:visible="visible"
     :width="modalWidth"
     :style="modalRootStyle"
+    :body-style="modalBodyStyle"
     centered
     @cancel="handleClose"
     :footer="null"
@@ -144,7 +148,7 @@ const allLocations = computed(() => props.product?.product?.locations || []);
     <template #title>
       <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <span>Product Details</span>
-        <div v-if="!props.isGlobalView && storeData" class="flex items-center space-x-2">
+        <div v-if="!props.isGlobalView && storeData" class="flex flex-wrap items-center gap-2">
           <a-tag color="blue" size="small">
             <IconShoppingCart :size="14" class="mr-1" />
             {{ storeData.total_products_count }} total items
@@ -158,7 +162,7 @@ const allLocations = computed(() => props.product?.product?.locations || []);
             {{ storeData.out_of_stock_products_count }} out of stock
           </a-tag>
         </div>
-        <div v-else-if="props.isGlobalView && allLocations.length" class="flex items-center space-x-2">
+        <div v-else-if="props.isGlobalView && allLocations.length" class="flex flex-wrap items-center gap-2">
           <a-tag color="blue" size="small">
             {{ allLocations.length }} locations
           </a-tag>
@@ -203,10 +207,10 @@ const allLocations = computed(() => props.product?.product?.locations || []);
       </div>
 
       <!-- Product Header -->
-      <div class="flex items-start space-x-4 pb-4 border-b">
+      <div class="flex flex-col gap-4 border-b pb-4 md:flex-row md:items-start md:gap-4">
         <!-- Product Image/Avatar -->
         <div
-          class="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0"
+          class="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-gray-200"
         >
           <img
             v-if="
@@ -231,8 +235,8 @@ const allLocations = computed(() => props.product?.product?.locations || []);
         </div>
 
         <!-- Product Info -->
-        <div class="flex-1">
-          <h3 class="text-xl font-semibold text-gray-900">
+        <div class="min-w-0 flex-1">
+          <h3 class="break-words text-xl font-semibold text-gray-900">
             {{ product.product?.name || "Unknown Product" }}
           </h3>
           <p class="text-gray-600">
@@ -242,7 +246,7 @@ const allLocations = computed(() => props.product?.product?.locations || []);
             SKU: {{ product.product?.SKU || "N/A" }}
           </p>
           <!-- Domain and Location Info -->
-          <div class="flex items-center space-x-4 mt-2">
+          <div class="mt-2 flex flex-wrap items-center gap-2">
             <a-tag color="blue" size="small">
               Domain: {{ product.product?.domain || "N/A" }}
             </a-tag>
@@ -257,6 +261,7 @@ const allLocations = computed(() => props.product?.product?.locations || []);
 
         <!-- Status Badge -->
         <a-tag
+          class="w-fit self-start"
           :color="getStockStatusColor(product.product?.stock_status)"
           size="large"
         >
@@ -275,59 +280,53 @@ const allLocations = computed(() => props.product?.product?.locations || []);
           <IconBuildingStore :size="20" class="mr-2" />
           Stock Information
         </h4>
-        <a-row :gutter="16">
-          <a-col :span="8">
-            <div class="bg-gray-50 p-3 rounded-lg border">
-              <div class="text-center">
-                <p class="text-2xl font-bold text-blue-600">
-                  {{ product.quantity_on_hand }}
-                </p>
-                <p class="text-sm text-gray-500">On Hand</p>
-                <p class="text-xs text-gray-400">
-                  {{ product.product?.unit_of_measure || "pcs" }}
-                </p>
-              </div>
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div class="rounded-lg border bg-gray-50 p-3">
+            <div class="text-center">
+              <p class="text-2xl font-bold text-blue-600">
+                {{ product.quantity_on_hand }}
+              </p>
+              <p class="text-sm text-gray-500">On Hand</p>
+              <p class="text-xs text-gray-400">
+                {{ product.product?.unit_of_measure || "pcs" }}
+              </p>
             </div>
-          </a-col>
-          <a-col :span="8">
-            <div class="bg-gray-50 p-3 rounded-lg border">
-              <div class="text-center">
-                <p
-                  class="text-2xl font-bold"
-                  :class="{
-                    'text-green-600': product.quantity_available > 0,
-                    'text-red-600': product.quantity_available <= 0,
-                  }"
-                >
-                  {{ product.quantity_available }}
-                </p>
-                <p class="text-sm text-gray-500">Available</p>
-                <p class="text-xs text-gray-400">
-                  {{ product.product?.unit_of_measure || "pcs" }}
-                </p>
-              </div>
+          </div>
+          <div class="rounded-lg border bg-gray-50 p-3">
+            <div class="text-center">
+              <p
+                class="text-2xl font-bold"
+                :class="{
+                  'text-green-600': product.quantity_available > 0,
+                  'text-red-600': product.quantity_available <= 0,
+                }"
+              >
+                {{ product.quantity_available }}
+              </p>
+              <p class="text-sm text-gray-500">Available</p>
+              <p class="text-xs text-gray-400">
+                {{ product.product?.unit_of_measure || "pcs" }}
+              </p>
             </div>
-          </a-col>
-          <a-col :span="8">
-            <div class="bg-gray-50 p-3 rounded-lg border">
-              <div class="text-center rounded-lg">
-                <p
-                  class="text-2xl font-bold"
-                  :class="{
-                    'text-orange-600': product.quantity_reserved > 0,
-                    'text-gray-500': product.quantity_reserved <= 0,
-                  }"
-                >
-                  {{ product.quantity_reserved }}
-                </p>
-                <p class="text-sm text-gray-500">Reserved</p>
-                <p class="text-xs text-gray-400">
-                  {{ product.product?.unit_of_measure || "pcs" }}
-                </p>
-              </div>
+          </div>
+          <div class="rounded-lg border bg-gray-50 p-3">
+            <div class="rounded-lg text-center">
+              <p
+                class="text-2xl font-bold"
+                :class="{
+                  'text-orange-600': product.quantity_reserved > 0,
+                  'text-gray-500': product.quantity_reserved <= 0,
+                }"
+              >
+                {{ product.quantity_reserved }}
+              </p>
+              <p class="text-sm text-gray-500">Reserved</p>
+              <p class="text-xs text-gray-400">
+                {{ product.product?.unit_of_measure || "pcs" }}
+              </p>
             </div>
-          </a-col>
-        </a-row>
+          </div>
+        </div>
       </div>
 
       <!-- Global View: Locations Table -->
@@ -336,7 +335,7 @@ const allLocations = computed(() => props.product?.product?.locations || []);
         <div v-if="!allLocations.length" class="text-center text-gray-500 py-6">
           No location data available
         </div>
-        <div v-else class="overflow-x-auto">
+        <div v-else-if="isMdUp" class="overflow-x-auto">
           <a-table :data-source="allLocations" :pagination="false" size="small">
             <a-table-column title="Location" key="name">
               <template #default="{ record }">
@@ -345,11 +344,28 @@ const allLocations = computed(() => props.product?.product?.locations || []);
               </template>
             </a-table-column>
             <a-table-column title="Status" key="status" align="center">
-              <template #default="{ record }">
+              <template #default>
                 <a-tag color="blue" size="small">Active</a-tag>
               </template>
             </a-table-column>
           </a-table>
+        </div>
+        <div v-else class="flex flex-col gap-3">
+          <div
+            v-for="location in allLocations"
+            :key="location.id"
+            class="overflow-hidden rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+          >
+            <div class="truncate font-semibold text-gray-900">
+              {{ location.name }}
+            </div>
+            <div class="mt-1 break-words text-xs text-gray-500">
+              {{ location.address }}
+            </div>
+            <div class="mt-2">
+              <a-tag color="blue" size="small">Active</a-tag>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -359,32 +375,26 @@ const allLocations = computed(() => props.product?.product?.locations || []);
           <IconCurrencyDollar :size="20" class="mr-2" />
           Financial Information
         </h4>
-        <a-row :gutter="16">
-          <a-col :span="8">
-            <div class="bg-gray-100 p-3 rounded-lg border">
-              <p class="text-sm text-gray-600">Total Value</p>
-              <p class="text-lg font-semibold">
-                {{ formatCurrency(product.total_value) }}
-              </p>
-            </div>
-          </a-col>
-          <a-col :span="8">
-            <div class="bg-gray-100 p-3 rounded-lg border">
-              <p class="text-sm text-gray-600">Average Cost</p>
-              <p class="text-lg font-semibold">
-                {{ formatCurrency(product.average_cost) }}
-              </p>
-            </div>
-          </a-col>
-          <a-col :span="8">
-            <div class="bg-gray-100 p-3 rounded border">
-              <p class="text-sm text-gray-600">Last Cost</p>
-              <p class="text-lg font-semibold">
-                {{ formatCurrency(product.last_cost) }}
-              </p>
-            </div>
-          </a-col>
-        </a-row>
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div class="rounded-lg border bg-gray-100 p-3">
+            <p class="text-sm text-gray-600">Total Value</p>
+            <p class="text-lg font-semibold">
+              {{ formatCurrency(product.total_value) }}
+            </p>
+          </div>
+          <div class="rounded-lg border bg-gray-100 p-3">
+            <p class="text-sm text-gray-600">Average Cost</p>
+            <p class="text-lg font-semibold">
+              {{ formatCurrency(product.average_cost) }}
+            </p>
+          </div>
+          <div class="rounded border bg-gray-100 p-3">
+            <p class="text-sm text-gray-600">Last Cost</p>
+            <p class="text-lg font-semibold">
+              {{ formatCurrency(product.last_cost) }}
+            </p>
+          </div>
+        </div>
       </div>
 
       <!-- Product Details -->
@@ -393,52 +403,48 @@ const allLocations = computed(() => props.product?.product?.locations || []);
           <IconTag :size="20" class="mr-2" />
           Product Details
         </h4>
-        <a-row :gutter="16">
-          <a-col :span="12">
-            <div class="space-y-2">
-              <div class="flex justify-between">
-                <span class="text-gray-600">Selling Price:</span>
-                <span class="font-semibold">{{
-                  formatCurrency(product.product?.price)
-                }}</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-gray-600">Cost Price:</span>
-                <span class="font-semibold">{{
-                  formatCurrency(product.product?.cost)
-                }}</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-gray-600">Reorder Level:</span>
-                <span class="font-semibold">{{
-                  product.product?.reorder_level || "Not set"
-                }}</span>
-              </div>
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div class="space-y-2">
+            <div class="flex justify-between gap-2">
+              <span class="text-gray-600">Selling Price:</span>
+              <span class="font-semibold">{{
+                formatCurrency(product.product?.price)
+              }}</span>
             </div>
-          </a-col>
-          <a-col :span="12">
-            <div class="space-y-2">
-              <div class="flex justify-between">
-                <span class="text-gray-600">Max Stock Level:</span>
-                <span class="font-semibold">{{
-                  product.product?.max_stock_level || "Not set"
-                }}</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-gray-600">Unit Weight:</span>
-                <span class="font-semibold">{{
-                  product.product?.unit_weight || "Not set"
-                }}</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-gray-600">Supplier SKU:</span>
-                <span class="font-semibold">{{
-                  product.product?.supplier_sku || "Not set"
-                }}</span>
-              </div>
+            <div class="flex justify-between gap-2">
+              <span class="text-gray-600">Cost Price:</span>
+              <span class="font-semibold">{{
+                formatCurrency(product.product?.cost)
+              }}</span>
             </div>
-          </a-col>
-        </a-row>
+            <div class="flex justify-between gap-2">
+              <span class="text-gray-600">Reorder Level:</span>
+              <span class="font-semibold">{{
+                product.product?.reorder_level || "Not set"
+              }}</span>
+            </div>
+          </div>
+          <div class="space-y-2">
+            <div class="flex justify-between gap-2">
+              <span class="text-gray-600">Max Stock Level:</span>
+              <span class="font-semibold">{{
+                product.product?.max_stock_level || "Not set"
+              }}</span>
+            </div>
+            <div class="flex justify-between gap-2">
+              <span class="text-gray-600">Unit Weight:</span>
+              <span class="font-semibold">{{
+                product.product?.unit_weight || "Not set"
+              }}</span>
+            </div>
+            <div class="flex justify-between gap-2">
+              <span class="text-gray-600">Supplier SKU:</span>
+              <span class="font-semibold">{{
+                product.product?.supplier_sku || "Not set"
+              }}</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Movement History -->
@@ -447,32 +453,26 @@ const allLocations = computed(() => props.product?.product?.locations || []);
           <IconCalendar :size="20" class="mr-2" />
           Recent Activity
         </h4>
-        <a-row :gutter="16">
-          <a-col :span="8">
-            <div class="bg-gray-50 p-3 rounded-lg border">
-              <p class="text-sm text-gray-600">Last Movement</p>
-              <p class="text-sm font-semibold">
-                {{ formatDateTime(product.last_movement_at) }}
-              </p>
-            </div>
-          </a-col>
-          <a-col :span="8">
-            <div class="bg-gray-50 p-3 rounded-lg border">
-              <p class="text-sm text-gray-600">Last Restock</p>
-              <p class="text-sm font-semibold">
-                {{ formatDateTime(product.last_restock_at) }}
-              </p>
-            </div>
-          </a-col>
-          <a-col :span="8">
-            <div class="bg-gray-50 p-3 rounded-lg border">
-              <p class="text-sm text-gray-600">Last Sale</p>
-              <p class="text-sm font-semibold">
-                {{ formatDateTime(product.last_sale_at) }}
-              </p>
-            </div>
-          </a-col>
-        </a-row>
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div class="rounded-lg border bg-gray-50 p-3">
+            <p class="text-sm text-gray-600">Last Movement</p>
+            <p class="text-sm font-semibold">
+              {{ formatDateTime(product.last_movement_at) }}
+            </p>
+          </div>
+          <div class="rounded-lg border bg-gray-50 p-3">
+            <p class="text-sm text-gray-600">Last Restock</p>
+            <p class="text-sm font-semibold">
+              {{ formatDateTime(product.last_restock_at) }}
+            </p>
+          </div>
+          <div class="rounded-lg border bg-gray-50 p-3">
+            <p class="text-sm text-gray-600">Last Sale</p>
+            <p class="text-sm font-semibold">
+              {{ formatDateTime(product.last_sale_at) }}
+            </p>
+          </div>
+        </div>
       </div>
 
       <!-- Notes -->
