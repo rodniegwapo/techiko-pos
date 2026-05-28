@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from "vue";
 import { usePage } from "@inertiajs/vue3";
+import { useMediaQuery } from "@vueuse/core";
 import {
   IconEye,
   IconEdit,
@@ -18,6 +19,7 @@ import { router } from "@inertiajs/vue3";
 const { formatCurrency, formatDate, confirmDelete, showNotification } =
   useHelpers();
 const page = usePage();
+const isMdUp = useMediaQuery("(min-width: 768px)");
 
 const emit = defineEmits(["handleTableChange", "refresh", "showDetails"]);
 
@@ -39,6 +41,10 @@ const props = defineProps({
     default: false,
   },
 });
+
+const showSuperUserDomain = computed(
+  () => page.props.auth?.user?.data?.is_super_user && props.isGlobalView,
+);
 
 // Simplified columns - only essential information
 const columns = computed(() => {
@@ -76,7 +82,7 @@ const columns = computed(() => {
   ];
 
   // Add domain column for super users only in global view
-  if (page.props.auth?.user?.data?.is_super_user && props.isGlobalView) {
+  if (showSuperUserDomain.value) {
     baseColumns.splice(2, 0, {
       title: "Domain",
       dataIndex: "domain",
@@ -231,10 +237,18 @@ const dataSource = computed(() => {
     })) || []
   );
 });
+
+function onMobilePaginationChange(pageNum) {
+  emit("handleTableChange", {
+    current: pageNum,
+    pageSize: props.pagination?.pageSize ?? 10,
+  });
+}
 </script>
 
 <template>
   <a-table
+    v-if="isMdUp"
     :columns="columns"
     :data-source="dataSource"
     :pagination="pagination"
@@ -377,6 +391,151 @@ const dataSource = computed(() => {
       </div>
     </template>
   </a-table>
+
+  <div v-else class="px-2 py-2 md:px-0">
+    <a-spin :spinning="loading">
+      <div
+        v-if="!dataSource.length"
+        class="py-12 text-center text-sm text-gray-500"
+      >
+        <IconFileText :size="48" class="mx-auto mb-4 text-gray-400" />
+        <p>No stock adjustments found</p>
+        <p class="text-xs text-gray-400">
+          Create your first adjustment to get started
+        </p>
+      </div>
+      <div v-else class="flex flex-col gap-3">
+        <div
+          v-for="record in dataSource"
+          :key="record.id"
+          class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm"
+        >
+          <div class="flex flex-wrap items-start justify-between gap-2 px-4 py-3">
+            <div>
+              <p
+                class="cursor-pointer font-mono text-sm font-semibold text-blue-600"
+                @click="viewAdjustment(record.adjustment)"
+              >
+                {{ record.number }}
+              </p>
+              <p class="text-xs text-gray-500">
+                {{ formatDate(record.created_at) }}
+              </p>
+            </div>
+            <a-tag class="m-0 w-fit" :color="getStatusColor(record.status)">
+              {{ getStatusText(record.status) }}
+            </a-tag>
+          </div>
+
+          <div class="mx-4 mb-3 rounded-lg bg-gray-50 p-3">
+            <div class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-sm">
+              <span class="text-gray-500">Reason</span>
+              <span class="text-right font-medium text-gray-900">
+                {{ record.reason || "No reason provided" }}
+              </span>
+              <span class="text-gray-500">Location</span>
+              <span class="text-right font-medium text-gray-900">
+                {{ record.location?.name || "N/A" }}
+              </span>
+              <span class="text-gray-500">Items</span>
+              <span class="text-right font-semibold text-gray-900">
+                {{ record.items_count ?? 0 }}
+              </span>
+              <span class="text-gray-500">Value</span>
+              <span
+                class="text-right font-semibold"
+                :class="{
+                  'text-green-600': record.value_change > 0,
+                  'text-red-600': record.value_change < 0,
+                  'text-gray-600': record.value_change === 0,
+                }"
+              >
+                {{ record.value_change > 0 ? "+" : ""
+                }}{{ formatCurrency(record.value_change) }}
+              </span>
+              <template v-if="showSuperUserDomain">
+                <span class="text-gray-500">Domain</span>
+                <span
+                  class="flex min-w-0 items-center justify-end gap-1 truncate font-medium text-gray-900"
+                >
+                  <IconWorld size="16" class="shrink-0" />
+                  {{ record.domain || "N/A" }}
+                </span>
+              </template>
+            </div>
+          </div>
+
+          <div class="border-t border-gray-100 px-4 py-3">
+            <div class="flex flex-col gap-2">
+              <a-button
+                class="flex items-center justify-center gap-2"
+                @click="showDetails(record.adjustment)"
+              >
+                <template #icon><IconEye size="18" /></template>
+                View details
+              </a-button>
+              <a-button
+                v-if="record.status === 'draft'"
+                class="flex items-center justify-center gap-2"
+                @click="submitForApproval(record.adjustment)"
+              >
+                <template #icon><IconSend size="18" /></template>
+                Submit for approval
+              </a-button>
+              <a-button
+                v-if="record.status === 'pending_approval'"
+                type="primary"
+                class="flex items-center justify-center gap-2"
+                @click="approveAdjustment(record.adjustment)"
+              >
+                <template #icon><IconCheck size="18" /></template>
+                Approve
+              </a-button>
+              <a-button
+                v-if="record.status === 'pending_approval'"
+                danger
+                class="flex items-center justify-center gap-2"
+                @click="rejectAdjustment(record.adjustment)"
+              >
+                <template #icon><IconX size="18" /></template>
+                Reject
+              </a-button>
+              <a-button
+                v-if="record.status === 'draft'"
+                class="flex items-center justify-center gap-2"
+                @click="editAdjustment(record.adjustment)"
+              >
+                <template #icon><IconEdit size="18" /></template>
+                Edit
+              </a-button>
+              <a-button
+                v-if="record.status === 'draft'"
+                danger
+                class="flex items-center justify-center gap-2"
+                @click="deleteAdjustment(record.adjustment)"
+              >
+                <template #icon><IconTrash size="18" /></template>
+                Delete
+              </a-button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <a-pagination
+        v-if="
+          pagination?.total &&
+          pagination.total > (pagination.pageSize ?? 10)
+        "
+        class="mt-4 justify-center pt-2"
+        show-less-items
+        :current="pagination.current"
+        :page-size="pagination.pageSize"
+        :total="pagination.total"
+        :show-size-changer="false"
+        @change="onMobilePaginationChange"
+      />
+    </a-spin>
+  </div>
 </template>
 
 <style scoped>

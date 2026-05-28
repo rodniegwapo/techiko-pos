@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, watch } from "vue";
 import { Head, router, usePage } from "@inertiajs/vue3";
+import { useMediaQuery } from "@vueuse/core";
 import axios from "axios";
 import dayjs from "dayjs";
 import { message } from "ant-design-vue";
@@ -13,6 +14,7 @@ import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useHelpers } from "@/Composables/useHelpers";
 
 const page = usePage();
+const isMdUp = useMediaQuery("(min-width: 768px)");
 const { getRoute } = useDomainRoutes();
 const { formattedTotal } = useHelpers();
 
@@ -354,13 +356,68 @@ const columns = [
     <AuthenticatedLayout>
         <Head title="VAT report" />
         <ContentHeader
-            class="mb-6 no-print"
+            class="mb-4 md:mb-6 no-print"
             :title="`VAT report — ${domainName}`"
         />
-        <ContentLayout title="Output VAT (paid sales)">
+        <ContentLayout
+            title="Output VAT (paid sales)"
+            filter-class="flex flex-wrap items-center justify-end gap-2 w-full min-w-0"
+        >
+            <template #filters>
+                <div class="flex w-full min-w-0 flex-col gap-1 md:w-auto">
+                    <span class="text-xs text-gray-600">Date range</span>
+                    <a-range-picker
+                        v-model:value="dateRangeLocal"
+                        format="YYYY-MM-DD"
+                        class="w-full min-w-0 md:min-w-[260px]"
+                    />
+                </div>
+                <div class="flex w-full min-w-0 flex-col gap-1 md:w-auto">
+                    <span class="text-xs text-gray-600">Location</span>
+                    <a-select
+                        v-model:value="locationIdLocal"
+                        allow-clear
+                        placeholder="All locations"
+                        class="w-full min-w-0 md:min-w-[200px]"
+                        :options="
+                            (locations || []).map((l) => ({
+                                value: l.id,
+                                label: l.name,
+                            }))
+                        "
+                    />
+                </div>
+                <a-button
+                    type="primary"
+                    class="w-full md:w-auto"
+                    @click="applyFilters"
+                >
+                    Apply
+                </a-button>
+                <a-button
+                    type="default"
+                    class="w-full md:w-auto"
+                    :loading="exportingExcel"
+                    @click="exportExcel"
+                >
+                    Export Excel
+                </a-button>
+                <span v-print="vatPrintOptions" class="block w-full md:w-auto">
+                    <a-button
+                        type="default"
+                        class="flex w-full items-center justify-center gap-2 md:inline-flex md:w-auto"
+                    >
+                        <template #icon>
+                            <IconPrinter :size="20" />
+                        </template>
+                        Print
+                    </a-button>
+                </span>
+            </template>
+
             <template #table>
                 <div
-                    class="vat-report-print-root px-6 pt-2 pb-8 space-y-6 max-w-7xl"
+                    class="vat-report-print-root space-y-6 px-4 pb-8 pt-2 md:px-6 max-w-7xl"
                 >
                     <p class="text-sm text-gray-600 no-print">
                         Totals use
@@ -371,66 +428,9 @@ const columns = [
                         separately.
                     </p>
 
-                    <div class="flex flex-wrap items-end gap-4 no-print">
-                        <div class="flex flex-col gap-1">
-                            <span class="text-xs text-gray-600"
-                                >Date range</span
-                            >
-                            <a-range-picker
-                                v-model:value="dateRangeLocal"
-                                format="YYYY-MM-DD"
-                                class="min-w-[260px]"
-                            />
-                        </div>
-                        <div class="flex flex-col gap-1">
-                            <span class="text-xs text-gray-600">Location</span>
-                            <a-select
-                                v-model:value="locationIdLocal"
-                                allow-clear
-                                placeholder="All locations"
-                                class="min-w-[200px]"
-                                :options="
-                                    (locations || []).map((l) => ({
-                                        value: l.id,
-                                        label: l.name,
-                                    }))
-                                "
-                            />
-                        </div>
-                        <a-button type="primary" @click="applyFilters">
-                            Apply
-                        </a-button>
-                        <div class="ml-auto flex flex-wrap items-center gap-2">
-                            <!-- <a
-                                class="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-[5px] text-sm font-medium leading-snug text-gray-900 shadow-sm hover:bg-gray-50 hover:border-gray-400"
-                                :href="vatExportCsvUrl"
-                            >
-                                Export CSV
-                            </a> -->
-                            <a-button
-                                type="default"
-                                :loading="exportingExcel"
-                                @click="exportExcel"
-                            >
-                                Export Excel
-                            </a-button>
-                            <span v-print="vatPrintOptions">
-                                <a-button
-                                    type="default"
-                                    class="flex items-center gap-2"
-                                >
-                                    <template #icon>
-                                        <IconPrinter :size="20" />
-                                    </template>
-                                    Print
-                                </a-button>
-                            </span>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
                         <div
-                            class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+                            class="w-full rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
                         >
                             <div class="text-xs font-medium text-gray-500">
                                 Total output VAT
@@ -442,7 +442,7 @@ const columns = [
                             </div>
                         </div>
                         <div
-                            class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+                            class="w-full rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
                         >
                             <div class="text-xs font-medium text-gray-500">
                                 Gross sales (paid)
@@ -454,7 +454,7 @@ const columns = [
                             </div>
                         </div>
                         <div
-                            class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+                            class="w-full rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
                         >
                             <div class="text-xs font-medium text-gray-500">
                                 Number of sales
@@ -486,6 +486,7 @@ const columns = [
                         </div>
 
                         <a-table
+                            v-if="isMdUp"
                             :columns="columns"
                             :data-source="txData"
                             :pagination="false"
@@ -495,9 +496,103 @@ const columns = [
                             class="bg-white"
                         />
 
+                        <div v-else class="w-full py-2 md:px-0">
+                            <div
+                                v-if="!txData.length"
+                                class="py-12 text-center text-sm text-gray-500"
+                            >
+                                No transactions found for this period.
+                            </div>
+                            <div v-else class="flex w-full flex-col gap-3">
+                                <div
+                                    v-for="row in txData"
+                                    :key="row.id"
+                                    class="w-full overflow-hidden rounded-none border border-gray-200 bg-white shadow-sm md:rounded-lg"
+                                >
+                                    <div
+                                        class="flex flex-wrap items-start justify-between gap-2 px-4 py-3"
+                                    >
+                                        <div class="min-w-0">
+                                            <p
+                                                class="truncate text-sm font-semibold text-gray-900"
+                                            >
+                                                {{ row.reference }}
+                                            </p>
+                                            <p class="text-xs text-gray-500">
+                                                {{ row.transaction_date_display }}
+                                            </p>
+                                        </div>
+                                        <span
+                                            class="text-base font-semibold text-gray-900"
+                                        >
+                                            {{ formattedTotal(row.grand_total) }}
+                                        </span>
+                                    </div>
+                                    <div
+                                        class="mx-4 mb-3 rounded-lg bg-gray-50 p-3"
+                                    >
+                                        <div
+                                            class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-sm"
+                                        >
+                                            <span class="text-gray-500"
+                                                >Receipt</span
+                                            >
+                                            <span
+                                                class="truncate text-right font-medium text-gray-900"
+                                            >
+                                                {{ row.reference }}
+                                            </span>
+                                            <span class="text-gray-500"
+                                                >Date</span
+                                            >
+                                            <span
+                                                class="text-right font-medium text-gray-900"
+                                            >
+                                                {{
+                                                    row.transaction_date_display
+                                                }}
+                                            </span>
+                                            <span class="text-gray-500"
+                                                >Net</span
+                                            >
+                                            <span
+                                                class="text-right font-medium text-gray-900"
+                                            >
+                                                {{
+                                                    formattedTotal(
+                                                        row.taxable_net,
+                                                    )
+                                                }}
+                                            </span>
+                                            <span class="text-gray-500"
+                                                >VAT</span
+                                            >
+                                            <span
+                                                class="text-right font-medium text-gray-900"
+                                            >
+                                                {{
+                                                    formattedTotal(row.tax_amount)
+                                                }}
+                                            </span>
+                                            <span class="text-gray-500"
+                                                >Gross</span
+                                            >
+                                            <span
+                                                class="text-right font-semibold text-gray-900"
+                                            >
+                                                {{
+                                                    formattedTotal(row.grand_total)
+                                                }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div
                             v-if="txData.length"
-                            class="flex flex-wrap justify-end gap-6 text-sm border border-t-0 border-gray-200 rounded-b bg-gray-50 px-3 py-2"
+                            class="flex w-full flex-col gap-2 rounded-b border border-t-0 border-gray-200 bg-gray-50 px-3 py-2 text-sm md:flex-row md:flex-wrap md:justify-end md:gap-6"
                         >
                             <span
                                 ><strong>This page</strong> — Taxable (net):

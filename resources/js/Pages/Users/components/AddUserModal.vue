@@ -2,19 +2,23 @@
     <a-modal
         :visible="visible"
         :title="isEdit ? 'Edit User' : 'Add New User'"
-        :confirm-loading="saving"
-        @ok="handleSave"
+        :width="modalWidth"
+        :style="modalRootStyle"
+        :body-style="modalBodyStyle"
+        wrap-class-name="modal-footer-full-mobile"
+        centered
         @cancel="handleCancel"
-        width="600px"
     >
         <a-form
             ref="formRef"
+            class="modal-form-stack"
             :model="form"
             :rules="rules"
             layout="vertical"
+            :colon="false"
             @finish="handleSave"
         >
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="flex flex-col md:grid md:grid-cols-2 md:gap-4">
                 <a-form-item
                     label="Full Name"
                     name="name"
@@ -22,6 +26,7 @@
                 >
                     <a-input
                         v-model:value="form.name"
+                        class="w-full"
                         placeholder="Enter user's full name"
                     />
                 </a-form-item>
@@ -29,6 +34,7 @@
                 <a-form-item label="Email Address" name="email">
                     <a-input
                         v-model:value="form.email"
+                        class="w-full"
                         placeholder="user@example.com"
                         type="email"
                     />
@@ -37,6 +43,7 @@
                 <a-form-item label="Role" name="role_id">
                     <a-select
                         v-model:value="form.role_id"
+                        class="w-full"
                         placeholder="Select user role"
                         :options="availableRoles"
                         @change="onRoleChange"
@@ -52,6 +59,7 @@
             >
                 <a-select
                     v-model:value="form.domain"
+                    class="w-full"
                     placeholder="Select domain"
                     :options="domainOptions"
                     @change="onDomainChange"
@@ -63,6 +71,7 @@
                 <a-form-item :label="assignLabel" name="supervisor_id">
                     <a-select
                         v-model:value="form.supervisor_id"
+                        class="w-full"
                         :placeholder="`Select ${assignLabel.toLowerCase()}`"
                         :options="availableSupervisors"
                         :loading="loadingSupervisors"
@@ -85,10 +94,11 @@
                 </a-form-item>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="flex flex-col md:grid md:grid-cols-2 md:gap-4">
                 <a-form-item label="Password" name="password">
                     <a-input-password
                         v-model:value="form.password"
+                        class="w-full"
                         :placeholder="
                             isEdit
                                 ? 'Leave blank to keep current password'
@@ -104,6 +114,7 @@
                 >
                     <a-input-password
                         v-model:value="form.password_confirmation"
+                        class="w-full"
                         placeholder="Confirm password"
                         autocomplete="new-password"
                     />
@@ -131,7 +142,7 @@
         <!-- User Preview -->
         <div class="mt-6 p-4 bg-gray-50 rounded-lg">
             <h4 class="text-sm font-medium text-gray-900 mb-3">Preview</h4>
-            <div class="flex items-center space-x-4">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
                 <a-avatar
                     :size="48"
                     :style="{ backgroundColor: getAvatarColor(form.name) }"
@@ -153,11 +164,30 @@
                 </div>
             </div>
         </div>
+
+        <template #footer>
+            <div
+                class="modal-footer-actions flex w-full flex-col gap-2 md:flex-row md:justify-end"
+            >
+                <a-button class="w-full md:w-auto" @click="handleCancel">
+                    Cancel
+                </a-button>
+                <a-button
+                    type="primary"
+                    class="w-full md:w-auto"
+                    :loading="saving"
+                    @click="handleSave"
+                >
+                    {{ isEdit ? "Update User" : "Add User" }}
+                </a-button>
+            </div>
+        </template>
     </a-modal>
 </template>
 
 <script setup>
 import { ref, watch, reactive, computed } from "vue";
+import { useMediaQuery } from "@vueuse/core";
 import { notification } from "ant-design-vue";
 import { SafetyCertificateOutlined } from "@ant-design/icons-vue";
 import { usePage } from "@inertiajs/vue3";
@@ -166,6 +196,17 @@ import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 
 const page = usePage();
 const { getRoute } = useDomainRoutes();
+
+const isMdUp = useMediaQuery("(min-width: 768px)");
+const modalWidth = computed(() =>
+    isMdUp.value ? 600 : "calc(100vw - 24px)",
+);
+const modalRootStyle = computed(() =>
+    isMdUp.value ? {} : { maxWidth: "100vw", top: "12px", paddingBottom: 0 },
+);
+const modalBodyStyle = computed(() =>
+    isMdUp.value ? {} : { maxHeight: "calc(100vh - 120px)", overflowY: "auto" },
+);
 
 // Domain options
 const domainOptions = computed(() => {

@@ -20,7 +20,7 @@ const props = defineProps({
 <template>
     <div>
         <div
-            class="bg-white rounded-lg px-6 py-6 lg:w-full md:w-full sm:w-[750px] lg:overflow-auto md:overflow-auto sm:overflow-scroll"
+            class="bg-white rounded-lg px-6 py-6 w-full max-w-full min-w-0 overflow-x-auto lg:overflow-auto md:overflow-auto"
         >
             <div :class="filterMainClass">
                 <h1

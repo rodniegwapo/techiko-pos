@@ -1,7 +1,5 @@
 <script setup>
-import LeftMenu from "@/Components/sidebar/leftMenu.vue";
 import LeftSidebarWrapper from "@/Components/sidebar/leftWrapper.vue";
-import LeftAccountSettings from "@/Components/sidebar/leftAccountSettings.vue";
 import LocationBadge from "@/Components/LocationBadge.vue";
 import InquiryChatWidget from "@/Components/InquiryChatWidget.vue";
 import Terminal from "@/Components/Terminal.vue";
@@ -15,12 +13,27 @@ import {
     UploadOutlined,
 } from "@ant-design/icons-vue";
 import { IconMenu2 } from "@tabler/icons-vue";
+import { useMediaQuery } from "@vueuse/core";
 import { useAuth } from "@/Composables/useAuth";
 import { useSidebar } from "@/Composables/useSidebar";
 
 const { user } = useAuth();
-const { isCollapsed } = useSidebar();
 const page = usePage();
+const { toggleMobileDrawer, closeMobileDrawer } = useSidebar();
+const isMdUp = useMediaQuery("(min-width: 768px)");
+watch(isMdUp, (matches) => {
+    if (matches) {
+        closeMobileDrawer();
+    }
+});
+
+watch(
+    () => page.url,
+    () => {
+        closeMobileDrawer();
+    },
+);
+
 const pusherKey = import.meta.env.VITE_PUSHER_APP_KEY;
 
 const staffInboxBadge = ref(0);
@@ -77,15 +90,12 @@ onMounted(() => {
             // ignore
         }
     } else {
-        staffInboxFallbackTimer = setInterval(
-            () => {
-                router.reload({
-                    only: ["inquiryUnreadCount"],
-                    preserveScroll: true,
-                });
-            },
-            60_000,
-        );
+        staffInboxFallbackTimer = setInterval(() => {
+            router.reload({
+                only: ["inquiryUnreadCount"],
+                preserveScroll: true,
+            });
+        }, 60_000);
     }
 });
 
@@ -101,6 +111,12 @@ onMounted(() => {
 
     return (terminalModal.value = true);
 });
+
+let currentMobileTitle = ref("");
+onMounted(() => {
+    currentMobileTitle.value =
+        localStorage.getItem("selectedMenuForMobile") ?? "Menu";
+});
 </script>
 
 <template>
@@ -111,20 +127,26 @@ onMounted(() => {
         class="relative bg-dots-darker bg-center bg-gray-200 dark:bg-dots-lighter dark:bg-gray-900 selection:bg-red-500 selection:text-white"
     >
         <!-- <terminal /> -->
-        <left-sidebar-wrapper>
-            <!-- menu -->
-            <left-menu />
+        <left-sidebar-wrapper :user="user" />
 
-            <!-- account-settings -->
-            <left-account-settings
-                :user="user"
-                :leftSidebatdCollapsed="isCollapsed"
-            />
-        </left-sidebar-wrapper>
-
-        <a-layout-content>
+        <a-layout-content class="flex min-h-screen flex-1 flex-col">
             <div
-                class="max-w-7xl mx-auto p-6 lg:overflow-auto md:overflow-auto sm:overflow-scroll bg-gray-200 dark:bg-dots-lighter dark:bg-gray-900 selection:bg-red-500 selection:text-white"
+                class="sticky top-0 z-[60] flex shrink-0 items-center gap-3 border-b border-gray-300 bg-white px-3 py-2.5 shadow-sm md:hidden"
+            >
+                <button
+                    type="button"
+                    class="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white p-2 text-gray-900 shadow-sm hover:bg-gray-50 active:bg-gray-100"
+                    aria-label="Open menu"
+                    @click="toggleMobileDrawer"
+                >
+                    <IconMenu2 :size="24" :stroke-width="2" color="#111827" />
+                </button>
+                <span class="text-sm font-semibold text-gray-900">{{
+                    currentMobileTitle
+                }}</span>
+            </div>
+            <div
+                class="max-w-7xl mx-auto w-full min-w-0 flex-1 p-3 sm:p-4 md:p-6 lg:overflow-auto md:overflow-auto sm:overflow-scroll bg-gray-200 dark:bg-dots-lighter dark:bg-gray-900 selection:bg-red-500 selection:text-white"
             >
                 <slot />
             </div>

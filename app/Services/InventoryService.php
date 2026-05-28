@@ -584,7 +584,17 @@ class InventoryService
             $fromInventory = $this->getOrCreateInventory($product, $fromLocation);
 
             if (! $fromInventory->isInStock($quantity)) {
-                throw new \Exception("Insufficient stock at source location. Available: {$fromInventory->quantity_available}");
+                $available = max(0, (int) $fromInventory->quantity_available);
+
+                throw new InsufficientStockException([
+                    [
+                        'product_id' => $product->id,
+                        'product_name' => $product->name,
+                        'requested_quantity' => (int) $quantity,
+                        'available_quantity' => $available,
+                        'shortage' => (int) $quantity - $available,
+                    ],
+                ]);
             }
 
             // Record transfer out

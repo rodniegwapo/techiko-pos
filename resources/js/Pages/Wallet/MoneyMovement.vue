@@ -87,7 +87,7 @@ const isShiftClosed = computed(() => !!props.cashControl?.is_closed);
 <template>
     <WalletShell v-bind="props" :is-money-movement-page="true">
         <template #primary>
-            <div class="mt-6 max-w-7xl">
+            <div class="mt-6 max-w-7xl w-full min-w-0">
                 <CashLedgerPanel
                     v-if="ledger"
                     :movements="ledger.movements"

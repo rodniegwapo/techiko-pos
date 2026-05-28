@@ -8,6 +8,7 @@ import { IconPlus } from "@tabler/icons-vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 import { useHelpers } from "@/Composables/useHelpers";
+import { useMediaQuery } from "@vueuse/core";
 
 const props = defineProps({
     movements: {
@@ -43,6 +44,15 @@ const props = defineProps({
 const { getRoute } = useDomainRoutes();
 const { hasPermission } = usePermissionsV2();
 const { formattedTotal } = useHelpers();
+
+const isMdUp = useMediaQuery("(min-width: 768px)");
+
+const ledgerModalWidth = computed(() =>
+    isMdUp.value ? 720 : "calc(100vw - 24px)",
+);
+const ledgerModalRootStyle = computed(() =>
+    isMdUp.value ? {} : { maxWidth: "100vw", top: "12px", paddingBottom: 0 },
+);
 
 const page = usePage();
 const todayYmd = new Date().toISOString().slice(0, 10);
@@ -408,6 +418,10 @@ function onTableChange(tablePagination) {
     visitWithFilters({ page: tablePagination.current });
 }
 
+function onMobilePaginationChange(page) {
+    visitWithFilters({ page });
+}
+
 const paginationConfig = computed(() => ({
     current: props.movements.current_page,
     pageSize: props.movements.per_page,
@@ -433,7 +447,7 @@ watch(
 </script>
 
 <template>
-    <div id="cash-ledger" class="max-w-7xl space-y-4">
+    <div id="cash-ledger" class="w-full min-w-0 max-w-7xl space-y-4">
         <div
             class="rounded-lg border border-gray-200 bg-white px-4 py-4 shadow-sm"
         >
@@ -446,7 +460,7 @@ watch(
                 class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between"
             >
                 <div
-                    class="grid min-w-0 flex-1 grid-cols-2 gap-x-4 gap-y-3 lg:max-w-2xl"
+                    class="grid min-w-0 flex-1 grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:max-w-2xl"
                 >
                     <div>
                         <label
@@ -470,7 +484,7 @@ watch(
                             class="w-full rounded border border-gray-300 px-2 py-2 text-sm"
                         >
                     </div>
-                    <div class="col-span-2 md:col-span-1">
+                    <div class="sm:col-span-1">
                         <label
                             class="mb-1 block text-xs font-medium text-gray-600"
                             >Rail</label
@@ -483,7 +497,7 @@ watch(
                             show-search
                         />
                     </div>
-                    <div class="col-span-2 md:col-span-1">
+                    <div class="sm:col-span-1">
                         <label
                             class="mb-1 block text-xs font-medium text-gray-600"
                             >Kind</label
@@ -502,9 +516,9 @@ watch(
                     </div>
                 </div>
                 <div
-                    class="flex flex-wrap items-end justify-end gap-x-6 gap-y-2 border-t border-gray-100 pt-3 xl:border-0 xl:pt-0"
+                    class="flex flex-col items-stretch gap-3 border-t border-gray-100 pt-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-end sm:gap-x-6 sm:gap-y-2 xl:border-0 xl:pt-0"
                 >
-                    <div>
+                    <div class="min-w-0">
                         <div class="text-xs font-medium uppercase text-gray-500">
                             Ledger net
                         </div>
@@ -519,7 +533,7 @@ watch(
                             {{ formattedTotal(Number(ledgerBalance)) }}
                         </div>
                     </div>
-                    <div v-if="runningCashBalance != null">
+                    <div v-if="runningCashBalance != null" class="min-w-0">
                         <div
                             class="text-xs font-medium uppercase text-gray-500"
                             title="All-time cash in minus cash out for this location; not expected drawer cash for the selected business date."
@@ -539,7 +553,11 @@ watch(
                             }}
                         </div>
                     </div>
-                    <a-button type="primary" @click="applyFilters">
+                    <a-button
+                        type="primary"
+                        class="w-full shrink-0 sm:w-auto"
+                        @click="applyFilters"
+                    >
                         Apply
                     </a-button>
                 </div>
@@ -548,12 +566,14 @@ watch(
 
         <ContentLayout title="Ledger movements">
             <template #filters>
-                <a-dropdown
+                <div
                     v-if="hasPermission('wallet-cash-ledger.store')"
+                    class="w-full md:w-auto"
                 >
+                <a-dropdown>
                     <a-button
                         type="primary"
-                        class="flex items-center gap-1"
+                        class="flex w-full items-center justify-center gap-1 md:inline-flex md:w-auto"
                         :disabled="isShiftClosed"
                     >
                         <IconPlus class="h-4 w-4" />
@@ -568,9 +588,11 @@ watch(
                         </a-menu>
                     </template>
                 </a-dropdown>
+                </div>
             </template>
             <template #table>
                 <a-table
+                    v-if="isMdUp"
                     :columns="columns"
                     :data-source="movements.data"
                     :pagination="paginationConfig"
@@ -622,12 +644,87 @@ watch(
                         </template>
                     </template>
                 </a-table>
+
+                <div v-else class="px-2 py-2 sm:px-4 md:px-0">
+                    <div
+                        v-if="!movements.data?.length"
+                        class="py-12 text-center text-sm text-gray-500"
+                    >
+                        No ledger entries yet.
+                    </div>
+                    <div v-else class="flex flex-col gap-3">
+                        <a-card
+                            v-for="record in movements.data"
+                            :key="record.id"
+                            size="small"
+                            class="shadow-sm"
+                        >
+                            <div
+                                class="mb-2 text-sm font-semibold text-gray-900"
+                            >
+                                {{ formatMovementDate(record.movement_date) }}
+                            </div>
+                            <div class="space-y-1.5 text-sm">
+                                <div>
+                                    <div class="font-medium text-gray-900">
+                                        {{ kindCellLabel(record) }}
+                                    </div>
+                                    <div
+                                        v-if="secondaryNoteLine(record)"
+                                        class="mt-0.5 break-words text-xs text-gray-500"
+                                    >
+                                        {{ secondaryNoteLine(record) }}
+                                    </div>
+                                </div>
+                                <div class="flex justify-between gap-2 pt-1">
+                                    <span class="text-gray-500">Rail</span>
+                                    <span
+                                        class="min-w-0 break-words text-right text-gray-800"
+                                        >{{ rowRail(record) }}</span
+                                    >
+                                </div>
+                                <div class="flex justify-between gap-2">
+                                    <span class="text-gray-500">Amount</span>
+                                    <span
+                                        class="font-semibold tabular-nums"
+                                        :class="signedAmountParts(record).className"
+                                        ><span>{{
+                                            signedAmountParts(record).prefix
+                                        }}</span
+                                        ><span>{{
+                                            signedAmountParts(record).formatted
+                                        }}</span></span
+                                    >
+                                </div>
+                                <div class="flex justify-between gap-2">
+                                    <span class="text-gray-500">By</span>
+                                    <span class="text-right">{{
+                                        record.user?.name ?? "-"
+                                    }}</span>
+                                </div>
+                            </div>
+                        </a-card>
+                    </div>
+                    <a-pagination
+                        v-if="movements.total > movements.per_page"
+                        class="mt-4 justify-center pt-2"
+                        show-less-items
+                        :current="movements.current_page"
+                        :page-size="movements.per_page"
+                        :total="movements.total"
+                        :show-size-changer="false"
+                        @change="onMobilePaginationChange"
+                    />
+                </div>
             </template>
         </ContentLayout>
 
         <a-modal
             v-model:visible="modalVisible"
             :title="modalTitle"
+            :width="ledgerModalWidth"
+            :style="ledgerModalRootStyle"
+            centered
             :confirm-loading="submitting"
             ok-text="Save"
             destroy-on-close
@@ -639,7 +736,12 @@ watch(
                     <label class="mb-1 block text-xs font-medium text-gray-700"
                         >Cash flow direction</label
                     >
-                    <a-radio-group v-model:value="entryForm.direction">
+                    <a-radio-group
+                        v-model:value="entryForm.direction"
+                        class="flex flex-wrap gap-2"
+                        option-type="button"
+                        button-style="solid"
+                    >
                         <a-radio-button
                             value="in"
                             :disabled="isOwnerDraw"
@@ -680,7 +782,12 @@ watch(
                     <label class="mb-1 block text-xs font-medium text-gray-700"
                         >Withdraw from</label
                     >
-                    <a-radio-group v-model:value="entryForm.drawSource">
+                    <a-radio-group
+                        v-model:value="entryForm.drawSource"
+                        option-type="button"
+                        button-style="solid"
+                        class="flex flex-wrap gap-2"
+                    >
                         <a-radio-button value="cash_register">
                             Cash register
                         </a-radio-button>

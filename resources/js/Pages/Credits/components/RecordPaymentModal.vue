@@ -3,13 +3,18 @@
         :visible="visible"
         title="Record Payment"
         :confirm-loading="loading"
+        :width="modalWidth"
+        :style="modalRootStyle"
+        :body-style="modalBodyStyle"
+        centered
         @ok="handleSubmit"
         @cancel="handleCancel"
-        width="600px"
     >
         <a-form :model="formData" layout="vertical" ref="formRef">
+            <div class="grid grid-cols-1 gap-0 md:grid-cols-2 md:gap-x-4">
             <!-- Amount -->
             <a-form-item
+                class="md:col-span-2"
                 label="Amount"
                 name="amount"
                 :rules="[
@@ -51,7 +56,7 @@
             </a-form-item>
 
             <!-- Apply to Invoices -->
-            <a-form-item label="Apply to Invoices (Optional)">
+            <a-form-item class="md:col-span-2" label="Apply to Invoices (Optional)">
                 <a-checkbox-group v-model:value="formData.transaction_ids">
                     <div class="space-y-2 max-h-48 overflow-y-auto">
                         <a-checkbox
@@ -88,21 +93,34 @@
             </a-form-item>
 
             <!-- Notes -->
-            <a-form-item label="Notes" name="notes">
+            <a-form-item class="md:col-span-2" label="Notes" name="notes">
                 <a-textarea
                     v-model:value="formData.notes"
                     :rows="3"
                     placeholder="Enter notes (optional)"
                 />
             </a-form-item>
+            </div>
         </a-form>
     </a-modal>
 </template>
 
 <script setup>
 import { ref, computed, watch } from "vue";
+import { useMediaQuery } from "@vueuse/core";
 import { useCredit } from "@/Composables/useCredit";
 import { notification } from "ant-design-vue";
+
+const isMdUp = useMediaQuery("(min-width: 768px)");
+const modalWidth = computed(() =>
+    isMdUp.value ? 600 : "calc(100vw - 24px)",
+);
+const modalRootStyle = computed(() =>
+    isMdUp.value ? {} : { maxWidth: "100vw", top: "12px", paddingBottom: 0 },
+);
+const modalBodyStyle = computed(() =>
+    isMdUp.value ? {} : { maxHeight: "calc(100vh - 120px)", overflowY: "auto" },
+);
 
 // Props
 const props = defineProps({

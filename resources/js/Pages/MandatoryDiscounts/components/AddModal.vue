@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref } from "vue";
+import { useMediaQuery } from "@vueuse/core";
 import PrimaryButton from "@/Components/PrimaryButton.vue";
 import { router } from "@inertiajs/vue3";
 import { useTable } from "@/Composables/useTable";
@@ -11,6 +12,15 @@ const { spinning } = useTable();
 const page = usePage();
 const { formData, openModal, isEdit, errors } = useGlobalVariables();
 const { inertiaProgressLifecyle } = useHelpers();
+
+const isMdUp = useMediaQuery("(min-width: 768px)");
+
+const modalWidth = computed(() =>
+    isMdUp.value ? 640 : "calc(100vw - 24px)",
+);
+const modalRootStyle = computed(() =>
+    isMdUp.value ? {} : { maxWidth: "100vw", top: "12px", paddingBottom: 0 },
+);
 
 const props = defineProps({
   visible: {
@@ -130,7 +140,9 @@ const modalTitle = computed(() => {
   <a-modal
     v-model:visible="openModal"
     :title="modalTitle"
-    width="500px"
+    :width="modalWidth"
+    :style="modalRootStyle"
+    centered
     @cancel="openModal = false"
     :maskClosable="false"
   >

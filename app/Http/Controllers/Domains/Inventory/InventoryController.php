@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Domains\Inventory;
 
+use App\Exceptions\InsufficientStockException;
 use App\Helpers;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\InventoryMovementResource;
@@ -327,14 +328,26 @@ class InventoryController extends Controller
         $fromLocation = InventoryLocation::forDomain($domain->name_slug)->findOrFail($validated['from_location_id']);
         $toLocation = InventoryLocation::forDomain($domain->name_slug)->findOrFail($validated['to_location_id']);
 
-        $this->inventoryService->transferInventory(
-            $product,
-            $fromLocation,
-            $toLocation,
-            $validated['quantity'],
-            auth()->user(),
-            $validated['notes'] ?? null
-        );
+        try {
+            $this->inventoryService->transferInventory(
+                $product,
+                $fromLocation,
+                $toLocation,
+                $validated['quantity'],
+                auth()->user(),
+                $validated['notes'] ?? null
+            );
+        } catch (InsufficientStockException $e) {
+            $item = $e->getUnavailableItems()[0] ?? null;
+            $available = $item['available_quantity'] ?? 0;
+            $message = "Only {$available} units available at source location";
+
+            return response()->json([
+                'success' => false,
+                'errors' => ['quantity' => [$message]],
+                'message' => $message,
+            ], 422);
+        }
 
         return response()->noContent(200);
     }
@@ -355,7 +368,10 @@ class InventoryController extends Controller
 
         $query = Product::query()
             ->where('domain', $domain->name_slug)
-            ->with('category')
+            ->with([
+                'category',
+                'inventories' => fn ($q) => $q->where('location_id', $location->id),
+            ])
             ->whereHas('activeLocations', function ($q) use ($location) {
                 $q->where('inventory_locations.id', $location->id);
             })

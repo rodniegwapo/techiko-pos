@@ -1,5 +1,6 @@
 <script setup>
 import { computed, toRefs, ref, watch } from "vue";
+import { useMediaQuery } from "@vueuse/core";
 import { 
   IconClipboardList,
   IconMapPin,
@@ -15,6 +16,16 @@ import { useHelpers } from "@/Composables/useHelpers";
 import axios from "axios";
 
 const { formatCurrency, formatDate, formatDateTime } = useHelpers();
+const isMdUp = useMediaQuery("(min-width: 768px)");
+const modalWidth = computed(() =>
+  isMdUp.value ? 900 : "calc(100vw - 24px)",
+);
+const modalRootStyle = computed(() =>
+  isMdUp.value ? {} : { maxWidth: "100vw", top: "12px", paddingBottom: 0 },
+);
+const modalBodyStyle = computed(() =>
+  isMdUp.value ? {} : { maxHeight: "calc(100vh - 120px)", overflowY: "auto" },
+);
 
 const props = defineProps({
   visible: {
@@ -145,14 +156,18 @@ const totalQuantityAdjusted = computed(() => {
   <a-modal
     v-model:visible="visible"
     title="Stock Adjustment Details"
-    width="900px"
+    :width="modalWidth"
+    :style="modalRootStyle"
+    :body-style="modalBodyStyle"
     @cancel="handleClose"
     :footer="null"
     :loading="loading"
   >
     <div v-if="displayAdjustment" class="space-y-6">
       <!-- Adjustment Header -->
-      <div class="flex items-start justify-between pb-4 border-b">
+      <div
+        class="flex flex-col gap-3 border-b pb-4 md:flex-row md:items-start md:justify-between"
+      >
         <div class="flex items-center space-x-3">
           <div class="p-2 rounded-lg bg-blue-100 text-blue-600">
             <IconClipboardList :size="24" />
@@ -172,7 +187,7 @@ const totalQuantityAdjusted = computed(() => {
       </div>
 
       <!-- Summary Information -->
-      <div class="grid grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div class="bg-blue-50 p-4 rounded-lg text-center border">
           <p class="text-2xl font-bold text-blue-600">{{ displayAdjustment.items?.length || 0 }}</p>
           <p class="text-sm text-gray-600">Products Adjusted</p>
@@ -188,7 +203,7 @@ const totalQuantityAdjusted = computed(() => {
       </div>
 
       <!-- Basic Information -->
-      <div class="grid grid-cols-2 gap-6">
+      <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
         <!-- Location & User -->
         <div>
           <h4 class="text-md font-semibold mb-3 flex items-center">
@@ -256,7 +271,9 @@ const totalQuantityAdjusted = computed(() => {
       <div v-if="displayAdjustment.items?.length > 0">
         <h4 class="text-md font-semibold mb-3">Adjustment Items</h4>
         <div class="border border-gray-200 rounded-lg overflow-hidden">
-          <div class="bg-gray-50 px-4 py-2 grid grid-cols-12 gap-2 text-sm font-medium text-gray-700">
+          <div
+            class="hidden bg-gray-50 px-4 py-2 text-sm font-medium text-gray-700 md:grid md:grid-cols-12 md:gap-2"
+          >
             <div class="col-span-4">Product</div>
             <div class="col-span-2 text-center">System Qty</div>
             <div class="col-span-2 text-center">Actual Qty</div>
@@ -267,52 +284,53 @@ const totalQuantityAdjusted = computed(() => {
           <div
             v-for="(item, index) in displayAdjustment.items"
             :key="index"
-            class="px-4 py-3 grid grid-cols-12 gap-2 items-center border-b border-gray-100 last:border-b-0"
+            class="border-b border-gray-100 px-4 py-3 last:border-b-0 md:grid md:grid-cols-12 md:items-center md:gap-2"
           >
-            <!-- Product Info -->
-            <div class="col-span-4">
+            <div class="md:col-span-4">
               <p class="font-medium text-sm">{{ item.product?.name || 'Unknown Product' }}</p>
               <p class="text-xs text-gray-500">{{ item.product?.SKU || 'N/A' }}</p>
             </div>
 
-            <!-- System Quantity -->
-            <div class="col-span-2 text-center">
-              <p class="font-semibold">{{ item.system_quantity }}</p>
-            </div>
-
-            <!-- Actual Quantity -->
-            <div class="col-span-2 text-center">
-              <p class="font-semibold">{{ item.actual_quantity }}</p>
-            </div>
-
-            <!-- Adjustment -->
-            <div class="col-span-2 text-center">
-              <p class="font-semibold" :class="{
-                'text-green-600': item.adjustment_quantity > 0,
-                'text-red-600': item.adjustment_quantity < 0,
-                'text-gray-600': item.adjustment_quantity === 0
-              }">
+            <div class="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm md:contents">
+              <span class="text-gray-500 md:hidden">System Qty</span>
+              <span class="text-right font-semibold md:col-span-2 md:text-center">
+                {{ item.system_quantity }}
+              </span>
+              <span class="text-gray-500 md:hidden">Actual Qty</span>
+              <span class="text-right font-semibold md:col-span-2 md:text-center">
+                {{ item.actual_quantity }}
+              </span>
+              <span class="text-gray-500 md:hidden">Adjustment</span>
+              <span
+                class="text-right font-semibold md:col-span-2 md:text-center"
+                :class="{
+                  'text-green-600': item.adjustment_quantity > 0,
+                  'text-red-600': item.adjustment_quantity < 0,
+                  'text-gray-600': item.adjustment_quantity === 0,
+                }"
+              >
                 {{ item.adjustment_quantity > 0 ? '+' : '' }}{{ item.adjustment_quantity }}
-              </p>
-            </div>
-
-            <!-- Cost Impact -->
-            <div class="col-span-2 text-right">
-              <p class="font-semibold" :class="{
-                'text-green-600': item.total_cost_change > 0,
-                'text-red-600': item.total_cost_change < 0,
-                'text-gray-600': item.total_cost_change === 0
-              }">
+              </span>
+              <span class="text-gray-500 md:hidden">Cost Impact</span>
+              <span
+                class="text-right font-semibold md:col-span-2 md:text-right"
+                :class="{
+                  'text-green-600': item.total_cost_change > 0,
+                  'text-red-600': item.total_cost_change < 0,
+                  'text-gray-600': item.total_cost_change === 0,
+                }"
+              >
                 {{ formatCurrency(item.total_cost_change || 0) }}
-              </p>
+              </span>
             </div>
           </div>
 
-          <!-- Total Row -->
-          <div class="bg-gray-50 px-4 py-3 grid grid-cols-12 gap-2 items-center font-semibold">
-            <div class="col-span-8">Total Impact</div>
-            <div class="col-span-2 text-center">{{ totalQuantityAdjusted }} items</div>
-            <div class="col-span-2 text-right">{{ formatCurrency(totalValueAdjusted) }}</div>
+          <div
+            class="flex flex-col gap-1 bg-gray-50 px-4 py-3 font-semibold sm:flex-row sm:items-center sm:justify-between md:grid md:grid-cols-12 md:gap-2"
+          >
+            <div class="md:col-span-8">Total Impact</div>
+            <div class="md:col-span-2 md:text-center">{{ totalQuantityAdjusted }} items</div>
+            <div class="md:col-span-2 md:text-right">{{ formatCurrency(totalValueAdjusted) }}</div>
           </div>
         </div>
       </div>

@@ -1,12 +1,14 @@
 <script setup>
 import { computed } from "vue";
 import { usePage } from "@inertiajs/vue3";
+import { useMediaQuery } from "@vueuse/core";
 import { IconArrowUp, IconArrowDown, IconEye, IconWorld } from "@tabler/icons-vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { useHelpers } from "@/Composables/useHelpers";
 
-const { formatCurrency, formatDate, formatDateTime } = useHelpers();
+const { formatDate, formatDateTime } = useHelpers();
 const page = usePage();
+const isMdUp = useMediaQuery("(min-width: 768px)");
 
 const emit = defineEmits(["handleTableChange", "showDetails"]);
 
@@ -28,6 +30,10 @@ const props = defineProps({
     default: false,
   },
 });
+
+const showSuperUserDomain = computed(
+  () => page.props.auth?.user?.data?.is_super_user && props.isGlobalView,
+);
 
 // Simplified columns - only essential information
 const columns = computed(() => {
@@ -58,8 +64,7 @@ const columns = computed(() => {
     },
   ];
 
-  // Add domain column for super users only in global view
-  if (page.props.auth?.user?.data?.is_super_user && props.isGlobalView) {
+  if (showSuperUserDomain.value) {
     baseColumns.splice(2, 0, {
       title: "Domain",
       dataIndex: "domain",
@@ -69,7 +74,7 @@ const columns = computed(() => {
   }
 
   baseColumns.push({ title: "Actions", key: "actions", align: "center", width: "1%" });
-  
+
   return baseColumns;
 });
 
@@ -93,6 +98,9 @@ const getMovementTypeIcon = (type) => {
   const increaseTypes = ["purchase", "adjustment", "transfer_in", "return"];
   return increaseTypes.includes(type) ? IconArrowUp : IconArrowDown;
 };
+
+const getMovementTypeDisplay = (record) =>
+  record.movement?.movement_type_display || record.type;
 
 const showDetails = (movement) => {
   emit("showDetails", movement);
@@ -128,10 +136,18 @@ const dataSource = computed(() => {
     })) || []
   );
 });
+
+function onMobilePaginationChange(pageNum) {
+  emit("handleTableChange", {
+    current: pageNum,
+    pageSize: props.pagination?.pageSize ?? 10,
+  });
+}
 </script>
 
 <template>
   <a-table
+    v-if="isMdUp"
     :columns="columns"
     :data-source="dataSource"
     :pagination="pagination"
@@ -165,10 +181,9 @@ const dataSource = computed(() => {
       <template v-else-if="column.key === 'domain'">
         <div class="flex items-center justify-center">
           <IconWorld class="mr-1" size="16" />
-          <span class="text-sm font-medium">{{ record.domain || 'N/A' }}</span>
+          <span class="text-sm font-medium">{{ record.domain || "N/A" }}</span>
         </div>
       </template>
-
 
       <!-- Movement Type Column -->
       <template v-else-if="column.key === 'type'">
@@ -179,7 +194,7 @@ const dataSource = computed(() => {
               :size="14"
               class="mr-1"
             />
-            {{ record.movement?.movement_type_display || record.type }}
+            {{ getMovementTypeDisplay(record) }}
           </a-tag>
         </div>
       </template>
@@ -224,6 +239,107 @@ const dataSource = computed(() => {
       </div>
     </template>
   </a-table>
+
+  <div v-else class="px-2 py-2 md:px-0">
+    <a-spin :spinning="loading">
+      <div
+        v-if="!dataSource.length"
+        class="py-12 text-center text-sm text-gray-500"
+      >
+        <IconArrowDown :size="48" class="mx-auto mb-4 text-gray-400" />
+        <p>No inventory movements found</p>
+        <p class="text-xs text-gray-400">
+          Try adjusting your filters or check back later
+        </p>
+      </div>
+      <div v-else class="flex flex-col gap-3">
+        <div
+          v-for="record in dataSource"
+          :key="record.id"
+          class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm"
+        >
+          <div class="flex flex-wrap items-start justify-between gap-2 px-4 py-3">
+            <div>
+              <p class="text-sm font-medium text-gray-900">
+                {{ formatDateTime(record.date) }}
+              </p>
+              <p class="text-xs text-gray-500">Movement #{{ record.id }}</p>
+            </div>
+            <a-tag class="m-0 w-fit" :color="getMovementTypeColor(record.type)">
+              <component
+                :is="getMovementTypeIcon(record.type)"
+                :size="14"
+                class="mr-1"
+              />
+              {{ getMovementTypeDisplay(record) }}
+            </a-tag>
+          </div>
+
+          <div class="mx-4 mb-3 rounded-lg bg-gray-50 p-3">
+            <div class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-sm">
+              <span class="text-gray-500">Product</span>
+              <span class="text-right font-semibold text-gray-900">
+                {{ record.product?.name || "Unknown Product" }}
+              </span>
+              <span class="text-gray-500">SKU</span>
+              <span class="text-right font-medium text-gray-900">
+                {{ record.product?.SKU || "N/A" }}
+              </span>
+              <template v-if="record.batch_number">
+                <span class="text-gray-500">Batch</span>
+                <span class="text-right font-medium text-blue-600">
+                  {{ record.batch_number }}
+                </span>
+              </template>
+              <span class="text-gray-500">Quantity</span>
+              <span
+                class="text-right text-base font-bold"
+                :class="getQuantityChangeColor(record.quantity_change)"
+              >
+                {{ record.quantity_change > 0 ? "+" : ""
+                }}{{ record.quantity_change }}
+                {{ record.product?.unit_of_measure || "pcs" }}
+              </span>
+              <template v-if="showSuperUserDomain">
+                <span class="text-gray-500">Domain</span>
+                <span
+                  class="flex min-w-0 items-center justify-end gap-1 truncate font-medium text-gray-900"
+                >
+                  <IconWorld size="16" class="shrink-0" />
+                  {{ record.domain || "N/A" }}
+                </span>
+              </template>
+            </div>
+          </div>
+
+          <div class="border-t border-gray-100 px-4 py-3">
+            <a-button
+              class="flex w-full items-center justify-center gap-2"
+              @click="showDetails(record.movement)"
+            >
+              <template #icon>
+                <IconEye size="18" />
+              </template>
+              View details
+            </a-button>
+          </div>
+        </div>
+      </div>
+      <a-pagination
+        v-if="
+          pagination?.total &&
+          pagination.total > (pagination.pageSize ?? 10)
+        "
+        class="mt-4 justify-center pt-2"
+        show-less-items
+        :current="pagination.current"
+        :page-size="pagination.pageSize"
+        :total="pagination.total"
+        :show-size-changer="false"
+        @change="onMobilePaginationChange"
+      />
+    </a-spin>
+  </div>
 </template>
 
 <style scoped>

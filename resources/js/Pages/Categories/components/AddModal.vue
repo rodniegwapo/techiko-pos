@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed } from "vue";
+import { useMediaQuery } from "@vueuse/core";
 import PrimaryButton from "@/Components/PrimaryButton.vue";
 import { useEmits } from "@/Composables/useEmits";
 import { router } from "@inertiajs/vue3";
@@ -54,6 +55,9 @@ const handleUpdate = () => {
     <a-modal
         v-model:visible="openModal"
         :title="isEdit ? 'Edit Category' : 'Add Category'"
+        :width="modalWidth"
+        :style="modalRootStyle"
+        centered
         @cancel="openModal = false"
         :maskClosable="false"
     >
