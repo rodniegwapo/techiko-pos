@@ -1,7 +1,8 @@
 <script setup>
 import axios from "axios";
-import { ref, watch } from "vue";
+import { ref, watch, computed } from "vue";
 import { watchDebounced } from "@vueuse/core";
+import { useMediaQuery } from "@vueuse/core";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { message } from "ant-design-vue";
 
@@ -19,6 +20,15 @@ const props = defineProps({
 const emit = defineEmits(["update:visible", "attached"]);
 
 const { getRoute } = useDomainRoutes();
+
+const isMdUp = useMediaQuery("(min-width: 768px)");
+
+const modalWidth = computed(() =>
+    isMdUp.value ? 640 : "calc(100vw - 24px)",
+);
+const modalRootStyle = computed(() =>
+    isMdUp.value ? {} : { maxWidth: "100vw", top: "12px", paddingBottom: 0 },
+);
 
 const modalSearch = ref("");
 const loading = ref(false);
@@ -142,7 +152,9 @@ function categoryLabel(p) {
         :visible="visible"
         title="Add existing product to this store"
         destroy-on-close
-        width="640px"
+        :width="modalWidth"
+        :style="modalRootStyle"
+        centered
         :footer="null"
         @cancel="close"
         @update:visible="(v) => emit('update:visible', v)"
@@ -173,7 +185,7 @@ function categoryLabel(p) {
                 <div
                     v-for="p in results"
                     :key="p.id"
-                    class="flex items-center justify-between border rounded px-3 py-2 gap-3"
+                    class="flex flex-col gap-2 rounded border px-3 py-2 md:flex-row md:items-center md:justify-between md:gap-3"
                 >
                     <div class="min-w-0 flex-1">
                         <div class="font-medium truncate">{{ p.name }}</div>
@@ -186,6 +198,7 @@ function categoryLabel(p) {
                     <a-button
                         type="primary"
                         size="small"
+                        class="w-full shrink-0 md:w-auto"
                         :loading="attachingId === p.id"
                         :disabled="attachingId !== null && attachingId !== p.id"
                         @click="attach(p)"
