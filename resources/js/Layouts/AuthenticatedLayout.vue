@@ -27,9 +27,12 @@ watch(isMdUp, (matches) => {
     }
 });
 
-watch(() => page.url, () => {
-    closeMobileDrawer();
-});
+watch(
+    () => page.url,
+    () => {
+        closeMobileDrawer();
+    },
+);
 
 const pusherKey = import.meta.env.VITE_PUSHER_APP_KEY;
 
@@ -87,15 +90,12 @@ onMounted(() => {
             // ignore
         }
     } else {
-        staffInboxFallbackTimer = setInterval(
-            () => {
-                router.reload({
-                    only: ["inquiryUnreadCount"],
-                    preserveScroll: true,
-                });
-            },
-            60_000,
-        );
+        staffInboxFallbackTimer = setInterval(() => {
+            router.reload({
+                only: ["inquiryUnreadCount"],
+                preserveScroll: true,
+            });
+        }, 60_000);
     }
 });
 
@@ -110,6 +110,12 @@ onMounted(() => {
     }
 
     return (terminalModal.value = true);
+});
+
+let currentMobileTitle = ref("");
+onMounted(() => {
+    currentMobileTitle.value =
+        localStorage.getItem("selectedMenuForMobile") ?? "Menu";
 });
 </script>
 
@@ -133,13 +139,11 @@ onMounted(() => {
                     aria-label="Open menu"
                     @click="toggleMobileDrawer"
                 >
-                    <IconMenu2
-                        :size="24"
-                        :stroke-width="2"
-                        color="#111827"
-                    />
+                    <IconMenu2 :size="24" :stroke-width="2" color="#111827" />
                 </button>
-                <span class="text-sm font-semibold text-gray-900">Menu</span>
+                <span class="text-sm font-semibold text-gray-900">{{
+                    currentMobileTitle
+                }}</span>
             </div>
             <div
                 class="max-w-7xl mx-auto w-full min-w-0 flex-1 p-3 sm:p-4 md:p-6 lg:overflow-auto md:overflow-auto sm:overflow-scroll bg-gray-200 dark:bg-dots-lighter dark:bg-gray-900 selection:bg-red-500 selection:text-white"
