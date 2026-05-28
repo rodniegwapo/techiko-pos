@@ -313,7 +313,7 @@ const getRoleColorHex = (level) => {
                     v-if="hasPermission('users.hierarchy')"
                     @click="router.visit(getRoute('users.hierarchy'))"
                     type="default"
-                    class="flex w-full items-center justify-center border border-purple-500 bg-white text-purple-500 md:inline-flex md:w-auto"
+                    class="hidden items-center justify-center border border-purple-500 bg-white text-purple-500 md:inline-flex md:w-auto"
                 >
                     <template #icon>
                         <IconHierarchy />
