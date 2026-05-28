@@ -1,5 +1,6 @@
 <script setup>
 import { computed, toRefs, ref, watch } from "vue";
+import { useMediaQuery } from "@vueuse/core";
 import {
   IconCircleCheck,
   IconAlertTriangle,
@@ -15,6 +16,13 @@ import { useHelpers } from "@/Composables/useHelpers";
 import axios from "axios";
 
 const { formatCurrency, formatDate, formatDateTime } = useHelpers();
+const isMdUp = useMediaQuery("(min-width: 768px)");
+const modalWidth = computed(() =>
+  isMdUp.value ? 900 : "calc(100vw - 24px)",
+);
+const modalRootStyle = computed(() =>
+  isMdUp.value ? {} : { maxWidth: "100vw", top: "12px", paddingBottom: 0 },
+);
 
 const props = defineProps({
   visible: {
@@ -127,12 +135,14 @@ const allLocations = computed(() => props.product?.product?.locations || []);
 <template>
   <a-modal
     v-model:visible="visible"
-    width="900px"
+    :width="modalWidth"
+    :style="modalRootStyle"
+    centered
     @cancel="handleClose"
     :footer="null"
   >
     <template #title>
-      <div class="flex items-center justify-between">
+      <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <span>Product Details</span>
         <div v-if="!props.isGlobalView && storeData" class="flex items-center space-x-2">
           <a-tag color="blue" size="small">
@@ -158,12 +168,12 @@ const allLocations = computed(() => props.product?.product?.locations || []);
     <div v-if="product" class="space-y-6">
       <!-- Store Context Banner (domain-scoped) -->
       <div v-if="!props.isGlobalView && storeData" class="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border border-blue-200">
-        <div class="flex items-center justify-between">
+        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h5 class="font-semibold text-blue-900">{{ storeData.name }}</h5>
             <p class="text-sm text-blue-700">{{ storeData.address }}</p>
           </div>
-          <div class="grid grid-cols-4 gap-4 text-center">
+          <div class="grid grid-cols-2 gap-4 text-center md:grid-cols-4">
             <div>
               <p class="text-lg font-bold text-blue-600">{{ storeData.total_products_count || 0 }}</p>
               <p class="text-xs text-gray-600">Total Items</p>

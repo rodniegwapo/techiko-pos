@@ -1,5 +1,6 @@
 <script setup>
 import { ref, reactive, computed, watch, toRefs } from "vue";
+import { useMediaQuery } from "@vueuse/core";
 import { router } from "@inertiajs/vue3";
 import { SearchOutlined, SwapOutlined, ShoppingCartOutlined, WarningOutlined } from "@ant-design/icons-vue";
 import { notification } from "ant-design-vue";
@@ -8,6 +9,13 @@ import axios from "axios";
 import { usePage } from "@inertiajs/vue3";
 
 const page = usePage();
+const isMdUp = useMediaQuery("(min-width: 768px)");
+const modalWidth = computed(() =>
+  isMdUp.value ? 700 : "calc(100vw - 24px)",
+);
+const modalRootStyle = computed(() =>
+  isMdUp.value ? {} : { maxWidth: "100vw", top: "12px", paddingBottom: 0 },
+);
 
 const { openModal } = useGlobalVariables();
 
@@ -381,15 +389,17 @@ watch(
 <template>
   <a-modal
     v-model:visible="visible"
-    width="700px"
+    :width="modalWidth"
+    :style="modalRootStyle"
+    centered
     :confirm-loading="loading"
     @ok="handleSubmit"
     @cancel="closeModal"
   >
     <template #title>
-      <div class="flex items-center justify-between">
+      <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <span>Transfer Inventory</span>
-        <div class="flex items-center space-x-2">
+        <div class="flex flex-wrap items-center gap-2">
           <div v-if="fromStore" class="flex items-center space-x-1">
             <span class="text-xs text-gray-500">From:</span>
             <a-tag color="blue" size="small">
@@ -482,7 +492,7 @@ watch(
       </div>
 
       <!-- Location Selection -->
-      <div class="grid grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">
             From Location *
