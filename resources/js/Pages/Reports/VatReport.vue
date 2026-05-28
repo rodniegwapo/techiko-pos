@@ -417,7 +417,7 @@ const columns = [
 
             <template #table>
                 <div
-                    class="vat-report-print-root space-y-6 px-6 pb-8 pt-2 max-w-7xl"
+                    class="vat-report-print-root space-y-6 px-4 pb-8 pt-2 md:px-6 max-w-7xl"
                 >
                     <p class="text-sm text-gray-600 no-print">
                         Totals use
@@ -428,9 +428,9 @@ const columns = [
                         separately.
                     </p>
 
-                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
                         <div
-                            class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+                            class="w-full rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
                         >
                             <div class="text-xs font-medium text-gray-500">
                                 Total output VAT
@@ -442,7 +442,7 @@ const columns = [
                             </div>
                         </div>
                         <div
-                            class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+                            class="w-full rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
                         >
                             <div class="text-xs font-medium text-gray-500">
                                 Gross sales (paid)
@@ -454,7 +454,7 @@ const columns = [
                             </div>
                         </div>
                         <div
-                            class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
+                            class="w-full rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
                         >
                             <div class="text-xs font-medium text-gray-500">
                                 Number of sales
@@ -496,18 +496,18 @@ const columns = [
                             class="bg-white"
                         />
 
-                        <div v-else class="px-2 py-2 md:px-0">
+                        <div v-else class="w-full py-2 md:px-0">
                             <div
                                 v-if="!txData.length"
                                 class="py-12 text-center text-sm text-gray-500"
                             >
                                 No transactions found for this period.
                             </div>
-                            <div v-else class="flex flex-col gap-3">
+                            <div v-else class="flex w-full flex-col gap-3">
                                 <div
                                     v-for="row in txData"
                                     :key="row.id"
-                                    class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm"
+                                    class="w-full overflow-hidden rounded-none border border-gray-200 bg-white shadow-sm md:rounded-lg"
                                 >
                                     <div
                                         class="flex flex-wrap items-start justify-between gap-2 px-4 py-3"
@@ -592,7 +592,7 @@ const columns = [
 
                         <div
                             v-if="txData.length"
-                            class="flex flex-col gap-2 rounded-b border border-t-0 border-gray-200 bg-gray-50 px-3 py-2 text-sm md:flex-row md:flex-wrap md:justify-end md:gap-6"
+                            class="flex w-full flex-col gap-2 rounded-b border border-t-0 border-gray-200 bg-gray-50 px-3 py-2 text-sm md:flex-row md:flex-wrap md:justify-end md:gap-6"
                         >
                             <span
                                 ><strong>This page</strong> — Taxable (net):

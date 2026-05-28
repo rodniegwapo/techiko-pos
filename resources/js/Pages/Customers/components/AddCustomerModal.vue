@@ -2,22 +2,23 @@
   <a-modal
     :visible="visible"
     :title="isEdit ? 'Edit Customer' : 'Add New Customer'"
-    :confirm-loading="saving"
     :width="modalWidth"
     :style="modalRootStyle"
     :body-style="modalBodyStyle"
+    wrap-class-name="modal-footer-full-mobile"
     centered
-    @ok="handleSave"
     @cancel="handleCancel"
   >
     <a-form
       ref="formRef"
+      class="modal-form-stack"
       :model="form"
       :rules="rules"
       layout="vertical"
+      :colon="false"
       @finish="handleSave"
     >
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="flex flex-col md:grid md:grid-cols-2 md:gap-4">
         <a-form-item
           label="Full Name"
           name="name"
@@ -25,6 +26,7 @@
         >
           <a-input
             v-model:value="form.name"
+            class="w-full"
             placeholder="Enter customer's full name"
           />
         </a-form-item>
@@ -35,6 +37,7 @@
         >
           <a-input
             v-model:value="form.email"
+            class="w-full"
             placeholder="customer@example.com"
             type="email"
           />
@@ -46,6 +49,7 @@
         >
           <a-input
             v-model:value="form.phone"
+            class="w-full"
             placeholder="+63 912 345 6789"
           />
         </a-form-item>
@@ -55,6 +59,7 @@
       <a-form-item v-if="page.props.isGlobalView" label="Domain" name="domain">
         <a-select
           v-model:value="form.domain"
+          class="w-full"
           placeholder="Select domain"
           :options="domainOptions"
         />
@@ -66,6 +71,7 @@
       >
         <a-textarea
           v-model:value="form.address"
+          class="w-full"
           placeholder="Enter customer's address"
           :rows="2"
         />
@@ -77,8 +83,8 @@
       >
         <a-date-picker
           v-model:value="form.date_of_birth"
+          class="w-full"
           placeholder="Select date of birth"
-          style="width: 100%"
           format="YYYY-MM-DD"
         />
       </a-form-item>
@@ -108,7 +114,7 @@
     <!-- Customer Preview -->
     <div class="mt-6 p-4 bg-gray-50 rounded-lg">
       <h4 class="text-sm font-medium text-gray-900 mb-3">Preview</h4>
-      <div class="flex items-center space-x-4">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
         <a-avatar 
           :size="48"
           :style="{ backgroundColor: getAvatarColor(form.name) }"
@@ -125,6 +131,24 @@
         </div>
       </div>
     </div>
+
+    <template #footer>
+      <div
+        class="modal-footer-actions flex w-full flex-col gap-2 md:flex-row md:justify-end"
+      >
+        <a-button class="w-full md:w-auto" @click="handleCancel">
+          Cancel
+        </a-button>
+        <a-button
+          type="primary"
+          class="w-full md:w-auto"
+          :loading="saving"
+          @click="handleSave"
+        >
+          {{ isEdit ? "Update Customer" : "Add Customer" }}
+        </a-button>
+      </div>
+    </template>
   </a-modal>
 </template>
 
