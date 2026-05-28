@@ -1,4 +1,6 @@
 <script setup>
+import { computed } from "vue";
+import { useMediaQuery } from "@vueuse/core";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useHelpers } from "@/Composables/useHelpers";
 import {
@@ -18,6 +20,15 @@ import {
 
 const { formattedTotal } = useHelpers();
 const { openViewModal } = useGlobalVariables();
+
+const isMdUp = useMediaQuery("(min-width: 768px)");
+
+const modalWidth = computed(() =>
+    isMdUp.value ? 720 : "calc(100vw - 24px)",
+);
+const modalRootStyle = computed(() =>
+    isMdUp.value ? {} : { maxWidth: "100vw", top: "12px", paddingBottom: 0 },
+);
 
 const props = defineProps({
   selectedMandatoryDiscount: {
@@ -52,8 +63,10 @@ const formatDate = (dateStr) => {
   <a-modal
     v-model:visible="openViewModal"
     title="Mandatory Discount Details"
+    :width="modalWidth"
+    :style="modalRootStyle"
+    centered
     @cancel="openViewModal = false"
-    width="700px"
     :maskClosable="false"
   >
     <div>

@@ -67,22 +67,25 @@ const mandatoryDiscountDetail = ref({});
 <template>
   <AuthenticatedLayout>
     <Head title="Mandatory Discounts" />
-    <ContentHeader class="mb-8" title="Mandatory Discounts" />
-    <ContentLayout title="Mandatory Discounts">
+    <ContentHeader class="mb-4 md:mb-8" title="Mandatory Discounts" />
+    <ContentLayout
+      title="Mandatory Discounts"
+      filter-class="flex flex-wrap items-center justify-end gap-2 w-full min-w-0"
+    >
       <!-- Filters -->
       <template #filters>
         <RefreshButton :loading="spinning" @click="getItems" />
         <a-input-search
           v-model:value="search"
           placeholder="Search mandatory discount"
-          class="min-w-[100px] max-w-[300px]"
+          class="w-full min-w-0 md:max-w-[300px]"
         />
         <a-select
           v-if="isGlobalView"
           v-model:value="domain"
           placeholder="Filter by domain"
           allow-clear
-          class="min-w-[150px] max-w-[200px]"
+          class="w-full min-w-0 md:max-w-[200px]"
           @change="getItems"
         >
           <a-select-option
@@ -96,7 +99,7 @@ const mandatoryDiscountDetail = ref({});
         <a-button
           @click="showModal"
           type="primary"
-          class="bg-white border flex items-center border-green-500 text-green-500"
+          class="flex w-full items-center justify-center border border-green-500 bg-white text-green-500 md:inline-flex md:w-auto"
         >
           <template #icon>
             <PlusSquareOutlined />
