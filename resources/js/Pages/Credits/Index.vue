@@ -165,15 +165,18 @@ const handleCreditSettingsSaved = () => {
 <template>
   <AuthenticatedLayout>
     <Head title="Credit Management" />
-    <ContentHeader class="mb-8" title="Credit Management" />
+    <ContentHeader class="mb-4 md:mb-8" title="Credit Management" />
 
-    <ContentLayout title="Customer Credit Accounts">
+    <ContentLayout
+      title="Customer Credit Accounts"
+      filter-class="flex flex-wrap items-center justify-end gap-2 w-full min-w-0"
+    >
       <template #filters>
         <RefreshButton :loading="spinning" @click="getItems" />
         <a-input-search
           v-model:value="search"
           placeholder="Search customers by name, email, or phone..."
-          class="min-w-[100px] max-w-[400px]"
+          class="w-full min-w-0 md:max-w-[400px]"
         />
         <FilterDropdown v-model="filters" :filters="filtersConfig" />
       </template>
@@ -189,8 +192,7 @@ const handleCreditSettingsSaved = () => {
         />
       </template>
 
-      <!-- Overdue Alerts -->
-      <template #alerts>
+      <template #activeStore>
         <OverdueAlerts
           :overdue-accounts="overdueAccounts"
           :loading="creditLoading"

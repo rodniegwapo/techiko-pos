@@ -3,9 +3,12 @@
     :visible="visible"
     :title="isEdit ? 'Edit Customer' : 'Add New Customer'"
     :confirm-loading="saving"
+    :width="modalWidth"
+    :style="modalRootStyle"
+    :body-style="modalBodyStyle"
+    centered
     @ok="handleSave"
     @cancel="handleCancel"
-    width="600px"
   >
     <a-form
       ref="formRef"
@@ -127,6 +130,7 @@
 
 <script setup>
 import { ref, watch, reactive, computed } from "vue";
+import { useMediaQuery } from "@vueuse/core";
 import { notification } from "ant-design-vue";
 import { GiftOutlined, CheckCircleOutlined } from "@ant-design/icons-vue";
 import { router } from "@inertiajs/vue3";
@@ -136,6 +140,17 @@ import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 
 const page = usePage();
 const { getRoute } = useDomainRoutes();
+
+const isMdUp = useMediaQuery("(min-width: 768px)");
+const modalWidth = computed(() =>
+  isMdUp.value ? 600 : "calc(100vw - 24px)",
+);
+const modalRootStyle = computed(() =>
+  isMdUp.value ? {} : { maxWidth: "100vw", top: "12px", paddingBottom: 0 },
+);
+const modalBodyStyle = computed(() =>
+  isMdUp.value ? {} : { maxHeight: "calc(100vh - 120px)", overflowY: "auto" },
+);
 
 // Domain options
 const domainOptions = computed(() => {

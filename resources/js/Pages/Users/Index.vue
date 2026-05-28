@@ -266,8 +266,11 @@ const getRoleColorHex = (level) => {
 <template>
     <AuthenticatedLayout>
         <Head title="User Management" />
-        <ContentHeader class="mb-8" title="User Management" />
-        <ContentLayout title="User Management">
+        <ContentHeader class="mb-4 md:mb-8" title="User Management" />
+        <ContentLayout
+            title="User Management"
+            filter-class="flex flex-wrap items-center justify-end gap-2 w-full min-w-0"
+        >
             <template #filters>
                 <!-- <a-alert
                     v-if="
@@ -287,43 +290,41 @@ const getRoleColorHex = (level) => {
                     </template>
                 </a-alert> -->
 
-                <div class="flex gap-2 items-center justify-endw-full">
-                    <RefreshButton :loading="spinning" @click="getItems" />
-                    <a-input-search
-                        v-model:value="search"
-                        placeholder="Search users by name or email..."
-                        class="min-w-[100px] max-w-[400px]"
-                    />
-                    <a-button
-                        v-if="isSuperUser || hasPermission('users.store')"
-                        :disabled="usersAtCapacity && !props.isGlobalView"
-                        @click="handleAddUser"
-                        type="primary"
-                        class="bg-white border flex items-center border-green-500 text-green-500"
-                    >
-                        <template #icon>
-                            <IconPlus />
-                        </template>
-                        Add User
-                    </a-button>
+                <RefreshButton :loading="spinning" @click="getItems" />
+                <a-input-search
+                    v-model:value="search"
+                    placeholder="Search users by name or email..."
+                    class="w-full min-w-0 md:max-w-[400px]"
+                />
+                <a-button
+                    v-if="isSuperUser || hasPermission('users.store')"
+                    :disabled="usersAtCapacity && !props.isGlobalView"
+                    @click="handleAddUser"
+                    type="primary"
+                    class="flex w-full items-center justify-center border border-green-500 bg-white text-green-500 md:inline-flex md:w-auto"
+                >
+                    <template #icon>
+                        <IconPlus />
+                    </template>
+                    Add User
+                </a-button>
 
-                    <a-button
-                        v-if="hasPermission('users.hierarchy')"
-                        @click="router.visit(getRoute('users.hierarchy'))"
-                        type="default"
-                        class="bg-white border flex items-center border-purple-500 text-purple-500"
-                    >
-                        <template #icon>
-                            <IconHierarchy />
-                        </template>
-                        User Hierarchy
-                    </a-button>
+                <a-button
+                    v-if="hasPermission('users.hierarchy')"
+                    @click="router.visit(getRoute('users.hierarchy'))"
+                    type="default"
+                    class="flex w-full items-center justify-center border border-purple-500 bg-white text-purple-500 md:inline-flex md:w-auto"
+                >
+                    <template #icon>
+                        <IconHierarchy />
+                    </template>
+                    User Hierarchy
+                </a-button>
 
-                    <FilterDropdown
-                        v-model="filters"
-                        :filters="filtersConfig"
-                    />
-                </div>
+                <FilterDropdown
+                    v-model="filters"
+                    :filters="filtersConfig"
+                />
             </template>
 
             <!-- Active Filters -->

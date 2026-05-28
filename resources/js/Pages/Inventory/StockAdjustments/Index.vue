@@ -143,41 +143,32 @@ const showAdjustmentDetails = (adjustment) => {
   <Head title="Stock Adjustments" />
 
   <AuthenticatedLayout>
-    <ContentHeader title="Stock Adjustments">
-      <template #actions>
-        <a-button @click="exportAdjustments" style="margin-right: 8px">
-          <template #icon>
-            <DownloadOutlined />
-          </template>
-          Export
-        </a-button>
-        
-        <a-button type="primary" @click="createAdjustment" style="margin-right: 8px">
-          <template #icon>
-            <PlusSquareOutlined />
-          </template>
-          New Adjustment
-        </a-button>
-        
-        <RefreshButton @click="getItems" />
-      </template>
+    <ContentHeader class="mb-4 md:mb-8" title="Stock Adjustments">
+      <template #actions> </template>
     </ContentHeader>
 
-    <ContentLayout title="Stock Adjustments">
+    <ContentLayout
+      title="Stock Adjustments"
+      filter-class="flex flex-wrap items-center justify-end gap-2 w-full min-w-0"
+    >
       <template #filters>
         <RefreshButton :loading="spinning" @click="getItems" />
         <a-input-search
           v-model:value="search"
           placeholder="Search adjustments, reasons, or notes..."
-          class="min-w-[100px] max-w-[300px]"
+          class="w-full min-w-0 md:max-w-[300px]"
         />
-        <a-button class="bg-white border flex items-center border-green-500 text-green-500" type="primary" @click="createAdjustment">
+        <a-button
+          class="flex w-full items-center justify-center border border-green-500 bg-white text-green-500 md:inline-flex md:w-auto"
+          type="primary"
+          @click="createAdjustment"
+        >
           <template #icon>
             <PlusSquareOutlined />
           </template>
           New Adjustment
         </a-button>
-        <a-button @click="exportAdjustments">
+        <a-button class="w-full md:w-auto" @click="exportAdjustments">
           <template #icon>
             <DownloadOutlined />
           </template>

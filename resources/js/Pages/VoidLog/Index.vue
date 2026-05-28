@@ -91,15 +91,17 @@ const { pagination, handleTableChange } = useTable("items", tableFilters);
 <template>
   <AuthenticatedLayout>
     <Head title="Void Logs" />
-    <ContentHeader class="mb-8" title="Void Logs" />
-    <ContentLayout title="Void Logs">
+    <ContentHeader class="mb-4 md:mb-8" title="Void Logs" />
+    <ContentLayout
+      title="Void Logs"
+      filter-class="flex flex-wrap items-center justify-end gap-2 w-full min-w-0"
+    >
       <template #filters>
         <refresh-button :loading="spinning" @click="getItems" />
         <a-input-search
           v-model:value="search"
           placeholder="Input search text"
-          style="width: 100%"
-          class="min-w-[100px] max-w-[300px]"
+          class="w-full min-w-0 md:max-w-[300px]"
         />
         <FilterDropdown v-model="filters" :filters="filtersConfig" />
       </template>

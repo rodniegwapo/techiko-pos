@@ -1,5 +1,6 @@
 <template>
   <a-table
+    v-if="isMdUp"
     class="ant-table-striped"
     :columns="columns"
     :data-source="customers"
@@ -93,17 +94,127 @@
       </template>
     </template>
   </a-table>
+
+  <div v-else class="px-2 py-2 md:px-0">
+    <a-spin :spinning="loading">
+      <div
+        v-if="!customers?.length"
+        class="py-12 text-center text-sm text-gray-500"
+      >
+        No customers found.
+      </div>
+      <div v-else class="flex flex-col gap-3">
+        <div
+          v-for="record in customers"
+          :key="record.id"
+          class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm"
+        >
+          <div class="flex gap-3 px-4 py-3">
+            <a-avatar
+              class="shrink-0"
+              :style="{ backgroundColor: getAvatarColor(record.name) }"
+            >
+              {{ getInitials(record.name) }}
+            </a-avatar>
+            <div class="min-w-0 flex-1">
+              <div class="truncate text-base font-semibold text-gray-900">
+                {{ record.name }}
+              </div>
+              <div class="mt-1 flex flex-wrap gap-1">
+                <a-tag
+                  v-if="record.loyalty_points !== null"
+                  class="m-0 capitalize"
+                  :color="getTierTagColor(record.tier)"
+                >
+                  {{ record.tier || 'Bronze' }}
+                </a-tag>
+                <a-tag
+                  v-if="record.loyalty_points !== null"
+                  class="m-0"
+                  color="blue"
+                >
+                  {{ record.loyalty_points?.toLocaleString() || 0 }} pts
+                </a-tag>
+                <a-tag v-else class="m-0" color="default">
+                  Not enrolled
+                </a-tag>
+              </div>
+            </div>
+          </div>
+
+          <div class="mx-4 mb-3 rounded-lg bg-gray-50 p-3">
+            <div class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-sm">
+              <span class="text-gray-500">Email</span>
+              <span class="truncate text-right font-medium text-gray-900">
+                {{ record.email || 'N/A' }}
+              </span>
+              <span class="text-gray-500">Phone</span>
+              <span class="text-right font-medium text-gray-900">
+                {{ record.phone || 'N/A' }}
+              </span>
+              <template v-if="showSuperUserDomain">
+                <span class="text-gray-500">Domain</span>
+                <span
+                  class="flex min-w-0 items-center justify-end gap-1 truncate font-medium text-gray-900"
+                >
+                  <IconWorld size="16" class="shrink-0" />
+                  {{ record.domain || 'N/A' }}
+                </span>
+              </template>
+            </div>
+          </div>
+
+          <div class="border-t border-gray-100 px-4 py-3">
+            <div class="grid grid-cols-2 gap-2">
+              <a-button
+                class="flex items-center justify-center gap-2"
+                @click="$emit('view', record)"
+              >
+                <template #icon>
+                  <IconEye size="18" />
+                </template>
+                View
+              </a-button>
+              <a-button
+                class="flex items-center justify-center gap-2"
+                @click="$emit('edit', record)"
+              >
+                <template #icon>
+                  <IconEdit size="18" />
+                </template>
+                Edit
+              </a-button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <a-pagination
+        v-if="
+          pagination?.total &&
+          pagination.total > (pagination.pageSize ?? 10)
+        "
+        class="mt-4 justify-center pt-2"
+        show-less-items
+        :current="pagination.current"
+        :page-size="pagination.pageSize"
+        :total="pagination.total"
+        :show-size-changer="false"
+        @change="onMobilePaginationChange"
+      />
+    </a-spin>
+  </div>
 </template>
 
 <script setup>
 import { computed } from "vue";
 import { usePage } from "@inertiajs/vue3";
+import { useMediaQuery } from "@vueuse/core";
 import { IconEye, IconEdit, IconWorld } from "@tabler/icons-vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 
 const page = usePage();
+const isMdUp = useMediaQuery("(min-width: 768px)");
 
-// Props
 const props = defineProps({
   customers: {
     type: Array,
@@ -123,10 +234,12 @@ const props = defineProps({
   },
 });
 
-// Emits
 const emit = defineEmits(['change', 'edit', 'view']);
 
-// Table columns
+const showSuperUserDomain = computed(
+  () => page.props.auth?.user?.data?.is_super_user && props.isGlobalView,
+);
+
 const columns = computed(() => {
   const baseColumns = [
     {
@@ -161,8 +274,7 @@ const columns = computed(() => {
     },
   ];
 
-  // Add domain column for super users only in global view
-  if (page.props.auth?.user?.data?.is_super_user && props.isGlobalView) {
+  if (showSuperUserDomain.value) {
     baseColumns.splice(2, 0, {
       title: "Domain",
       dataIndex: "domain",
@@ -182,10 +294,16 @@ const columns = computed(() => {
   return baseColumns;
 });
 
-// Methods
 const handleChange = (pagination, filters, sorter) => {
   emit('change', pagination, filters, sorter);
 };
+
+function onMobilePaginationChange(pageNum) {
+  emit('change', {
+    current: pageNum,
+    pageSize: props.pagination?.pageSize ?? 10,
+  });
+}
 
 const getInitials = (name) => {
   if (!name) return "?";
@@ -215,6 +333,16 @@ const getTierColor = (tier) => {
     platinum: "#E5E4E2",
   };
   return tierColors[tier] || tierColors.bronze;
+};
+
+const getTierTagColor = (tier) => {
+  const tagColors = {
+    bronze: "orange",
+    silver: "default",
+    gold: "gold",
+    platinum: "purple",
+  };
+  return tagColors[tier] || "orange";
 };
 
 const formatDate = (date) => {
