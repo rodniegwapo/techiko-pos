@@ -550,26 +550,6 @@ watch(
             :loading="storeLoading"
           >
             <a-select-option
-              v-for="location in locations"
-              :key="location.id"
-              :value="location.id"
-            >
-              {{ location.name }}
-            </a-select-option>
-          </a-select>
-        </div>
-
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">
-            To Location *
-          </label>
-          <a-select
-            v-model:value="form.to_location_id"
-            placeholder="Select destination location"
-            class="w-full"
-            :disabled="loading"
-          >
-            <a-select-option
               v-for="location in availableToLocations"
               :key="location.id"
               :value="location.id"
