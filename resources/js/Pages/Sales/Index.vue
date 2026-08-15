@@ -1407,7 +1407,7 @@ watch(
                         v-model:value="search"
                         placeholder="Search menu..."
                         allow-clear
-                        class="min-w-[140px] max-w-[320px]"
+                        class="cs-menu-search min-w-[140px] max-w-[320px]"
                     />
                     <a-input-search
                         v-else
