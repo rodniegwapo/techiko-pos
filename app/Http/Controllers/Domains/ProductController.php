@@ -15,6 +15,7 @@ use App\Models\SharedProductSuggestion;
 use App\Services\DomainSubscriptionService;
 use App\Services\InventoryService;
 use App\Support\BarcodeNormalizer;
+use App\Support\ProductImageStorage;
 use App\Support\ProductPayloadNormalizer;
 use App\Traits\LocationCategoryScoping;
 use Illuminate\Database\Eloquent\Builder;
@@ -71,6 +72,12 @@ class ProductController extends Controller
 
             'representation_type' => ['nullable', 'string', 'in:image,color,text'],
             'representation' => ['nullable', 'string'],
+            'representation_image' => [
+                'nullable',
+                'image',
+                'mimes:jpeg,jpg,png,webp,gif',
+                'max:2048',
+            ],
 
             'track_inventory' => ['boolean'],
             'reorder_level' => ['nullable', 'numeric', 'min:0'],
@@ -83,6 +90,7 @@ class ProductController extends Controller
             'sold_type' => 'sold type',
             'category_id' => 'category',
             'location_id' => 'location',
+            'representation_image' => 'product image',
         ]);
 
         if (array_key_exists('category_id', $validated) && $validated['category_id'] === '') {
@@ -97,6 +105,9 @@ class ProductController extends Controller
         } else {
             $validated['barcode'] = $validated['barcode'] ?? '';
         }
+
+        // Request-only fields — not columns on products
+        unset($validated['location_id'], $validated['representation_image']);
 
         return $validated;
     }
@@ -154,6 +165,7 @@ class ProductController extends Controller
         }
 
         $query = Product::where('domain', $domain->name_slug)
+            ->where('name', $request->input('name'))
             ->whereHas('activeLocations', function ($q) use ($request) {
                 $q->where('location_id', $request->input('location_id'));
             });
@@ -351,6 +363,11 @@ class ProductController extends Controller
         $validated = ProductPayloadNormalizer::applyRepresentationAndCostDefaults(
             $this->validatedData($request, null, $domain),
         );
+        $validated = ProductPayloadNormalizer::applyUploadedRepresentationImage(
+            $request,
+            $validated,
+            $domain?->name_slug,
+        );
 
         if ($domain) {
             $validated['domain'] = $domain->name_slug;
@@ -385,6 +402,11 @@ class ProductController extends Controller
         $this->validateProductUniqueness($request, $product, $domain);
         $validated = ProductPayloadNormalizer::applyRepresentationAndCostDefaults(
             $this->validatedData($request, $product, $domain),
+        );
+        $validated = ProductPayloadNormalizer::applyUploadedRepresentationImage(
+            $request,
+            $validated,
+            $domain->name_slug,
         );
         $product->update($validated);
         $product->refresh();
@@ -451,7 +473,13 @@ class ProductController extends Controller
             : Category::where('domain', $domain->name_slug);
 
         return Inertia::render('Products/Edit', [
-            'product' => $product,
+            'product' => [
+                ...$product->toArray(),
+                'representation_display_url' => ProductImageStorage::displayUrl(
+                    $product->representation,
+                    $product->representation_type,
+                ),
+            ],
             'categories' => $categoriesQuery->get(),
             'sold_by_types' => ProductSoldType::all(),
             'isGlobalView' => false,

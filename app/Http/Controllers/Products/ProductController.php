@@ -10,6 +10,7 @@ use App\Models\Product\Product;
 use App\Models\Product\ProductSoldType;
 use App\Services\DomainSubscriptionService;
 use App\Support\BarcodeNormalizer;
+use App\Support\ProductImageStorage;
 use App\Support\ProductPayloadNormalizer;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -67,7 +68,13 @@ class ProductController extends Controller
     public function edit(Request $request, Product $product)
     {
         return inertia('Products/Edit', [
-            'product' => $product,
+            'product' => [
+                ...$product->toArray(),
+                'representation_display_url' => ProductImageStorage::displayUrl(
+                    $product->representation,
+                    $product->representation_type,
+                ),
+            ],
             'categories' => Category::query()
                 ->when($product->domain, fn ($q) => $q->where('domain', $product->domain))
                 ->orderBy('name')
@@ -82,6 +89,11 @@ class ProductController extends Controller
     public function store(Request $request)
     {
         $data = ProductPayloadNormalizer::applyRepresentationAndCostDefaults($this->validatedData($request, null));
+        $data = ProductPayloadNormalizer::applyUploadedRepresentationImage(
+            $request,
+            $data,
+            $data['domain'] ?? null,
+        );
 
         $domainModel = isset($data['domain'])
             ? Domain::where('name_slug', $data['domain'])->first()
@@ -99,6 +111,11 @@ class ProductController extends Controller
     public function update(Request $request, Product $product)
     {
         $data = ProductPayloadNormalizer::applyRepresentationAndCostDefaults($this->validatedData($request, $product));
+        $data = ProductPayloadNormalizer::applyUploadedRepresentationImage(
+            $request,
+            $data,
+            $product->domain ?? ($data['domain'] ?? null),
+        );
 
         $product->update($data);
 
@@ -135,6 +152,12 @@ class ProductController extends Controller
             'barcode' => $barcodeRules,
             'representation_type' => ['nullable', 'string', 'in:image,color,text'],
             'representation' => ['nullable', 'string'],
+            'representation_image' => [
+                'nullable',
+                'image',
+                'mimes:jpeg,jpg,png,webp,gif',
+                'max:2048',
+            ],
             'category_id' => ['nullable', 'exists:categories,id'],
         ];
 
@@ -142,7 +165,9 @@ class ProductController extends Controller
             $rules['domain'] = ['required', 'string', 'exists:domains,name_slug'];
         }
 
-        $data = $request->validate($rules);
+        $data = $request->validate($rules, [], [
+            'representation_image' => 'product image',
+        ]);
 
         if (array_key_exists('category_id', $data) && $data['category_id'] === '') {
             $data['category_id'] = null;
@@ -154,6 +179,8 @@ class ProductController extends Controller
         if (! empty($data['barcode'])) {
             $data['barcode'] = BarcodeNormalizer::normalize($data['barcode']);
         }
+
+        unset($data['representation_image']);
 
         return $data;
     }

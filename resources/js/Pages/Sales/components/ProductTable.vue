@@ -5,6 +5,7 @@ import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { notifyInsufficientStock } from "@/Composables/useCartStockNotification";
 import { usePage } from "@inertiajs/vue3";
 import axios from "axios";
+import ProductMedia from "@/Components/ProductMedia.vue";
 
 const props = defineProps({
     products: {
@@ -44,6 +45,11 @@ const props = defineProps({
         default: "desktop",
         validator: (value) => ["desktop", "mobile"].includes(value),
     },
+    variant: {
+        type: String,
+        default: "classic",
+        validator: (value) => ["classic", "coffeeshop"].includes(value),
+    },
 });
 
 const { getRoute } = useDomainRoutes();
@@ -60,10 +66,25 @@ const online = computed(() =>
         : salesCartIsOnlineInject.value,
 );
 
+const isCoffeeshop = computed(() => props.variant === "coffeeshop");
+
 const emit = defineEmits(["cart-updated", "offline-add-product", "load-more"]);
+
+function isOutOfStock(product) {
+    if (!product?.track_inventory) return false;
+    if (
+        product.location_quantity_available === null ||
+        product.location_quantity_available === undefined
+    ) {
+        return false;
+    }
+    return Number(product.location_quantity_available) <= 0;
+}
 
 const addingItem = ref(false);
 const addToCart = async (product) => {
+    if (isOutOfStock(product)) return;
+
     try {
         addingItem.value = true;
         if (!online.value) {
@@ -98,19 +119,88 @@ const formattedTotal = (price) => {
 
 <template>
     <div
-        class="flex flex-col min-h-0"
+        class="flex min-h-0 flex-col"
         :class="
             layout === 'mobile'
                 ? 'h-[calc(100dvh-12rem)]'
-                : 'h-[calc(100vh-430px)]'
+                : isCoffeeshop
+                  ? 'h-full min-h-0 flex-1'
+                  : 'h-[calc(100vh-430px)]'
         "
     >
-        <div class="overflow-y-auto overflow-x-hidden flex-1 min-h-0 relative">
+        <div class="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
             <a-spin
                 v-if="props.loading"
                 class="-rotate-45 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
                 size="large"
             />
+
+            <!-- Coffeeshop image-first tiles -->
+            <div
+                v-else-if="products.length && isCoffeeshop"
+                class="mt-1 grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))] md:[grid-template-columns:repeat(auto-fill,minmax(180px,1fr))]"
+            >
+                <button
+                    v-for="product in products"
+                    :key="product.id"
+                    type="button"
+                    class="group relative flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white text-left shadow-sm transition hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#287e47] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:shadow-sm"
+                    :class="isOutOfStock(product) ? 'opacity-60' : ''"
+                    :disabled="addingItem || isOutOfStock(product)"
+                    @click="addToCart(product)"
+                >
+                    <div class="relative">
+                        <ProductMedia
+                            class="aspect-[5/4] w-full rounded-none bg-gray-100"
+                            :representation-type="product.representation_type"
+                            :representation="product.representation"
+                            :name="product.name"
+                        />
+                        <span
+                            v-if="isOutOfStock(product)"
+                            class="absolute left-2 top-2 rounded bg-gray-900/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white"
+                        >
+                            Out of stock
+                        </span>
+                    </div>
+                    <div class="flex flex-1 flex-col gap-1 px-3.5 pb-3.5 pt-3">
+                        <div class="flex items-start justify-between gap-2">
+                            <div
+                                class="line-clamp-2 text-[15px] font-semibold leading-snug text-gray-900"
+                            >
+                                {{ product.name }}
+                            </div>
+                            <div
+                                class="shrink-0 text-sm font-semibold text-green-700"
+                            >
+                                {{ formattedTotal(product.price) }}
+                            </div>
+                        </div>
+                        <div
+                            class="truncate text-xs text-gray-500"
+                            v-if="product?.category?.name"
+                        >
+                            {{ product.category.name }}
+                        </div>
+                        <div
+                            class="mt-auto pt-2 text-sm font-medium transition"
+                            :class="
+                                isOutOfStock(product)
+                                    ? 'text-red-400'
+                                    : 'text-[#287e47] group-hover:text-[#1f6b3a]'
+                            "
+                        >
+                            {{
+                                isOutOfStock(product)
+                                    ? "Out of stock"
+                                    : "+ Add to order"
+                            }}
+                        </div>
+                    </div>
+                </button>
+            </div>
+
+            <!-- Classic text cards -->
             <div
                 v-else-if="products.length"
                 class="grid [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))] gap-4 mt-2"
@@ -118,10 +208,17 @@ const formattedTotal = (price) => {
                 <div
                     v-for="product in products"
                     :key="product.id"
-                    class="flex justify-between items-start border px-4 py-3 rounded-lg bg-white hover:shadow cursor-pointer"
+                    class="flex justify-between items-start border px-4 py-3 rounded-lg bg-white"
+                    :class="
+                        isOutOfStock(product)
+                            ? 'opacity-60 cursor-not-allowed'
+                            : 'hover:shadow cursor-pointer'
+                    "
                 >
                     <div>
-                        <div class="text-sm font-semibold">{{ product.name }}</div>
+                        <div class="text-sm font-semibold">
+                            {{ product.name }}
+                        </div>
                         <div
                             class="text-[10px] text-gray-400 w-fit mt-0.5"
                             v-if="product.SKU"
@@ -140,12 +237,22 @@ const formattedTotal = (price) => {
                         </div>
                         <a-button
                             type="primary"
-                            class="text-xs flex items-center p-0 mt-1 bg-transparent text-gray-800 border-none shadow-none"
+                            class="text-xs flex items-center p-0 mt-1 bg-transparent border-none shadow-none"
+                            :class="
+                                isOutOfStock(product)
+                                    ? 'text-red-600'
+                                    : 'text-gray-800'
+                            "
                             size="small"
                             @click="addToCart(product)"
-                            :disabled="addingItem"
+                            :disabled="addingItem || isOutOfStock(product)"
                         >
-                            <PlusSquareOutlined /> Add to Cart
+                            <PlusSquareOutlined v-if="!isOutOfStock(product)" />
+                            {{
+                                isOutOfStock(product)
+                                    ? "Out of stock"
+                                    : "Add to Cart"
+                            }}
                         </a-button>
                     </div>
                 </div>
@@ -154,8 +261,9 @@ const formattedTotal = (price) => {
                 v-else-if="!online"
                 class="flex items-center justify-center h-full min-h-[200px] text-center text-gray-500 text-sm px-6"
             >
-                No offline catalog loaded. While online, use &quot;Sync for offline&quot;
-                on Sales, or add items via barcode from a prior session.
+                No offline catalog loaded. While online, switch to Classic
+                layout and use Sync for offline, or add items via barcode from a
+                prior session.
             </div>
             <div
                 v-else
