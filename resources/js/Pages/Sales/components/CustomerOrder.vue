@@ -43,10 +43,7 @@ const { getRoute } = useDomainRoutes();
 const { checkCreditAvailability } = useCredit();
 const page = usePage();
 const domainSlug = computed(
-    () =>
-        page.props.domain?.name_slug ??
-        page.props.domain?.nameSlug ??
-        null
+    () => page.props.domain?.name_slug ?? page.props.domain?.nameSlug ?? null,
 );
 const creditInfo = ref(null);
 
@@ -844,367 +841,401 @@ defineExpose({
                   : ''
         "
     >
-    <!-- Coffeeshop collapsed strip -->
-    <div
-        v-if="isCoffeeshopLayout && orderCollapsed"
-        class="flex shrink-0 flex-col gap-2 rounded-xl border border-[var(--cs-border)] bg-[var(--cs-card)] px-3 py-3.5"
-    >
+        <!-- Coffeeshop collapsed strip -->
         <div
-            class="flex cursor-pointer flex-col gap-2"
-            role="button"
-            tabindex="0"
-            :aria-expanded="false"
-            aria-label="Expand current order"
-            @click="toggleOrderCollapsed"
-            @keydown="onOrderCollapsedKeydown"
+            v-if="isCoffeeshopLayout && orderCollapsed"
+            class="flex shrink-0 flex-col gap-2 rounded-xl border border-[var(--cs-border)] bg-[var(--cs-card)] px-3 py-3.5"
         >
-            <div class="flex items-center justify-between gap-1">
-                <span
-                    class="text-[10px] font-semibold tracking-[0.12em] text-[var(--cs-muted)]"
-                >
-                    NEW ORDER
-                </span>
-                <DownOutlined class="text-[var(--cs-muted)]" />
-            </div>
             <div
-                class="cs-display text-lg font-semibold leading-tight text-[var(--cs-ink)]"
+                class="flex cursor-pointer flex-col gap-2"
+                role="button"
+                tabindex="0"
+                :aria-expanded="false"
+                aria-label="Expand current order"
+                @click="toggleOrderCollapsed"
+                @keydown="onOrderCollapsedKeydown"
             >
-                {{ orderId ? `Order #${orderId}` : "Order" }}
-            </div>
-            <div class="text-xs text-[var(--cs-muted)]">
-                {{ saleItemCount }} item{{ saleItemCount === 1 ? "" : "s" }}
-            </div>
-            <div class="cs-display text-base font-semibold text-[var(--cs-ink)]">
-                {{ formattedTotal(grandTotalDisplay) }}
-            </div>
-        </div>
-        <a-button
-            type="primary"
-            size="small"
-            block
-            class="cs-charge-btn mt-1 rounded-full"
-            :disabled="saleItemCount === 0"
-            aria-label="Continue to checkout"
-            @click.stop="emit('charge-request')"
-        >
-            Charge {{ formattedTotal(grandTotalDisplay) }}
-        </a-button>
-    </div>
-
-    <template v-else>
-    <div
-        class="flex min-h-0 flex-1 flex-col overflow-hidden"
-        :class="!isCoffeeshopLayout && !isDrawerLayout ? 'contents' : ''"
-    >
-    <div
-        class="flex shrink-0 items-start justify-between gap-2"
-        :class="isCoffeeshopLayout ? 'flex-col items-stretch' : 'items-center'"
-    >
-        <div
-            v-if="isCoffeeshopLayout"
-            class="flex w-full cursor-pointer items-start justify-between gap-2"
-            role="button"
-            tabindex="0"
-            :aria-expanded="true"
-            aria-label="Collapse current order"
-            @click="toggleOrderCollapsed"
-            @keydown="onOrderCollapsedKeydown"
-        >
-            <div class="min-w-0">
-                <p
-                    class="mb-0.5 text-[10px] font-semibold tracking-[0.12em] text-[var(--cs-muted)]"
-                >
-                    NEW ORDER
-                </p>
-                <div
-                    class="cs-display text-2xl font-semibold leading-tight text-[var(--cs-ink)]"
-                >
-                    {{ orderId ? `Order #${orderId}` : "New order" }}
-                </div>
-                <div class="mt-0.5 text-xs text-[var(--cs-muted)]">
-                    {{ saleItemCount }} item{{ saleItemCount === 1 ? "" : "s" }}
-                    · {{ formattedTotal(grandTotalDisplay) }}
-                </div>
-            </div>
-            <UpOutlined class="mt-1 shrink-0 text-[var(--cs-muted)]" />
-        </div>
-        <div
-            v-else-if="!isDrawerLayout"
-            class="font-semibold text-lg"
-        >
-            Current Order
-        </div>
-        <span
-            v-else
-            class="text-sm font-medium text-gray-600"
-        >
-            Customer
-        </span>
-
-        <!-- Coffeeshop: segmented Walk-in / Loyal -->
-        <div
-            v-if="isCoffeeshopLayout"
-            class="mt-2 flex w-full rounded-full bg-gray-100 p-1"
-            @click.stop
-        >
-            <button
-                type="button"
-                class="flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition"
-                :class="
-                    !isLoyalCustomer
-                        ? 'bg-[#287e47] text-white shadow-sm'
-                        : 'text-gray-500'
-                "
-                @click="
-                    () => {
-                        if (isLoyalCustomer) {
-                            isLoyalCustomer = false;
-                            handleCustomerTypeChange(false);
-                        }
-                    }
-                "
-            >
-                Walk-in
-            </button>
-            <button
-                type="button"
-                class="flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition"
-                :class="
-                    isLoyalCustomer
-                        ? 'bg-[#287e47] text-white shadow-sm'
-                        : 'text-gray-500'
-                "
-                :disabled="!salesCartIsOnline"
-                @click="
-                    () => {
-                        if (!isLoyalCustomer) {
-                            isLoyalCustomer = true;
-                            handleCustomerTypeChange(true);
-                        }
-                    }
-                "
-            >
-                Loyal
-            </button>
-        </div>
-        <a-switch
-            v-else
-            v-model:checked="isLoyalCustomer"
-            checked-children="Loyal"
-            un-checked-children="Walk-in"
-            :disabled="!salesCartIsOnline"
-            @change="handleCustomerTypeChange"
-        />
-    </div>
-
-    <!-- Customer Search/Display -->
-    <div
-        :class="[
-            'mt-1 shrink-0',
-            isDrawerLayout && 'shrink-0',
-        ]"
-    >
-        <div v-if="isLoyalCustomer" class="space-y-2 max-h-52 overflow-y-auto">
-            <!-- Search Instructions -->
-            <div
-                v-if="!selectedCustomer && customerSearchQuery.length < 2"
-                class="text-xs text-gray-500 mb-1"
-            >
-                <template v-if="salesCartIsOnline">
-                    Type at least 2 characters to search for existing customers
-                </template>
-                <template v-else>
-                    Offline: search only customers saved with &quot;Sync for
-                    offline&quot;. Type 2+ characters.
-                </template>
-            </div>
-
-            <!-- Customer Search -->
-            <a-auto-complete
-                v-if="!selectedCustomer"
-                v-model:value="customerSearchQuery"
-                :options="customerOptions"
-                placeholder="Search customer by name, phone, or email (min 2 chars)"
-                :loading="searchingCustomers"
-                @search="handleCustomerSearch"
-                @select="handleCustomerSelect"
-                @clear="
-                    () => {
-                        customerOptions = [];
-                    }
-                "
-                allow-clear
-                class="w-full"
-                :filter-option="false"
-            >
-                <template #option="{ value, label, customer }">
-                    <div
-                        class="flex justify-between items-center py-2 px-1 hover:bg-gray-50 rounded transition-colors"
+                <div class="flex items-center justify-between gap-1">
+                    <span
+                        class="text-[10px] font-semibold tracking-[0.12em] text-[var(--cs-muted)]"
                     >
-                        <div class="flex-1">
-                            <div class="font-medium text-sm">
-                                {{ customer.name }}
-                            </div>
-                            <div class="text-xs text-gray-500">
-                                {{
-                                    customer.phone ||
-                                    customer.email ||
-                                    "No contact info"
-                                }}
-                            </div>
-                        </div>
-                        <div class="text-right ml-2">
-                            <div
-                                class="text-xs font-medium px-2 py-0.5 rounded-full text-white"
-                                :style="{
-                                    backgroundColor: customer.tier_info.color,
-                                }"
-                            >
-                                {{ customer.tier_info.name }}
-                            </div>
-                            <div class="text-xs text-purple-600 mt-0.5">
-                                {{
-                                    customer.loyalty_points?.toLocaleString() ||
-                                    0
-                                }}
-                                pts
-                            </div>
-                        </div>
-                    </div>
-                </template>
+                        NEW ORDER
+                    </span>
+                    <DownOutlined class="text-[var(--cs-muted)]" />
+                </div>
+                <div
+                    class="cs-display text-lg font-semibold leading-tight text-[var(--cs-ink)]"
+                >
+                    {{ orderId ? `Order #${orderId}` : "Order" }}
+                </div>
+                <div class="text-xs text-[var(--cs-muted)]">
+                    {{ saleItemCount }} item{{ saleItemCount === 1 ? "" : "s" }}
+                </div>
+                <div
+                    class="cs-display text-base font-semibold text-[var(--cs-ink)]"
+                >
+                    {{ formattedTotal(grandTotalDisplay) }}
+                </div>
+            </div>
+            <a-button
+                type="primary"
+                size="small"
+                block
+                class="cs-charge-btn mt-1 rounded-full"
+                :disabled="saleItemCount === 0"
+                aria-label="Continue to checkout"
+                @click.stop="emit('charge-request')"
+            >
+                Charge {{ formattedTotal(grandTotalDisplay) }}
+            </a-button>
+        </div>
 
-                <!-- Loading state -->
-                <template #notFoundContent v-if="searchingCustomers">
-                    <div class="text-center py-2 text-gray-500">
-                        <a-spin size="small" /> Searching...
-                    </div>
-                </template>
-
-                <!-- Empty state -->
-                <template
-                    #notFoundContent
-                    v-else-if="
-                        customerSearchQuery &&
-                        customerSearchQuery.length >= 2 &&
-                        customerOptions.length === 0
+        <template v-else>
+            <div
+                class="flex min-h-0 flex-1 flex-col overflow-hidden"
+                :class="
+                    !isCoffeeshopLayout && !isDrawerLayout ? 'contents' : ''
+                "
+            >
+                <div
+                    class="flex shrink-0 items-start justify-between gap-2"
+                    :class="
+                        isCoffeeshopLayout
+                            ? 'flex-col items-stretch'
+                            : 'items-center'
                     "
                 >
-                    <div class="text-center py-2 text-gray-500">
-                        No customers found.
-                        <a-button
-                            type="link"
-                            size="small"
-                            @click="showAddCustomerModal = true"
-                        >
-                            Add new customer
-                        </a-button>
-                    </div>
-                </template>
-            </a-auto-complete>
-
-            <!-- Selected Customer Card -->
-            <CustomerLoyaltyCard
-                v-if="selectedCustomer"
-                :customer="selectedCustomer"
-                :total-amount="totalAmount"
-                :show-points-preview="true"
-                @view-details="showCustomerDetails"
-                @clear-customer="clearCustomer"
-            />
-
-            <!-- Credit Information Card -->
-            <div
-                v-if="selectedCustomer && creditInfo?.creditEnabled"
-                class="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4"
-            >
-                <div class="flex items-center justify-between mb-2">
-                    <h4 class="font-semibold text-blue-900">
-                        Credit Information
-                    </h4>
-                    <a-tag v-if="creditInfo.overdueAmount > 0" color="error"
-                        >Overdue</a-tag
+                    <div
+                        v-if="isCoffeeshopLayout"
+                        class="flex w-full cursor-pointer items-start justify-between gap-2"
+                        role="button"
+                        tabindex="0"
+                        :aria-expanded="true"
+                        aria-label="Collapse current order"
+                        @click="toggleOrderCollapsed"
+                        @keydown="onOrderCollapsedKeydown"
                     >
-                    <a-tag v-else color="success">Good Standing</a-tag>
-                </div>
-                <div class="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                        <span class="text-gray-600">Credit Limit:</span>
-                        <span class="font-medium text-blue-700 ml-2">
-                            ₱{{
-                                (creditInfo.creditLimit || 0).toLocaleString(
-                                    "en-US",
-                                    {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                    },
-                                )
-                            }}
-                        </span>
+                        <div class="min-w-0">
+                            <p
+                                class="mb-0.5 text-[10px] font-semibold tracking-[0.12em] text-[var(--cs-muted)]"
+                            >
+                                NEW ORDER
+                            </p>
+                            <div
+                                class="cs-display text-2xl font-semibold leading-tight text-[var(--cs-ink)]"
+                            >
+                                {{
+                                    orderId ? `Order #${orderId}` : "New order"
+                                }}
+                            </div>
+                            <div class="mt-0.5 text-xs text-[var(--cs-muted)]">
+                                {{ saleItemCount }} item{{
+                                    saleItemCount === 1 ? "" : "s"
+                                }}
+                                · {{ formattedTotal(grandTotalDisplay) }}
+                            </div>
+                        </div>
+                        <UpOutlined
+                            class="mt-1 shrink-0 text-[var(--cs-muted)]"
+                        />
                     </div>
-                    <div>
-                        <span class="text-gray-600">Current Balance:</span>
-                        <span class="font-medium text-red-600 ml-2">
-                            ₱{{
-                                (creditInfo.creditBalance || 0).toLocaleString(
-                                    "en-US",
-                                    {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                    },
-                                )
-                            }}
-                        </span>
+                    <div
+                        v-else-if="!isDrawerLayout"
+                        class="font-semibold text-lg"
+                    >
+                        Current Order
                     </div>
-                    <div>
-                        <span class="text-gray-600">Available Credit:</span>
-                        <span class="font-medium text-green-600 ml-2">
-                            ₱{{
-                                (
-                                    creditInfo.availableCredit || 0
-                                ).toLocaleString("en-US", {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                })
-                            }}
-                        </span>
-                    </div>
-                    <div v-if="creditInfo.overdueAmount > 0">
-                        <span class="text-gray-600">Overdue:</span>
-                        <span class="font-medium text-red-600 ml-2">
-                            ₱{{
-                                creditInfo.overdueAmount.toLocaleString(
-                                    "en-US",
-                                    {
-                                        minimumFractionDigits: 2,
-                                        maximumFractionDigits: 2,
-                                    },
-                                )
-                            }}
-                        </span>
-                    </div>
-                </div>
-            </div>
+                    <span v-else class="text-sm font-medium text-gray-600">
+                        Customer
+                    </span>
 
-            <!-- Quick Add Customer -->
-            <div class="flex gap-2">
-                <a-button
-                    type="primary"
-                    size="small"
-                    :disabled="!salesCartIsOnline"
-                    @click="showAddCustomerModal = true"
-                >
-                    <div class="flex items-center gap-2">
-                        <plus-outlined />
-                        <span class="text-xs"> Add New Customer</span>
+                    <!-- Coffeeshop: segmented Walk-in / Loyal -->
+                    <div
+                        v-if="isCoffeeshopLayout"
+                        class="mt-2 flex w-full rounded-full bg-gray-100 p-1"
+                        @click.stop
+                    >
+                        <button
+                            type="button"
+                            class="flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition"
+                            :class="
+                                !isLoyalCustomer
+                                    ? 'bg-[#287e47] text-white shadow-sm'
+                                    : 'text-gray-500'
+                            "
+                            @click="
+                                () => {
+                                    if (isLoyalCustomer) {
+                                        isLoyalCustomer = false;
+                                        handleCustomerTypeChange(false);
+                                    }
+                                }
+                            "
+                        >
+                            Walk-in
+                        </button>
+                        <button
+                            type="button"
+                            class="flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition"
+                            :class="
+                                isLoyalCustomer
+                                    ? 'bg-[#287e47] text-white shadow-sm'
+                                    : 'text-gray-500'
+                            "
+                            :disabled="!salesCartIsOnline"
+                            @click="
+                                () => {
+                                    if (!isLoyalCustomer) {
+                                        isLoyalCustomer = true;
+                                        handleCustomerTypeChange(true);
+                                    }
+                                }
+                            "
+                        >
+                            Loyal
+                        </button>
                     </div>
-                </a-button>
-            </div>
-        </div>
+                    <a-switch
+                        v-else
+                        v-model:checked="isLoyalCustomer"
+                        checked-children="Loyal"
+                        un-checked-children="Walk-in"
+                        :disabled="!salesCartIsOnline"
+                        @change="handleCustomerTypeChange"
+                    />
+                </div>
 
-        <!-- Walk-in Customer Display -->
-        <a-input v-else value="Walk-in Customer" disabled />
-    </div>
-    <!-- <div class="mt-2">
+                <!-- Customer Search/Display -->
+                <div :class="['mt-1 shrink-0', isDrawerLayout && 'shrink-0']">
+                    <div
+                        v-if="isLoyalCustomer"
+                        class="space-y-2 max-h-52 overflow-y-auto"
+                    >
+                        <!-- Search Instructions -->
+                        <div
+                            v-if="
+                                !selectedCustomer &&
+                                customerSearchQuery.length < 2
+                            "
+                            class="text-xs text-gray-500 mb-1"
+                        >
+                            <template v-if="salesCartIsOnline">
+                                Type at least 2 characters to search for
+                                existing customers
+                            </template>
+                            <template v-else>
+                                Offline: search only customers saved with
+                                &quot;Sync for offline&quot;. Type 2+
+                                characters.
+                            </template>
+                        </div>
+
+                        <!-- Customer Search -->
+                        <a-auto-complete
+                            v-if="!selectedCustomer"
+                            v-model:value="customerSearchQuery"
+                            :options="customerOptions"
+                            placeholder="Search customer by name, phone, or email (min 2 chars)"
+                            :loading="searchingCustomers"
+                            @search="handleCustomerSearch"
+                            @select="handleCustomerSelect"
+                            @clear="
+                                () => {
+                                    customerOptions = [];
+                                }
+                            "
+                            allow-clear
+                            class="w-full"
+                            :filter-option="false"
+                        >
+                            <template #option="{ value, label, customer }">
+                                <div
+                                    class="flex justify-between items-center py-2 px-1 hover:bg-gray-50 rounded transition-colors"
+                                >
+                                    <div class="flex-1">
+                                        <div class="font-medium text-sm">
+                                            {{ customer.name }}
+                                        </div>
+                                        <div class="text-xs text-gray-500">
+                                            {{
+                                                customer.phone ||
+                                                customer.email ||
+                                                "No contact info"
+                                            }}
+                                        </div>
+                                    </div>
+                                    <div class="text-right ml-2">
+                                        <div
+                                            class="text-xs font-medium px-2 py-0.5 rounded-full text-white"
+                                            :style="{
+                                                backgroundColor:
+                                                    customer.tier_info.color,
+                                            }"
+                                        >
+                                            {{ customer.tier_info.name }}
+                                        </div>
+                                        <div
+                                            class="text-xs text-purple-600 mt-0.5"
+                                        >
+                                            {{
+                                                customer.loyalty_points?.toLocaleString() ||
+                                                0
+                                            }}
+                                            pts
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <!-- Loading state -->
+                            <template
+                                #notFoundContent
+                                v-if="searchingCustomers"
+                            >
+                                <div class="text-center py-2 text-gray-500">
+                                    <a-spin size="small" /> Searching...
+                                </div>
+                            </template>
+
+                            <!-- Empty state -->
+                            <template
+                                #notFoundContent
+                                v-else-if="
+                                    customerSearchQuery &&
+                                    customerSearchQuery.length >= 2 &&
+                                    customerOptions.length === 0
+                                "
+                            >
+                                <div class="text-center py-2 text-gray-500">
+                                    No customers found.
+                                    <a-button
+                                        type="link"
+                                        size="small"
+                                        @click="showAddCustomerModal = true"
+                                    >
+                                        Add new customer
+                                    </a-button>
+                                </div>
+                            </template>
+                        </a-auto-complete>
+
+                        <!-- Selected Customer Card -->
+                        <CustomerLoyaltyCard
+                            v-if="selectedCustomer"
+                            :customer="selectedCustomer"
+                            :total-amount="totalAmount"
+                            :show-points-preview="true"
+                            @view-details="showCustomerDetails"
+                            @clear-customer="clearCustomer"
+                        />
+
+                        <!-- Credit Information Card -->
+                        <div
+                            v-if="selectedCustomer && creditInfo?.creditEnabled"
+                            class="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4"
+                        >
+                            <div class="flex items-center justify-between mb-2">
+                                <h4 class="font-semibold text-blue-900">
+                                    Credit Information
+                                </h4>
+                                <a-tag
+                                    v-if="creditInfo.overdueAmount > 0"
+                                    color="error"
+                                    >Overdue</a-tag
+                                >
+                                <a-tag v-else color="success"
+                                    >Good Standing</a-tag
+                                >
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 text-sm">
+                                <div>
+                                    <span class="text-gray-600"
+                                        >Credit Limit:</span
+                                    >
+                                    <span
+                                        class="font-medium text-blue-700 ml-2"
+                                    >
+                                        ₱{{
+                                            (
+                                                creditInfo.creditLimit || 0
+                                            ).toLocaleString("en-US", {
+                                                minimumFractionDigits: 2,
+                                                maximumFractionDigits: 2,
+                                            })
+                                        }}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span class="text-gray-600"
+                                        >Current Balance:</span
+                                    >
+                                    <span class="font-medium text-red-600 ml-2">
+                                        ₱{{
+                                            (
+                                                creditInfo.creditBalance || 0
+                                            ).toLocaleString("en-US", {
+                                                minimumFractionDigits: 2,
+                                                maximumFractionDigits: 2,
+                                            })
+                                        }}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span class="text-gray-600"
+                                        >Available Credit:</span
+                                    >
+                                    <span
+                                        class="font-medium text-green-600 ml-2"
+                                    >
+                                        ₱{{
+                                            (
+                                                creditInfo.availableCredit || 0
+                                            ).toLocaleString("en-US", {
+                                                minimumFractionDigits: 2,
+                                                maximumFractionDigits: 2,
+                                            })
+                                        }}
+                                    </span>
+                                </div>
+                                <div v-if="creditInfo.overdueAmount > 0">
+                                    <span class="text-gray-600">Overdue:</span>
+                                    <span class="font-medium text-red-600 ml-2">
+                                        ₱{{
+                                            creditInfo.overdueAmount.toLocaleString(
+                                                "en-US",
+                                                {
+                                                    minimumFractionDigits: 2,
+                                                    maximumFractionDigits: 2,
+                                                },
+                                            )
+                                        }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Quick Add Customer -->
+                        <div class="flex gap-2">
+                            <a-button
+                                type="primary"
+                                size="small"
+                                :disabled="!salesCartIsOnline"
+                                @click="showAddCustomerModal = true"
+                            >
+                                <div class="flex items-center gap-2">
+                                    <plus-outlined />
+                                    <span class="text-xs">
+                                        Add New Customer</span
+                                    >
+                                </div>
+                            </a-button>
+                        </div>
+                    </div>
+
+                    <!-- Walk-in Customer Display -->
+                    <a-input v-else value="Walk-in Customer" disabled />
+                </div>
+                <!-- <div class="mt-2">
     <div class="font-semibold">Quick Discounts</div>
     <div class="flex items-center gap-2 mt-1">
       <div :class="cardClass">
@@ -1224,373 +1255,493 @@ defineExpose({
     </div>
   </div> -->
 
-    <div
-        :class="[
-            isDrawerLayout &&
-                'relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden',
-            isCoffeeshopLayout &&
-                'relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden',
-            !isDrawerLayout && !isCoffeeshopLayout && 'relative',
-        ]"
-    >
-        <!-- Flex shim: Transition alone may not behave as flex child in all cases -->
-        <div
-            :class="
-                isDrawerLayout || isCoffeeshopLayout
-                    ? 'flex min-h-0 flex-1 flex-col overflow-hidden'
-                    : ''
-            "
-        >
-        <!-- Transition wrapper -->
-        <Transition name="slide-x" mode="out-in">
-            <!-- 🟥 ORDER SUMMARY PAGE -->
-            <div
-                v-if="!showPayment"
-                key="order"
-                :class="
-                    isDrawerLayout || isCoffeeshopLayout
-                        ? 'flex min-h-0 flex-1 flex-col overflow-hidden'
-                        : ''
-                "
-            >
                 <div
-                    v-if="isDrawerLayout"
-                    class="mt-4 flex shrink-0 cursor-pointer items-center justify-between gap-2 rounded-t border border-b-0 border-gray-200 bg-gray-50 px-3 py-2"
-                    role="button"
-                    tabindex="0"
-                    :aria-expanded="drawerOrderItemsExpanded"
-                    :aria-controls="DRAWER_ORDER_LINES_ID"
-                    :aria-label="
-                        drawerOrderItemsExpanded
-                            ? 'Collapse current order'
-                            : 'Expand current order'
-                    "
-                    @click="toggleDrawerOrderItems"
-                    @keydown="onDrawerOrderItemsKeydown"
-                >
-                    <div class="min-w-0">
-                        <span class="text-sm font-semibold text-gray-700">
-                            Current order
-                        </span>
-                        <span class="ml-2 text-xs text-gray-500">
-                            <template v-if="!drawerOrderItemsExpanded">
-                                {{ saleItemCount }} item{{
-                                    saleItemCount === 1 ? "" : "s"
-                                }}
-                                · {{ formattedTotal(grandTotalDisplay) }}
-                            </template>
-                            <template v-else>
-                                {{ saleItemCount }} item{{
-                                    saleItemCount === 1 ? "" : "s"
-                                }}
-                                <template v-if="orders.length">
-                                    · {{ orders.length }} line{{
-                                        orders.length === 1 ? "" : "s"
-                                    }}
-                                </template>
-                            </template>
-                        </span>
-                    </div>
-                    <span class="shrink-0 text-gray-600">
-                        <UpOutlined v-if="drawerOrderItemsExpanded" />
-                        <DownOutlined v-else />
-                    </span>
-                </div>
-                <div
-                    v-show="!isDrawerLayout || drawerOrderItemsExpanded"
-                    :id="isDrawerLayout ? DRAWER_ORDER_LINES_ID : undefined"
                     :class="[
-                        'scrollable-orders relative flex flex-col gap-2 overflow-x-hidden transition-all duration-300',
-                        isDrawerLayout
-                            ? 'min-h-0 flex-1 overflow-y-auto border border-t-0 border-gray-200'
-                            : isCoffeeshopLayout
-                              ? 'mt-3 min-h-0 flex-1 overflow-y-auto'
-                              : 'mt-4 overflow-auto',
-                        !isDrawerLayout &&
-                            !isCoffeeshopLayout && {
-                                'h-[calc(100vh-430px)]': !isLoyalCustomer,
-                                'h-[calc(100vh-480px)]':
-                                    isLoyalCustomer && !selectedCustomer,
-                                'h-[calc(100vh-570px)]':
-                                    isLoyalCustomer &&
-                                    selectedCustomer &&
-                                    totalAmount <= 0,
-                                'h-[calc(100vh-540px)]':
-                                    isLoyalCustomer &&
-                                    selectedCustomer &&
-                                    totalAmount > 0,
-                            },
+                        isDrawerLayout &&
+                            'relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden',
+                        isCoffeeshopLayout &&
+                            'relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden',
+                        !isDrawerLayout && !isCoffeeshopLayout && 'relative',
                     ]"
                 >
+                    <!-- Flex shim: Transition alone may not behave as flex child in all cases -->
                     <div
-                        v-if="orders.length == 0"
-                        class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center"
                         :class="
-                            isCoffeeshopLayout
-                                ? 'cs-display text-2xl font-semibold text-[var(--cs-muted)] opacity-40'
-                                : 'rotate-[-45deg] text-[40px] font-bold uppercase text-gray-200'
+                            isDrawerLayout || isCoffeeshopLayout
+                                ? 'flex min-h-0 flex-1 flex-col overflow-hidden'
+                                : ''
                         "
                     >
-                        {{ isCoffeeshopLayout ? "No items yet" : "No Order" }}
-                    </div>
-
-                    <div v-else class="flex flex-col gap-2">
-                        <div
-                            v-for="(order, index) in orders"
-                            :key="index"
-                            class="relative flex cursor-pointer items-center justify-between"
-                            :class="
-                                isCoffeeshopLayout
-                                    ? 'gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2.5'
-                                    : 'rounded-lg border bg-white px-4 hover:shadow'
-                            "
-                            @click="handleShowProductDiscountModal(order)"
-                        >
-                            <ProductMedia
-                                v-if="isCoffeeshopLayout"
-                                class="h-11 w-11 shrink-0 rounded-lg"
-                                :representation-type="order.representation_type"
-                                :representation="order.representation"
-                                :name="order.name"
-                            />
+                        <!-- Transition wrapper -->
+                        <Transition name="slide-x" mode="out-in">
+                            <!-- 🟥 ORDER SUMMARY PAGE -->
                             <div
-                                class="flex min-w-0 flex-1 flex-col gap-1 py-1"
+                                v-if="!showPayment"
+                                key="order"
+                                :class="
+                                    isDrawerLayout || isCoffeeshopLayout
+                                        ? 'flex min-h-0 flex-1 flex-col overflow-hidden'
+                                        : ''
+                                "
                             >
                                 <div
-                                    class="text-sm font-semibold"
-                                    :class="
-                                        isCoffeeshopLayout
-                                            ? 'text-[var(--cs-ink)]'
-                                            : ''
+                                    v-if="isDrawerLayout"
+                                    class="mt-4 flex shrink-0 cursor-pointer items-center justify-between gap-2 rounded-t border border-b-0 border-gray-200 bg-gray-50 px-3 py-2"
+                                    role="button"
+                                    tabindex="0"
+                                    :aria-expanded="drawerOrderItemsExpanded"
+                                    :aria-controls="DRAWER_ORDER_LINES_ID"
+                                    :aria-label="
+                                        drawerOrderItemsExpanded
+                                            ? 'Collapse current order'
+                                            : 'Expand current order'
                                     "
+                                    @click="toggleDrawerOrderItems"
+                                    @keydown="onDrawerOrderItemsKeydown"
                                 >
-                                    {{ order.name }}
-                                </div>
-
-                                <div
-                                    class="flex items-center gap-2"
-                                    @click.stop
-                                >
-                                    <a-tooltip title="Remove item">
-                                        <a-button
-                                            type="text"
-                                            size="small"
-                                            :disabled="
-                                                loadingStates[order.id] ||
-                                                getDisplayQuantity(order) <= 0
-                                            "
-                                            @click.stop="onSubtractClick(order)"
-                                            class="quantity-button minus"
-                                        >
-                                            <template #icon>
-                                                <MinusSquareOutlined />
-                                            </template>
-                                        </a-button>
-                                    </a-tooltip>
-
-                                    <!-- Quantity Display with modal input -->
-                                    <div
-                                        class="quantity-display cursor-pointer"
-                                        @click="toggleQuantityEdit(order)"
-                                    >
+                                    <div class="min-w-0">
                                         <span
-                                            v-if="loadingStates[order.id]"
-                                            class="quantity-loading text-xs"
-                                        >
-                                            <a-spin size="small" />
-                                        </span>
-                                        <span
-                                            v-else
                                             class="text-sm font-semibold text-gray-700"
                                         >
-                                            {{ getDisplayQuantity(order) }}
+                                            Current order
+                                        </span>
+                                        <span
+                                            class="ml-2 text-xs text-gray-500"
+                                        >
+                                            <template
+                                                v-if="!drawerOrderItemsExpanded"
+                                            >
+                                                {{ saleItemCount }} item{{
+                                                    saleItemCount === 1
+                                                        ? ""
+                                                        : "s"
+                                                }}
+                                                ·
+                                                {{
+                                                    formattedTotal(
+                                                        grandTotalDisplay,
+                                                    )
+                                                }}
+                                            </template>
+                                            <template v-else>
+                                                {{ saleItemCount }} item{{
+                                                    saleItemCount === 1
+                                                        ? ""
+                                                        : "s"
+                                                }}
+                                                <template v-if="orders.length">
+                                                    · {{ orders.length }} line{{
+                                                        orders.length === 1
+                                                            ? ""
+                                                            : "s"
+                                                    }}
+                                                </template>
+                                            </template>
                                         </span>
                                     </div>
-
-                                    <a-tooltip title="Add item">
-                                        <a-button
-                                            type="text"
-                                            size="small"
-                                            :disabled="loadingStates[order.id]"
-                                            @click.stop="onAddClick(order)"
-                                            class="quantity-button plus"
-                                        >
-                                            <template #icon>
-                                                <PlusSquareOutlined />
-                                            </template>
-                                        </a-button>
-                                    </a-tooltip>
-                                </div>
-                                <div
-                                    v-if="!isCoffeeshopLayout"
-                                    class="text-[11px]"
-                                    @click.stop
-                                >
-                                    {{ order.price }} x
-                                    <span
-                                        v-if="loadingStates[order.id]"
-                                        class="animate-pulse bg-gray-200 rounded px-1"
-                                    >
-                                        ...
-                                    </span>
-                                    <span v-else>
-                                        {{ getDisplayQuantity(order) }}
+                                    <span class="shrink-0 text-gray-600">
+                                        <UpOutlined
+                                            v-if="drawerOrderItemsExpanded"
+                                        />
+                                        <DownOutlined v-else />
                                     </span>
                                 </div>
-                            </div>
-                            <div
-                                v-if="isCoffeeshopLayout"
-                                class="flex shrink-0 flex-col items-end gap-1"
-                            >
-                                <a-tooltip
-                                    v-if="salesCartIsOnline"
-                                    title="Remove item from order"
-                                >
-                                    <a-button
-                                        type="text"
-                                        size="small"
-                                        @click.stop="showVoidItem(order)"
-                                        class="h-auto border-0 p-1 text-[var(--cs-muted)] hover:text-red-600"
-                                    >
-                                        <template #icon>
-                                            <CloseOutlined />
-                                        </template>
-                                    </a-button>
-                                </a-tooltip>
                                 <div
-                                    class="cs-display text-sm font-semibold text-[var(--cs-ink)]"
-                                >
-                                    {{
-                                        formattedTotal(
-                                            (parseFloat(order.price) || 0) *
-                                                (getDisplayQuantity(order) ||
-                                                    0),
-                                        )
-                                    }}
-                                </div>
-                            </div>
-
-                            <div
-                                class="text-right flex flex-col py-1 items-end gap-1"
-                                :class="isCoffeeshopLayout ? 'hidden' : ''"
-                            >
-                                <template v-if="salesCartIsOnline">
-                                    <a-tooltip title="Remove item from order">
-                                        <a-button
-                                            type="text"
-                                            size="small"
-                                            @click.stop="showVoidItem(order)"
-                                            class="p-1 h-auto border-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                                        >
-                                            <template #icon>
-                                                <CloseOutlined />
-                                            </template>
-                                        </a-button>
-                                    </a-tooltip>
-                                </template>
-
-                                <div
-                                    class="text-xs"
-                                    v-if="
-                                        order.discount &&
-                                        parseFloat(order.discount) > 0
+                                    v-show="
+                                        !isDrawerLayout ||
+                                        drawerOrderItemsExpanded
                                     "
+                                    :id="
+                                        isDrawerLayout
+                                            ? DRAWER_ORDER_LINES_ID
+                                            : undefined
+                                    "
+                                    :class="[
+                                        'scrollable-orders relative flex flex-col gap-2 overflow-x-hidden transition-all duration-300',
+                                        isDrawerLayout
+                                            ? 'min-h-0 flex-1 overflow-y-auto border border-t-0 border-gray-200'
+                                            : isCoffeeshopLayout
+                                              ? 'mt-3 min-h-0 flex-1 overflow-y-auto'
+                                              : 'mt-4 overflow-auto',
+                                        !isDrawerLayout &&
+                                            !isCoffeeshopLayout && {
+                                                'h-[calc(100vh-430px)]':
+                                                    !isLoyalCustomer,
+                                                'h-[calc(100vh-480px)]':
+                                                    isLoyalCustomer &&
+                                                    !selectedCustomer,
+                                                'h-[calc(100vh-570px)]':
+                                                    isLoyalCustomer &&
+                                                    selectedCustomer &&
+                                                    totalAmount <= 0,
+                                                'h-[calc(100vh-540px)]':
+                                                    isLoyalCustomer &&
+                                                    selectedCustomer &&
+                                                    totalAmount > 0,
+                                            },
+                                    ]"
                                 >
                                     <div
-                                        class="text-gray-600 border-b px-2"
-                                        v-if="
-                                            order.discounts &&
-                                            order.discounts.length > 0 &&
-                                            (order.discounts[0].type ===
-                                                'percentage' ||
-                                                order.discounts[0].type ===
-                                                    'percent')
+                                        v-if="orders.length == 0"
+                                        class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center"
+                                        :class="
+                                            isCoffeeshopLayout
+                                                ? 'cs-display text-2xl font-semibold text-[var(--cs-muted)] opacity-40'
+                                                : 'rotate-[-45deg] text-[40px] font-bold uppercase text-gray-200'
                                         "
                                     >
-                                        Disc:
                                         {{
-                                            parseFloat(
-                                                order.discounts[0].value,
-                                            )
-                                        }}% -
-                                        {{
-                                            formattedTotal(
-                                                parseFloat(order.discount) || 0,
-                                            )
+                                            isCoffeeshopLayout
+                                                ? "No items yet"
+                                                : "No Order"
                                         }}
                                     </div>
-                                    <div
-                                        class="text-gray-600 border-b px-2"
-                                        v-else-if="
-                                            order.discounts &&
-                                            order.discounts.length > 0 &&
-                                            order.discounts[0].type === 'amount'
-                                        "
-                                    >
-                                        Disc: ₱{{
-                                            parseFloat(
-                                                order.discounts[0].value,
-                                            ).toFixed(2)
-                                        }}
-                                        -
-                                        {{
-                                            formattedTotal(
-                                                parseFloat(order.discount) || 0,
-                                            )
-                                        }}
-                                    </div>
-                                    <div
-                                        class="text-gray-600 border-b px-2"
-                                        v-else
-                                    >
-                                        Disc: -
-                                        {{
-                                            formattedTotal(
-                                                parseFloat(order.discount) || 0,
-                                            )
-                                        }}
-                                    </div>
-                                </div>
-                                <div
-                                    class="text-xs text-gray-600 line-through invisible"
-                                    v-else
-                                >
-                                    Discount
-                                </div>
 
-                                <div
-                                    class="text-md font-semibold text-green-700"
-                                    v-if="order.discount"
-                                >
-                                    {{
-                                        formattedTotal(
-                                            parseFloat(order.subtotal) || 0,
-                                        )
-                                    }}
-                                </div>
-                                <div
-                                    v-else
-                                    class="text-md font-semibold text-green-700"
-                                >
-                                    {{
-                                        formattedTotal(
-                                            (parseFloat(order.price) || 0) *
-                                                (parseFloat(order.quantity) ||
-                                                    0),
-                                        )
-                                    }}
+                                    <div v-else class="flex flex-col gap-2">
+                                        <div
+                                            v-for="(order, index) in orders"
+                                            :key="index"
+                                            class="relative flex cursor-pointer items-center justify-between"
+                                            :class="
+                                                isCoffeeshopLayout
+                                                    ? 'gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2.5'
+                                                    : 'rounded-lg border bg-white px-4 hover:shadow'
+                                            "
+                                            @click="
+                                                handleShowProductDiscountModal(
+                                                    order,
+                                                )
+                                            "
+                                        >
+                                            <ProductMedia
+                                                v-if="isCoffeeshopLayout"
+                                                class="h-11 w-11 shrink-0 rounded-lg"
+                                                :representation-type="
+                                                    order.representation_type
+                                                "
+                                                :representation="
+                                                    order.representation
+                                                "
+                                                :name="order.name"
+                                            />
+                                            <div
+                                                class="flex min-w-0 flex-1 flex-col gap-1 py-1"
+                                            >
+                                                <div
+                                                    class="text-sm font-semibold"
+                                                    :class="
+                                                        isCoffeeshopLayout
+                                                            ? 'text-[var(--cs-ink)]'
+                                                            : ''
+                                                    "
+                                                >
+                                                    {{ order.name }}
+                                                </div>
+
+                                                <div
+                                                    class="flex items-center gap-2"
+                                                    @click.stop
+                                                >
+                                                    <a-tooltip
+                                                        title="Remove item"
+                                                    >
+                                                        <a-button
+                                                            type="text"
+                                                            size="small"
+                                                            :disabled="
+                                                                loadingStates[
+                                                                    order.id
+                                                                ] ||
+                                                                getDisplayQuantity(
+                                                                    order,
+                                                                ) <= 0
+                                                            "
+                                                            @click.stop="
+                                                                onSubtractClick(
+                                                                    order,
+                                                                )
+                                                            "
+                                                            class="quantity-button minus"
+                                                        >
+                                                            <template #icon>
+                                                                <MinusSquareOutlined />
+                                                            </template>
+                                                        </a-button>
+                                                    </a-tooltip>
+
+                                                    <!-- Quantity Display with modal input -->
+                                                    <div
+                                                        class="quantity-display cursor-pointer"
+                                                        @click="
+                                                            toggleQuantityEdit(
+                                                                order,
+                                                            )
+                                                        "
+                                                    >
+                                                        <span
+                                                            v-if="
+                                                                loadingStates[
+                                                                    order.id
+                                                                ]
+                                                            "
+                                                            class="quantity-loading text-xs"
+                                                        >
+                                                            <a-spin
+                                                                size="small"
+                                                            />
+                                                        </span>
+                                                        <span
+                                                            v-else
+                                                            class="text-sm font-semibold text-gray-700"
+                                                        >
+                                                            {{
+                                                                getDisplayQuantity(
+                                                                    order,
+                                                                )
+                                                            }}
+                                                        </span>
+                                                    </div>
+
+                                                    <a-tooltip title="Add item">
+                                                        <a-button
+                                                            type="text"
+                                                            size="small"
+                                                            :disabled="
+                                                                loadingStates[
+                                                                    order.id
+                                                                ]
+                                                            "
+                                                            @click.stop="
+                                                                onAddClick(
+                                                                    order,
+                                                                )
+                                                            "
+                                                            class="quantity-button plus"
+                                                        >
+                                                            <template #icon>
+                                                                <PlusSquareOutlined />
+                                                            </template>
+                                                        </a-button>
+                                                    </a-tooltip>
+                                                </div>
+                                                <div
+                                                    v-if="!isCoffeeshopLayout"
+                                                    class="text-[11px]"
+                                                    @click.stop
+                                                >
+                                                    {{ order.price }} x
+                                                    <span
+                                                        v-if="
+                                                            loadingStates[
+                                                                order.id
+                                                            ]
+                                                        "
+                                                        class="animate-pulse bg-gray-200 rounded px-1"
+                                                    >
+                                                        ...
+                                                    </span>
+                                                    <span v-else>
+                                                        {{
+                                                            getDisplayQuantity(
+                                                                order,
+                                                            )
+                                                        }}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div
+                                                v-if="isCoffeeshopLayout"
+                                                class="flex shrink-0 flex-col items-end gap-1"
+                                            >
+                                                <a-tooltip
+                                                    v-if="salesCartIsOnline"
+                                                    title="Remove item from order"
+                                                >
+                                                    <a-button
+                                                        type="text"
+                                                        size="small"
+                                                        @click.stop="
+                                                            showVoidItem(order)
+                                                        "
+                                                        class="h-auto border-0 p-1 text-[var(--cs-muted)] hover:text-red-600"
+                                                    >
+                                                        <template #icon>
+                                                            <CloseOutlined />
+                                                        </template>
+                                                    </a-button>
+                                                </a-tooltip>
+                                                <div
+                                                    class="cs-display text-sm font-semibold text-[var(--cs-ink)]"
+                                                >
+                                                    {{
+                                                        formattedTotal(
+                                                            (parseFloat(
+                                                                order.price,
+                                                            ) || 0) *
+                                                                (getDisplayQuantity(
+                                                                    order,
+                                                                ) || 0),
+                                                        )
+                                                    }}
+                                                </div>
+                                            </div>
+
+                                            <div
+                                                class="text-right flex flex-col py-1 items-end gap-1"
+                                                :class="
+                                                    isCoffeeshopLayout
+                                                        ? 'hidden'
+                                                        : ''
+                                                "
+                                            >
+                                                <template
+                                                    v-if="salesCartIsOnline"
+                                                >
+                                                    <a-tooltip
+                                                        title="Remove item from order"
+                                                    >
+                                                        <a-button
+                                                            type="text"
+                                                            size="small"
+                                                            @click.stop="
+                                                                showVoidItem(
+                                                                    order,
+                                                                )
+                                                            "
+                                                            class="p-1 h-auto border-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                        >
+                                                            <template #icon>
+                                                                <CloseOutlined />
+                                                            </template>
+                                                        </a-button>
+                                                    </a-tooltip>
+                                                </template>
+
+                                                <div
+                                                    class="text-xs"
+                                                    v-if="
+                                                        order.discount &&
+                                                        parseFloat(
+                                                            order.discount,
+                                                        ) > 0
+                                                    "
+                                                >
+                                                    <div
+                                                        class="text-gray-600 border-b px-2"
+                                                        v-if="
+                                                            order.discounts &&
+                                                            order.discounts
+                                                                .length > 0 &&
+                                                            (order.discounts[0]
+                                                                .type ===
+                                                                'percentage' ||
+                                                                order
+                                                                    .discounts[0]
+                                                                    .type ===
+                                                                    'percent')
+                                                        "
+                                                    >
+                                                        Disc:
+                                                        {{
+                                                            parseFloat(
+                                                                order
+                                                                    .discounts[0]
+                                                                    .value,
+                                                            )
+                                                        }}% -
+                                                        {{
+                                                            formattedTotal(
+                                                                parseFloat(
+                                                                    order.discount,
+                                                                ) || 0,
+                                                            )
+                                                        }}
+                                                    </div>
+                                                    <div
+                                                        class="text-gray-600 border-b px-2"
+                                                        v-else-if="
+                                                            order.discounts &&
+                                                            order.discounts
+                                                                .length > 0 &&
+                                                            order.discounts[0]
+                                                                .type ===
+                                                                'amount'
+                                                        "
+                                                    >
+                                                        Disc: ₱{{
+                                                            parseFloat(
+                                                                order
+                                                                    .discounts[0]
+                                                                    .value,
+                                                            ).toFixed(2)
+                                                        }}
+                                                        -
+                                                        {{
+                                                            formattedTotal(
+                                                                parseFloat(
+                                                                    order.discount,
+                                                                ) || 0,
+                                                            )
+                                                        }}
+                                                    </div>
+                                                    <div
+                                                        class="text-gray-600 border-b px-2"
+                                                        v-else
+                                                    >
+                                                        Disc: -
+                                                        {{
+                                                            formattedTotal(
+                                                                parseFloat(
+                                                                    order.discount,
+                                                                ) || 0,
+                                                            )
+                                                        }}
+                                                    </div>
+                                                </div>
+                                                <div
+                                                    class="text-xs text-gray-600 line-through invisible"
+                                                    v-else
+                                                >
+                                                    Discount
+                                                </div>
+
+                                                <div
+                                                    class="text-md font-semibold text-green-700"
+                                                    v-if="order.discount"
+                                                >
+                                                    {{
+                                                        formattedTotal(
+                                                            parseFloat(
+                                                                order.subtotal,
+                                                            ) || 0,
+                                                        )
+                                                    }}
+                                                </div>
+                                                <div
+                                                    v-else
+                                                    class="text-md font-semibold text-green-700"
+                                                >
+                                                    {{
+                                                        formattedTotal(
+                                                            (parseFloat(
+                                                                order.price,
+                                                            ) || 0) *
+                                                                (parseFloat(
+                                                                    order.quantity,
+                                                                ) || 0),
+                                                        )
+                                                    }}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        </Transition>
                     </div>
                 </div>
             </div>
-        </Transition>
-        </div>
-    </div>
-
-    </div>
-    </template>
+        </template>
     </div>
 
     <void-product-modal

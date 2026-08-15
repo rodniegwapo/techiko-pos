@@ -1482,21 +1482,24 @@ watch(
                 </div>
             </template>
             <template #filters>
-                <a-input-search
+                <a-input
+                    v-if="isCoffeeshopLayout"
                     v-model:value="search"
-                    :placeholder="
-                        isCoffeeshopLayout
-                            ? 'Search menu...'
-                            : 'Search Product'
-                    "
-                    class="min-w-[100px] max-w-[300px]"
-                    :class="
-                        isCoffeeshopLayout
-                            ? '[&_.ant-input]:rounded-full [&_.ant-input-affix-wrapper]:rounded-full'
-                            : ''
-                    "
+                    placeholder="Search menu..."
+                    allow-clear
+                    class="min-w-[140px] max-w-[320px]"
                 />
-                <RefreshButton :loading="loading" @click="getProducts" />
+                <a-input-search
+                    v-else
+                    v-model:value="search"
+                    placeholder="Search Product"
+                    class="min-w-[100px] max-w-[300px]"
+                />
+                <RefreshButton
+                    v-if="!isCoffeeshopLayout"
+                    :loading="loading"
+                    @click="getProducts"
+                />
                 <a-button
                     v-if="!isCoffeeshopLayout"
                     type="default"
@@ -1510,7 +1513,11 @@ watch(
                     Sync for offline
                 </a-button>
 
-                <FilterDropdown v-model="filters" :filters="filtersConfig" />
+                <FilterDropdown
+                    v-if="!isCoffeeshopLayout"
+                    v-model="filters"
+                    :filters="filtersConfig"
+                />
             </template>
             <template #activeFilters>
                 <ActiveFilters
