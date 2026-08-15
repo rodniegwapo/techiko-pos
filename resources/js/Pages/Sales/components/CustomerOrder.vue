@@ -5,6 +5,7 @@ import ApplyProductDiscountModal from "./ApplyProductDiscountModal.vue";
 import ApplyOrderDiscountModal from "./ApplyOrderDiscountModal.vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import CustomerLoyaltyCard from "@/Components/Loyalty/CustomerLoyaltyCard.vue";
+import ProductMedia from "@/Components/ProductMedia.vue";
 import {
     ref,
     inject,
@@ -80,7 +81,13 @@ const props = defineProps({
     layout: {
         type: String,
         default: "sidebar",
-        validator: (value) => ["sidebar", "drawer"].includes(value),
+        validator: (value) =>
+            ["sidebar", "drawer", "coffeeshop"].includes(value),
+    },
+    /** Desktop coffeeshop: cart panel collapsed (controlled from Sales Index) */
+    orderCollapsed: {
+        type: Boolean,
+        default: false,
     },
     /** Server sale row (VAT / grand_total) when cart is online — used by drawer order summary */
     currentSale: { type: Object, default: null },
@@ -101,6 +108,7 @@ const {
 } = toRefs(props);
 
 const isDrawerLayout = computed(() => props.layout === "drawer");
+const isCoffeeshopLayout = computed(() => props.layout === "coffeeshop");
 const currentSale = computed(() => props.currentSale);
 
 const drawerOrderItemsExpanded = useStorage(
@@ -124,6 +132,21 @@ function onDrawerOrderItemsKeydown(event) {
     if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
         toggleDrawerOrderItems();
+    }
+}
+
+function setOrderCollapsed(collapsed) {
+    emit("update:orderCollapsed", collapsed);
+}
+
+function toggleOrderCollapsed() {
+    setOrderCollapsed(!props.orderCollapsed);
+}
+
+function onOrderCollapsedKeydown(event) {
+    if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        toggleOrderCollapsed();
     }
 }
 
@@ -773,6 +796,8 @@ const emit = defineEmits([
     "offline-cart-subtract",
     "offline-cart-set-qty",
     "offline-cart-remove",
+    "update:orderCollapsed",
+    "charge-request",
 ]);
 
 // Reset optimistic quantities when orders data changes (cart refresh)
@@ -814,12 +839,97 @@ defineExpose({
         :class="
             isDrawerLayout
                 ? 'flex h-full min-h-0 flex-col overflow-hidden px-3 pt-2'
-                : ''
+                : isCoffeeshopLayout
+                  ? 'flex h-full min-h-0 flex-col overflow-hidden'
+                  : ''
         "
     >
-    <div class="flex shrink-0 items-center justify-between">
+    <!-- Coffeeshop collapsed strip -->
+    <div
+        v-if="isCoffeeshopLayout && orderCollapsed"
+        class="flex shrink-0 flex-col gap-2 rounded-xl border border-[var(--cs-border)] bg-[var(--cs-card)] px-3 py-3.5"
+    >
         <div
-            v-if="!isDrawerLayout"
+            class="flex cursor-pointer flex-col gap-2"
+            role="button"
+            tabindex="0"
+            :aria-expanded="false"
+            aria-label="Expand current order"
+            @click="toggleOrderCollapsed"
+            @keydown="onOrderCollapsedKeydown"
+        >
+            <div class="flex items-center justify-between gap-1">
+                <span
+                    class="text-[10px] font-semibold tracking-[0.12em] text-[var(--cs-muted)]"
+                >
+                    NEW ORDER
+                </span>
+                <DownOutlined class="text-[var(--cs-muted)]" />
+            </div>
+            <div
+                class="cs-display text-lg font-semibold leading-tight text-[var(--cs-ink)]"
+            >
+                {{ orderId ? `Order #${orderId}` : "Order" }}
+            </div>
+            <div class="text-xs text-[var(--cs-muted)]">
+                {{ saleItemCount }} item{{ saleItemCount === 1 ? "" : "s" }}
+            </div>
+            <div class="cs-display text-base font-semibold text-[var(--cs-ink)]">
+                {{ formattedTotal(grandTotalDisplay) }}
+            </div>
+        </div>
+        <a-button
+            type="primary"
+            size="small"
+            block
+            class="cs-charge-btn mt-1 rounded-full"
+            :disabled="saleItemCount === 0"
+            aria-label="Continue to checkout"
+            @click.stop="emit('charge-request')"
+        >
+            Charge {{ formattedTotal(grandTotalDisplay) }}
+        </a-button>
+    </div>
+
+    <template v-else>
+    <div
+        class="flex min-h-0 flex-1 flex-col overflow-hidden"
+        :class="!isCoffeeshopLayout && !isDrawerLayout ? 'contents' : ''"
+    >
+    <div
+        class="flex shrink-0 items-start justify-between gap-2"
+        :class="isCoffeeshopLayout ? 'flex-col items-stretch' : 'items-center'"
+    >
+        <div
+            v-if="isCoffeeshopLayout"
+            class="flex w-full cursor-pointer items-start justify-between gap-2"
+            role="button"
+            tabindex="0"
+            :aria-expanded="true"
+            aria-label="Collapse current order"
+            @click="toggleOrderCollapsed"
+            @keydown="onOrderCollapsedKeydown"
+        >
+            <div class="min-w-0">
+                <p
+                    class="mb-0.5 text-[10px] font-semibold tracking-[0.12em] text-[var(--cs-muted)]"
+                >
+                    NEW ORDER
+                </p>
+                <div
+                    class="cs-display text-2xl font-semibold leading-tight text-[var(--cs-ink)]"
+                >
+                    {{ orderId ? `Order #${orderId}` : "New order" }}
+                </div>
+                <div class="mt-0.5 text-xs text-[var(--cs-muted)]">
+                    {{ saleItemCount }} item{{ saleItemCount === 1 ? "" : "s" }}
+                    · {{ formattedTotal(grandTotalDisplay) }}
+                </div>
+            </div>
+            <UpOutlined class="mt-1 shrink-0 text-[var(--cs-muted)]" />
+        </div>
+        <div
+            v-else-if="!isDrawerLayout"
             class="font-semibold text-lg"
         >
             Current Order
@@ -830,7 +940,55 @@ defineExpose({
         >
             Customer
         </span>
+
+        <!-- Coffeeshop: segmented Walk-in / Loyal -->
+        <div
+            v-if="isCoffeeshopLayout"
+            class="mt-2 flex w-full rounded-full bg-[#ebe4d8] p-1"
+            @click.stop
+        >
+            <button
+                type="button"
+                class="flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition"
+                :class="
+                    !isLoyalCustomer
+                        ? 'bg-[var(--cs-ink)] text-white shadow-sm'
+                        : 'text-[var(--cs-muted)]'
+                "
+                @click="
+                    () => {
+                        if (isLoyalCustomer) {
+                            isLoyalCustomer = false;
+                            handleCustomerTypeChange(false);
+                        }
+                    }
+                "
+            >
+                Walk-in
+            </button>
+            <button
+                type="button"
+                class="flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition"
+                :class="
+                    isLoyalCustomer
+                        ? 'bg-[var(--cs-ink)] text-white shadow-sm'
+                        : 'text-[var(--cs-muted)]'
+                "
+                :disabled="!salesCartIsOnline"
+                @click="
+                    () => {
+                        if (!isLoyalCustomer) {
+                            isLoyalCustomer = true;
+                            handleCustomerTypeChange(true);
+                        }
+                    }
+                "
+            >
+                Loyal
+            </button>
+        </div>
         <a-switch
+            v-else
             v-model:checked="isLoyalCustomer"
             checked-children="Loyal"
             un-checked-children="Walk-in"
@@ -840,7 +998,12 @@ defineExpose({
     </div>
 
     <!-- Customer Search/Display -->
-    <div :class="['mt-1', isDrawerLayout && 'shrink-0']">
+    <div
+        :class="[
+            'mt-1 shrink-0',
+            isDrawerLayout && 'shrink-0',
+        ]"
+    >
         <div v-if="isLoyalCustomer" class="space-y-2 max-h-52 overflow-y-auto">
             <!-- Search Instructions -->
             <div
@@ -1065,13 +1228,15 @@ defineExpose({
         :class="[
             isDrawerLayout &&
                 'relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden',
-            !isDrawerLayout && 'relative',
+            isCoffeeshopLayout &&
+                'relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden',
+            !isDrawerLayout && !isCoffeeshopLayout && 'relative',
         ]"
     >
         <!-- Flex shim: Transition alone may not behave as flex child in all cases -->
         <div
             :class="
-                isDrawerLayout
+                isDrawerLayout || isCoffeeshopLayout
                     ? 'flex min-h-0 flex-1 flex-col overflow-hidden'
                     : ''
             "
@@ -1083,7 +1248,7 @@ defineExpose({
                 v-if="!showPayment"
                 key="order"
                 :class="
-                    isDrawerLayout
+                    isDrawerLayout || isCoffeeshopLayout
                         ? 'flex min-h-0 flex-1 flex-col overflow-hidden'
                         : ''
                 "
@@ -1138,38 +1303,67 @@ defineExpose({
                         'scrollable-orders relative flex flex-col gap-2 overflow-x-hidden transition-all duration-300',
                         isDrawerLayout
                             ? 'min-h-0 flex-1 overflow-y-auto border border-t-0 border-gray-200'
-                            : 'mt-4 overflow-auto',
-                        !isDrawerLayout && {
-                                  'h-[calc(100vh-430px)]': !isLoyalCustomer,
-                                  'h-[calc(100vh-480px)]':
-                                      isLoyalCustomer && !selectedCustomer,
-                                  'h-[calc(100vh-570px)]':
-                                      isLoyalCustomer &&
-                                      selectedCustomer &&
-                                      totalAmount <= 0,
-                                  'h-[calc(100vh-540px)]':
-                                      isLoyalCustomer &&
-                                      selectedCustomer &&
-                                      totalAmount > 0,
-                              },
+                            : isCoffeeshopLayout
+                              ? 'mt-3 min-h-0 flex-1 overflow-y-auto'
+                              : 'mt-4 overflow-auto',
+                        !isDrawerLayout &&
+                            !isCoffeeshopLayout && {
+                                'h-[calc(100vh-430px)]': !isLoyalCustomer,
+                                'h-[calc(100vh-480px)]':
+                                    isLoyalCustomer && !selectedCustomer,
+                                'h-[calc(100vh-570px)]':
+                                    isLoyalCustomer &&
+                                    selectedCustomer &&
+                                    totalAmount <= 0,
+                                'h-[calc(100vh-540px)]':
+                                    isLoyalCustomer &&
+                                    selectedCustomer &&
+                                    totalAmount > 0,
+                            },
                     ]"
                 >
                     <div
                         v-if="orders.length == 0"
-                        class="text-[40px] text-nowrap uppercase font-bold text-gray-200 -rotate-45 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+                        class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center"
+                        :class="
+                            isCoffeeshopLayout
+                                ? 'cs-display text-2xl font-semibold text-[var(--cs-muted)] opacity-40'
+                                : 'rotate-[-45deg] text-[40px] font-bold uppercase text-gray-200'
+                        "
                     >
-                        No Order
+                        {{ isCoffeeshopLayout ? "No items yet" : "No Order" }}
                     </div>
 
                     <div v-else class="flex flex-col gap-2">
                         <div
                             v-for="(order, index) in orders"
                             :key="index"
-                            class="flex justify-between items-center border relative px-4 rounded-lg bg-white hover:shadow cursor-pointer"
+                            class="relative flex cursor-pointer items-center justify-between"
+                            :class="
+                                isCoffeeshopLayout
+                                    ? 'gap-3 rounded-xl border border-[var(--cs-border)] bg-[var(--cs-card)] px-3 py-2.5'
+                                    : 'rounded-lg border bg-white px-4 hover:shadow'
+                            "
                             @click="handleShowProductDiscountModal(order)"
                         >
-                            <div class="flex flex-col gap-1 py-1">
-                                <div class="text-sm font-semibold">
+                            <ProductMedia
+                                v-if="isCoffeeshopLayout"
+                                class="h-11 w-11 shrink-0 rounded-lg"
+                                :representation-type="order.representation_type"
+                                :representation="order.representation"
+                                :name="order.name"
+                            />
+                            <div
+                                class="flex min-w-0 flex-1 flex-col gap-1 py-1"
+                            >
+                                <div
+                                    class="text-sm font-semibold"
+                                    :class="
+                                        isCoffeeshopLayout
+                                            ? 'text-[var(--cs-ink)]'
+                                            : ''
+                                    "
+                                >
                                     {{ order.name }}
                                 </div>
 
@@ -1227,22 +1421,58 @@ defineExpose({
                                         </a-button>
                                     </a-tooltip>
                                 </div>
-                                <div class="text-[11px]" @click.stop>
+                                <div
+                                    v-if="!isCoffeeshopLayout"
+                                    class="text-[11px]"
+                                    @click.stop
+                                >
                                     {{ order.price }} x
                                     <span
                                         v-if="loadingStates[order.id]"
                                         class="animate-pulse bg-gray-200 rounded px-1"
                                     >
+                                        ...
+                                    </span>
+                                    <span v-else>
                                         {{ getDisplayQuantity(order) }}
                                     </span>
-                                    <span v-else>{{
-                                        getDisplayQuantity(order)
-                                    }}</span>
+                                </div>
+                            </div>
+                            <div
+                                v-if="isCoffeeshopLayout"
+                                class="flex shrink-0 flex-col items-end gap-1"
+                            >
+                                <a-tooltip
+                                    v-if="salesCartIsOnline"
+                                    title="Remove item from order"
+                                >
+                                    <a-button
+                                        type="text"
+                                        size="small"
+                                        @click.stop="showVoidItem(order)"
+                                        class="h-auto border-0 p-1 text-[var(--cs-muted)] hover:text-red-600"
+                                    >
+                                        <template #icon>
+                                            <CloseOutlined />
+                                        </template>
+                                    </a-button>
+                                </a-tooltip>
+                                <div
+                                    class="cs-display text-sm font-semibold text-[var(--cs-ink)]"
+                                >
+                                    {{
+                                        formattedTotal(
+                                            (parseFloat(order.price) || 0) *
+                                                (getDisplayQuantity(order) ||
+                                                    0),
+                                        )
+                                    }}
                                 </div>
                             </div>
 
                             <div
                                 class="text-right flex flex-col py-1 items-end gap-1"
+                                :class="isCoffeeshopLayout ? 'hidden' : ''"
                             >
                                 <template v-if="salesCartIsOnline">
                                     <a-tooltip title="Remove item from order">
@@ -1359,6 +1589,8 @@ defineExpose({
         </div>
     </div>
 
+    </div>
+    </template>
     </div>
 
     <void-product-modal

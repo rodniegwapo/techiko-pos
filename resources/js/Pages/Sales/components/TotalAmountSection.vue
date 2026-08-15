@@ -63,6 +63,10 @@ const props = defineProps({
         default: "footer",
         validator: (value) => ["footer", "compact"].includes(value),
     },
+    coffeeshopSkin: {
+        type: Boolean,
+        default: false,
+    },
 });
 
 const {
@@ -637,7 +641,7 @@ const creditLimitSufficient = computed(() => {
 </script>
 
 <template>
-    <div class="bg-white">
+    <div :class="coffeeshopSkin ? 'cs-footer-skin' : 'bg-white'">
         <div
             :class="
                 layout === 'compact'
