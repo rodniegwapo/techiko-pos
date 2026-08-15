@@ -1365,10 +1365,10 @@ watch(
                         <a-switch
                             v-model:checked="isCoffeeshopLayout"
                             size="small"
-                            aria-label="Switch between classic and coffeeshop layout"
+                            aria-label="Switch between classic and modern layout"
                         />
                         <span class="text-xs font-medium text-gray-400">
-                            Coffeeshop
+                            Modern
                         </span>
                     </div>
                 </template>
@@ -1407,7 +1407,7 @@ watch(
                         v-model:value="search"
                         placeholder="Search menu..."
                         allow-clear
-                        class="min-w-[140px] max-w-[320px]"
+                        class="cs-menu-search min-w-[140px] max-w-[320px]"
                     />
                     <a-input-search
                         v-else
@@ -1511,7 +1511,7 @@ watch(
                                 <a-switch
                                     v-model:checked="isCoffeeshopLayout"
                                     size="small"
-                                    aria-label="Switch between classic and coffeeshop layout"
+                                    aria-label="Switch between classic and modern layout"
                                 />
                                 <span
                                     class="text-xs font-medium"
@@ -1521,7 +1521,7 @@ watch(
                                             : 'text-gray-400'
                                     "
                                 >
-                                    Coffeeshop
+                                    Modern
                                 </span>
                             </div>
                         </div>
