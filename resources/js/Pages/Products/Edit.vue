@@ -13,7 +13,7 @@ import {
     validationMessage,
     validationSummaryNotice,
 } from "@/Composables/useValidationMessage.js";
-import { ArrowLeftOutlined, SaveOutlined } from "@ant-design/icons-vue";
+import { ArrowLeftOutlined, PlusOutlined, SaveOutlined } from "@ant-design/icons-vue";
 import { message } from "ant-design-vue";
 
 const page = usePage();
@@ -48,9 +48,77 @@ const form = useForm({
     SKU: props.product.SKU,
     barcode: props.product.barcode,
     sold_type: props.product.sold_type,
-    representation_type: props.product.representation_type,
+    representation_type: props.product.representation_type || "color",
     representation: props.product.representation,
+    representation_image: null,
 });
+
+const imageFileList = ref(
+    props.product.representation_type === "image" &&
+        (props.product.representation_display_url || props.product.representation)
+        ? [
+              {
+                  uid: "-1",
+                  name: "current-image",
+                  status: "done",
+                  url:
+                      props.product.representation_display_url ||
+                      props.product.representation,
+              },
+          ]
+        : [],
+);
+
+function beforeImageUpload(file) {
+    const raw = file?.originFileObj instanceof File ? file.originFileObj : file;
+    if (!(raw instanceof File)) {
+        message.error("Please choose a valid image file.");
+        return false;
+    }
+    form.representation_image = raw;
+    imageFileList.value = [
+        {
+            uid: String(file.uid || Date.now()),
+            name: raw.name,
+            status: "done",
+            url: URL.createObjectURL(raw),
+        },
+    ];
+    return false;
+}
+
+function onImageRemove() {
+    form.representation_image = null;
+    form.representation = "";
+    imageFileList.value = [];
+}
+
+function onRepresentationTypeChange(type) {
+    form.representation_type = type;
+    if (type === "color") {
+        onImageRemove();
+        form.representation = "";
+    } else if (
+        props.product.representation_type === "image" &&
+        props.product.representation
+    ) {
+        form.representation = props.product.representation;
+        form.representation_image = null;
+        imageFileList.value = [
+            {
+                uid: "-1",
+                name: "current-image",
+                status: "done",
+                url:
+                    props.product.representation_display_url ||
+                    props.product.representation,
+            },
+        ];
+    } else {
+        form.representation = "";
+        onImageRemove();
+    }
+}
 
 const domainSlug = computed(() => {
     if (props.isGlobalView) {
@@ -132,27 +200,48 @@ const representationHexColor = computed(() => {
 });
 
 const handleUpdate = () => {
-    form.put(
-        hrefWithPreservedLocationId(
-            getRoute("products.update", { product: props.product.id }),
-        ),
-        {
-            onSuccess: () => {
-                message.success("Product updated successfully");
+    form
+        .transform((data) => {
+            const payload = { ...data };
+            if (!(payload.representation_image instanceof File)) {
+                delete payload.representation_image;
+            }
+            if (payload.representation_type !== "image") {
+                delete payload.representation_image;
+            }
+            return payload;
+        })
+        .put(
+            hrefWithPreservedLocationId(
+                getRoute("products.update", { product: props.product.id }),
+            ),
+            {
+                forceFormData: true,
+                onSuccess: () => {
+                    message.success("Product updated successfully");
+                },
+                onError: (errs) => {
+                    const bag = errs || form.errors;
+                    const planMsg = bag?.plan;
+                    if (
+                        planMsg !== undefined &&
+                        planMsg !== null &&
+                        planMsg !== ""
+                    ) {
+                        message.error(
+                            Array.isArray(planMsg)
+                                ? planMsg[0]
+                                : planMsg || "Failed to update product",
+                        );
+                        return;
+                    }
+                    message.warning(validationSummaryNotice(bag));
+                },
+                onFinish: () => {
+                    form.transform((data) => data);
+                },
             },
-            onError: (errs) => {
-                const bag = errs || form.errors;
-                const planMsg = bag?.plan;
-                if (planMsg !== undefined && planMsg !== null && planMsg !== "") {
-                    message.error(
-                        Array.isArray(planMsg) ? planMsg[0] : planMsg || "Failed to update product",
-                    );
-                    return;
-                }
-                message.warning(validationSummaryNotice(bag));
-            },
-        },
-    );
+        );
 };
 
 useBarcodeScanner((code) => {
@@ -201,6 +290,15 @@ useBarcodeScanner((code) => {
                             "
                             class="h-8 w-8 shrink-0 rounded border border-gray-200"
                             :style="{ backgroundColor: representationHexColor }"
+                        />
+                        <img
+                            v-else-if="
+                                form.representation_type === 'image' &&
+                                imageFileList[0]?.url
+                            "
+                            :src="imageFileList[0].url"
+                            alt=""
+                            class="h-8 w-8 shrink-0 rounded border border-gray-200 object-cover"
                         />
                         <div class="min-w-0 flex-1">
                             <h2 class="text-lg font-semibold text-gray-900">
@@ -443,75 +541,126 @@ useBarcodeScanner((code) => {
                                 </a-radio-group>
                             </a-form-item>
 
-                            <div
-                                class="space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0"
+                            <a-form-item
+                                label="Display style"
+                                :validate-status="
+                                    validationHasError(
+                                        form.errors,
+                                        'representation_type',
+                                    )
+                                        ? 'error'
+                                        : ''
+                                "
+                                :help="
+                                    validationMessage(
+                                        form.errors,
+                                        'representation_type',
+                                    )
+                                "
+                                class="mb-0"
                             >
-                                <a-form-item
-                                    label="Representation Type"
-                                    :validate-status="
-                                        validationHasError(
-                                            form.errors,
-                                            'representation_type',
-                                        )
-                                            ? 'error'
-                                            : ''
-                                    "
-                                    :help="
-                                        validationMessage(
-                                            form.errors,
-                                            'representation_type',
-                                        )
-                                    "
-                                    class="mb-0"
+                                <a-radio-group
+                                    :value="form.representation_type"
+                                    size="large"
+                                    class="flex w-full flex-col gap-2 md:flex-row md:gap-4"
+                                    @update:value="onRepresentationTypeChange"
                                 >
-                                    <a-select
-                                        v-model:value="form.representation_type"
-                                        :options="[
-                                            { label: 'Color', value: 'color' },
-                                        ]"
-                                        placeholder="Select representation type"
-                                        size="large"
-                                    />
-                                </a-form-item>
-
-                                <a-form-item
-                                    label="Representation"
-                                    :validate-status="
-                                        validationHasError(
-                                            form.errors,
-                                            'representation',
-                                        )
-                                            ? 'error'
-                                            : ''
-                                    "
-                                    :help="
-                                        validationMessage(
-                                            form.errors,
-                                            'representation',
-                                        )
-                                    "
-                                    class="mb-0"
-                                >
-                                    <div
-                                        class="flex flex-col gap-2 md:flex-row md:items-center"
+                                    <a-radio
+                                        value="color"
+                                        class="!m-0 !flex !w-full !items-center rounded-md border border-gray-200 bg-white px-3 py-2.5 md:!w-auto"
                                     >
-                                        <a-input
-                                            v-model:value="form.representation"
-                                            placeholder="Enter representation (e.g., hex color code)"
-                                            size="large"
-                                            class="min-w-0 w-full flex-1"
-                                        />
-                                        <div
-                                            v-if="representationHexColor"
-                                            class="h-10 w-full shrink-0 rounded border border-gray-200 md:w-10"
-                                            :style="{
-                                                backgroundColor:
-                                                    representationHexColor,
-                                            }"
-                                        />
+                                        Color
+                                    </a-radio>
+                                    <a-radio
+                                        value="image"
+                                        class="!m-0 !flex !w-full !items-center rounded-md border border-gray-200 bg-white px-3 py-2.5 md:!w-auto"
+                                    >
+                                        Image
+                                    </a-radio>
+                                </a-radio-group>
+                            </a-form-item>
+
+                            <a-form-item
+                                v-if="form.representation_type === 'color'"
+                                label="Color (hex, optional)"
+                                :validate-status="
+                                    validationHasError(
+                                        form.errors,
+                                        'representation',
+                                    )
+                                        ? 'error'
+                                        : ''
+                                "
+                                :help="
+                                    validationMessage(
+                                        form.errors,
+                                        'representation',
+                                    ) || 'Leave blank to use the default color'
+                                "
+                                class="mb-0"
+                            >
+                                <div
+                                    class="flex flex-col gap-2 md:flex-row md:items-center"
+                                >
+                                    <a-input
+                                        v-model:value="form.representation"
+                                        placeholder="e.g. ff5733 (no #)"
+                                        size="large"
+                                        class="min-w-0 w-full flex-1"
+                                    />
+                                    <div
+                                        v-if="representationHexColor"
+                                        class="h-10 w-full shrink-0 rounded border border-gray-200 md:w-10"
+                                        :style="{
+                                            backgroundColor:
+                                                representationHexColor,
+                                        }"
+                                    />
+                                </div>
+                            </a-form-item>
+
+                            <a-form-item
+                                v-else
+                                label="Product image"
+                                :validate-status="
+                                    validationHasError(
+                                        form.errors,
+                                        'representation_image',
+                                    ) ||
+                                    validationHasError(
+                                        form.errors,
+                                        'representation',
+                                    )
+                                        ? 'error'
+                                        : ''
+                                "
+                                :help="
+                                    validationMessage(
+                                        form.errors,
+                                        'representation_image',
+                                    ) ||
+                                    validationMessage(
+                                        form.errors,
+                                        'representation',
+                                    ) ||
+                                    'Upload a new image to replace the current one. JPEG, PNG, WebP or GIF up to 2MB'
+                                "
+                                class="mb-0"
+                            >
+                                <a-upload
+                                    v-model:file-list="imageFileList"
+                                    list-type="picture-card"
+                                    :max-count="1"
+                                    accept="image/jpeg,image/png,image/webp,image/gif"
+                                    :before-upload="beforeImageUpload"
+                                    @remove="onImageRemove"
+                                >
+                                    <div v-if="imageFileList.length < 1">
+                                        <PlusOutlined />
+                                        <div class="mt-2">Upload</div>
                                     </div>
-                                </a-form-item>
-                            </div>
+                                </a-upload>
+                            </a-form-item>
                         </section>
 
                         <div

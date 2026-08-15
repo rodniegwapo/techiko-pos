@@ -47,8 +47,47 @@ const form = useForm({
     SKU: "",
     barcode: "",
     sold_type: null,
+    representation_type: "color",
     representation: "",
+    representation_image: null,
 });
+
+const imageFileList = ref([]);
+
+function beforeImageUpload(file) {
+    const raw = file?.originFileObj instanceof File ? file.originFileObj : file;
+    if (!(raw instanceof File)) {
+        message.error("Please choose a valid image file.");
+        return false;
+    }
+    form.representation_image = raw;
+    form.representation = "";
+    imageFileList.value = [
+        {
+            uid: String(file.uid || Date.now()),
+            name: raw.name,
+            status: "done",
+            url: URL.createObjectURL(raw),
+        },
+    ];
+    return false;
+}
+
+function onImageRemove() {
+    form.representation_image = null;
+    form.representation = "";
+    imageFileList.value = [];
+}
+
+function onRepresentationTypeChange(type) {
+    form.representation_type = type;
+    if (type === "color") {
+        onImageRemove();
+        form.representation = "";
+    } else {
+        form.representation = "";
+    }
+}
 
 const domainSlug = computed(() => {
     if (props.isGlobalView) {
@@ -148,26 +187,44 @@ const representationHexColor = computed(() => {
 });
 
 const handleSave = () => {
-    form.post(hrefWithPreservedLocationId(getRoute("products.store")), {
-        onSuccess: () => {
-            form.reset();
-            form.clearErrors();
-            sharedCategoryHint.value = "";
-            barcodeLookupNonce.value += 1;
-            message.success("Product created successfully");
-        },
-        onError: (errs) => {
-            const bag = errs || form.errors;
-            const planMsg = bag?.plan;
-            if (planMsg !== undefined && planMsg !== null && planMsg !== "") {
-                message.error(
-                    Array.isArray(planMsg) ? planMsg[0] : planMsg || "Failed to create product",
-                );
-                return;
+    form
+        .transform((data) => {
+            const payload = { ...data };
+            if (!(payload.representation_image instanceof File)) {
+                delete payload.representation_image;
             }
-            message.warning(validationSummaryNotice(bag));
-        },
-    });
+            if (payload.representation_type !== "image") {
+                delete payload.representation_image;
+            }
+            return payload;
+        })
+        .post(hrefWithPreservedLocationId(getRoute("products.store")), {
+            forceFormData: true,
+            onSuccess: () => {
+                form.reset();
+                form.representation_type = "color";
+                form.representation_image = null;
+                form.clearErrors();
+                imageFileList.value = [];
+                sharedCategoryHint.value = "";
+                barcodeLookupNonce.value += 1;
+                message.success("Product created successfully");
+            },
+            onError: (errs) => {
+                const bag = errs || form.errors;
+                const planMsg = bag?.plan;
+                if (planMsg !== undefined && planMsg !== null && planMsg !== "") {
+                    message.error(
+                        Array.isArray(planMsg) ? planMsg[0] : planMsg || "Failed to create product",
+                    );
+                    return;
+                }
+                message.warning(validationSummaryNotice(bag));
+            },
+            onFinish: () => {
+                form.transform((data) => data);
+            },
+        });
 };
 
 useBarcodeScanner((code) => {
@@ -435,6 +492,46 @@ useBarcodeScanner((code) => {
                             </a-form-item>
 
                             <a-form-item
+                                label="Display style"
+                                :validate-status="
+                                    validationHasError(
+                                        form.errors,
+                                        'representation_type',
+                                    )
+                                        ? 'error'
+                                        : ''
+                                "
+                                :help="
+                                    validationMessage(
+                                        form.errors,
+                                        'representation_type',
+                                    )
+                                "
+                                class="mb-0"
+                            >
+                                <a-radio-group
+                                    :value="form.representation_type"
+                                    size="large"
+                                    class="flex w-full flex-col gap-2 md:flex-row md:gap-4"
+                                    @update:value="onRepresentationTypeChange"
+                                >
+                                    <a-radio
+                                        value="color"
+                                        class="!m-0 !flex !w-full !items-center rounded-md border border-gray-200 bg-white px-3 py-2.5 md:!w-auto"
+                                    >
+                                        Color
+                                    </a-radio>
+                                    <a-radio
+                                        value="image"
+                                        class="!m-0 !flex !w-full !items-center rounded-md border border-gray-200 bg-white px-3 py-2.5 md:!w-auto"
+                                    >
+                                        Image
+                                    </a-radio>
+                                </a-radio-group>
+                            </a-form-item>
+
+                            <a-form-item
+                                v-if="form.representation_type === 'color'"
                                 label="Color (hex, optional)"
                                 :validate-status="
                                     validationHasError(
@@ -469,6 +566,49 @@ useBarcodeScanner((code) => {
                                         }"
                                     />
                                 </div>
+                            </a-form-item>
+
+                            <a-form-item
+                                v-else
+                                label="Product image"
+                                :validate-status="
+                                    validationHasError(
+                                        form.errors,
+                                        'representation_image',
+                                    ) ||
+                                    validationHasError(
+                                        form.errors,
+                                        'representation',
+                                    )
+                                        ? 'error'
+                                        : ''
+                                "
+                                :help="
+                                    validationMessage(
+                                        form.errors,
+                                        'representation_image',
+                                    ) ||
+                                    validationMessage(
+                                        form.errors,
+                                        'representation',
+                                    ) ||
+                                    'JPEG, PNG, WebP or GIF up to 2MB'
+                                "
+                                class="mb-0"
+                            >
+                                <a-upload
+                                    v-model:file-list="imageFileList"
+                                    list-type="picture-card"
+                                    :max-count="1"
+                                    accept="image/jpeg,image/png,image/webp,image/gif"
+                                    :before-upload="beforeImageUpload"
+                                    @remove="onImageRemove"
+                                >
+                                    <div v-if="imageFileList.length < 1">
+                                        <PlusOutlined />
+                                        <div class="mt-2">Upload</div>
+                                    </div>
+                                </a-upload>
                             </a-form-item>
                         </section>
 
