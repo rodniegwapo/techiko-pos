@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Providers\RouteServiceProvider;
+use App\Providers\AppServiceProvider;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -38,7 +38,7 @@ class PublicVerifyEmailController extends Controller
         // Match AuthenticatedSessionController redirect intent after login
         $user = Auth::user();
         if ($user->isSuperUser()) {
-            return redirect()->intended(RouteServiceProvider::HOME.'?verified=1');
+            return redirect()->intended(AppServiceProvider::HOME.'?verified=1');
         }
 
         if ($user->domain) {
@@ -47,6 +47,6 @@ class PublicVerifyEmailController extends Controller
             );
         }
 
-        return redirect()->intended(RouteServiceProvider::HOME.'?verified=1');
+        return redirect()->intended(AppServiceProvider::HOME.'?verified=1');
     }
 }
