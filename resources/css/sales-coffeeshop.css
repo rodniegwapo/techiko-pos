@@ -72,6 +72,16 @@
     background: var(--cs-panel);
 }
 
+.sales-coffeeshop .cs-menu-search.ant-input,
+.sales-coffeeshop .cs-menu-search.ant-input-affix-wrapper {
+    border-radius: 9999px !important;
+    padding-inline: 0.9rem;
+}
+
+.sales-coffeeshop .cs-menu-search.ant-input-affix-wrapper > input.ant-input {
+    border-radius: 0 !important;
+}
+
 /* Viewport lock: stage fits one screen; only product grid scrolls */
 .sales-coffeeshop.sales-coffeeshop--viewport {
     /* Layout padding: p-3 (0.75rem*2) mobile, md:p-6 (1.5rem*2) desktop */
