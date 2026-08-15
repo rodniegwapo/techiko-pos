@@ -200,9 +200,10 @@ const representationHexColor = computed(() => {
 });
 
 const handleUpdate = () => {
+    // PHP does not parse multipart bodies on real PUT — spoof via POST + _method.
     form
         .transform((data) => {
-            const payload = { ...data };
+            const payload = { ...data, _method: "put" };
             if (!(payload.representation_image instanceof File)) {
                 delete payload.representation_image;
             }
@@ -211,7 +212,7 @@ const handleUpdate = () => {
             }
             return payload;
         })
-        .put(
+        .post(
             hrefWithPreservedLocationId(
                 getRoute("products.update", { product: props.product.id }),
             ),
@@ -560,10 +561,16 @@ useBarcodeScanner((code) => {
                                 class="mb-0"
                             >
                                 <a-radio-group
-                                    :value="form.representation_type"
+                                    v-model:value="form.representation_type"
                                     size="large"
                                     class="flex w-full flex-col gap-2 md:flex-row md:gap-4"
-                                    @update:value="onRepresentationTypeChange"
+                                    @change="
+                                        (e) =>
+                                            onRepresentationTypeChange(
+                                                e?.target?.value ??
+                                                    form.representation_type,
+                                            )
+                                    "
                                 >
                                     <a-radio
                                         value="color"
