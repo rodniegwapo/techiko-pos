@@ -3,7 +3,6 @@
 namespace App\Support;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 class ProductPayloadNormalizer
@@ -87,10 +86,12 @@ class ProductPayloadNormalizer
                 ]);
             }
 
-            $disk = Storage::disk(ProductImageStorage::DISK);
-
             try {
-                $disk->put($path, $contents);
+                ProductImageStorage::put(
+                    $path,
+                    $contents,
+                    $file->getMimeType() ?: null,
+                );
             } catch (\Throwable $e) {
                 report($e);
                 throw ValidationException::withMessages([

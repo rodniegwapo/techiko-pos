@@ -10,6 +10,32 @@ class ProductImageStorage
     public const DISK = 'product_images';
 
     /**
+     * Upload without object ACLs (Bucket owner enforced buckets reject ACL headers).
+     */
+    public static function put(string $path, string $contents, ?string $contentType = null): void
+    {
+        $disk = Storage::disk(self::DISK);
+        $config = $disk->getConfig();
+        $bucket = $config['bucket'] ?? null;
+
+        if (! is_string($bucket) || $bucket === '') {
+            throw new \RuntimeException('Product images S3 bucket is not configured.');
+        }
+
+        $params = [
+            'Bucket' => $bucket,
+            'Key' => ltrim($path, '/'),
+            'Body' => $contents,
+        ];
+
+        if ($contentType !== null && $contentType !== '') {
+            $params['ContentType'] = $contentType;
+        }
+
+        $disk->getClient()->putObject($params);
+    }
+
+    /**
      * Resolve a browser-usable URL for a product image representation.
      * S3 objects use temporary signed URLs (bucket ACLs often disabled).
      */

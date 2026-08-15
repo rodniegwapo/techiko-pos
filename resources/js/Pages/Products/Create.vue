@@ -510,10 +510,16 @@ useBarcodeScanner((code) => {
                                 class="mb-0"
                             >
                                 <a-radio-group
-                                    :value="form.representation_type"
+                                    v-model:value="form.representation_type"
                                     size="large"
                                     class="flex w-full flex-col gap-2 md:flex-row md:gap-4"
-                                    @update:value="onRepresentationTypeChange"
+                                    @change="
+                                        (e) =>
+                                            onRepresentationTypeChange(
+                                                e?.target?.value ??
+                                                    form.representation_type,
+                                            )
+                                    "
                                 >
                                     <a-radio
                                         value="color"
