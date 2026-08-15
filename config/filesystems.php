@@ -56,6 +56,24 @@ return [
             'throw' => false,
         ],
 
+        /*
+        | Product representation images (Create/Edit product upload).
+        | Uses the same AWS_* credentials as the s3 disk.
+        | Do not set object ACLs — modern buckets often block ACLs
+        | (Bucket owner enforced). Use a bucket policy for public reads.
+        */
+        'product_images' => [
+            'driver' => 's3',
+            'key' => env('AWS_ACCESS_KEY_ID'),
+            'secret' => env('AWS_SECRET_ACCESS_KEY'),
+            'region' => env('AWS_DEFAULT_REGION'),
+            'bucket' => env('AWS_BUCKET'),
+            'url' => env('AWS_URL'),
+            'endpoint' => env('AWS_ENDPOINT'),
+            'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+            'throw' => true,
+        ],
+
     ],
 
     /*

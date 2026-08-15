@@ -23,6 +23,7 @@ import {
 import ContentHeader from "@/Components/ContentHeader.vue";
 import ContentLayoutV2 from "@/Components/ContentLayoutV2.vue";
 import ContentLayoutV3 from "@/Components/ContentLayoutV3.vue";
+import ContentLayoutV4 from "@/Components/ContentLayoutV4.vue";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import RefreshButton from "@/Components/buttons/Refresh.vue";
 import FilterDropdown from "@/Components/filters/FilterDropdown.vue";
@@ -32,29 +33,36 @@ import CustomerOrder from "./components/CustomerOrder.vue";
 import TotalAmountSection from "./components/TotalAmountSection.vue";
 import SalesMobileCheckoutBar from "./components/SalesMobileCheckoutBar.vue";
 import SalesCartDrawer from "./components/SalesCartDrawer.vue";
-import { useMediaQuery } from "@vueuse/core";
+import { useMediaQuery, watchDebounced } from "@vueuse/core";
 import { useSalesCartDrawer } from "@/Composables/useSalesCartDrawer";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useSaleTotals } from "@/Composables/useSaleTotals";
+import { useSalesLayoutMode } from "@/Composables/useSalesLayoutMode";
 
 import {
     CloseOutlined,
     PlusSquareOutlined,
     MinusSquareOutlined,
     CloudDownloadOutlined,
+    LeftOutlined,
 } from "@ant-design/icons-vue";
 import { message } from "ant-design-vue";
 
 import { usePage, Head, Link } from "@inertiajs/vue3";
 import { useFilters, toLabel } from "@/Composables/useFilters";
-import { watchDebounced } from "@vueuse/core";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { notifyInsufficientStock } from "@/Composables/useCartStockNotification";
 
 const page = usePage();
 const { getRoute, getLocationQueryFromPage } = useDomainRoutes();
 const isMdUp = useMediaQuery("(min-width: 768px)");
-const { closeCartDrawer, goToPaymentStep } = useSalesCartDrawer();
+const {
+    closeCartDrawer,
+    goToPaymentStep,
+    goToOrderStep,
+    resetCheckoutStep,
+    checkoutStep,
+} = useSalesCartDrawer();
 
 watch(isMdUp, (matches) => {
     if (matches) {
@@ -72,8 +80,52 @@ const salesCartIsOnline = computed(
 );
 provide("isSalesOnline", salesCartIsOnline);
 
-const domainSlug = computed(
-    () => page.props.domain?.name_slug ?? page.props.domain?.nameSlug,
+const { domainSlug, isCoffeeshopLayout } = useSalesLayoutMode();
+const productTableVariant = computed(() =>
+    isCoffeeshopLayout.value ? "coffeeshop" : "classic",
+);
+const salesLayoutComponent = computed(() => {
+    if (isCoffeeshopLayout.value) return ContentLayoutV4;
+    return isMdUp.value ? ContentLayoutV2 : ContentLayoutV3;
+});
+const productTableLayout = computed(() =>
+    isMdUp.value ? "desktop" : "mobile",
+);
+
+function onCoffeeshopPaymentSuccess() {
+    goToOrderStep();
+}
+
+function onCoffeeshopChargeClick() {
+    goToPaymentStep();
+}
+
+watch(isCoffeeshopLayout, () => {
+    resetCheckoutStep();
+});
+
+const cashierFirstName = computed(() => {
+    const name = page.props.auth?.user?.data?.name ?? "";
+    const first = String(name).trim().split(/\s+/)[0];
+    return first || "there";
+});
+
+const timeGreeting = computed(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 17) return "Good afternoon";
+    return "Good evening";
+});
+
+const coffeeshopDateLabel = computed(() =>
+    new Intl.DateTimeFormat("en-US", {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+    })
+        .format(new Date())
+        .toUpperCase(),
 );
 
 const salesSettings = computed(
@@ -323,6 +375,8 @@ function ordersToLineItems(ordersList) {
         quantity: parseInt(o.quantity, 10) || 0,
         unit_price: parseFloat(o.price) || 0,
         name: o.name,
+        representation_type: o.representation_type ?? null,
+        representation: o.representation ?? null,
     }));
 }
 
@@ -338,6 +392,8 @@ function lineItemsToOrders(lines) {
         discount: null,
         discount_amount: 0,
         discounts: [],
+        representation_type: li.representation_type ?? null,
+        representation: li.representation ?? null,
     }));
 }
 
@@ -356,7 +412,7 @@ async function persistOfflineCartToDexie() {
         payment_method: offlinePaymentMethod.value,
         payment_card_type_id:
             offlinePaymentMethod.value === "card"
-                ? offlinePaymentCardTypeId.value ?? null
+                ? (offlinePaymentCardTypeId.value ?? null)
                 : null,
         location_id: activeLocationId.value ?? null,
         customer_id: selectedCustomer.value?.id ?? null,
@@ -532,7 +588,8 @@ const handleScanAndAdd = async (scannedCode) => {
 
         loading.value = true;
         const locQ = getLocationQueryFromPage();
-        const locationId = locQ.location_id ?? activeLocationId.value ?? undefined;
+        const locationId =
+            locQ.location_id ?? activeLocationId.value ?? undefined;
         const items = await axios.get(getRoute("sales.products"), {
             params: {
                 page: 1,
@@ -618,6 +675,8 @@ const addToCart = async (product, options = {}) => {
                     discount: null,
                     discount_amount: 0,
                     discounts: [],
+                    representation_type: product.representation_type ?? null,
+                    representation: product.representation ?? null,
                 });
             } else {
                 const o = orders.value[idx];
@@ -766,6 +825,8 @@ const transformCartItems = (items) => {
             discount: item.discount,
             discount_amount: item.discount_amount,
             discounts: item.discounts || [], // Include the discounts relationship
+            representation_type: item.product?.representation_type ?? null,
+            representation: item.product?.representation ?? null,
         };
     });
 };
@@ -819,6 +880,8 @@ function onOfflineCartAdd(product) {
             discount: null,
             discount_amount: 0,
             discounts: [],
+            representation_type: product.representation_type ?? null,
+            representation: product.representation ?? null,
         });
     } else {
         const o = orders.value[idx];
@@ -929,9 +992,7 @@ async function completeOfflineSale() {
         })),
         payment_method: payment,
         payment_card_type_id:
-            payment === "card"
-                ? Number(offlinePaymentCardTypeId.value)
-                : null,
+            payment === "card" ? Number(offlinePaymentCardTypeId.value) : null,
         location_id: activeLocationId.value,
         cashier_user_id: cashierUserId.value,
         notes: null,
@@ -1179,7 +1240,8 @@ const getProducts = async ({ append = false } = {}) => {
     }
     try {
         const locQ = getLocationQueryFromPage();
-        const locationId = locQ.location_id ?? activeLocationId.value ?? undefined;
+        const locationId =
+            locQ.location_id ?? activeLocationId.value ?? undefined;
         const res = await axios.get(getRoute("sales.products"), {
             params: {
                 page: nextPage,
@@ -1288,228 +1350,479 @@ watch(
 <template>
     <AuthenticatedLayout>
         <Head title="Sales" />
-        <ContentHeader title="Sales">
-            <template v-if="lastOfflineSyncLabel" #meta>
-                Last offline sync: {{ lastOfflineSyncLabel }}
-            </template>
-        </ContentHeader>
+        <div
+            :class="{
+                'sales-coffeeshop': isCoffeeshopLayout,
+                'sales-coffeeshop--viewport': isCoffeeshopLayout,
+            }"
+        >
+            <ContentHeader v-if="!isCoffeeshopLayout" title="Sales">
+                <template v-if="!isMdUp" #actions>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-medium text-gray-800">
+                            Classic
+                        </span>
+                        <a-switch
+                            v-model:checked="isCoffeeshopLayout"
+                            size="small"
+                            aria-label="Switch between classic and coffeeshop layout"
+                        />
+                        <span class="text-xs font-medium text-gray-400">
+                            Coffeeshop
+                        </span>
+                    </div>
+                </template>
+                <template v-if="lastOfflineSyncLabel" #meta>
+                    Last offline sync: {{ lastOfflineSyncLabel }}
+                </template>
+            </ContentHeader>
 
-        <ContentLayoutV2 v-if="isMdUp" title="Create Transaction">
-            <template #filters>
-                <a-input-search
-                    v-model:value="search"
-                    placeholder="Search Product"
-                    class="min-w-[100px] max-w-[300px]"
-                />
-                <RefreshButton :loading="loading" @click="getProducts" />
-                <a-button
-                    type="default"
-                    :loading="syncingOffline"
-                    :disabled="!salesCartIsOnline || !activeLocationId"
-                    @click="syncOfflineDataForSales"
-                >
-                    <template #icon>
-                        <CloudDownloadOutlined />
-                    </template>
-                    Sync for offline
-                </a-button>
-
-                <FilterDropdown v-model="filters" :filters="filtersConfig" />
-            </template>
-            <template #activeFilters>
-                <ActiveFilters
-                    :filters="activeFilters"
-                    @remove-filter="handleClearSelectedFilter"
-                    @clear-all="
-                        () =>
-                            Object.keys(filters).forEach(
-                                (k) => (filters[k] = null),
-                            )
-                    "
-                    :always-show="true"
-                />
-            </template>
-
-            <template #table>
-                <ProductTable
-                    :products="products"
-                    :loading="loading"
-                    :loading-more="loadingMore"
-                    :has-more-products="hasMoreProducts"
-                    :products-total="productsTotal"
-                    :sales-cart-is-online="salesCartIsOnline"
-                    :orders="orders"
-                    :orderId="orderId"
-                    layout="desktop"
-                    @cart-updated="loadCurrentPendingSale"
-                    @offline-add-product="addToCart"
-                    @load-more="loadMoreProducts"
-                />
-            </template>
-            <template #right-side-content>
-                <customer-order
-                    @customer-changed="handleCustomerChanged"
-                    @discount-applied="loadCurrentPendingSale"
-                    @cart-updated="loadCurrentPendingSale"
-                    @offline-cart-add="onOfflineCartAdd"
-                    @offline-cart-subtract="onOfflineCartSubtract"
-                    @offline-cart-set-qty="
-                        (e) => onOfflineCartSetQty(e.product, e.quantity)
-                    "
-                    @offline-cart-remove="onOfflineCartRemove"
-                    :loading="isLoadingCart"
-                    :orders="orders"
-                    :orderId="orderId"
-                    :orderDiscountAmount="orderDiscountAmount"
-                    :orderDiscountId="orderDiscountId"
-                    :discountOptions="discountOptions"
-                    :offline-cached-customers="offlineCustomersCache"
-                />
-            </template>
-        </ContentLayoutV2>
-
-        <ContentLayoutV3 v-else title="Create Transaction">
-            <template #filters>
-                <a-input-search
-                    v-model:value="search"
-                    placeholder="Search Product"
-                    class="min-w-[100px] max-w-[300px]"
-                />
-                <RefreshButton :loading="loading" @click="getProducts" />
-                <a-button
-                    type="default"
-                    :loading="syncingOffline"
-                    :disabled="!salesCartIsOnline || !activeLocationId"
-                    @click="syncOfflineDataForSales"
-                >
-                    <template #icon>
-                        <CloudDownloadOutlined />
-                    </template>
-                    Sync for offline
-                </a-button>
-
-                <FilterDropdown v-model="filters" :filters="filtersConfig" />
-            </template>
-            <template #activeFilters>
-                <ActiveFilters
-                    :filters="activeFilters"
-                    @remove-filter="handleClearSelectedFilter"
-                    @clear-all="
-                        () =>
-                            Object.keys(filters).forEach(
-                                (k) => (filters[k] = null),
-                            )
-                    "
-                    :always-show="true"
-                />
-            </template>
-
-            <template #table>
-                <ProductTable
-                    :products="products"
-                    :loading="loading"
-                    :loading-more="loadingMore"
-                    :has-more-products="hasMoreProducts"
-                    :products-total="productsTotal"
-                    :sales-cart-is-online="salesCartIsOnline"
-                    :orders="orders"
-                    :orderId="orderId"
-                    layout="mobile"
-                    @cart-updated="loadCurrentPendingSale"
-                    @offline-add-product="addToCart"
-                    @load-more="loadMoreProducts"
-                />
-            </template>
-            <template #mobile-actions>
-                <SalesMobileCheckoutBar
-                    :orders="orders"
-                    :order-discount-amount="orderDiscountAmount"
-                    :sales-settings="salesSettings"
-                    :current-sale="currentSale"
-                />
-            </template>
-        </ContentLayoutV3>
-
-        <SalesCartDrawer v-if="!isMdUp">
-            <template #cart>
-                <customer-order
-                    layout="drawer"
-                    :current-sale="currentSale"
-                    :sales-settings="salesSettings"
-                    @customer-changed="handleCustomerChanged"
-                    @discount-applied="loadCurrentPendingSale"
-                    @cart-updated="loadCurrentPendingSale"
-                    @offline-cart-add="onOfflineCartAdd"
-                    @offline-cart-subtract="onOfflineCartSubtract"
-                    @offline-cart-set-qty="
-                        (e) => onOfflineCartSetQty(e.product, e.quantity)
-                    "
-                    @offline-cart-remove="onOfflineCartRemove"
-                    :loading="isLoadingCart"
-                    :orders="orders"
-                    :orderId="orderId"
-                    :orderDiscountAmount="orderDiscountAmount"
-                    :orderDiscountId="orderDiscountId"
-                    :discountOptions="discountOptions"
-                    :offline-cached-customers="offlineCustomersCache"
-                />
-            </template>
-            <template #payment>
-                <total-amount-section
-                    layout="compact"
-                    :selected-customer="selectedCustomer"
-                    :orders="orders"
-                    :currentSale="currentSale"
-                    :orderDiscountAmount="orderDiscountAmount"
-                    :orderDiscountId="orderDiscountId"
-                    :orderId="orderId"
-                    :discountOptions="discountOptions"
-                    :sales-settings="salesSettings"
-                    :loyalty-redemption-settings="loyaltyRedemptionSettings"
-                    :offline-payment-method="offlinePaymentMethod"
-                    :cached-payment-card-types="cachedPaymentCardTypes"
-                    :offline-payment-card-type-id="offlinePaymentCardTypeId"
-                    @discount-applied="loadCurrentPendingSale"
-                    @cart-updated="loadCurrentPendingSale"
-                    @payment-success="closeCartDrawer"
-                    @update:offline-payment-method="syncOfflinePaymentMethod"
-                    @update:offline-payment-card-type-id="
-                        syncOfflinePaymentCardTypeId
-                    "
-                    @save-offline-sale="completeOfflineSale"
-                />
-            </template>
-            <template #drawer-footer>
-                <div
-                    class="flex items-center justify-between gap-3 px-3 py-3"
-                    style="
-                        padding-bottom: max(
-                            0.75rem,
-                            env(safe-area-inset-bottom, 0px)
-                        );
-                    "
-                >
+            <component :is="salesLayoutComponent" title="Create Transaction">
+                <template v-if="isCoffeeshopLayout" #hero>
                     <div class="min-w-0">
-                        <p class="text-xs text-gray-500">Total</p>
-                        <p class="truncate text-lg font-bold text-green-600">
-                            {{ formattedTotal(grandTotalDisplay) }}
+                        <p
+                            class="mb-1 text-[10px] font-semibold tracking-[0.14em] text-[var(--cs-muted)]"
+                        >
+                            {{ coffeeshopDateLabel }}
+                        </p>
+                        <h1
+                            class="cs-display m-0 text-3xl font-semibold leading-tight text-[var(--cs-ink)] sm:text-4xl"
+                        >
+                            {{ timeGreeting }}, {{ cashierFirstName }}.
+                        </h1>
+                        <p class="mt-1 mb-0 text-sm text-[var(--cs-muted)]">
+                            What can we make for you?
+                        </p>
+                        <p
+                            v-if="lastOfflineSyncLabel"
+                            class="mt-2 mb-0 text-[10px] text-[var(--cs-muted)]"
+                        >
+                            Last offline sync: {{ lastOfflineSyncLabel }}
                         </p>
                     </div>
+                </template>
+                <template #filters>
+                    <a-input
+                        v-if="isCoffeeshopLayout"
+                        v-model:value="search"
+                        placeholder="Search menu..."
+                        allow-clear
+                        class="min-w-[140px] max-w-[320px]"
+                    />
+                    <a-input-search
+                        v-else
+                        v-model:value="search"
+                        placeholder="Search Product"
+                        class="min-w-[100px] max-w-[300px]"
+                    />
+                    <RefreshButton
+                        v-if="!isCoffeeshopLayout"
+                        :loading="loading"
+                        @click="getProducts"
+                    />
                     <a-button
-                        type="primary"
-                        size="large"
-                        class="shrink-0"
-                        :disabled="orders.length === 0"
-                        aria-label="Continue to checkout"
-                        @click="goToPaymentStep"
+                        v-if="!isCoffeeshopLayout"
+                        type="default"
+                        :loading="syncingOffline"
+                        :disabled="!salesCartIsOnline || !activeLocationId"
+                        @click="syncOfflineDataForSales"
                     >
-                        Pay
+                        <template #icon>
+                            <CloudDownloadOutlined />
+                        </template>
+                        Sync for offline
                     </a-button>
-                </div>
-            </template>
-        </SalesCartDrawer>
 
-        <template v-if="isMdUp" #content-footer>
+                    <FilterDropdown
+                        v-if="!isCoffeeshopLayout"
+                        v-model="filters"
+                        :filters="filtersConfig"
+                    />
+                </template>
+                <template v-if="!isCoffeeshopLayout" #activeFilters>
+                    <ActiveFilters
+                        :filters="activeFilters"
+                        @remove-filter="handleClearSelectedFilter"
+                        @clear-all="
+                            () =>
+                                Object.keys(filters).forEach(
+                                    (k) => (filters[k] = null),
+                                )
+                        "
+                        :always-show="true"
+                    />
+                </template>
+
+                <template #table>
+                    <ProductTable
+                        :products="products"
+                        :loading="loading"
+                        :loading-more="loadingMore"
+                        :has-more-products="hasMoreProducts"
+                        :products-total="productsTotal"
+                        :sales-cart-is-online="salesCartIsOnline"
+                        :orders="orders"
+                        :orderId="orderId"
+                        :layout="productTableLayout"
+                        :variant="productTableVariant"
+                        @cart-updated="loadCurrentPendingSale"
+                        @offline-add-product="addToCart"
+                        @load-more="loadMoreProducts"
+                    />
+                </template>
+                <template #right-side-content>
+                    <div class="flex h-full min-h-0 flex-col overflow-hidden">
+                        <div
+                            class="mb-3 flex shrink-0 items-center justify-between gap-2 border-b pb-3"
+                            :class="
+                                isCoffeeshopLayout
+                                    ? 'border-[var(--cs-border)]'
+                                    : 'border-gray-100'
+                            "
+                        >
+                            <span
+                                class="text-xs font-semibold uppercase tracking-wide"
+                                :class="
+                                    isCoffeeshopLayout
+                                        ? 'text-[var(--cs-muted)]'
+                                        : 'text-gray-500'
+                                "
+                            >
+                                Layout
+                            </span>
+                            <div
+                                class="flex shrink-0 items-center gap-2 rounded-full border px-2.5 py-1"
+                                :class="
+                                    isCoffeeshopLayout
+                                        ? 'border-[var(--cs-border)] bg-[var(--cs-card)]'
+                                        : 'border-gray-200 bg-gray-50'
+                                "
+                            >
+                                <span
+                                    class="text-xs font-medium"
+                                    :class="
+                                        isCoffeeshopLayout
+                                            ? 'text-gray-400'
+                                            : 'text-gray-800'
+                                    "
+                                >
+                                    Classic
+                                </span>
+                                <a-switch
+                                    v-model:checked="isCoffeeshopLayout"
+                                    size="small"
+                                    aria-label="Switch between classic and coffeeshop layout"
+                                />
+                                <span
+                                    class="text-xs font-medium"
+                                    :class="
+                                        isCoffeeshopLayout
+                                            ? 'text-green-700'
+                                            : 'text-gray-400'
+                                    "
+                                >
+                                    Coffeeshop
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Coffeeshop desktop: 2-step order → payment rail -->
+                        <div
+                            v-if="isCoffeeshopLayout"
+                            class="flex min-h-0 flex-1 flex-col overflow-hidden"
+                        >
+                            <div
+                                v-if="checkoutStep === 'payment'"
+                                class="mb-3 flex shrink-0 items-center gap-1"
+                            >
+                                <a-button
+                                    type="text"
+                                    class="flex h-8 min-w-8 items-center justify-center !p-0 text-[var(--cs-ink)]"
+                                    aria-label="Back to order"
+                                    @click="goToOrderStep"
+                                >
+                                    <LeftOutlined class="text-base" />
+                                </a-button>
+                                <span
+                                    class="cs-display text-xl font-semibold text-[var(--cs-ink)]"
+                                >
+                                    Checkout
+                                </span>
+                            </div>
+
+                            <div
+                                class="relative min-h-0 flex-1 overflow-hidden"
+                            >
+                                <div
+                                    class="absolute inset-0 flex min-h-0 flex-col overflow-hidden transition-transform duration-300 ease-out will-change-transform"
+                                    :class="[
+                                        checkoutStep === 'payment'
+                                            ? '-translate-x-full'
+                                            : 'translate-x-0',
+                                        checkoutStep !== 'order'
+                                            ? 'pointer-events-none'
+                                            : '',
+                                    ]"
+                                >
+                                    <div
+                                        class="flex min-h-0 flex-1 flex-col overflow-hidden"
+                                    >
+                                        <customer-order
+                                            layout="coffeeshop"
+                                            @customer-changed="
+                                                handleCustomerChanged
+                                            "
+                                            @discount-applied="
+                                                loadCurrentPendingSale
+                                            "
+                                            @cart-updated="
+                                                loadCurrentPendingSale
+                                            "
+                                            @offline-cart-add="onOfflineCartAdd"
+                                            @offline-cart-subtract="
+                                                onOfflineCartSubtract
+                                            "
+                                            @offline-cart-set-qty="
+                                                (e) =>
+                                                    onOfflineCartSetQty(
+                                                        e.product,
+                                                        e.quantity,
+                                                    )
+                                            "
+                                            @offline-cart-remove="
+                                                onOfflineCartRemove
+                                            "
+                                            :loading="isLoadingCart"
+                                            :orders="orders"
+                                            :orderId="orderId"
+                                            :orderDiscountAmount="
+                                                orderDiscountAmount
+                                            "
+                                            :orderDiscountId="orderDiscountId"
+                                            :discountOptions="discountOptions"
+                                            :offline-cached-customers="
+                                                offlineCustomersCache
+                                            "
+                                            :current-sale="currentSale"
+                                            :sales-settings="salesSettings"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div
+                                    class="absolute inset-0 flex min-h-0 flex-col overflow-hidden transition-transform duration-300 ease-out will-change-transform"
+                                    :class="[
+                                        checkoutStep === 'payment'
+                                            ? 'translate-x-0'
+                                            : 'translate-x-full',
+                                        checkoutStep !== 'payment'
+                                            ? 'pointer-events-none'
+                                            : '',
+                                    ]"
+                                >
+                                    <div
+                                        class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
+                                    >
+                                        <total-amount-section
+                                            layout="compact"
+                                            coffeeshop-skin
+                                            :selected-customer="
+                                                selectedCustomer
+                                            "
+                                            :orders="orders"
+                                            :currentSale="currentSale"
+                                            :orderDiscountAmount="
+                                                orderDiscountAmount
+                                            "
+                                            :orderDiscountId="orderDiscountId"
+                                            :orderId="orderId"
+                                            :discountOptions="discountOptions"
+                                            :sales-settings="salesSettings"
+                                            :loyalty-redemption-settings="
+                                                loyaltyRedemptionSettings
+                                            "
+                                            :offline-payment-method="
+                                                offlinePaymentMethod
+                                            "
+                                            :cached-payment-card-types="
+                                                cachedPaymentCardTypes
+                                            "
+                                            :offline-payment-card-type-id="
+                                                offlinePaymentCardTypeId
+                                            "
+                                            @discount-applied="
+                                                loadCurrentPendingSale
+                                            "
+                                            @cart-updated="
+                                                loadCurrentPendingSale
+                                            "
+                                            @payment-success="
+                                                onCoffeeshopPaymentSuccess
+                                            "
+                                            @update:offline-payment-method="
+                                                syncOfflinePaymentMethod
+                                            "
+                                            @update:offline-payment-card-type-id="
+                                                syncOfflinePaymentCardTypeId
+                                            "
+                                            @save-offline-sale="
+                                                completeOfflineSale
+                                            "
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div
+                                v-show="checkoutStep === 'order'"
+                                class="cs-rail-charge mt-3 flex shrink-0 items-center justify-between gap-3 border-t border-[var(--cs-border)] bg-[var(--cs-panel)] pt-3"
+                            >
+                                <div class="min-w-0">
+                                    <p
+                                        class="mb-0 text-[10px] font-semibold tracking-[0.12em] text-[var(--cs-muted)]"
+                                    >
+                                        TOTAL
+                                    </p>
+                                    <p
+                                        class="cs-display mb-0 truncate text-xl font-semibold text-[var(--cs-ink)]"
+                                    >
+                                        {{ formattedTotal(grandTotalDisplay) }}
+                                    </p>
+                                </div>
+                                <a-button
+                                    type="primary"
+                                    size="large"
+                                    class="cs-charge-btn shrink-0 rounded-full px-5"
+                                    :disabled="orders.length === 0"
+                                    aria-label="Continue to checkout"
+                                    @click="onCoffeeshopChargeClick"
+                                >
+                                    Charge
+                                    {{ formattedTotal(grandTotalDisplay) }}
+                                </a-button>
+                            </div>
+                        </div>
+
+                        <!-- Classic desktop: single cart sidebar -->
+                        <customer-order
+                            v-else
+                            layout="sidebar"
+                            @customer-changed="handleCustomerChanged"
+                            @discount-applied="loadCurrentPendingSale"
+                            @cart-updated="loadCurrentPendingSale"
+                            @offline-cart-add="onOfflineCartAdd"
+                            @offline-cart-subtract="onOfflineCartSubtract"
+                            @offline-cart-set-qty="
+                                (e) =>
+                                    onOfflineCartSetQty(e.product, e.quantity)
+                            "
+                            @offline-cart-remove="onOfflineCartRemove"
+                            :loading="isLoadingCart"
+                            :orders="orders"
+                            :orderId="orderId"
+                            :orderDiscountAmount="orderDiscountAmount"
+                            :orderDiscountId="orderDiscountId"
+                            :discountOptions="discountOptions"
+                            :offline-cached-customers="offlineCustomersCache"
+                        />
+                    </div>
+                </template>
+                <template #mobile-actions>
+                    <SalesMobileCheckoutBar
+                        v-if="!isMdUp"
+                        :orders="orders"
+                        :order-discount-amount="orderDiscountAmount"
+                        :sales-settings="salesSettings"
+                        :current-sale="currentSale"
+                    />
+                </template>
+            </component>
+
+            <SalesCartDrawer v-if="!isMdUp">
+                <template #cart>
+                    <customer-order
+                        layout="drawer"
+                        :current-sale="currentSale"
+                        :sales-settings="salesSettings"
+                        @customer-changed="handleCustomerChanged"
+                        @discount-applied="loadCurrentPendingSale"
+                        @cart-updated="loadCurrentPendingSale"
+                        @offline-cart-add="onOfflineCartAdd"
+                        @offline-cart-subtract="onOfflineCartSubtract"
+                        @offline-cart-set-qty="
+                            (e) => onOfflineCartSetQty(e.product, e.quantity)
+                        "
+                        @offline-cart-remove="onOfflineCartRemove"
+                        :loading="isLoadingCart"
+                        :orders="orders"
+                        :orderId="orderId"
+                        :orderDiscountAmount="orderDiscountAmount"
+                        :orderDiscountId="orderDiscountId"
+                        :discountOptions="discountOptions"
+                        :offline-cached-customers="offlineCustomersCache"
+                    />
+                </template>
+                <template #payment>
+                    <total-amount-section
+                        layout="compact"
+                        :selected-customer="selectedCustomer"
+                        :orders="orders"
+                        :currentSale="currentSale"
+                        :orderDiscountAmount="orderDiscountAmount"
+                        :orderDiscountId="orderDiscountId"
+                        :orderId="orderId"
+                        :discountOptions="discountOptions"
+                        :sales-settings="salesSettings"
+                        :loyalty-redemption-settings="loyaltyRedemptionSettings"
+                        :offline-payment-method="offlinePaymentMethod"
+                        :cached-payment-card-types="cachedPaymentCardTypes"
+                        :offline-payment-card-type-id="offlinePaymentCardTypeId"
+                        @discount-applied="loadCurrentPendingSale"
+                        @cart-updated="loadCurrentPendingSale"
+                        @payment-success="closeCartDrawer"
+                        @update:offline-payment-method="
+                            syncOfflinePaymentMethod
+                        "
+                        @update:offline-payment-card-type-id="
+                            syncOfflinePaymentCardTypeId
+                        "
+                        @save-offline-sale="completeOfflineSale"
+                    />
+                </template>
+                <template #drawer-footer>
+                    <div
+                        class="flex items-center justify-between gap-3 px-3 py-3"
+                        style="
+                            padding-bottom: max(
+                                0.75rem,
+                                env(safe-area-inset-bottom, 0px)
+                            );
+                        "
+                    >
+                        <div class="min-w-0">
+                            <p class="text-xs text-gray-500">Total</p>
+                            <p
+                                class="truncate text-lg font-bold text-green-600"
+                            >
+                                {{ formattedTotal(grandTotalDisplay) }}
+                            </p>
+                        </div>
+                        <a-button
+                            type="primary"
+                            size="large"
+                            class="shrink-0"
+                            :disabled="orders.length === 0"
+                            aria-label="Continue to checkout"
+                            @click="goToPaymentStep"
+                        >
+                            Pay
+                        </a-button>
+                    </div>
+                </template>
+            </SalesCartDrawer>
+        </div>
+
+        <template v-if="isMdUp && !isCoffeeshopLayout" #content-footer>
             <total-amount-section
                 :selected-customer="selectedCustomer"
                 :orders="orders"
@@ -1526,7 +1839,9 @@ watch(
                 @discount-applied="loadCurrentPendingSale"
                 @cart-updated="loadCurrentPendingSale"
                 @update:offline-payment-method="syncOfflinePaymentMethod"
-                @update:offline-payment-card-type-id="syncOfflinePaymentCardTypeId"
+                @update:offline-payment-card-type-id="
+                    syncOfflinePaymentCardTypeId
+                "
                 @save-offline-sale="completeOfflineSale"
             />
         </template>

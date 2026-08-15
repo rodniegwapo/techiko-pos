@@ -25,12 +25,14 @@ import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useSidebar } from "@/Composables/useSidebar";
+import { useSalesLayoutMode } from "@/Composables/useSalesLayoutMode";
 
 const page = usePage();
 const { hasPermission } = usePermissionsV2();
 const { selectedKeys, openKeys } = useGlobalVariables();
 const { getRoute, getLocationQueryFromPage } = useDomainRoutes();
 const { closeMobileDrawer } = useSidebar();
+const { isCoffeeshopLayout } = useSalesLayoutMode();
 
 // Ensure selectedKeys and openKeys are arrays
 if (!Array.isArray(selectedKeys.value)) {
@@ -399,6 +401,11 @@ const menus = computed(() => {
 
                 // Hide Sales for super users (Sales page not relevant for super user role)
                 if (item.key === "sales" && isSuperUser.value) {
+                    return false;
+                }
+
+                // Coffeeshop layout: Offline sales page is hidden
+                if (item.key === "offline-sales" && isCoffeeshopLayout.value) {
                     return false;
                 }
 
