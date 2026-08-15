@@ -944,7 +944,7 @@ defineExpose({
         <!-- Coffeeshop: segmented Walk-in / Loyal -->
         <div
             v-if="isCoffeeshopLayout"
-            class="mt-2 flex w-full rounded-full bg-[#ebe4d8] p-1"
+            class="mt-2 flex w-full rounded-full bg-gray-100 p-1"
             @click.stop
         >
             <button
@@ -952,8 +952,8 @@ defineExpose({
                 class="flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition"
                 :class="
                     !isLoyalCustomer
-                        ? 'bg-[var(--cs-ink)] text-white shadow-sm'
-                        : 'text-[var(--cs-muted)]'
+                        ? 'bg-[#287e47] text-white shadow-sm'
+                        : 'text-gray-500'
                 "
                 @click="
                     () => {
@@ -971,8 +971,8 @@ defineExpose({
                 class="flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition"
                 :class="
                     isLoyalCustomer
-                        ? 'bg-[var(--cs-ink)] text-white shadow-sm'
-                        : 'text-[var(--cs-muted)]'
+                        ? 'bg-[#287e47] text-white shadow-sm'
+                        : 'text-gray-500'
                 "
                 :disabled="!salesCartIsOnline"
                 @click="
@@ -1341,7 +1341,7 @@ defineExpose({
                             class="relative flex cursor-pointer items-center justify-between"
                             :class="
                                 isCoffeeshopLayout
-                                    ? 'gap-3 rounded-xl border border-[var(--cs-border)] bg-[var(--cs-card)] px-3 py-2.5'
+                                    ? 'gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2.5'
                                     : 'rounded-lg border bg-white px-4 hover:shadow'
                             "
                             @click="handleShowProductDiscountModal(order)"

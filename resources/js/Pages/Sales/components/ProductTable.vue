@@ -131,12 +131,12 @@ const formattedTotal = (price) => {
                     v-for="product in products"
                     :key="product.id"
                     type="button"
-                    class="group flex flex-col overflow-hidden rounded-2xl border border-[var(--cs-border,rgba(59,47,39,0.1))] bg-[var(--cs-card,#fff)] text-left shadow-none transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--cs-accent,#c4a574)] disabled:opacity-60"
+                    class="group flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white text-left shadow-sm transition hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#287e47] disabled:opacity-60"
                     :disabled="addingItem"
                     @click="addToCart(product)"
                 >
                     <ProductMedia
-                        class="aspect-[5/4] w-full rounded-none bg-[#ebe4d8]"
+                        class="aspect-[5/4] w-full rounded-none bg-gray-100"
                         :representation-type="product.representation_type"
                         :representation="product.representation"
                         :name="product.name"
@@ -144,24 +144,24 @@ const formattedTotal = (price) => {
                     <div class="flex flex-1 flex-col gap-1 px-3.5 pb-3.5 pt-3">
                         <div class="flex items-start justify-between gap-2">
                             <div
-                                class="line-clamp-2 text-[15px] font-semibold leading-snug text-[var(--cs-ink,#3b2f27)]"
+                                class="line-clamp-2 text-[15px] font-semibold leading-snug text-gray-900"
                             >
                                 {{ product.name }}
                             </div>
                             <div
-                                class="shrink-0 text-sm font-semibold text-[var(--cs-ink,#3b2f27)]"
+                                class="shrink-0 text-sm font-semibold text-green-700"
                             >
                                 {{ formattedTotal(product.price) }}
                             </div>
                         </div>
                         <div
-                            class="truncate text-xs text-[var(--cs-muted,#8a7b6d)]"
+                            class="truncate text-xs text-gray-500"
                             v-if="product?.category?.name"
                         >
                             {{ product.category.name }}
                         </div>
                         <div
-                            class="mt-auto pt-2 text-sm font-medium text-[var(--cs-accent,#c4a574)] transition group-hover:text-[var(--cs-accent-hover,#b3925f)]"
+                            class="mt-auto pt-2 text-sm font-medium text-[#287e47] transition group-hover:text-[#1f6b3a]"
                         >
                             + Add to order
                         </div>

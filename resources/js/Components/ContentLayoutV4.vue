@@ -12,7 +12,7 @@ defineProps({
 </script>
 
 <template>
-    <div class="cs-stage flex h-full min-h-0 w-full flex-col overflow-hidden rounded-2xl">
+    <div class="cs-stage flex h-full min-h-0 w-full flex-col overflow-hidden rounded-lg bg-white shadow">
         <div
             class="flex min-h-0 w-full flex-1 flex-col overflow-hidden md:flex-row"
         >

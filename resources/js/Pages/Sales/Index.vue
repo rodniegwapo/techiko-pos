@@ -1401,7 +1401,7 @@ watch(
                         :class="
                             isCoffeeshopLayout
                                 ? 'text-gray-400'
-                                : 'text-stone-800'
+                                : 'text-gray-800'
                         "
                     >
                         Classic
@@ -1415,7 +1415,7 @@ watch(
                         class="text-xs font-medium"
                         :class="
                             isCoffeeshopLayout
-                                ? 'text-amber-800'
+                                ? 'text-green-700'
                                 : 'text-gray-400'
                         "
                     >
@@ -1457,7 +1457,7 @@ watch(
                     >
                         <div class="flex items-center justify-end gap-2">
                             <span
-                                class="text-xs font-medium text-[var(--cs-muted)]"
+                                class="text-xs font-medium text-gray-400"
                             >
                                 Classic
                             </span>
@@ -1467,7 +1467,7 @@ watch(
                                 aria-label="Switch between classic and coffeeshop layout"
                             />
                             <span
-                                class="text-xs font-medium text-[var(--cs-ink)]"
+                                class="text-xs font-medium text-green-700"
                             >
                                 Coffeeshop
                             </span>
