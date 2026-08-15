@@ -113,7 +113,10 @@ class SaleController extends Controller
             ->when($request->input('category'), function ($q, $category) {
                 $q->whereHas('category', fn ($q) => $q->where('name', $category));
             })
-            ->with('category');
+            ->with([
+                'category',
+                'inventories' => fn ($q) => $q->where('location_id', $location->id),
+            ]);
 
         $total = (clone $base)->count();
         $lastPage = max(1, (int) ceil($total / $perPage));
@@ -166,7 +169,10 @@ class SaleController extends Controller
             ->whereHas('activeLocations', function ($q) use ($location) {
                 $q->where('location_id', $location->id);
             })
-            ->with('category');
+            ->with([
+                'category',
+                'inventories' => fn ($q) => $q->where('location_id', $location->id),
+            ]);
 
         $total = (clone $base)->count();
         $lastPage = max(1, (int) ceil($total / $perPage));
