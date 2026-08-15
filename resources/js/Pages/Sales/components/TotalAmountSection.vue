@@ -118,11 +118,7 @@ const loyaltyPatching = ref(false);
 const loyaltyRedemptionModalOpen = ref(false);
 
 watch(
-    () =>
-        [
-            currentSale.value,
-            currentSale.value?.loyalty_points_redeemed,
-        ],
+    () => [currentSale.value, currentSale.value?.loyalty_points_redeemed],
     () => {
         if (!currentSale.value) {
             loyaltyPointsDraft.value = 0;
@@ -143,25 +139,20 @@ const maxRedeemablePoints = computed(() => {
     if (!props.selectedCustomer?.loyalty_points) return 0;
     const ppcu = Number(loyaltyCfg.value.points_per_currency_unit) || 100;
     const maxPct =
-        (Number(
-            loyaltyCfg.value.max_redemption_percent_of_eligible_net,
-        ) || 50) / 100;
+        (Number(loyaltyCfg.value.max_redemption_percent_of_eligible_net) ||
+            50) / 100;
     const net = Number(netAfterOrderDiscount.value) || 0;
     if (net <= 0) return 0;
     const maxPeso = Math.min(net * maxPct, net);
     const maxPts = Math.floor(maxPeso * ppcu);
-    return Math.min(
-        maxPts,
-        Number(props.selectedCustomer.loyalty_points) || 0,
-    );
+    return Math.min(maxPts, Number(props.selectedCustomer.loyalty_points) || 0);
 });
 
 const syncLoyaltyRedemptionPatch = async () => {
     if (!salesCartIsOnline.value || !orderId.value) return;
     if (!props.selectedCustomer?.id) return;
     const ruleCap = maxRedeemablePoints.value;
-    const onSalePts =
-        Number(currentSale.value?.loyalty_points_redeemed) || 0;
+    const onSalePts = Number(currentSale.value?.loyalty_points_redeemed) || 0;
     const upperBound = Math.max(ruleCap, onSalePts);
     let clamped = Math.max(
         0,
@@ -175,8 +166,7 @@ const syncLoyaltyRedemptionPatch = async () => {
         loyaltyPointsDraft.value = 0;
     }
 
-    const onSale =
-        Number(currentSale.value?.loyalty_points_redeemed) || 0;
+    const onSale = Number(currentSale.value?.loyalty_points_redeemed) || 0;
     if (clamped === onSale) {
         return;
     }
@@ -216,10 +206,7 @@ const loyaltyRedemptionIconEnabled = computed(
 );
 
 async function onLoyaltyModalApply(points) {
-    loyaltyPointsDraft.value = Math.max(
-        0,
-        Math.floor(Number(points) || 0),
-    );
+    loyaltyPointsDraft.value = Math.max(0, Math.floor(Number(points) || 0));
     loyaltyRedemptionModalOpen.value = false;
     await syncLoyaltyRedemptionPatch();
 }
@@ -723,9 +710,7 @@ const creditLimitSufficient = computed(() => {
                 <!-- Loyalty redemption (configured in modal; synced via PATCH) -->
                 <div
                     v-if="
-                        salesCartIsOnline &&
-                        props.selectedCustomer &&
-                        orderId
+                        salesCartIsOnline && props.selectedCustomer && orderId
                     "
                     class="flex shrink-0 items-center gap-2"
                 >
@@ -740,7 +725,8 @@ const creditLimitSufficient = computed(() => {
                     <IconTooltipButton
                         name="Apply loyalty redemption"
                         :class="{
-                            'hover:bg-amber-600 p-1': loyaltyRedemptionIconEnabled,
+                            'hover:bg-amber-600 p-1':
+                                loyaltyRedemptionIconEnabled,
                         }"
                         :disabled="!loyaltyRedemptionIconEnabled"
                         @click="loyaltyRedemptionModalOpen = true"
@@ -784,13 +770,25 @@ const creditLimitSufficient = computed(() => {
                 "
             >
                 <!-- Payment Method -->
-                <div class="flex items-start flex-col gap-2">
+                <div
+                    class="flex w-full flex-col items-stretch gap-2"
+                    :class="
+                        layout === 'compact'
+                            ? 'rounded-lg  bg-white '
+                            : 'items-start'
+                    "
+                >
                     <span class="text-gray-700 whitespace-nowrap"
-                        >Payment Method</span
+                        >Payment method</span
                     >
                     <a-radio-group
                         v-model:value="paymentMethod"
                         button-style="solid"
+                        :class="
+                            layout === 'compact'
+                                ? 'flex w-full [&>.ant-radio-button-wrapper]:flex-1 [&>.ant-radio-button-wrapper]:text-center'
+                                : ''
+                        "
                     >
                         <a-radio-button value="cash">Cash</a-radio-button>
                         <a-radio-button value="card">Card</a-radio-button>
