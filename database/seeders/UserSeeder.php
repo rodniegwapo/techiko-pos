@@ -24,10 +24,10 @@ class UserSeeder extends Seeder
 
         // Create super user (Level 1 - no restrictions)
         $superUser = User::updateOrCreate(
-            ['email' => 'super.admin@example.com'],
+            ['email' => env('SUPER_USER_EMAIL')],
             [
                 'name' => 'Super Admin',
-                'password' => Hash::make('password'),
+                'password' => Hash::make(env('SUPER_USER_PASSWORD')),
                 'is_super_user' => true,
                 'role_level' => 1,
                 'can_switch_locations' => true,
