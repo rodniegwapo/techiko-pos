@@ -1369,16 +1369,9 @@ watch(
                 'sales-coffeeshop--viewport': isCoffeeshopLayout,
             }"
         >        <ContentHeader v-if="!isCoffeeshopLayout" title="Sales">
-            <template #actions>
+            <template v-if="!isMdUp" #actions>
                 <div class="flex items-center gap-2">
-                    <span
-                        class="text-xs font-medium"
-                        :class="
-                            isCoffeeshopLayout
-                                ? 'text-gray-400'
-                                : 'text-gray-800'
-                        "
-                    >
+                    <span class="text-xs font-medium text-gray-800">
                         Classic
                     </span>
                     <a-switch
@@ -1386,14 +1379,7 @@ watch(
                         size="small"
                         aria-label="Switch between classic and coffeeshop layout"
                     />
-                    <span
-                        class="text-xs font-medium"
-                        :class="
-                            isCoffeeshopLayout
-                                ? 'text-green-700'
-                                : 'text-gray-400'
-                        "
-                    >
+                    <span class="text-xs font-medium text-gray-400">
                         Coffeeshop
                     </span>
                 </div>
@@ -1678,26 +1664,51 @@ watch(
                 </div>
 
                 <!-- Classic desktop: single cart sidebar -->
-                <customer-order
-                    v-else
-                    layout="sidebar"
-                    @customer-changed="handleCustomerChanged"
-                    @discount-applied="loadCurrentPendingSale"
-                    @cart-updated="loadCurrentPendingSale"
-                    @offline-cart-add="onOfflineCartAdd"
-                    @offline-cart-subtract="onOfflineCartSubtract"
-                    @offline-cart-set-qty="
-                        (e) => onOfflineCartSetQty(e.product, e.quantity)
-                    "
-                    @offline-cart-remove="onOfflineCartRemove"
-                    :loading="isLoadingCart"
-                    :orders="orders"
-                    :orderId="orderId"
-                    :orderDiscountAmount="orderDiscountAmount"
-                    :orderDiscountId="orderDiscountId"
-                    :discountOptions="discountOptions"
-                    :offline-cached-customers="offlineCustomersCache"
-                />
+                <div v-else class="flex min-h-0 flex-col">
+                    <div
+                        class="mb-3 flex shrink-0 items-center justify-between gap-2 border-b border-gray-100 pb-3"
+                    >
+                        <span
+                            class="text-xs font-semibold uppercase tracking-wide text-gray-500"
+                        >
+                            Layout
+                        </span>
+                        <div
+                            class="flex shrink-0 items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1"
+                        >
+                            <span class="text-xs font-medium text-gray-800">
+                                Classic
+                            </span>
+                            <a-switch
+                                v-model:checked="isCoffeeshopLayout"
+                                size="small"
+                                aria-label="Switch between classic and coffeeshop layout"
+                            />
+                            <span class="text-xs font-medium text-gray-400">
+                                Coffeeshop
+                            </span>
+                        </div>
+                    </div>
+                    <customer-order
+                        layout="sidebar"
+                        @customer-changed="handleCustomerChanged"
+                        @discount-applied="loadCurrentPendingSale"
+                        @cart-updated="loadCurrentPendingSale"
+                        @offline-cart-add="onOfflineCartAdd"
+                        @offline-cart-subtract="onOfflineCartSubtract"
+                        @offline-cart-set-qty="
+                            (e) => onOfflineCartSetQty(e.product, e.quantity)
+                        "
+                        @offline-cart-remove="onOfflineCartRemove"
+                        :loading="isLoadingCart"
+                        :orders="orders"
+                        :orderId="orderId"
+                        :orderDiscountAmount="orderDiscountAmount"
+                        :orderDiscountId="orderDiscountId"
+                        :discountOptions="discountOptions"
+                        :offline-cached-customers="offlineCustomersCache"
+                    />
+                </div>
             </template>
             <template #mobile-actions>
                 <SalesMobileCheckoutBar
