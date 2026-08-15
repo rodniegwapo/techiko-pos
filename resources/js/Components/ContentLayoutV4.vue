@@ -4,10 +4,6 @@ defineProps({
         type: String,
         default: "Title",
     },
-    orderCollapsed: {
-        type: Boolean,
-        default: false,
-    },
 });
 </script>
 
@@ -18,10 +14,7 @@ defineProps({
         >
             <!-- Menu / products -->
             <div
-                class="flex h-full min-h-0 min-w-0 flex-col px-4 pt-4 pb-24 sm:px-6 sm:pt-5 md:pb-5"
-                :class="
-                    orderCollapsed ? 'md:flex-1 md:w-auto' : 'md:w-[68%]'
-                "
+                class="flex h-full min-h-0 min-w-0 flex-col px-4 pt-4 pb-24 sm:px-6 sm:pt-5 md:w-[68%] md:pb-5"
             >
                 <div v-if="$slots.hero" class="mb-4 shrink-0">
                     <slot name="hero" />
@@ -65,12 +58,7 @@ defineProps({
 
             <!-- Order rail (desktop) -->
             <div
-                class="cs-order-rail hidden min-h-0 min-w-0 overflow-hidden md:flex md:h-full md:min-h-0 md:flex-col"
-                :class="
-                    orderCollapsed
-                        ? 'md:w-52 md:shrink-0 md:px-3 md:py-5'
-                        : 'md:w-[32%] md:px-5 md:py-6'
-                "
+                class="cs-order-rail hidden min-h-0 min-w-0 overflow-hidden md:flex md:h-full md:min-h-0 md:w-[32%] md:flex-col md:px-5 md:py-6"
             >
                 <div class="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
                     <slot name="right-side-content" />

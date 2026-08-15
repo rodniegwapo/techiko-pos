@@ -104,39 +104,14 @@ const salesLayoutComponent = computed(() => {
 const productTableLayout = computed(() =>
     isMdUp.value ? "desktop" : "mobile",
 );
-/** Desktop coffeeshop cart panel collapse — shared by V4 widths + CustomerOrder */
-const orderCollapsed = useStorage("sales_v4_order_collapsed", false);
-
-/** Collapse only on order step; payment always uses the full rail */
-const railOrderCollapsed = computed(
-    () =>
-        isCoffeeshopLayout.value &&
-        orderCollapsed.value &&
-        checkoutStep.value === "order",
-);
-
-function onRailOrderCollapsedUpdate(collapsed) {
-    if (checkoutStep.value === "payment") {
-        goToOrderStep();
-    }
-    orderCollapsed.value = collapsed;
-}
 
 function onCoffeeshopPaymentSuccess() {
     goToOrderStep();
-    orderCollapsed.value = false;
 }
 
 function onCoffeeshopChargeClick() {
-    orderCollapsed.value = false;
     goToPaymentStep();
 }
-
-watch(checkoutStep, (step) => {
-    if (step === "payment") {
-        orderCollapsed.value = false;
-    }
-});
 
 watch(isCoffeeshopLayout, () => {
     resetCheckoutStep();
@@ -1431,7 +1406,6 @@ watch(
         <component
             :is="salesLayoutComponent"
             title="Create Transaction"
-            :order-collapsed="railOrderCollapsed"
         >
             <template v-if="isCoffeeshopLayout" #hero>
                 <div
@@ -1592,11 +1566,6 @@ watch(
                             >
                                 <customer-order
                                     layout="coffeeshop"
-                                    :order-collapsed="orderCollapsed"
-                                    @update:order-collapsed="
-                                        onRailOrderCollapsedUpdate
-                                    "
-                                    @charge-request="onCoffeeshopChargeClick"
                                     @customer-changed="handleCustomerChanged"
                                     @discount-applied="loadCurrentPendingSale"
                                     @cart-updated="loadCurrentPendingSale"
@@ -1680,7 +1649,7 @@ watch(
                     </div>
 
                     <div
-                        v-show="checkoutStep === 'order' && !orderCollapsed"
+                        v-show="checkoutStep === 'order'"
                         class="cs-rail-charge mt-3 flex shrink-0 items-center justify-between gap-3 border-t border-[var(--cs-border)] bg-[var(--cs-panel)] pt-3"
                     >
                         <div class="min-w-0">
