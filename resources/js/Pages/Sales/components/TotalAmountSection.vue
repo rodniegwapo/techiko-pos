@@ -633,7 +633,7 @@ const creditLimitSufficient = computed(() => {
             :class="
                 layout === 'compact'
                     ? 'px-3 py-3'
-                    : 'px-6 max-w-7xl mx-auto py-4 shadow-sm'
+                    : 'px-6 max-w-7xl mx-auto py-2 shadow-sm'
             "
         >
             <div

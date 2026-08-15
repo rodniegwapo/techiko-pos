@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
-import { Head, usePage } from "@inertiajs/vue3";
+import { Head, usePage, router } from "@inertiajs/vue3";
 import axios from "axios";
 import { v4 as uuidv4 } from "uuid";
 import { PlusSquareOutlined } from "@ant-design/icons-vue";
@@ -13,6 +13,7 @@ import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useNetworkInfo } from "@/Composables/useNetworkInfo";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
+import { useSalesLayoutMode } from "@/Composables/useSalesLayoutMode";
 import { useMediaQuery } from "@vueuse/core";
 import {
     addPendingSale,
@@ -28,6 +29,14 @@ const page = usePage();
 const { getRoute } = useDomainRoutes();
 const { spinning } = useGlobalVariables();
 const { hasPermission } = usePermissionsV2();
+const { domainSlug, isCoffeeshopLayout } = useSalesLayoutMode();
+
+function redirectAwayIfCoffeeshop() {
+    if (!isCoffeeshopLayout.value) return;
+    router.visit(getRoute("sales.index"), { replace: true });
+}
+
+watch(isCoffeeshopLayout, redirectAwayIfCoffeeshop, { immediate: true });
 
 const isMdUp = useMediaQuery("(min-width: 768px)");
 
@@ -45,9 +54,6 @@ const captureModalRootStyle = computed(() =>
     isMdUp.value ? {} : { maxWidth: "100vw", top: "12px", paddingBottom: 0 },
 );
 
-const domainSlug = computed(
-    () => page.props.domain?.name_slug ?? page.props.domain?.nameSlug,
-);
 const locations = computed(() => page.props.locations ?? []);
 const activeLocationId = computed(() => page.props.activeLocationId);
 
