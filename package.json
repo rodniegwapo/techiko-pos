@@ -19,6 +19,7 @@
         "vue": "^3.4.0"
     },
     "dependencies": {
+        "@fontsource/fraunces": "^5.3.0",
         "@fontsource/inter": "^5.2.6",
         "@tabler/icons-vue": "^2.4.0",
         "@vueuse/core": "^9.12.0",

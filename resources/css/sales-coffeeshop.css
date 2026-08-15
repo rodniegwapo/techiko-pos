@@ -1,0 +1,104 @@
+/* Coffeeshop Sales mode — scoped under .sales-coffeeshop */
+
+.sales-coffeeshop {
+    --cs-bg: #f3efe6;
+    --cs-panel: #faf7f1;
+    --cs-panel-soft: #f7f2ea;
+    --cs-ink: #3b2f27;
+    --cs-muted: #8a7b6d;
+    --cs-accent: #c4a574;
+    --cs-accent-hover: #b3925f;
+    --cs-border: rgba(59, 47, 39, 0.1);
+    --cs-card: #ffffff;
+    color: var(--cs-ink);
+}
+
+.sales-coffeeshop .cs-stage {
+    background: var(--cs-bg);
+}
+
+.sales-coffeeshop .cs-order-rail {
+    background: var(--cs-panel);
+    border-left: 1px solid var(--cs-border);
+}
+
+.sales-coffeeshop .cs-display {
+    font-family: Fraunces, Georgia, serif;
+}
+
+.sales-coffeeshop .ant-btn-primary:not(.ant-btn-background-ghost) {
+    background: var(--cs-accent) !important;
+    border-color: var(--cs-accent) !important;
+}
+
+.sales-coffeeshop .ant-btn-primary:not(.ant-btn-background-ghost):hover,
+.sales-coffeeshop .ant-btn-primary:not(.ant-btn-background-ghost):focus {
+    background: var(--cs-accent-hover) !important;
+    border-color: var(--cs-accent-hover) !important;
+}
+
+.sales-coffeeshop .cs-footer-skin {
+    background: var(--cs-panel) !important;
+    border-top: 1px solid var(--cs-border);
+}
+
+.sales-coffeeshop .cs-footer-skin .text-green-600,
+.sales-coffeeshop .cs-footer-skin .text-green-700 {
+    color: var(--cs-ink) !important;
+}
+
+.sales-coffeeshop .cs-thumb-letter {
+    font-size: 0.875rem !important;
+}
+
+.sales-coffeeshop .cs-charge-btn.ant-btn-primary {
+    background: var(--cs-accent) !important;
+    border-color: var(--cs-accent) !important;
+    color: #fff !important;
+    font-weight: 600;
+}
+
+.sales-coffeeshop .cs-charge-btn.ant-btn-primary:hover,
+.sales-coffeeshop .cs-charge-btn.ant-btn-primary:focus {
+    background: var(--cs-accent-hover) !important;
+    border-color: var(--cs-accent-hover) !important;
+}
+
+.sales-coffeeshop .cs-charge-btn.ant-btn-primary[disabled] {
+    opacity: 0.45;
+}
+
+.sales-coffeeshop .cs-rail-charge {
+    flex-shrink: 0;
+    position: relative;
+    z-index: 2;
+}
+
+/* Viewport lock: stage fits one screen; only product grid scrolls */
+.sales-coffeeshop.sales-coffeeshop--viewport {
+    /* Layout padding: p-3 (0.75rem*2) mobile, md:p-6 (1.5rem*2) desktop */
+    /* Mobile sticky header ~3rem when visible */
+    --cs-viewport-pad: 1.5rem;
+    --cs-mobile-header: 3.25rem;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    height: calc(100dvh - var(--cs-mobile-header) - var(--cs-viewport-pad));
+    max-height: calc(100dvh - var(--cs-mobile-header) - var(--cs-viewport-pad));
+}
+
+@media (min-width: 768px) {
+    .sales-coffeeshop.sales-coffeeshop--viewport {
+        --cs-viewport-pad: 3rem;
+        height: calc(100dvh - var(--cs-viewport-pad));
+        max-height: calc(100dvh - var(--cs-viewport-pad));
+    }
+}
+
+.sales-coffeeshop.sales-coffeeshop--viewport .cs-stage {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+}
