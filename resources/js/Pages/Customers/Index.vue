@@ -176,20 +176,23 @@ console.log("Items prop:", props.items);
 <template>
   <AuthenticatedLayout>
     <Head title="Customers" />
-    <ContentHeader class="mb-8" title="Customer Management" />
-    
-    <ContentLayout title="Customer Management">
+    <ContentHeader class="mb-4 md:mb-8" title="Customer Management" />
+
+    <ContentLayout
+      title="Customer Management"
+      filter-class="flex flex-wrap items-center justify-end gap-2 w-full min-w-0"
+    >
       <template #filters>
         <RefreshButton :loading="spinning" @click="getItems" />
         <a-input-search
           v-model:value="search"
           placeholder="Search customers by name, email, or phone..."
-          class="min-w-[100px] max-w-[400px]"
+          class="w-full min-w-0 md:max-w-[400px]"
         />
         <a-button
           @click="handleAddCustomer"
           type="primary"
-          class="bg-white border flex items-center border-green-500 text-green-500"
+          class="flex w-full items-center justify-center border border-green-500 bg-white text-green-500 md:inline-flex md:w-auto"
         >
           <template #icon>
             <IconPlus />

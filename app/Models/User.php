@@ -2,9 +2,10 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Services\UserHierarchyService;
 use App\Traits\Searchable;
+use Illuminate\Auth\MustVerifyEmail as MustVerifyEmailTrait;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -12,9 +13,9 @@ use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasPermissions;
 use Spatie\Permission\Traits\HasRoles;
 
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
-    use HasApiTokens, HasFactory, HasPermissions, HasRoles, Notifiable, Searchable;
+    use HasApiTokens, HasFactory, HasPermissions, HasRoles, MustVerifyEmailTrait, Notifiable, Searchable;
 
     /**
      * The guard name for Spatie Permission.
@@ -209,10 +210,10 @@ class User extends Authenticatable
             return true;
         }
 
-        return $this->permissions()
-            ->where('route_name', $routeName)
-            ->orWhere('name', $routeName) // Fallback for backward compatibility
-            ->exists();
+        return $this->getAllPermissions()->contains(function ($permission) use ($routeName) {
+            return $permission->route_name === $routeName
+                || $permission->name === $routeName; // Fallback for backward compatibility
+        });
     }
 
     /**

@@ -32,39 +32,28 @@ const {
     <Head title="Dashboard" />
 
     <AuthenticatedLayout>
-        <ContentHeader title="Dashboard" :isDashboard="true">
-            <template #actions>
-                <FilterDropdown
-                    :filters="filtersConfig"
-                    :selectedValues="{ location_id: selectedLocation }"
-                    @update:selectedValues="
-                        (values) => {
-                            selectedLocation = values.location_id;
-                            getItems();
-                        }
-                    "
-                />
-                <RefreshButton @click="getItems" />
-            </template>
-        </ContentHeader>
+        <ContentHeader title="Dashboard" :isDashboard="true"> </ContentHeader>
 
         <SummaryCards :cards="summaryCards" />
 
-        <div class="flex w-full gap-6 mb-8">
+        <div class="flex w-full flex-col gap-6 mb-8 lg:flex-row">
             <SalesOverview
-                class="w-[60%]"
+                class="w-full min-w-0 lg:flex-[3]"
                 :options="salesChartOptions"
                 :series="salesChartSeries"
                 v-model:graphFilter="graphFilter"
             />
-            <TopProducts class="w-[40%]" :products="topProducts" />
+            <TopProducts
+                class="w-full min-w-0 lg:flex-[2]"
+                :products="topProducts"
+            />
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
             <CombinedInventoryAlerts :alerts="inventoryAlerts" />
-            <PerformanceCard 
-                :storePerformance="storePerformance" 
-                :topUsers="topUsers" 
+            <PerformanceCard
+                :storePerformance="storePerformance"
+                :topUsers="topUsers"
             />
         </div>
     </AuthenticatedLayout>

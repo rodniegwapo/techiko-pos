@@ -1,8 +1,8 @@
 <template>
-  <div class="p-6">
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+  <div class="min-w-0 w-full p-4 md:p-6">
+    <div class="grid min-w-0 w-full grid-cols-1 gap-6 md:gap-8 lg:grid-cols-2">
       <!-- Tier Distribution -->
-      <div class="bg-white border rounded-lg p-4">
+      <div class="min-w-0 w-full rounded-lg border bg-white p-4">
         <h3 class="text-lg font-medium text-gray-900 mb-4">
           Tier Distribution
         </h3>
@@ -37,9 +37,9 @@
       </div>
 
       <!-- Points Overview -->
-      <div class="bg-white border rounded-lg p-4">
+      <div class="min-w-0 w-full rounded-lg border bg-white p-4">
         <h3 class="text-lg font-medium text-gray-900 mb-4">Points Overview</h3>
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid min-w-0 w-full grid-cols-1 gap-4 sm:grid-cols-2">
           <div class="bg-blue-50 rounded-lg p-4 text-center border">
             <div class="text-2xl font-bold text-blue-600">
               {{ stats.total_points_issued?.toLocaleString() || 0 }}
@@ -75,7 +75,7 @@
       </div>
 
       <!-- Revenue Impact -->
-      <div class="bg-white border rounded-lg p-4">
+      <div class="min-w-0 w-full rounded-lg border bg-white p-4">
         <h3 class="text-lg font-medium text-gray-900 mb-4">Revenue Impact</h3>
         <div class="space-y-4">
           <div class="bg-gray-50 rounded-lg p-4 border">
@@ -131,7 +131,7 @@
       </div>
 
       <!-- Recent Activity -->
-      <div class="bg-white border rounded-lg p-4">
+      <div class="min-w-0 w-full rounded-lg border bg-white p-4">
         <h3 class="text-lg font-medium text-gray-900 mb-4">Recent Activity</h3>
         <div class="space-y-3 max-h-64 overflow-y-auto">
           <div

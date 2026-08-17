@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Enums\Role;
 use App\Models\Domain;
+use App\Models\InventoryLocation;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -23,13 +24,14 @@ class UserSeeder extends Seeder
 
         // Create super user (Level 1 - no restrictions)
         $superUser = User::updateOrCreate(
-            ['email' => 'super.admin@example.com'],
+            ['email' => env('SUPER_USER_EMAIL')],
             [
                 'name' => 'Super Admin',
-                'password' => Hash::make('password'),
+                'password' => Hash::make(env('SUPER_USER_PASSWORD')),
                 'is_super_user' => true,
                 'role_level' => 1,
                 'can_switch_locations' => true,
+                'email_verified_at' => now(),
             ]
         );
 
@@ -37,14 +39,16 @@ class UserSeeder extends Seeder
         $domainSlugs = Domain::pluck('name_slug')->all();
         $pickDomain = function (int $i) use ($domainSlugs) {
             $count = max(count($domainSlugs), 1);
-            return $domainSlugs[ $i % $count ] ?? null;
+
+            return $domainSlugs[$i % $count] ?? null;
         };
 
         // Load inventory locations for assignment
-        $locations = \App\Models\InventoryLocation::all();
+        $locations = InventoryLocation::all();
         $pickLocation = function (int $i) use ($locations) {
             $count = max(count($locations), 1);
-            return $locations[ $i % $count ]->id ?? null;
+
+            return $locations[$i % $count]->id ?? null;
         };
 
         // Organization-specific users
@@ -134,7 +138,7 @@ class UserSeeder extends Seeder
 
         foreach ($users as $data) {
             // Determine role level based on role
-            $roleLevel = match($data['role']) {
+            $roleLevel = match ($data['role']) {
                 'admin' => 2,
                 'manager' => 3,
                 'supervisor' => 4,
@@ -145,7 +149,7 @@ class UserSeeder extends Seeder
             // Get location ID if location_code is specified
             $locationId = null;
             if (isset($data['location_code'])) {
-                $location = \App\Models\InventoryLocation::where('code', $data['location_code'])->first();
+                $location = InventoryLocation::where('code', $data['location_code'])->first();
                 $locationId = $location ? $location->id : null;
             }
 
@@ -159,6 +163,7 @@ class UserSeeder extends Seeder
                     'role_level' => $roleLevel,
                     'location_id' => $locationId,
                     'can_switch_locations' => $roleLevel <= 2, // Level 1-2 can switch locations
+                    'email_verified_at' => now(),
                 ]
             );
 
@@ -167,4 +172,3 @@ class UserSeeder extends Seeder
         }
     }
 }
-

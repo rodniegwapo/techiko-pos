@@ -3,7 +3,8 @@ import MarketingHeroOrbit from "@/Components/Marketing/MarketingHeroOrbit.vue";
 import MarketingPageHero from "@/Components/Marketing/MarketingPageHero.vue";
 import MarketingSeoHead from "@/Components/MarketingSeoHead.vue";
 import MarketingLayout from "@/Layouts/MarketingLayout.vue";
-import { Link } from "@inertiajs/vue3";
+import { Link, usePage } from "@inertiajs/vue3";
+import { computed } from "vue";
 
 defineProps({
     seo: {
@@ -11,6 +12,11 @@ defineProps({
         required: true,
     },
 });
+
+const page = usePage();
+const showMarketingPricing = computed(
+    () => !!page.props.features?.marketing_pricing_visible,
+);
 </script>
 
 <template>
@@ -55,6 +61,7 @@ defineProps({
                     class="mt-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4"
                 >
                     <Link
+                        v-if="showMarketingPricing"
                         :href="route('marketing.pricing')"
                         class="inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-teal-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:from-blue-700 hover:to-teal-600"
                     >
@@ -67,7 +74,7 @@ defineProps({
                         Contact
                     </Link>
                     <Link
-                        :href="route('marketing.home')"
+                        :href="route('home')"
                         class="text-sm font-semibold text-blue-600 transition hover:text-teal-600"
                     >
                         Back to home

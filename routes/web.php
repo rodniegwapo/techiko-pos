@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Controllers\Billing\AdminManualPaymentsController;
+use App\Http\Controllers\Catalog\SharedProductController;
+use App\Http\Controllers\Catalog\SharedProductSuggestionController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ConversationController;
 use App\Http\Controllers\CustomerController;
@@ -22,6 +25,7 @@ use App\Http\Controllers\StockAdjustmentController;
 use App\Http\Controllers\SupervisorAssignmentController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VoidLogController;
+use App\Http\Controllers\Webhooks\PayMongoWebhookController;
 use App\Models\User;
 use App\Services\UserHierarchyService;
 use Illuminate\Support\Facades\Route;
@@ -34,14 +38,26 @@ use Inertia\Inertia;
 */
 
 // Public marketing (SEO) – `/login` is the canonical auth entry (see routes/auth.php)
-Route::get('/', [MarketingController::class, 'home'])->name('marketing.home');
+Route::get('/', [MarketingController::class, 'home'])->name('home');
 Route::get('/services', [MarketingController::class, 'services'])->name('marketing.services');
 Route::get('/about', [MarketingController::class, 'about'])->name('marketing.about');
 Route::get('/contact', [MarketingController::class, 'contact'])->name('marketing.contact');
-Route::get('/pricing', [MarketingController::class, 'pricing'])->name('marketing.pricing');
+//Route::get('/pricing', [MarketingController::class, 'pricing'])->name('marketing.pricing');
 
 Route::get('/sitemap.xml', [SeoController::class, 'sitemap'])->name('sitemap');
-Route::get('/robots.txt', [SeoController::class, 'robots'])->name('robots');
+// Source of truth is public/robots.txt (nginx often serves it before PHP). Route keeps tests / non-nginx stacks working.
+Route::get('/robots.txt', function () {
+    $path = public_path('robots.txt');
+    abort_unless(file_exists($path), 404);
+
+    return response(
+        file_get_contents($path),
+        200,
+        ['Content-Type' => 'text/plain; charset=UTF-8'],
+    );
+})->name('robots');
+
+Route::post('/webhooks/paymongo', [PayMongoWebhookController::class, 'handle'])->name('webhooks.paymongo');
 
 Route::get('/dashboard', [DashboardController::class, 'index'])
     ->middleware(['auth', 'verified'])
@@ -62,13 +78,13 @@ Route::middleware('auth')->group(function () {
 // ===================================
 // GLOBAL ROUTES (Super Users Only)
 // ===================================
-Route::middleware(['auth', 'user.permission'])->group(function () {
+Route::middleware(['auth', 'verified', 'user.permission'])->group(function () {
     // Sales (Global - All Organizations)
     Route::get('/sales', [SaleController::class, 'index'])->name('sales.index');
 
     // Products (Global - All Organizations)
     Route::resource('products', ProductController::class)
-        ->only(['index', 'store', 'update', 'destroy'])
+        ->only(['index', 'create', 'store', 'edit', 'update', 'destroy'])
         ->names('products');
 
     // Categories (Global - All Organizations)
@@ -96,6 +112,20 @@ Route::middleware(['auth', 'user.permission'])->group(function () {
 
     // Void Logs (Global)
     Route::get('/void-logs', [VoidLogController::class, 'index'])->name('voids.index');
+
+    // Shared product catalog (super-only; controllers enforce isSuperUser)
+    Route::prefix('catalog')->name('catalog.')->group(function () {
+        Route::resource('shared-products', SharedProductController::class)->only(['index', 'store', 'update', 'destroy']);
+        Route::get('shared-product-suggestions', [SharedProductSuggestionController::class, 'index'])->name('shared-product-suggestions.index');
+        Route::post('shared-product-suggestions/{shared_product_suggestion}/accept', [SharedProductSuggestionController::class, 'accept'])->name('shared-product-suggestions.accept');
+        Route::post('shared-product-suggestions/{shared_product_suggestion}/reject', [SharedProductSuggestionController::class, 'reject'])->name('shared-product-suggestions.reject');
+    });
+
+    Route::prefix('billing')->name('billing.')->group(function () {
+        Route::get('/manual-payments', [AdminManualPaymentsController::class, 'index'])->name('manual-payments.index');
+        Route::post('/manual-payments/{manual_payment_request}/approve', [AdminManualPaymentsController::class, 'approve'])->name('manual-payments.approve');
+        Route::post('/manual-payments/{manual_payment_request}/reject', [AdminManualPaymentsController::class, 'reject'])->name('manual-payments.reject');
+    });
 
     // Inventory Management (Global)
     Route::prefix('inventory')->name('inventory.')->group(function () {
@@ -131,10 +161,10 @@ Route::get('/thank-you', function () {
 })->name('registration.thankyou');
 
 // Organization-specific routes extracted to routes/domains.php
-require __DIR__.'/domains.php';
+require __DIR__ . '/domains.php';
 
 // Domain Management Routes (for super users)
-Route::middleware(['auth', 'user.permission'])->prefix('domains')->name('domains.')->group(function () {
+Route::middleware(['auth', 'verified', 'user.permission'])->prefix('domains')->name('domains.')->group(function () {
     Route::get('/', [DomainController::class, 'index'])->name('index');
     Route::get('/create', [DomainController::class, 'create'])->name('create');
     Route::post('/', [DomainController::class, 'store'])->name('store');
@@ -146,7 +176,7 @@ Route::middleware(['auth', 'user.permission'])->prefix('domains')->name('domains
 });
 
 // Global routes (not domain-specific)
-Route::middleware(['auth', 'user.permission'])->group(function () {
+Route::middleware(['auth', 'verified', 'user.permission'])->group(function () {
     // User Management (global - not domain specific)
     Route::get('/users', [UserController::class, 'index'])->name('users.index');
     Route::get('/users/hierarchy', [UserController::class, 'hierarchy'])->name('users.hierarchy');
@@ -169,10 +199,8 @@ Route::middleware(['auth', 'user.permission'])->group(function () {
 
     // Cascading Assignment Routes
     Route::get('/supervisors/cascading-options', [SupervisorAssignmentController::class, 'cascadingOptions'])
-        ->middleware('auth')
         ->name('supervisors.cascading-options');
     Route::post('/supervisors/{supervisor}/cascading-assign', [SupervisorAssignmentController::class, 'cascadingAssign'])
-        ->middleware('auth')
         ->name('supervisors.cascading-assign');
 
     // Role Management (Only for super user)
@@ -206,7 +234,7 @@ Route::get('/debug-super-user', function () {
         'isSuperUser_method' => $user->isSuperUser(),
         'method_exists' => method_exists($user, 'isSuperUser'),
     ]);
-})->middleware('auth');
+})->middleware(['auth', 'verified']);
 
 Route::get('/debug-role-hierarchy', function () {
     $hierarchy = UserHierarchyService::getRoleHierarchyInfo();
@@ -230,9 +258,9 @@ Route::get('/debug-role-hierarchy', function () {
         'role_hierarchy' => $hierarchy,
         'users_without_supervisors' => $usersWithoutSupervisors,
     ]);
-})->middleware('auth');
+})->middleware(['auth', 'verified']);
 
-Route::middleware(['auth'])->group(function () {
+Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/inquiries', [ConversationController::class, 'store'])
         ->middleware('throttle:20,1')
         ->name('inquiries.store');
@@ -240,10 +268,10 @@ Route::middleware(['auth'])->group(function () {
         ->name('conversations.messages');
 });
 
-Route::middleware(['auth', 'check.super.user'])->group(function () {
+Route::middleware(['auth', 'verified', 'check.super.user'])->group(function () {
     Route::get('/messages', [ConversationController::class, 'index'])->name('messages.index');
     Route::post('/messages/{conversation}/read', [ConversationController::class, 'markRead'])->name('messages.read');
     Route::post('/messages/{conversation}/messages', [ConversationController::class, 'storeStaff'])->name('messages.staff');
 });
 
-require __DIR__.'/auth.php';
+require __DIR__ . '/auth.php';

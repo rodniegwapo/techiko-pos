@@ -7,9 +7,10 @@ import {
     DownloadOutlined,
     PrinterOutlined,
 } from "@ant-design/icons-vue";
+import { IconWorld } from "@tabler/icons-vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useFilters, toLabel } from "@/Composables/useFilters";
-import { watchDebounced } from "@vueuse/core";
+import { watchDebounced, useMediaQuery } from "@vueuse/core";
 
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
@@ -21,6 +22,7 @@ import LocationInfoAlert from "@/Components/LocationInfoAlert.vue";
 
 const page = usePage();
 const { spinning } = useGlobalVariables();
+const isMdUp = useMediaQuery("(min-width: 768px)");
 
 const selectedLocation = ref(null);
 const selectedDomain = ref(null);
@@ -169,6 +171,19 @@ const tableColumns = computed(() => {
     return baseColumns;
 });
 
+const showSuperUserDomain = computed(
+    () =>
+        page.props.auth?.user?.data?.is_super_user && page.props.isGlobalView,
+);
+
+const formatCurrency = (value) =>
+    `₱${parseFloat(value || 0).toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+    })}`;
+
+const formatLastMovement = (date) =>
+    date ? new Date(date).toLocaleDateString() : "N/A";
+
 // Filter management - Domain first, then Location
 const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
     getItems,
@@ -233,19 +248,33 @@ const printValuation = () => {
     <Head title="Inventory Valuation Report" />
 
     <AuthenticatedLayout>
-        <ContentHeader title="Inventory Valuation Report" />
+        <ContentHeader
+            class="mb-4 md:mb-8"
+            title="Inventory Valuation Report"
+        />
 
-        <ContentLayout title="Valuation Report">
+        <ContentLayout
+            title="Valuation Report"
+            filter-class="flex flex-wrap items-center justify-end gap-2 w-full min-w-0"
+        >
             <template #filters>
                 <RefreshButton :loading="spinning" @click="getItems" />
 
-                <a-button @click="exportValuation" type="primary">
+                <a-button
+                    class="w-full md:w-auto"
+                    @click="exportValuation"
+                    type="primary"
+                >
                     <template #icon>
                         <DownloadOutlined />
                     </template>
                     Export
                 </a-button>
-                <a-button @click="printValuation" type="primary">
+                <a-button
+                    class="w-full md:w-auto"
+                    @click="printValuation"
+                    type="primary"
+                >
                     <template #icon>
                         <PrinterOutlined />
                     </template>
@@ -350,6 +379,7 @@ const printValuation = () => {
                         </template>
 
                         <a-table
+                            v-if="isMdUp"
                             :columns="tableColumns"
                             :data-source="items"
                             :pagination="{
@@ -375,34 +405,135 @@ const printValuation = () => {
                                 </template>
                             </template>
                         </a-table>
+
+                        <div v-else class="px-2 py-2 md:px-0">
+                            <div
+                                v-if="!items?.length"
+                                class="py-12 text-center text-sm text-gray-500"
+                            >
+                                <BoxPlotOutlined
+                                    class="mx-auto mb-4 text-4xl text-gray-400"
+                                />
+                                <p>No valuation items found</p>
+                                <p class="text-xs text-gray-400">
+                                    Try adjusting your filters or check back
+                                    later
+                                </p>
+                            </div>
+                            <div v-else class="flex flex-col gap-3">
+                                <div
+                                    v-for="(record, index) in items"
+                                    :key="record.sku || index"
+                                    class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm"
+                                >
+                                    <div
+                                        class="flex flex-wrap items-start justify-between gap-2 px-4 py-3"
+                                    >
+                                        <div class="min-w-0">
+                                            <p
+                                                class="truncate text-sm font-semibold text-gray-900"
+                                            >
+                                                {{ record.product_name }}
+                                            </p>
+                                            <p class="text-xs text-gray-500">
+                                                SKU: {{ record.sku || "N/A" }}
+                                            </p>
+                                        </div>
+                                        <span
+                                            class="text-base font-bold text-green-600"
+                                        >
+                                            {{ formatCurrency(record.total_value) }}
+                                        </span>
+                                    </div>
+
+                                    <div
+                                        class="mx-4 mb-3 rounded-lg bg-gray-50 p-3"
+                                    >
+                                        <div
+                                            class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-sm"
+                                        >
+                                            <span class="text-gray-500"
+                                                >Quantity</span
+                                            >
+                                            <span
+                                                class="text-right font-semibold text-gray-900"
+                                            >
+                                                {{
+                                                    record.quantity_on_hand?.toLocaleString() ??
+                                                    0
+                                                }}
+                                            </span>
+                                            <span class="text-gray-500"
+                                                >Avg cost</span
+                                            >
+                                            <span
+                                                class="text-right font-medium text-gray-900"
+                                            >
+                                                {{
+                                                    formatCurrency(
+                                                        record.average_cost,
+                                                    )
+                                                }}
+                                            </span>
+                                            <span class="text-gray-500"
+                                                >Last movement</span
+                                            >
+                                            <span
+                                                class="text-right font-medium text-gray-900"
+                                            >
+                                                {{
+                                                    formatLastMovement(
+                                                        record.last_movement_at,
+                                                    )
+                                                }}
+                                            </span>
+                                            <template v-if="showSuperUserDomain">
+                                                <span class="text-gray-500"
+                                                    >Domain</span
+                                                >
+                                                <span
+                                                    class="flex min-w-0 items-center justify-end gap-1 truncate font-medium text-gray-900"
+                                                >
+                                                    <IconWorld
+                                                        size="16"
+                                                        class="shrink-0"
+                                                    />
+                                                    {{ record.domain || "N/A" }}
+                                                </span>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </a-card>
                 </div>
 
                 <!-- Summary Footer -->
                 <div class="mb-6 px-6">
-                    <div>
-                        <div class="flex justify-between items-center">
-                            <div>
-                                <h3 class="text-lg font-semibold text-gray-800">
-                                    Report Summary
-                                </h3>
-                                <p class="text-sm text-gray-600">
-                                    Total value of {{ totalProducts }} products
-                                    with {{ totalQuantity }} units in stock
-                                </p>
-                            </div>
-                            <div class="text-right">
-                                <p class="text-sm text-gray-600 font-bold">
-                                    Grand Total
-                                </p>
-                                <p class="text-3xl font-bold text-green-600">
-                                    ₱{{
-                                        totalValue.toLocaleString("en-US", {
-                                            minimumFractionDigits: 2,
-                                        })
-                                    }}
-                                </p>
-                            </div>
+                    <div
+                        class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between"
+                    >
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-800">
+                                Report Summary
+                            </h3>
+                            <p class="text-sm text-gray-600">
+                                Total value of {{ totalProducts }} products
+                                with {{ totalQuantity }} units in stock
+                            </p>
+                        </div>
+                        <div class="md:text-right">
+                            <p class="text-sm font-bold text-gray-600">
+                                Grand Total
+                            </p>
+                            <p class="text-3xl font-bold text-green-600">
+                                ₱{{
+                                    totalValue.toLocaleString("en-US", {
+                                        minimumFractionDigits: 2,
+                                    })
+                                }}
+                            </p>
                         </div>
                     </div>
                 </div>

@@ -8,11 +8,10 @@ import { Head, Link } from '@inertiajs/vue3';
     <div class="max-w-xl w-full bg-white border rounded-xl shadow-sm p-8 text-center">
       <h1 class="text-2xl font-semibold text-gray-900 mb-2">Thank you for registering!</h1>
       <p class="text-gray-600 mb-6">
-        Your organization was submitted for review. We’ll notify you by email once it’s approved.
+        We sent a verification link to your email. Open it to confirm your address—you’ll be signed in automatically. You can also use Sign in below after you’ve verified.
       </p>
       <div class="space-y-2 text-sm text-gray-500 mb-8">
-        <p>If you didn’t receive any emails, please check your spam folder.</p>
-        <p>You may safely close this window now.</p>
+        <p>If you don’t see the message, check spam or promotions. Until you verify, most app pages will redirect you to the verification screen when you sign in.</p>
       </div>
       <Link
         :href="route('login')"

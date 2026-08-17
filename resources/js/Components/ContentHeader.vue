@@ -1,43 +1,54 @@
 <script setup>
-import dayjs from 'dayjs'
+import { ref, onMounted, onBeforeUnmount } from "vue";
+import dayjs from "dayjs";
 
 defineProps({
     title: String,
     isDashboard: {
         type: Boolean,
-        default: false
-    }
-})
+        default: false,
+    },
+});
 
+const now = ref(dayjs());
+let clockTimer = null;
+
+onMounted(() => {
+    clockTimer = setInterval(() => {
+        now.value = dayjs();
+    }, 1000);
+});
+
+onBeforeUnmount(() => {
+    if (clockTimer) {
+        clearInterval(clockTimer);
+    }
+});
 </script>
 
 <template>
     <div>
-        <div class="w-full flex justify-between items-end">
-            <p class="text-xl font-semibold mb-0" v-if="isDashboard">
-                {{ title }}
-            </p>
-            <p class="text-xl font-semibold mb-0" v-else>
-                {{ title }}
-            </p>
-        </div>
-
         <div
-            class="flex lg:w-1/2 md:w-1/2 sm:w-full lg:space-x-6 md:space-x-6 sm:space-x-0 items-center"
+            class="mb-2 flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
         >
-            <p v-if="isDashboard" class="sm:hidden lg:block md:block">
-                Here’s your dashboard today
+            <p class="mb-0 min-w-0 text-xl font-semibold">
+                {{ title }}
             </p>
-            <p class="text-xs sm:hidden lg:block md:block">
-              {{ dayjs().format('dddd, MMMM D, YYYY HH:mm:ss') }}
-            </p>
-        </div>
-
-        <div>
-            <div class="text-[8pt] sm:block md:hidden lg:hidden">
-                <span v-if="isDashboard">Here’s your dashboard today</span>
-             {{ dayjs().format('dddd, MMMM D, YYYY HH:mm:ss') }}
+            <div
+                class="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto sm:justify-end"
+            >
+                <slot name="actions" />
             </div>
         </div>
+
+        <p class="mb-4 min-w-0 break-words text-xs text-gray-500">
+            <span v-if="isDashboard">Here's your dashboard today</span>
+            <span v-if="isDashboard"> · </span>
+            <span>{{ now.format("dddd, MMMM D, YYYY HH:mm:ss") }}</span>
+            <template v-if="$slots.meta">
+                <span> | </span>
+                <slot name="meta" />
+            </template>
+        </p>
     </div>
 </template>

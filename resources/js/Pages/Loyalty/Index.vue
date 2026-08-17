@@ -2,7 +2,7 @@
   <Head title="Loyalty Program" />
 
   <AuthenticatedLayout>
-    <ContentHeader class="mb-4" title="Loyalt Programs" />
+    <ContentHeader class="mb-4 md:mb-8" title="Loyalt Programs" />
     <!-- Enhanced Stats Overview with Animations -->
     <div class=" relative z-10">
       <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-6">
@@ -148,8 +148,8 @@
       <template #table>
         <!-- Enhanced Tabs with Modern Design -->
 
-        <div class="loyalty-programs">
-          <a-tabs v-model:activeKey="activeTab" size="large">
+        <div class="loyalty-tabs">
+          <a-tabs v-model:activeKey="activeTab" :size="tabSize">
             <!-- Program Rules Tab -->
             <a-tab-pane key="rules">
               <template #tab>
@@ -206,6 +206,7 @@
 
 <script setup>
 import { ref, onMounted, computed } from "vue";
+import { useMediaQuery } from "@vueuse/core";
 import { Head } from "@inertiajs/vue3";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
@@ -222,6 +223,9 @@ import {
 } from "@ant-design/icons-vue";
 import { notification } from "ant-design-vue";
 import axios from "axios";
+
+const isMdUp = useMediaQuery("(min-width: 768px)");
+const tabSize = computed(() => (isMdUp.value ? "large" : "small"));
 
 // Reactive data
 const activeTab = ref("rules");

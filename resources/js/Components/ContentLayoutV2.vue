@@ -19,9 +19,6 @@ const props = defineProps({
 
 <template>
     <div>
-        <div>
-            <slot name="offline-info"> </slot>
-        </div>
         <div class="rounded-lg w-full flex gap-4">
             <div class="w-[70%] p-6 bg-white rounded-lg shadow">
                 <div :class="filterMainClass">

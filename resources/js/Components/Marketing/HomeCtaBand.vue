@@ -1,5 +1,11 @@
 <script setup>
-import { Link } from "@inertiajs/vue3";
+import { Link, usePage } from "@inertiajs/vue3";
+import { computed } from "vue";
+
+const page = usePage();
+const showMarketingPricing = computed(
+    () => !!page.props.features?.marketing_pricing_visible,
+);
 </script>
 
 <template>
@@ -19,13 +25,19 @@ import { Link } from "@inertiajs/vue3";
             <p
                 class="mx-auto mt-3 max-w-xl text-base text-blue-100 leading-relaxed md:text-lg"
             >
-                Open an account to explore Techiko POS, or sign in if your team
-                is already on board. See
-                <Link
-                    :href="route('marketing.pricing')"
-                    class="font-semibold text-white underline decoration-teal-200/90 decoration-2 underline-offset-2 transition hover:text-blue-50"
-                >pricing &amp; plans</Link>
-                for how to get started.
+                <template v-if="showMarketingPricing">
+                    Open an account to explore Techiko POS, or sign in if your team
+                    is already on board. See
+                    <Link
+                        :href="route('marketing.pricing')"
+                        class="font-semibold text-white underline decoration-teal-200/90 decoration-2 underline-offset-2 transition hover:text-blue-50"
+                    >pricing &amp; plans</Link>
+                    for how to get started.
+                </template>
+                <template v-else>
+                    Open an account to explore Techiko POS, or sign in if your team
+                    is already on board.
+                </template>
             </p>
             <div
                 class="mt-8 flex flex-wrap items-center justify-center gap-3"

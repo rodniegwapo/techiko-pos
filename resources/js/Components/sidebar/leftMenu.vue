@@ -24,11 +24,15 @@ import { router, usePage } from "@inertiajs/vue3";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
+import { useSidebar } from "@/Composables/useSidebar";
+import { useSalesLayoutMode } from "@/Composables/useSalesLayoutMode";
 
 const page = usePage();
 const { hasPermission } = usePermissionsV2();
 const { selectedKeys, openKeys } = useGlobalVariables();
-const { getRoute } = useDomainRoutes();
+const { getRoute, getLocationQueryFromPage } = useDomainRoutes();
+const { closeMobileDrawer } = useSidebar();
+const { isCoffeeshopLayout } = useSalesLayoutMode();
 
 // Ensure selectedKeys and openKeys are arrays
 if (!Array.isArray(selectedKeys.value)) {
@@ -132,12 +136,24 @@ const menuItems = [
         domainOnly: true,
     },
     {
-        key: "payment-wallet",
-        title: "Payment wallet",
+        key: "wallet-group",
+        title: "Cash & wallet",
         icon: IconWallet,
-        routeName: "payment-card-types.index",
-        path: "/payment-card-types",
         domainOnly: true,
+        children: [
+            {
+                key: "wallet-money-movement",
+                title: "Money movement",
+                routeName: "wallet.money-movement",
+                path: "/wallet/money-movement",
+            },
+            {
+                key: "wallet-card-terminals",
+                title: "Card terminals",
+                routeName: "payment-card-types.index",
+                path: "/payment-card-types",
+            },
+        ],
     },
     {
         key: "domains",
@@ -158,24 +174,44 @@ const menuItems = [
                 title: "Items",
                 routeName: "products.index",
                 path: "/products",
+                hideForSuperOutsideDomain: true,
             },
             {
                 key: "products-categories",
                 title: "Categories",
                 routeName: "categories.index",
                 path: "/categories",
+                hideForSuperOutsideDomain: true,
             },
             {
                 key: "products-discounts",
                 title: "Discounts",
                 routeName: "products.discounts.index",
                 path: "/products/discounts",
+                hideForSuperOutsideDomain: true,
+            },
+            {
+                key: "catalog-shared-products",
+                title: "Shared catalog",
+                routeName: "catalog.shared-products.index",
+                path: "/catalog/shared-products",
+                superUserOnly: true,
+                globalOnly: true,
+            },
+            {
+                key: "catalog-suggestions",
+                title: "Catalog suggestions",
+                routeName: "catalog.shared-product-suggestions.index",
+                path: "/catalog/shared-product-suggestions",
+                superUserOnly: true,
+                globalOnly: true,
             },
             {
                 key: "mandatory-discounts",
                 title: "Mandatory Discounts",
                 routeName: "mandatory-discounts.index",
                 path: "/mandatory-discounts",
+                hideForSuperOutsideDomain: true,
             },
         ],
     },
@@ -183,6 +219,7 @@ const menuItems = [
         key: "inventory",
         title: "Inventory",
         icon: IconPackage,
+        hideForSuperOutsideDomain: true,
         children: [
             {
                 key: "inventory-dashboard",
@@ -228,6 +265,7 @@ const menuItems = [
         icon: IconGift,
         routeName: "loyalty.index",
         path: "/loyalty",
+        hideForSuperOutsideDomain: true,
     },
     {
         key: "voids",
@@ -235,6 +273,7 @@ const menuItems = [
         icon: IconHistory,
         routeName: "voids.index",
         path: "/void-logs",
+        hideForSuperOutsideDomain: true,
     },
     {
         key: "customers",
@@ -242,6 +281,7 @@ const menuItems = [
         icon: IconUsers,
         routeName: "customers.index",
         path: "/customers",
+        hideForSuperOutsideDomain: true,
     },
     {
         key: "credits",
@@ -275,6 +315,14 @@ const menuItems = [
         domainOnly: true,
     },
     {
+        key: "billing-servicing",
+        title: "Servicing payment",
+        icon: IconWallet,
+        routeName: "billing.servicing.index",
+        path: "/billing/servicing",
+        domainOnly: true,
+    },
+    {
         key: "roles",
         title: "Roles",
         icon: IconUserCheck,
@@ -288,6 +336,15 @@ const menuItems = [
         icon: IconKey,
         routeName: "permissions.index",
         path: "/permissions",
+        superUserOnly: true,
+        globalOnly: true,
+    },
+    {
+        key: "manual-gcash-payments",
+        title: "Manual GCash payments",
+        icon: IconWallet,
+        routeName: "billing.manual-payments.index",
+        path: "/billing/manual-payments",
         superUserOnly: true,
         globalOnly: true,
     },
@@ -333,8 +390,29 @@ const menus = computed(() => {
                     return false;
                 }
 
+                // Tenant ops: hide from super when browsing global URLs (show again under /domains/{slug}/)
+                if (
+                    isSuperUser.value &&
+                    !isInDomainContext.value &&
+                    item.hideForSuperOutsideDomain
+                ) {
+                    return false;
+                }
+
                 // Hide Sales for super users (Sales page not relevant for super user role)
                 if (item.key === "sales" && isSuperUser.value) {
+                    return false;
+                }
+
+                // Coffeeshop layout: Offline sales page is hidden
+                if (item.key === "offline-sales" && isCoffeeshopLayout.value) {
+                    return false;
+                }
+
+                if (
+                    item.key === "billing-servicing" &&
+                    !page.props.features?.domain_servicing_sidebar_visible
+                ) {
                     return false;
                 }
 
@@ -372,6 +450,23 @@ const menus = computed(() => {
 });
 
 // ===================
+// WALLET MENU QUERY (optional business_date from current URL only)
+// ===================
+function walletMenuQuery() {
+    const url = page.url || "";
+    const idx = url.indexOf("?");
+    if (idx === -1) {
+        return {};
+    }
+    const params = new URLSearchParams(url.slice(idx + 1));
+    const bd = params.get("business_date");
+    if (bd) {
+        return { business_date: bd };
+    }
+    return {};
+}
+
+// ===================
 // MENU CLICK HANDLER
 // ===================
 const handleClick = (menu) => {
@@ -380,12 +475,45 @@ const handleClick = (menu) => {
         return;
     }
 
+    localStorage.setItem("selectedMenuForMobile", menu.title);
     try {
+        if (menu.key === "wallet-money-movement") {
+            const routePath = getRoute("wallet.money-movement");
+            if (routePath && routePath !== "#") {
+                selectedKeys.value = [menu.key];
+                router.get(routePath, {
+                    ...getLocationQueryFromPage(),
+                    ...walletMenuQuery(),
+                });
+                closeMobileDrawer();
+            }
+            return;
+        }
+
+        if (menu.key === "wallet-card-terminals") {
+            const routePath = getRoute("payment-card-types.index");
+            if (routePath && routePath !== "#") {
+                selectedKeys.value = [menu.key];
+                router.get(routePath, {
+                    ...getLocationQueryFromPage(),
+                    ...walletMenuQuery(),
+                });
+                closeMobileDrawer();
+            }
+            return;
+        }
+
         const routePath = getRoute(menu.routeName);
 
         if (routePath && routePath !== "#") {
             selectedKeys.value = [menu.key];
-            router.visit(routePath);
+            const slug = getCurrentDomainFromUrl();
+            if (slug) {
+                router.get(routePath, getLocationQueryFromPage());
+            } else {
+                router.visit(routePath);
+            }
+            closeMobileDrawer();
         } else {
             console.error(
                 "Invalid route generated for menu:",
@@ -510,7 +638,8 @@ const safeMenus = computed(() => {
                         </span>
                         <span
                             v-else-if="
-                                menu.key === 'messages' && inquiryUnreadCount > 0
+                                menu.key === 'messages' &&
+                                inquiryUnreadCount > 0
                             "
                             class="ml-1 min-w-[1.1rem] rounded-full bg-red-500 px-1.5 text-center text-[10px] leading-tight text-white"
                         >

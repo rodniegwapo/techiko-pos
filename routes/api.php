@@ -55,7 +55,7 @@ Route::middleware(['auth:sanctum', 'user.permission'])->group(function () {
      * -----------------------
      */
     Route::prefix('customers')->group(function () {
-        Route::get('/', [CustomerController::class, 'index'])->name('customers.index');
+        Route::get('/', [CustomerController::class, 'index'])->name('api.customers.index');
         Route::get('/search', [CustomerController::class, 'search'])->name('customers.search');
         Route::get('/tier-options', [CustomerController::class, 'getTierOptions'])->name('customers.tier-options');
         Route::post('/', [CustomerController::class, 'store'])->name('customers.store');
@@ -91,15 +91,15 @@ Route::middleware(['auth:sanctum', 'user.permission'])->group(function () {
      * User Management Routes
      * -----------------------
      */
-    Route::get('/users/roles', [UserController::class, 'getRoles'])->name('users.roles');
-    Route::patch('/users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
+    Route::get('/users/roles', [UserController::class, 'getRoles'])->name('api.users.roles');
+    Route::patch('/users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('api.users.toggle-status');
 
     Route::apiResource('users', UserController::class)->names([
-        'index'   => 'users.index',
-        'store'   => 'users.store',
-        'show'    => 'users.show',
-        'update'  => 'users.update',
-        'destroy' => 'users.destroy',
+        'index'   => 'api.users.index',
+        'store'   => 'api.users.store',
+        'show'    => 'api.users.show',
+        'update'  => 'api.users.update',
+        'destroy' => 'api.users.destroy',
     ]);
 
 
@@ -110,7 +110,7 @@ Route::middleware(['auth:sanctum', 'user.permission'])->group(function () {
      * Inventory Routes
      * -----------------------
      */
-    Route::prefix('inventory')->name('inventory.')->group(function () {
+    Route::prefix('inventory')->name('api.inventory.')->group(function () {
         // Core Inventory
         Route::get('/products', [InventoryController::class, 'products'])->name('products');
         Route::get('/movements', [InventoryController::class, 'movements'])->name('movements');

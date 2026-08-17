@@ -12,6 +12,7 @@ use App\Models\Product\Product;
 use App\Models\StockAdjustment;
 use App\Services\InventoryService;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Inertia\Inertia;
 
 class StockAdjustmentController extends Controller
@@ -24,6 +25,23 @@ class StockAdjustmentController extends Controller
     public function index(Request $request, Domain $domain)
     {
         $location = Helpers::getActiveLocation($domain, $request->input('location_id'));
+
+        if (! $location) {
+            $empty = new LengthAwarePaginator([], 0, $request->per_page ?? 20);
+
+            return Inertia::render('Inventory/StockAdjustments/Index', [
+                'adjustments' => StockAdjustmentResource::collection($empty),
+                'locations' => InventoryLocation::active()->forDomain($domain->name_slug)->get(),
+                'statuses' => [
+                    'draft' => 'Draft',
+                    'pending_approval' => 'Pending Approval',
+                    'approved' => 'Approved',
+                    'rejected' => 'Rejected',
+                ],
+                'filters' => $request->only(['search', 'status', 'location_id', 'date_from', 'date_to']),
+                'isGlobalView' => false,
+            ]);
+        }
 
         $query = StockAdjustment::with(['location', 'createdBy', 'approvedBy'])
             ->withCount('items')
@@ -105,6 +123,7 @@ class StockAdjustmentController extends Controller
 
         // Domain guard on location
         $location = InventoryLocation::forDomain($domain->name_slug)->findOrFail($validated['location_id']);
+        $validated['domain'] = $location->domain ?? $domain->name_slug;
 
         $adjustment = $this->inventoryService->createStockAdjustment(
             $validated,
@@ -196,7 +215,9 @@ class StockAdjustmentController extends Controller
 
         $query = Product::with(['inventories' => function ($q) use ($locationId) {
             $q->where('location_id', $locationId);
-        }])->where('track_inventory', true);
+        }])
+            ->where('domain', $domain->name_slug)
+            ->where('track_inventory', true);
 
         if (! empty($validated['search'])) {
             $query->search($validated['search']);

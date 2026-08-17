@@ -8,13 +8,18 @@ use App\Models\Category;
 use App\Models\Domain;
 use App\Models\Product\Product;
 use App\Models\Product\ProductSoldType;
+use App\Services\DomainSubscriptionService;
+use App\Support\BarcodeNormalizer;
+use App\Support\ProductImageStorage;
 use App\Support\ProductPayloadNormalizer;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class ProductController extends Controller
 {
-    public function __construct()
-    {
+    public function __construct(
+        private DomainSubscriptionService $subscriptionService,
+    ) {
         // Middleware is handled at route level
     }
 
@@ -49,9 +54,54 @@ class ProductController extends Controller
         ]);
     }
 
+    public function create(Request $request)
+    {
+        return inertia('Products/Create', [
+            'categories' => Category::query()->orderBy('domain')->orderBy('name')->get(),
+            'sold_by_types' => ProductSoldType::all(),
+            'isGlobalView' => true,
+            'currentLocation' => null,
+            'domains' => Domain::select('id', 'name', 'name_slug')->get(),
+        ]);
+    }
+
+    public function edit(Request $request, Product $product)
+    {
+        return inertia('Products/Edit', [
+            'product' => [
+                ...$product->toArray(),
+                'representation_display_url' => ProductImageStorage::displayUrl(
+                    $product->representation,
+                    $product->representation_type,
+                ),
+            ],
+            'categories' => Category::query()
+                ->when($product->domain, fn ($q) => $q->where('domain', $product->domain))
+                ->orderBy('name')
+                ->get(),
+            'sold_by_types' => ProductSoldType::all(),
+            'isGlobalView' => true,
+            'currentLocation' => null,
+            'domains' => Domain::select('id', 'name', 'name_slug')->get(),
+        ]);
+    }
+
     public function store(Request $request)
     {
-        $data = ProductPayloadNormalizer::applyRepresentationAndCostDefaults($this->validatedData($request));
+        $data = ProductPayloadNormalizer::applyRepresentationAndCostDefaults($this->validatedData($request, null));
+        $data = ProductPayloadNormalizer::applyUploadedRepresentationImage(
+            $request,
+            $data,
+            $data['domain'] ?? null,
+        );
+
+        $domainModel = isset($data['domain'])
+            ? Domain::where('name_slug', $data['domain'])->first()
+            : null;
+
+        if ($domainModel) {
+            $this->subscriptionService->assertCanCreateProduct($domainModel);
+        }
 
         Product::create($data);
 
@@ -60,7 +110,12 @@ class ProductController extends Controller
 
     public function update(Request $request, Product $product)
     {
-        $data = ProductPayloadNormalizer::applyRepresentationAndCostDefaults($this->validatedData($request));
+        $data = ProductPayloadNormalizer::applyRepresentationAndCostDefaults($this->validatedData($request, $product));
+        $data = ProductPayloadNormalizer::applyUploadedRepresentationImage(
+            $request,
+            $data,
+            $product->domain ?? ($data['domain'] ?? null),
+        );
 
         $product->update($data);
 
@@ -71,28 +126,62 @@ class ProductController extends Controller
     {
         $product->delete();
 
-        redirect()->back();
+        return redirect()->back();
     }
 
-    private function validatedData(Request $request)
+    private function validatedData(Request $request, ?Product $product = null): array
     {
+        $productId = $product?->id;
+
+        $barcodeRules = ['required', 'string', 'max:255'];
+        if ($request->filled('domain')) {
+            $domainSlug = $request->domain;
+            $barcodeRules[] = Rule::unique('products', 'barcode')
+                ->where(fn ($q) => $q->where('domain', $domainSlug))
+                ->ignore($productId);
+        } else {
+            $barcodeRules[] = Rule::unique('products', 'barcode')->ignore($productId);
+        }
+
         $rules = [
             'name' => ['required', 'string', 'max:255'],
-            'sold_type' => ['required', 'exists:product_sold_types,name'], // must exist in table
+            'sold_type' => ['required', 'exists:product_sold_types,name'],
             'price' => ['required', 'numeric', 'min:0'],
             'cost' => ['nullable', 'numeric', 'min:0'],
-            'SKU' => ['required', 'string', 'max:100', 'unique:products,SKU,'.$request->id],
-            'barcode' => ['required', 'string', 'max:255', 'unique:products,barcode,'.$request->id],
+            'SKU' => ['nullable', 'string', 'max:255', 'unique:products,SKU,'.$productId],
+            'barcode' => $barcodeRules,
             'representation_type' => ['nullable', 'string', 'in:image,color,text'],
             'representation' => ['nullable', 'string'],
+            'representation_image' => [
+                'nullable',
+                'image',
+                'mimes:jpeg,jpg,png,webp,gif',
+                'max:2048',
+            ],
             'category_id' => ['nullable', 'exists:categories,id'],
         ];
 
-        // Add domain validation for global view
         if ($request->has('domain') && $request->domain) {
             $rules['domain'] = ['required', 'string', 'exists:domains,name_slug'];
         }
 
-        return $request->validate($rules);
+        $data = $request->validate($rules, [], [
+            'representation_image' => 'product image',
+        ]);
+
+        if (array_key_exists('category_id', $data) && $data['category_id'] === '') {
+            $data['category_id'] = null;
+        }
+        if (array_key_exists('SKU', $data)) {
+            $trim = isset($data['SKU']) ? trim((string) $data['SKU']) : '';
+            $data['SKU'] = $trim === '' ? null : $trim;
+        }
+        if (! empty($data['barcode'])) {
+            $data['barcode'] = BarcodeNormalizer::normalize($data['barcode']);
+        }
+
+        unset($data['representation_image']);
+
+        return $data;
     }
 }

@@ -1,17 +1,18 @@
 <template>
   <a-table
+    class="ant-table-striped"
     :columns="columns"
     :data-source="invoices"
     :loading="loading"
     :pagination="{ pageSize: 10 }"
+    :row-class-name="(_, index) => (index % 2 === 1 ? 'bg-gray-50 group' : 'group')"
     row-key="id"
   >
     <template #bodyCell="{ column, record }">
       <template v-if="column.key === 'invoice_number'">
-        <a v-if="record.sale" @click="handleViewInvoice(record.sale)">
-          {{ record.reference_number || record.sale?.invoice_number || 'N/A' }}
-        </a>
-        <span v-else>{{ record.reference_number || 'N/A' }}</span>
+        <span>
+          {{ record.reference_number || record.sale?.invoice_number || "N/A" }}
+        </span>
       </template>
 
       <template v-if="column.key === 'date'">
@@ -20,7 +21,12 @@
 
       <template v-if="column.key === 'amount'">
         <span class="font-medium text-red-600">
-          ₱{{ record.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}
+          ₱{{
+            record.amount.toLocaleString("en-US", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })
+          }}
         </span>
       </template>
 
@@ -38,9 +44,24 @@
       </template>
 
       <template v-if="column.key === 'actions'">
-        <a-button size="small" type="primary" @click="$emit('recordPayment', record)">
-          Record Payment
-        </a-button>
+        <div class="flex items-center justify-center gap-2">
+          <IconTooltipButton
+            hover="group-hover:bg-teal-500"
+            name="Record Payment"
+            @click="$emit('recordPayment', record)"
+          >
+            <IconCash size="20" class="mx-auto" />
+          </IconTooltipButton>
+
+          <IconTooltipButton
+            hover="group-hover:bg-blue-500"
+            name="View order"
+            :disabled="!record.sale"
+            @click="$emit('viewOrder', record)"
+          >
+            <IconListDetails size="20" class="mx-auto" />
+          </IconTooltipButton>
+        </div>
       </template>
     </template>
   </a-table>
@@ -48,14 +69,16 @@
 
 <script setup>
 import { computed } from "vue";
+import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
+import { IconCash, IconListDetails } from "@tabler/icons-vue";
 
-const props = defineProps({
+defineProps({
   invoices: Array,
   customer: Object,
   loading: Boolean,
 });
 
-const emit = defineEmits(["recordPayment"]);
+defineEmits(["recordPayment", "viewOrder"]);
 
 const columns = computed(() => [
   {
@@ -117,10 +140,5 @@ const getDueDateClass = (dueDate) => {
   if (daysOverdue > 0) return "text-red-600 font-medium";
   if (daysOverdue === 0) return "text-orange-600 font-medium";
   return "text-gray-600";
-};
-
-const handleViewInvoice = (sale) => {
-  // Navigate to sale details if needed
-  console.log("View invoice:", sale);
 };
 </script>

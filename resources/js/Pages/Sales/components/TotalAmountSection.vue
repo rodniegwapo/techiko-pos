@@ -2,11 +2,13 @@
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import ApplyOrderDiscountModal from "./ApplyOrderDiscountModal.vue";
 import CardPaymentTypeModal from "./CardPaymentTypeModal.vue";
-import { IconDiscount, IconArrowRightToArc } from "@tabler/icons-vue";
+import LoyaltyRedemptionModal from "./LoyaltyRedemptionModal.vue";
+import { IconDiscount, IconGift, IconArrowRightToArc } from "@tabler/icons-vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useCredit } from "@/Composables/useCredit";
+import { useSaleTotals } from "@/Composables/useSaleTotals";
 import { ref, computed, createVNode, toRefs, watch, inject } from "vue";
 import { Modal, notification } from "ant-design-vue";
 import { ExclamationCircleOutlined } from "@ant-design/icons-vue";
@@ -48,6 +50,23 @@ const props = defineProps({
             vat_pricing_mode: "exclusive",
         }),
     },
+    loyaltyRedemptionSettings: {
+        type: Object,
+        default: () => ({
+            points_per_currency_unit: 100,
+            max_redemption_percent_of_eligible_net: 50,
+            min_points_redemption: 1,
+        }),
+    },
+    layout: {
+        type: String,
+        default: "footer",
+        validator: (value) => ["footer", "compact"].includes(value),
+    },
+    coffeeshopSkin: {
+        type: Boolean,
+        default: false,
+    },
 });
 
 const {
@@ -64,92 +83,133 @@ const emit = defineEmits([
     "discount-applied",
     "cart-updated",
     "save-offline-sale",
+    "payment-success",
     "update:offlinePaymentMethod",
     "update:offlinePaymentCardTypeId",
 ]);
 
-// Computed values
-const totalAmount = computed(() => {
-    return orders.value.reduce((sum, order) => {
-        const price = parseFloat(order.price) || 0;
-        const quantity = parseInt(order.quantity) || 0;
-        const subtotal = !isNaN(price * quantity)
-            ? price * quantity
-            : quantity * price;
-        return sum + subtotal;
-    }, 0);
+const {
+    salesSettingsResolved,
+    totalAmount,
+    isInclusive,
+    netAfterOrderDiscount,
+    taxAmountDisplay,
+    grandTotalDisplay,
+    netExVatDisplay,
+} = useSaleTotals({
+    orders,
+    orderDiscountAmount,
+    salesSettings: computed(() => props.salesSettings),
+    currentSale,
+    salesCartIsOnline,
 });
 
-const salesSettingsResolved = computed(
+const loyaltyCfg = computed(
     () =>
-        props.salesSettings ?? {
-            apply_vat_automatically: false,
-            vat_rate_percent: 12,
-            vat_pricing_mode: "exclusive",
+        props.loyaltyRedemptionSettings ?? {
+            points_per_currency_unit: 100,
+            max_redemption_percent_of_eligible_net: 50,
+            min_points_redemption: 1,
         },
 );
 
-const isInclusive = computed(
-    () => salesSettingsResolved.value.vat_pricing_mode === "inclusive",
+const loyaltyPointsDraft = ref(0);
+const loyaltyPatching = ref(false);
+const loyaltyRedemptionModalOpen = ref(false);
+
+watch(
+    () => [currentSale.value, currentSale.value?.loyalty_points_redeemed],
+    () => {
+        if (!currentSale.value) {
+            loyaltyPointsDraft.value = 0;
+            loyaltyRedemptionModalOpen.value = false;
+            return;
+        }
+        const v = currentSale.value.loyalty_points_redeemed;
+        if (v !== undefined && v !== null) {
+            loyaltyPointsDraft.value = Number(v) || 0;
+        } else {
+            loyaltyPointsDraft.value = 0;
+        }
+    },
+    { immediate: true },
 );
 
-const netAfterOrderDiscount = computed(() =>
-    Math.max(
-        0,
-        Number(totalAmount.value) -
-            (parseFloat(orderDiscountAmount.value) || 0),
-    ),
-);
-
-const taxAmountDisplay = computed(() => {
-    if (!salesSettingsResolved.value.apply_vat_automatically) {
-        return 0;
-    }
-    if (
-        salesCartIsOnline.value &&
-        currentSale.value &&
-        currentSale.value.tax_amount != null
-    ) {
-        return Number(currentSale.value.tax_amount) || 0;
-    }
-    const rate =
-        (Number(salesSettingsResolved.value.vat_rate_percent) || 12) / 100;
-    const net = netAfterOrderDiscount.value;
-    if (isInclusive.value) {
-        return Math.round(net * (rate / (1 + rate)) * 100) / 100;
-    }
-    return Math.round(net * rate * 100) / 100;
+const maxRedeemablePoints = computed(() => {
+    if (!props.selectedCustomer?.loyalty_points) return 0;
+    const ppcu = Number(loyaltyCfg.value.points_per_currency_unit) || 100;
+    const maxPct =
+        (Number(loyaltyCfg.value.max_redemption_percent_of_eligible_net) ||
+            50) / 100;
+    const net = Number(netAfterOrderDiscount.value) || 0;
+    if (net <= 0) return 0;
+    const maxPeso = Math.min(net * maxPct, net);
+    const maxPts = Math.floor(maxPeso * ppcu);
+    return Math.min(maxPts, Number(props.selectedCustomer.loyalty_points) || 0);
 });
 
-const grandTotalDisplay = computed(() => {
-    if (
-        salesCartIsOnline.value &&
-        currentSale.value &&
-        currentSale.value.grand_total != null
-    ) {
-        return Number(currentSale.value.grand_total) || 0;
-    }
-    if (
-        salesSettingsResolved.value.apply_vat_automatically &&
-        isInclusive.value
-    ) {
-        return netAfterOrderDiscount.value;
-    }
-    return netAfterOrderDiscount.value + taxAmountDisplay.value;
-});
-
-const netExVatDisplay = computed(() => {
-    if (!salesSettingsResolved.value.apply_vat_automatically) {
-        return 0;
-    }
-    if (!isInclusive.value) {
-        return 0;
-    }
-    return Math.max(
+const syncLoyaltyRedemptionPatch = async () => {
+    if (!salesCartIsOnline.value || !orderId.value) return;
+    if (!props.selectedCustomer?.id) return;
+    const ruleCap = maxRedeemablePoints.value;
+    const onSalePts = Number(currentSale.value?.loyalty_points_redeemed) || 0;
+    const upperBound = Math.max(ruleCap, onSalePts);
+    let clamped = Math.max(
         0,
-        Number(grandTotalDisplay.value) - Number(taxAmountDisplay.value),
+        Math.min(Number(loyaltyPointsDraft.value) || 0, upperBound),
     );
-});
+    if (
+        clamped > 0 &&
+        clamped < (Number(loyaltyCfg.value.min_points_redemption) || 1)
+    ) {
+        clamped = 0;
+        loyaltyPointsDraft.value = 0;
+    }
+
+    const onSale = Number(currentSale.value?.loyalty_points_redeemed) || 0;
+    if (clamped === onSale) {
+        return;
+    }
+
+    loyaltyPatching.value = true;
+    try {
+        await axios.patch(
+            getRoute("sales.loyalty-redemption", {
+                sale: orderId.value,
+            }),
+            {
+                loyalty_points: clamped,
+                customer_id: props.selectedCustomer.id,
+            },
+        );
+        emit("cart-updated");
+    } catch (e) {
+        const msg =
+            e.response?.data?.message ||
+            Object.values(e.response?.data?.errors || {})[0]?.[0] ||
+            "Could not update loyalty redemption.";
+        notification.error({ message: "Loyalty redemption", description: msg });
+    } finally {
+        loyaltyPatching.value = false;
+    }
+};
+
+/** Sale already has redeemed points locked to the order (still open modal to adjust/clear when caps shrink). */
+const saleHasActiveRedemption = computed(
+    () => (Number(currentSale.value?.loyalty_points_redeemed) || 0) > 0,
+);
+
+const loyaltyRedemptionIconEnabled = computed(
+    () =>
+        !loyaltyPatching.value &&
+        (maxRedeemablePoints.value > 0 || saleHasActiveRedemption.value),
+);
+
+async function onLoyaltyModalApply(points) {
+    loyaltyPointsDraft.value = Math.max(0, Math.floor(Number(points) || 0));
+    loyaltyRedemptionModalOpen.value = false;
+    await syncLoyaltyRedemptionPatch();
+}
 
 // Using formattedTotal from useHelpers composable
 
@@ -176,23 +236,9 @@ const showDiscountOrder = async () => {
     let currentMandatoryDiscount = null;
 
     try {
-        // Use consolidated discount data from props instead of API call
-        console.log(
-            "TotalAmountSection - discountOptions:",
-            discountOptions.value,
-        );
         const { promotional_discount_options, mandatory_discount_options } =
             discountOptions.value;
-        console.log(
-            "TotalAmountSection - promotional_discount_options:",
-            promotional_discount_options,
-        );
-        console.log(
-            "TotalAmountSection - mandatory_discount_options:",
-            mandatory_discount_options,
-        );
 
-        // Convert database discounts to option objects for the select components
         regularDiscountOptions = (promotional_discount_options || []).map(
             (discount) => ({
                 label: `${discount.name} (${
@@ -227,9 +273,7 @@ const showDiscountOrder = async () => {
                 const saleResponse = await axios.get(
                     getRoute("sales.discounts.sale", { sale: orderId.value }),
                 );
-                console.log("Sale discounts response:", saleResponse.data);
 
-                // Handle different response structures - backend returns 'discounts'
                 const sale_discounts =
                     saleResponse.data?.discounts ||
                     saleResponse.data?.sale_discounts ||
@@ -253,12 +297,6 @@ const showDiscountOrder = async () => {
                         }),
                     );
 
-                    console.log(
-                        "Current promotional discounts loaded:",
-                        currentPromotionalDiscounts,
-                    );
-
-                    // Get currently applied mandatory discount
                     const appliedMandatory = sale_discounts.filter(
                         (item) => item.discount_type === "mandatory",
                     );
@@ -278,18 +316,9 @@ const showDiscountOrder = async () => {
                             type: mandatory.mandatoryDiscount?.type,
                         };
                     }
-
-                    console.log(
-                        "Current mandatory discount loaded:",
-                        currentMandatoryDiscount,
-                    );
                 }
-            } catch (saleError) {
-                console.log(
-                    "No current discounts found or error loading sale discounts:",
-                    saleError,
-                );
-                // This is not an error - just means no discounts are currently applied
+            } catch {
+                // No discounts currently applied
             }
         }
     } catch (error) {
@@ -367,9 +396,7 @@ const handleProceedPaymentConfirmation = () => {
                 }
             });
         },
-        onCancel() {
-            console.log("Cancel");
-        },
+        onCancel() {},
     });
 };
 
@@ -421,6 +448,7 @@ const handleProceedPayment = async () => {
             customer_id: props.selectedCustomer?.id || null,
             sale_amount: grandTotalDisplay.value,
             payment_method: paymentMethod.value,
+            loyalty_points_to_redeem: Number(loyaltyPointsDraft.value ?? 0),
         };
         if (paymentMethod.value === "card" && selectedPaymentCardTypeId.value) {
             body.payment_card_type_id = selectedPaymentCardTypeId.value;
@@ -475,6 +503,7 @@ const handleProceedPayment = async () => {
 
         // Refresh current pending sale data to show updated state
         emit("cart-updated");
+        emit("payment-success");
 
         localStorage.setItem("order_discount_amount", 0);
         localStorage.setItem("order_discount_ids", "");
@@ -599,10 +628,21 @@ const creditLimitSufficient = computed(() => {
 </script>
 
 <template>
-    <div class="bg-white">
-        <div class="px-6 max-w-7xl mx-auto py-4 shadow-sm">
-            <!-- Horizontal Layout - Single Row -->
-            <div class="flex items-center justify-between gap-6">
+    <div :class="coffeeshopSkin ? 'cs-footer-skin' : 'bg-white'">
+        <div
+            :class="
+                layout === 'compact'
+                    ? 'px-3 py-3'
+                    : 'px-6 max-w-7xl mx-auto py-2 shadow-sm'
+            "
+        >
+            <div
+                :class="
+                    layout === 'compact'
+                        ? 'flex flex-col gap-3'
+                        : 'flex items-center justify-between gap-6'
+                "
+            >
                 <!-- Order Discount -->
                 <div class="flex items-center gap-2">
                     <span class="text-gray-700 whitespace-nowrap"
@@ -611,7 +651,7 @@ const creditLimitSufficient = computed(() => {
                     <span class="font-medium">{{
                         formattedTotal(orderDiscountAmount)
                     }}</span>
-                    <icon-tooltip-button
+                    <IconTooltipButton
                         name="Apply Order Discount"
                         :class="{
                             'hover:bg-green-700 p-1': orders.length !== 0,
@@ -620,7 +660,7 @@ const creditLimitSufficient = computed(() => {
                         @click="showDiscountOrder"
                     >
                         <IconDiscount size="20" class="mx-auto" />
-                    </icon-tooltip-button>
+                    </IconTooltipButton>
                 </div>
 
                 <!-- Subtotal -->
@@ -667,6 +707,38 @@ const creditLimitSufficient = computed(() => {
                     }}</span>
                 </div>
 
+                <!-- Loyalty redemption (configured in modal; synced via PATCH) -->
+                <div
+                    v-if="
+                        salesCartIsOnline && props.selectedCustomer && orderId
+                    "
+                    class="flex shrink-0 items-center gap-2"
+                >
+                    <span class="text-gray-700 whitespace-nowrap"
+                        >Loyalty redemption:</span
+                    >
+                    <span class="font-medium">{{
+                        formattedTotal(
+                            currentSale?.loyalty_discount_amount ?? 0,
+                        )
+                    }}</span>
+                    <IconTooltipButton
+                        name="Apply loyalty redemption"
+                        :class="{
+                            'hover:bg-amber-600 p-1':
+                                loyaltyRedemptionIconEnabled,
+                        }"
+                        :disabled="!loyaltyRedemptionIconEnabled"
+                        @click="loyaltyRedemptionModalOpen = true"
+                    >
+                        <IconGift
+                            size="20"
+                            class="mx-auto"
+                            aria-hidden="true"
+                        />
+                    </IconTooltipButton>
+                </div>
+
                 <!-- Total -->
                 <div class="flex flex-col gap-0.5">
                     <div class="flex items-center gap-2">
@@ -690,15 +762,33 @@ const creditLimitSufficient = computed(() => {
             </div>
 
             <hr class="mt-4" />
-            <div class="p-2 flex gap-8">
+            <div
+                :class="
+                    layout === 'compact'
+                        ? 'flex flex-col gap-4 p-2'
+                        : 'p-2 flex gap-8'
+                "
+            >
                 <!-- Payment Method -->
-                <div class="flex items-start flex-col gap-2">
+                <div
+                    class="flex w-full flex-col items-stretch gap-2"
+                    :class="
+                        layout === 'compact'
+                            ? 'rounded-lg  bg-white '
+                            : 'items-start'
+                    "
+                >
                     <span class="text-gray-700 whitespace-nowrap"
-                        >Payment Method</span
+                        >Payment method</span
                     >
                     <a-radio-group
                         v-model:value="paymentMethod"
                         button-style="solid"
+                        :class="
+                            layout === 'compact'
+                                ? 'flex w-full [&>.ant-radio-button-wrapper]:flex-1 [&>.ant-radio-button-wrapper]:text-center'
+                                : ''
+                        "
                     >
                         <a-radio-button value="cash">Cash</a-radio-button>
                         <a-radio-button value="card">Card</a-radio-button>
@@ -792,8 +882,10 @@ const creditLimitSufficient = computed(() => {
                     <a-button
                         v-if="salesCartIsOnline"
                         type="primary"
-                        class="w-[300px]"
-                        :class="disabledPaymentButtonColor"
+                        :class="[
+                            layout === 'compact' ? 'w-full' : 'w-[300px]',
+                            disabledPaymentButtonColor,
+                        ]"
                         @click="handleProceedPaymentConfirmation"
                         :disabled="
                             proceedPaymentLoading ||
@@ -812,7 +904,11 @@ const creditLimitSufficient = computed(() => {
                     <a-button
                         v-else
                         type="primary"
-                        class="w-[300px] bg-amber-700 border-amber-700 hover:bg-amber-600"
+                        :class="
+                            layout === 'compact'
+                                ? 'w-full bg-amber-700 border-amber-700 hover:bg-amber-600'
+                                : 'w-[300px] bg-amber-700 border-amber-700 hover:bg-amber-600'
+                        "
                         :disabled="
                             orders.length == 0 ||
                             (paymentMethod === 'card' &&
@@ -831,8 +927,6 @@ const creditLimitSufficient = computed(() => {
                 :orderId="orderId"
                 :orders="orders"
                 :currentSale="currentSale"
-                :orderDiscountAmount="orderDiscountAmount"
-                :orderDiscountId="orderDiscountId"
                 :discountOptions="discountOptions"
                 @close="openOrderDicountModal = false"
                 @discount-applied="emit('discount-applied')"
@@ -845,6 +939,18 @@ const creditLimitSufficient = computed(() => {
                 :initial-selected-id="selectedPaymentCardTypeId"
                 @confirm="onCardTypeModalConfirm"
                 @cancel="onCardTypeModalCancel"
+            />
+
+            <loyalty-redemption-modal
+                :open-modal="loyaltyRedemptionModalOpen"
+                :selected-customer="selectedCustomer"
+                :loyalty-cfg="loyaltyCfg"
+                :max-redeemable-points="maxRedeemablePoints"
+                :eligible-net-peso="netAfterOrderDiscount"
+                :initial-points="loyaltyPointsDraft"
+                :patching="loyaltyPatching"
+                @close="loyaltyRedemptionModalOpen = false"
+                @apply="onLoyaltyModalApply"
             />
         </div>
     </div>

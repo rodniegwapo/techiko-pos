@@ -2,8 +2,10 @@
 import { PlusSquareOutlined } from "@ant-design/icons-vue";
 import { ref, inject, computed } from "vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
+import { notifyInsufficientStock } from "@/Composables/useCartStockNotification";
 import { usePage } from "@inertiajs/vue3";
 import axios from "axios";
+import ProductMedia from "@/Components/ProductMedia.vue";
 
 const props = defineProps({
     products: {
@@ -14,6 +16,22 @@ const props = defineProps({
         type: Boolean,
         default: false,
     },
+    loadingMore: {
+        type: Boolean,
+        default: false,
+    },
+    hasMoreProducts: {
+        type: Boolean,
+        default: false,
+    },
+    productsTotal: {
+        type: Number,
+        default: 0,
+    },
+    salesCartIsOnline: {
+        type: Boolean,
+        default: true,
+    },
     orders: {
         type: Array,
         default: () => [],
@@ -22,25 +40,54 @@ const props = defineProps({
         type: [String, Number],
         default: null,
     },
+    layout: {
+        type: String,
+        default: "desktop",
+        validator: (value) => ["desktop", "mobile"].includes(value),
+    },
+    variant: {
+        type: String,
+        default: "classic",
+        validator: (value) => ["classic", "coffeeshop"].includes(value),
+    },
 });
 
 const { getRoute } = useDomainRoutes();
 const page = usePage();
 
-const salesCartIsOnline = inject(
+const salesCartIsOnlineInject = inject(
     "isSalesOnline",
     computed(() => true),
 );
 
-// Emit events to parent
-const emit = defineEmits(["cart-updated", "offline-add-product"]);
+const online = computed(() =>
+    typeof props.salesCartIsOnline === "boolean"
+        ? props.salesCartIsOnline
+        : salesCartIsOnlineInject.value,
+);
 
-// Handle adding items to cart with direct API call
-const loading = ref(false);
+const isCoffeeshop = computed(() => props.variant === "coffeeshop");
+
+const emit = defineEmits(["cart-updated", "offline-add-product", "load-more"]);
+
+function isOutOfStock(product) {
+    if (!product?.track_inventory) return false;
+    if (
+        product.location_quantity_available === null ||
+        product.location_quantity_available === undefined
+    ) {
+        return false;
+    }
+    return Number(product.location_quantity_available) <= 0;
+}
+
+const addingItem = ref(false);
 const addToCart = async (product) => {
+    if (isOutOfStock(product)) return;
+
     try {
-        loading.value = true;
-        if (!salesCartIsOnline.value) {
+        addingItem.value = true;
+        if (!online.value) {
             emit("offline-add-product", product);
             return;
         }
@@ -55,13 +102,13 @@ const addToCart = async (product) => {
 
         emit("cart-updated");
     } catch (error) {
+        notifyInsufficientStock(error);
         console.error("Failed to add item to cart:", error);
     } finally {
-        loading.value = false;
+        addingItem.value = false;
     }
 };
 
-//  Formatted total with commas (Philippine Peso example)
 const formattedTotal = (price) => {
     return new Intl.NumberFormat("en-PH", {
         style: "currency",
@@ -72,58 +119,178 @@ const formattedTotal = (price) => {
 
 <template>
     <div
-        class="overflow-y-auto overflow-x-hidden h-[calc(100vh-430px)] relative"
+        class="flex min-h-0 flex-col"
+        :class="
+            layout === 'mobile'
+                ? 'h-[calc(100dvh-12rem)]'
+                : isCoffeeshop
+                  ? 'h-full min-h-0 flex-1'
+                  : 'h-[calc(100vh-430px)]'
+        "
     >
-        <a-spin
-            v-if="loading"
-            class="-rotate-45 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
-            size="large"
-        />
-        <div
-            v-else-if="products.length"
-            class="grid [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))] gap-4 mt-2"
-        >
+        <div class="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+            <a-spin
+                v-if="props.loading"
+                class="-rotate-45 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+                size="large"
+            />
+
+            <!-- Coffeeshop image-first tiles -->
             <div
-                v-for="(product, index) in products"
-                :key="index"
-                class="flex justify-between items-start border px-4 py-3 rounded-lg bg-white hover:shadow cursor-pointer"
+                v-else-if="products.length && isCoffeeshop"
+                class="mt-1 grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))] md:[grid-template-columns:repeat(auto-fill,minmax(180px,1fr))]"
             >
-                <div>
-                    <div class="text-sm font-semibold">{{ product.name }}</div>
-                    <div
-                        class="text-[10px] text-gray-300 bg-gray-600 w-fit px-2 py-[1px] rounded-full mt-1"
-                    >
-                        {{ product?.category?.name }}
+                <button
+                    v-for="product in products"
+                    :key="product.id"
+                    type="button"
+                    class="group relative flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white text-left shadow-sm transition hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#287e47] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:shadow-sm"
+                    :class="isOutOfStock(product) ? 'opacity-60' : ''"
+                    :disabled="addingItem || isOutOfStock(product)"
+                    @click="addToCart(product)"
+                >
+                    <div class="relative">
+                        <ProductMedia
+                            class="aspect-[5/4] w-full rounded-none bg-gray-100"
+                            :representation-type="product.representation_type"
+                            :representation="product.representation"
+                            :name="product.name"
+                        />
+                        <span
+                            v-if="isOutOfStock(product)"
+                            class="absolute left-2 top-2 rounded bg-gray-900/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white"
+                        >
+                            Out of stock
+                        </span>
                     </div>
-                </div>
-                <div class="text-right">
-                    <div class="text-md text-green-700 font-bold">
-                        {{ formattedTotal(product.price) }}
+                    <div class="flex flex-1 flex-col gap-1 px-3.5 pb-3.5 pt-3">
+                        <div class="flex items-start justify-between gap-2">
+                            <div
+                                class="line-clamp-2 text-[15px] font-semibold leading-snug text-gray-900"
+                            >
+                                {{ product.name }}
+                            </div>
+                            <div
+                                class="shrink-0 text-sm font-semibold text-green-700"
+                            >
+                                {{ formattedTotal(product.price) }}
+                            </div>
+                        </div>
+                        <div
+                            class="truncate text-xs text-gray-500"
+                            v-if="product?.category?.name"
+                        >
+                            {{ product.category.name }}
+                        </div>
+                        <div
+                            class="mt-auto pt-2 text-sm font-medium transition"
+                            :class="
+                                isOutOfStock(product)
+                                    ? 'text-red-400'
+                                    : 'text-[#287e47] group-hover:text-[#1f6b3a]'
+                            "
+                        >
+                            {{
+                                isOutOfStock(product)
+                                    ? "Out of stock"
+                                    : "+ Add to order"
+                            }}
+                        </div>
                     </div>
-                    <a-button
-                        type="primary"
-                        class="text-xs flex items-center p-0 mt-1 bg-transparent text-gray-800 border-none shadow-none"
-                        size="small"
-                        @click="addToCart(product)"
-                        :disabled="loading"
-                    >
-                        <PlusSquareOutlined /> Add to Cart
-                    </a-button>
+                </button>
+            </div>
+
+            <!-- Classic text cards -->
+            <div
+                v-else-if="products.length"
+                class="grid [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))] gap-4 mt-2"
+            >
+                <div
+                    v-for="product in products"
+                    :key="product.id"
+                    class="flex justify-between items-start border px-4 py-3 rounded-lg bg-white"
+                    :class="
+                        isOutOfStock(product)
+                            ? 'opacity-60 cursor-not-allowed'
+                            : 'hover:shadow cursor-pointer'
+                    "
+                >
+                    <div>
+                        <div class="text-sm font-semibold">
+                            {{ product.name }}
+                        </div>
+                        <div
+                            class="text-[10px] text-gray-400 w-fit mt-0.5"
+                            v-if="product.SKU"
+                        >
+                            SKU {{ product.SKU }}
+                        </div>
+                        <div
+                            class="text-[10px] text-gray-300 bg-gray-600 w-fit px-2 py-[1px] rounded-full mt-1"
+                        >
+                            {{ product?.category?.name ?? "Uncategorized" }}
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-md text-green-700 font-bold">
+                            {{ formattedTotal(product.price) }}
+                        </div>
+                        <a-button
+                            type="primary"
+                            class="text-xs flex items-center p-0 mt-1 bg-transparent border-none shadow-none"
+                            :class="
+                                isOutOfStock(product)
+                                    ? 'text-red-600'
+                                    : 'text-gray-800'
+                            "
+                            size="small"
+                            @click="addToCart(product)"
+                            :disabled="addingItem || isOutOfStock(product)"
+                        >
+                            <PlusSquareOutlined v-if="!isOutOfStock(product)" />
+                            {{
+                                isOutOfStock(product)
+                                    ? "Out of stock"
+                                    : "Add to Cart"
+                            }}
+                        </a-button>
+                    </div>
                 </div>
             </div>
+            <div
+                v-else-if="!online"
+                class="flex items-center justify-center h-full min-h-[200px] text-center text-gray-500 text-sm px-6"
+            >
+                No offline catalog loaded. While online, switch to Classic
+                layout and use Sync for offline, or add items via barcode from a
+                prior session.
+            </div>
+            <div
+                v-else
+                class="text-[40px] text-nowrap uppercase font-bold text-gray-200 -rotate-45 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+            >
+                No Item Found
+            </div>
+        </div>
+
+        <div
+            v-if="online && products.length && props.productsTotal > 0"
+            class="shrink-0 pt-3 pb-1 text-xs text-gray-500 text-center border-t border-gray-100"
+        >
+            Showing {{ products.length }} of {{ props.productsTotal }}
         </div>
         <div
-            v-else-if="!salesCartIsOnline"
-            class="flex items-center justify-center h-full min-h-[200px] text-center text-gray-500 text-sm px-6"
+            v-if="online && props.hasMoreProducts && products.length"
+            class="shrink-0 pb-2 flex justify-center"
         >
-            No offline catalog loaded. While online, use &quot;Sync for offline&quot;
-            on Sales, or add items via barcode from a prior session.
-        </div>
-        <div
-            v-else
-            class="text-[40px] text-nowrap uppercase font-bold text-gray-200 -rotate-45 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
-        >
-            No Item Found
+            <a-button
+                type="default"
+                :loading="props.loadingMore"
+                :disabled="props.loading"
+                @click="emit('load-more')"
+            >
+                Load more
+            </a-button>
         </div>
     </div>
 </template>
