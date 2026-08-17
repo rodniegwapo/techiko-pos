@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Notifications\VerifyEmail;
 use App\Services\UserHierarchyService;
 use App\Traits\Searchable;
 use Illuminate\Auth\MustVerifyEmail as MustVerifyEmailTrait;
@@ -73,6 +74,14 @@ class User extends Authenticatable implements MustVerifyEmail
         'password' => 'hashed',
         'is_super_user' => 'boolean',
     ];
+
+    /**
+     * Send the email verification notification (queued).
+     */
+    public function sendEmailVerificationNotification(): void
+    {
+        $this->notify(new VerifyEmail);
+    }
 
     /**
      * Get the domain that this user belongs to.
