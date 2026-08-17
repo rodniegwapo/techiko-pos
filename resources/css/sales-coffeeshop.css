@@ -1,0 +1,112 @@
+/* Coffeeshop Sales mode — scoped under .sales-coffeeshop
+   Theme aligned with app green / white / gray (see main.css #287e47) */
+
+.sales-coffeeshop {
+    --cs-bg: #f3f4f6;
+    --cs-panel: #ffffff;
+    --cs-panel-soft: #f9fafb;
+    --cs-ink: #111827;
+    --cs-muted: #6b7280;
+    --cs-accent: #287e47;
+    --cs-accent-hover: #1f6b3a;
+    --cs-border: rgba(0, 0, 0, 0.08);
+    --cs-card: #ffffff;
+    color: var(--cs-ink);
+}
+
+.sales-coffeeshop .cs-stage {
+    background: var(--cs-panel);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.sales-coffeeshop .cs-order-rail {
+    background: var(--cs-panel);
+    border-left: 1px solid #e5e7eb;
+}
+
+.sales-coffeeshop .cs-display {
+    font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+.sales-coffeeshop .ant-btn-primary:not(.ant-btn-background-ghost) {
+    background: var(--cs-accent) !important;
+    border-color: var(--cs-accent) !important;
+}
+
+.sales-coffeeshop .ant-btn-primary:not(.ant-btn-background-ghost):hover,
+.sales-coffeeshop .ant-btn-primary:not(.ant-btn-background-ghost):focus {
+    background: var(--cs-accent-hover) !important;
+    border-color: var(--cs-accent-hover) !important;
+}
+
+.sales-coffeeshop .cs-footer-skin {
+    background: var(--cs-panel) !important;
+    border-top: 1px solid #e5e7eb;
+}
+
+.sales-coffeeshop .cs-thumb-letter {
+    font-size: 0.875rem !important;
+}
+
+.sales-coffeeshop .cs-charge-btn.ant-btn-primary {
+    background: var(--cs-accent) !important;
+    border-color: var(--cs-accent) !important;
+    color: #fff !important;
+    font-weight: 600;
+}
+
+.sales-coffeeshop .cs-charge-btn.ant-btn-primary:hover,
+.sales-coffeeshop .cs-charge-btn.ant-btn-primary:focus {
+    background: var(--cs-accent-hover) !important;
+    border-color: var(--cs-accent-hover) !important;
+}
+
+.sales-coffeeshop .cs-charge-btn.ant-btn-primary[disabled] {
+    opacity: 0.45;
+}
+
+.sales-coffeeshop .cs-rail-charge {
+    flex-shrink: 0;
+    position: relative;
+    z-index: 2;
+    background: var(--cs-panel);
+}
+
+.sales-coffeeshop .cs-menu-search.ant-input,
+.sales-coffeeshop .cs-menu-search.ant-input-affix-wrapper {
+    border-radius: 9999px !important;
+    padding-inline: 0.9rem;
+}
+
+.sales-coffeeshop .cs-menu-search.ant-input-affix-wrapper > input.ant-input {
+    border-radius: 0 !important;
+}
+
+/* Viewport lock: stage fits one screen; only product grid scrolls */
+.sales-coffeeshop.sales-coffeeshop--viewport {
+    /* Layout padding: p-3 (0.75rem*2) mobile, md:p-6 (1.5rem*2) desktop */
+    /* Mobile sticky header ~3rem when visible */
+    --cs-viewport-pad: 1.5rem;
+    --cs-mobile-header: 3.25rem;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    height: calc(100dvh - var(--cs-mobile-header) - var(--cs-viewport-pad));
+    max-height: calc(100dvh - var(--cs-mobile-header) - var(--cs-viewport-pad));
+}
+
+@media (min-width: 768px) {
+    .sales-coffeeshop.sales-coffeeshop--viewport {
+        --cs-viewport-pad: 3rem;
+        height: calc(100dvh - var(--cs-viewport-pad));
+        max-height: calc(100dvh - var(--cs-viewport-pad));
+    }
+}
+
+.sales-coffeeshop.sales-coffeeshop--viewport .cs-stage {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+}

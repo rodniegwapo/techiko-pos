@@ -46,10 +46,6 @@ const domainOptions = computed(() => {
   return list.map((item) => ({ label: item.name, value: item.name_slug }));
 });
 
-const isOrganizationProductForm = computed(
-  () => !page.props.isGlobalView,
-);
-
 // Handle category_id value extraction for select
 const handleCategoryChange = (value) => {
   formData.value.category_id = value;
@@ -171,15 +167,15 @@ const handleUpdate = () => {
 
       <!-- Category -->
       <a-form-item
-        label="Category"
-        :required="isOrganizationProductForm"
+        label="Category (optional)"
         :validate-status="validationHasError(errors, 'category_id') ? 'error' : ''"
         :help="validationMessage(errors, 'category_id')"
       >
         <a-select
           v-model:value="categoryIdValue"
           :options="categoriesOption"
-          placeholder="Select category"
+          placeholder="Select category or leave blank"
+          allow-clear
           show-search
           :filter-option="(input, option) => option.label.toLowerCase().includes(input.toLowerCase())"
           size="large"

@@ -3,7 +3,7 @@
 namespace Tests\Feature\Auth;
 
 use App\Models\User;
-use App\Providers\RouteServiceProvider;
+use App\Providers\AppServiceProvider;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
@@ -25,7 +25,7 @@ class EmailVerificationTest extends TestCase
         $response->assertStatus(200);
     }
 
-    public function test_email_can_be_verified(): void
+    public function test_guest_can_verify_email_via_signed_link(): void
     {
         $user = User::factory()->create([
             'email_verified_at' => null,
@@ -39,14 +39,15 @@ class EmailVerificationTest extends TestCase
             ['id' => $user->id, 'hash' => sha1($user->email)]
         );
 
-        $response = $this->actingAs($user)->get($verificationUrl);
+        $response = $this->get($verificationUrl);
 
         Event::assertDispatched(Verified::class);
         $this->assertTrue($user->fresh()->hasVerifiedEmail());
-        $response->assertRedirect(RouteServiceProvider::HOME.'?verified=1');
+        $this->assertAuthenticatedAs($user);
+        $response->assertRedirect(AppServiceProvider::HOME.'?verified=1');
     }
 
-    public function test_email_is_not_verified_with_invalid_hash(): void
+    public function test_guest_cannot_verify_with_invalid_hash(): void
     {
         $user = User::factory()->create([
             'email_verified_at' => null,
@@ -58,8 +59,9 @@ class EmailVerificationTest extends TestCase
             ['id' => $user->id, 'hash' => sha1('wrong-email')]
         );
 
-        $this->actingAs($user)->get($verificationUrl);
+        $this->get($verificationUrl)->assertForbidden();
 
         $this->assertFalse($user->fresh()->hasVerifiedEmail());
+        $this->assertGuest();
     }
 }

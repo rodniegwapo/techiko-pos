@@ -10,9 +10,11 @@ class TrustProxies extends Middleware
     /**
      * The trusted proxies for this application.
      *
+     * Trust Cloudflare so X-Forwarded-Proto/Host are honoured (HTTPS, correct host behind proxy).
+     *
      * @var array<int, string>|string|null
      */
-    protected $proxies;
+    protected $proxies = '*';
 
     /**
      * The headers that should be used to detect proxies.

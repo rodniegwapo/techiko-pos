@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted, computed } from "vue";
+import { useMediaQuery } from "@vueuse/core";
 import { notification, Modal } from "ant-design-vue";
 import { watchDebounced } from "@vueuse/core";
 import {
@@ -13,6 +14,8 @@ import IconTooltip from "@/Components/buttons/IconTooltip.vue";
 import TierFormModal from "./TierFormModal.vue";
 import RefreshButton from "@/Components/buttons/Refresh.vue";
 import { IconEdit, IconTrash } from "@tabler/icons-vue";
+
+const isMdUp = useMediaQuery("(min-width: 768px)");
 
 // State
 const tiers = ref([]);
@@ -101,6 +104,20 @@ const handleTableChange = (pag) => {
   pagination.value.per_page = pag.pageSize;
   loadTiers(pag.current);
 };
+
+function onMobilePaginationChange(pageNum) {
+  loadTiers(pageNum);
+}
+
+const tablePagination = computed(() => ({
+  current: pagination.value.current_page,
+  total: pagination.value.total,
+  pageSize: pagination.value.per_page,
+  showSizeChanger: true,
+  showQuickJumper: true,
+  showTotal: (total, range) =>
+    `${range[0]}-${range[1]} of ${total} tiers`,
+}));
 
 // Watch for search/filter changes
 watchDebounced(
@@ -270,25 +287,23 @@ onMounted(() => {
 
 
 <template>
-  <div class="p-6">
+  <div class="p-4 md:p-6">
     <!-- Search and Filters -->
-    <div class="flex justify-between mb-4 gap-2">
-      <div class="flex items-center gap-2">
+    <div class="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <div class="overflow-x-auto">
         <a-radio-group v-model:value="statusFilter" button-style="solid">
           <a-radio-button value="">All</a-radio-button>
           <a-radio-button value="active">Active</a-radio-button>
           <a-radio-button value="inactive">Inactive</a-radio-button>
         </a-radio-group>
       </div>
-      <div class="flex items-center gap-2">
-        <div>
-          <a-input
-            v-model:value="tierSearch"
-            placeholder="Search tiers by name..."
-            class="w-[300px]"
-            allow-clear
-          />
-        </div>
+      <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+        <a-input
+          v-model:value="tierSearch"
+          placeholder="Search tiers by name..."
+          class="w-full sm:w-[300px]"
+          allow-clear
+        />
 
         <refresh-button
           :loading="loading"
@@ -298,7 +313,7 @@ onMounted(() => {
         <a-button
           @click="showAddTierModal = true"
           type="primary"
-          class="bg-white border flex items-center border-green-500 text-green-500"
+          class="flex w-full items-center justify-center border border-green-500 bg-white text-green-500 sm:w-auto"
         >
           <template #icon>
             <PlusSquareOutlined />
@@ -310,19 +325,12 @@ onMounted(() => {
 
     <!-- Tiers Table -->
     <a-table
+      v-if="isMdUp"
       :columns="tierColumns"
       :data-source="tiers"
       :loading="loading"
       row-key="id"
-      :pagination="{
-        current: pagination.current_page,
-        total: pagination.total,
-        pageSize: pagination.per_page,
-        showSizeChanger: true,
-        showQuickJumper: true,
-        showTotal: (total, range) =>
-          `${range[0]}-${range[1]} of ${total} tiers`,
-      }"
+      :pagination="tablePagination"
       @change="handleTableChange"
       bordered
     >
@@ -375,6 +383,100 @@ onMounted(() => {
         </template>
       </template>
     </a-table>
+
+    <div v-else>
+      <a-spin :spinning="loading">
+        <div
+          v-if="!tiers.length"
+          class="py-12 text-center text-sm text-gray-500"
+        >
+          No tiers found
+        </div>
+        <div v-else class="flex flex-col gap-3">
+          <div
+            v-for="record in tiers"
+            :key="record.id"
+            class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm"
+          >
+            <div class="flex items-center gap-3 px-4 py-3">
+              <div
+                class="h-8 w-8 shrink-0 rounded-full border"
+                :style="{ backgroundColor: record.color }"
+              ></div>
+              <div class="min-w-0 flex-1">
+                <div class="font-semibold text-gray-900">
+                  {{ record.display_name }}
+                </div>
+                <div class="text-sm text-gray-500">
+                  {{ record.multiplier }}x multiplier
+                </div>
+              </div>
+              <a-switch
+                :checked="record.is_active"
+                size="small"
+                @change="(checked) => toggleTierStatus(record, checked)"
+              />
+            </div>
+
+            <div class="mx-4 mb-3 rounded-lg bg-gray-50 p-3">
+              <div
+                class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-sm"
+              >
+                <span class="text-gray-500">Threshold</span>
+                <span class="text-right font-semibold text-gray-900">
+                  ₱{{ record.spending_threshold?.toLocaleString() || 0 }}
+                </span>
+                <span class="text-gray-500">Color</span>
+                <span class="text-right font-mono text-gray-900">
+                  {{ record.color }}
+                </span>
+                <span class="text-gray-500">Status</span>
+                <span class="text-right font-medium text-gray-900">
+                  {{ record.is_active ? "Active" : "Inactive" }}
+                </span>
+              </div>
+            </div>
+
+            <div class="border-t border-gray-100 px-4 py-3">
+              <div class="flex flex-col gap-2">
+                <a-button
+                  class="flex items-center justify-center gap-2"
+                  @click="editTier(record)"
+                >
+                  <template #icon>
+                    <IconEdit size="18" />
+                  </template>
+                  Edit tier
+                </a-button>
+                <a-button
+                  danger
+                  class="flex items-center justify-center gap-2"
+                  @click="deleteTier(record)"
+                >
+                  <template #icon>
+                    <IconTrash size="18" />
+                  </template>
+                  Delete tier
+                </a-button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <a-pagination
+          v-if="
+            pagination.total &&
+            pagination.total > pagination.per_page
+          "
+          class="mt-4 justify-center pt-2"
+          show-less-items
+          :current="pagination.current_page"
+          :page-size="pagination.per_page"
+          :total="pagination.total"
+          :show-size-changer="false"
+          @change="onMobilePaginationChange"
+        />
+      </a-spin>
+    </div>
 
     <!-- Tier Form Modal -->
     <TierFormModal

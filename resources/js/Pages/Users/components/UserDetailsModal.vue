@@ -2,13 +2,17 @@
   <a-modal
     :visible="visible"
     :title="`User Details - ${user?.name || 'Unknown'}`"
+    :width="modalWidth"
+    :style="modalRootStyle"
+    :body-style="modalBodyStyle"
+    wrap-class-name="modal-footer-full-mobile"
+    centered
     @cancel="$emit('close')"
-    width="900px"
     :footer="null"
   >
     <div v-if="user" class="space-y-6">
       <!-- User Header -->
-      <div class="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+      <div class="flex flex-col gap-4 rounded-lg border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div class="flex items-center space-x-4">
           <a-avatar 
             :size="64"
@@ -31,10 +35,11 @@
             </div>
           </div>
         </div>
-        <div class="text-right">
+        <div class="sm:text-right">
           <a-button 
             v-if="canEdit"
-            type="primary" 
+            type="primary"
+            class="w-full sm:w-auto"
             @click="$emit('edit', user)"
           >
             <edit-outlined class="mr-1" />
@@ -154,11 +159,11 @@
           <!-- Assign Supervisor -->
           <div v-if="canAssignSupervisor">
             <h5 class="font-medium text-gray-700 mb-2">Assign New Supervisor:</h5>
-            <div class="flex space-x-2">
+            <div class="flex flex-col gap-2 sm:flex-row sm:space-x-2">
               <a-select
                 v-model:value="selectedSupervisorId"
                 placeholder="Select a supervisor"
-                class="flex-1"
+                class="flex-1 w-full"
                 :loading="loadingSupervisors"
                 show-search
                 :filter-option="filterSupervisorOption"
@@ -173,6 +178,7 @@
               </a-select>
               <a-button 
                 type="primary"
+                class="w-full sm:w-auto"
                 @click="assignSupervisor"
                 :disabled="!selectedSupervisorId"
                 :loading="assigningSupervisor"
@@ -226,6 +232,7 @@
 
 <script setup>
 import { computed, ref, onMounted, watch } from "vue";
+import { useMediaQuery } from "@vueuse/core";
 import { 
   UserOutlined, 
   EditOutlined, 
@@ -238,6 +245,17 @@ import axios from "axios";
 import { message } from "ant-design-vue";
 
 const page = usePage();
+
+const isMdUp = useMediaQuery("(min-width: 768px)");
+const modalWidth = computed(() =>
+  isMdUp.value ? 900 : "calc(100vw - 24px)",
+);
+const modalRootStyle = computed(() =>
+  isMdUp.value ? {} : { maxWidth: "100vw", top: "12px", paddingBottom: 0 },
+);
+const modalBodyStyle = computed(() =>
+  isMdUp.value ? {} : { maxHeight: "calc(100vh - 120px)", overflowY: "auto" },
+);
 
 // Props
 const props = defineProps({

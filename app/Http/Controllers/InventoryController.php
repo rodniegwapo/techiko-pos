@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\InsufficientStockException;
 use App\Http\Resources\InventoryMovementResource;
 use App\Http\Resources\ProductInventoryResource;
 use App\Http\Resources\ProductResource;
@@ -15,6 +16,7 @@ use App\Services\InventoryService;
 use App\Traits\MovementTypes;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class InventoryController extends Controller
@@ -49,6 +51,10 @@ class InventoryController extends Controller
 
         if ($location) {
             $query->where('location_id', $location->id);
+        }
+
+        if ($request->product_id) {
+            $query->where('product_id', $request->product_id);
         }
 
         if ($request->search) {
@@ -188,11 +194,47 @@ class InventoryController extends Controller
      */
     public function searchProducts(Request $request)
     {
-        $query = Product::query()
-            ->with('category')
-            ->when($request->search, fn ($q, $search) => $q->search($search))
-            ->when($request->domain, fn ($q, $domain) => $q->where('domain', $domain))
-            ->when($request->category_id, fn ($q, $categoryId) => $q->where('category_id', $categoryId));
+        $validated = $request->validate([
+            'search' => 'nullable|string',
+            'domain' => 'nullable|string',
+            'location_id' => 'nullable|exists:inventory_locations,id',
+            'category_id' => 'nullable|exists:categories,id',
+        ]);
+
+        if (! empty($validated['domain']) && empty($validated['location_id'])) {
+            throw ValidationException::withMessages([
+                'location_id' => ['Location is required when filtering by domain.'],
+            ]);
+        }
+
+        $location = null;
+
+        if (! empty($validated['domain']) && ! empty($validated['location_id'])) {
+            $location = InventoryLocation::query()
+                ->whereKey($validated['location_id'])
+                ->where('domain', $validated['domain'])
+                ->firstOrFail();
+        }
+
+        $query = Product::query()->with(
+            $location
+                ? [
+                    'category',
+                    'inventories' => fn ($q) => $q->where('location_id', $location->id),
+                ]
+                : ['category']
+        );
+
+        if ($location) {
+            $query->where('domain', $validated['domain'])
+                ->whereHas('activeLocations', function ($q) use ($location) {
+                    $q->where('inventory_locations.id', $location->id);
+                });
+        }
+
+        $query
+            ->when($validated['search'] ?? null, fn ($q, $search) => $q->search($search))
+            ->when($validated['category_id'] ?? null, fn ($q, $categoryId) => $q->where('category_id', $categoryId));
 
         $products = $query->limit(20)->get();
 
@@ -223,6 +265,16 @@ class InventoryController extends Controller
         ]);
 
         $location = InventoryLocation::findOrFail($validated['location_id']);
+        $locationDomain = $location->domain;
+
+        foreach ($validated['items'] as $index => $item) {
+            $product = Product::findOrFail($item['product_id']);
+            if ((string) $product->domain !== (string) $locationDomain) {
+                throw ValidationException::withMessages([
+                    "items.{$index}.product_id" => ['Product must belong to the same domain as the receiving location.'],
+                ]);
+            }
+        }
 
         // Receiving stock is modeled as a Purchase movement when not linked to another document.
         $referenceType = $validated['reference_type'] ?? 'Purchase';
@@ -256,14 +308,36 @@ class InventoryController extends Controller
         $fromLocation = InventoryLocation::findOrFail($validated['from_location_id']);
         $toLocation = InventoryLocation::findOrFail($validated['to_location_id']);
 
-        $this->inventoryService->transferInventory(
-            $product,
-            $fromLocation,
-            $toLocation,
-            $validated['quantity'],
-            auth()->user(),
-            $validated['notes'] ?? null
-        );
+        $d1 = (string) $fromLocation->domain;
+        $d2 = (string) $toLocation->domain;
+        $d3 = (string) $product->domain;
+
+        if ($d1 !== $d2 || $d1 !== $d3 || $d2 !== $d3) {
+            throw ValidationException::withMessages([
+                'product_id' => ['Product and both locations must belong to the same domain.'],
+            ]);
+        }
+
+        try {
+            $this->inventoryService->transferInventory(
+                $product,
+                $fromLocation,
+                $toLocation,
+                $validated['quantity'],
+                auth()->user(),
+                $validated['notes'] ?? null
+            );
+        } catch (InsufficientStockException $e) {
+            $item = $e->getUnavailableItems()[0] ?? null;
+            $available = $item['available_quantity'] ?? 0;
+            $message = "Only {$available} units available at source location";
+
+            return response()->json([
+                'success' => false,
+                'errors' => ['quantity' => [$message]],
+                'message' => $message,
+            ], 422);
+        }
 
         return response()->json(['success' => true, 'message' => 'Inventory transferred successfully']);
     }

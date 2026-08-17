@@ -16,53 +16,33 @@ class SeoController extends Controller
     ];
 
     /**
-     * Disallow app areas that should not be indexed; allow marketing and auth pages.
+     * Canonical HTTPS base for sitemap.xml <loc>.
+     * Uses seo.canonical_url if set; otherwise APP_URL. In production, http:// gets upgraded.
      */
-    private const DISALLOW_PREFIXES = [
-        '/api/',
-        '/dashboard',
-        '/profile',
-        '/sales',
-        '/products',
-        '/categories',
-        '/discounts',
-        '/mandatory-discounts',
-        '/loyalty',
-        '/customers',
-        '/void-logs',
-        '/inventory',
-        '/domains',
-        '/users',
-        '/roles',
-        '/permissions',
-        '/impersonate',
-        '/stop-impersonating',
-        '/debug-',
-    ];
-
-    public function robots(): Response
+    private function seoAbsoluteBase(): string
     {
-        $base = rtrim((string) config('app.url'), '/');
-        $sitemap = $base.'/sitemap.xml';
-        $lines = ['User-agent: *', 'Allow: /', ''];
-        foreach (self::DISALLOW_PREFIXES as $prefix) {
-            $lines[] = 'Disallow: '.$prefix;
-        }
-        $lines[] = '';
-        $lines[] = 'Sitemap: '.$sitemap;
-        $lines[] = '';
+        $raw = trim((string) (config('seo.canonical_url') ?: config('app.url')));
+        $base = rtrim($raw, '/');
 
-        return response(implode("\n", $lines), 200, [
-            'Content-Type' => 'text/plain; charset=UTF-8',
-        ]);
+        if (app()->environment('production') && str_starts_with($base, 'http://')) {
+            $base = 'https://'.substr($base, strlen('http://'));
+        }
+
+        return $base;
     }
 
     public function sitemap(): Response
     {
-        $base = rtrim((string) config('app.url'), '/');
+        $base = $this->seoAbsoluteBase();
         $lastmod = Carbon::now()->toIso8601String();
         $urls = [];
         foreach (self::SITEMAP_PATHS as $row) {
+            if (
+                ($row['path'] ?? '') === '/pricing'
+                && ! config('features.marketing_pricing_visible')
+            ) {
+                continue;
+            }
             $loc = $base.$row['path'];
             $urls[] = sprintf(
                 '  <url><loc>%s</loc><lastmod>%s</lastmod><changefreq>%s</changefreq><priority>%s</priority></url>',

@@ -1,5 +1,6 @@
 <script setup>
 import { ref, watch, computed } from "vue";
+import { useMediaQuery } from "@vueuse/core";
 import axios from "axios";
 import { usePage } from "@inertiajs/vue3";
 import { notification } from "ant-design-vue";
@@ -14,6 +15,17 @@ const emit = defineEmits(["update:visible", "saved"]);
 
 const page = usePage();
 const { getRoute } = useDomainRoutes();
+
+const isMdUp = useMediaQuery("(min-width: 768px)");
+const modalWidth = computed(() =>
+    isMdUp.value ? 420 : "calc(100vw - 24px)",
+);
+const modalRootStyle = computed(() =>
+    isMdUp.value ? {} : { maxWidth: "100vw", top: "12px", paddingBottom: 0 },
+);
+const modalBodyStyle = computed(() =>
+    isMdUp.value ? {} : { maxHeight: "calc(100vh - 120px)", overflowY: "auto" },
+);
 
 const pinCode = ref("");
 const pinConfirm = ref("");
@@ -101,7 +113,11 @@ async function handleSubmit() {
         title="Set user PIN"
         :confirm-loading="saving"
         ok-text="Save PIN"
-        width="420px"
+        :width="modalWidth"
+        :style="modalRootStyle"
+        :body-style="modalBodyStyle"
+        wrap-class-name="modal-footer-full-mobile"
+        centered
         :mask-closable="false"
         @update:visible="emit('update:visible', $event)"
         @ok="handleSubmit"

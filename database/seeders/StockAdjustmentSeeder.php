@@ -2,13 +2,13 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use App\Models\StockAdjustment;
-use App\Models\StockAdjustmentItem;
 use App\Models\InventoryLocation;
 use App\Models\Product\Product;
+use App\Models\StockAdjustment;
+use App\Models\StockAdjustmentItem;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Database\Seeder;
 
 class StockAdjustmentSeeder extends Seeder
 {
@@ -21,7 +21,7 @@ class StockAdjustmentSeeder extends Seeder
         $jollibeeMain = InventoryLocation::where('code', 'JB-MAIN')->first();
         $jollibeeBranch = InventoryLocation::where('code', 'JB-BRANCH')->first();
         $jollibeeWarehouse = InventoryLocation::where('code', 'JB-WH')->first();
-        
+
         $mcdonaldsMain = InventoryLocation::where('code', 'MC-MAIN')->first();
         $mcdonaldsBranch = InventoryLocation::where('code', 'MC-BRANCH')->first();
         $mcdonaldsWarehouse = InventoryLocation::where('code', 'MC-WH')->first();
@@ -44,7 +44,7 @@ class StockAdjustmentSeeder extends Seeder
             'system_error',
             'promotion',
             'sample',
-            'other'
+            'other',
         ];
 
         // Create adjustments for Jollibee locations
@@ -76,22 +76,30 @@ class StockAdjustmentSeeder extends Seeder
 
     private function createAdjustmentsForLocation($location, $products, $users, $domain, $statuses, $reasons)
     {
+        if ($products->isEmpty() || $users->isEmpty()) {
+            return;
+        }
+
         $adjustmentsPerLocation = 12;
         $startDate = Carbon::now()->subDays(20);
-        
+
         for ($i = 0; $i < $adjustmentsPerLocation; $i++) {
             $user = $users->random();
             $status = $statuses[array_rand($statuses)];
             $reason = $reasons[array_rand($reasons)];
-            
+
+            $approvers = $users->where('role_level', '<=', 2);
+            $approvedBy = ($status === 'approved' && $approvers->isNotEmpty())
+                ? $approvers->random()->id
+                : null;
+
             // Create random date within last 20 days
             $randomDate = $startDate->copy()->addDays(rand(0, 20))->addHours(rand(0, 23))->addMinutes(rand(0, 59));
-            
+
             $adjustment = StockAdjustment::create([
-                'adjustment_number' => $this->generateAdjustmentNumber(),
                 'location_id' => $location->id,
                 'created_by' => $user->id,
-                'approved_by' => $status === 'approved' ? $users->where('role_level', '<=', 2)->random()->id : null,
+                'approved_by' => $approvedBy,
                 'status' => $status,
                 'reason' => $reason,
                 'description' => $this->generateAdjustmentNotes($reason, $location->name),
@@ -102,7 +110,10 @@ class StockAdjustmentSeeder extends Seeder
             ]);
 
             // Add 1-4 items to each adjustment
-            $itemCount = rand(1, 4);
+            $itemCount = min(rand(1, 4), $products->count());
+            if ($itemCount < 1) {
+                continue;
+            }
             $selectedProducts = $products->random($itemCount);
             $totalValue = 0;
 
@@ -146,10 +157,5 @@ class StockAdjustmentSeeder extends Seeder
         ];
 
         return $notes[$reason] ?? "Stock adjustment at {$locationName}";
-    }
-
-    private function generateAdjustmentNumber()
-    {
-        return 'ADJ-' . str_pad(rand(1000, 9999), 4, '0', STR_PAD_LEFT) . '-' . time();
     }
 }

@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\CustomerResource;
 use App\Models\Customer;
+use App\Models\Domain;
 use App\Models\LoyaltyTier;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class CustomerController extends Controller
@@ -19,13 +21,14 @@ class CustomerController extends Controller
         return Inertia::render('Customers/Index', [
             'items' => CustomerResource::collection($customers),
             'isGlobalView' => true,
-            'domains' => \App\Models\Domain::select('id', 'name', 'name_slug')->get(),
+            'domains' => Domain::select('id', 'name', 'name_slug')->get(),
         ]);
     }
 
     public function index(Request $request)
     {
-        $customers = Customer::filters($request->all())
+        $query = $this->scopedCustomersQuery($request);
+        $customers = $query->filters($request->all())
             ->paginate($request->get('per_page', 10));
 
         return CustomerResource::collection($customers);
@@ -39,10 +42,11 @@ class CustomerController extends Controller
             return response()->json([]);
         }
 
-        $customers = Customer::search($query)
+        $customers = $this->scopedCustomersQuery($request)
+            ->search($query)
             ->limit(10)
             ->get()
-            ->map(fn($customer) => $this->formatCustomerResponse($customer));
+            ->map(fn ($customer) => $this->formatCustomerResponse($customer));
 
         return response()->json($customers);
     }
@@ -52,7 +56,7 @@ class CustomerController extends Controller
         $tiers = LoyaltyTier::active()->ordered()->get(['name', 'display_name']);
 
         return response()->json(
-            $tiers->map(fn($tier) => [
+            $tiers->map(fn ($tier) => [
                 'value' => $tier->name,
                 'label' => $tier->display_name,
             ])
@@ -62,6 +66,14 @@ class CustomerController extends Controller
     public function store(Request $request)
     {
         $validated = $this->validateCustomer($request);
+
+        $slug = $request->user()->getEffectiveDomain($validated['domain'] ?? null);
+        if (! $slug) {
+            throw ValidationException::withMessages([
+                'domain' => ['A domain is required to create a customer.'],
+            ]);
+        }
+        $validated['domain'] = $slug;
 
         if ($validated['enroll_in_loyalty'] ?? false) {
             $validated = array_merge($validated, Customer::defaultLoyaltyData());
@@ -73,13 +85,14 @@ class CustomerController extends Controller
         return response()->json([
             'success' => true,
             'customer' => $this->formatCustomerResponse($customer),
-            'message' => 'Customer created successfully'
+            'message' => 'Customer created successfully',
         ]);
     }
 
     public function update(Request $request, Customer $customer)
     {
         $validated = $this->validateCustomer($request, $customer->id);
+        unset($validated['domain']);
 
         if (($validated['enroll_in_loyalty'] ?? false) && is_null($customer->loyalty_points)) {
             $validated = array_merge($validated, Customer::defaultLoyaltyData());
@@ -91,7 +104,7 @@ class CustomerController extends Controller
         return response()->json([
             'success' => true,
             'customer' => $this->formatCustomerResponse($customer->fresh()),
-            'message' => 'Customer updated successfully'
+            'message' => 'Customer updated successfully',
         ]);
     }
 
@@ -115,18 +128,29 @@ class CustomerController extends Controller
         $rules = [
             'name' => 'required|string|max:255',
             'phone' => 'nullable|string|max:20',
-            'email' => 'nullable|email|unique:customers,email' . ($ignoreId ? ",$ignoreId" : ''),
+            'email' => 'nullable|email|unique:customers,email'.($ignoreId ? ",$ignoreId" : ''),
             'address' => 'nullable|string|max:500',
             'date_of_birth' => 'nullable|date',
-            'enroll_in_loyalty' => 'boolean'
+            'enroll_in_loyalty' => 'boolean',
+            'domain' => 'nullable|string|exists:domains,name_slug',
         ];
 
-        // Add domain validation for global view
-        if ($request->has('domain') && $request->domain) {
-            $rules['domain'] = 'required|string|exists:domains,name_slug';
+        return $request->validate($rules);
+    }
+
+    /**
+     * Limit customer queries to the authenticated user's effective domain when set.
+     */
+    private function scopedCustomersQuery(Request $request)
+    {
+        $query = Customer::query();
+        $domain = $request->user()->getEffectiveDomain($request->input('domain'));
+
+        if ($domain) {
+            $query->where('domain', $domain);
         }
 
-        return $request->validate($rules);
+        return $query;
     }
 
     /**
@@ -139,7 +163,7 @@ class CustomerController extends Controller
         return array_merge($customer->toArray(), [
             'tier' => $customer->tier ?? 'bronze',
             'tier_info' => $tierInfo,
-            'display_text' => $customer->name . ($customer->phone ? " ({$customer->phone})" : ''),
+            'display_text' => $customer->name.($customer->phone ? " ({$customer->phone})" : ''),
         ]);
     }
 }

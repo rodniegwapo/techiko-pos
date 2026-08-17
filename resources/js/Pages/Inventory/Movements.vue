@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from "vue";
 import { usePage, router, Head } from "@inertiajs/vue3";
-import { DownloadOutlined, FilterOutlined } from "@ant-design/icons-vue";
+import { DownloadOutlined } from "@ant-design/icons-vue";
 import { watchDebounced } from "@vueuse/core";
 import { useFilters, toLabel } from "@/Composables/useFilters";
 import { useHelpers } from "@/Composables/useHelpers";
@@ -151,28 +151,22 @@ const showMovementDetails = (movement) => {
   <Head title="Inventory Movements" />
 
   <AuthenticatedLayout>
-    <ContentHeader title="Inventory Movements">
-      <template #actions>
-        <a-button @click="exportMovements" style="margin-right: 8px">
-          <template #icon>
-            <DownloadOutlined />
-          </template>
-          Export
-        </a-button>
-        
-        <RefreshButton @click="getItems" />
-      </template>
+    <ContentHeader class="mb-4 md:mb-8" title="Inventory Movements">
+      <template #actions> </template>
     </ContentHeader>
 
-    <ContentLayout title="Inventory Movements">
+    <ContentLayout
+      title="Inventory Movements"
+      filter-class="flex flex-wrap items-center justify-end gap-2 w-full min-w-0"
+    >
       <template #filters>
         <RefreshButton :loading="spinning" @click="getItems" />
         <a-input-search
           v-model:value="search"
           placeholder="Search movements, products, or references..."
-          class="min-w-[100px] max-w-[300px]"
+          class="w-full min-w-0 md:max-w-[300px]"
         />
-        <a-button @click="exportMovements">
+        <a-button class="w-full md:w-auto" @click="exportMovements">
           <template #icon>
             <DownloadOutlined />
           </template>

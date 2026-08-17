@@ -3,9 +3,13 @@
     :visible="visible"
     :title="editingTier ? 'Edit Tier' : 'Add New Tier'"
     :confirm-loading="saving"
+    :width="modalWidth"
+    :style="modalRootStyle"
+    :body-style="modalBodyStyle"
+    wrap-class-name="modal-footer-full-mobile"
+    centered
     @ok="handleSave"
     @cancel="handleCancel"
-    width="600px"
   >
     <a-form
       ref="formRef"
@@ -160,6 +164,18 @@
 
 <script setup>
 import { ref, watch, reactive, computed } from 'vue';
+import { useMediaQuery } from '@vueuse/core';
+
+const isMdUp = useMediaQuery('(min-width: 768px)');
+const modalWidth = computed(() =>
+  isMdUp.value ? 600 : 'calc(100vw - 24px)',
+);
+const modalRootStyle = computed(() =>
+  isMdUp.value ? {} : { maxWidth: '100vw', top: '12px', paddingBottom: 0 },
+);
+const modalBodyStyle = computed(() =>
+  isMdUp.value ? {} : { maxHeight: 'calc(100vh - 120px)', overflowY: 'auto' },
+);
 
 // Props
 const props = defineProps({

@@ -37,7 +37,7 @@ const form = useForm({
 
 // Methods
 const handleSubmit = () => {
-    form.put(route('domains.update', props.domain.id), {
+    form.put(route('domains.update', { domain: props.domain.name_slug }), {
         onSuccess: () => {
             notification.success({
                 message: 'Success',
@@ -54,7 +54,7 @@ const handleSubmit = () => {
 };
 
 const handleCancel = () => {
-    router.visit(route('domains.show', props.domain.id));
+    router.visit(route('domains.show', { domain: props.domain.name_slug }));
 };
 </script>
 

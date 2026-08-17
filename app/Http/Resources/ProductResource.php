@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Support\ProductImageStorage;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -15,6 +16,19 @@ class ProductResource extends JsonResource
     public function toArray(Request $request): array
     {
         $data = parent::toArray($request);
+
+        if (($data['representation_type'] ?? null) === 'image') {
+            $data['representation'] = ProductImageStorage::displayUrl(
+                $data['representation'] ?? null,
+                'image',
+            );
+        }
+
+        if ($this->relationLoaded('category')) {
+            $data['category'] = $this->category
+                ? $this->category->only(['id', 'name'])
+                : null;
+        }
 
         if ($this->resource->relationLoaded('inventories')) {
             if ($this->track_inventory) {
