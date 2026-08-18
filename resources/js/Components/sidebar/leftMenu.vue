@@ -19,6 +19,7 @@ import {
     IconAccessPointOff,
     IconSettings,
     IconMessages,
+    IconMail,
 } from "@tabler/icons-vue";
 import { router, usePage } from "@inertiajs/vue3";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
@@ -354,6 +355,15 @@ const menuItems = [
         icon: IconMessages,
         routeName: "messages.index",
         path: "/messages",
+        superUserOnly: true,
+        globalOnly: true,
+    },
+    {
+        key: "mail-test",
+        title: "Test email",
+        icon: IconMail,
+        routeName: "mail.test",
+        path: "/mail/test",
         superUserOnly: true,
         globalOnly: true,
     },
