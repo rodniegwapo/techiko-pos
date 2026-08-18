@@ -4,9 +4,11 @@ namespace Tests\Feature\Auth;
 
 use App\Models\Domain;
 use App\Models\User;
+use App\Notifications\VerifyEmail;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 class RegistrationTest extends TestCase
@@ -44,6 +46,27 @@ class RegistrationTest extends TestCase
         $domain = Domain::where('name_slug', $user->domain)->first();
         $this->assertNotNull($domain);
         $this->assertTrue((bool) $domain->is_active);
+    }
+
+    public function test_registration_sends_verification_email(): void
+    {
+        Notification::fake();
+
+        $response = $this->post('/register', [
+            'name' => 'Test User',
+            'email' => 'verify-queue@example.com',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+            'organization' => 'Queue Org',
+        ]);
+
+        $response->assertRedirect(route('registration.thankyou'));
+
+        $user = User::where('email', 'verify-queue@example.com')->first();
+        $this->assertNotNull($user);
+        $this->assertNull($user->email_verified_at);
+
+        Notification::assertSentTo($user, VerifyEmail::class);
     }
 
     public function test_registration_submission_is_rate_limited(): void

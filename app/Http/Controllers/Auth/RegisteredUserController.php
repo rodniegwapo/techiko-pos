@@ -29,10 +29,9 @@ class RegisteredUserController extends Controller
     /**
      * Handle an incoming registration request.
      *
-     * Registration is persisted in one transaction together with firing
-     * {@see Registered}. If synchronous verification mail throws (common with
-     * {@see \Illuminate\Contracts\Mail\Mailer}, non-queued verification), the
-     * transaction rolls back. Queued verification would commit before mail runs—see Laravel queue config.
+     * User, domain, and default location are persisted in one transaction.
+     * {@see Registered} is fired only after commit so queued verification
+     * mail cannot roll back signup if SMTP fails.
      *
      * @throws ValidationException
      */
@@ -48,7 +47,7 @@ class RegisteredUserController extends Controller
         ]);
 
         try {
-            return DB::transaction(function () use ($request) {
+            $user = DB::transaction(function () use ($request) {
                 // 1) Create user
                 $user = User::create([
                     'name' => $request->name,
@@ -114,15 +113,17 @@ class RegisteredUserController extends Controller
                     'notes' => 'Default location created during registration',
                 ]);
 
-                event(new Registered($user->fresh()));
-
-                // Do NOT auto-login; send to a public thank-you page
-                return redirect()->route('registration.thankyou');
+                return $user->fresh();
             });
         } catch (\Throwable $e) {
             report($e);
 
             return back()->withErrors(['registration' => 'Registration failed. Please try again later.']);
         }
+
+        event(new Registered($user));
+
+        // Do NOT auto-login; send to a public thank-you page
+        return redirect()->route('registration.thankyou');
     }
 }
