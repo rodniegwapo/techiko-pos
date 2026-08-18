@@ -12,6 +12,7 @@ use App\Http\Controllers\ImpersonationController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryLocationController;
 use App\Http\Controllers\LoyaltyController;
+use App\Http\Controllers\MailTestController;
 use App\Http\Controllers\MandatoryDiscountController;
 use App\Http\Controllers\MarketingController;
 use App\Http\Controllers\PermissionController;
@@ -272,6 +273,11 @@ Route::middleware(['auth', 'verified', 'check.super.user'])->group(function () {
     Route::get('/messages', [ConversationController::class, 'index'])->name('messages.index');
     Route::post('/messages/{conversation}/read', [ConversationController::class, 'markRead'])->name('messages.read');
     Route::post('/messages/{conversation}/messages', [ConversationController::class, 'storeStaff'])->name('messages.staff');
+
+    Route::get('/mail/test', [MailTestController::class, 'create'])->name('mail.test');
+    Route::post('/mail/test', [MailTestController::class, 'store'])
+        ->middleware('throttle:5,1')
+        ->name('mail.test.send');
 });
 
 require __DIR__ . '/auth.php';
