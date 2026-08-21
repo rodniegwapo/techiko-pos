@@ -357,7 +357,15 @@ class InventoryController extends Controller
      */
     public function searchProducts(Request $request, Domain $domain)
     {
-        $location = Helpers::getActiveLocation($domain, $request->input('location_id'));
+        $validated = $request->validate([
+            'search' => 'nullable|string',
+            'location_id' => 'nullable|exists:inventory_locations,id',
+            'category_id' => 'nullable|exists:categories,id',
+            'scope' => 'nullable|string|in:domain,location',
+        ]);
+
+        $location = Helpers::getActiveLocation($domain, $validated['location_id'] ?? null);
+        $scope = $validated['scope'] ?? 'location';
 
         if (! $location) {
             return response()->json([
@@ -372,11 +380,20 @@ class InventoryController extends Controller
                 'category',
                 'inventories' => fn ($q) => $q->where('location_id', $location->id),
             ])
-            ->whereHas('activeLocations', function ($q) use ($location) {
+            ->when($validated['search'] ?? null, fn ($q, $search) => $q->search($search))
+            ->when($validated['category_id'] ?? null, fn ($q, $categoryId) => $q->where('category_id', $categoryId));
+
+        if ($scope === 'domain') {
+            $query->withExists([
+                'activeLocations as at_location' => function ($q) use ($location) {
+                    $q->where('inventory_locations.id', $location->id);
+                },
+            ]);
+        } else {
+            $query->whereHas('activeLocations', function ($q) use ($location) {
                 $q->where('inventory_locations.id', $location->id);
-            })
-            ->when($request->search, fn ($q, $search) => $q->search($search))
-            ->when($request->category_id, fn ($q, $categoryId) => $q->where('category_id', $categoryId));
+            });
+        }
 
         $products = $query->limit(20)->get();
 
