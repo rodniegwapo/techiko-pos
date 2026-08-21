@@ -42,6 +42,10 @@ class ProductResource extends JsonResource
             unset($data['inventories']);
         }
 
+        if (array_key_exists('at_location', $data)) {
+            $data['at_location'] = (bool) $data['at_location'];
+        }
+
         return $data;
     }
 }

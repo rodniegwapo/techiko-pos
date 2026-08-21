@@ -13,6 +13,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class InventoryService
 {
@@ -314,6 +315,41 @@ class InventoryService
     }
 
     /**
+     * Ensure the product is active at the location (attach + inventory row if missing).
+     * Used when receiving stock for a domain product not yet assigned to this store.
+     */
+    public function ensureProductAssignedToLocation(Product $product, InventoryLocation $location): void
+    {
+        if ((string) $product->domain !== (string) $location->domain) {
+            throw ValidationException::withMessages([
+                'product_id' => ['Product must belong to the same domain as the receiving location.'],
+            ]);
+        }
+
+        if ($product->isAvailableAt($location)) {
+            return;
+        }
+
+        $exists = Product::query()
+            ->where('domain', $product->domain)
+            ->where('id', '!=', $product->id)
+            ->where('name', $product->name)
+            ->whereHas('activeLocations', function ($q) use ($location) {
+                $q->where('inventory_locations.id', $location->id);
+            })
+            ->exists();
+
+        if ($exists) {
+            throw ValidationException::withMessages([
+                'product_id' => [__('Another product with the same name is already assigned to this store.')],
+            ]);
+        }
+
+        $product->addToLocation($location, true);
+        $this->getOrCreateInventory($product, $location);
+    }
+
+    /**
      * Receive inventory from purchase/supplier
      */
     public function receiveInventory(array $items, User $user, ?InventoryLocation $location = null, ?string $referenceType = null, ?int $referenceId = null): bool
@@ -334,6 +370,8 @@ class InventoryService
                 if ($quantity <= 0) {
                     continue;
                 }
+
+                $this->ensureProductAssignedToLocation($product, $location);
 
                 $this->recordMovement([
                     'product_id' => $product->id,

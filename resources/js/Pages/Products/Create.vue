@@ -14,7 +14,7 @@ import {
 } from "@/Composables/useValidationMessage.js";
 import { ArrowLeftOutlined, PlusOutlined } from "@ant-design/icons-vue";
 import { message } from "ant-design-vue";
-import { useBarcodeScanner } from "@/Composables/useBarcodeScanner";
+import { useHiddenBarcodeCapture } from "@/Composables/useHiddenBarcodeCapture";
 
 const page = usePage();
 const { getRoute, hrefWithPreservedLocationId } = useDomainRoutes();
@@ -142,6 +142,18 @@ watchDebounced(() => form.barcode, runBarcodeLookup, {
     debounce: 450,
 });
 
+const {
+    scannerBuffer,
+    captureInputRef,
+    formContainerRef,
+    onCaptureEnter,
+    focusCapture,
+} = useHiddenBarcodeCapture((code) => {
+    form.barcode = code;
+    message.success("Barcode scanned: " + code);
+    runBarcodeLookup();
+});
+
 const categoriesOption = computed(() => {
     return props.categories.map((item) => ({
         label: item.name,
@@ -187,51 +199,46 @@ const representationHexColor = computed(() => {
 });
 
 const handleSave = () => {
-    form
-        .transform((data) => {
-            const payload = { ...data };
-            if (!(payload.representation_image instanceof File)) {
-                delete payload.representation_image;
+    form.transform((data) => {
+        const payload = { ...data };
+        if (!(payload.representation_image instanceof File)) {
+            delete payload.representation_image;
+        }
+        if (payload.representation_type !== "image") {
+            delete payload.representation_image;
+        }
+        return payload;
+    }).post(hrefWithPreservedLocationId(getRoute("products.store")), {
+        forceFormData: true,
+        onSuccess: () => {
+            form.reset();
+            form.representation_type = "color";
+            form.representation_image = null;
+            form.clearErrors();
+            imageFileList.value = [];
+            sharedCategoryHint.value = "";
+            barcodeLookupNonce.value += 1;
+            message.success("Product created successfully");
+            focusCapture();
+        },
+        onError: (errs) => {
+            const bag = errs || form.errors;
+            const planMsg = bag?.plan;
+            if (planMsg !== undefined && planMsg !== null && planMsg !== "") {
+                message.error(
+                    Array.isArray(planMsg)
+                        ? planMsg[0]
+                        : planMsg || "Failed to create product",
+                );
+                return;
             }
-            if (payload.representation_type !== "image") {
-                delete payload.representation_image;
-            }
-            return payload;
-        })
-        .post(hrefWithPreservedLocationId(getRoute("products.store")), {
-            forceFormData: true,
-            onSuccess: () => {
-                form.reset();
-                form.representation_type = "color";
-                form.representation_image = null;
-                form.clearErrors();
-                imageFileList.value = [];
-                sharedCategoryHint.value = "";
-                barcodeLookupNonce.value += 1;
-                message.success("Product created successfully");
-            },
-            onError: (errs) => {
-                const bag = errs || form.errors;
-                const planMsg = bag?.plan;
-                if (planMsg !== undefined && planMsg !== null && planMsg !== "") {
-                    message.error(
-                        Array.isArray(planMsg) ? planMsg[0] : planMsg || "Failed to create product",
-                    );
-                    return;
-                }
-                message.warning(validationSummaryNotice(bag));
-            },
-            onFinish: () => {
-                form.transform((data) => data);
-            },
-        });
+            message.warning(validationSummaryNotice(bag));
+        },
+        onFinish: () => {
+            form.transform((data) => data);
+        },
+    });
 };
-
-useBarcodeScanner((code) => {
-    form.barcode = code;
-    message.success("Barcode Scanned: " + code);
-    runBarcodeLookup();
-});
 </script>
 
 <template>
@@ -242,7 +249,9 @@ useBarcodeScanner((code) => {
             <template #actions>
                 <Link
                     class="block w-full md:w-auto"
-                    :href="hrefWithPreservedLocationId(getRoute('products.index'))"
+                    :href="
+                        hrefWithPreservedLocationId(getRoute('products.index'))
+                    "
                 >
                     <a-button
                         class="flex w-full items-center justify-center md:inline-flex md:w-auto"
@@ -268,381 +277,480 @@ useBarcodeScanner((code) => {
                         message="Product limit reached"
                     >
                         <template #description>
-                            <span class="mr-1">Subscribe for unlimited products on this domain.</span>
-                            <a :href="subscription.billing_url">Open servicing payment</a>
+                            <span class="mr-1"
+                                >Subscribe for unlimited products on this
+                                domain.</span
+                            >
+                            <a :href="subscription.billing_url"
+                                >Open servicing payment</a
+                            >
                         </template>
                     </a-alert>
 
-                    <a-form layout="vertical" class="product-form space-y-6">
-                        <section class="space-y-4 rounded-lg bg-gray-50 p-4">
-                            <h4 class="font-semibold text-gray-900">
-                                Basic information
-                            </h4>
-                            <a-form-item
-                                label="Product Name"
-                                required
-                                :validate-status="
-                                    validationHasError(form.errors, 'name')
-                                        ? 'error'
-                                        : ''
-                                "
-                                :help="validationMessage(form.errors, 'name')"
-                                class="mb-0"
+                    <div ref="formContainerRef">
+                        <a-form
+                            layout="vertical"
+                            class="product-form space-y-6"
+                        >
+                            <section
+                                class="space-y-4 rounded-lg bg-gray-50 p-4"
                             >
-                                <a-input
-                                    v-model:value="form.name"
-                                    placeholder="Enter product name"
-                                    size="large"
-                                />
-                            </a-form-item>
-
-                            <a-form-item
-                                v-if="props.isGlobalView"
-                                label="Domain"
-                                required
-                                :validate-status="
-                                    validationHasError(form.errors, 'domain')
-                                        ? 'error'
-                                        : ''
-                                "
-                                :help="validationMessage(form.errors, 'domain')"
-                                class="mb-0"
-                            >
-                                <a-select
-                                    v-model:value="form.domain"
-                                    :options="domainOptions"
-                                    placeholder="Select domain"
-                                    size="large"
-                                />
-                            </a-form-item>
-
-                            <a-form-item
-                                label="Category (optional)"
-                                :validate-status="
-                                    validationHasError(form.errors, 'category_id')
-                                        ? 'error'
-                                        : ''
-                                "
-                                :help="
-                                    validationMessage(form.errors, 'category_id')
-                                "
-                                class="mb-0"
-                            >
-                                <a-select
-                                    v-model:value="form.category_id"
-                                    :options="categoriesOption"
-                                    placeholder="Select category or leave blank"
-                                    allow-clear
-                                    show-search
-                                    :filter-option="
-                                        (input, option) =>
-                                            option.label
-                                                .toLowerCase()
-                                                .includes(input.toLowerCase())
-                                    "
-                                    size="large"
-                                    :allow-clear="true"
-                                />
-                            </a-form-item>
-                        </section>
-
-                        <section class="space-y-4 rounded-lg bg-gray-50 p-4">
-                            <h4 class="font-semibold text-gray-900">Pricing</h4>
-                            <div
-                                class="space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0"
-                            >
+                                <h4 class="font-semibold text-gray-900">
+                                    Basic information
+                                </h4>
                                 <a-form-item
-                                    label="Cost"
-                                    :validate-status="
-                                        validationHasError(form.errors, 'cost')
-                                            ? 'error'
-                                            : ''
-                                    "
-                                    :help="validationMessage(form.errors, 'cost')"
-                                    class="mb-0"
-                                >
-                                    <a-input-number
-                                        v-model:value="form.cost"
-                                        placeholder="Enter cost"
-                                        :min="0"
-                                        :precision="2"
-                                        :parser="decimalParser"
-                                        size="large"
-                                    />
-                                </a-form-item>
-
-                                <a-form-item
-                                    label="Price"
+                                    label="Product Name"
                                     required
                                     :validate-status="
-                                        validationHasError(form.errors, 'price')
-                                            ? 'error'
-                                            : ''
-                                    "
-                                    :help="validationMessage(form.errors, 'price')"
-                                    class="mb-0"
-                                >
-                                    <a-input-number
-                                        v-model:value="form.price"
-                                        placeholder="Enter price"
-                                        :min="0"
-                                        :precision="2"
-                                        :parser="decimalParser"
-                                        size="large"
-                                    />
-                                </a-form-item>
-                            </div>
-                        </section>
-
-                        <section class="space-y-4 rounded-lg bg-gray-50 p-4">
-                            <h4 class="font-semibold text-gray-900">
-                                Identification
-                            </h4>
-                            <div
-                                class="space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0"
-                            >
-                                <a-form-item
-                                    label="SKU"
-                                    :required="props.isGlobalView"
-                                    :validate-status="
-                                        validationHasError(form.errors, 'SKU')
-                                            ? 'error'
-                                            : ''
-                                    "
-                                    :help="validationMessage(form.errors, 'SKU')"
-                                    class="mb-0"
-                                >
-                                    <a-input
-                                        v-model:value="form.SKU"
-                                        placeholder="Enter SKU"
-                                        size="large"
-                                    />
-                                </a-form-item>
-
-                                <a-form-item
-                                    label="Barcode"
-                                    :required="props.isGlobalView"
-                                    :validate-status="
-                                        validationHasError(form.errors, 'barcode')
+                                        validationHasError(form.errors, 'name')
                                             ? 'error'
                                             : ''
                                     "
                                     :help="
-                                        validationMessage(form.errors, 'barcode')
+                                        validationMessage(form.errors, 'name')
                                     "
                                     class="mb-0"
                                 >
                                     <a-input
-                                        v-model:value="form.barcode"
-                                        placeholder="Enter barcode"
+                                        v-model:value="form.name"
+                                        placeholder="Enter product name"
                                         size="large"
                                     />
                                 </a-form-item>
-                            </div>
 
-                            <div v-if="domainLookupEnabled" class="space-y-2">
-                                <a-alert
-                                    v-if="lookupLoading"
-                                    type="info"
-                                    message="Checking shared catalog…"
-                                />
-                                <a-alert
-                                    v-else-if="catalogFound"
-                                    type="success"
-                                    message="Review prefilled fields before saving."
-                                    show-icon
-                                />
-                                <a-alert
-                                    v-if="domainLookupEnabled && sharedCategoryHint"
-                                    type="info"
-                                    :message="`Suggested category (hint only): ${sharedCategoryHint}`"
-                                />
-                            </div>
-                        </section>
-
-                        <section class="space-y-4 rounded-lg bg-gray-50 p-4">
-                            <h4 class="font-semibold text-gray-900">
-                                Display & type
-                            </h4>
-                            <a-form-item
-                                label="Sold Type"
-                                required
-                                :validate-status="
-                                    validationHasError(form.errors, 'sold_type')
-                                        ? 'error'
-                                        : ''
-                                "
-                                :help="validationMessage(form.errors, 'sold_type')"
-                                class="mb-0"
-                            >
-                                <a-radio-group
-                                    v-model:value="form.sold_type"
-                                    size="large"
-                                    class="flex w-full flex-col gap-2 md:flex-row md:flex-wrap md:gap-x-4 md:gap-y-2"
-                                >
-                                    <a-radio
-                                        v-for="option in soltTypeOptions"
-                                        :key="option"
-                                        :value="option"
-                                        class="!m-0 !flex !w-full !items-center rounded-md border border-gray-200 bg-white px-3 py-2.5 md:!w-auto md:!border-0 md:!bg-transparent md:!px-0 md:!py-0"
-                                    >
-                                        {{ option }}
-                                    </a-radio>
-                                </a-radio-group>
-                            </a-form-item>
-
-                            <a-form-item
-                                label="Display style"
-                                :validate-status="
-                                    validationHasError(
-                                        form.errors,
-                                        'representation_type',
-                                    )
-                                        ? 'error'
-                                        : ''
-                                "
-                                :help="
-                                    validationMessage(
-                                        form.errors,
-                                        'representation_type',
-                                    )
-                                "
-                                class="mb-0"
-                            >
-                                <a-radio-group
-                                    v-model:value="form.representation_type"
-                                    size="large"
-                                    class="flex w-full flex-col gap-2 md:flex-row md:gap-4"
-                                    @change="
-                                        (e) =>
-                                            onRepresentationTypeChange(
-                                                e?.target?.value ??
-                                                    form.representation_type,
-                                            )
+                                <a-form-item
+                                    v-if="props.isGlobalView"
+                                    label="Domain"
+                                    required
+                                    :validate-status="
+                                        validationHasError(
+                                            form.errors,
+                                            'domain',
+                                        )
+                                            ? 'error'
+                                            : ''
                                     "
+                                    :help="
+                                        validationMessage(form.errors, 'domain')
+                                    "
+                                    class="mb-0"
                                 >
-                                    <a-radio
-                                        value="color"
-                                        class="!m-0 !flex !w-full !items-center rounded-md border border-gray-200 bg-white px-3 py-2.5 md:!w-auto"
-                                    >
-                                        Color
-                                    </a-radio>
-                                    <a-radio
-                                        value="image"
-                                        class="!m-0 !flex !w-full !items-center rounded-md border border-gray-200 bg-white px-3 py-2.5 md:!w-auto"
-                                    >
-                                        Image
-                                    </a-radio>
-                                </a-radio-group>
-                            </a-form-item>
-
-                            <a-form-item
-                                v-if="form.representation_type === 'color'"
-                                label="Color (hex, optional)"
-                                :validate-status="
-                                    validationHasError(
-                                        form.errors,
-                                        'representation',
-                                    )
-                                        ? 'error'
-                                        : ''
-                                "
-                                :help="
-                                    validationMessage(
-                                        form.errors,
-                                        'representation',
-                                    ) || 'Leave blank to use the default color'
-                                "
-                                class="mb-0"
-                            >
-                                <div
-                                    class="flex flex-col gap-2 md:flex-row md:items-center"
-                                >
-                                    <a-input
-                                        v-model:value="form.representation"
-                                        placeholder="e.g. ff5733 (no #)"
+                                    <a-select
+                                        v-model:value="form.domain"
+                                        :options="domainOptions"
+                                        placeholder="Select domain"
                                         size="large"
-                                        class="min-w-0 w-full flex-1"
                                     />
-                                    <div
-                                        v-if="representationHexColor"
-                                        class="h-10 w-full shrink-0 rounded border border-gray-200 md:w-10"
-                                        :style="{
-                                            backgroundColor: representationHexColor,
-                                        }"
+                                </a-form-item>
+
+                                <a-form-item
+                                    label="Category (optional)"
+                                    :validate-status="
+                                        validationHasError(
+                                            form.errors,
+                                            'category_id',
+                                        )
+                                            ? 'error'
+                                            : ''
+                                    "
+                                    :help="
+                                        validationMessage(
+                                            form.errors,
+                                            'category_id',
+                                        )
+                                    "
+                                    class="mb-0"
+                                >
+                                    <a-select
+                                        v-model:value="form.category_id"
+                                        :options="categoriesOption"
+                                        placeholder="Select category or leave blank"
+                                        allow-clear
+                                        show-search
+                                        :filter-option="
+                                            (input, option) =>
+                                                option.label
+                                                    .toLowerCase()
+                                                    .includes(
+                                                        input.toLowerCase(),
+                                                    )
+                                        "
+                                        size="large"
+                                        :allow-clear="true"
+                                    />
+                                </a-form-item>
+                            </section>
+
+                            <section
+                                class="space-y-4 rounded-lg bg-gray-50 p-4"
+                            >
+                                <h4 class="font-semibold text-gray-900">
+                                    Pricing
+                                </h4>
+                                <div
+                                    class="space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0"
+                                >
+                                    <a-form-item
+                                        label="Cost"
+                                        :validate-status="
+                                            validationHasError(
+                                                form.errors,
+                                                'cost',
+                                            )
+                                                ? 'error'
+                                                : ''
+                                        "
+                                        :help="
+                                            validationMessage(
+                                                form.errors,
+                                                'cost',
+                                            )
+                                        "
+                                        class="mb-0"
+                                    >
+                                        <a-input-number
+                                            v-model:value="form.cost"
+                                            placeholder="Enter cost"
+                                            :min="0"
+                                            :precision="2"
+                                            :parser="decimalParser"
+                                            size="large"
+                                        />
+                                    </a-form-item>
+
+                                    <a-form-item
+                                        label="Price"
+                                        required
+                                        :validate-status="
+                                            validationHasError(
+                                                form.errors,
+                                                'price',
+                                            )
+                                                ? 'error'
+                                                : ''
+                                        "
+                                        :help="
+                                            validationMessage(
+                                                form.errors,
+                                                'price',
+                                            )
+                                        "
+                                        class="mb-0"
+                                    >
+                                        <a-input-number
+                                            v-model:value="form.price"
+                                            placeholder="Enter price"
+                                            :min="0"
+                                            :precision="2"
+                                            :parser="decimalParser"
+                                            size="large"
+                                        />
+                                    </a-form-item>
+                                </div>
+                            </section>
+
+                            <section
+                                class="space-y-4 rounded-lg bg-gray-50 p-4"
+                            >
+                                <h4 class="font-semibold text-gray-900">
+                                    Identification
+                                </h4>
+                                <div
+                                    class="space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0"
+                                >
+                                    <a-form-item
+                                        label="SKU"
+                                        :required="props.isGlobalView"
+                                        :validate-status="
+                                            validationHasError(
+                                                form.errors,
+                                                'SKU',
+                                            )
+                                                ? 'error'
+                                                : ''
+                                        "
+                                        :help="
+                                            validationMessage(
+                                                form.errors,
+                                                'SKU',
+                                            )
+                                        "
+                                        class="mb-0"
+                                    >
+                                        <a-input
+                                            v-model:value="form.SKU"
+                                            placeholder="Enter SKU"
+                                            size="large"
+                                        />
+                                    </a-form-item>
+
+                                    <a-form-item
+                                        label="Barcode"
+                                        :required="props.isGlobalView"
+                                        :validate-status="
+                                            validationHasError(
+                                                form.errors,
+                                                'barcode',
+                                            )
+                                                ? 'error'
+                                                : ''
+                                        "
+                                        :help="
+                                            validationMessage(
+                                                form.errors,
+                                                'barcode',
+                                            )
+                                        "
+                                        class="mb-0"
+                                    >
+                                        <input
+                                            ref="captureInputRef"
+                                            v-model="scannerBuffer"
+                                            type="text"
+                                            tabindex="-1"
+                                            aria-hidden="true"
+                                            autocomplete="off"
+                                            class="fixed left-0 top-0 h-px w-px overflow-hidden opacity-0"
+                                            @keydown.enter="onCaptureEnter"
+                                        />
+                                        <!-- <p class="mb-2 text-xs text-gray-500">
+                                        Scan while this page is active, or type
+                                        barcode manually below.
+                                    </p> -->
+                                        <a-input
+                                            v-model:value="form.barcode"
+                                            placeholder="Enter barcode"
+                                            size="large"
+                                        />
+                                    </a-form-item>
+                                </div>
+
+                                <div
+                                    v-if="domainLookupEnabled"
+                                    class="space-y-2"
+                                >
+                                    <a-alert
+                                        v-if="lookupLoading"
+                                        type="info"
+                                        message="Checking shared catalog…"
+                                    />
+                                    <a-alert
+                                        v-else-if="catalogFound"
+                                        type="success"
+                                        message="Review prefilled fields before saving."
+                                        show-icon
+                                    />
+                                    <a-alert
+                                        v-if="
+                                            domainLookupEnabled &&
+                                            sharedCategoryHint
+                                        "
+                                        type="info"
+                                        :message="`Suggested category (hint only): ${sharedCategoryHint}`"
                                     />
                                 </div>
-                            </a-form-item>
+                            </section>
 
-                            <a-form-item
-                                v-else
-                                label="Product image"
-                                :validate-status="
-                                    validationHasError(
-                                        form.errors,
-                                        'representation_image',
-                                    ) ||
-                                    validationHasError(
-                                        form.errors,
-                                        'representation',
-                                    )
-                                        ? 'error'
-                                        : ''
-                                "
-                                :help="
-                                    validationMessage(
-                                        form.errors,
-                                        'representation_image',
-                                    ) ||
-                                    validationMessage(
-                                        form.errors,
-                                        'representation',
-                                    ) ||
-                                    'JPEG, PNG, WebP or GIF up to 2MB'
-                                "
-                                class="mb-0"
+                            <section
+                                class="space-y-4 rounded-lg bg-gray-50 p-4"
                             >
-                                <a-upload
-                                    v-model:file-list="imageFileList"
-                                    list-type="picture-card"
-                                    :max-count="1"
-                                    accept="image/jpeg,image/png,image/webp,image/gif"
-                                    :before-upload="beforeImageUpload"
-                                    @remove="onImageRemove"
+                                <h4 class="font-semibold text-gray-900">
+                                    Display & type
+                                </h4>
+                                <a-form-item
+                                    label="Sold Type"
+                                    required
+                                    :validate-status="
+                                        validationHasError(
+                                            form.errors,
+                                            'sold_type',
+                                        )
+                                            ? 'error'
+                                            : ''
+                                    "
+                                    :help="
+                                        validationMessage(
+                                            form.errors,
+                                            'sold_type',
+                                        )
+                                    "
+                                    class="mb-0"
                                 >
-                                    <div v-if="imageFileList.length < 1">
-                                        <PlusOutlined />
-                                        <div class="mt-2">Upload</div>
+                                    <a-radio-group
+                                        v-model:value="form.sold_type"
+                                        size="large"
+                                        class="flex w-full flex-col gap-2 md:flex-row md:flex-wrap md:gap-x-4 md:gap-y-2"
+                                    >
+                                        <a-radio
+                                            v-for="option in soltTypeOptions"
+                                            :key="option"
+                                            :value="option"
+                                            class="!m-0 !flex !w-full !items-center rounded-md border border-gray-200 bg-white px-3 py-2.5 md:!w-auto md:!border-0 md:!bg-transparent md:!px-0 md:!py-0"
+                                        >
+                                            {{ option }}
+                                        </a-radio>
+                                    </a-radio-group>
+                                </a-form-item>
+
+                                <a-form-item
+                                    label="Display style"
+                                    :validate-status="
+                                        validationHasError(
+                                            form.errors,
+                                            'representation_type',
+                                        )
+                                            ? 'error'
+                                            : ''
+                                    "
+                                    :help="
+                                        validationMessage(
+                                            form.errors,
+                                            'representation_type',
+                                        )
+                                    "
+                                    class="mb-0"
+                                >
+                                    <a-radio-group
+                                        v-model:value="form.representation_type"
+                                        size="large"
+                                        class="flex w-full flex-col gap-2 md:flex-row md:gap-4"
+                                        @change="
+                                            (e) =>
+                                                onRepresentationTypeChange(
+                                                    e?.target?.value ??
+                                                        form.representation_type,
+                                                )
+                                        "
+                                    >
+                                        <a-radio
+                                            value="color"
+                                            class="!m-0 !flex !w-full !items-center rounded-md border border-gray-200 bg-white px-3 py-2.5 md:!w-auto"
+                                        >
+                                            Color
+                                        </a-radio>
+                                        <a-radio
+                                            value="image"
+                                            class="!m-0 !flex !w-full !items-center rounded-md border border-gray-200 bg-white px-3 py-2.5 md:!w-auto"
+                                        >
+                                            Image
+                                        </a-radio>
+                                    </a-radio-group>
+                                </a-form-item>
+
+                                <a-form-item
+                                    v-if="form.representation_type === 'color'"
+                                    label="Color (hex, optional)"
+                                    :validate-status="
+                                        validationHasError(
+                                            form.errors,
+                                            'representation',
+                                        )
+                                            ? 'error'
+                                            : ''
+                                    "
+                                    :help="
+                                        validationMessage(
+                                            form.errors,
+                                            'representation',
+                                        ) ||
+                                        'Leave blank to use the default color'
+                                    "
+                                    class="mb-0"
+                                >
+                                    <div
+                                        class="flex flex-col gap-2 md:flex-row md:items-center"
+                                    >
+                                        <a-input
+                                            v-model:value="form.representation"
+                                            placeholder="e.g. ff5733 (no #)"
+                                            size="large"
+                                            class="min-w-0 w-full flex-1"
+                                        />
+                                        <div
+                                            v-if="representationHexColor"
+                                            class="h-10 w-full shrink-0 rounded border border-gray-200 md:w-10"
+                                            :style="{
+                                                backgroundColor:
+                                                    representationHexColor,
+                                            }"
+                                        />
                                     </div>
-                                </a-upload>
-                            </a-form-item>
-                        </section>
+                                </a-form-item>
 
-                        <div
-                            class="mt-2 flex flex-col-reverse gap-2 border-t border-gray-200 pt-6 md:mt-8 md:flex-row md:justify-end"
-                        >
-                            <Link
-                                class="block w-full md:w-auto"
-                                :href="hrefWithPreservedLocationId(getRoute('products.index'))"
-                            >
-                                <a-button class="w-full md:w-auto"
-                                    >Cancel</a-button
+                                <a-form-item
+                                    v-else
+                                    label="Product image"
+                                    :validate-status="
+                                        validationHasError(
+                                            form.errors,
+                                            'representation_image',
+                                        ) ||
+                                        validationHasError(
+                                            form.errors,
+                                            'representation',
+                                        )
+                                            ? 'error'
+                                            : ''
+                                    "
+                                    :help="
+                                        validationMessage(
+                                            form.errors,
+                                            'representation_image',
+                                        ) ||
+                                        validationMessage(
+                                            form.errors,
+                                            'representation',
+                                        ) ||
+                                        'JPEG, PNG, WebP or GIF up to 2MB'
+                                    "
+                                    class="mb-0"
                                 >
-                            </Link>
-                            <a-button
-                                type="primary"
-                                class="w-full md:w-auto"
-                                :loading="form.processing"
-                                :disabled="productsAtCapacity"
-                                @click="handleSave"
+                                    <a-upload
+                                        v-model:file-list="imageFileList"
+                                        list-type="picture-card"
+                                        :max-count="1"
+                                        accept="image/jpeg,image/png,image/webp,image/gif"
+                                        :before-upload="beforeImageUpload"
+                                        @remove="onImageRemove"
+                                    >
+                                        <div v-if="imageFileList.length < 1">
+                                            <PlusOutlined />
+                                            <div class="mt-2">Upload</div>
+                                        </div>
+                                    </a-upload>
+                                </a-form-item>
+                            </section>
+
+                            <div
+                                class="mt-2 flex flex-col-reverse gap-2 border-t border-gray-200 pt-6 md:mt-8 md:flex-row md:justify-end"
                             >
-                                <template #icon>
-                                    <PlusOutlined />
-                                </template>
-                                Create Product
-                            </a-button>
-                        </div>
-                    </a-form>
+                                <Link
+                                    class="block w-full md:w-auto"
+                                    :href="
+                                        hrefWithPreservedLocationId(
+                                            getRoute('products.index'),
+                                        )
+                                    "
+                                >
+                                    <a-button class="w-full md:w-auto"
+                                        >Cancel</a-button
+                                    >
+                                </Link>
+                                <a-button
+                                    type="primary"
+                                    class="w-full md:w-auto"
+                                    :loading="form.processing"
+                                    :disabled="productsAtCapacity"
+                                    @click="handleSave"
+                                >
+                                    <template #icon>
+                                        <PlusOutlined />
+                                    </template>
+                                    Create Product
+                                </a-button>
+                            </div>
+                        </a-form>
+                    </div>
                 </div>
             </template>
         </ContentLayout>

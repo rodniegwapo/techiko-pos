@@ -121,7 +121,7 @@ const searchProducts = async () => {
 
   searchLoading.value = true;
   try {
-    const params = { search: productSearch.value };
+    const params = { search: productSearch.value, scope: "domain" };
     if (form.domain) {
       params.domain = form.domain;
     }
@@ -430,6 +430,12 @@ watch(
                 <div>
                   <p class="font-medium text-gray-900">{{ product.name }}</p>
                   <p class="text-sm text-gray-500">SKU: {{ product.SKU }}</p>
+                  <p
+                    v-if="!product.at_location"
+                    class="mt-1 text-xs text-amber-600"
+                  >
+                    Not at this store — will be added on receive
+                  </p>
                 </div>
                 <div class="text-right">
                   <p class="text-sm font-medium">
