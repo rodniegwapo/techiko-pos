@@ -40,7 +40,13 @@
                     />
                 </a-form-item>
 
-                <a-form-item label="Role" name="role_id">
+                <a-form-item
+                    v-if="isOwnRoleLocked"
+                    label="Role"
+                >
+                    <a-input :value="ownRoleName" disabled />
+                </a-form-item>
+                <a-form-item v-else label="Role" name="role_id">
                     <a-select
                         v-model:value="form.role_id"
                         class="w-full"
@@ -195,7 +201,22 @@ import axios from "axios";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 
 const page = usePage();
-const { getRoute } = useDomainRoutes();
+const { getRoute, isInDomainContext } = useDomainRoutes();
+
+/** Global /users has no web store/update — CRUD goes through /api/users. */
+const userStoreUrl = () => {
+    if (isInDomainContext.value) {
+        return getRoute("users.store");
+    }
+    return "/api/users";
+};
+
+const userUpdateUrl = (userId) => {
+    if (isInDomainContext.value) {
+        return getRoute("users.update", { user: userId });
+    }
+    return `/api/users/${userId}`;
+};
 
 const isMdUp = useMediaQuery("(min-width: 768px)");
 const modalWidth = computed(() =>
@@ -256,6 +277,34 @@ const form = reactive({
 
 // Current user
 const currentUser = computed(() => page.props.auth.user?.data);
+
+const isSuperUser = computed(
+    () => currentUser.value?.is_super_user || false
+);
+
+const editingUserData = computed(() => {
+    if (!props.user) return null;
+    return props.user.data || props.user;
+});
+
+const isEditingSelf = computed(() => {
+    if (!props.isEdit || !editingUserData.value || !currentUser.value) {
+        return false;
+    }
+    return editingUserData.value.id === currentUser.value.id;
+});
+
+const isOwnRoleLocked = computed(
+    () => isEditingSelf.value && !isSuperUser.value
+);
+
+const ownRoleName = computed(() => {
+    return (
+        editingUserData.value?.roles?.[0]?.name ||
+        selectedRole.value?.name ||
+        "—"
+    );
+});
 
 // Available roles (filter out super admin for regular admins)
 const availableRoles = computed(() => {
@@ -326,7 +375,9 @@ const rules = computed(() => ({
             },
         },
     ],
-    role_id: [{ required: true, message: "Please select a role" }],
+    role_id: isOwnRoleLocked.value
+        ? []
+        : [{ required: true, message: "Please select a role" }],
 }));
 
 // Watch for user changes
@@ -516,10 +567,14 @@ const handleSave = async () => {
         const userData = {
             name: form.name,
             email: form.email,
-            role_id: form.role_id,
             supervisor_id: form.supervisor_id,
             domain: form.domain || undefined,
         };
+
+        // Own role is locked for non-super users — omit role_id so it cannot be changed
+        if (!isOwnRoleLocked.value) {
+            userData.role_id = form.role_id;
+        }
 
         // Only include password if it's provided
         if (form.password) {
@@ -529,16 +584,14 @@ const handleSave = async () => {
 
         console.log("Saving user data:", userData);
 
-        if (props.isEdit && props.user) {
-            // Update existing user using domain route
-            await axios.put(getRoute('users.update', { user: props.user.id }), userData);
+        if (props.isEdit && editingUserData.value) {
+            await axios.put(userUpdateUrl(editingUserData.value.id), userData);
             notification.success({
                 message: "User Updated",
                 description: `${userData.name} has been updated successfully`,
             });
         } else {
-            // Create new user using domain route
-            await axios.post(getRoute('users.store'), userData);
+            await axios.post(userStoreUrl(), userData);
             notification.success({
                 message: "User Created",
                 description: `${userData.name} has been created successfully`,
