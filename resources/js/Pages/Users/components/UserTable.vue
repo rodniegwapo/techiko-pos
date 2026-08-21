@@ -81,12 +81,16 @@ const columns = computed(() => {
             key: "created_at",
             align: "left",
         },
-        {
+    ];
+
+    // Hierarchy column for super users only
+    if (isSuperUser.value) {
+        baseColumns.push({
             title: "Hierarchy",
             key: "hierarchy",
             align: "left",
-        },
-    ];
+        });
+    }
 
     // Add domain column for super users only in global view
     if (page.props.auth?.user?.data?.is_super_user && props.isGlobalView) {
