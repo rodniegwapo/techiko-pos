@@ -201,7 +201,22 @@ import axios from "axios";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 
 const page = usePage();
-const { getRoute } = useDomainRoutes();
+const { getRoute, isInDomainContext } = useDomainRoutes();
+
+/** Global /users has no web store/update — CRUD goes through /api/users. */
+const userStoreUrl = () => {
+    if (isInDomainContext.value) {
+        return getRoute("users.store");
+    }
+    return "/api/users";
+};
+
+const userUpdateUrl = (userId) => {
+    if (isInDomainContext.value) {
+        return getRoute("users.update", { user: userId });
+    }
+    return `/api/users/${userId}`;
+};
 
 const isMdUp = useMediaQuery("(min-width: 768px)");
 const modalWidth = computed(() =>
@@ -569,16 +584,14 @@ const handleSave = async () => {
 
         console.log("Saving user data:", userData);
 
-        if (props.isEdit && props.user) {
-            // Update existing user using domain route
-            await axios.put(getRoute('users.update', { user: props.user.id }), userData);
+        if (props.isEdit && editingUserData.value) {
+            await axios.put(userUpdateUrl(editingUserData.value.id), userData);
             notification.success({
                 message: "User Updated",
                 description: `${userData.name} has been updated successfully`,
             });
         } else {
-            // Create new user using domain route
-            await axios.post(getRoute('users.store'), userData);
+            await axios.post(userStoreUrl(), userData);
             notification.success({
                 message: "User Created",
                 description: `${userData.name} has been created successfully`,
