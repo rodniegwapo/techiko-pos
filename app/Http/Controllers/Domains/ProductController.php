@@ -444,12 +444,13 @@ class ProductController extends Controller
     public function create(Request $request, Domain $domain)
     {
         $location = $this->resolveActiveLocation($request, $domain);
-        $categoriesQuery = $location !== null
-            ? $this->buildCategoriesQuery($domain, $location)
-            : Category::where('domain', $domain->name_slug);
+        // All domain categories (same as category management), not only those with products at this store.
+        $categories = Category::where('domain', $domain->name_slug)
+            ->orderBy('name')
+            ->get();
 
         return Inertia::render('Products/Create', [
-            'categories' => $categoriesQuery->get(),
+            'categories' => $categories,
             'sold_by_types' => ProductSoldType::all(),
             'isGlobalView' => false,
             'currentLocation' => $location,
@@ -468,9 +469,10 @@ class ProductController extends Controller
         }
 
         $location = $this->resolveActiveLocation($request, $domain);
-        $categoriesQuery = $location !== null
-            ? $this->buildCategoriesQuery($domain, $location)
-            : Category::where('domain', $domain->name_slug);
+        // All domain categories (same as category management), not only those with products at this store.
+        $categories = Category::where('domain', $domain->name_slug)
+            ->orderBy('name')
+            ->get();
 
         return Inertia::render('Products/Edit', [
             'product' => [
@@ -480,7 +482,7 @@ class ProductController extends Controller
                     $product->representation_type,
                 ),
             ],
-            'categories' => $categoriesQuery->get(),
+            'categories' => $categories,
             'sold_by_types' => ProductSoldType::all(),
             'isGlobalView' => false,
             'currentLocation' => $location,
