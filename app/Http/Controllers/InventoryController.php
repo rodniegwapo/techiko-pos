@@ -199,6 +199,7 @@ class InventoryController extends Controller
             'domain' => 'nullable|string',
             'location_id' => 'nullable|exists:inventory_locations,id',
             'category_id' => 'nullable|exists:categories,id',
+            'scope' => 'nullable|string|in:domain,location',
         ]);
 
         if (! empty($validated['domain']) && empty($validated['location_id'])) {
@@ -208,6 +209,7 @@ class InventoryController extends Controller
         }
 
         $location = null;
+        $scope = $validated['scope'] ?? 'location';
 
         if (! empty($validated['domain']) && ! empty($validated['location_id'])) {
             $location = InventoryLocation::query()
@@ -226,10 +228,19 @@ class InventoryController extends Controller
         );
 
         if ($location) {
-            $query->where('domain', $validated['domain'])
-                ->whereHas('activeLocations', function ($q) use ($location) {
+            $query->where('domain', $validated['domain']);
+
+            if ($scope === 'domain') {
+                $query->withExists([
+                    'activeLocations as at_location' => function ($q) use ($location) {
+                        $q->where('inventory_locations.id', $location->id);
+                    },
+                ]);
+            } else {
+                $query->whereHas('activeLocations', function ($q) use ($location) {
                     $q->where('inventory_locations.id', $location->id);
                 });
+            }
         }
 
         $query
