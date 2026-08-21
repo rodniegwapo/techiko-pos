@@ -40,7 +40,13 @@
                     />
                 </a-form-item>
 
-                <a-form-item label="Role" name="role_id">
+                <a-form-item
+                    v-if="isOwnRoleLocked"
+                    label="Role"
+                >
+                    <a-input :value="ownRoleName" disabled />
+                </a-form-item>
+                <a-form-item v-else label="Role" name="role_id">
                     <a-select
                         v-model:value="form.role_id"
                         class="w-full"
@@ -257,6 +263,34 @@ const form = reactive({
 // Current user
 const currentUser = computed(() => page.props.auth.user?.data);
 
+const isSuperUser = computed(
+    () => currentUser.value?.is_super_user || false
+);
+
+const editingUserData = computed(() => {
+    if (!props.user) return null;
+    return props.user.data || props.user;
+});
+
+const isEditingSelf = computed(() => {
+    if (!props.isEdit || !editingUserData.value || !currentUser.value) {
+        return false;
+    }
+    return editingUserData.value.id === currentUser.value.id;
+});
+
+const isOwnRoleLocked = computed(
+    () => isEditingSelf.value && !isSuperUser.value
+);
+
+const ownRoleName = computed(() => {
+    return (
+        editingUserData.value?.roles?.[0]?.name ||
+        selectedRole.value?.name ||
+        "—"
+    );
+});
+
 // Available roles (filter out super admin for regular admins)
 const availableRoles = computed(() => {
     let roles = props.roles.map((role) => ({
@@ -326,7 +360,9 @@ const rules = computed(() => ({
             },
         },
     ],
-    role_id: [{ required: true, message: "Please select a role" }],
+    role_id: isOwnRoleLocked.value
+        ? []
+        : [{ required: true, message: "Please select a role" }],
 }));
 
 // Watch for user changes
@@ -516,10 +552,14 @@ const handleSave = async () => {
         const userData = {
             name: form.name,
             email: form.email,
-            role_id: form.role_id,
             supervisor_id: form.supervisor_id,
             domain: form.domain || undefined,
         };
+
+        // Own role is locked for non-super users — omit role_id so it cannot be changed
+        if (!isOwnRoleLocked.value) {
+            userData.role_id = form.role_id;
+        }
 
         // Only include password if it's provided
         if (form.password) {

@@ -7,6 +7,7 @@ use App\Services\UserHierarchyService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Role;
 
 class UserService
@@ -227,8 +228,27 @@ class UserService
 
         $user->update($updateData);
 
-        // Update role only if user has permission
-        if ($canUpdateSensitive && isset($data['role_id'])) {
+        // Non-super users cannot change their own role
+        if (
+            $canUpdateSensitive
+            && isset($data['role_id'])
+            && $currentUser->id === $user->id
+            && ! $currentUser->isSuperUser()
+        ) {
+            $currentRoleId = $user->roles()->first()?->id;
+            if ((int) $data['role_id'] !== (int) $currentRoleId) {
+                throw ValidationException::withMessages([
+                    'role_id' => ['You cannot change your own role.'],
+                ]);
+            }
+        }
+
+        // Update role only if user has permission and is not locking own role
+        if (
+            $canUpdateSensitive
+            && isset($data['role_id'])
+            && ! ($currentUser->id === $user->id && ! $currentUser->isSuperUser())
+        ) {
             $role = Role::findById($data['role_id'], 'web');
             $user->syncRoles([$role]);
         }
@@ -311,15 +331,20 @@ class UserService
                 })
                 ->pluck('id');
 
+            $isSelfRoleLocked = $currentUser->id === $targetUser->id
+                && ! $currentUser->isSuperUser();
+
             $rules = [
                 'name' => 'required|string|max:255',
                 'email' => ['required', 'email', Rule::unique('users')->ignore($targetUser->id)],
                 'password' => 'nullable|string|min:8|confirmed',
-                'role_id' => ['required', 'exists:roles,id', function ($attribute, $value, $fail) use ($availableRoles) {
-                    if (!$availableRoles->contains($value)) {
-                        $fail('You are not authorized to assign this role.');
-                    }
-                }],
+                'role_id' => $isSelfRoleLocked
+                    ? ['sometimes', 'exists:roles,id']
+                    : ['required', 'exists:roles,id', function ($attribute, $value, $fail) use ($availableRoles) {
+                        if (!$availableRoles->contains($value)) {
+                            $fail('You are not authorized to assign this role.');
+                        }
+                    }],
                 'supervisor_id' => 'nullable|exists:users,id'
             ];
 
