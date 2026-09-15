@@ -15,8 +15,10 @@ import AddModal from "./components/AddModal.vue";
 import ViewDetailModal from "./components/ViewDetailModal.vue";
 
 import { useTable } from "@/Composables/useTable";
+import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 
 const { showModal } = useHelpers();
+const { hasPermission } = usePermissionsV2();
 
 // Page props
 const page = usePage();
@@ -97,6 +99,7 @@ const discountDetail = ref({});
           </a-select-option>
         </a-select>
         <a-button
+          v-if="hasPermission('products.discounts.store')"
           @click="showModal"
           type="primary"
           class="flex w-full items-center justify-center border border-green-500 bg-white text-green-500 md:inline-flex md:w-auto"

@@ -80,17 +80,20 @@ const domainValue = computed({
     },
 });
 
+/** Date for the API, or null when empty or not a valid date (never the string "Invalid Date"). */
+function toApiDate(value) {
+    if (!value) return null;
+    const d = dayjs(value);
+    return d.isValid() ? d.format("YYYY-MM-DD HH:mm:ss") : null;
+}
+
 const handleSave = () => {
     const payload = {
         ...formData.value,
         type: formData.value?.type?.value || formData.value.type,
         scope: formData.value?.scope?.value || formData.value.scope,
-        start_date: formData.value.start_date
-            ? dayjs(formData.value.start_date).format("YYYY-MM-DD HH:mm:ss")
-            : null,
-        end_date: formData.value?.end_date
-            ? dayjs(formData.value.end_date).format("YYYY-MM-DD HH:mm:ss")
-            : null,
+        start_date: toApiDate(formData.value.start_date),
+        end_date: toApiDate(formData.value?.end_date),
     };
 
     router.post(
@@ -105,12 +108,8 @@ const handleUpdate = () => {
         ...formData.value,
         type: formData.value?.type?.value || formData.value.type,
         scope: formData.value?.scope?.value || formData.value.scope,
-        start_date: formData.value.start_date
-            ? dayjs(formData.value.start_date).format("YYYY-MM-DD HH:mm:ss")
-            : null,
-        end_date: formData.value?.end_date
-            ? dayjs(formData.value.end_date).format("YYYY-MM-DD HH:mm:ss")
-            : null,
+        start_date: toApiDate(formData.value.start_date),
+        end_date: toApiDate(formData.value?.end_date),
     };
 
     router.put(
