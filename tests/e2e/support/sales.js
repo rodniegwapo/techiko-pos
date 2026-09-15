@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { expect } from "@playwright/test";
 import { apiJson } from "./fixtures.js";
+import { pickSelectOption } from "./antd.js";
 import { E2E } from "./users.js";
 
 /** IDs written by E2ESalesSeeder before the run (tests/e2e/.fixtures.json). */
@@ -180,23 +181,8 @@ export class SalesPage {
     }
 
     /** Picks an option in an antd select inside `scope` (dialog) whose label contains `optionText`. */
-    async pickSelectOption(scope, selectIndex, optionText) {
-        const select = scope.locator(".ant-select").nth(selectIndex);
-        await select.click();
-        const dropdown = this.page.locator(".ant-select-dropdown:not(.ant-select-dropdown-hidden)").last();
-        await expect(dropdown).toBeVisible();
-        // The virtual list re-renders while the dropdown animates open; clicking too early hits a detached node.
-        await this.page.waitForTimeout(300);
-
-        // Options are virtualized, so far-down ones aren't in the DOM until scrolled to.
-        // (Typing doesn't help: these selects filter on option IDs, not labels.)
-        const option = dropdown.locator(`.ant-select-item-option[title*="${optionText.replaceAll('"', '\\"')}"]`).first();
-        const holder = dropdown.locator(".rc-virtual-list-holder");
-        for (let i = 0; i < 30 && !(await option.isVisible()); i++) {
-            await holder.evaluate((el) => (el.scrollTop += 120));
-            await this.page.waitForTimeout(80);
-        }
-        await option.click();
+    pickSelectOption(scope, selectIndex, optionText) {
+        return pickSelectOption(this.page, scope, selectIndex, optionText);
     }
 
     /** Customer search box (antd auto-complete; its placeholder isn't an input attribute). */
