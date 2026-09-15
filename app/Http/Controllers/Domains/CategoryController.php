@@ -9,6 +9,8 @@ use App\Http\Resources\CategoryResource;
 use App\Helpers;
 use App\Traits\LocationCategoryScoping;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Unique;
 use Inertia\Inertia;
 
 class CategoryController extends Controller
@@ -17,7 +19,7 @@ class CategoryController extends Controller
     /**
      * Display a listing of categories for the domain.
      */
-    public function index(Request $request, Domain $domain = null)
+    public function index(Request $request, ?Domain $domain = null)
     {
         // For category management, show all categories for the domain regardless of location
         // Location filtering should only apply to product/inventory views, not category management
@@ -41,12 +43,12 @@ class CategoryController extends Controller
     /**
      * Store a newly created category for the domain.
      */
-    public function store(Request $request, Domain $domain = null)
+    public function store(Request $request, ?Domain $domain = null)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
+            'name' => ['required', 'string', 'max:255', $this->uniqueNameRule($domain)],
             'description' => 'nullable|string',
-        ]);
+        ], $this->uniqueNameMessage());
 
         if ($domain) {
             $validated['domain'] = $domain->name_slug;
@@ -69,13 +71,25 @@ class CategoryController extends Controller
         }
 
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
+            'name' => ['required', 'string', 'max:255', $this->uniqueNameRule($domain)->ignore($category->id)],
             'description' => 'nullable|string',
-        ]);
+        ], $this->uniqueNameMessage());
 
         $category->update($validated);
 
         return redirect()->back()->with('success', 'Category updated successfully');
+    }
+
+    /** Category names are unique within an organization, or products can't tell them apart. */
+    private function uniqueNameRule(?Domain $domain): Unique
+    {
+        return Rule::unique('categories', 'name')->where('domain', $domain?->name_slug);
+    }
+
+    /** @return array<string, string> */
+    private function uniqueNameMessage(): array
+    {
+        return ['name.unique' => 'A category with this name already exists.'];
     }
 
     /**
