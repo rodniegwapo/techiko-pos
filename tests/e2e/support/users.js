@@ -41,6 +41,12 @@ export const USERS = {
         domain: "mcdonalds-corp",
         role: "cashier",
     },
+    mcManager: {
+        email: "manager@mcdonalds-corp.com",
+        password: "mcdonalds123",
+        domain: "mcdonalds-corp",
+        role: "manager",
+    },
 };
 
 export const OTHER_DOMAIN = "mcdonalds-corp";
@@ -63,10 +69,30 @@ export function workerCashier(parallelIndex) {
     };
 }
 
-/** Resolves an `account` option: a USERS key, or "worker-cashier". */
+/** Worker number (1..4) shared by the sales cashiers and wallet stores. */
+export const workerNumber = (parallelIndex) => (parallelIndex % WORKER_CASHIER_COUNT) + 1;
+
+/**
+ * Wallet accounts from E2EWalletSeeder: each worker has its own store with a manager and a
+ * second manager ("partner"), so wallet tests never share a store's cash data.
+ */
+export function walletUser(kind, parallelIndex) {
+    const n = workerNumber(parallelIndex);
+    return {
+        email: `e2e-wallet-${kind}-${n}@techiko.test`,
+        password: "e2e-password",
+        domain: "jollibee-corp",
+        role: "manager",
+    };
+}
+
+/** Resolves an `account` option: a USERS key, "worker-cashier", "wallet-manager" or "wallet-partner". */
 export function resolveAccount(account, parallelIndex) {
     if (account === "worker-cashier") {
         return workerCashier(parallelIndex);
+    }
+    if (account === "wallet-manager" || account === "wallet-partner") {
+        return walletUser(account.replace("wallet-", ""), parallelIndex);
     }
     const user = USERS[account];
     if (!user) {
