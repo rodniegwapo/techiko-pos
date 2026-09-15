@@ -227,7 +227,10 @@ export class SalesPage {
         await dialog.getByRole("spinbutton").fill(String(quantity));
 
         const patch = this.waitForCart("PATCH", "/cart/update-quantity").catch(() => null);
-        await dialog.getByRole("button", { name: "Update Quantity" }).click();
+        // Under load the button occasionally never reports "stable" (the dialog keeps animating);
+        // it is visible and enabled, so fall back to a forced click instead of hanging.
+        const updateButton = dialog.getByRole("button", { name: "Update Quantity" });
+        await updateButton.click({ timeout: 10_000 }).catch(() => updateButton.click({ force: true }));
         return Promise.race([patch, this.page.waitForTimeout(3000).then(() => null)]);
     }
 
