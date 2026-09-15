@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Domains\Inventory;
 
+use App\Helpers;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\InventoryLocationResource;
 use App\Http\Requests\InventoryLocationRequest;
@@ -16,17 +17,17 @@ class InventoryLocationController extends Controller
     public function index(Request $request, Domain $domain)
     {
         $user = auth()->user();
-        
+
         $query = InventoryLocation::active()
             ->forDomain($domain->name_slug)
             ->when($request->search, fn($q, $s) => $q->search($s))
             ->orderBy('name');
-            
+
         // Apply role-based access control
         if ($user->hasLocationRestriction() && $user->location_id) {
             $query->where('id', $user->location_id);
         }
-        
+
         $items = $query->paginate($request->per_page ?? 15);
 
         return inertia('Inventory/Locations/Index', [
@@ -54,8 +55,15 @@ class InventoryLocationController extends Controller
     {
         $validated = $request->validated();
         $validated['domain'] = $domain->name_slug;
-        
+        $makeDefault = (bool) ($validated['is_default'] ?? false);
+        unset($validated['is_default']);
+
         $location = InventoryLocation::create($validated);
+        // Through setAsDefault so the domain keeps exactly one default store.
+        if ($makeDefault) {
+            $location->setAsDefault();
+        }
+
         return back()->with('success', 'Location created');
     }
 
@@ -86,8 +94,17 @@ class InventoryLocationController extends Controller
     public function update(InventoryLocationRequest $request, Domain $domain, InventoryLocation $location)
     {
         $this->ensureLocationBelongsToDomain($location, $domain);
-        
-        $location->update($request->validated());
+
+        $validated = $request->validated();
+        $makeDefault = (bool) ($validated['is_default'] ?? false);
+        // Unsetting the default happens by making another store the default.
+        unset($validated['is_default']);
+
+        $location->update($validated);
+        if ($makeDefault) {
+            $location->setAsDefault();
+        }
+
         return back()->with('success', 'Location updated');
     }
 
@@ -107,11 +124,65 @@ class InventoryLocationController extends Controller
     public function destroy(Domain $domain, InventoryLocation $location)
     {
         $this->ensureLocationBelongsToDomain($location, $domain);
-        
+
         $location->delete();
         return back()->with('success', 'Location deleted');
     }
-    
+
+    /**
+     * Make this store the organization's default (the store used when nobody picked one).
+     */
+    public function setDefault(Request $request, Domain $domain, InventoryLocation $location)
+    {
+        $this->ensureLocationBelongsToDomain($location, $domain);
+
+        $location->setAsDefault();
+
+        if ($request->expectsJson()) {
+            return new InventoryLocationResource($location);
+        }
+
+        return back()->with('success', 'Default location updated successfully for this domain.');
+    }
+
+    public function toggleStatus(Request $request, Domain $domain, InventoryLocation $location)
+    {
+        $this->ensureLocationBelongsToDomain($location, $domain);
+
+        $location->update(['is_active' => ! $location->is_active]);
+
+        if ($request->expectsJson()) {
+            return new InventoryLocationResource($location);
+        }
+
+        return back()->with('success', 'Location status updated successfully.');
+    }
+
+    /**
+     * Switch the store this admin works in (header location badge). Kept in their session only,
+     * so it doesn't change the organization's default store for everyone else.
+     */
+    public function switch(Request $request, Domain $domain, InventoryLocation $location)
+    {
+        $this->ensureLocationBelongsToDomain($location, $domain);
+
+        if ($request->user()->hasLocationRestriction()) {
+            abort(403, 'You are assigned to a store and can\'t switch.');
+        }
+
+        if (! $location->is_active) {
+            abort(422, 'This store is inactive.');
+        }
+
+        $request->session()->put(Helpers::selectedLocationSessionKey($domain->name_slug), $location->id);
+
+        if ($request->expectsJson()) {
+            return new InventoryLocationResource($location);
+        }
+
+        return back();
+    }
+
     /**
      * Ensure location belongs to the specified domain
      */
@@ -122,5 +193,3 @@ class InventoryLocationController extends Controller
         }
     }
 }
-
-

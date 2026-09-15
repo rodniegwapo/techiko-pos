@@ -6,6 +6,7 @@ use App\Traits\Searchable;
 use App\Models\LocationProduct;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 class InventoryLocation extends Model
 {
@@ -138,14 +139,20 @@ class InventoryLocation extends Model
      */
     public function setAsDefault()
     {
-        // First, unset any existing default for this domain
-        static::where('domain', $this->domain)
-            ->where('is_default', true)
-            ->update(['is_default' => false]);
-        
-        // Set this location as default
-        $this->update(['is_default' => true]);
-        
+        DB::transaction(function () {
+            // Unset any other default for this domain
+            static::where('domain', $this->domain)
+                ->whereKeyNot($this->getKey())
+                ->where('is_default', true)
+                ->update(['is_default' => false]);
+
+            // Written directly: $this->update() skips saving when this model already says it's the
+            // default, which left the domain with no default at all.
+            static::whereKey($this->getKey())->update(['is_default' => true]);
+            $this->is_default = true;
+            $this->syncOriginalAttribute('is_default');
+        });
+
         return $this;
     }
 

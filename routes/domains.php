@@ -251,7 +251,9 @@ Route::prefix('domains/{domain:name_slug}')
             Route::get('/adjustment-products', [StockAdjustmentController::class, 'getProductsForAdjustment'])->name('adjustment-products');
 
             Route::resource('locations', InventoryLocationController::class)->names('locations');
-            // set-default/toggle-status handlers remain global unless you want domain-specific ones
+            Route::post('/locations/{location}/set-default', [InventoryLocationController::class, 'setDefault'])->name('locations.set-default');
+            Route::post('/locations/{location}/toggle-status', [InventoryLocationController::class, 'toggleStatus'])->name('locations.toggle-status');
+            Route::post('/locations/{location}/switch', [InventoryLocationController::class, 'switch'])->name('locations.switch');
         });
 
         // Terminal Setup (Organization-specific)

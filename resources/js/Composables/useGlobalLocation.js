@@ -77,8 +77,15 @@ export function useGlobalLocation() {
         if (locationId === selectedLocationId.value) return
         
         try {
-            // Call the set-default API
-            await axios.post(`/inventory/locations/${locationId}/set-default`)
+            // Switch for this user's session only; never change the organization's default store
+            await axios.post(
+                window.route('domains.inventory.locations.switch', {
+                    domain: page.props.currentDomain?.name_slug,
+                    location: locationId,
+                }),
+                {},
+                { headers: { Accept: 'application/json' } }
+            )
             
             // Update local state
             selectedLocationId.value = locationId
@@ -96,7 +103,7 @@ export function useGlobalLocation() {
             // Show success notification
             notification.success({
                 message: 'Location Updated',
-                description: 'Default location has been updated successfully.',
+                description: 'Location switched successfully.',
                 duration: 3
             })
             
