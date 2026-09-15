@@ -153,7 +153,9 @@ export function useHelpers() {
                         });
                     });
                 },
-                onCancel: () => reject(new Error("User canceled")),
+                // Cancelling is a normal choice, not an error: resolve with null instead of rejecting,
+                // since callers don't await this and a rejection surfaces as an uncaught error.
+                onCancel: () => resolve(null),
             });
         });
     };

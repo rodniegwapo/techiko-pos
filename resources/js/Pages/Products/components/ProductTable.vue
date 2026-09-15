@@ -12,6 +12,7 @@ import {
 import { useHelpers } from "@/Composables/useHelpers";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
+import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 
 import { usePage, router } from "@inertiajs/vue3";
 
@@ -21,6 +22,11 @@ const emit = defineEmits(["handleTableChange"]);
 const { confirmDelete, formatCurrency, formatDate } = useHelpers();
 const { spinning } = useGlobalVariables();
 const { getRoute, getLocationQueryFromPage } = useDomainRoutes();
+const { hasPermission } = usePermissionsV2();
+
+/** Only offer actions the server will allow for this user. */
+const canEdit = computed(() => hasPermission("products.edit"));
+const canDelete = computed(() => hasPermission("products.destroy"));
 
 const isMdUp = useMediaQuery("(min-width: 768px)");
 
@@ -235,6 +241,7 @@ function onMobilePaginationChange(pageNum) {
                     </IconTooltipButton>
 
                     <IconTooltipButton
+                        v-if="canEdit"
                         hover="group-hover:bg-blue-500"
                         name="Edit Product"
                         @click="handleClickEdit(record)"
@@ -243,6 +250,7 @@ function onMobilePaginationChange(pageNum) {
                     </IconTooltipButton>
 
                     <IconTooltipButton
+                        v-if="canDelete"
                         hover="group-hover:bg-red-500"
                         name="Delete Product"
                         @click="handleDeleteCategory(record)"
@@ -369,8 +377,12 @@ function onMobilePaginationChange(pageNum) {
 
                                 View details
                             </a-button>
-                            <div class="grid grid-cols-2 gap-2">
+                            <div
+                                v-if="canEdit || canDelete"
+                                class="grid grid-cols-2 gap-2"
+                            >
                                 <a-button
+                                    v-if="canEdit"
                                     class="flex item-center gap-2 justify-center"
                                     @click="handleClickEdit(record)"
                                 >
@@ -380,6 +392,7 @@ function onMobilePaginationChange(pageNum) {
                                     Edit
                                 </a-button>
                                 <a-button
+                                    v-if="canDelete"
                                     class="flex item-center gap-2 justify-center"
                                     danger
                                     @click="handleDeleteCategory(record)"

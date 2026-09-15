@@ -59,6 +59,12 @@ class ProductController extends Controller
             $barcodeRules[] = Rule::unique('products', 'barcode')->ignore($productId);
         }
 
+        // SKUs are unique within an organization, like barcodes; another organization's SKU is free to use.
+        $skuRule = Rule::unique('products', 'SKU')->ignore($productId);
+        if ($domainSlug) {
+            $skuRule->where(fn ($q) => $q->where('domain', $domainSlug));
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
@@ -66,8 +72,13 @@ class ProductController extends Controller
             'price' => ['required', 'numeric', 'min:0'],
             'cost' => ['nullable', 'numeric', 'min:0'],
 
-            'category_id' => ['nullable', 'exists:categories,id'],
-            'SKU' => ['nullable', 'string', 'max:255', 'unique:products,SKU,'.$productId],
+            'category_id' => [
+                'nullable',
+                $domainSlug
+                    ? Rule::exists('categories', 'id')->where('domain', $domainSlug)
+                    : 'exists:categories,id',
+            ],
+            'SKU' => ['nullable', 'string', 'max:255', $skuRule],
             'barcode' => $barcodeRules,
 
             'representation_type' => ['nullable', 'string', 'in:image,color,text'],
@@ -84,8 +95,16 @@ class ProductController extends Controller
             'max_stock_level' => ['nullable', 'numeric', 'min:0'],
             'unit_weight' => ['nullable', 'numeric', 'min:0'],
 
-            'location_id' => ['nullable', 'exists:inventory_locations,id'],
-        ], [], [
+            'location_id' => [
+                'nullable',
+                $domainSlug
+                    ? Rule::exists('inventory_locations', 'id')->where('domain', $domainSlug)
+                    : 'exists:inventory_locations,id',
+            ],
+        ], [
+            'category_id.exists' => 'The selected category does not belong to this organization.',
+            'location_id.exists' => 'The selected store does not belong to this organization.',
+        ], [
             'name' => 'product name',
             'sold_type' => 'sold type',
             'category_id' => 'category',
@@ -100,11 +119,10 @@ class ProductController extends Controller
             $trim = isset($validated['SKU']) ? trim((string) $validated['SKU']) : '';
             $validated['SKU'] = $trim === '' ? null : $trim;
         }
-        if (! empty($validated['barcode'])) {
-            $validated['barcode'] = BarcodeNormalizer::normalize($validated['barcode']);
-        } else {
-            $validated['barcode'] = $validated['barcode'] ?? '';
-        }
+        // A missing barcode is NULL, not '': the (domain, barcode) unique index allows many NULLs
+        // but only one '' per organization.
+        $barcode = BarcodeNormalizer::normalize($validated['barcode'] ?? null);
+        $validated['barcode'] = $barcode === '' ? null : $barcode;
 
         // Request-only fields — not columns on products
         unset($validated['location_id'], $validated['representation_image']);
@@ -196,7 +214,11 @@ class ProductController extends Controller
                 return $query->whereHas('category', function ($q) use ($category) {
                     $q->where('name', $category);
                 });
-            });
+            })
+            ->when($request->sold_type, fn ($q, $soldType) => $q->where('sold_type', $soldType))
+            // Price and cost filters (number inputs) match the exact amount.
+            ->when(is_numeric($request->price), fn ($q) => $q->where('price', (float) $request->price))
+            ->when(is_numeric($request->cost), fn ($q) => $q->where('cost', (float) $request->cost));
     }
 
     /**
