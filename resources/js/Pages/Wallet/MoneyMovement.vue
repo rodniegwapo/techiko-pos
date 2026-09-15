@@ -97,6 +97,7 @@ const isShiftClosed = computed(() => !!props.cashControl?.is_closed);
                     :active-location-id="activeLocationId"
                     :is-shift-closed="isShiftClosed"
                     :running-cash-balance="runningCashBalance"
+                    :business-date="cashControl?.business_date ?? null"
                 />
             </div>
         </template>
