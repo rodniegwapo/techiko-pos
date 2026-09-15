@@ -10,6 +10,7 @@
         "test:e2e:sales": "playwright test tests/e2e/sales",
         "test:e2e:wallet": "playwright test tests/e2e/wallet",
         "test:e2e:products": "playwright test tests/e2e/products",
+        "test:e2e:categories": "playwright test tests/e2e/categories",
         "test:e2e:report": "playwright show-report tests/e2e/playwright-report"
     },
     "devDependencies": {
