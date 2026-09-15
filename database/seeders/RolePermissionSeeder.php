@@ -198,6 +198,7 @@ class RolePermissionSeeder extends Seeder
             'inventory.locations.destroy',
             'inventory.locations.edit',
             'inventory.locations.set-default',
+            'inventory.locations.switch',
             'inventory.locations.toggle-status',
 
             // Inventory API
@@ -503,6 +504,7 @@ class RolePermissionSeeder extends Seeder
             'inventory.locations.destroy',
             'inventory.locations.edit',
             'inventory.locations.set-default',
+            'inventory.locations.switch',
             'inventory.locations.toggle-status',
 
             // Inventory API
@@ -975,6 +977,7 @@ class RolePermissionSeeder extends Seeder
             'submit' => 'Submit',
             'toggle-status' => 'Toggle',
             'set-default' => 'Set Default',
+            'switch' => 'Switch Store',
             'hierarchy' => 'Hierarchy',
             'assign-supervisor' => 'Assign Supervisor',
             'remove-supervisor' => 'Remove Supervisor',

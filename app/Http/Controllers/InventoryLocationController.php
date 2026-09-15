@@ -17,6 +17,7 @@ class InventoryLocationController extends Controller
     public function index(Request $request)
     {
         $query = InventoryLocation::query()
+            ->when(! $request->user()->isSuperUser(), fn ($q) => $q->where('domain', $request->user()->domain))
             ->withCount(['productInventories', 'inventoryMovements', 'stockAdjustments'])
             ->when($request->input('search'), function ($query, $search) {
                 return $query->search($search);
@@ -71,12 +72,19 @@ class InventoryLocationController extends Controller
      */
     public function store(StoreInventoryLocationRequest $request)
     {
-        // If this is set as default, unset other defaults
-        if ($request->is_default) {
-            InventoryLocation::where('is_default', true)->update(['is_default' => false]);
+        $data = $request->validated();
+        // Only super users may create stores for another organization.
+        if (! $request->user()->isSuperUser()) {
+            $data['domain'] = $request->user()->domain;
         }
+        $makeDefault = (bool) ($data['is_default'] ?? false);
+        unset($data['is_default']);
 
-        $location = InventoryLocation::create($request->validated());
+        $location = InventoryLocation::create($data);
+        // setAsDefault only replaces the default within this store's organization.
+        if ($makeDefault) {
+            $location->setAsDefault();
+        }
 
         if ($request->expectsJson()) {
             return new InventoryLocationResource($location);
@@ -91,6 +99,8 @@ class InventoryLocationController extends Controller
      */
     public function show(Request $request, InventoryLocation $location)
     {
+        $this->authorizeLocation($request, $location);
+
         $location->loadCount(['productInventories', 'inventoryMovements', 'stockAdjustments']);
         
         // Get location statistics
@@ -118,8 +128,10 @@ class InventoryLocationController extends Controller
     /**
      * Show the form for editing the specified location
      */
-    public function edit(InventoryLocation $location)
+    public function edit(Request $request, InventoryLocation $location)
     {
+        $this->authorizeLocation($request, $location);
+
         return Inertia::render('Inventory/Locations/Edit', [
             'location' => new InventoryLocationResource($location),
             'locationTypes' => $this->getLocationTypes(),
@@ -131,12 +143,20 @@ class InventoryLocationController extends Controller
      */
     public function update(UpdateInventoryLocationRequest $request, InventoryLocation $location)
     {
-        // If this is set as default, unset other defaults
-        if ($request->is_default && !$location->is_default) {
-            InventoryLocation::where('is_default', true)->update(['is_default' => false]);
-        }
+        $this->authorizeLocation($request, $location);
 
-        $location->update($request->validated());
+        $data = $request->validated();
+        if (! $request->user()->isSuperUser()) {
+            unset($data['domain']);
+        }
+        $makeDefault = (bool) ($data['is_default'] ?? false);
+        // Unsetting the default happens by making another store the default.
+        unset($data['is_default']);
+
+        $location->update($data);
+        if ($makeDefault) {
+            $location->setAsDefault();
+        }
 
         if ($request->expectsJson()) {
             return new InventoryLocationResource($location);
@@ -151,6 +171,8 @@ class InventoryLocationController extends Controller
      */
     public function destroy(Request $request, InventoryLocation $location)
     {
+        $this->authorizeLocation($request, $location);
+
         // Prevent deletion of default location
         if ($location->is_default) {
             if ($request->expectsJson()) {
@@ -189,6 +211,7 @@ class InventoryLocationController extends Controller
         }
 
         $locations = InventoryLocation::search($query)
+            ->when(! $request->user()->isSuperUser(), fn ($q) => $q->where('domain', $request->user()->domain))
             ->active()
             ->limit(10)
             ->get()
@@ -210,6 +233,8 @@ class InventoryLocationController extends Controller
      */
     public function setDefault(Request $request, InventoryLocation $location)
     {
+        $this->authorizeLocation($request, $location);
+
         // Use the new domain-specific method
         $location->setAsDefault();
 
@@ -225,6 +250,8 @@ class InventoryLocationController extends Controller
      */
     public function toggleStatus(Request $request, InventoryLocation $location)
     {
+        $this->authorizeLocation($request, $location);
+
         $location->update(['is_active' => !$location->is_active]);
 
         if ($request->expectsJson()) {
@@ -232,6 +259,18 @@ class InventoryLocationController extends Controller
         }
 
         return redirect()->back()->with('success', 'Location status updated successfully.');
+    }
+
+    /**
+     * These routes aren't tied to an organization, so anyone but a super user may only touch their
+     * own organization's stores (otherwise an admin could change another organization's stores).
+     */
+    private function authorizeLocation(Request $request, InventoryLocation $location): void
+    {
+        $user = $request->user();
+        if (! $user->isSuperUser() && $location->domain !== $user->domain) {
+            abort(403, 'Location does not belong to your organization.');
+        }
     }
 
     /**

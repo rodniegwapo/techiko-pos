@@ -198,7 +198,7 @@ const deleteLocation = (location) => {
 
 const setAsDefault = (location) => {
     router.post(
-        route("inventory.locations.set-default", location.id),
+        getRoute("inventory.locations.set-default", { location: location.id }),
         {},
         {
             preserveScroll: true,
@@ -211,7 +211,7 @@ const setAsDefault = (location) => {
 
 const toggleStatus = (location) => {
     router.post(
-        route("inventory.locations.toggle-status", location.id),
+        getRoute("inventory.locations.toggle-status", { location: location.id }),
         {},
         {
             preserveScroll: true,

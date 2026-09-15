@@ -4,6 +4,7 @@ import { IconMapPin, IconChevronDown } from "@tabler/icons-vue";
 import { usePage } from "@inertiajs/vue3";
 import axios from "axios";
 import { notification } from "ant-design-vue";
+import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 
 const page = usePage();
 const visible = ref(false);
@@ -14,18 +15,12 @@ const currentLocation = computed(() => page.props.currentLocation);
 // Get current domain from page props
 const currentDomain = computed(() => page.props.currentDomain);
 
-// Get user from page props
-const userRole = computed(() => page.props.auth?.user?.data?.roles[0]);
+const { hasPermission } = usePermissionsV2();
 
-// Check if user has admin/super admin permissions
-const hasLocationAccess = computed(() => {
-    const role = userRole.value;
-
-    // Add null checks to prevent errors
-    if (!role) return false;
-
-    return role.name === "admin" || role.name === "super admin";
-});
+// Admins (and super users) may switch the store they work in
+const hasLocationAccess = computed(() =>
+    hasPermission("inventory.locations.switch"),
+);
 
 // Get available locations from global handleInertia data (always array)
 const availableLocations = computed(() => {
@@ -36,14 +31,6 @@ const availableLocations = computed(() => {
 
 // Debug visibility conditions
 const shouldShowBadge = computed(() => {
-    const debug = {
-        currentDomain: !!currentDomain.value,
-        hasLocationAccess: hasLocationAccess.value,
-        availableLocationsLength: availableLocations.value.length,
-        userRole: userRole.value?.name,
-        currentLocation: currentLocation.value?.name,
-    };
-
     return (
         currentDomain.value &&
         hasLocationAccess.value &&
@@ -63,11 +50,18 @@ const getLocationIcon = (type) => {
     return icons[type?.toLowerCase()] || icons.default;
 };
 
-// Switch location using set-default API
+// Switch the store for this admin only (remembered in their session). This must not change the
+// organization's default store, which everyone else without an assigned store works in.
 const switchLocation = async (location) => {
     try {
-        // Call the set-default API
-        await axios.post(`/inventory/locations/${location.id}/set-default`);
+        await axios.post(
+            window.route("domains.inventory.locations.switch", {
+                domain: currentDomain.value.name_slug,
+                location: location.id,
+            }),
+            {},
+            { headers: { Accept: "application/json" } },
+        );
 
         // Close popover
         visible.value = false;
@@ -77,12 +71,12 @@ const switchLocation = async (location) => {
         url.searchParams.set("location_id", location.id);
         window.location.href = url.toString();
     } catch (error) {
-        console.error("Failed to set default location:", error);
+        console.error("Failed to switch location:", error);
 
         // Show error notification
         notification.error({
             message: "Location Update Failed",
-            description: "Failed to update default location. Please try again.",
+            description: "Failed to switch location. Please try again.",
             duration: 5,
         });
     }
