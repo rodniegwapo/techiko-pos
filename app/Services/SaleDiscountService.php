@@ -21,6 +21,11 @@ class SaleDiscountService
         Log::info("Regular discount IDs: " . json_encode($regularDiscountIds));
         Log::info("Mandatory discount IDs: " . json_encode($mandatoryDiscountIds));
 
+        // Regulatory rule: one mandatory discount (PWD, Senior, …) per transaction.
+        if (count(array_unique($mandatoryDiscountIds)) > 1) {
+            throw new \InvalidArgumentException('Only one mandatory discount can be applied per transaction.');
+        }
+
         return DB::transaction(function () use ($sale, $regularDiscountIds, $mandatoryDiscountIds) {
             // Step 1: Calculate the correct base amount for discounts
             $itemsSubtotal = $this->calculateItemsSubtotal($sale);

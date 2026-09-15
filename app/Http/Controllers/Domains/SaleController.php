@@ -241,8 +241,10 @@ class SaleController extends Controller
 
     public function proceedPayment(Request $request, Domain $domain, Sale $sale)
     {
+        $this->ensureSaleBelongsToDomain($sale, $domain);
+
         $validated = $request->validate([
-            'customer_id' => 'nullable|exists:customers,id',
+            'customer_id' => ['nullable', $this->customerInDomainRule($domain)],
             'sale_amount' => 'nullable|numeric|min:0',
             'loyalty_points_to_redeem' => 'nullable|integer|min:0',
             'payment_method' => 'required|string|in:cash,card,e-wallet,credit',
@@ -285,19 +287,20 @@ class SaleController extends Controller
                 $redeemPoints = (int) ($validated['loyalty_points_to_redeem'] ?? 0);
 
                 if ($sale->payment_status !== 'pending') {
-                    throw new \Exception('Sale is not pending.');
+                    throw ValidationException::withMessages(['sale' => 'Sale is not pending.']);
+                }
+
+                if (! $sale->saleItems()->exists()) {
+                    throw ValidationException::withMessages(['sale' => 'Add at least one item before taking payment.']);
                 }
 
                 // Planned loyalty redemption (updates sale totals) before deducting inventory
                 if ($redeemPoints > 0) {
                     if (empty($validated['customer_id'])) {
-                        throw new \Exception('Customer is required to redeem loyalty points.');
+                        throw ValidationException::withMessages(['customer_id' => 'Customer is required to redeem loyalty points.']);
                     }
 
                     $customerForRedemption = Customer::query()->findOrFail($validated['customer_id']);
-                    if ($customerForRedemption->domain !== $domain->name_slug) {
-                        throw new \Exception('Customer does not belong to this organization.');
-                    }
 
                     $redemptionService->applyPendingForCheckout($sale, $customerForRedemption, $redeemPoints);
 
@@ -334,7 +337,7 @@ class SaleController extends Controller
                 // 3. Handle credit payment if selected
                 if ($validated['payment_method'] === 'credit') {
                     if (! $validated['customer_id']) {
-                        throw new \Exception('Customer is required for credit payments.');
+                        throw ValidationException::withMessages(['customer_id' => 'Customer is required for credit payments.']);
                     }
 
                     $customer = Customer::findOrFail($validated['customer_id']);
@@ -424,6 +427,31 @@ class SaleController extends Controller
         }
     }
 
+    /** `exists` rule limited to this organization's customers. */
+    protected function customerInDomainRule(Domain $domain)
+    {
+        return Rule::exists('customers', 'id')->where('domain', $domain->name_slug);
+    }
+
+    /** `exists` rule limited to this organization's products. */
+    protected function productInDomainRule(Domain $domain)
+    {
+        return Rule::exists('products', 'id')->where('domain', $domain->name_slug);
+    }
+
+    /**
+     * The user whose cart a users/{user}/sales route acts on. Must belong to this organization:
+     * otherwise a cart (and sale) would be created for another organization's user.
+     */
+    protected function cartUserInDomain(Request $request, Domain $domain): User
+    {
+        $user = User::findOrFail($request->route('user'));
+
+        abort_if($user->domain !== $domain->name_slug, 404);
+
+        return $user;
+    }
+
     public function storeDraft(Request $request, Domain $domain)
     {
         $user = $request->user();
@@ -449,7 +477,7 @@ class SaleController extends Controller
     public function addItemToCart(Request $request, Domain $domain, Sale $sale)
     {
         $validated = $request->validate([
-            'product_id' => 'required|exists:products,id',
+            'product_id' => ['required', $this->productInDomainRule($domain)],
             'quantity' => 'required|integer|min:1',
         ]);
 
@@ -502,7 +530,7 @@ class SaleController extends Controller
     public function removeItemFromCart(Request $request, Domain $domain, Sale $sale)
     {
         $validated = $request->validate([
-            'product_id' => 'required|exists:products,id',
+            'product_id' => ['required', $this->productInDomainRule($domain)],
         ]);
 
         $sale->saleItems()->where('product_id', $validated['product_id'])->delete();
@@ -526,7 +554,7 @@ class SaleController extends Controller
     public function updateItemQuantity(Request $request, Domain $domain, Sale $sale)
     {
         $validated = $request->validate([
-            'product_id' => 'required|exists:products,id',
+            'product_id' => ['required', $this->productInDomainRule($domain)],
             'quantity' => 'required|integer|min:1',
         ]);
 
@@ -652,8 +680,10 @@ class SaleController extends Controller
 
     public function assignCustomer(Request $request, Domain $domain, Sale $sale)
     {
+        $this->ensureSaleBelongsToDomain($sale, $domain);
+
         $validated = $request->validate([
-            'customer_id' => 'nullable|exists:customers,id',
+            'customer_id' => ['nullable', $this->customerInDomainRule($domain)],
         ]);
 
         \Log::info("Domains\SaleController::assignCustomer called", [
@@ -800,10 +830,7 @@ class SaleController extends Controller
      */
     public function createSaleForUser(Request $request, Domain $domain, $userId)
     {
-        // Explicitly get the 'user' parameter from the route
-        $userId = $request->route('user');
-        // Verify the user exists and is accessible
-        $user = User::findOrFail($userId);
+        $user = $this->cartUserInDomain($request, $domain);
 
         // Determine location based on current user's role
         $currentUser = auth()->user();
@@ -845,7 +872,7 @@ class SaleController extends Controller
             'all_parameters' => $request->all(),
         ]);
 
-        $user = User::findOrFail($userId);
+        $user = $this->cartUserInDomain($request, $domain);
 
         $currentUser = auth()->user();
         $userRole = $currentUser->roles()->first();
@@ -889,7 +916,7 @@ class SaleController extends Controller
 
         // Now add item to the sale
         $validated = $request->validate([
-            'product_id' => 'required|exists:products,id',
+            'product_id' => ['required', $this->productInDomainRule($domain)],
             'quantity' => 'required|integer|min:1',
         ]);
 
@@ -1067,7 +1094,7 @@ class SaleController extends Controller
         }
 
         $validated = $request->validate([
-            'product_id' => 'required|exists:products,id',
+            'product_id' => ['required', $this->productInDomainRule($domain)],
             'quantity' => 'required|integer|min:1',
         ]);
 
@@ -1112,13 +1139,15 @@ class SaleController extends Controller
             ->pending()
             ->orderBy('created_at', 'desc');
 
-        // Apply location-based filtering based on user role
+        // Apply location-based filtering based on user role (same as updateUserCartQuantity)
         if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
-            // Admin/Super Admin: Filter by default location or current location
-            $defaultLocation = $currentUser->location_id ?? $request->input('location_id');
-            if ($defaultLocation) {
-                $query->where('location_id', $defaultLocation);
+            // Admin/Super Admin: Use active location
+            $location = Helpers::getActiveLocation($domain);
+            if ($location) {
+                $query->where('location_id', $location->id);
             }
+            // Always scope to target user, or this would edit whichever pending sale is newest
+            $query->where('user_id', $userId);
         } else {
             // Regular users: Filter by their assigned location and user ID
             $query->where('location_id', $currentUser->location_id)
@@ -1133,7 +1162,7 @@ class SaleController extends Controller
         }
 
         $validated = $request->validate([
-            'product_id' => 'required|exists:products,id',
+            'product_id' => ['required', $this->productInDomainRule($domain)],
         ]);
 
         $sale->saleItems()->where('product_id', $validated['product_id'])->delete();
