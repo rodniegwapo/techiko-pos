@@ -12,6 +12,7 @@
         "test:e2e:products": "playwright test tests/e2e/products",
         "test:e2e:categories": "playwright test tests/e2e/categories",
         "test:e2e:discounts": "playwright test tests/e2e/discounts",
+        "test:e2e:mandatory-discounts": "playwright test tests/e2e/mandatory-discounts",
         "test:e2e:report": "playwright show-report tests/e2e/playwright-report"
     },
     "devDependencies": {
