@@ -192,8 +192,14 @@ export class MoneyMovementPage {
 
     /** Opens "Add entry" → Cash in / Cash out / Other entry and returns the dialog. */
     async openEntryDialog(menuItem) {
-        await this.page.getByRole("button", { name: /Add entry/ }).hover();
-        await this.page.getByRole("menuitem", { name: menuItem }).click();
+        // The menu opens on hover, which occasionally doesn't register under load; retry until it shows.
+        const item = this.page.getByRole("menuitem", { name: menuItem });
+        await expect(async () => {
+            await this.page.mouse.move(0, 0);
+            await this.page.getByRole("button", { name: /Add entry/ }).hover();
+            await expect(item).toBeVisible({ timeout: 1500 });
+        }).toPass({ timeout: 15_000 });
+        await item.click();
         const dialog = this.page.getByRole("dialog");
         await expect(dialog).toBeVisible();
         return dialog;
@@ -251,23 +257,29 @@ export class MoneyMovementPage {
     /** Sets ledger filters and applies them. */
     async filter({ from, to, rail, kind } = {}) {
         const panel = this.page.locator("#cash-ledger");
-        if (from !== undefined) await panel.locator('input[type="date"]').nth(0).fill(from);
-        if (to !== undefined) await panel.locator('input[type="date"]').nth(1).fill(to);
         if (rail) await pickSelectOption(this.page, panel, 0, rail);
         if (kind) await pickSelectOption(this.page, panel, 1, kind);
 
-        // Wait for this Apply's reload specifically, not an earlier save's redirect back.
-        const reloaded = this.page.waitForResponse((r) => {
-            const url = new URL(r.url());
-            return (
-                r.request().method() === "GET" &&
-                url.pathname === walletUrl &&
-                (from === undefined || url.searchParams.get("date_from") === from) &&
-                (to === undefined || url.searchParams.get("date_to") === to)
-            );
-        });
-        await panel.getByRole("button", { name: "Apply" }).click();
-        await reloaded;
+        // A reload still finishing from an earlier save can reset the filter inputs, so re-apply
+        // until the page URL actually carries the requested dates.
+        await expect(async () => {
+            if (from !== undefined) await panel.locator('input[type="date"]').nth(0).fill(from);
+            if (to !== undefined) await panel.locator('input[type="date"]').nth(1).fill(to);
+            const reloaded = this.page.waitForResponse((r) => {
+                const url = new URL(r.url());
+                return (
+                    r.request().method() === "GET" &&
+                    url.pathname === walletUrl &&
+                    (from === undefined || url.searchParams.get("date_from") === from) &&
+                    (to === undefined || url.searchParams.get("date_to") === to)
+                );
+            }, { timeout: 5000 });
+            await panel.getByRole("button", { name: "Apply" }).click();
+            await reloaded;
+            await this.page.waitForTimeout(300);
+            if (from !== undefined) await expect(this.page).toHaveURL(new RegExp(`date_from=${from}`), { timeout: 1000 });
+            if (to !== undefined) await expect(this.page).toHaveURL(new RegExp(`date_to=${to}`), { timeout: 1000 });
+        }).toPass({ timeout: 20_000 });
     }
 
     get rows() {
