@@ -19,6 +19,8 @@ use App\Support\Wallet\WalletLocationResolver;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Unique;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
@@ -377,9 +379,9 @@ class PaymentCardTypeController extends Controller
         $location = WalletLocationResolver::resolve($request, $domain);
 
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'name' => ['required', 'string', 'max:255', $this->uniqueNameInLocation($domain, $location)],
             'sort_order' => ['nullable', 'integer', 'min:0', 'max:65535'],
-        ]);
+        ], $this->uniqueNameMessage());
 
         $type = PaymentCardType::query()->create([
             'domain' => $domain->name_slug,
@@ -401,10 +403,16 @@ class PaymentCardTypeController extends Controller
         $this->ensureInDomainLocation($domain, $location, $paymentCardType);
 
         $validated = $request->validate([
-            'name' => ['sometimes', 'required', 'string', 'max:255'],
+            'name' => [
+                'sometimes',
+                'required',
+                'string',
+                'max:255',
+                $this->uniqueNameInLocation($domain, $location)->ignore($paymentCardType->id),
+            ],
             'is_active' => ['sometimes', 'boolean'],
             'sort_order' => ['nullable', 'integer', 'min:0', 'max:65535'],
-        ]);
+        ], $this->uniqueNameMessage());
 
         $paymentCardType->update($validated);
 
@@ -517,6 +525,20 @@ class PaymentCardTypeController extends Controller
             'success' => true,
             'message' => 'Card type deleted.',
         ]);
+    }
+
+    /** Card type names must be unique per store, or cashiers can't tell them apart at checkout. */
+    private function uniqueNameInLocation(Domain $domain, InventoryLocation $location): Unique
+    {
+        return Rule::unique('payment_card_types', 'name')
+            ->where('domain', $domain->name_slug)
+            ->where('location_id', $location->id);
+    }
+
+    /** @return array<string, string> */
+    private function uniqueNameMessage(): array
+    {
+        return ['name.unique' => 'A card type with this name already exists at this store.'];
     }
 
     private function ensureInDomainLocation(Domain $domain, InventoryLocation $location, PaymentCardType $paymentCardType): void
