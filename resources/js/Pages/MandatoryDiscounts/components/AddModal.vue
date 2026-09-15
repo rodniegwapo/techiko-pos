@@ -7,11 +7,13 @@ import { useTable } from "@/Composables/useTable";
 import { usePage } from "@inertiajs/vue3";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useHelpers } from "@/Composables/useHelpers";
+import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 
 const { spinning } = useTable();
 const page = usePage();
 const { formData, openModal, isEdit, errors } = useGlobalVariables();
 const { inertiaProgressLifecyle } = useHelpers();
+const { getRoute } = useDomainRoutes();
 
 const isMdUp = useMediaQuery("(min-width: 768px)");
 
@@ -104,7 +106,7 @@ const handleSave = () => {
   };
 
   router.post(
-    route("mandatory-discounts.store"),
+    getRoute("mandatory-discounts.store"),
     payload,
     inertiaProgressLifecyle
   );
@@ -123,7 +125,7 @@ const handleUpdate = () => {
   };
 
   router.put(
-    route("mandatory-discounts.update", {
+    getRoute("mandatory-discounts.update", {
       mandatory_discount: formData.value.id,
     }),
     payload,

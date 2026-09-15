@@ -17,7 +17,8 @@ class MandatoryDiscount extends Model
         'value' => 'decimal:2',
     ];
 
-    protected $searchableFields = ['name', 'type'];
+    // The Searchable trait reads $searchable.
+    protected $searchable = ['name', 'type'];
 
     // Remove domain relationship - now using domain string column
     // public function domain()

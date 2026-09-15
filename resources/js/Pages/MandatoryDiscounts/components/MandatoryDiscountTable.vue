@@ -6,6 +6,11 @@ import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { IconTrash, IconEdit, IconEye, IconWorld } from "@tabler/icons-vue";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
+import { usePermissionsV2 } from "@/Composables/usePermissionV2";
+
+const { hasPermission } = usePermissionsV2();
+const canEdit = computed(() => hasPermission("mandatory-discounts.update"));
+const canDelete = computed(() => hasPermission("mandatory-discounts.destroy"));
 
 const emit = defineEmits(["handleTableChange", "selectedMandatoryDiscount"]);
 const { confirmDelete, formattedTotal, formattedPercent } = useHelpers();
@@ -165,6 +170,7 @@ function onMobilePaginationChange(pageNum) {
             <template v-if="column.key == 'action'">
                 <div class="flex items-center gap-2">
                     <icon-tooltip-button
+                        v-if="canEdit"
                         hover="group-hover:bg-blue-500"
                         name="Edit Mandatory Discount"
                         @click="handleClickEdit(record)"
@@ -173,6 +179,7 @@ function onMobilePaginationChange(pageNum) {
                     </icon-tooltip-button>
 
                     <icon-tooltip-button
+                        v-if="canDelete"
                         hover="group-hover:bg-red-500"
                         name="Delete Mandatory Discount"
                         @click="handleDelete(record)"
@@ -267,8 +274,13 @@ function onMobilePaginationChange(pageNum) {
                                 </template>
                                 View mandatory discount
                             </a-button>
-                            <div class="grid grid-cols-2 gap-2">
+                            <div
+                                v-if="canEdit || canDelete"
+                                class="grid gap-2"
+                                :class="canEdit && canDelete ? 'grid-cols-2' : 'grid-cols-1'"
+                            >
                                 <a-button
+                                    v-if="canEdit"
                                     class="flex items-center justify-center gap-2"
                                     @click="handleClickEdit(record)"
                                 >
@@ -278,6 +290,7 @@ function onMobilePaginationChange(pageNum) {
                                     Edit
                                 </a-button>
                                 <a-button
+                                    v-if="canDelete"
                                     class="flex items-center justify-center gap-2"
                                     danger
                                     @click="handleDelete(record)"
