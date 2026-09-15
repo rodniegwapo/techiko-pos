@@ -1,51 +1,29 @@
 <script setup>
 import { ref, computed, onMounted } from "vue";
-import { usePage, router, Head } from "@inertiajs/vue3";
+import { router, Head } from "@inertiajs/vue3";
 import {
     ShoppingCartOutlined,
     WarningOutlined,
     StopOutlined,
-    DollarOutlined,
     BoxPlotOutlined,
     HistoryOutlined,
-    ArrowUpOutlined,
-    ArrowDownOutlined,
 } from "@ant-design/icons-vue";
-import { useGlobalVariables } from "@/Composables/useGlobalVariable";
-import { useFilters, toLabel } from "@/Composables/useFilters";
 import { useHelpers } from "@/Composables/useHelpers";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
+import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useMediaQuery } from "@vueuse/core";
 import VueApexCharts from "vue3-apexcharts";
 
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
-import RefreshButton from "@/Components/buttons/Refresh.vue";
-import FilterDropdown from "@/Components/filters/FilterDropdown.vue";
-import ActiveFilters from "@/Components/filters/ActiveFilters.vue";
 
-const page = usePage();
-const { spinning } = useGlobalVariables();
 const { formattedTotal } = useHelpers();
-
-// Use permission composable
-const isSuperUser = computed(
-    () => usePage().props.auth?.user?.data?.is_super_user || false,
-);
-
-const selectedLocation = ref(null);
+const { hasPermission } = usePermissionsV2();
+const { getRoute } = useDomainRoutes();
 
 const props = defineProps({
     report: Object,
     locations: Array,
-    currentLocation: Object,
-    filters: Object,
-});
-
-// Initialize filters
-onMounted(() => {
-    selectedLocation.value =
-        props.filters?.location_id || props.currentLocation?.id || null;
 });
 
 // Computed Data
@@ -53,64 +31,32 @@ const summary = computed(() => props.report?.summary || {});
 const location = computed(() => props.report?.location || {});
 const lowStockProducts = computed(() => props.report?.low_stock_products || []);
 
-// Fetch Data
-const getItems = () => {
-    router.reload({
-        only: ["report"],
-        preserveScroll: true,
-        data: { location_id: selectedLocation.value || undefined },
-        onStart: () => (spinning.value = true),
-        onFinish: () => (spinning.value = false),
+// Stores are switched from the header's location badge, which sets ?location_id.
+const locationId = computed(() => location.value.id || undefined);
+
+// Navigation (organization routes, keeping the store shown here)
+const navigateToProducts = (extra = {}) =>
+    router.visit(getRoute("inventory.products"), {
+        data: { location_id: locationId.value, ...extra },
     });
-};
 
-// Filter Options
-const locationFilterOptions = computed(
-    () =>
-        props.locations?.map((loc) => ({
-            label: loc.name,
-            value: loc.id,
-        })) || [],
-);
-
-// Filters
-const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
-    getItems,
-    configs: [
-        {
-            label: "Location",
-            key: "location_id",
-            ref: selectedLocation,
-            getLabel: toLabel(computed(() => locationFilterOptions.value)),
-        },
-    ],
-});
-
-const filtersConfig = [
-    {
-        key: "location_id",
-        label: "Location",
-        type: "select",
-        options: locationFilterOptions.value,
-    },
-];
-
-// Navigation
-const navigateToProducts = () =>
-    router.visit(route("inventory.products"), {
-        data: { location_id: selectedLocation.value },
-    });
+const navigateToLowStockProducts = () =>
+    navigateToProducts({ stock_status: "low_stock" });
 
 const navigateToMovements = () =>
-    router.visit(route("inventory.movements"), {
-        data: { location_id: selectedLocation.value },
+    router.visit(getRoute("inventory.movements"), {
+        data: { location_id: locationId.value },
     });
 
-const navigateToAdjustments = () => {
-    if (usePermissionsV2("inventory.adjustments.store") || isSuperUser.value) {
-        router.visit(route("inventory.adjustments.index"));
-    }
-};
+const navigateToAdjustments = () =>
+    router.visit(getRoute("inventory.adjustments.index"));
+
+const navigateToValuation = () =>
+    router.visit(getRoute("inventory.valuation"), {
+        data: { location_id: locationId.value },
+    });
+
+const canViewValuation = computed(() => hasPermission("inventory.valuation"));
 
 const summaryCards = computed(() => [
     {
@@ -118,58 +64,51 @@ const summaryCards = computed(() => [
         value: summary.value.total_products || 0,
         icon: BoxPlotOutlined,
         color: "blue",
-        change: 5, // Mock growth percentage
-        trend: "up",
     },
     {
         title: "In Stock",
         value: summary.value.in_stock_products || 0,
         icon: ShoppingCartOutlined,
         color: "green",
-        change: 12,
-        trend: "up",
     },
     {
         title: "Low Stock",
         value: summary.value.low_stock_products || 0,
         icon: WarningOutlined,
         color: "orange",
-        change: -3,
-        trend: "down",
     },
     {
         title: "Out of Stock",
         value: summary.value.out_of_stock_products || 0,
         icon: StopOutlined,
         color: "red",
-        change: -8,
-        trend: "down",
     },
 ]);
 
 const quickActions = computed(() => {
     const actions = [];
 
-    if (usePermissionsV2("inventory.index") || isSuperUser.value) {
-        actions.push(
-            {
-                title: "Manage Products",
-                desc: "View and manage product inventory levels",
-                color: "blue",
-                icon: BoxPlotOutlined,
-                action: navigateToProducts,
-            },
-            {
-                title: "Inventory Movements",
-                desc: "Track all inventory transactions",
-                color: "green",
-                icon: HistoryOutlined,
-                action: navigateToMovements,
-            },
-        );
+    if (hasPermission("inventory.products")) {
+        actions.push({
+            title: "Manage Products",
+            desc: "View and manage product inventory levels",
+            color: "blue",
+            icon: BoxPlotOutlined,
+            action: () => navigateToProducts(),
+        });
     }
 
-    if (usePermissionsV2("inventory.adjustments.store") || isSuperUser.value) {
+    if (hasPermission("inventory.movements")) {
+        actions.push({
+            title: "Inventory Movements",
+            desc: "Track all inventory transactions",
+            color: "green",
+            icon: HistoryOutlined,
+            action: navigateToMovements,
+        });
+    }
+
+    if (hasPermission("inventory.adjustments.index")) {
         actions.push({
             title: "Stock Adjustments",
             desc: "Create and manage stock adjustments",
@@ -288,42 +227,9 @@ onMounted(() => setTimeout(() => (chartLoaded.value = true), 400));
                             <p class="text-sm font-medium text-gray-600 mb-1">
                                 {{ card.title }}
                             </p>
-                            <p class="text-2xl font-bold text-gray-900 mb-2">
+                            <p class="text-2xl font-bold text-gray-900">
                                 {{ card.value }}
                             </p>
-                            <div class="flex flex-wrap items-center gap-y-1">
-                                <component
-                                    :is="
-                                        card.trend === 'up'
-                                            ? ArrowUpOutlined
-                                            : ArrowDownOutlined
-                                    "
-                                    :class="
-                                        card.trend === 'up'
-                                            ? 'text-green-500'
-                                            : card.trend === 'down'
-                                              ? 'text-red-500'
-                                              : 'text-gray-500'
-                                    "
-                                    class="w-4 h-4 mr-1"
-                                />
-                                <span
-                                    :class="
-                                        card.trend === 'up'
-                                            ? 'text-green-600'
-                                            : card.trend === 'down'
-                                              ? 'text-red-600'
-                                              : 'text-gray-600'
-                                    "
-                                    class="text-sm font-medium"
-                                >
-                                    {{ card.change > 0 ? "+" : ""
-                                    }}{{ card.change }}%
-                                </span>
-                                <span class="text-sm text-gray-500 ml-2"
-                                    >vs last month</span
-                                >
-                            </div>
                         </div>
                         <div
                             :class="`p-3 rounded-lg border ${
@@ -447,9 +353,10 @@ onMounted(() => setTimeout(() => (chartLoaded.value = true), 400));
                     </div>
 
                     <a-button
+                        v-if="canViewValuation"
                         type="primary"
                         class="bg-purple-600 border-purple-600 hover:bg-purple-700 mt-4 w-full rounded-lg"
-                        @click="router.visit(route('inventory.valuation'))"
+                        @click="navigateToValuation"
                         size="large"
                     >
                         View Report
@@ -537,7 +444,7 @@ onMounted(() => setTimeout(() => (chartLoaded.value = true), 400));
                     <div class="mt-4 text-center">
                         <a-button
                             type="link"
-                            @click="navigateToProducts"
+                            @click="navigateToLowStockProducts"
                             class="text-orange-600 hover:text-orange-700"
                         >
                             View All Low Stock Products →
