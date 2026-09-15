@@ -1,4 +1,4 @@
-﻿import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, relative } from "node:path";
 
 /**

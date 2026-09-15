@@ -1,16 +1,20 @@
 import { test as base, expect } from "@playwright/test";
-import { USERS } from "./users.js";
+import { resolveAccount } from "./users.js";
 import { login } from "./inertia.js";
 
 /** Requests slower than this (ms) are listed in the findings report. */
 const SLOW_MS = Number(process.env.E2E_SLOW_MS) || 3000;
+
+const API_ORIGIN = new URL(process.env.E2E_BASE_URL || "http://techiko-pos.test").origin;
 
 /** Header the suite's own probe requests carry, so their expected 403s aren't reported as unusual. */
 export const PROBE_HEADER = "x-e2e-probe";
 
 /**
  * - `test.use({ account: "cashier" })` signs the browser page in before each test.
- * - `serverAs("cashier")` returns an HTTP-only session (no browser, no app JavaScript).
+ *   `account: "worker-cashier"` uses this worker's own seeded cashier (see users.js).
+ * - `serverAs("cashier")` returns an HTTP-only session (no browser, no app JavaScript);
+ *   call `apiJson(api, ...)` on it for JSON requests with the XSRF header.
  * - `observe("message")` records something odd that shouldn't fail the test; it shows
  *   up in tests/e2e/findings-report.md.
  *
@@ -29,7 +33,7 @@ export const test = base.extend({
         const findings = recordFindings(page);
 
         if (account) {
-            await login(page, USERS[account]);
+            await login(page, resolveAccount(account, testInfo.parallelIndex));
         }
         await use(page);
 
@@ -41,13 +45,13 @@ export const test = base.extend({
         }
     },
 
-    serverAs: async ({ playwright, baseURL }, use) => {
+    serverAs: async ({ playwright, baseURL }, use, testInfo) => {
         const contexts = [];
 
         await use(async (account) => {
             const api = await playwright.request.newContext({ baseURL });
             contexts.push(api);
-            await apiLogin(api, USERS[account]);
+            await apiLogin(api, resolveAccount(account, testInfo.parallelIndex));
             return api;
         });
 
@@ -99,6 +103,36 @@ function recordFindings(page) {
     });
 
     return findings;
+}
+
+/**
+ * JSON request on a `serverAs` session, sent like the app's axios calls (XSRF header,
+ * Accept: application/json). Returns `{ status, body }`; body is null for non-JSON.
+ */
+export async function apiJson(api, method, url, data) {
+    const xsrf = (await api.storageState()).cookies.find((c) => c.name === "XSRF-TOKEN");
+    const res = await api.fetch(url, {
+        method,
+        data,
+        headers: {
+            Accept: "application/json",
+            "X-Requested-With": "XMLHttpRequest",
+            // Sanctum only treats /api requests as session-authenticated when they come from the app's own origin.
+            Referer: `${API_ORIGIN}/`,
+            Origin: API_ORIGIN,
+            ...(xsrf ? { "X-XSRF-TOKEN": decodeURIComponent(xsrf.value) } : {}),
+        },
+        maxRedirects: 0,
+        timeout: 30_000,
+    });
+
+    let body = null;
+    try {
+        body = await res.json();
+    } catch {
+        // Redirects and HTML error pages have no JSON body.
+    }
+    return { status: res.status(), body };
 }
 
 /** Posts the login form over HTTP with Laravel's XSRF cookie. */

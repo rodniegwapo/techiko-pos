@@ -1,4 +1,4 @@
-﻿import { test, expect } from "./support/fixtures.js";
+import { test, expect } from "./support/fixtures.js";
 import { USERS, OTHER_DOMAIN } from "./support/users.js";
 import { pageComponent, pageProps, postJson, responseProps } from "./support/inertia.js";
 
