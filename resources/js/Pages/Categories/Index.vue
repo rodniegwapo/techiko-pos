@@ -15,8 +15,10 @@ import { watchDebounced } from "@vueuse/core";
 import { router } from "@inertiajs/vue3";
 import { useHelpers } from "@/Composables/useHelpers";
 import LocationInfoAlert from "@/Components/LocationInfoAlert.vue";
+import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 
 const page = usePage();
+const { hasPermission } = usePermissionsV2();
 const { openModal, isEdit } = useGlobalVariables();
 const { showModal } = useHelpers();
 
@@ -63,6 +65,7 @@ const { pagination, handleTableChange ,spinning} = useTable("items", tableFilter
           class="w-full min-w-0 md:max-w-[300px]"
         />
         <a-button
+          v-if="hasPermission('categories.store')"
           @click="showModal"
           type="primary"
           class="flex w-full items-center justify-center border border-green-500 bg-white text-green-500 md:inline-flex md:w-auto"
