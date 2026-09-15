@@ -426,14 +426,9 @@ const menus = computed(() => {
                     return false;
                 }
 
-                // Check permission for items with routeName
+                // Check permission for items with routeName (the server denies these routes too)
                 if (item.routeName && !hasPermission(item.routeName)) {
-                    // Special case: Dashboard should always be available if user is authenticated
-                    if (item.key === "dashboard") {
-                        return true; // Dashboard is always available
-                    } else {
-                        return false;
-                    }
+                    return false;
                 }
 
                 return true;
