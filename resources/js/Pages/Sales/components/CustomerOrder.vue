@@ -208,22 +208,18 @@ const handleUpdateQuantity = async (product, quantity) => {
         return;
     }
 
-    try {
-        const userId = page.props.auth.user.data.id;
-        const route = getRoute("users.sales.cart.update-quantity", {
-            user: userId,
-        });
-        await axios.patch(route, {
-            product_id: product.id,
-            quantity: quantity,
-        });
+    // Errors propagate to saveQuantity, which shows the stock or failure notification once.
+    const userId = page.props.auth.user.data.id;
+    const route = getRoute("users.sales.cart.update-quantity", {
+        user: userId,
+    });
+    await axios.patch(route, {
+        product_id: product.id,
+        quantity: quantity,
+    });
 
-        // Emit event to parent to refresh cart data
-        emit("cart-updated");
-    } catch (error) {
-        notifyInsufficientStock(error);
-        throw error;
-    }
+    // Emit event to parent to refresh cart data
+    emit("cart-updated");
 };
 
 const removeOrder = async (product) => {
@@ -1375,6 +1371,7 @@ defineExpose({
                                                                     order,
                                                                 )
                                                             "
+                                                            :aria-label="`Decrease ${order.name}`"
                                                             class="quantity-button minus"
                                                         >
                                                             <template #icon>
@@ -1386,7 +1383,15 @@ defineExpose({
                                                     <!-- Quantity Display with modal input -->
                                                     <div
                                                         class="quantity-display cursor-pointer"
+                                                        role="button"
+                                                        tabindex="0"
+                                                        :aria-label="`Edit ${order.name} quantity`"
                                                         @click="
+                                                            toggleQuantityEdit(
+                                                                order,
+                                                            )
+                                                        "
+                                                        @keydown.enter="
                                                             toggleQuantityEdit(
                                                                 order,
                                                             )
@@ -1430,6 +1435,7 @@ defineExpose({
                                                                     order,
                                                                 )
                                                             "
+                                                            :aria-label="`Increase ${order.name}`"
                                                             class="quantity-button plus"
                                                         >
                                                             <template #icon>
@@ -1477,6 +1483,7 @@ defineExpose({
                                                         @click.stop="
                                                             showVoidItem(order)
                                                         "
+                                                        :aria-label="`Remove ${order.name}`"
                                                         class="h-auto border-0 p-1 text-[var(--cs-muted)] hover:text-red-600"
                                                     >
                                                         <template #icon>
@@ -1522,6 +1529,7 @@ defineExpose({
                                                                     order,
                                                                 )
                                                             "
+                                                            :aria-label="`Remove ${order.name}`"
                                                             class="p-1 h-auto border-0 text-red-600 hover:text-red-700 hover:bg-red-50"
                                                         >
                                                             <template #icon>

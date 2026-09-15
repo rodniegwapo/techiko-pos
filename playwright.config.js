@@ -17,7 +17,10 @@ export default defineConfig({
     fullyParallel: true,
     forbidOnly: !!process.env.CI,
     retries: process.env.CI ? 2 : 0,
-    workers: process.env.CI ? 1 : undefined,
+    // At most one worker per seeded sales cashier (E2ESalesSeeder::WORKER_CASHIERS): each has its own cart.
+    workers: process.env.CI ? 1 : 4,
+    // Checkout flows make several slow round trips on a local server.
+    timeout: 60_000,
     reporter: [
         ["list"],
         ["html", { outputFolder: "tests/e2e/playwright-report", open: "never" }],

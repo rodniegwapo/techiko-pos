@@ -1,7 +1,8 @@
 /**
  * Accounts the e2e suite signs in as.
- * - admin/manager/cashier come from database/seeders/UserSeeder.php
- * - super/noDashboard come from database/seeders/E2EUserSeeder.php (run in global-setup)
+ * - admin/manager/cashier (Jollibee) and mcCashier come from database/seeders/UserSeeder.php
+ * - super/noDashboard come from database/seeders/E2EUserSeeder.php
+ * - e2e-cashier-1..4 come from database/seeders/E2ESalesSeeder.php (see workerCashier)
  */
 export const USERS = {
     super: {
@@ -34,6 +35,63 @@ export const USERS = {
         password: "e2e-password",
         domain: "jollibee-corp",
     },
+    mcCashier: {
+        email: "cashier1@mcdonalds-corp.com",
+        password: "mcdonalds123",
+        domain: "mcdonalds-corp",
+        role: "cashier",
+    },
 };
 
 export const OTHER_DOMAIN = "mcdonalds-corp";
+
+/** Seeded worker cashiers (E2ESalesSeeder::WORKER_CASHIERS). */
+export const WORKER_CASHIER_COUNT = 4;
+
+/**
+ * Each Playwright worker signs in as its own cashier, because a user has one pending cart
+ * and parallel tests sharing a cashier would edit the same cart.
+ */
+export function workerCashier(parallelIndex) {
+    const n = (parallelIndex % WORKER_CASHIER_COUNT) + 1;
+    return {
+        email: `e2e-cashier-${n}@techiko.test`,
+        password: "e2e-password",
+        domain: "jollibee-corp",
+        role: "cashier",
+        locationCode: "JB-MAIN",
+    };
+}
+
+/** Resolves an `account` option: a USERS key, or "worker-cashier". */
+export function resolveAccount(account, parallelIndex) {
+    if (account === "worker-cashier") {
+        return workerCashier(parallelIndex);
+    }
+    const user = USERS[account];
+    if (!user) {
+        throw new Error(`Unknown e2e account "${account}"`);
+    }
+    return user;
+}
+
+/** Records created by E2ESalesSeeder. */
+export const E2E = {
+    domain: "jollibee-corp",
+    products: {
+        burger: { name: "E2E Burger", price: 100, stock: 1000 },
+        fries: { name: "E2E Fries", price: 50, stock: 1000 },
+        limited: { name: "E2E Limited", price: 80, stock: 2 },
+        soldOut: { name: "E2E Sold Out", price: 60, stock: 0 },
+        // Only security.spec.js touches this one, so its cross-cart probes can't disturb other tests.
+        probe: { name: "E2E Security Probe", price: 10, stock: 1000 },
+    },
+    customers: {
+        loyalty: { name: "E2E Loyalty Customer", points: 5000 },
+        credit: { name: "E2E Credit Customer", creditLimit: 500 },
+        noCredit: { name: "E2E No Credit Customer" },
+    },
+    cards: { visa: "E2E Visa", inactive: "E2E Inactive Card", otherOrg: "E2E McDonalds Card" },
+    discounts: { order: "E2E 10% Order", item: "E2E ₱20 Item", senior: "E2E Senior 20%", pwd: "E2E PWD 20%" },
+    pins: { manager: "1234", admin: "4567" },
+};
