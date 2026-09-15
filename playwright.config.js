@@ -29,6 +29,8 @@ export default defineConfig({
     ],
     use: {
         baseURL: process.env.E2E_BASE_URL || "http://techiko-pos.test",
+        // Browsers open visibly by default so runs can be watched. CI or E2E_HEADLESS=1 hides them.
+        headless: !!process.env.CI || process.env.E2E_HEADLESS === "1",
         trace: "on-first-retry",
         screenshot: "only-on-failure",
         video: "retain-on-failure",
