@@ -134,11 +134,14 @@ class ProductController extends Controller
         $productId = $product?->id;
 
         $barcodeRules = ['required', 'string', 'max:255'];
+        // SKUs, like barcodes, are unique within an organization.
+        $skuRule = Rule::unique('products', 'SKU')->ignore($productId);
         if ($request->filled('domain')) {
             $domainSlug = $request->domain;
             $barcodeRules[] = Rule::unique('products', 'barcode')
                 ->where(fn ($q) => $q->where('domain', $domainSlug))
                 ->ignore($productId);
+            $skuRule->where(fn ($q) => $q->where('domain', $domainSlug));
         } else {
             $barcodeRules[] = Rule::unique('products', 'barcode')->ignore($productId);
         }
@@ -148,7 +151,7 @@ class ProductController extends Controller
             'sold_type' => ['required', 'exists:product_sold_types,name'],
             'price' => ['required', 'numeric', 'min:0'],
             'cost' => ['nullable', 'numeric', 'min:0'],
-            'SKU' => ['nullable', 'string', 'max:255', 'unique:products,SKU,'.$productId],
+            'SKU' => ['nullable', 'string', 'max:255', $skuRule],
             'barcode' => $barcodeRules,
             'representation_type' => ['nullable', 'string', 'in:image,color,text'],
             'representation' => ['nullable', 'string'],

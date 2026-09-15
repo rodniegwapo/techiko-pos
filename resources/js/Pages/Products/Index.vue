@@ -8,6 +8,7 @@ import { useHelpers } from "@/Composables/useHelpers";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useTable } from "@/Composables/useTable";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
+import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
@@ -126,6 +127,10 @@ const { pagination, handleTableChange } = useTable("items", tableFilters, {
     preserveQueryKeys: ["location_id"],
 });
 
+const { hasPermission } = usePermissionsV2();
+const canCreate = computed(() => hasPermission("products.create"));
+const canAttach = computed(() => hasPermission("products.attach-location"));
+
 const subscription = computed(() => page.props.subscription ?? null);
 
 const productsAtCapacity = computed(
@@ -167,6 +172,7 @@ const hasMultipleStores = computed(() => {
                     class="w-full min-w-0 md:max-w-[300px]"
                 />
 
+                <template v-if="canCreate">
                 <Link
                     v-if="!productsAtCapacity"
                     class="block w-full md:w-auto"
@@ -201,8 +207,10 @@ const hasMultipleStores = computed(() => {
                         </a-button>
                     </span>
                 </a-tooltip>
+                </template>
                 <a-button
                     v-if="
+                        canAttach &&
                         hasMultipleStores &&
                         effectiveLocationId != null &&
                         effectiveLocationId !== ''
