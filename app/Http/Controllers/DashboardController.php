@@ -28,6 +28,23 @@ class DashboardController extends Controller
 
     public function index(Request $request)
     {
+        $user = $request->user();
+
+        // The global dashboard aggregates every organization, so only super users may see it.
+        // Login, email verification, impersonation and the guest middleware all send users
+        // here, so everyone else is redirected into their own organization instead of denied.
+        if (! $user->isSuperUser()) {
+            abort_unless($user->domain, 403, 'You do not have permission to access this page.');
+
+            // Mirror the login redirect for users without the dashboard permission; sending them to
+            // the org dashboard would be denied and redirected back here, looping.
+            $routeName = $user->getAllPermissions()->contains('route_name', 'dashboard')
+                ? 'domains.dashboard'
+                : 'domains.sales.index';
+
+            return redirect()->route($routeName, ['domain' => $user->domain]);
+        }
+
         logger('Dashboard global');
 
         // Global view: no location filtering - show data from ALL locations
