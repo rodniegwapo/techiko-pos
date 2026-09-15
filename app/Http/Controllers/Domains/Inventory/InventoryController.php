@@ -129,36 +129,51 @@ class InventoryController extends Controller
         $slug = $domain->name_slug;
         $location = Helpers::getActiveLocation($domain, $request->input('location_id'));
 
-        if (! $location) {
-            return Inertia::render('Inventory/Movements', [
-                'movements' => InventoryMovementResource::collection(
-                    new LengthAwarePaginator([], 0, 50)
-                ),
-                'locations' => InventoryLocation::active()->forDomain($slug)->get(),
-                'products' => Product::select('id', 'name', 'SKU')->where('domain', $slug)->get(),
-                'domains' => Domain::select('id', 'name', 'name_slug')->get(),
-                'movementTypes' => [
-                    'sale' => 'Sale',
-                    'purchase' => 'Purchase',
-                    'adjustment' => 'Stock Adjustment',
-                    'transfer_in' => 'Transfer In',
-                    'transfer_out' => 'Transfer Out',
-                    'return' => 'Customer Return',
-                    'damage' => 'Damaged Goods',
-                    'theft' => 'Theft/Loss',
-                    'expired' => 'Expired Products',
-                    'promotion' => 'Promotional Giveaway',
-                ],
-                'filters' => $request->only(['search', 'location_id', 'product_id', 'movement_type', 'date_from', 'date_to']),
-                'isGlobalView' => false,
-                'currentLocation' => null,
-            ]);
+        if ($request->input('export') === 'csv') {
+            return $this->exportMovementsCsv($request, $domain, $location);
         }
 
+        // 1–100 per page; anything else (missing, 0, "abc") falls back to 50.
+        $perPage = filter_var($request->input('per_page'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) ?: 50;
+        $perPage = min($perPage, 100);
+
+        $movements = $location
+            ? $this->movementsQuery($request, $slug, $location)->paginate($perPage)
+            : new LengthAwarePaginator([], 0, $perPage);
+
+        return Inertia::render('Inventory/Movements', [
+            'movements' => InventoryMovementResource::collection($movements),
+            'locations' => InventoryLocation::active()->forDomain($slug)->get(),
+            'products' => Product::select('id', 'name', 'SKU')->where('domain', $slug)->get(),
+            // Only the global view filters by organization.
+            'domains' => [],
+            'movementTypes' => self::MOVEMENT_TYPES,
+            'filters' => $request->only(['search', 'location_id', 'product_id', 'movement_type', 'date_from', 'date_to']),
+            'isGlobalView' => false,
+            'currentLocation' => $location,
+        ]);
+    }
+
+    private const MOVEMENT_TYPES = [
+        'sale' => 'Sale',
+        'purchase' => 'Purchase',
+        'adjustment' => 'Stock Adjustment',
+        'transfer_in' => 'Transfer In',
+        'transfer_out' => 'Transfer Out',
+        'return' => 'Customer Return',
+        'damage' => 'Damaged Goods',
+        'theft' => 'Theft/Loss',
+        'expired' => 'Expired Products',
+        'promotion' => 'Promotional Giveaway',
+    ];
+
+    /** The store's movements with the page's filters, newest first. */
+    private function movementsQuery(Request $request, string $slug, InventoryLocation $location)
+    {
         $query = InventoryMovement::query()
             ->where('domain', $slug)
             ->where('location_id', $location->id)
-            ->with(['product', 'location', 'user']);
+            ->with(['product.category', 'location', 'user']);
 
         if ($request->search) {
             $query->search($request->search);
@@ -176,29 +191,45 @@ class InventoryController extends Controller
             $query->whereDate('created_at', '<=', $request->date_to);
         }
 
-        $movements = $query->orderBy('created_at', 'desc')->paginate($request->per_page ?? 50);
+        return $query->orderBy('created_at', 'desc')->orderBy('id', 'desc');
+    }
 
-        return Inertia::render('Inventory/Movements', [
-            'movements' => InventoryMovementResource::collection($movements),
-            'locations' => InventoryLocation::active()->forDomain($slug)->get(),
-            'products' => Product::select('id', 'name', 'SKU')->where('domain', $slug)->get(),
-            'domains' => Domain::select('id', 'name', 'name_slug')->get(),
-            'movementTypes' => [
-                'sale' => 'Sale',
-                'purchase' => 'Purchase',
-                'adjustment' => 'Stock Adjustment',
-                'transfer_in' => 'Transfer In',
-                'transfer_out' => 'Transfer Out',
-                'return' => 'Customer Return',
-                'damage' => 'Damaged Goods',
-                'theft' => 'Theft/Loss',
-                'expired' => 'Expired Products',
-                'promotion' => 'Promotional Giveaway',
-            ],
-            'filters' => $request->only(['search', 'location_id', 'product_id', 'movement_type', 'date_from', 'date_to']),
-            'isGlobalView' => false,
-            'currentLocation' => $location,
-        ]);
+    /** CSV of the store's movements with the page's current filters (Export button). */
+    private function exportMovementsCsv(Request $request, Domain $domain, ?InventoryLocation $location)
+    {
+        $filename = sprintf('inventory-movements-%s-%s.csv', $location?->code ?? $domain->name_slug, now()->format('Y-m-d'));
+
+        return response()->streamDownload(function () use ($request, $domain, $location) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, ['Date', 'Store', 'Product', 'SKU', 'Type', 'Quantity Before', 'Change', 'Quantity After', 'Unit Cost', 'Total Cost', 'Batch', 'Expiry Date', 'Reference', 'Reason', 'Notes', 'User']);
+
+            if ($location) {
+                $this->movementsQuery($request, $domain->name_slug, $location)->chunk(500, function ($movements) use ($out) {
+                    foreach ($movements as $m) {
+                        fputcsv($out, [
+                            $m->created_at?->toDateTimeString(),
+                            $m->location?->name,
+                            $m->product?->name,
+                            $m->product?->SKU,
+                            $m->movement_type_display,
+                            $m->quantity_before,
+                            $m->quantity_change,
+                            $m->quantity_after,
+                            $m->unit_cost,
+                            $m->total_cost,
+                            $m->batch_number,
+                            $m->expiry_date?->toDateString(),
+                            trim(($m->reference_type ?? '').' '.($m->reference_id ? '#'.$m->reference_id : '')),
+                            $m->reason,
+                            $m->notes,
+                            $m->user?->name,
+                        ]);
+                    }
+                });
+            }
+
+            fclose($out);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     public function lowStock(Request $request, Domain $domain)

@@ -14,6 +14,15 @@ class InventoryMovementResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        return parent::toArray($request);
+        $data = parent::toArray($request);
+
+        $data['movement_type_display'] = $this->movement_type_display;
+
+        // Only who made the movement; the rest of their account isn't needed on these pages.
+        if ($this->relationLoaded('user')) {
+            $data['user'] = $this->user ? ['id' => $this->user->id, 'name' => $this->user->name] : null;
+        }
+
+        return $data;
     }
 }
