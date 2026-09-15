@@ -132,9 +132,19 @@ const { pagination, handleTableChange } = useTable("movements", tableFilters, {
 });
 
 // Methods
+// Downloads a CSV of the movements matching the current store and filters.
 const exportMovements = () => {
-  // TODO: Implement export functionality
-  console.log("Export movements");
+  const url = new URL(page.url, window.location.origin);
+  for (const [key, value] of Object.entries({
+    search: search.value,
+    movement_type: movement_type.value,
+  })) {
+    if (value) url.searchParams.set(key, value);
+    else url.searchParams.delete(key);
+  }
+  url.searchParams.delete("page");
+  url.searchParams.set("export", "csv");
+  window.location.href = url.toString();
 };
 
 // Modal states for movement details
@@ -187,16 +197,16 @@ const showMovementDetails = (movement) => {
 
       <template #activeStore>
         <LocationInfoAlert />
+        <!-- Inside a slot: ContentLayout has no default slot, so it wasn't rendered before. -->
+        <a-alert
+          v-if="!page.props.isGlobalView && !page.props.currentLocation"
+          type="warning"
+          show-icon
+          message="Select a store"
+          description="Choose a location or open this page with ?location_id= in the URL to view movements for this organization."
+          class="mb-4"
+        />
       </template>
-
-      <a-alert
-        v-if="!page.props.isGlobalView && !page.props.currentLocation"
-        type="warning"
-        show-icon
-        message="Select a store"
-        description="Choose a location or open this page with ?location_id= in the URL to view movements for this organization."
-        class="mb-4"
-      />
 
       <template #table>
         <MovementsTable
