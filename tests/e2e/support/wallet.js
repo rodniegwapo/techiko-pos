@@ -11,6 +11,8 @@ import { workerNumber } from "./users.js";
 export const WALLET_DOMAIN = "jollibee-corp";
 export const walletUrl = `/domains/${WALLET_DOMAIN}/wallet/money-movement`;
 export const ledgerUrl = (path = "") => `/domains/${WALLET_DOMAIN}/wallet/cash-ledger${path}`;
+export const cardTypesUrl = (path = "") => `/domains/${WALLET_DOMAIN}/payment-card-types${path}`;
+export const cardTypeUrl = (id, path = "") => cardTypesUrl(`/${id}${path}`);
 
 /** This worker's seeded store, managers and card type (E2EWalletSeeder). */
 export function walletFixture(testInfo) {
