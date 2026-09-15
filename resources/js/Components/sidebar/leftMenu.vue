@@ -439,16 +439,16 @@ const menus = computed(() => {
                 // Filter children if they exist
                 if (item.children && Array.isArray(item.children)) {
                     const filteredChildren = filterMenuItems(item.children);
-                    if (filteredChildren.length > 0) {
-                        filteredItem.children = filteredChildren;
-                    } else {
-                        // Remove children if none are visible
-                        delete filteredItem.children;
+                    if (filteredChildren.length === 0) {
+                        // A group with no permitted pages leads nowhere, so hide it
+                        return null;
                     }
+                    filteredItem.children = filteredChildren;
                 }
 
                 return filteredItem;
-            });
+            })
+            .filter(Boolean);
     };
 
     return filterMenuItems(menuItems);
