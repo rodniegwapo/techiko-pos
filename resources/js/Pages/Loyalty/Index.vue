@@ -2,7 +2,7 @@
   <Head title="Loyalty Program" />
 
   <AuthenticatedLayout>
-    <ContentHeader class="mb-4 md:mb-8" title="Loyalt Programs" />
+    <ContentHeader class="mb-4 md:mb-8" title="Loyalty Program" />
     <!-- Enhanced Stats Overview with Animations -->
     <div class=" relative z-10">
       <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-6">
@@ -31,10 +31,6 @@
                   </div>
                   <div class="text-sm text-gray-500">Total Members</div>
                 </div>
-              </div>
-              <div class="flex items-center text-sm">
-                <div class="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
-                <span class="text-green-600 font-medium">+12% this month</span>
               </div>
             </div>
           </div>
@@ -66,10 +62,6 @@
                   <div class="text-sm text-gray-500">Active Points</div>
                 </div>
               </div>
-              <div class="flex items-center text-sm">
-                <div class="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
-                <span class="text-green-600 font-medium">+8% this month</span>
-              </div>
             </div>
           </div>
         </div>
@@ -95,14 +87,10 @@
                   <div
                     class="text-2xl font-bold text-gray-900 group-hover:text-purple-600 transition-colors"
                   >
-                    ₱{{ stats.total_spending?.toLocaleString() || 0 }}
+                    {{ peso(stats.loyalty_revenue) }}
                   </div>
                   <div class="text-sm text-gray-500">Total Spending</div>
                 </div>
-              </div>
-              <div class="flex items-center text-sm">
-                <div class="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
-                <span class="text-green-600 font-medium">+15% this month</span>
               </div>
             </div>
           </div>
@@ -129,14 +117,10 @@
                   <div
                     class="text-2xl font-bold text-gray-900 group-hover:text-orange-600 transition-colors"
                   >
-                    ₱{{ stats.avg_transaction?.toLocaleString() || 0 }}
+                    {{ peso(stats.avg_transaction) }}
                   </div>
                   <div class="text-sm text-gray-500">Avg. Transaction</div>
                 </div>
-              </div>
-              <div class="flex items-center text-sm">
-                <div class="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
-                <span class="text-green-600 font-medium">+5% this month</span>
               </div>
             </div>
           </div>
@@ -192,7 +176,7 @@
                 </div>
               </template>
               <AnalyticsTab
-                :stats="stats"
+                :stats="analyticsStats"
                 :tier-stats="tierStats"
                 :recent-activity="recentActivity"
               />
@@ -231,9 +215,13 @@ const tabSize = computed(() => (isMdUp.value ? "large" : "small"));
 const activeTab = ref("rules");
 const stats = ref({});
 
-// Analytics state
+// Analytics state. Its own stats: points issued and redeemed, and the sales members brought in.
 const tierStats = ref([]);
+const analyticsStats = ref({});
 const recentActivity = ref([]);
+
+const peso = (value) =>
+  `₱${Number(value ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
 // Detect if we're in a domain context
 const isDomainContext = computed(() => {
@@ -265,6 +253,7 @@ const loadAnalytics = async () => {
   try {
     const response = await axios.get(getApiUrl("analytics"));
     tierStats.value = response.data.tier_distribution || [];
+    analyticsStats.value = response.data.stats || {};
     recentActivity.value = response.data.recent_activity || [];
   } catch (error) {
     console.error("Failed to load analytics:", error);
