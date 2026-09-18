@@ -51,15 +51,24 @@ class CustomerController extends Controller
         return response()->json($customers);
     }
 
-    public function getTierOptions()
+    public function getTierOptions(Request $request)
     {
-        $tiers = LoyaltyTier::active()->ordered()->get(['name', 'display_name']);
+        // The tiers of the organization the user works in; a super user sees every one of them.
+        $domain = $request->user()?->domain;
+
+        $tiers = LoyaltyTier::active()
+            ->when($domain, fn ($query) => $query->forDomain($domain))
+            ->ordered()
+            ->get(['name', 'display_name']);
 
         return response()->json(
             $tiers->map(fn ($tier) => [
                 'value' => $tier->name,
                 'label' => $tier->display_name,
             ])
+                // Organizations name their tiers independently; the filter offers each name once.
+                ->unique('value')
+                ->values()
         );
     }
 

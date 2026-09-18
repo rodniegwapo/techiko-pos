@@ -16,8 +16,8 @@ use RuntimeException;
  * its tier filter, plus one member per Playwright worker for the points adjustment tests, since
  * those change the member they act on. Rebuilt every run. Local/testing only.
  *
- * Tiers are left alone: they are seeded without an organization (see LoyaltyTierSeeder), and the
- * tier tests create their own for this organization and drop them again.
+ * Tiers are left alone: each organization is seeded with its own set (see TierSeeder), and the tier
+ * tests create their own alongside those and drop them again.
  */
 class E2ELoyaltySeeder extends Seeder
 {
