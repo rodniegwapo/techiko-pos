@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed } from "vue";
 import { Head, router, usePage } from "@inertiajs/vue3";
 import { watchDebounced } from "@vueuse/core";
 import { IconPlus, IconUsers } from "@tabler/icons-vue";
@@ -25,13 +25,14 @@ const { showModal } = useHelpers();
 
 const props = defineProps({
   items: Object,
+  filters: Object,
 });
 
-// Filter state
-const search = ref("");
-const loyalty_status = ref(null);
-const tier = ref(null);
-const date_range = ref(null);
+// Filter state, seeded from the URL's own filters so the boxes show what the list is filtered by.
+const search = ref(props.filters?.search ?? "");
+const loyalty_status = ref(props.filters?.loyalty_status ?? null);
+const tier = ref(props.filters?.tier ?? null);
+const date_range = ref(props.filters?.date_range ?? null);
 
 // Modal state
 const selectedCustomer = ref(null);
@@ -168,9 +169,6 @@ const handleCustomerSaved = () => {
   handleModalClose();
   getItems();
 };
-
-// Debug - log the items data
-console.log("Items prop:", props.items);
 </script>
 
 <template>

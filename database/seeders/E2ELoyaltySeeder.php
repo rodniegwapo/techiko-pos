@@ -43,6 +43,11 @@ class E2ELoyaltySeeder extends Seeder
             $gold = $this->member('E2E Loy Gold', 'gold', 7500, 55000);
             $noPoints = $this->member('E2E Loy Sleeper', 'bronze', 0, 0);
 
+            // Registered two years ago, so the customers page's registration-period filter has
+            // somebody to leave out.
+            $longStanding = $this->member('E2E Loy Veteran', 'silver', 900, 21000);
+            $longStanding->forceFill(['created_at' => now()->subYears(2)])->save();
+
             $adjustable = [];
             for ($n = 1; $n <= self::WORKER_MEMBERS; $n++) {
                 $member = $this->member("E2E Loy Adjust {$n}", 'bronze', self::ADJUSTABLE_POINTS, 500);
@@ -55,6 +60,7 @@ class E2ELoyaltySeeder extends Seeder
                     'silver' => $this->row($silver),
                     'gold' => $this->row($gold),
                     'noPoints' => $this->row($noPoints),
+                    'longStanding' => $this->row($longStanding->refresh()),
                 ],
                 'adjustable' => $adjustable,
                 'adjustablePoints' => self::ADJUSTABLE_POINTS,
