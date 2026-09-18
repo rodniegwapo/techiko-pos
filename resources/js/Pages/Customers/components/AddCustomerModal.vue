@@ -273,7 +273,6 @@ const handleSave = async () => {
       domain: form.domain || undefined,
     };
 
-    console.log("Saving customer data:", customerData);
 
     if (props.isEdit && props.customer) {
       // Update existing customer using domain route
@@ -286,7 +285,7 @@ const handleSave = async () => {
           emit("saved");
         },
         onError: (errors) => {
-          console.error("Update customer error:", errors);
+          // A rejected save is answered with a notification, not console noise.
           let errorMessage = "Failed to update customer";
           if (errors && typeof errors === 'object') {
             const firstError = Object.values(errors)[0];
@@ -312,7 +311,6 @@ const handleSave = async () => {
           emit("saved");
         },
         onError: (errors) => {
-          console.error("Create customer error:", errors);
           let errorMessage = "Failed to create customer";
           if (errors && typeof errors === 'object') {
             const firstError = Object.values(errors)[0];
@@ -329,7 +327,7 @@ const handleSave = async () => {
       });
     }
   } catch (error) {
-    console.error("Save customer error:", error);
+    // Usually the form refusing to validate, which it already explains under each field.
     notification.error({
       message: "Save Failed",
       description: "Please check your input and try again",
