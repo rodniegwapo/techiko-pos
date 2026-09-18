@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, computed } from 'vue';
+import { ref, reactive, computed, watch } from 'vue';
 import { useMediaQuery } from '@vueuse/core';
 import {
   PlusOutlined,
@@ -60,6 +60,20 @@ const rules = {
   ]
 };
 
+// The dialog is reused for every member, so it opens on a blank form rather than on whatever was
+// typed for the previous one.
+watch(
+  () => props.visible,
+  (visible) => {
+    if (visible) {
+      form.type = 'add';
+      form.amount = null;
+      form.reason = '';
+      formRef.value?.clearValidate?.();
+    }
+  }
+);
+
 // Methods
 const calculateNewTotal = () => {
   const currentPoints = props.customer?.loyalty_points || 0;
@@ -85,9 +99,13 @@ const getTierColor = (tier) => {
 const handleSave = async () => {
   try {
     await formRef.value.validate();
-    emit('save', { ...form });
+    // The server's vocabulary is add/subtract/set; the form says "Deduct".
+    emit('save', {
+      ...form,
+      type: form.type === 'deduct' ? 'subtract' : form.type,
+    });
   } catch (error) {
-    console.log('Validation failed:', error);
+    // The form shows the reason under each field; nothing to add here.
   }
 };
 </script>

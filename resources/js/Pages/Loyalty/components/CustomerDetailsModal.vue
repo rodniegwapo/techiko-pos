@@ -46,7 +46,7 @@
           </div>
           <div class="text-center">
             <div class="text-2xl font-bold text-green-600">
-              ₱{{ customer.lifetime_spent?.toLocaleString() || 0 }}
+              {{ peso(customer.lifetime_spent) }}
             </div>
             <div class="text-sm text-gray-500">Lifetime Spent</div>
           </div>
@@ -111,6 +111,10 @@ const modalRootStyle = computed(() =>
 const modalBodyStyle = computed(() =>
   isMdUp.value ? {} : { maxHeight: 'calc(100vh - 120px)', overflowY: 'auto' },
 );
+
+// Spending arrives as a decimal string, which toLocaleString would hand back unformatted.
+const peso = (value) =>
+  `₱${Number(value ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 
 // Props
 const props = defineProps({

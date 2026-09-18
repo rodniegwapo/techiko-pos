@@ -24,14 +24,24 @@ class LoyaltyController extends Controller
     {
         $q = Customer::where('domain', $domain->name_slug);
 
+        // Numbers, not the strings MySQL returns for SUM/AVG, so the page can format them.
         $stats = [
             'total_customers' => (clone $q)->count(),
             'loyal_customers' => (clone $q)->whereNotNull('loyalty_points')->where('loyalty_points', '>', 0)->count(),
-            'total_points' => (clone $q)->sum('loyalty_points'),
-            'loyalty_revenue' => (clone $q)->sum('lifetime_spent'),
+            'total_points' => (int) (clone $q)->sum('loyalty_points'),
+            'loyalty_revenue' => round((float) (clone $q)->sum('lifetime_spent'), 2),
+            'avg_transaction' => round((float) $this->paidSales($domain)->avg('grand_total'), 2),
         ];
 
         return response()->json($stats);
+    }
+
+    /** The organization's completed sales, which every figure on this page is measured against. */
+    private function paidSales(Domain $domain)
+    {
+        return Sale::query()
+            ->where('domain', $domain->name_slug)
+            ->where('payment_status', 'paid');
     }
 
     public function customers(Request $request, Domain $domain)
@@ -98,18 +108,16 @@ class LoyaltyController extends Controller
             ];
         });
 
-        $totalPointsIssued = Customer::where('domain', $domain->name_slug)->sum('loyalty_points') ?? 0;
-        $totalPointsRedeemed = (int) (Sale::query()
-            ->where('payment_status', 'paid')
-            ->where('domain', $domain->name_slug)
-            ->sum('loyalty_points_redeemed') ?? 0);
+        $totalPointsIssued = (int) Customer::where('domain', $domain->name_slug)->sum('loyalty_points');
+        $totalPointsRedeemed = (int) $this->paidSales($domain)->sum('loyalty_points_redeemed');
         $activePoints = $totalPointsIssued - $totalPointsRedeemed;
 
-        $loyaltyMemberSales = Sale::whereNotNull('customer_id')->where('payment_status', 'paid')->sum('grand_total') ?? 0;
-        $nonMemberSales = Sale::whereNull('customer_id')->where('payment_status', 'paid')->sum('grand_total') ?? 0;
+        // Sales figures are this organization's own, like every other number on the page.
+        $loyaltyMemberSales = (float) $this->paidSales($domain)->whereNotNull('customer_id')->sum('grand_total');
+        $nonMemberSales = (float) $this->paidSales($domain)->whereNull('customer_id')->sum('grand_total');
 
-        $avgMemberTransaction = Sale::whereNotNull('customer_id')->where('payment_status', 'paid')->avg('grand_total') ?? 0;
-        $avgNonMemberTransaction = Sale::whereNull('customer_id')->where('payment_status', 'paid')->avg('grand_total') ?? 0;
+        $avgMemberTransaction = (float) ($this->paidSales($domain)->whereNotNull('customer_id')->avg('grand_total') ?? 0);
+        $avgNonMemberTransaction = (float) ($this->paidSales($domain)->whereNull('customer_id')->avg('grand_total') ?? 0);
 
         return response()->json([
             'tier_distribution' => $tierDistribution,
