@@ -14,6 +14,20 @@ class StockAdjustmentResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        return parent::toArray($request);
+        $data = parent::toArray($request);
+
+        // Readable labels, so the pages don't have to repeat the enum maps.
+        $data['reason_display'] = $this->reason_display;
+        $data['status_display'] = $this->status_display;
+
+        // Only who created and approved it; the rest of their accounts isn't needed on these pages.
+        foreach (['created_by' => 'createdBy', 'approved_by' => 'approvedBy'] as $key => $relation) {
+            if ($this->relationLoaded($relation)) {
+                $user = $this->{$relation};
+                $data[$key] = $user ? ['id' => $user->id, 'name' => $user->name] : null;
+            }
+        }
+
+        return $data;
     }
 }

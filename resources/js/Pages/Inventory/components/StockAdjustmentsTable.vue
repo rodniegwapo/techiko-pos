@@ -14,12 +14,21 @@ import {
 } from "@tabler/icons-vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { useHelpers } from "@/Composables/useHelpers";
+import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 import { router } from "@inertiajs/vue3";
 
 const { formatCurrency, formatDate, confirmDelete, showNotification } =
   useHelpers();
+const { hasPermission } = usePermissionsV2();
 const page = usePage();
 const isMdUp = useMediaQuery("(min-width: 768px)");
+
+// Actions a user without the permission can't complete, so they aren't offered.
+const canEdit = computed(() => hasPermission("inventory.adjustments.edit"));
+const canDelete = computed(() => hasPermission("inventory.adjustments.destroy"));
+const canSubmit = computed(() => hasPermission("inventory.adjustments.submit"));
+const canApprove = computed(() => hasPermission("inventory.adjustments.approve"));
+const canReject = computed(() => hasPermission("inventory.adjustments.reject"));
 
 const emit = defineEmits(["handleTableChange", "refresh", "showDetails"]);
 
@@ -130,10 +139,6 @@ const getTypeColor = (type) => {
   return colors[type] || "default";
 };
 
-const viewAdjustment = (adjustment) => {
-  router.visit(route("inventory.adjustments.show", adjustment.id));
-};
-
 const editAdjustment = (adjustment) => {
   router.visit(route("inventory.adjustments.edit", adjustment.id));
 };
@@ -207,11 +212,11 @@ const rejectAdjustment = async (adjustment) => {
 };
 
 const deleteAdjustment = (adjustment) => {
+  // The route parameter is {adjustment}; anything else can't be built into a URL.
   confirmDelete(
     "inventory.adjustments.destroy",
-    { stockAdjustment: adjustment.id },
-    "Do you want to delete this adjustment?",
-    "This action cannot be undone."
+    { adjustment: adjustment.id },
+    "Do you want to delete this adjustment? This action cannot be undone."
   );
 };
 
@@ -223,7 +228,7 @@ const dataSource = computed(() => {
       number: adjustment.adjustment_number,
       location: adjustment.location,
       type: adjustment.type,
-      reason: adjustment.reason,
+      reason: adjustment.reason_display || adjustment.reason,
       status: adjustment.status,
       domain: adjustment.domain,
       value_change: adjustment.total_value_change,
@@ -261,7 +266,7 @@ function onMobilePaginationChange(pageNum) {
         <div>
           <p
             class="font-mono font-semibold text-blue-600 cursor-pointer hover:underline"
-            @click="viewAdjustment(record.adjustment)"
+            @click="showDetails(record.adjustment)"
           >
             {{ record.number }}
           </p>
@@ -334,7 +339,7 @@ function onMobilePaginationChange(pageNum) {
 
           <!-- Submit for Approval (Draft status only) -->
           <IconTooltipButton
-            v-if="record.status === 'draft'"
+            v-if="record.status === 'draft' && canSubmit"
             name="Submit for Approval"
             @click="submitForApproval(record.adjustment)"
           >
@@ -343,7 +348,7 @@ function onMobilePaginationChange(pageNum) {
 
           <!-- Approve (Pending approval status only) -->
           <IconTooltipButton
-            v-if="record.status === 'pending_approval'"
+            v-if="record.status === 'pending_approval' && canApprove"
             name="Approve"
             @click="approveAdjustment(record.adjustment)"
           >
@@ -352,7 +357,7 @@ function onMobilePaginationChange(pageNum) {
 
           <!-- Reject (Pending approval status only) -->
           <IconTooltipButton
-            v-if="record.status === 'pending_approval'"
+            v-if="record.status === 'pending_approval' && canReject"
             name="Reject"
             @click="rejectAdjustment(record.adjustment)"
           >
@@ -361,7 +366,7 @@ function onMobilePaginationChange(pageNum) {
 
           <!-- Edit (Draft status only) -->
           <IconTooltipButton
-            v-if="record.status === 'draft'"
+            v-if="record.status === 'draft' && canEdit"
             name="Edit"
             @click="editAdjustment(record.adjustment)"
           >
@@ -370,7 +375,7 @@ function onMobilePaginationChange(pageNum) {
 
           <!-- Delete (Draft status only) -->
           <IconTooltipButton
-            v-if="record.status === 'draft'"
+            v-if="record.status === 'draft' && canDelete"
             name="Delete"
             @click="deleteAdjustment(record.adjustment)"
           >
@@ -414,7 +419,7 @@ function onMobilePaginationChange(pageNum) {
             <div>
               <p
                 class="cursor-pointer font-mono text-sm font-semibold text-blue-600"
-                @click="viewAdjustment(record.adjustment)"
+                @click="showDetails(record.adjustment)"
               >
                 {{ record.number }}
               </p>
@@ -475,7 +480,7 @@ function onMobilePaginationChange(pageNum) {
                 View details
               </a-button>
               <a-button
-                v-if="record.status === 'draft'"
+                v-if="record.status === 'draft' && canSubmit"
                 class="flex items-center justify-center gap-2"
                 @click="submitForApproval(record.adjustment)"
               >
@@ -483,7 +488,7 @@ function onMobilePaginationChange(pageNum) {
                 Submit for approval
               </a-button>
               <a-button
-                v-if="record.status === 'pending_approval'"
+                v-if="record.status === 'pending_approval' && canApprove"
                 type="primary"
                 class="flex items-center justify-center gap-2"
                 @click="approveAdjustment(record.adjustment)"
@@ -492,7 +497,7 @@ function onMobilePaginationChange(pageNum) {
                 Approve
               </a-button>
               <a-button
-                v-if="record.status === 'pending_approval'"
+                v-if="record.status === 'pending_approval' && canReject"
                 danger
                 class="flex items-center justify-center gap-2"
                 @click="rejectAdjustment(record.adjustment)"
@@ -501,7 +506,7 @@ function onMobilePaginationChange(pageNum) {
                 Reject
               </a-button>
               <a-button
-                v-if="record.status === 'draft'"
+                v-if="record.status === 'draft' && canEdit"
                 class="flex items-center justify-center gap-2"
                 @click="editAdjustment(record.adjustment)"
               >
@@ -509,7 +514,7 @@ function onMobilePaginationChange(pageNum) {
                 Edit
               </a-button>
               <a-button
-                v-if="record.status === 'draft'"
+                v-if="record.status === 'draft' && canDelete"
                 danger
                 class="flex items-center justify-center gap-2"
                 @click="deleteAdjustment(record.adjustment)"

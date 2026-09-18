@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed } from "vue";
 import { usePage, router, Head } from "@inertiajs/vue3";
 import { PlusSquareOutlined, DownloadOutlined } from "@ant-design/icons-vue";
 import { watchDebounced } from "@vueuse/core";
@@ -7,6 +7,7 @@ import { useFilters, toLabel } from "@/Composables/useFilters";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useTable } from "@/Composables/useTable";
+import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
@@ -21,10 +22,10 @@ import LocationInfoAlert from "@/Components/LocationInfoAlert.vue";
 const page = usePage();
 const { showModal } = useHelpers();
 const { spinning } = useGlobalVariables();
+const { hasPermission } = usePermissionsV2();
 
-const search = ref("");
-const status = ref(null);
-const domain = ref(null);
+// Creating needs its own permission, so users who only review adjustments aren't offered it.
+const canCreate = computed(() => hasPermission("inventory.adjustments.create"));
 
 // Props from backend
 const props = defineProps({
@@ -36,14 +37,11 @@ const props = defineProps({
   filters: Object,
 });
 
-// Initialize filters from backend
-onMounted(() => {
-  if (props.filters) {
-    search.value = props.filters.search || "";
-    status.value = props.filters.status || null;
-    domain.value = props.filters.domain || null;
-  }
-});
+// Seeded from the URL's own filters. Assigning these after mount instead would look like the user
+// had just typed, and the reload that followed would cancel whatever request was in flight.
+const search = ref(props.filters?.search ?? "");
+const status = ref(props.filters?.status ?? null);
+const domain = ref(props.filters?.domain ?? null);
 
 // Fetch items
 const getItems = () => {
@@ -54,6 +52,8 @@ const getItems = () => {
       search: search.value || undefined,
       status: status.value || undefined,
       domain: domain.value || undefined,
+      // A new search or filter starts over; keeping the old page hides the matches.
+      page: 1,
     },
     onStart: () => (spinning.value = true),
     onFinish: () => (spinning.value = false),
@@ -159,6 +159,7 @@ const showAdjustmentDetails = (adjustment) => {
           class="w-full min-w-0 md:max-w-[300px]"
         />
         <a-button
+          v-if="canCreate"
           class="flex w-full items-center justify-center border border-green-500 bg-white text-green-500 md:inline-flex md:w-auto"
           type="primary"
           @click="createAdjustment"
