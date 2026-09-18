@@ -74,12 +74,14 @@ class Customer extends Model
 
     public function getTierInfo(): array
     {
-        // Get tier from database instead of hardcoded values
-        $tierModel = \App\Models\LoyaltyTier::where('name', $this->tier ?? 'bronze')->first();
+        // The tier as this customer's own organization defines it.
+        $tiers = \App\Models\LoyaltyTier::query()->where('domain', $this->domain);
+
+        $tierModel = (clone $tiers)->where('name', $this->tier ?? 'bronze')->first();
 
         if (! $tierModel) {
             // Fallback to bronze if tier not found
-            $tierModel = \App\Models\LoyaltyTier::where('name', 'bronze')->first();
+            $tierModel = (clone $tiers)->where('name', 'bronze')->first();
         }
 
         if (! $tierModel) {
@@ -116,8 +118,8 @@ class Customer extends Model
     {
         $previousTier = $this->tier;
 
-        // Get appropriate tier based on spending from database
-        $newTierModel = \App\Models\LoyaltyTier::getTierForSpending($this->lifetime_spent);
+        // Get appropriate tier based on spending, among this customer's organization's tiers
+        $newTierModel = \App\Models\LoyaltyTier::getTierForSpending($this->lifetime_spent, $this->domain);
 
         if ($newTierModel && $previousTier !== $newTierModel->name) {
             $this->update([

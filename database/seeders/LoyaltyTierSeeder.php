@@ -52,11 +52,14 @@ class LoyaltyTierSeeder extends Seeder
             ],
         ];
 
-        foreach ($tiers as $tier) {
-            LoyaltyTier::updateOrCreate(
-                ['name' => $tier['name']],
-                $tier
-            );
+        // Each organization runs its own program, so each gets its own set of tiers.
+        foreach (\App\Models\Domain::pluck('name_slug') as $domain) {
+            foreach ($tiers as $tier) {
+                LoyaltyTier::updateOrCreate(
+                    ['domain' => $domain, 'name' => $tier['name']],
+                    $tier + ['domain' => $domain]
+                );
+            }
         }
     }
 }

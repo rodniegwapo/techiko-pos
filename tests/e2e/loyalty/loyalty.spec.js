@@ -8,10 +8,9 @@ import { fixtureIds } from "../support/sales.js";
  *
  * Members come from database/seeders/E2ELoyaltySeeder.php: four with fixed points, tiers and
  * lifetime spending for the list, and one per worker for the points adjustments, since those change
- * the member they act on. Tier tests create their own tier for this organization and drop it again.
- *
- * Note: the tiers seeded by LoyaltyTierSeeder have no organization, so the Tier Management tab —
- * which lists this organization's tiers — starts empty even though customers are on those tiers.
+ * the member they act on. Tiers belong to an organization, so the tab lists the ones this
+ * organization was seeded with (bronze through diamond); tests that change tiers create their own
+ * and drop it again rather than touching those.
  */
 
 const fixture = () => fixtureIds().loyalty;
@@ -302,6 +301,21 @@ test.describe("Loyalty tiers (admin)", () => {
     // These create tiers, whose names have to be unique. One at a time, in order.
     test.describe.configure({ mode: "default" });
 
+    test("the organization's own tiers are listed with their multipliers", async ({ page }) => {
+        await openLoyalty(page, "Tier Management");
+
+        for (const [name, multiplier, threshold] of [
+            ["Bronze", "1.00x", 0],
+            ["Silver", "1.25x", 20000],
+            ["Gold", "1.50x", 50000],
+            ["Platinum", "2.00x", 100000],
+        ]) {
+            const row = rowWith(page, name);
+            await expect(row, name).toContainText(multiplier);
+            await expect(row, name).toContainText(peso(threshold));
+        }
+    });
+
     test("a tier of this organization is listed with its multiplier and threshold", async ({ page }) => {
         const tier = await createTier(page);
         await openLoyalty(page, "Tier Management");
@@ -475,6 +489,40 @@ test.describe("Loyalty access (API)", () => {
 
         expect(res.status).toBe(422);
         expect(Object.keys(res.body.errors ?? {}).sort()).toEqual(["amount", "type"]);
+    });
+
+    test("each organization has its own tiers, and may name them the same", async ({ serverAs }) => {
+        const jollibee = await serverAs("admin");
+        const everywhere = await serverAs("super");
+
+        const ours = (await apiJson(jollibee, "GET", `${loyaltyPath}/tiers?per_page=50`)).body.data;
+        const theirs = (await apiJson(everywhere, "GET", "/domains/mcdonalds-corp/loyalty/tiers?per_page=50")).body.data;
+
+        const names = (tiers) => tiers.map((t) => t.name).sort();
+        expect(names(ours), "Jollibee's own tiers").toContain("gold");
+        expect(names(theirs), "McDonald's own tiers").toContain("gold");
+        expect(ours.find((t) => t.name === "gold").id).not.toBe(theirs.find((t) => t.name === "gold").id);
+    });
+
+    test("another organization's tier can't be changed", async ({ serverAs }) => {
+        const everywhere = await serverAs("super");
+        const jollibee = await serverAs("admin");
+        const theirs = (await apiJson(everywhere, "GET", "/domains/mcdonalds-corp/loyalty/tiers?per_page=50")).body.data
+            .find((t) => t.name === "gold");
+
+        const res = await apiJson(jollibee, "PUT", `${loyaltyPath}/tiers/${theirs.id}`, {
+            name: theirs.name,
+            display_name: "E2E Hijacked",
+            multiplier: 9,
+            spending_threshold: 0,
+            color: "#000000",
+            sort_order: 1,
+        });
+
+        expect(res.status).toBe(403);
+        const after = (await apiJson(everywhere, "GET", "/domains/mcdonalds-corp/loyalty/tiers?per_page=50")).body.data
+            .find((t) => t.id === theirs.id);
+        expect(after.display_name, "their tier is untouched").toBe(theirs.display_name);
     });
 
     test("another organization's manager can't read Jollibee's loyalty figures", async ({ serverAs }) => {
