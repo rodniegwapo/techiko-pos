@@ -14,13 +14,33 @@ use Illuminate\Http\Request;
 class InventoryLocationController extends Controller
 {
     use LocationTypes;
+
+    /** 1–100 per page; anything else (missing, 0, "abc") falls back to 15. */
+    private function perPage(Request $request): int
+    {
+        $perPage = filter_var($request->input('per_page'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) ?: 15;
+
+        return min($perPage, 100);
+    }
+
     public function index(Request $request, Domain $domain)
     {
         $user = auth()->user();
 
-        $query = InventoryLocation::active()
+        // Every status is listed, so a deactivated store can still be found and switched back on.
+        $query = InventoryLocation::query()
             ->forDomain($domain->name_slug)
+            ->withCount('productInventories')
             ->when($request->search, fn($q, $s) => $q->search($s))
+            ->when($request->input('type'), fn($q, $type) => $q->where('type', $type))
+            ->when($request->input('status'), function ($q, $status) {
+                return match ($status) {
+                    'active' => $q->where('is_active', true),
+                    'inactive' => $q->where('is_active', false),
+                    default => $q,
+                };
+            })
+            ->orderBy('is_default', 'desc')
             ->orderBy('name');
 
         // Apply role-based access control
@@ -28,7 +48,7 @@ class InventoryLocationController extends Controller
             $query->where('id', $user->location_id);
         }
 
-        $items = $query->paginate($request->per_page ?? 15);
+        $items = $query->paginate($this->perPage($request));
 
         return inertia('Inventory/Locations/Index', [
             'locations' => InventoryLocationResource::collection($items),
@@ -121,12 +141,33 @@ class InventoryLocationController extends Controller
         ]);
     }
 
-    public function destroy(Domain $domain, InventoryLocation $location)
+    public function destroy(Request $request, Domain $domain, InventoryLocation $location)
     {
         $this->ensureLocationBelongsToDomain($location, $domain);
 
+        // The organization would be left without a default store.
+        if ($location->is_default) {
+            return $this->refuse($request, 'Cannot delete the default location.');
+        }
+
+        // Stock and history point at the store, so the database would refuse the delete anyway.
+        if ($location->productInventories()->exists() || $location->inventoryMovements()->exists()) {
+            return $this->refuse($request, 'Cannot delete a location that still has inventory or movements.');
+        }
+
         $location->delete();
+
         return back()->with('success', 'Location deleted');
+    }
+
+    /** Says no to a JSON caller outright; the page reads the reason from the flash message. */
+    private function refuse(Request $request, string $message)
+    {
+        if ($request->expectsJson()) {
+            return response()->json(['message' => $message], 422);
+        }
+
+        return back()->with('error', $message);
     }
 
     /**
