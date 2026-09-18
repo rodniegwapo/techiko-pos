@@ -286,7 +286,8 @@ class InventoryController extends Controller
         $totalValue = $inventories->sum('total_value');
         $totalQuantity = $inventories->sum('quantity_on_hand');
 
-        $valuationData = $inventories->map(function ($inventory) {
+        // Every row is stock at $location, so its organization is known without loading it per row.
+        $valuationData = $inventories->map(function ($inventory) use ($location) {
             return [
                 'product_id' => $inventory->product_id,
                 'product_name' => $inventory->product->name,
@@ -295,7 +296,7 @@ class InventoryController extends Controller
                 'average_cost' => $inventory->average_cost,
                 'total_value' => $inventory->total_value,
                 'last_movement_at' => $inventory->last_movement_at,
-                'domain' => $inventory->location->domain ?? 'N/A',
+                'domain' => $location->domain ?? 'N/A',
             ];
         });
 

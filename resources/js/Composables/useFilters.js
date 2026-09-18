@@ -1,9 +1,10 @@
-import { ref, watch, computed, unref, onMounted } from "vue";
+import { ref, watch, computed, unref } from "vue";
 import { usePage, router } from "@inertiajs/vue3"; // assuming Inertia.js
 
 export const toLabel = (optionsRef) => (v) => {
     const raw = v && typeof v === "object" && "value" in v ? v.value : v;
-    const opt = (optionsRef.value ?? []).find((o) => o.value === raw);
+    // A filter read back from the URL is a string, while its option's value may be a number.
+    const opt = (optionsRef.value ?? []).find((o) => String(o.value) === String(raw));
     return opt?.label ?? null;
 };
 
@@ -21,19 +22,23 @@ export function useFilters({ configs, getItems }) {
         filters.value[key] = ref.value ?? null;
     });
 
-    // **Update filters from query parameters on mount**
- onMounted(() => {
-    const url = usePage().url ?? ""; // use Inertia's url
-    const queryString = url.split("?")[1] ?? "";
+    // Seed the filters the URL already carries, before the watcher below is set up: assigning them
+    // after mount looks like the user changing a filter, and the reload that follows repeats the
+    // request the server has already answered (and can cancel one still in flight).
+    const queryString = (usePage().url ?? "").split("?")[1] ?? "";
     if (queryString) {
         const params = Object.fromEntries(new URLSearchParams(queryString));
         Object.keys(params).forEach((key) => {
             if (key in filters.value) {
                 filters.value[key] = params[key];
+                const config = configs.find((c) => c.key === key);
+                if (config) {
+                    config.ref.value = params[key];
+                }
             }
         });
     }
-});
+
     // Sync filters with refs and call getItems
     watch(
         filters,

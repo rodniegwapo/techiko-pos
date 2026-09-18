@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, watch } from "vue";
 import { usePage, router, Head } from "@inertiajs/vue3";
 import {
     DollarOutlined,
@@ -24,9 +24,6 @@ const page = usePage();
 const { spinning } = useGlobalVariables();
 const isMdUp = useMediaQuery("(min-width: 768px)");
 
-const selectedLocation = ref(null);
-const selectedDomain = ref(null);
-
 // Props from backend
 const props = defineProps({
     location: Object,
@@ -37,14 +34,10 @@ const props = defineProps({
     domains: Array,
 });
 
-// Initialize filters from backend
-onMounted(() => {
-    if (props.filters) {
-        selectedLocation.value =
-            props.filters.location_id || props.location?.id || null;
-        selectedDomain.value = props.filters.domain || null;
-    }
-});
+// Seeded from the store the report is already showing. Assigning these after mount instead would
+// look like the user picking a filter, and repeat the request the server has just answered.
+const selectedLocation = ref(props.filters?.location_id ?? props.location?.id ?? null);
+const selectedDomain = ref(props.filters?.domain ?? null);
 
 // Computed values
 const totalValue = computed(() => props.summary?.total_value || 0);
@@ -54,7 +47,8 @@ const totalProducts = computed(() => props.summary?.total_products || 0);
 // Fetch items
 const getItems = () => {
     router.reload({
-        only: ["location", "summary", "items"],
+        // currentLocation too, or the "Viewing inventory for:" banner keeps naming the old store.
+        only: ["location", "summary", "items", "currentLocation"],
         preserveScroll: true,
         data: {
             location_id: selectedLocation.value || undefined,
