@@ -144,7 +144,9 @@ class InventoryController extends Controller
         return Inertia::render('Inventory/Movements', [
             'movements' => InventoryMovementResource::collection($movements),
             'locations' => InventoryLocation::active()->forDomain($slug)->get(),
-            'products' => Product::select('id', 'name', 'SKU')->where('domain', $slug)->get(),
+            // No products: the page offers no product filter, so sending the organization's whole
+            // catalogue only to throw it away cost a table dump on every load and every page turn,
+            // growing with the catalogue. Send it again if a product filter is ever added.
             // Only the global view filters by organization.
             'domains' => [],
             'movementTypes' => self::MOVEMENT_TYPES,

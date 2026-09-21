@@ -160,6 +160,58 @@ test.describe("Inventory movements list (admin)", () => {
         expect(lines).toHaveLength(2);
         expect(lines[1]).toContain("Damaged Goods");
     });
+
+    test("Export only includes the movements of the type being shown", async ({ page }) => {
+        await openMovements(page);
+
+        await page.locator("button:has(.anticon-filter)").click();
+        const popover = page.locator(".ant-popover:not(.ant-popover-hidden)").filter({ hasText: "Filters:" });
+        const loaded = page.waitForResponse((r) => new URL(r.url()).searchParams.get("movement_type") === "purchase");
+        await pickSelectOption(page, popover.locator(".ant-form-item").filter({ hasText: "Movement Type" }), 0, "Purchase");
+        await loaded;
+        await page.keyboard.press("Escape");
+
+        const downloading = page.waitForEvent("download", { timeout: 10_000 });
+        await page.getByRole("button", { name: "Export" }).click();
+        const download = await downloading;
+
+        const { readFile } = await import("node:fs/promises");
+        const lines = (await readFile(await download.path(), "utf8")).trim().split(/\r?\n/);
+        expect(lines.slice(1).every((l) => l.includes("Purchase")), "purchases only").toBe(true);
+        expect(lines.find((l) => l.includes(moves().purchase.batch))).toBeTruthy();
+    });
+
+    test("clearing the type filter puts the rest of the movements back", async ({ page }) => {
+        await openMovements(page);
+        const all = (await pageProps(page)).movements.meta.total;
+
+        await page.locator("button:has(.anticon-filter)").click();
+        const popover = page.locator(".ant-popover:not(.ant-popover-hidden)").filter({ hasText: "Filters:" });
+        const filtered = page.waitForResponse((r) => new URL(r.url()).searchParams.get("movement_type") === "damage");
+        await pickSelectOption(page, popover.locator(".ant-form-item").filter({ hasText: "Movement Type" }), 0, "Damaged Goods");
+        await filtered;
+        await page.keyboard.press("Escape");
+        await expect(rows(page)).toHaveCount(1);
+
+        const cleared = page.waitForResponse(
+            (r) => new URL(r.url()).pathname === movementsPath && ! new URL(r.url()).searchParams.get("movement_type"),
+        );
+        await page.locator(".ant-tag").filter({ hasText: "Movement Type" }).locator(".anticon-close").click();
+        await cleared;
+
+        await expect(page.locator(".ant-tag").filter({ hasText: "Movement Type" })).toHaveCount(0);
+        await expect(rows(page)).toHaveCount(Math.min(50, all));
+    });
+
+    test("the page isn't sent the organization's product catalogue", async ({ page }) => {
+        await openMovements(page);
+
+        // The page offers no product filter, so nothing here needs the catalogue. It used to be
+        // sent in full on every load and every page turn, growing with the number of products.
+        const props = await pageProps(page);
+        expect(props.products, "no product list among the page's props").toBeUndefined();
+        await expect(rows(page).first(), "and the movements still arrive").toBeVisible();
+    });
 });
 
 test.describe("Movement details (admin)", () => {
@@ -235,6 +287,29 @@ test.describe("Inventory movements access and filters (API)", () => {
         const { movements } = await responseProps(await api.get(storeUrl("&date_from=2026-03-10&date_to=2026-03-11")));
 
         expect(movements.data.map((m) => m.id).sort()).toEqual([moves().purchase.id, moves().sale.id].sort());
+    });
+
+    test("a product filter narrows the list to that product's movements", async ({ serverAs }) => {
+        const api = await serverAs("admin");
+
+        // The product's id is taken from the list itself rather than from the fixtures file, whose
+        // top-level product map is written by another seeder and goes stale when the inventory
+        // fixtures are rebuilt.
+        const all = await responseProps(await api.get(storeUrl("&per_page=100")));
+        const product = all.movements.data.find((m) => m.product?.name === moves().purchase.product)?.product;
+        expect(product, `${moves().purchase.product} has movements in this store`).toBeTruthy();
+
+        // Only the page's URL offers this filter; there is no control for it on screen.
+        const props = await responseProps(await api.get(storeUrl(`&product_id=${product.id}&per_page=100`)));
+        const names = props.movements.data.map((m) => m.product?.name);
+
+        expect(names.length).toBeGreaterThan(1);
+        expect([...new Set(names)], "this product and no other").toEqual([product.name]);
+        expect(
+            props.movements.data.map((m) => m.movement_type),
+            "the delivery and the breakage among them",
+        ).toEqual(expect.arrayContaining(["purchase", "damage"]));
+        expect(names.length, "fewer than the store's whole list").toBeLessThan(all.movements.data.length);
     });
 
     test("the page size is capped", async ({ serverAs }) => {

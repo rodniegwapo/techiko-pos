@@ -30,7 +30,6 @@ const domain = ref(null);
 const props = defineProps({
   movements: Object,
   locations: Array,
-  products: Array,
   movementTypes: Object,
   domains: Array,
   filters: Object,
