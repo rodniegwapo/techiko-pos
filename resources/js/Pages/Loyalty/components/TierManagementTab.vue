@@ -146,8 +146,6 @@ const editTier = (tier) => {
 };
 
 const deleteTier = (tier) => {
-  console.log("Attempting to delete tier:", tier);
-
   Modal.confirm({
     title: "Delete Tier",
     content: `Are you sure you want to delete the ${tier.display_name} tier? This action cannot be undone.`,
@@ -156,15 +154,15 @@ const deleteTier = (tier) => {
     cancelText: "Cancel",
     onOk: async () => {
       try {
-        console.log(`Deleting tier ID: ${tier.id}`);
-        const response = await axios.delete(`${getApiUrl("tiers")}/${tier.id}`);
-        console.log("Delete response:", response.data);
+        await axios.delete(`${getApiUrl("tiers")}/${tier.id}`);
+
+        // Wait for the list, so the tier is gone from it by the time we say it was deleted.
+        await loadTiers(pagination.value.current_page);
 
         notification.success({
           message: "Tier Deleted",
           description: `${tier.display_name} tier has been deleted successfully`,
         });
-        loadTiers(pagination.value.current_page);
       } catch (error) {
         console.error("Delete tier error:", error);
         console.error("Error response:", error.response);
@@ -236,36 +234,28 @@ const closeModal = () => {
 };
 
 const saveTier = async (tierData) => {
-  console.log("Saving tier data:", tierData);
-  console.log("Editing tier:", editingTier.value);
-
   savingTier.value = true;
   try {
-    let response;
-    if (editingTier.value) {
+    const isEdit = !! editingTier.value;
+    if (isEdit) {
       // Update existing tier
-      console.log(`Updating tier ID: ${editingTier.value.id}`);
-      response = await axios.put(
-        `${getApiUrl("tiers")}/${editingTier.value.id}`,
-        tierData
-      );
-      notification.success({
-        message: "Tier Updated",
-        description: `${tierData.display_name} tier has been updated successfully`,
-      });
+      await axios.put(`${getApiUrl("tiers")}/${editingTier.value.id}`, tierData);
     } else {
       // Create new tier
-      console.log("Creating new tier");
-      response = await axios.post(getApiUrl("tiers"), tierData);
-      notification.success({
-        message: "Tier Created",
-        description: `${tierData.display_name} tier has been created successfully`,
-      });
+      await axios.post(getApiUrl("tiers"), tierData);
     }
 
-    console.log("Save response:", response.data);
+    // Wait for the list before closing and saying it was saved, so the tier that was just written
+    // is on screen by the time the dialog gets out of the way.
+    await loadTiers(pagination.value.current_page);
+
     closeModal();
-    loadTiers(pagination.value.current_page);
+    notification.success({
+      message: isEdit ? "Tier Updated" : "Tier Created",
+      description: `${tierData.display_name} tier has been ${
+        isEdit ? "updated" : "created"
+      } successfully`,
+    });
   } catch (error) {
     console.error("Save tier error:", error);
     console.error("Error response:", error.response);
@@ -274,7 +264,6 @@ const saveTier = async (tierData) => {
     if (error.response?.data?.errors) {
       // Handle validation errors
       const errors = error.response.data.errors;
-      console.log("Validation errors:", errors);
       const firstError = Object.values(errors)[0];
       errorMessage = Array.isArray(firstError) ? firstError[0] : firstError;
     } else if (error.response?.data?.message) {
