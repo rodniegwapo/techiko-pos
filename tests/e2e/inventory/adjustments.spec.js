@@ -77,6 +77,21 @@ async function createDraft(page, { actualQuantity, description }) {
     return res.body.adjustment;
 }
 
+/** The same draft over an HTTP session, for tests whose browser page is signed out. */
+async function createDraftAs(api, description, actualQuantity = 1) {
+    const { flowStore, products } = fixture();
+    const res = await apiJson(api, "POST", adjustmentsPath, {
+        location_id: flowStore.id,
+        type: "decrease",
+        reason: "damaged_goods",
+        description,
+        items: [{ product_id: products.gadget.id, actual_quantity: actualQuantity, unit_cost: products.gadget.cost }],
+    });
+
+    expect(res.status, `create a draft: ${JSON.stringify(res.body)?.slice(0, 200)}`).toBe(200);
+    return res.body.adjustment;
+}
+
 test.describe("Stock adjustments list (admin)", () => {
     test.use({ account: "admin" });
 
@@ -373,6 +388,121 @@ test.describe("Stock adjustment actions (admin)", () => {
     });
 });
 
+test.describe("Creating a stock adjustment (admin)", () => {
+    test.use({ account: "admin" });
+    // These write adjustments at the flow store. One at a time, in order.
+    test.describe.configure({ mode: "default" });
+
+    const createPath = `${adjustmentsPath}/create`;
+    const uniqueNote = () => `E2E created ${Math.random().toString(36).slice(2, 8)}`;
+
+    /** Adjustments this test made; removed again afterwards. */
+    const made = [];
+
+    test.afterEach(async ({ page }) => {
+        while (made.length) {
+            await apiJson(page.request, "DELETE", `${adjustmentsPath}/${made.pop()}`).catch(() => {});
+        }
+    });
+
+    async function openCreate(page) {
+        await page.goto(createPath);
+        await expect(page.getByText("Create Stock Adjustment", { exact: true }).first()).toBeVisible();
+        await expect(page.getByRole("button", { name: "Save Adjustment" })).toBeVisible();
+    }
+
+    /** The block holding a labelled control on the form. */
+    const field = (page, label) => page.locator("label").filter({ hasText: label }).first().locator("xpath=..");
+
+    /**
+     * Picks an option by the text on it. The store options are drawn with their address beside the
+     * name, so antd gives them no title for the shared helper to match against.
+     */
+    async function pickOption(page, label, text) {
+        await field(page, label).locator(".ant-select").first().click();
+        const dropdown = page.locator(".ant-select-dropdown:not(.ant-select-dropdown-hidden)").last();
+        await expect(dropdown).toBeVisible();
+        await dropdown.getByText(text, { exact: true }).first().click();
+    }
+
+    /**
+     * The store the form is filled in for. The suite's own adjustment stores are kept inactive so
+     * they stay out of everybody else's store pickers, and this form lists only active ones — so
+     * the first store the page offers is used, and whatever is made for it is removed again.
+     */
+    async function firstStore(page) {
+        const { locations } = await pageProps(page);
+        expect(locations.length, "the form offers a store to adjust").toBeGreaterThan(0);
+
+        return locations[0];
+    }
+
+    /** Picks a store, a reason, and puts one product on the form; returns its row. */
+    async function startAdjustment(page, { product = E2E_PRODUCT } = {}) {
+        const store = await firstStore(page);
+        await pickOption(page, "Location *", store.name);
+        await pickOption(page, "Reason *", "Physical Count");
+
+        const found = page.waitForResponse((r) => r.url().includes("adjustment-products"));
+        await page.getByPlaceholder("Search by product name, SKU, or barcode...").fill(product);
+        await found;
+        await page.getByText(product, { exact: true }).first().click();
+
+        return { store, line: page.locator(".grid.grid-cols-12").filter({ hasText: product }) };
+    }
+
+    /** Stock is only counted when an adjustment is approved, and these never approve one. */
+    const E2E_PRODUCT = "E2E Burger";
+
+    test("products can't be searched until a store is chosen", async ({ page }) => {
+        await openCreate(page);
+
+        // The search reads stock for a store, so there is nothing to search until one is picked.
+        await expect(page.getByPlaceholder("Search by product name, SKU, or barcode...")).toBeDisabled();
+    });
+
+    test("adding a product shows the stock on hand and the difference counted against it", async ({ page }) => {
+        await openCreate(page);
+
+        const { line } = await startAdjustment(page);
+
+        // The form is told what the store believes it holds; the difference is worked out from
+        // whatever is counted against it.
+        const onHand = Number((await line.locator("div.bg-gray-50").first().innerText()).trim());
+        expect(onHand, "the stock on hand is shown").toBeGreaterThan(3);
+
+        await line.locator(".ant-input-number-input").first().fill(String(onHand - 3));
+        await expect(line, "counted three short").toContainText("-3");
+
+        await line.locator(".ant-input-number-input").first().fill(String(onHand + 2));
+        await expect(line, "and two over").toContainText("+2");
+    });
+
+    test("an adjustment made on the form arrives on the list as a draft", async ({ page }) => {
+        const note = uniqueNote();
+        await openCreate(page);
+
+        const { store, line } = await startAdjustment(page);
+        const onHand = Number((await line.locator("div.bg-gray-50").first().innerText()).trim());
+        await line.locator(".ant-input-number-input").first().fill(String(onHand - 2));
+        await page.getByPlaceholder("Optional description or notes about this adjustment").fill(note);
+        await page.getByRole("button", { name: "Save Adjustment" }).click();
+
+        await expect(notice(page, "Adjustment Created")).toBeVisible();
+        await expect(page).toHaveURL(/\/inventory\/adjustments(\?|$)/);
+
+        await openAdjustments(page, storeUrl(store.id, `&search=${encodeURIComponent(note)}`));
+        const row = rows(page).first();
+        await expect(row).toContainText(note);
+        await expect(cell(row, "status"), "waiting to be sent for approval").toContainText("Draft");
+        await expect(cell(row, "items")).toContainText("1");
+
+        const listed = (await pageProps(page)).adjustments.data[0];
+        made.push(listed.id);
+        expect(listed.location_id, "at the store it was made for").toBe(store.id);
+    });
+});
+
 test.describe("Stock adjustments as a manager", () => {
     test.use({ account: "manager" });
 
@@ -447,6 +577,100 @@ test.describe("Stock adjustments access and filters (API)", () => {
         expect(props.isGlobalView, "an organization user isn't shown the global view").toBe(false);
         expect([...new Set(props.locations.map((l) => l.domain))]).toEqual(["jollibee-corp"]);
         expect(props.domains.map((d) => d.name_slug)).toEqual(["jollibee-corp"]);
+    });
+
+    test("the product picker reports the store's stock on hand", async ({ serverAs }) => {
+        const api = await serverAs("admin");
+        const { flowStore, products } = fixture();
+
+        const res = await apiJson(
+            api,
+            "GET",
+            `${adjustmentsPath.replace("/adjustments", "/adjustment-products")}?location_id=${flowStore.id}&search=${products.gadget.sku}`,
+        );
+
+        expect(res.status).toBe(200);
+        const found = res.body.data.find((p) => p.SKU === products.gadget.sku);
+        expect(found, "the product searched for").toBeTruthy();
+        expect(found.current_stock, "what the store believes it holds").toBe(products.gadget.qty);
+    });
+
+    test("the product picker needs a store, and refuses one from another organization", async ({ serverAs }) => {
+        const api = await serverAs("admin");
+        const productsPath = adjustmentsPath.replace("/adjustments", "/adjustment-products");
+
+        expect((await apiJson(api, "GET", productsPath)).status, "no store given").toBe(422);
+
+        // A store outside the organization isn't found here at all, which refuses it just as
+        // firmly as a 403 would and gives nothing away about whether it exists.
+        const elsewhere = await apiJson(api, "GET", `${productsPath}?location_id=${fixture().otherOrgLocationId}`);
+        expect(elsewhere.status, "a store of another organization").toBeGreaterThanOrEqual(400);
+        expect(elsewhere.body?.data, "and no products with it").toBeFalsy();
+    });
+
+    test("an adjustment needs a store, a reason and something to adjust", async ({ serverAs }) => {
+        const api = await serverAs("admin");
+
+        const res = await apiJson(api, "POST", adjustmentsPath, {});
+
+        expect(res.status).toBe(422);
+        expect(Object.keys(res.body.errors ?? {}).sort()).toEqual(["items", "location_id", "reason", "type"]);
+    });
+
+    test("a draft can be edited, but one already approved can't", async ({ serverAs }) => {
+        const api = await serverAs("admin");
+        const draft = await createDraftAs(api, "E2E editable");
+
+        const edited = await apiJson(api, "PUT", `${adjustmentsPath}/${draft.id}`, {
+            type: "decrease",
+            reason: "expired_goods",
+            description: "E2E edited",
+        });
+        expect(edited.status, "a draft is still open to changes").toBe(200);
+
+        const approved = adj().approved;
+        const refused = await apiJson(api, "PUT", `${adjustmentsPath}/${approved.id}`, {
+            type: "decrease",
+            reason: "expired_goods",
+            description: "E2E must not take",
+        });
+
+        // Once it has moved stock, an adjustment is a record of what happened, not a draft.
+        expect(refused.status).toBe(400);
+        expect(refused.body.message).toMatch(/only draft/i);
+        await apiJson(api, "DELETE", `${adjustmentsPath}/${draft.id}`).catch(() => {});
+    });
+
+    test("an adjustment that has been approved can't be approved or rejected again", async ({ serverAs }) => {
+        const api = await serverAs("admin");
+        const approved = adj().approved;
+
+        // A draft may be approved without being sent for approval first — see
+        // StockAdjustment::canBeApproved, which allows both draft and pending. What it must not
+        // allow is moving the stock a second time for an adjustment already applied.
+        const again = await apiJson(api, "POST", `${adjustmentsPath}/${approved.id}/approve`);
+        expect(again.status).toBe(400);
+        expect(again.body.message).toMatch(/failed to approve/i);
+
+        const rejected = await apiJson(api, "POST", `${adjustmentsPath}/${approved.id}/reject`);
+        expect(rejected.status, "nor turned down after the fact").toBe(400);
+
+        const after = await apiJson(api, "GET", `${adjustmentsPath}/${approved.id}`);
+        expect(after.body.adjustment.status, "still approved, and applied only once").toBe("approved");
+    });
+
+    test("an approved adjustment can't be deleted", async ({ serverAs }) => {
+        const api = await serverAs("admin");
+        const approved = adj().approved;
+
+        const res = await apiJson(api, "DELETE", `${adjustmentsPath}/${approved.id}`);
+
+        expect(res.status).toBe(400);
+        expect(res.body.message).toMatch(/only draft/i);
+        expect(
+            (await apiJson(api, "GET", `${adjustmentsPath}/${approved.id}`)).status,
+            "and it is still there",
+        ).toBe(200);
     });
 
     test("a cashier can't open the adjustments page", async ({ serverAs }) => {
