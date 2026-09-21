@@ -162,15 +162,21 @@ const handlePointsAdjustment = async (adjustmentData) => {
       adjustmentData
     );
 
+    const member = selectedCustomer.value.name;
+
+    // The list is what shows the new balance, so wait for it before saying the points were
+    // adjusted and letting go of the dialog. The dialog also reads the member's balance for its
+    // "maximum deductible", so one opened again on the old figures would cap a deduction at a
+    // maximum that no longer applies.
+    await loadCustomers(pagination.value.current_page);
+
+    showPointsModal.value = false;
     notification.success({
       message: "Points Adjusted",
-      description: `${selectedCustomer.value.name}'s points have been ${
+      description: `${member}'s points have been ${
         adjustmentData.type === "add" ? "added" : "deducted"
       }`,
     });
-
-    showPointsModal.value = false;
-    loadCustomers(pagination.value.current_page);
   } catch (error) {
     notification.error({
       message: "Adjustment Failed",
