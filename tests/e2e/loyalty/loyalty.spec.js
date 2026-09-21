@@ -65,7 +65,17 @@ async function pointsShown(page) {
     return Number(text.split("\n")[0].replace(/,/g, ""));
 }
 
-/** Fills in the points dialog for the first listed member and saves it. */
+const customersUrl = `${loyaltyPath}/customers`;
+
+/**
+ * Fills in the points dialog for the first listed member, saves it, and waits for the list behind
+ * the dialog to catch up.
+ *
+ * Saving posts the adjustment and only then reloads the list, so the balance on screen is the one
+ * from before the adjustment until that second request comes back. Reading it without waiting left
+ * the tests polling against a stale table, which is fine on an idle machine and not at all fine
+ * when the whole suite is running and that reload is the slowest thing on the page.
+ */
 async function adjustPoints(page, { kind, amount, reason }) {
     await rows(page).first().getByRole("button", { name: "Adjust Points" }).click();
     const dialog = page.getByRole("dialog").filter({ hasText: "Adjust Customer Points" });
@@ -75,7 +85,20 @@ async function adjustPoints(page, { kind, amount, reason }) {
     await dialog.locator(".ant-radio-button-wrapper", { hasText: label }).click();
     await dialog.locator(".ant-input-number-input").first().fill(String(amount));
     await dialog.locator("textarea").fill(reason);
+
+    const saved = page.waitForResponse(
+        (r) => r.request().method() === "POST" && r.url().includes("/adjust-points"),
+    );
+    const reloaded = page.waitForResponse(
+        (r) => r.request().method() === "GET" && r.url().includes(`${customersUrl}?`),
+    );
     await dialog.getByRole("button", { name: "OK" }).click();
+
+    // Say which adjustment went wrong here, rather than leaving a balance that never moved to
+    // surface as a puzzling mismatch further down the test.
+    expect((await saved).status(), `${kind} ${amount} points`).toBe(200);
+    await reloaded;
+    await expect(dialog, "the dialog closes once the points are saved").toBeHidden();
 
     return dialog;
 }
