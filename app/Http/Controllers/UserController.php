@@ -117,6 +117,10 @@ class UserController extends Controller
      */
     public function toggleStatus(User $user)
     {
+        // This route carries no organization in its path, so the policy is what keeps one
+        // organization's admin from deactivating another organization's staff.
+        $this->authorize('update', $user);
+
         $currentUser = auth()->user();
 
         try {

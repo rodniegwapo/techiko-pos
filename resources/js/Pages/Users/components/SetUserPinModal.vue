@@ -131,6 +131,7 @@ async function handleSubmit() {
         <a-form layout="vertical" @submit.prevent="handleSubmit">
             <a-form-item
                 label="PIN"
+                html-for="user-pin-code"
                 :validate-status="fieldErrors.pin_code ? 'error' : ''"
                 :help="
                     Array.isArray(fieldErrors.pin_code)
@@ -139,6 +140,7 @@ async function handleSubmit() {
                 "
             >
                 <a-input-password
+                    id="user-pin-code"
                     v-model:value="pinCode"
                     placeholder="4–6 digits"
                     maxlength="6"
@@ -148,6 +150,7 @@ async function handleSubmit() {
             </a-form-item>
             <a-form-item
                 label="Confirm PIN"
+                html-for="user-pin-code-confirmation"
                 :validate-status="fieldErrors.pin_code_confirmation ? 'error' : ''"
                 :help="
                     Array.isArray(fieldErrors.pin_code_confirmation)
@@ -156,6 +159,7 @@ async function handleSubmit() {
                 "
             >
                 <a-input-password
+                    id="user-pin-code-confirmation"
                     v-model:value="pinConfirm"
                     placeholder="Repeat PIN"
                     maxlength="6"

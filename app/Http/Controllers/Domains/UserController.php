@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Domains;
 
-use App\Helpers;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\UserResource;
 use App\Models\Domain;
@@ -30,6 +29,9 @@ class UserController extends Controller
     {
         $currentUser = auth()->user();
 
+        // The page asks for its own page size; cap it so a large one can't be requested.
+        $perPage = min(max((int) $request->input('per_page', 15), 1), 100);
+
         $users = User::query()
             ->with(['roles', 'supervisor', 'location'])
             ->where('domain', $domain->name_slug)
@@ -39,17 +41,22 @@ class UserController extends Controller
                     $q->where('name', $role);
                 });
             })
+            // Accounts predating the status column count as active, which is how the list shows them.
+            ->when($request->status === 'active', fn ($q) => $q->where(function ($q) {
+                $q->where('status', 'active')->orWhereNull('status');
+            }))
+            ->when($request->status === 'inactive', fn ($q) => $q->where('status', 'inactive'))
             ->latest()
-            ->paginate(15);
+            ->paginate($perPage)
+            ->withQueryString();
 
         $roles = $this->userService->getManageableRoles($currentUser);
-
-        // Get current location and available locations for the alert
-        $currentLocation = Helpers::getActiveLocation($domain, $request->input('location_id'));
 
         return Inertia::render('Users/Index', [
             'items' => UserResource::collection($users),
             'roles' => $roles,
+            // So the search box and the filter tags show what the list is filtered by.
+            'filters' => $request->only(['search', 'role', 'status']),
             'hierarchy' => UserHierarchyService::getRoleHierarchy(),
             'isGlobalView' => ! $domain,
             'subscription' => $domain

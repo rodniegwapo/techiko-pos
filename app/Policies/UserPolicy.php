@@ -7,6 +7,19 @@ use App\Models\User;
 class UserPolicy
 {
     /**
+     * Whether both accounts belong to the same organization.
+     *
+     * Only a super user works across organizations. Everybody else — an admin, and a super admin
+     * too — is confined to their own, because the global /api/users routes carry no organization
+     * in their path and would otherwise let one organization's admin rename, deactivate or
+     * otherwise reach into another organization's staff.
+     */
+    private function sameDomain(User $actor, User $target): bool
+    {
+        return $actor->domain !== null && $actor->domain === $target->domain;
+    }
+
+    /**
      * Determine whether the user can view any models.
      */
     public function viewAny(User $user): bool
@@ -27,6 +40,10 @@ class UserPolicy
         // Super users can view anyone
         if ($user->isSuperUser()) {
             return true;
+        }
+
+        if (! $this->sameDomain($user, $model)) {
+            return false;
         }
 
         if ($user->hasAnyRole(['super admin', 'admin'])) {
@@ -82,7 +99,11 @@ class UserPolicy
             return true;
         }
 
-        // super admin can edit anyone
+        if (! $this->sameDomain($user, $model)) {
+            return false;
+        }
+
+        // super admin can edit anyone in their own organization
         if ($user->hasRole('super admin')) {
             return true;
         }
@@ -110,6 +131,10 @@ class UserPolicy
             return true;
         }
 
+        if (! $this->sameDomain($user, $model)) {
+            return false;
+        }
+
         // Only Super Admin and Admin can update sensitive fields
         if ($user->hasRole('super admin')) {
             return true;
@@ -135,6 +160,10 @@ class UserPolicy
 
         // Only super admin can delete users
         if (! $user->hasRole('super admin')) {
+            return false;
+        }
+
+        if (! $this->sameDomain($user, $model)) {
             return false;
         }
 
@@ -172,7 +201,11 @@ class UserPolicy
             return true;
         }
 
-        // Super Admin and Admin can assign supervisors to anyone
+        if (! $this->sameDomain($user, $model)) {
+            return false;
+        }
+
+        // Super Admin and Admin can assign supervisors to anyone in their own organization
         if ($user->hasAnyRole(['super admin', 'admin'])) {
             return true;
         }
@@ -204,6 +237,10 @@ class UserPolicy
         }
 
         if ($target->is_super_user) {
+            return false;
+        }
+
+        if (! $this->sameDomain($actor, $target)) {
             return false;
         }
 

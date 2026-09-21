@@ -36,6 +36,13 @@ class UserService
             });
         }
 
+        // Apply status filter (accounts predating the column count as active)
+        if ($request->input('status') === 'active') {
+            $query->where(fn ($q) => $q->where('status', 'active')->orWhereNull('status'));
+        } elseif ($request->input('status') === 'inactive') {
+            $query->where('status', 'inactive');
+        }
+
         // Apply domain filter (for super users in global view)
         if ($request->input('domain')) {
             $query->where('domain', $request->input('domain'));
@@ -181,9 +188,15 @@ class UserService
             'supervisor_id' => $data['supervisor_id'] ?? null,
         ];
 
-        // Add domain if provided (for global view)
-        if (isset($data['domain']) && $data['domain']) {
-            $userData['domain'] = $data['domain'];
+        // Add domain if provided (for global view). Only a super user may choose one: for anybody
+        // else the new account joins their own organization, so the global /api/users route can't
+        // be used to plant a user in another organization or in none at all.
+        if ($currentUser->isSuperUser()) {
+            if (isset($data['domain']) && $data['domain']) {
+                $userData['domain'] = $data['domain'];
+            }
+        } else {
+            $userData['domain'] = $currentUser->domain;
         }
 
         $user = User::create($userData);
@@ -211,8 +224,8 @@ class UserService
                 'supervisor_id' => $data['supervisor_id'] ?? null,
             ];
 
-            // Add domain if provided (for global view)
-            if (isset($data['domain']) && $data['domain']) {
+            // Only a super user may move an account to another organization (see createUser).
+            if ($currentUser->isSuperUser() && isset($data['domain']) && $data['domain']) {
                 $updateData['domain'] = $data['domain'];
             }
 
