@@ -30,7 +30,8 @@ const props = defineProps({
 
 const { spinning } = useGlobalVariables();
 const { startDateFormat, endDateFormat } = useHelpers();
-const search = ref("");
+// Seeded from the URL's own filters, so the box shows what the list is filtered by.
+const search = ref(props.filters?.search ?? "");
 
 const selectedRange = ref(
   props.filters?.start_date || props.filters?.end_date
@@ -75,6 +76,8 @@ const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
   getItems,
   configs: [
     {
+      // Without a label the chip that appears when a range is picked has no name on it.
+      label: "Select Date",
       key: "selectedRange",
       ref: selectedRange,
       getLabel: (v) =>
