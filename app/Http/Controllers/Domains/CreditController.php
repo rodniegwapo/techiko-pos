@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Domains;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\CreditCustomerResource;
 use App\Models\CreditTransaction;
 use App\Models\Customer;
 use App\Models\Domain;
@@ -51,7 +52,10 @@ class CreditController extends Controller
                 };
             });
 
-        $customers = $query->latest()->paginate(15);
+        // The page asks for its own page size; cap it so a large one can't be requested.
+        $perPage = min(max((int) $request->input('per_page', 15), 1), 100);
+
+        $customers = $query->latest()->paginate($perPage)->withQueryString();
 
         // Calculate overdue amounts for each customer
         $customers->getCollection()->transform(function ($customer) {
@@ -62,7 +66,11 @@ class CreditController extends Controller
         });
 
         return Inertia::render('Credits/Index', [
-            'customers' => $customers,
+            // A resource collection, so the totals land where the table looks for them. Handed the
+            // paginator raw, the table saw no totals at all and fell back to paging the rows it had
+            // been given ten at a time — so it claimed there were fifteen customers however many
+            // there were, and everybody past the fifteenth was unreachable.
+            'customers' => CreditCustomerResource::collection($customers),
             'domain' => $domain,
             'filters' => $request->only(['search', 'status']),
         ]);
