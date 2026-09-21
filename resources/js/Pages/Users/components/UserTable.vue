@@ -15,11 +15,19 @@ import { Modal, notification } from "ant-design-vue";
 import { usePage, router } from "@inertiajs/vue3";
 import axios from "axios";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
+import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import LocationInfo from "@/Components/LocationInfo.vue";
 
 const page = usePage();
 const { hasPermission } = usePermissionsV2();
+const { getRoute, isInDomainContext } = useDomainRoutes();
 const isMdUp = useMediaQuery("(min-width: 768px)");
+
+/** Inside an organization the delete goes through its own route; the global page has only /api. */
+const userDeleteUrl = (userId) =>
+    isInDomainContext.value
+        ? getRoute("users.destroy", { user: userId })
+        : `/api/users/${userId}`;
 
 // Use permission composable
 const isSuperUser = computed(
@@ -51,7 +59,7 @@ const props = defineProps({
 });
 
 // Emits
-const emit = defineEmits(["change", "edit", "view", "set-pin"]);
+const emit = defineEmits(["change", "edit", "view", "set-pin", "refresh"]);
 
 // Table columns
 const columns = computed(() => {
@@ -189,27 +197,25 @@ const canEdit = (user) => {
     return false;
 };
 
+// Mirrors UserPolicy::delete: only a super user or a super admin may delete, and never themselves.
+// An organization's admin is not offered it, because the server would refuse every time.
 const canDelete = (user) => {
     // Handle data wrapping from resources
     const userData = user.data || user;
+    const actor = currentUser.value;
 
-    // Super user can delete anyone (except themselves)
-    if (isSuperUser.value) {
-        const actor = currentUser.value;
-        if (!actor) {
-            return false;
-        }
-        return userData.id !== actor.id;
-    }
-
-    // Only users with manage permissions can delete
-    if (!hasPermission("users.update")) {
+    if (!actor) {
         return false;
     }
 
     // Cannot delete yourself
-    if (userData.id === currentUser.value?.id) {
+    if (userData.id === actor.id) {
         return false;
+    }
+
+    // Super user can delete anyone
+    if (isSuperUser.value) {
+        return true;
     }
 
     // Cannot delete super users
@@ -217,7 +223,10 @@ const canDelete = (user) => {
         return false;
     }
 
-    return true;
+    return (
+        hasPermission("users.destroy") &&
+        actor.roles?.some((role) => role.name.toLowerCase() === "super admin")
+    );
 };
 
 const handleDelete = (user) => {
@@ -232,13 +241,12 @@ const handleDelete = (user) => {
         cancelText: "Cancel",
         onOk: async () => {
             try {
-                await axios.delete(`/api/users/${userData.id}`);
+                await axios.delete(userDeleteUrl(userData.id));
                 notification.success({
                     message: "User Deleted",
                     description: `${userData.name} has been deleted successfully`,
                 });
-                // Refresh the page data
-                window.location.reload();
+                emit("refresh");
             } catch (error) {
                 console.error("Delete user error:", error);
                 notification.error({
@@ -378,8 +386,7 @@ const handleStatusToggle = async (user) => {
             description: response.data.message,
         });
 
-        // Refresh the page data
-        window.location.reload();
+        emit("refresh");
     } catch (error) {
         console.error("Toggle status error:", error);
         notification.error({

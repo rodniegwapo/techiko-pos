@@ -34,6 +34,10 @@ class UserResource extends JsonResource
                     ];
                 });
             }),
+            // The store the account works from; the users list shows it in its own column.
+            'location' => $this->whenLoaded('location', function () {
+                return $this->location ? new InventoryLocationResource($this->location) : null;
+            }),
             'supervisor' => $this->whenLoaded('supervisor', function () {
                 return [
                     'id' => $this->supervisor->id,
