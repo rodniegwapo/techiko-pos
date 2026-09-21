@@ -19,6 +19,9 @@ class RoleResource extends JsonResource
             'name' => $this->name,
             'guard_name' => $this->guard_name,
             'level' => $this->level,
+            // Without this the edit form opened with an empty description box whatever the role
+            // actually said, and saving wrote that emptiness back over it.
+            'description' => $this->description,
             'permissions' => $this->whenLoaded('permissions', function () {
                 return $this->permissions->map(function ($permission) {
                     return [

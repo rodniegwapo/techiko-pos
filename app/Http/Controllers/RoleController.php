@@ -83,7 +83,7 @@ class RoleController extends Controller
                 'name' => $validated['name'],
                 'guard_name' => 'web',
                 'level' => $validated['level'],
-                'description' => $validated['description'],
+                'description' => $validated['description'] ?? null,
             ]);
 
             // Assign permissions if provided
@@ -119,9 +119,18 @@ class RoleController extends Controller
     {
         $this->authorize('update', $role);
 
-        logger('role policey accepted');
 
         $validated = $this->validateRole($request, $role);
+
+        // What a system role is allowed to do can be changed; what it is called cannot. The
+        // application looks these roles up by name — the policies, the role hierarchy and the PIN
+        // checks all ask for "cashier", "manager" and so on — so renaming one would quietly stop
+        // every one of those checks matching, across every organization.
+        if ($this->isSystemRole($role) && mb_strtolower($validated['name']) !== mb_strtolower($role->name)) {
+            return back()->withErrors([
+                'name' => 'A system role cannot be renamed. Its level, description and permissions can still be changed.',
+            ]);
+        }
 
         try {
             $oldPermissions = $role->permissions->pluck('id')->toArray();
@@ -129,7 +138,7 @@ class RoleController extends Controller
             $role->update([
                 'name' => $validated['name'],
                 'level' => $validated['level'],
-                'description' => $validated['description'],
+                'description' => $validated['description'] ?? null,
             ]);
 
             // Update permissions
@@ -156,6 +165,14 @@ class RoleController extends Controller
             });
 
         return $grouped;
+    }
+
+    /** The roles the application itself depends on, found by name throughout the code. */
+    private const SYSTEM_ROLES = ['super admin', 'admin', 'manager', 'supervisor', 'cashier'];
+
+    private function isSystemRole(Role $role): bool
+    {
+        return in_array(mb_strtolower($role->name), self::SYSTEM_ROLES, true);
     }
 
     /**
@@ -236,8 +253,7 @@ class RoleController extends Controller
         $this->authorize('delete', $role);
 
         // Prevent deletion of system roles
-        $systemRoles = ['super admin', 'admin', 'manager', 'supervisor', 'cashier'];
-        if (in_array(strtolower($role->name), $systemRoles)) {
+        if ($this->isSystemRole($role)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Cannot delete system roles',
