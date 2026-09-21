@@ -12,6 +12,7 @@ import {
 } from "@tabler/icons-vue";
 
 import { ArrowLeftOutlined } from "@ant-design/icons-vue";
+import { notification } from "ant-design-vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
@@ -317,25 +318,40 @@ const usersWithoutSupervisors = computed(() => {
 
 const handleBackToUsers = () => router.visit(getRoute("users.index"));
 
-const autoAssignSupervisors = async () => {
+const autoAssignSupervisors = () => {
     autoAssignLoading.value = true;
-    try {
-        await router.post(
-            getRoute("supervisors.auto-assign"),
-            {},
-            {
-                onSuccess: (page) => {
-                    // Show success message if available
 
-                    router.reload();
-                },
-                onError: (errors) => {},
-            }
-        );
-    } catch (error) {
-    } finally {
-        autoAssignLoading.value = false;
-    }
+    router.post(
+        getRoute("supervisors.auto-assign"),
+        {},
+        {
+            preserveScroll: true,
+            // The redirect back already brings the hierarchy again, and it is what carries the
+            // tally of who was assigned, who was skipped and why. Reloading on top of it threw
+            // that away before it could be read, so the button appeared to do nothing at all —
+            // which it does for anybody whose next rank up has nobody in it.
+            onSuccess: (page) => {
+                notification.success({
+                    message: "Supervisors assigned",
+                    description:
+                        page.props?.flash?.success ||
+                        "Auto-assignment finished.",
+                    duration: 8,
+                });
+            },
+            onError: (errors) => {
+                notification.error({
+                    message: "Auto-assignment failed",
+                    description:
+                        Object.values(errors ?? {})[0] ||
+                        "Supervisors could not be assigned.",
+                });
+            },
+            // router.post doesn't return a promise, so awaiting it cleared the button's busy
+            // state immediately; onFinish is what runs when the request is actually done.
+            onFinish: () => (autoAssignLoading.value = false),
+        }
+    );
 };
 </script>
 

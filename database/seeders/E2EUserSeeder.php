@@ -63,5 +63,10 @@ class E2EUserSeeder extends Seeder
 
         $limited->syncRoles([]);
         $limited->syncPermissions($permissions);
+
+        // Nobody reports to anybody to begin with, so the hierarchy page starts each run from the
+        // same shape and its auto-assignment has something left to do. A run that stops halfway
+        // through assigning supervisors is put right here rather than left for the next one.
+        User::whereNotNull('domain')->update(['supervisor_id' => null]);
     }
 }
