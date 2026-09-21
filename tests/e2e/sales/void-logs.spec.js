@@ -35,16 +35,24 @@ async function search(page, text) {
     await found;
 }
 
-/** Every void the organization's page will show, however many pages that takes. */
-async function allVoids(api, query = "") {
-    const out = [];
-    for (let page = 1; ; page++) {
-        const props = await responseProps(await api.get(listUrl(`?page=${page}${query}`)));
-        out.push(...props.items.data);
-        if (page >= props.items.meta.last_page) {
-            return out;
-        }
-    }
+/**
+ * The voids the organization's page lists for a search, as product names.
+ *
+ * Narrowed by the search rather than read page by page: the sales suite is voiding lines of its own
+ * while this one runs, and a list being added to underneath shifts rows between one page and the
+ * next, so walking it would miss what it was looking for.
+ */
+async function voidsFor(api, search, query = "") {
+    const props = await responseProps(
+        await api.get(listUrl(`?search=${encodeURIComponent(search)}&per_page=100${query}`)),
+    );
+
+    return props.items.data.map((v) => v.sale_item?.product?.name);
+}
+
+/** The first page of the whole list, wide enough to say something about the organization's voids. */
+async function someVoids(api) {
+    return (await responseProps(await api.get(listUrl("?per_page=100")))).items.data;
 }
 
 test.describe("Void logs (admin)", () => {
@@ -124,23 +132,17 @@ test.describe("Void logs (admin)", () => {
         await expect(rows(page)).toHaveCount(0);
     });
 
-    test("the date filter leaves out what falls outside it", async ({ page, serverAs }) => {
+    test("the date filter leaves out what falls outside it", async ({ serverAs }) => {
         const api = await serverAs("admin");
         const { old } = fixture();
         const recent = fixture().recent[0];
-        await openVoidLogs(page);
+        const thisWeek = `&start_date=${today(-6)}&end_date=${today(0)}`;
 
-        // Counting rows would race the sales suite's own voids, so ask which ones are on each list.
-        const thisWeek = `?start_date=${today(-6)}&end_date=${today(0)}`;
-        const products = (voids) => voids.map((v) => v.sale_item?.product?.name);
-
-        expect(products(await allVoids(api)), "voided a year ago").toContain(old.product);
-        expect(products(await allVoids(api, thisWeek)), "and so left out of this week").not.toContain(
-            old.product,
-        );
-        expect(products(await allVoids(api, thisWeek)), "while this week's voids stay").toContain(
-            recent.product,
-        );
+        expect(await voidsFor(api, old.product), "voided a year ago").toContain(old.product);
+        expect(await voidsFor(api, old.product, thisWeek), "and so left out of this week")
+            .not.toContain(old.product);
+        expect(await voidsFor(api, recent.product, thisWeek), "while this week's voids stay")
+            .toContain(recent.product);
     });
 
     test("picking a range in the filter asks the server for it", async ({ page }) => {
@@ -161,15 +163,13 @@ test.describe("Void logs (admin)", () => {
         const api = await serverAs("admin");
         const { other } = fixture();
 
-        const voids = await allVoids(api);
+        const voids = await someVoids(api);
 
         expect([...new Set(voids.map((v) => v.domain))], "one organization only").toEqual([
             "jollibee-corp",
         ]);
-        expect(
-            voids.map((v) => v.sale_item?.product?.name),
-            "the other organization's void is not here",
-        ).not.toContain(other.product);
+        expect(await voidsFor(api, other.product), "the other organization's void is not here")
+            .not.toContain(other.product);
         await openVoidLogs(page, listUrl(`?search=${encodeURIComponent(other.product)}`));
         await expect(rows(page), "and cannot be searched out either").toHaveCount(0);
     });

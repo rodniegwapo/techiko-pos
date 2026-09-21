@@ -6,6 +6,7 @@ import { useTable } from "@/Composables/useTable";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useFilters, toLabel } from "@/Composables/useFilters";
 import { useCredit } from "@/Composables/useCredit";
+import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
@@ -21,6 +22,7 @@ import RecordPaymentModal from "./components/RecordPaymentModal.vue";
 const page = usePage();
 const { spinning } = useGlobalVariables();
 const { getOverdueAccounts, fetchOutstandingForPayment, loading: creditLoading } = useCredit();
+const { hasPermission } = usePermissionsV2();
 
 const props = defineProps({
   customers: Object,
@@ -101,8 +103,14 @@ const filtersConfig = [
 const tableFilters = { search, status };
 const { pagination, handleTableChange } = useTable("customers", tableFilters);
 
-// Load overdue accounts
+// Load overdue accounts. A cashier may read the list but not the overdue summary, so asking for it
+// anyway meant every page load of theirs answered with a refusal nobody acted on.
+const canSeeOverdue = computed(() => hasPermission("credits.overdue"));
+
 const loadOverdueAccounts = async () => {
+  if (!canSeeOverdue.value) {
+    return;
+  }
   overdueAccounts.value = await getOverdueAccounts();
 };
 
