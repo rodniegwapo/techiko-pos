@@ -155,6 +155,7 @@ export class SalesPage {
     /** Adds one unit via the catalog and returns the add-to-cart response. */
     async addProduct(name) {
         await this.search(name);
+        const before = await this.quantityOf(name).catch(() => 0);
         const added = this.waitForCart("POST", "/cart/add");
         // Not awaited when the add fails; swallow its rejection when the page closes.
         const refreshed = this.waitForCartRefresh().catch(() => null);
@@ -162,7 +163,11 @@ export class SalesPage {
         const response = await added;
         if (response.ok()) {
             await refreshed;
-            await expect(this.quantityButton(name)).toBeVisible();
+            // Wait for the line to show the new quantity, not merely to exist. Adding a product
+            // already in the cart leaves the line on screen throughout, and the refresh that
+            // repaints it can be beaten to the post by one the page fires on its own, so a caller
+            // that went on as soon as the line appeared could act on the quantity from before.
+            await expect(this.quantityButton(name)).toHaveText(String(before + 1));
         }
         return response;
     }
@@ -203,7 +208,12 @@ export class SalesPage {
         return this.page.getByRole("button", { name: `Edit ${name} quantity` });
     }
 
+    /** The quantity on the cart line, or 0 when the product isn't in the cart yet. */
     async quantityOf(name) {
+        if (! (await this.quantityButton(name).count())) {
+            return 0;
+        }
+
         return Number((await this.quantityButton(name).innerText()).trim());
     }
 
