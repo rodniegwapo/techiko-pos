@@ -7,18 +7,26 @@ use App\Models\InventoryLocation;
 
 class Helpers
 {
-    public static function getDateRange($startDate = null, $endDate = null)
+    /**
+     * The whole days between two dates, or null if either of them isn't a date.
+     *
+     * A date typed into the address bar by hand is not worth a server error, so an unreadable one
+     * gives no range and the caller simply doesn't narrow by it.
+     */
+    public static function getDateRange($startDate = null, $endDate = null): ?array
     {
-        $range = [
-            Carbon::parse($startDate)
-                ->startOfDay()
-                ->toDateTimeString(),
-            Carbon::parse($endDate)
-                ->endOfDay()
-                ->toDateTimeString(),
-        ];
-
-        return $range;
+        try {
+            return [
+                Carbon::parse($startDate)
+                    ->startOfDay()
+                    ->toDateTimeString(),
+                Carbon::parse($endDate)
+                    ->endOfDay()
+                    ->toDateTimeString(),
+            ];
+        } catch (\Exception $e) {
+            return null;
+        }
     }
 
     /**
