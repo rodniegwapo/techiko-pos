@@ -6,6 +6,7 @@ use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Services\UserHierarchyService;
 use App\Services\UserService;
+use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -28,12 +29,17 @@ class UserController extends Controller
         $users = $this->userService->getFilteredUsers($request, $currentUser);
         $roles = $this->userService->getManageableRoles($currentUser);
 
+        // An organization's admin can open this page too, and sees only their own organization's
+        // users, so the list of every organization (and the Domain filter and field it feeds) is
+        // for a super user alone.
+        $isSuperUser = $currentUser->isSuperUser();
+
         return Inertia::render('Users/Index', [
             'items' => UserResource::collection($users),
             'roles' => $roles,
             'hierarchy' => UserHierarchyService::getRoleHierarchy(),
-            'isGlobalView' => true,
-            'domains' => \App\Models\Domain::select('id', 'name', 'name_slug')->get(),
+            'isGlobalView' => $isSuperUser,
+            'domains' => $isSuperUser ? \App\Models\Domain::select('id', 'name', 'name_slug')->get() : [],
         ]);
     }
 
@@ -137,6 +143,36 @@ class UserController extends Controller
                 'message' => $e->getMessage()
             ], 400);
         }
+    }
+
+    /**
+     * Mark a user's email as verified.
+     *
+     * Accounts made on the Users page start unverified and are sent no verification email, so
+     * without this they can't get past the `verified` middleware.
+     */
+    public function verifyEmail(User $user)
+    {
+        // Like toggleStatus, this route carries no organization in its path, so the policy is what
+        // keeps one organization's admin from verifying another organization's staff.
+        $this->authorize('update', $user);
+
+        if ($user->hasVerifiedEmail()) {
+            return response()->json([
+                'success' => true,
+                'message' => "{$user->name}'s email is already verified",
+                'user' => new UserResource($user->load('roles')),
+            ]);
+        }
+
+        $user->markEmailAsVerified();
+        event(new Verified($user));
+
+        return response()->json([
+            'success' => true,
+            'message' => "{$user->name}'s email is now verified",
+            'user' => new UserResource($user->load('roles')),
+        ]);
     }
 
     /**

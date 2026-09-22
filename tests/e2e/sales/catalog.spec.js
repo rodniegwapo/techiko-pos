@@ -31,7 +31,8 @@ test.describe("Sales page access", () => {
         const api = await serverAs("mcCashier");
         const res = await api.get(salesUrl());
 
-        expect(new URL(res.url()).pathname, "should be redirected away").not.toBe(salesUrl());
+        // Opened directly, with no page to go back to, the refusal is a 403 (a redirect back could loop).
+        expect(res.status(), "refused").toBe(403);
     });
 });
 

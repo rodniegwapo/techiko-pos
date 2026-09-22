@@ -255,10 +255,11 @@ test.describe("Card terminals permissions", () => {
             api = await serverAs("worker-cashier");
         });
 
-        test("is redirected away from the page", async () => {
+        test("is refused the page", async () => {
             const res = await api.get(cardTypesUrl());
 
-            expect(new URL(res.url()).pathname).not.toBe(cardTypesUrl());
+            // Opened directly, with no page to go back to, the refusal is a 403 (a redirect back could loop).
+            expect(res.status()).toBe(403);
         });
 
         test("can list card types for checkout", async () => {

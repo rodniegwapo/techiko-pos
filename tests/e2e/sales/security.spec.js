@@ -27,7 +27,8 @@ test.describe("Sales permissions", () => {
         const api = await serverAs("worker-cashier");
         const res = await api.get(`/domains/${E2E.domain}/payment-card-types`);
 
-        expect(new URL(res.url()).pathname, "cashier should be redirected away").not.toBe(`/domains/${E2E.domain}/payment-card-types`);
+        // Opened directly, with no page to go back to, the refusal is a 403 (a redirect back could loop).
+        expect(res.status(), "cashier should be refused").toBe(403);
     });
 
     for (const account of ["admin", "manager"]) {

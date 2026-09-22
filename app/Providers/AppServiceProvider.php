@@ -2,7 +2,11 @@
 
 namespace App\Providers;
 
+use App\Http\Middleware\StartSessionUnlessRetired;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Contracts\Cache\Factory as CacheFactory;
+use Illuminate\Session\Middleware\StartSession;
+use Illuminate\Session\SessionManager;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -21,7 +25,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Every pipeline that starts a session resolves StartSession from the container — the web
+        // group, api-session and Sanctum's stateful /api requests alike — so this covers them all.
+        $this->app->singleton(StartSession::class, function ($app) {
+            return new StartSessionUnlessRetired($app->make(SessionManager::class), function () use ($app) {
+                return $app->make(CacheFactory::class);
+            });
+        });
     }
 
     /**
