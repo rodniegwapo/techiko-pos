@@ -44,6 +44,7 @@ class RolePermissionSeeder extends Seeder
             'users.destroy',
             'users.roles',
             'users.toggle-status',
+            'users.verify-email',
             'users.pin.update',
 
             // Sales
@@ -349,6 +350,7 @@ class RolePermissionSeeder extends Seeder
             'users.destroy',
             'users.roles',
             'users.toggle-status',
+            'users.verify-email',
             'users.pin.update',
 
             // Sales
