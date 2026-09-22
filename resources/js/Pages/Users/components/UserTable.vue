@@ -9,7 +9,7 @@ import {
     IconWorld,
     IconUserCheck,
     IconKey,
-    IconMailCheck,
+    IconShieldCheck,
 } from "@tabler/icons-vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { Modal, notification } from "ant-design-vue";
@@ -436,8 +436,8 @@ const handleVerify = (user) => {
     const userData = unwrapUser(user);
 
     Modal.confirm({
-        title: "Verify Email",
-        content: `Verify ${userData.name}'s email? They'll be able to sign in and use the app.`,
+        title: "Verify User",
+        content: "Verify this user? They'll be able to sign in and use the app.",
         okText: "Yes, Verify",
         okType: "primary",
         cancelText: "Cancel",
@@ -453,12 +453,12 @@ const handleVerify = (user) => {
                 });
                 emit("refresh");
             } catch (error) {
-                console.error("Verify email error:", error);
+                console.error("Verify user error:", error);
                 notification.error({
                     message: "Verification Failed",
                     description:
                         error.response?.data?.message ||
-                        "Failed to verify user's email",
+                        "Failed to verify user",
                 });
             } finally {
                 verifyLoading.value[userData.id] = false;
@@ -712,11 +712,11 @@ function onMobilePaginationChange(pageNum) {
                     <IconTooltipButton
                         v-if="canVerify(record)"
                         hover="group-hover:bg-teal-500"
-                        name="Verify Email"
+                        name="Verify User"
                         :loading="verifyLoading[(record.data || record).id]"
                         @click="handleVerify(record)"
                     >
-                        <IconMailCheck size="20" class="mx-auto" />
+                        <IconShieldCheck size="20" class="mx-auto" />
                     </IconTooltipButton>
 
                     <IconTooltipButton
@@ -876,9 +876,9 @@ function onMobilePaginationChange(pageNum) {
                                 @click="handleVerify(record)"
                             >
                                 <template #icon>
-                                    <IconMailCheck size="18" />
+                                    <IconShieldCheck size="18" />
                                 </template>
-                                Verify email
+                                Verify user
                             </a-button>
                             <a-button
                                 v-if="canSetPin(record)"

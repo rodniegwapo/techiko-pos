@@ -612,12 +612,14 @@ test.describe("Verifying a user", () => {
             const row = rowWith(page, email);
             await expect(row, "flagged as unverified").toContainText("Unverified");
 
-            await row.getByRole("button", { name: "Verify Email" }).click();
-            await page.locator(".ant-modal-confirm").getByRole("button", { name: "Yes, Verify" }).click();
+            await row.getByRole("button", { name: "Verify User" }).click();
+            const confirm = page.locator(".ant-modal-confirm");
+            await expect(confirm).toContainText("Verify this user? They'll be able to sign in and use the app.");
+            await confirm.getByRole("button", { name: "Yes, Verify" }).click();
 
-            await expect(notice(page, "User Verified")).toBeVisible();
+            await expect(notice(page, "User Verified")).toContainText("E2E Needs Verifying is now verified");
             await expect(row).not.toContainText("Unverified");
-            await expect(row.getByRole("button", { name: "Verify Email" }), "nothing left to verify").toHaveCount(0);
+            await expect(row.getByRole("button", { name: "Verify User" }), "nothing left to verify").toHaveCount(0);
             expect((await reread(page.request, user)).email_verified_at, "stored").toBeTruthy();
         });
 
@@ -628,7 +630,7 @@ test.describe("Verifying a user", () => {
             const row = rowWith(page, USERS.cashier.email);
             await expect(row).toHaveCount(1);
             await expect(row).not.toContainText("Unverified");
-            await expect(row.getByRole("button", { name: "Verify Email" })).toHaveCount(0);
+            await expect(row.getByRole("button", { name: "Verify User" })).toHaveCount(0);
         });
     });
 

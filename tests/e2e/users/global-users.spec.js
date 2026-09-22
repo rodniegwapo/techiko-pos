@@ -225,10 +225,12 @@ test.describe("Managing users across organizations (super user)", () => {
         await search(page, user.email);
         const row = rowWith(page, user.email);
 
-        await row.getByRole("button", { name: "Verify Email" }).click();
-        await page.locator(".ant-modal-confirm").getByRole("button", { name: "Yes, Verify" }).click();
+        await row.getByRole("button", { name: "Verify User" }).click();
+        const confirm = page.locator(".ant-modal-confirm");
+        await expect(confirm).toContainText("Verify this user?");
+        await confirm.getByRole("button", { name: "Yes, Verify" }).click();
 
-        await expect(notice(page, "User Verified")).toBeVisible();
+        await expect(notice(page, "User Verified")).toContainText(`${user.name} is now verified`);
         await expect(row).not.toContainText("Unverified");
         expect((await userWithEmail(page.request, user.email)).email_verified_at).toBeTruthy();
     });

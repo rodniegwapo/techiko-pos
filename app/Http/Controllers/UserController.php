@@ -160,7 +160,7 @@ class UserController extends Controller
         if ($user->hasVerifiedEmail()) {
             return response()->json([
                 'success' => true,
-                'message' => "{$user->name}'s email is already verified",
+                'message' => "{$user->name} is already verified",
                 'user' => new UserResource($user->load('roles')),
             ]);
         }
@@ -170,7 +170,7 @@ class UserController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => "{$user->name}'s email is now verified",
+            'message' => "{$user->name} is now verified",
             'user' => new UserResource($user->load('roles')),
         ]);
     }
