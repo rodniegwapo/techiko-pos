@@ -126,10 +126,13 @@ class PermissionController extends Controller
      */
     public function show(Permission $permission)
     {
-        $roles = $permission->roles()->with('users')->get();
+        // The page names the module the permission belongs to, and PermissionResource only sends
+        // it when the relation is loaded. Roles are counted, not listed: the page shows how many
+        // users each role has, so loading every one of them was both wrong and wasteful.
+        $roles = $permission->roles()->withCount('users')->get();
 
         return Inertia::render('Permissions/Show', [
-            'permission' => new PermissionResource($permission->load('roles')),
+            'permission' => new PermissionResource($permission->load('module', 'roles')),
             'roles' => $roles,
         ]);
     }
