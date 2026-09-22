@@ -6,6 +6,7 @@ use App\Models\CreditTransaction;
 use App\Models\Customer;
 use App\Models\Sale;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class CreditService
 {
@@ -116,12 +117,17 @@ class CreditService
      */
     public function checkCreditLimit(Customer $customer, float $amount): bool
     {
+        // Validation errors (422), not server errors: these are expected outcomes of a cashier's input.
         if (! $customer->credit_enabled) {
-            throw new \Exception('Credit is not enabled for this customer.');
+            throw ValidationException::withMessages([
+                'customer_id' => 'Credit is not enabled for this customer.',
+            ]);
         }
 
         if (! $customer->canPurchaseOnCredit($amount)) {
-            throw new \Exception('Credit limit exceeded. Available credit: '.number_format($customer->getAvailableCredit(), 2));
+            throw ValidationException::withMessages([
+                'customer_id' => 'Credit limit exceeded. Available credit: '.number_format($customer->getAvailableCredit(), 2),
+            ]);
         }
 
         return true;

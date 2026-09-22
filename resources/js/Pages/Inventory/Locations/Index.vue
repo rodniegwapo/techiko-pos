@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed } from "vue";
 import { usePage, router, Head } from "@inertiajs/vue3";
 import {
     PlusOutlined,
@@ -23,6 +23,7 @@ import { useHelpers } from "@/Composables/useHelpers";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useTable } from "@/Composables/useTable";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
+import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
@@ -34,14 +35,10 @@ import LocationInfoAlert from "@/Components/LocationInfoAlert.vue";
 
 const page = usePage();
 const isMdUp = useMediaQuery("(min-width: 768px)");
-const { showModal, showConfirm } = useHelpers();
+const { showModal, confirmDelete, showNotification } = useHelpers();
 const { spinning } = useGlobalVariables();
 const { getRoute } = useDomainRoutes();
-
-const search = ref("");
-const type = ref(null);
-const status = ref(null);
-const domain = ref(null);
+const { hasPermission } = usePermissionsV2();
 
 // Props from backend
 const props = defineProps({
@@ -52,15 +49,22 @@ const props = defineProps({
     isGlobalView: Boolean,
 });
 
-// Initialize filters from backend
-onMounted(() => {
-    if (props.filters) {
-        search.value = props.filters.search || "";
-        type.value = props.filters.type || null;
-        status.value = props.filters.status || null;
-        domain.value = props.filters.domain || null;
-    }
-});
+// Seeded from the URL's own filters. Assigning these after mount instead would look like the user
+// had just typed, and the reload that followed would cancel whatever request was in flight.
+const search = ref(props.filters?.search ?? "");
+const type = ref(props.filters?.type ?? null);
+const status = ref(props.filters?.status ?? null);
+const domain = ref(props.filters?.domain ?? null);
+
+// Actions a user without the permission can't complete, so they aren't offered.
+const canCreate = computed(() => hasPermission("inventory.locations.create"));
+const canEdit = computed(() => hasPermission("inventory.locations.edit"));
+const canDelete = computed(() => hasPermission("inventory.locations.destroy"));
+const canSetDefault = computed(() => hasPermission("inventory.locations.set-default"));
+const canToggleStatus = computed(() => hasPermission("inventory.locations.toggle-status"));
+const hasRowMenu = computed(
+    () => canSetDefault.value || canToggleStatus.value || canDelete.value,
+);
 
 // Fetch items
 const getItems = () => {
@@ -72,6 +76,8 @@ const getItems = () => {
             type: type.value || undefined,
             status: status.value || undefined,
             domain: domain.value || undefined,
+            // A new search or filter starts over; keeping the old page hides the matches.
+            page: 1,
         },
         onStart: () => (spinning.value = true),
         onFinish: () => (spinning.value = false),
@@ -183,26 +189,31 @@ const editLocation = (location) => {
 };
 
 const deleteLocation = (location) => {
-    showConfirm({
-        title: "Delete Location",
-        content: `Are you sure you want to delete "${location.name}"?`,
-        onOk: () => {
-            router.delete(getRoute("inventory.locations.destroy", { location: location.id }), {
-                onSuccess: () => {
-                    // Success handled by redirect
-                },
-            });
-        },
-    });
+    confirmDelete(
+        "inventory.locations.destroy",
+        { location: location.id },
+        `Are you sure you want to delete "${location.name}"?`
+    );
+};
+
+/** Says what happened; the message comes from the server when it sent one. */
+const reportResult = (reloaded, fallback) => {
+    const error = reloaded?.props?.flash?.error;
+    if (error) {
+        showNotification("error", "Error", error);
+        return;
+    }
+    showNotification("success", "Success", reloaded?.props?.flash?.success || fallback);
 };
 
 const setAsDefault = (location) => {
     router.post(
-        route("inventory.locations.set-default", location.id),
+        getRoute("inventory.locations.set-default", { location: location.id }),
         {},
         {
             preserveScroll: true,
-            onSuccess: () => {
+            onSuccess: (reloaded) => {
+                reportResult(reloaded, "Default location updated");
                 getItems();
             },
         }
@@ -211,11 +222,12 @@ const setAsDefault = (location) => {
 
 const toggleStatus = (location) => {
     router.post(
-        route("inventory.locations.toggle-status", location.id),
+        getRoute("inventory.locations.toggle-status", { location: location.id }),
         {},
         {
             preserveScroll: true,
-            onSuccess: () => {
+            onSuccess: (reloaded) => {
+                reportResult(reloaded, "Location status updated");
                 getItems();
             },
         }
@@ -305,6 +317,7 @@ function onMobilePaginationChange(pageNum) {
                     class="w-full min-w-0 md:max-w-[300px]"
                 />
                 <a-button
+                    v-if="canCreate"
                     type="primary"
                     @click="createLocation"
                     class="flex w-full items-center justify-center border border-green-500 bg-white text-green-500 md:inline-flex md:w-auto"
@@ -475,13 +488,14 @@ function onMobilePaginationChange(pageNum) {
                                 </IconTooltipButton>
 
                                 <IconTooltipButton
+                                    v-if="canEdit"
                                     name="Edit Location"
                                     @click="editLocation(record)"
                                 >
                                     <EditOutlined :size="20" class="mx-auto" />
                                 </IconTooltipButton>
 
-                                <a-dropdown>
+                                <a-dropdown v-if="hasRowMenu">
                                     <IconTooltipButton name="More Actions">
                                         <SettingOutlined
                                             :size="20"
@@ -491,13 +505,17 @@ function onMobilePaginationChange(pageNum) {
                                     <template #overlay>
                                         <a-menu>
                                             <a-menu-item
-                                                v-if="!record.is_default"
+                                                v-if="
+                                                    canSetDefault &&
+                                                    !record.is_default
+                                                "
                                                 key="default"
                                                 @click="setAsDefault(record)"
                                             >
                                                 Set as Default
                                             </a-menu-item>
                                             <a-menu-item
+                                                v-if="canToggleStatus"
                                                 key="toggle"
                                                 @click="toggleStatus(record)"
                                             >
@@ -507,8 +525,9 @@ function onMobilePaginationChange(pageNum) {
                                                         : "Activate"
                                                 }}
                                             </a-menu-item>
-                                            <a-menu-divider />
+                                            <a-menu-divider v-if="canDelete" />
                                             <a-menu-item
+                                                v-if="canDelete"
                                                 key="delete"
                                                 danger
                                                 :disabled="
@@ -697,6 +716,7 @@ function onMobilePaginationChange(pageNum) {
                                             View details
                                         </a-button>
                                         <a-button
+                                            v-if="canEdit"
                                             class="flex items-center justify-center gap-2"
                                             @click="editLocation(record)"
                                         >
@@ -706,7 +726,7 @@ function onMobilePaginationChange(pageNum) {
                                             Edit location
                                         </a-button>
                                         <a-button
-                                            v-if="!record.is_default"
+                                            v-if="canSetDefault && !record.is_default"
                                             class="flex items-center justify-center gap-2"
                                             @click="setAsDefault(record)"
                                         >
@@ -716,6 +736,7 @@ function onMobilePaginationChange(pageNum) {
                                             Set as default
                                         </a-button>
                                         <a-button
+                                            v-if="canToggleStatus"
                                             class="flex items-center justify-center gap-2"
                                             @click="toggleStatus(record)"
                                         >
@@ -726,6 +747,7 @@ function onMobilePaginationChange(pageNum) {
                                             }}
                                         </a-button>
                                         <a-button
+                                            v-if="canDelete"
                                             danger
                                             class="flex items-center justify-center gap-2"
                                             :disabled="

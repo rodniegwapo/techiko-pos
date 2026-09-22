@@ -7,12 +7,18 @@ import { IconTrash, IconEdit, IconWorld } from "@tabler/icons-vue";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
+import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 
 const emit = defineEmits(["handleTableChange"]);
 const { confirmDelete } = useHelpers();
 const { formData, openModal, isEdit, spinning } = useGlobalVariables();
 const { getRoute } = useDomainRoutes();
+const { hasPermission } = usePermissionsV2();
 const page = usePage();
+
+/** Only offer actions the server will allow for this user. */
+const canEdit = computed(() => hasPermission("categories.update"));
+const canDelete = computed(() => hasPermission("categories.destroy"));
 
 const isMdUp = useMediaQuery("(min-width: 768px)");
 
@@ -71,7 +77,8 @@ const handleDeleteCategory = (record) => {
 
 const handleClickEdit = (record) => {
   openModal.value = true;
-  formData.value = record;
+  // Edit a copy: binding the row itself would show unsaved typing in the table, even after Cancel.
+  formData.value = { ...record };
   isEdit.value = true;
 };
 
@@ -109,6 +116,7 @@ function onMobilePaginationChange(pageNum) {
       <template v-if="column.key == 'action'">
         <div class="flex items-center gap-2">
           <icon-tooltip-button
+            v-if="canEdit"
             hover="group-hover:bg-blue-500"
             name="Edit Category"
             @click="handleClickEdit(record)"
@@ -117,6 +125,7 @@ function onMobilePaginationChange(pageNum) {
           </icon-tooltip-button>
 
           <icon-tooltip-button
+            v-if="canDelete"
             hover="group-hover:bg-red-500"
             name="Delete Category"
             @click="handleDeleteCategory(record)"
@@ -168,9 +177,13 @@ function onMobilePaginationChange(pageNum) {
             </div>
           </div>
 
-          <div class="border-t border-gray-100 px-4 py-3">
+          <div
+            v-if="canEdit || canDelete"
+            class="border-t border-gray-100 px-4 py-3"
+          >
             <div class="grid grid-cols-2 gap-2">
               <a-button
+                v-if="canEdit"
                 class="flex items-center justify-center gap-2"
                 @click="handleClickEdit(record)"
               >
@@ -180,6 +193,7 @@ function onMobilePaginationChange(pageNum) {
                 Edit
               </a-button>
               <a-button
+                v-if="canDelete"
                 class="flex items-center justify-center gap-2"
                 danger
                 @click="handleDeleteCategory(record)"

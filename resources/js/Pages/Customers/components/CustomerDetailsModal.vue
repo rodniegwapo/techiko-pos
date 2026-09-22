@@ -109,7 +109,7 @@
             <div class="space-y-2">
               <div class="flex justify-between">
                 <span class="text-gray-600">Lifetime Spent:</span>
-                <span class="font-medium text-green-600">₱{{ (customer.lifetime_spent || 0).toLocaleString() }}</span>
+                <span class="font-medium text-green-600">{{ peso(customer.lifetime_spent) }}</span>
               </div>
               <div class="flex justify-between">
                 <span class="text-gray-600">Tier Achieved:</span>
@@ -212,6 +212,10 @@ const getTierColor = (tier) => {
   };
   return tierColors[tier] || tierColors.bronze;
 };
+
+// Spending arrives as a decimal string, which toLocaleString would hand back unformatted.
+const peso = (value) =>
+  `₱${Number(value ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 
 const formatDate = (date) => {
   if (!date) return null;

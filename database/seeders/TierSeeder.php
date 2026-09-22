@@ -82,12 +82,15 @@ class TierSeeder extends Seeder
             ],
         ];
 
-        foreach ($loyaltyTiers as $tier) {
-            LoyaltyTier::updateOrCreate(
-                ['name' => $tier['name']],
-                $tier
-            );
-            $this->command->line("  ✓ {$tier['display_name']} tier created/updated");
+        // Every organization runs its own program, so each gets its own set of tiers.
+        foreach (\App\Models\Domain::pluck('name_slug') as $domain) {
+            foreach ($loyaltyTiers as $tier) {
+                LoyaltyTier::updateOrCreate(
+                    ['domain' => $domain, 'name' => $tier['name']],
+                    $tier + ['domain' => $domain]
+                );
+            }
+            $this->command->line("  ✓ tiers created/updated for {$domain}");
         }
     }
 

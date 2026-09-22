@@ -6,7 +6,7 @@ import { IconArrowUp, IconArrowDown, IconEye, IconWorld } from "@tabler/icons-vu
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { useHelpers } from "@/Composables/useHelpers";
 
-const { formatDate, formatDateTime } = useHelpers();
+const { formatDateTime } = useHelpers();
 const page = usePage();
 const isMdUp = useMediaQuery("(min-width: 768px)");
 
@@ -94,10 +94,9 @@ const getMovementTypeColor = (type) => {
   return colors[type] || "default";
 };
 
-const getMovementTypeIcon = (type) => {
-  const increaseTypes = ["purchase", "adjustment", "transfer_in", "return"];
-  return increaseTypes.includes(type) ? IconArrowUp : IconArrowDown;
-};
+// By the actual change: an adjustment can go either way.
+const getMovementDirectionIcon = (change) =>
+  Number(change) > 0 ? IconArrowUp : IconArrowDown;
 
 const getMovementTypeDisplay = (record) =>
   record.movement?.movement_type_display || record.type;
@@ -158,7 +157,7 @@ function onMobilePaginationChange(pageNum) {
     <template #bodyCell="{ column, record }">
       <template v-if="column.key === 'date'">
         <div>
-          <p class="font-medium text-sm">{{ formatDate(record.date) }}</p>
+          <p class="font-medium text-sm">{{ formatDateTime(record.date) }}</p>
         </div>
       </template>
 
@@ -190,7 +189,7 @@ function onMobilePaginationChange(pageNum) {
         <div class="text-center">
           <a-tag class="w-fit" :color="getMovementTypeColor(record.type)">
             <component
-              :is="getMovementTypeIcon(record.type)"
+              :is="getMovementDirectionIcon(record.quantity_change)"
               :size="14"
               class="mr-1"
             />
@@ -267,7 +266,7 @@ function onMobilePaginationChange(pageNum) {
             </div>
             <a-tag class="m-0 w-fit" :color="getMovementTypeColor(record.type)">
               <component
-                :is="getMovementTypeIcon(record.type)"
+                :is="getMovementDirectionIcon(record.quantity_change)"
                 :size="14"
                 class="mr-1"
               />

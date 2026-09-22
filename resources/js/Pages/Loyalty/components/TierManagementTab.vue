@@ -14,8 +14,19 @@ import IconTooltip from "@/Components/buttons/IconTooltip.vue";
 import TierFormModal from "./TierFormModal.vue";
 import RefreshButton from "@/Components/buttons/Refresh.vue";
 import { IconEdit, IconTrash } from "@tabler/icons-vue";
+import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 
 const isMdUp = useMediaQuery("(min-width: 768px)");
+const { hasPermission } = usePermissionsV2();
+
+// Tiers are read-only for roles that may only look at the program.
+const canCreate = computed(() => hasPermission("loyalty.tiers.store"));
+const canEdit = computed(() => hasPermission("loyalty.tiers.update"));
+const canDelete = computed(() => hasPermission("loyalty.tiers.destroy"));
+
+// Thresholds arrive as decimal strings, which toLocaleString would hand back unformatted.
+const peso = (value) =>
+  `₱${Number(value ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
 // State
 const tiers = ref([]);
@@ -135,8 +146,6 @@ const editTier = (tier) => {
 };
 
 const deleteTier = (tier) => {
-  console.log("Attempting to delete tier:", tier);
-
   Modal.confirm({
     title: "Delete Tier",
     content: `Are you sure you want to delete the ${tier.display_name} tier? This action cannot be undone.`,
@@ -145,15 +154,15 @@ const deleteTier = (tier) => {
     cancelText: "Cancel",
     onOk: async () => {
       try {
-        console.log(`Deleting tier ID: ${tier.id}`);
-        const response = await axios.delete(`${getApiUrl("tiers")}/${tier.id}`);
-        console.log("Delete response:", response.data);
+        await axios.delete(`${getApiUrl("tiers")}/${tier.id}`);
+
+        // Wait for the list, so the tier is gone from it by the time we say it was deleted.
+        await loadTiers(pagination.value.current_page);
 
         notification.success({
           message: "Tier Deleted",
           description: `${tier.display_name} tier has been deleted successfully`,
         });
-        loadTiers(pagination.value.current_page);
       } catch (error) {
         console.error("Delete tier error:", error);
         console.error("Error response:", error.response);
@@ -186,6 +195,8 @@ const toggleTierStatus = async (tier, checked) => {
     }
 
     await axios.put(`${getApiUrl("tiers")}/${tier.id}`, {
+      // The whole tier is sent back, name included: the server requires it.
+      name: tier.name,
       display_name: tier.display_name,
       multiplier: tier.multiplier,
       spending_threshold: tier.spending_threshold,
@@ -223,36 +234,28 @@ const closeModal = () => {
 };
 
 const saveTier = async (tierData) => {
-  console.log("Saving tier data:", tierData);
-  console.log("Editing tier:", editingTier.value);
-
   savingTier.value = true;
   try {
-    let response;
-    if (editingTier.value) {
+    const isEdit = !! editingTier.value;
+    if (isEdit) {
       // Update existing tier
-      console.log(`Updating tier ID: ${editingTier.value.id}`);
-      response = await axios.put(
-        `${getApiUrl("tiers")}/${editingTier.value.id}`,
-        tierData
-      );
-      notification.success({
-        message: "Tier Updated",
-        description: `${tierData.display_name} tier has been updated successfully`,
-      });
+      await axios.put(`${getApiUrl("tiers")}/${editingTier.value.id}`, tierData);
     } else {
       // Create new tier
-      console.log("Creating new tier");
-      response = await axios.post(getApiUrl("tiers"), tierData);
-      notification.success({
-        message: "Tier Created",
-        description: `${tierData.display_name} tier has been created successfully`,
-      });
+      await axios.post(getApiUrl("tiers"), tierData);
     }
 
-    console.log("Save response:", response.data);
+    // Wait for the list before closing and saying it was saved, so the tier that was just written
+    // is on screen by the time the dialog gets out of the way.
+    await loadTiers(pagination.value.current_page);
+
     closeModal();
-    loadTiers(pagination.value.current_page);
+    notification.success({
+      message: isEdit ? "Tier Updated" : "Tier Created",
+      description: `${tierData.display_name} tier has been ${
+        isEdit ? "updated" : "created"
+      } successfully`,
+    });
   } catch (error) {
     console.error("Save tier error:", error);
     console.error("Error response:", error.response);
@@ -261,7 +264,6 @@ const saveTier = async (tierData) => {
     if (error.response?.data?.errors) {
       // Handle validation errors
       const errors = error.response.data.errors;
-      console.log("Validation errors:", errors);
       const firstError = Object.values(errors)[0];
       errorMessage = Array.isArray(firstError) ? firstError[0] : firstError;
     } else if (error.response?.data?.message) {
@@ -311,6 +313,7 @@ onMounted(() => {
         />
 
         <a-button
+          v-if="canCreate"
           @click="showAddTierModal = true"
           type="primary"
           class="flex w-full items-center justify-center border border-green-500 bg-white text-green-500 sm:w-auto"
@@ -350,14 +353,13 @@ onMounted(() => {
         </template>
 
         <template v-if="column.key === 'spending_threshold'">
-          <span class="font-medium"
-            >₱{{ record.spending_threshold?.toLocaleString() || 0 }}</span
-          >
+          <span class="font-medium">{{ peso(record.spending_threshold) }}</span>
         </template>
 
         <template v-if="column.key === 'is_active'">
           <a-switch
             :checked="record.is_active"
+            :disabled="!canEdit"
             @change="(checked) => toggleTierStatus(record, checked)"
             size="small"
           />
@@ -366,6 +368,7 @@ onMounted(() => {
         <template v-if="column.key === 'actions'">
           <a-space>
             <IconTooltip
+              v-if="canEdit"
               name="Edit Tier"
               hover="hover:bg-blue-500"
               @click="editTier(record)"
@@ -373,6 +376,7 @@ onMounted(() => {
               <IconEdit size="20" class="mx-auto" />
             </IconTooltip>
             <IconTooltip
+              v-if="canDelete"
               name="Delete Tier"
               hover="hover:bg-red-500"
               @click="deleteTier(record)"
@@ -413,6 +417,7 @@ onMounted(() => {
               </div>
               <a-switch
                 :checked="record.is_active"
+                :disabled="!canEdit"
                 size="small"
                 @change="(checked) => toggleTierStatus(record, checked)"
               />
@@ -424,7 +429,7 @@ onMounted(() => {
               >
                 <span class="text-gray-500">Threshold</span>
                 <span class="text-right font-semibold text-gray-900">
-                  ₱{{ record.spending_threshold?.toLocaleString() || 0 }}
+                  {{ peso(record.spending_threshold) }}
                 </span>
                 <span class="text-gray-500">Color</span>
                 <span class="text-right font-mono text-gray-900">
@@ -440,6 +445,7 @@ onMounted(() => {
             <div class="border-t border-gray-100 px-4 py-3">
               <div class="flex flex-col gap-2">
                 <a-button
+                  v-if="canEdit"
                   class="flex items-center justify-center gap-2"
                   @click="editTier(record)"
                 >
@@ -449,6 +455,7 @@ onMounted(() => {
                   Edit tier
                 </a-button>
                 <a-button
+                  v-if="canDelete"
                   danger
                   class="flex items-center justify-center gap-2"
                   @click="deleteTier(record)"

@@ -137,17 +137,18 @@ const getReasonDisplay = (reason) => {
   return reasons[reason] || reason?.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
 };
 
+// Decimal columns arrive as strings ("50.0000"), so they are added as numbers, not concatenated.
 const totalValueAdjusted = computed(() => {
   if (!displayAdjustment.value?.items) return 0;
   return displayAdjustment.value.items.reduce((sum, item) => {
-    return sum + (item.total_cost_change || 0);
+    return sum + (Number(item.total_cost_change) || 0);
   }, 0);
 });
 
 const totalQuantityAdjusted = computed(() => {
   if (!displayAdjustment.value?.items) return 0;
   return displayAdjustment.value.items.reduce((sum, item) => {
-    return sum + Math.abs(item.adjustment_quantity || 0);
+    return sum + Math.abs(Number(item.adjustment_quantity) || 0);
   }, 0);
 });
 </script>
@@ -213,15 +214,15 @@ const totalQuantityAdjusted = computed(() => {
           <div class="space-y-2">
             <div class="flex justify-between">
               <span class="text-gray-600">Location:</span>
-              <span class="font-semibold">{{ adjustment.location?.name || 'Unknown' }}</span>
+              <span class="font-semibold">{{ displayAdjustment.location?.name || 'Unknown' }}</span>
             </div>
             <div class="flex justify-between">
               <span class="text-gray-600">Created By:</span>
-              <span class="font-semibold">{{ adjustment.user?.name || 'System' }}</span>
+              <span class="font-semibold">{{ displayAdjustment.created_by?.name || 'System' }}</span>
             </div>
-            <div v-if="adjustment.approved_by_user" class="flex justify-between">
+            <div v-if="displayAdjustment.approved_by?.name" class="flex justify-between">
               <span class="text-gray-600">Approved By:</span>
-              <span class="font-semibold">{{ adjustment.approved_by_user.name }}</span>
+              <span class="font-semibold">{{ displayAdjustment.approved_by.name }}</span>
             </div>
           </div>
         </div>
@@ -258,7 +259,9 @@ const totalQuantityAdjusted = computed(() => {
         <div class="bg-gray-50 p-4 rounded-lg space-y-2 border">
           <div v-if="displayAdjustment.reason">
             <p class="text-sm text-gray-600">Reason:</p>
-            <p class="font-semibold">{{ getReasonDisplay(displayAdjustment.reason) }}</p>
+            <p class="font-semibold">
+              {{ displayAdjustment.reason_display || getReasonDisplay(displayAdjustment.reason) }}
+            </p>
           </div>
           <div v-if="displayAdjustment.notes">
             <p class="text-sm text-gray-600">Notes:</p>

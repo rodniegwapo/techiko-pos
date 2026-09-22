@@ -41,8 +41,8 @@ Route::middleware(['auth:sanctum', 'user.permission'])->group(function () {
      * Global API Routes (non-domain specific)
      * -----------------------
      */
-    // Global Dashboard API routes
-    Route::prefix('dashboard')->name('dashboard.')->group(function () {
+    // Global Dashboard API routes (all organizations' data: super users only)
+    Route::prefix('dashboard')->name('dashboard.')->middleware('check.super.user')->group(function () {
         Route::post('/sales-chart', [\App\Http\Controllers\DashboardController::class, 'getSalesChartData'])->name('sales-chart');
     });
     

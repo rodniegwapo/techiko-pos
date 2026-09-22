@@ -19,15 +19,24 @@ class StockAdjustmentController extends Controller
 {
     public function __construct(private InventoryService $inventoryService) {}
 
+    /** 1–100 per page; anything else (missing, 0, "abc") falls back to 20. */
+    private function perPage(Request $request): int
+    {
+        $perPage = filter_var($request->input('per_page'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) ?: 20;
+
+        return min($perPage, 100);
+    }
+
     /**
      * List adjustments scoped to domain
      */
     public function index(Request $request, Domain $domain)
     {
         $location = Helpers::getActiveLocation($domain, $request->input('location_id'));
+        $perPage = $this->perPage($request);
 
         if (! $location) {
-            $empty = new LengthAwarePaginator([], 0, $request->per_page ?? 20);
+            $empty = new LengthAwarePaginator([], 0, $perPage);
 
             return Inertia::render('Inventory/StockAdjustments/Index', [
                 'adjustments' => StockAdjustmentResource::collection($empty),
@@ -52,7 +61,7 @@ class StockAdjustmentController extends Controller
             ->when($request->input('date_to'), fn ($q, $d) => $q->whereDate('created_at', '<=', $d))
             ->orderBy('created_at', 'desc');
 
-        $adjustments = $query->paginate($request->per_page ?? 20);
+        $adjustments = $query->paginate($perPage);
 
         return Inertia::render('Inventory/StockAdjustments/Index', [
             'adjustments' => StockAdjustmentResource::collection($adjustments),
@@ -95,13 +104,17 @@ class StockAdjustmentController extends Controller
         $adjustment->load(['location', 'createdBy', 'approvedBy', 'items.product']);
 
         if ($request->expectsJson() || $request->is('api/*')) {
-            return response()->json(['success' => true, 'adjustment' => $adjustment]);
+            return response()->json([
+                'success' => true,
+                'adjustment' => new StockAdjustmentResource($adjustment),
+            ]);
         }
 
-        return Inertia::render('Inventory/StockAdjustments/Show', [
-            'adjustment' => $adjustment,
-            'currentDomain' => $domain,
-            'isGlobalView' => false,
+        // Adjustments are read on the list's details dialog; there is no standalone page.
+        return redirect()->route('domains.inventory.adjustments.index', [
+            'domain' => $domain->name_slug,
+            'location_id' => $adjustment->location_id,
+            'search' => $adjustment->adjustment_number,
         ]);
     }
 
@@ -159,17 +172,17 @@ class StockAdjustmentController extends Controller
         return response()->json(['success' => true, 'message' => 'Stock adjustment updated successfully']);
     }
 
-    public function destroy(Domain $domain, StockAdjustment $adjustment)
+    public function destroy(Request $request, Domain $domain, StockAdjustment $adjustment)
     {
         if ($adjustment->location->domain !== $domain->name_slug) {
             abort(403, 'Adjustment does not belong to this domain');
         }
         if ($adjustment->status !== 'draft') {
-            return response()->json(['success' => false, 'message' => 'Only draft adjustments can be deleted'], 400);
+            return $this->respond($request, false, 'Only draft adjustments can be deleted', 400);
         }
         $adjustment->delete();
 
-        return response()->json(['success' => true, 'message' => 'Stock adjustment deleted successfully']);
+        return $this->respond($request, true, 'Stock adjustment deleted successfully');
     }
 
     public function submitForApproval(Request $request, Domain $domain, StockAdjustment $adjustment)
@@ -177,9 +190,14 @@ class StockAdjustmentController extends Controller
         if ($adjustment->location->domain !== $domain->name_slug) {
             abort(403, 'Adjustment does not belong to this domain');
         }
-        $adjustment->submitForApproval();
 
-        return response()->json(['success' => true, 'message' => 'Stock adjustment submitted for approval']);
+        try {
+            $adjustment->submitForApproval();
+        } catch (\Exception $e) {
+            return $this->respond($request, false, 'Failed to submit for approval: '.$e->getMessage(), 400);
+        }
+
+        return $this->respond($request, true, 'Stock adjustment submitted for approval');
     }
 
     public function approve(Request $request, Domain $domain, StockAdjustment $adjustment)
@@ -187,9 +205,14 @@ class StockAdjustmentController extends Controller
         if ($adjustment->location->domain !== $domain->name_slug) {
             abort(403, 'Adjustment does not belong to this domain');
         }
-        $adjustment->approve(auth()->user());
 
-        return response()->json(['success' => true, 'message' => 'Stock adjustment approved and processed']);
+        try {
+            $adjustment->approve(auth()->user());
+        } catch (\Exception $e) {
+            return $this->respond($request, false, 'Failed to approve adjustment: '.$e->getMessage(), 400);
+        }
+
+        return $this->respond($request, true, 'Stock adjustment approved and processed');
     }
 
     public function reject(Request $request, Domain $domain, StockAdjustment $adjustment)
@@ -197,9 +220,27 @@ class StockAdjustmentController extends Controller
         if ($adjustment->location->domain !== $domain->name_slug) {
             abort(403, 'Adjustment does not belong to this domain');
         }
-        $adjustment->reject();
 
-        return response()->json(['success' => true, 'message' => 'Stock adjustment rejected']);
+        try {
+            $adjustment->reject();
+        } catch (\Exception $e) {
+            return $this->respond($request, false, 'Failed to reject adjustment: '.$e->getMessage(), 400);
+        }
+
+        return $this->respond($request, true, 'Stock adjustment rejected');
+    }
+
+    /**
+     * These actions are called both from the page (Inertia, which needs a redirect it can follow)
+     * and as plain JSON from axios, so the answer follows what the caller asked for.
+     */
+    private function respond(Request $request, bool $success, string $message, int $status = 200)
+    {
+        if ($request->expectsJson() || $request->is('api/*')) {
+            return response()->json(['success' => $success, 'message' => $message], $status);
+        }
+
+        return redirect()->back()->with($success ? 'success' : 'error', $message);
     }
 
     public function getProductsForAdjustment(Request $request, Domain $domain)

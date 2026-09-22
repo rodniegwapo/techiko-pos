@@ -39,6 +39,11 @@ const props = defineProps({
         type: Number,
         default: null,
     },
+    /** Business date being viewed; new entries default to it. */
+    businessDate: {
+        type: String,
+        default: null,
+    },
 });
 
 const { getRoute } = useDomainRoutes();
@@ -323,7 +328,8 @@ function openModal(options = {}) {
     entryForm.amount = null;
     entryForm.kind = kind;
     resetDrawFields();
-    entryForm.movement_date = new Date().toISOString().slice(0, 10);
+    // Default to the business date on screen, so entries land on the day being reviewed.
+    entryForm.movement_date = props.businessDate || todayYmd;
     entryForm.notes = "";
     modalTitle.value = title;
     modalVisible.value = true;
@@ -399,13 +405,20 @@ function submitEntry() {
         buildStorePayload(),
         {
             preserveScroll: true,
+            // Keep the dialog mounted on validation errors so the manager can correct the entry.
+            preserveState: true,
             onSuccess: () => {
                 submitting.value = false;
                 modalVisible.value = false;
                 antMessage.success("Ledger entry saved.");
             },
-            onError: () => {
+            onError: (errors) => {
                 submitting.value = false;
+                const first = Object.values(errors ?? {})[0];
+                antMessage.error(
+                    (Array.isArray(first) ? first[0] : first) ||
+                        "Could not save the ledger entry.",
+                );
             },
             onFinish: () => {
                 submitting.value = false;

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\DiscountResource;
 use App\Models\Product\Discount;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class DiscountController extends Controller
@@ -39,20 +40,16 @@ class DiscountController extends Controller
 
         Discount::create($data);
 
-        return redirect()->back();
+        return redirect()->back()->with('success', 'Discount created successfully');
     }
 
     public function update(Request $request, $domain, $discount)
     {
+        $discountModel = $this->findInRouteDomain($request, $discount);
+
         $data = $this->validatedData($request);
         if ($slug = $request->route('domain')) {
             $data['domain'] = $slug;
-        }
-
-        // Manually resolve the discount model
-        $discountModel = Discount::find($discount);
-        if (! $discountModel) {
-            return redirect()->back()->with('error', 'Discount not found');
         }
 
         $discountModel->update($data);
@@ -62,30 +59,35 @@ class DiscountController extends Controller
 
     public function destroy(Request $request, $domain, $discount)
     {
-        logger('DiscountController destroy called');
-        logger('Request route parameters:', $request->route()->parameters());
-        logger('Domain parameter:', ['domain' => $domain]);
-        logger('Discount parameter type:', ['type' => gettype($discount)]);
-        logger('Discount parameter value:', ['value' => $discount]);
-
-        // Manually resolve the discount model
-        $discountModel = Discount::find($discount);
-        if (! $discountModel) {
-            return redirect()->back()->with('error', 'Discount not found');
-        }
+        $discountModel = $this->findInRouteDomain($request, $discount);
 
         $discountModel->delete();
 
         return redirect()->back()->with('success', 'Discount deleted successfully');
     }
 
+    /**
+     * The discount by ID, limited to the organization in the URL (404 otherwise). Without this, an
+     * admin of one organization could edit (and take over) or delete another organization's discount.
+     */
+    private function findInRouteDomain(Request $request, $discountId): Discount
+    {
+        return Discount::query()
+            ->when($request->route('domain'), fn ($q, $slug) => $q->where('domain', $slug))
+            ->findOrFail($discountId);
+    }
+
     private function validatedData(Request $request)
     {
+        $isPercentage = in_array($request->input('type'), ['percentage', 'percent'], true);
+
         $rules = [
             'name' => 'string|max:200|required',
-            'type' => 'string|in:amount,percentage|required',
-            'value' => 'numeric|required',
-            'min_order_amount' => 'numeric|nullable',
+            // 'percent' is the older spelling still used by existing discounts.
+            'type' => ['required', 'string', Rule::in(['amount', 'percentage', 'percent'])],
+            // A discount can't add to the price, and a percentage can't take off more than 100%.
+            'value' => array_filter(['required', 'numeric', 'min:0', $isPercentage ? 'max:100' : null]),
+            'min_order_amount' => 'numeric|nullable|min:0',
             'scope' => 'string|in:order,product|required',
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|required_with:start_date|after:start_date',
@@ -96,6 +98,14 @@ class DiscountController extends Controller
             $rules['domain'] = 'required|string|exists:domains,name_slug';
         }
 
-        return $request->validate($rules);
+        $data = $request->validate($rules, [
+            'value.max' => 'A percentage discount can\'t be more than 100%.',
+        ]);
+
+        if (($data['type'] ?? null) === 'percent') {
+            $data['type'] = 'percentage';
+        }
+
+        return $data;
     }
 }

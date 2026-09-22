@@ -62,7 +62,7 @@
           <div class="font-medium text-lg">{{ record.total_purchases || 0 }}</div>
           <div class="text-sm text-gray-500">purchases</div>
           <div class="text-sm font-medium text-green-600 mt-1">
-            ₱{{ (record.lifetime_spent || 0).toLocaleString() }}
+            {{ peso(record.lifetime_spent) }}
           </div>
         </div>
       </template>
@@ -324,6 +324,10 @@ const getAvatarColor = (name) => {
   const index = name.charCodeAt(0) % colors.length;
   return colors[index];
 };
+
+// Spending arrives as a decimal string, which toLocaleString would hand back unformatted.
+const peso = (value) =>
+  `₱${Number(value ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
 const getTierColor = (tier) => {
   const tierColors = {

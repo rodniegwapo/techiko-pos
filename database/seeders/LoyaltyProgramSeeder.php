@@ -14,7 +14,7 @@ class LoyaltyProgramSeeder extends Seeder
     {
         $domains = Domain::pluck('name_slug')->all();
 
-        // Seed global loyalty tiers once (table enforces unique name)
+        // Each organization runs its own program, so each gets its own set of tiers.
         $tiers = [
             ['name' => 'bronze',   'display_name' => 'Bronze',   'multiplier' => 1.00, 'spending_threshold' => 0,     'sort_order' => 1],
             ['name' => 'silver',   'display_name' => 'Silver',   'multiplier' => 1.25, 'spending_threshold' => 20000, 'sort_order' => 2],
@@ -22,24 +22,26 @@ class LoyaltyProgramSeeder extends Seeder
             ['name' => 'platinum', 'display_name' => 'Platinum', 'multiplier' => 2.00, 'spending_threshold' => 100000, 'sort_order' => 4],
         ];
 
-        foreach ($tiers as $t) {
-            LoyaltyTier::updateOrCreate(
-                ['name' => $t['name']],
-                [
-                    'display_name' => $t['display_name'],
-                    'multiplier' => $t['multiplier'],
-                    'spending_threshold' => $t['spending_threshold'],
-                    'color' => match ($t['name']) {
-                        'bronze' => '#CD7F32',
-                        'silver' => '#C0C0C0',
-                        'gold' => '#FFD700',
-                        default => '#E5E4E2',
-                    },
-                    'description' => $t['display_name'].' loyalty tier',
-                    'sort_order' => $t['sort_order'],
-                    'is_active' => true,
-                ]
-            );
+        foreach ($domains as $slug) {
+            foreach ($tiers as $t) {
+                LoyaltyTier::updateOrCreate(
+                    ['domain' => $slug, 'name' => $t['name']],
+                    [
+                        'display_name' => $t['display_name'],
+                        'multiplier' => $t['multiplier'],
+                        'spending_threshold' => $t['spending_threshold'],
+                        'color' => match ($t['name']) {
+                            'bronze' => '#CD7F32',
+                            'silver' => '#C0C0C0',
+                            'gold' => '#FFD700',
+                            default => '#E5E4E2',
+                        },
+                        'description' => $t['display_name'].' loyalty tier',
+                        'sort_order' => $t['sort_order'],
+                        'is_active' => true,
+                    ]
+                );
+            }
         }
 
         // Seed sample customers per domain

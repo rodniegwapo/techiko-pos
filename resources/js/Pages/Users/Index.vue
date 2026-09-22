@@ -39,6 +39,10 @@ const props = defineProps({
     hierarchy: Object,
     domains: Array,
     isGlobalView: Boolean,
+    filters: {
+        type: Object,
+        default: () => ({}),
+    },
     subscription: {
         type: Object,
         default: null,
@@ -49,11 +53,11 @@ const usersAtCapacity = computed(
     () => !!props.subscription && props.subscription.users_at_capacity === true,
 );
 
-// Filter state
-const search = ref("");
-const role = ref(null);
-const domain = ref(null);
-const status = ref(null);
+// Filter state, seeded from the URL's own filters so the boxes show what the list is filtered by.
+const search = ref(props.filters?.search ?? "");
+const role = ref(props.filters?.role ?? null);
+const domain = ref(props.filters?.domain ?? null);
+const status = ref(props.filters?.status ?? null);
 
 // Modal state
 const selectedUser = ref(null);
@@ -167,17 +171,10 @@ const filtersConfig = computed(() => {
     return baseConfig;
 });
 
-// Table composable
-const tableFilters = computed(() => {
-    const baseFilters = { search, role, status };
-
-    // Add domain filter if in global view
-    if (props.isGlobalView) {
-        baseFilters.domain = domain;
-    }
-
-    return baseFilters;
-});
+// Table composable. useTable walks this object's entries itself, so it has to be a plain object of
+// refs — handing it a computed made it read the computed's own internals and paging threw instead
+// of asking the server for the next page. `domain` is only ever set in the global view.
+const tableFilters = { search, role, status, domain };
 const { pagination, handleTableChange } = useTable("items", tableFilters);
 
 // Methods
@@ -226,11 +223,6 @@ const handleUserUpdated = (updatedUser) => {
     // Refresh the user list to show updated data
     getItems();
 };
-
-// Debug - log the items data (remove in production)
-// console.log("Users data:", props.items);
-// console.log("Roles data:", props.roles);
-// console.log("Hierarchy data:", props.hierarchy);
 
 // Hierarchy helper methods
 const getRoleColor = (level) => {
@@ -356,6 +348,7 @@ const getRoleColorHex = (level) => {
                     @edit="handleEditUser"
                     @view="handleViewUser"
                     @set-pin="handleSetPin"
+                    @refresh="getItems"
                 />
             </template>
         </ContentLayout>

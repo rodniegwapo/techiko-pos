@@ -11,6 +11,7 @@ class MandatoryDiscountController extends Controller
 {
     public function index(Request $request)
     {
+        $this->ensureGlobalAccess($request);
         $domainSlug = $request->route('domain');
 
         $data = MandatoryDiscount::query()
@@ -30,6 +31,7 @@ class MandatoryDiscountController extends Controller
 
     public function store(Request $request)
     {
+        $this->ensureGlobalAccess($request);
         $data = $this->validatedData($request);
         if ($slug = $request->route('domain')) {
             $data['domain'] = $slug;
@@ -37,20 +39,16 @@ class MandatoryDiscountController extends Controller
 
         MandatoryDiscount::create($data);
 
-        return redirect()->back();
+        return redirect()->back()->with('success', 'Mandatory discount created successfully');
     }
 
-    public function update(Request $request, $domain, $mandatoryDiscount)
+    public function update(Request $request)
     {
+        $mandatoryDiscountModel = $this->findInRouteDomain($request);
+
         $data = $this->validatedData($request);
         if ($slug = $request->route('domain')) {
             $data['domain'] = $slug;
-        }
-
-        // Manually resolve the mandatory discount model
-        $mandatoryDiscountModel = MandatoryDiscount::find($mandatoryDiscount);
-        if (!$mandatoryDiscountModel) {
-            return redirect()->back()->with('error', 'Mandatory discount not found');
         }
 
         $mandatoryDiscountModel->update($data);
@@ -58,17 +56,35 @@ class MandatoryDiscountController extends Controller
         return redirect()->back()->with('success', 'Mandatory discount updated successfully');
     }
 
-    public function destroy(Request $request, $domain, $mandatoryDiscount)
+    public function destroy(Request $request)
     {
-        // Manually resolve the mandatory discount model
-        $mandatoryDiscountModel = MandatoryDiscount::find($mandatoryDiscount);
-        if (!$mandatoryDiscountModel) {
-            return redirect()->back()->with('error', 'Mandatory discount not found');
-        }
-
-        $mandatoryDiscountModel->delete();
+        $this->findInRouteDomain($request)->delete();
 
         return redirect()->back()->with('success', 'Mandatory discount deleted successfully');
+    }
+
+    /**
+     * The routes outside an organization (/mandatory-discounts) cover every organization, so only
+     * super users may use them. Otherwise an organization admin could list, create, edit or delete
+     * other organizations' mandatory discounts there.
+     */
+    private function ensureGlobalAccess(Request $request): void
+    {
+        if (! $request->route('domain') && ! $request->user()?->isSuperUser()) {
+            abort(403);
+        }
+    }
+
+    /**
+     * The mandatory discount from the URL, limited to the URL's organization (404 otherwise).
+     */
+    private function findInRouteDomain(Request $request): MandatoryDiscount
+    {
+        $this->ensureGlobalAccess($request);
+
+        return MandatoryDiscount::query()
+            ->when($request->route('domain'), fn ($q, $slug) => $q->where('domain', $slug))
+            ->findOrFail($request->route('mandatory_discount'));
     }
 
     private function validatedData(Request $request)
@@ -76,7 +92,14 @@ class MandatoryDiscountController extends Controller
         $rules = [
             'name' => 'string|max:200|required',
             'type' => 'string|in:amount,percentage|required',
-            'value' => 'numeric|required|min:0',
+            // A discount can't add to the price, a percentage can't take off more than 100%, and
+            // the column holds at most 99,999,999.99.
+            'value' => array_filter([
+                'required',
+                'numeric',
+                'min:0',
+                $request->input('type') === 'percentage' ? 'max:100' : 'max:99999999.99',
+            ]),
             'is_active' => 'boolean'
         ];
 
@@ -85,6 +108,10 @@ class MandatoryDiscountController extends Controller
             $rules['domain'] = 'required|string|exists:domains,name_slug';
         }
 
-        return $request->validate($rules);
+        return $request->validate($rules, [
+            'value.max' => $request->input('type') === 'percentage'
+                ? 'A percentage discount can\'t be more than 100%.'
+                : 'The value can\'t be more than 99,999,999.99.',
+        ]);
     }
 }

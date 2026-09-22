@@ -7,9 +7,33 @@ use App\Models\Domain;
 use App\Models\Sale;
 use App\Services\SaleDiscountService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class SaleDiscountController extends Controller
 {
+    /**
+     * Order discount rules: discounts must belong to this organization, and only one mandatory
+     * discount (PWD, Senior, …) is allowed per transaction (see MANDATORY_DISCOUNT_POLICY.md).
+     */
+    private function orderDiscountRules(Domain $domain, string $regularKey): array
+    {
+        return [
+            $regularKey => 'sometimes|array',
+            "{$regularKey}.*" => ['integer', Rule::exists('discounts', 'id')->where('domain', $domain->name_slug)],
+            'mandatory_discount_ids' => 'sometimes|array|max:1',
+            'mandatory_discount_ids.*' => ['integer', Rule::exists('mandatory_discounts', 'id')->where('domain', $domain->name_slug)],
+        ];
+    }
+
+    private function orderDiscountMessages(string $regularKey): array
+    {
+        return [
+            'mandatory_discount_ids.max' => 'Only one mandatory discount can be applied per transaction.',
+            "{$regularKey}.*.exists" => 'The selected discount is not available for this organization.',
+            'mandatory_discount_ids.*.exists' => 'The selected mandatory discount is not available for this organization.',
+        ];
+    }
+
     /**
      * Get sale-specific discount state
      */
@@ -42,12 +66,10 @@ class SaleDiscountController extends Controller
      */
     public function updateSaleDiscounts(Request $request, Domain $domain, Sale $sale)
     {
-        $validated = $request->validate([
-            'regular_discount_ids' => 'array',
-            'regular_discount_ids.*' => 'exists:discounts,id',
-            'mandatory_discount_ids' => 'array',
-            'mandatory_discount_ids.*' => 'exists:mandatory_discounts,id'
-        ]);
+        $validated = $request->validate(
+            $this->orderDiscountRules($domain, 'regular_discount_ids'),
+            $this->orderDiscountMessages('regular_discount_ids'),
+        );
 
         try {
             $saleDiscountService = app(\App\Services\SaleDiscountService::class);
@@ -98,12 +120,10 @@ class SaleDiscountController extends Controller
      */
     public function applyOrderDiscount(Request $request, Domain $domain, Sale $sale, SaleDiscountService $discountService)
     {
-        $validated = $request->validate([
-            'discount_ids' => 'sometimes|array',
-            'discount_ids.*' => 'integer|exists:discounts,id',
-            'mandatory_discount_ids' => 'sometimes|array',
-            'mandatory_discount_ids.*' => 'integer|exists:mandatory_discounts,id',
-        ]);
+        $validated = $request->validate(
+            $this->orderDiscountRules($domain, 'discount_ids'),
+            $this->orderDiscountMessages('discount_ids'),
+        );
 
         // Ensure at least one discount type is provided
         if (empty($validated['discount_ids']) && empty($validated['mandatory_discount_ids'])) {
@@ -166,7 +186,17 @@ class SaleDiscountController extends Controller
     public function applyItemDiscount(Request $request, Domain $domain, Sale $sale, $saleItem)
     {
         $validated = $request->validate([
-            'discount_id' => 'required|integer|exists:discounts,id',
+            'discount_id' => [
+                'required',
+                'integer',
+                // Item discounts must be this organization's, and not order-wide promotions.
+                Rule::exists('discounts', 'id')
+                    ->where('domain', $domain->name_slug)
+                    ->where('is_active', true)
+                    ->whereNot('scope', 'order'),
+            ],
+        ], [
+            'discount_id.exists' => 'Select an active product discount.',
         ]);
 
         try {

@@ -9,7 +9,7 @@ import {
     IconTrash,
 } from "@tabler/icons-vue";
 import axios from "axios";
-import { notification } from "ant-design-vue";
+import { Modal, notification } from "ant-design-vue";
 
 import ContentLayout from "@/Components/ContentLayout.vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
@@ -204,10 +204,22 @@ async function save() {
 
 const deletingId = ref(null);
 
+function confirmRemove(row) {
+    Modal.confirm({
+        title: `Remove "${row.name}"?`,
+        content:
+            "Card types used on past sales can't be deleted; they will be deactivated instead.",
+        okText: "Remove",
+        okType: "danger",
+        cancelText: "Cancel",
+        onOk: () => remove(row),
+    });
+}
+
 async function remove(row) {
     deletingId.value = row.id;
     try {
-        await axios.delete(
+        const { data } = await axios.delete(
             getRoute("payment-card-types.destroy", {
                 paymentCardType: row.id,
             }),
@@ -217,7 +229,8 @@ async function remove(row) {
                 },
             },
         );
-        notification.success({ message: "Done." });
+        // The server says whether it deleted the type or only deactivated it (used on past sales).
+        notification.success({ message: data?.message || "Card type removed." });
         router.reload({
             only: [
                 "cardTypes",
@@ -419,7 +432,7 @@ const showMobileSecondaryActions = computed(
                                                 :loading="
                                                     deletingId === record.id
                                                 "
-                                                @click="remove(record)"
+                                                @click="confirmRemove(record)"
                                             >
                                                 <IconTrash
                                                     size="20"
@@ -535,7 +548,9 @@ const showMobileSecondaryActions = computed(
                                                                 record.id
                                                             "
                                                             @click="
-                                                                remove(record)
+                                                                confirmRemove(
+                                                                    record,
+                                                                )
                                                             "
                                                         >
                                                             <template #icon>

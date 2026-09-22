@@ -384,8 +384,6 @@ const rules = computed(() => ({
 watch(
     () => props.user,
     async (newUser) => {
-        console.log("User prop changed:", newUser, "isEdit:", props.isEdit);
-
         if (newUser && props.isEdit) {
             // Handle data wrapping from resources
             const userData = newUser.data || newUser;
@@ -400,15 +398,8 @@ watch(
                 domain: userData.domain || null,
             });
 
-            console.log("Form assigned for edit:", form);
-            console.log("User supervisor_id:", userData.supervisor_id);
-            console.log("User supervisor:", userData.supervisor);
-            console.log("User domain:", userData.domain);
-            console.log("assignLabel:", assignLabel.value);
-
             // Fetch available supervisors for the current role when editing
             if (form.role_id && assignLabel.value) {
-                console.log("Fetching supervisors for edit mode");
                 await fetchAvailableSupervisors();
             }
         } else {
@@ -431,21 +422,8 @@ watch(
 watch(
     () => props.visible,
     async (isVisible) => {
-        console.log(
-            "Modal visibility changed:",
-            isVisible,
-            "isEdit:",
-            props.isEdit,
-            "user:",
-            props.user
-        );
-
         if (isVisible && props.isEdit && props.user) {
-            const userData = props.user.data || props.user;
-            console.log("Modal opened for edit, user data:", userData);
-
             if (form.role_id && assignLabel.value) {
-                console.log("Fetching supervisors for modal edit");
                 await fetchAvailableSupervisors();
             }
         }
@@ -468,10 +446,8 @@ watch(
 // Watch for domain changes to refresh supervisor options
 watch(
     () => form.domain,
-    (newDomain, oldDomain) => {
-        console.log("Domain changed from", oldDomain, "to", newDomain);
+    (newDomain) => {
         if (newDomain && form.role_id && assignLabel.value) {
-            console.log("Domain changed, refreshing supervisors for domain:", newDomain);
             fetchAvailableSupervisors();
         }
     }
@@ -484,7 +460,6 @@ const onRoleChange = () => {
 };
 
 const onDomainChange = () => {
-    console.log("Domain change handler triggered, new domain:", form.domain);
     // Reset supervisor when domain changes
     form.supervisor_id = null;
     // Clear available supervisors to force refresh
@@ -493,11 +468,9 @@ const onDomainChange = () => {
 
 const fetchAvailableSupervisors = async () => {
     if (!selectedRole.value) {
-        console.log("No selected role, skipping supervisor fetch");
         return;
     }
 
-    console.log("Fetching supervisors for role:", selectedRole.value.name);
     loadingSupervisors.value = true;
 
     try {
@@ -506,11 +479,8 @@ const fetchAvailableSupervisors = async () => {
             params: { role: selectedRole.value.name, cascading: true },
         });
 
-        console.log("Supervisors API response:", response.data);
-
         if (response.data?.supervisors) {
             supervisorUsers.value = response.data.supervisors;
-            console.log("supervisorUsers:", response.data.supervisors);
             availableSupervisors.value = response.data.supervisors.map(
                 (user) => ({
                     label: user.name,
@@ -518,17 +488,10 @@ const fetchAvailableSupervisors = async () => {
                     role: user.roles?.[0]?.name || "No Role",
                 })
             );
-            console.log(
-                "availableSupervisors mapped:",
-                availableSupervisors.value
-            );
         } else {
-            console.log("No supervisors found in response");
             availableSupervisors.value = [];
         }
     } catch (error) {
-        console.error("Error fetching supervisors:", error);
-        console.error("Error details:", error.response?.data);
         availableSupervisors.value = [];
     } finally {
         loadingSupervisors.value = false;
@@ -560,8 +523,14 @@ const getSupervisorRoleName = (userId) => {
 };
 
 const handleSave = async () => {
+    // The form marks its own fields; a notification on top of that says nothing extra.
     try {
         await formRef.value.validate();
+    } catch {
+        return;
+    }
+
+    try {
         saving.value = true;
 
         const userData = {
@@ -582,8 +551,6 @@ const handleSave = async () => {
             userData.password_confirmation = form.password_confirmation;
         }
 
-        console.log("Saving user data:", userData);
-
         if (props.isEdit && editingUserData.value) {
             await axios.put(userUpdateUrl(editingUserData.value.id), userData);
             notification.success({
@@ -600,8 +567,7 @@ const handleSave = async () => {
 
         emit("saved");
     } catch (error) {
-        console.error("Save user error:", error);
-
+        // The failure is explained in the notification below; nothing to log.
         let errorMessage = "Failed to save user";
         if (error.response?.data?.errors) {
             const errors = error.response.data.errors;

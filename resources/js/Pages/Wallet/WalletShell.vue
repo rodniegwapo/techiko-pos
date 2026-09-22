@@ -19,6 +19,11 @@ const { formattedTotal } = useHelpers();
 const page = usePage();
 const todayYmd = new Date().toISOString().slice(0, 10);
 
+/** The server rejects future business dates, so don't offer them in the picker. */
+function isFutureBusinessDate(current) {
+    return !!current && current.format("YYYY-MM-DD") > todayYmd;
+}
+
 /** @param {string} url */
 function queryObjectFromPageUrl(url) {
     if (!url || typeof url !== "string") {
@@ -193,8 +198,10 @@ function syncCashControlExpandedToPage() {
     cashControlExpanded.value = true;
 }
 
+// Watch whether a ledger exists, not the ledger object itself: every save reloads the page with a
+// new ledger object, which would otherwise collapse the panel the manager is working in.
 watch(
-    [() => props.isMoneyMovementPage, () => props.ledger],
+    [() => props.isMoneyMovementPage, () => !!props.ledger],
     () => {
         syncCashControlExpandedToPage();
     },
@@ -283,10 +290,18 @@ const disableSaveOpeningCashButton = computed(
         isCashInputNullOrZero(cashControlForm.value.opening_cash),
 );
 
+/** Treat null/empty/non-finite as missing; zero is a real count (an empty drawer). */
+function isCashInputMissing(value) {
+    if (value === null || value === undefined || value === "") {
+        return true;
+    }
+    return !Number.isFinite(Number(value));
+}
+
 const disableSaveCountedCashButton = computed(
     () =>
         isShiftClosed.value ||
-        isCashInputNullOrZero(cashControlForm.value.counted_cash),
+        isCashInputMissing(cashControlForm.value.counted_cash),
 );
 
 const canCashOutOnEndShift = computed(() => {
@@ -619,10 +634,11 @@ async function reopenShift() {
                                 class="flex flex-col gap-2 sm:flex-row sm:items-stretch"
                             >
                                 <a-date-picker
-                                    v-model="cashControlForm.business_date"
-                                    type="date"
-                                    :max="todayYmd"
-                                    class="w-full min-w-0 rounded border border-gray-300 px-2 text-sm"
+                                    v-model:value="cashControlForm.business_date"
+                                    value-format="YYYY-MM-DD"
+                                    :allow-clear="false"
+                                    :disabled-date="isFutureBusinessDate"
+                                    class="w-full min-w-0 text-sm"
                                 />
                                 <a-button
                                     class="shrink-0 sm:self-end"

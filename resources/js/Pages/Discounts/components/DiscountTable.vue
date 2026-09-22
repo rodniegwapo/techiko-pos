@@ -11,13 +11,19 @@ import {
 } from "@tabler/icons-vue";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
+import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 import dayjs from "dayjs";
 
 const emit = defineEmits(["handleTableChange", "selectedDiscount"]);
 const { confirmDelete, formattedTotal, formattedPercent } = useHelpers();
 const { formData, openModal, isEdit, spinning, openViewModal } =
     useGlobalVariables();
+const { hasPermission } = usePermissionsV2();
 const page = usePage();
+
+/** Only offer actions the server will allow for this user. */
+const canEdit = computed(() => hasPermission("products.discounts.update"));
+const canDelete = computed(() => hasPermission("products.discounts.destroy"));
 
 const isMdUp = useMediaQuery("(min-width: 768px)");
 
@@ -35,7 +41,7 @@ const showSuperUserDomain = computed(
 const columns = computed(() => {
     const baseColumns = [
         {
-            title: "Dicount Name",
+            title: "Discount Name",
             dataIndex: "name",
             key: "name",
             align: "left",
@@ -100,12 +106,24 @@ const handleDelete = (record) => {
 const handleClickEdit = (record) => {
     formData.value = {
         ...record,
-        start_date: dayjs(record.start_date),
-        end_date: dayjs(record.end_date),
+        // 'percent' is the older spelling; the form's radio uses 'percentage'.
+        type: isAmount(record) ? "amount" : "percentage",
+        // dayjs(null) is an invalid date that the form would send back as "Invalid Date".
+        start_date: record.start_date ? dayjs(record.start_date) : null,
+        end_date: record.end_date ? dayjs(record.end_date) : null,
     };
     isEdit.value = true;
     openModal.value = true;
 };
+
+/** Types are stored lowercase ('amount', 'percentage' or the older 'percent'). */
+function isAmount(record) {
+    return String(record.type).toLowerCase() === "amount";
+}
+
+function formatDateCell(value) {
+    return value ? dayjs(value).format("MMM DD YYYY hh:mm:ss a") : "—";
+}
 
 const handleViewDetail = (record) => {
     openViewModal.value = true;
@@ -113,17 +131,14 @@ const handleViewDetail = (record) => {
 };
 
 function discountValueLabel(record) {
-    if (record.type === "Amount") {
+    if (isAmount(record)) {
         return formattedTotal(record.value);
     }
     return formattedPercent(record.value);
 }
 
 function discountTypeLabel(record) {
-    if (record.type === "Amount") {
-        return "Amount";
-    }
-    return "Percentage";
+    return isAmount(record) ? "Amount" : "Percentage";
 }
 
 function formatMobileDate(iso) {
@@ -166,16 +181,21 @@ function onMobilePaginationChange(pageNum) {
                 {{ discountValueLabel(record) }}
             </template>
 
+            <template v-if="column.key == 'type'">
+                {{ discountTypeLabel(record) }}
+            </template>
+
             <template v-if="column.key == 'start_date'">
-                {{ dayjs(record.start_date).format("MMM DD YYYY hh:mm:ss a") }}
+                {{ formatDateCell(record.start_date) }}
             </template>
             <template v-if="column.key == 'end_date'">
-                {{ dayjs(record.end_date).format("MMM DD YYYY hh:mm:ss a") }}
+                {{ formatDateCell(record.end_date) }}
             </template>
 
             <template v-if="column.key == 'action'">
                 <div class="flex items-center gap-2">
                     <icon-tooltip-button
+                        v-if="canEdit"
                         hover="group-hover:bg-blue-500"
                         name="Edit Discount"
                         @click="handleClickEdit(record)"
@@ -184,6 +204,7 @@ function onMobilePaginationChange(pageNum) {
                     </icon-tooltip-button>
 
                     <icon-tooltip-button
+                        v-if="canDelete"
                         hover="group-hover:bg-red-500"
                         name="Delete Discount"
                         @click="handleDelete(record)"
@@ -273,8 +294,12 @@ function onMobilePaginationChange(pageNum) {
                                 </template>
                                 View discount
                             </a-button>
-                            <div class="grid grid-cols-2 gap-2">
+                            <div
+                                v-if="canEdit || canDelete"
+                                class="grid grid-cols-2 gap-2"
+                            >
                                 <a-button
+                                    v-if="canEdit"
                                     class="flex items-center justify-center gap-2"
                                     @click="handleClickEdit(record)"
                                 >
@@ -284,6 +309,7 @@ function onMobilePaginationChange(pageNum) {
                                     Edit
                                 </a-button>
                                 <a-button
+                                    v-if="canDelete"
                                     class="flex items-center justify-center gap-2"
                                     danger
                                     @click="handleDelete(record)"

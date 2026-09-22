@@ -56,19 +56,21 @@ class LoyaltyTier extends Model
         return $query->orderBy('sort_order');
     }
 
-    // Get tier for a specific spending amount
-    public static function getTierForSpending($amount)
+    // Get tier for a specific spending amount, within the organization that runs the program
+    public static function getTierForSpending($amount, ?string $domain = null)
     {
         return static::active()
+            ->when($domain, fn ($query) => $query->forDomain($domain))
             ->where('spending_threshold', '<=', $amount)
             ->orderBy('spending_threshold', 'desc')
             ->first();
     }
 
     // Get all active tiers as array for frontend
-    public static function getActiveTiersArray()
+    public static function getActiveTiersArray(?string $domain = null)
     {
         return static::active()
+            ->when($domain, fn ($query) => $query->forDomain($domain))
             ->ordered()
             ->get()
             ->map(function ($tier) {

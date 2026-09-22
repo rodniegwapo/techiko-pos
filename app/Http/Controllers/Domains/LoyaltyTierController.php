@@ -7,6 +7,7 @@ use App\Http\Resources\LoyaltyTierResource;
 use App\Models\Domain;
 use App\Models\LoyaltyTier;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class LoyaltyTierController extends Controller
@@ -49,7 +50,11 @@ class LoyaltyTierController extends Controller
     public function store(Request $request, Domain $domain)
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:loyalty_tiers,name',
+            // Unique within this organization: another organization may have its own "gold" tier.
+            'name' => [
+                'required', 'string', 'max:255',
+                Rule::unique('loyalty_tiers', 'name')->where('domain', $domain->name_slug),
+            ],
             'display_name' => 'required|string|max:255',
             'multiplier' => 'required|numeric|min:0.1|max:10',
             'spending_threshold' => 'required|numeric|min:0',
@@ -94,7 +99,10 @@ class LoyaltyTierController extends Controller
         }
 
         $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:loyalty_tiers,name,' . $tier->id,
+            'name' => [
+                'required', 'string', 'max:255',
+                Rule::unique('loyalty_tiers', 'name')->where('domain', $domain->name_slug)->ignore($tier->id),
+            ],
             'display_name' => 'required|string|max:255',
             'multiplier' => 'required|numeric|min:0.1|max:10',
             'spending_threshold' => 'required|numeric|min:0',

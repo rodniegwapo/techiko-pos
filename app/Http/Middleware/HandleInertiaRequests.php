@@ -101,8 +101,14 @@ class HandleInertiaRequests extends Middleware
             return null;
         }
 
-        // Use the centralized helper function
-        return Helpers::getActiveLocation($domain, $request->input('location_id'));
+        // Inertia shares props before route middleware runs, so RoleBasedAccessControl hasn't
+        // pinned location_id yet. Apply the same restriction here, or a restricted user asking for
+        // ?location_id=<other store> would be shown that store while seeing their own store's data.
+        $locationId = $user->hasLocationRestriction()
+            ? $user->getEffectiveLocationId($request->input('location_id'))
+            : $request->input('location_id');
+
+        return Helpers::getActiveLocation($domain, $locationId);
     }
 
     /**

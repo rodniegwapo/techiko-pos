@@ -30,6 +30,7 @@ defineProps({
       :class="['bg-gray-400', hover]"
       :loading="loading"
       :disabled="disabled"
+      :aria-label="name"
       type="primary"
     >
       <template #icon>

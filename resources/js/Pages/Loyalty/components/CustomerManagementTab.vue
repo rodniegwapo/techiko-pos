@@ -84,7 +84,12 @@ const getApiUrl = (endpoint) => {
 };
 
 // Methods
+// Answers can come back out of order (the tab's first load against a search typed right after it),
+// so only the newest request is allowed to fill the table.
+let latestRequest = 0;
+
 const loadCustomers = async (page = 1) => {
+  const request = ++latestRequest;
   loading.value = true;
   try {
     const params = new URLSearchParams();
@@ -94,6 +99,9 @@ const loadCustomers = async (page = 1) => {
     params.append("per_page", pagination.value.per_page);
 
     const response = await axios.get(`${getApiUrl("customers")}?${params}`);
+    if (request !== latestRequest) {
+      return;
+    }
     customers.value = response.data.data.map((customer) => {
       const tierInfo = customer.tier_info || getTierInfo(customer.tier);
       return {
@@ -154,15 +162,21 @@ const handlePointsAdjustment = async (adjustmentData) => {
       adjustmentData
     );
 
+    const member = selectedCustomer.value.name;
+
+    // The list is what shows the new balance, so wait for it before saying the points were
+    // adjusted and letting go of the dialog. The dialog also reads the member's balance for its
+    // "maximum deductible", so one opened again on the old figures would cap a deduction at a
+    // maximum that no longer applies.
+    await loadCustomers(pagination.value.current_page);
+
+    showPointsModal.value = false;
     notification.success({
       message: "Points Adjusted",
-      description: `${selectedCustomer.value.name}'s points have been ${
+      description: `${member}'s points have been ${
         adjustmentData.type === "add" ? "added" : "deducted"
       }`,
     });
-
-    showPointsModal.value = false;
-    loadCustomers(pagination.value.current_page);
   } catch (error) {
     notification.error({
       message: "Adjustment Failed",
@@ -182,6 +196,10 @@ const getTierColor = (tier) => {
   };
   return tierColors[tier] || tierColors.bronze;
 };
+
+// Spending arrives as a decimal string, which toLocaleString would hand back unformatted.
+const peso = (value) =>
+  `₱${Number(value ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
 const handleTableChange = (paginationInfo) => {
   loadCustomers(paginationInfo.current);
@@ -290,9 +308,7 @@ onMounted(() => {
 
         <template v-if="column.key === 'spending'">
           <div class="text-right">
-            <div class="font-medium">
-              ₱{{ record.lifetime_spent?.toLocaleString() || 0 }}
-            </div>
+            <div class="font-medium">{{ peso(record.lifetime_spent) }}</div>
             <div class="text-xs text-gray-500">lifetime</div>
           </div>
         </template>
@@ -361,7 +377,7 @@ onMounted(() => {
                 </span>
                 <span class="text-gray-500">Spending</span>
                 <span class="text-right font-semibold text-green-600">
-                  ₱{{ record.lifetime_spent?.toLocaleString() || 0 }}
+                  {{ peso(record.lifetime_spent) }}
                 </span>
               </div>
             </div>

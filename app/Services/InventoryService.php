@@ -436,6 +436,23 @@ class InventoryService
      */
     public function getLowStockProducts(?InventoryLocation $location = null, ?string $domain = null): Collection
     {
+        if ($location) {
+            // The store's assortment, low by the store's own reorder level when it has one, and not
+            // out of stock (counted separately), matching the dashboard's Low Stock count.
+            return $this->queryTrackedProductsAssignedToLocation($location, $domain)
+                ->get()
+                ->filter(fn (Product $product) => $product->getStockStatus($location) === 'low_stock')
+                ->map(function (Product $product) use ($location) {
+                    $inventory = $product->inventories->firstWhere('location_id', $location->id);
+                    $product->current_stock = $inventory->quantity_available;
+                    $product->min_stock_level = $inventory->getEffectiveReorderLevel();
+
+                    return $product;
+                })
+                ->sortBy('current_stock')
+                ->values();
+        }
+
         $query = Product::tracked()
             ->lowStock($location)
             ->with(['inventories' => function ($query) use ($location) {

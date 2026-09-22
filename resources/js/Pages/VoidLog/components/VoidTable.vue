@@ -5,6 +5,7 @@ import { useMediaQuery } from "@vueuse/core";
 import { IconEye, IconTrash } from "@tabler/icons-vue";
 import dayjs from "dayjs";
 
+import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 
@@ -61,6 +62,9 @@ const columns = computed(() => [
         },
       ]
     : []),
+  // Why a line was struck off is the substance of a void log, and it is only written in the
+  // details panel — which, until this column existed, nothing on a wide screen could open.
+  { title: "Actions", key: "actions", align: "center", width: "1%" },
 ]);
 
 const dataSource = computed(
@@ -122,6 +126,15 @@ function onMobilePaginationChange(pageNum) {
       </template>
       <template v-if="column.key == 'domain'">
         {{ record?.domain || "N/A" }}
+      </template>
+      <template v-if="column.key == 'actions'">
+        <IconTooltipButton
+          hover="group-hover:bg-blue-500"
+          name="View Details"
+          @click="showDetails(record)"
+        >
+          <IconEye size="20" class="mx-auto" />
+        </IconTooltipButton>
       </template>
     </template>
 
@@ -217,7 +230,7 @@ function onMobilePaginationChange(pageNum) {
   </div>
 
   <a-modal
-    v-model:open="detailsModalVisible"
+    v-model:visible="detailsModalVisible"
     title="Void log details"
     :footer="null"
     width="min(480px, 100vw)"

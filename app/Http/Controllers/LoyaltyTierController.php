@@ -7,16 +7,35 @@ use App\Models\LoyaltyTier;
 use App\Models\Customer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class LoyaltyTierController extends Controller
 {
+    /** A tier belongs to one organization, and only that organization's people may touch it. */
+    private function ensureTierAccessible(Request $request, LoyaltyTier $tier): void
+    {
+        $user = $request->user();
+
+        if ($user->isSuperUser()) {
+            return;
+        }
+
+        if (empty($user->domain) || $tier->domain !== $user->domain) {
+            abort(403, 'This tier belongs to another organization.');
+        }
+    }
+
     /**
      * Display a listing of the resource.
      */
     public function index(Request $request)
     {
+        $user = $request->user();
+
         $query = LoyaltyTier::query()
+            // Tiers belong to an organization; only a super user looks across all of them.
+            ->when(! $user->isSuperUser(), fn ($q) => $q->forDomain($user->domain))
             ->when($request->input('search'), function ($query, $search) {
                 return $query->search($search);
             })
@@ -48,8 +67,14 @@ class LoyaltyTierController extends Controller
      */
     public function store(Request $request)
     {
+        $domain = $request->user()->domain;
+
         $validated = $request->validate([
-            'name' => 'required|string|unique:loyalty_tiers,name',
+            // Unique within the organization: another organization may have a tier of the same name.
+            'name' => [
+                'required', 'string',
+                Rule::unique('loyalty_tiers', 'name')->where('domain', $domain),
+            ],
             'display_name' => 'required|string',
             'multiplier' => 'required|numeric|min:1|max:10',
             'spending_threshold' => 'required|numeric|min:0',
@@ -61,6 +86,7 @@ class LoyaltyTierController extends Controller
 
         // Set default value for is_active if not provided
         $validated['is_active'] = $validated['is_active'] ?? true;
+        $validated['domain'] = $domain;
 
         $tier = LoyaltyTier::create($validated);
         return response()->json($tier, 201);
@@ -69,8 +95,10 @@ class LoyaltyTierController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(LoyaltyTier $tier)
+    public function show(Request $request, LoyaltyTier $tier)
     {
+        $this->ensureTierAccessible($request, $tier);
+
         return response()->json($tier);
     }
 
@@ -79,6 +107,8 @@ class LoyaltyTierController extends Controller
      */
     public function update(Request $request, LoyaltyTier $tier)
     {
+        $this->ensureTierAccessible($request, $tier);
+
         $validated = $request->validate([
             'display_name' => 'sometimes|required|string',
             'multiplier' => 'sometimes|required|numeric|min:1|max:10',
@@ -91,10 +121,10 @@ class LoyaltyTierController extends Controller
 
         $oldThreshold = $tier->spending_threshold;
         $tier->update($validated);
-        
+
         // If spending threshold changed, recalculate customer tiers
         if (isset($validated['spending_threshold']) && $oldThreshold != $validated['spending_threshold']) {
-            $this->recalculateCustomerTiers();
+            $this->recalculateCustomerTiers($tier->domain);
         }
         
         return response()->json($tier->fresh());
@@ -103,10 +133,14 @@ class LoyaltyTierController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(LoyaltyTier $tier)
+    public function destroy(Request $request, LoyaltyTier $tier)
     {
+        $this->ensureTierAccessible($request, $tier);
+
         // Don't allow deleting if customers are using this tier
-        $customerCount = Customer::where('tier', $tier->name)->count();
+        $customerCount = Customer::where('tier', $tier->name)
+            ->where('domain', $tier->domain)
+            ->count();
         
         if ($customerCount > 0) {
             return response()->json([
@@ -121,10 +155,13 @@ class LoyaltyTierController extends Controller
     /**
      * Recalculate all customer tiers based on new thresholds
      */
-    private function recalculateCustomerTiers()
+    private function recalculateCustomerTiers(?string $domain = null)
     {
-        $customers = Customer::whereNotNull('lifetime_spent')->get();
-        
+        // Only the organization whose thresholds moved; other organizations keep their own.
+        $customers = Customer::whereNotNull('lifetime_spent')
+            ->when($domain, fn ($query) => $query->where('domain', $domain))
+            ->get();
+
         foreach ($customers as $customer) {
             $customer->updateTierBasedOnSpending();
         }

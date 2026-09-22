@@ -155,7 +155,8 @@ class InventoryController extends Controller
         return Inertia::render('Inventory/Movements', [
             'movements' => InventoryMovementResource::collection($movements),
             'locations' => InventoryLocation::active()->get(),
-            'products' => Product::select('id', 'name', 'SKU')->get(),
+            // No products: the page has no product filter to fill, and here it was every product
+            // of every organization on the installation (see the domain controller).
             'domains' => Domain::select('id', 'name', 'name_slug')->get(),
             'movementTypes' => $this->getMovementTypes(),
             'filters' => $request->only(['search', 'location_id', 'product_id', 'movement_type', 'date_from', 'date_to']),

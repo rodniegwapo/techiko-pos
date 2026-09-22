@@ -61,6 +61,9 @@ const handleSave = async () => {
     const roleData = {
       name: form.name,
       description: form.description,
+      // The hierarchy level is required by the server and is on the form above; leaving it out
+      // of what was sent made every attempt to add a role fail, with nothing on screen to say why.
+      level: form.level,
       permissions: form.permissions,
     };
 
@@ -74,11 +77,14 @@ const handleSave = async () => {
           description: `Role "${roleData.name}" has been created successfully`,
         });
       },
+      // Say what the server objected to. Sending the reader to look for errors on the form only
+      // helps when the field at fault is one the form shows.
       onError: (errors) => {
-        console.error("Save role error:", errors);
         notification.error({
           message: "Save Failed",
-          description: "Failed to create role. Please check the form for errors.",
+          description:
+            Object.values(errors ?? {})[0] ||
+            "Failed to create role. Please check the form for errors.",
         });
       },
       onFinish: () => {

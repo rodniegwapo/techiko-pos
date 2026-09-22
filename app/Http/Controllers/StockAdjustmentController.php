@@ -107,8 +107,16 @@ class StockAdjustmentController extends Controller
      */
     public function index(Request $request)
     {
+        $user = auth()->user();
+
         $query = StockAdjustment::with(['location', 'createdBy', 'approvedBy'])
             ->withCount('items')
+            // Only super users see across organizations; everyone else sees their own.
+            ->when(! $user->is_super_user, function ($query) use ($user) {
+                return empty($user->domain)
+                    ? $query->whereRaw('1 = 0')
+                    : $query->whereHas('location', fn ($lq) => $lq->forDomain($user->domain));
+            })
             ->when($request->input('search'), function ($query, $search) {
                 return $query->search($search);
             })
@@ -133,8 +141,8 @@ class StockAdjustmentController extends Controller
 
         return Inertia::render('Inventory/StockAdjustments/Index', [
             'adjustments' => StockAdjustmentResource::collection($adjustments),
-            'locations' => InventoryLocation::active()->get(),
-            'domains' => Domain::select('id', 'name', 'name_slug')->get(),
+            'locations' => $this->adjustmentFormLocations(),
+            'domains' => $this->adjustmentFormDomains(),
             'statuses' => [
                 'draft' => 'Draft',
                 'pending_approval' => 'Pending Approval',
@@ -143,7 +151,8 @@ class StockAdjustmentController extends Controller
             ],
             'reasons' => static::adjustmentReasons(),
             'filters' => $request->only(['search', 'status', 'location_id', 'date_from', 'date_to', 'domain']),
-            'isGlobalView' => true,
+            // The organization column and filter only make sense when more than one is visible.
+            'isGlobalView' => $this->isGlobalAdjustmentForm(),
         ]);
     }
 
@@ -252,13 +261,14 @@ class StockAdjustmentController extends Controller
             if ($request->expectsJson() || $request->is('api/*')) {
                 return response()->json([
                     'success' => true,
-                    'adjustment' => $adjustment,
+                    'adjustment' => new StockAdjustmentResource($adjustment),
                 ]);
             }
 
-            // Return Inertia render for web requests
-            return Inertia::render('Inventory/StockAdjustments/Show', [
-                'adjustment' => $adjustment,
+            // Adjustments are read on the list's details dialog; there is no standalone page.
+            return redirect()->route('inventory.adjustments.index', [
+                'location_id' => $adjustment->location_id,
+                'search' => $adjustment->adjustment_number,
             ]);
         } catch (\Exception $e) {
             \Log::error('Error in StockAdjustmentController@show: '.$e->getMessage(), [

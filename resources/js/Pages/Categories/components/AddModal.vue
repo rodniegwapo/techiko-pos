@@ -1,38 +1,41 @@
 <script setup>
-import { ref, computed } from "vue";
+import { computed, watch } from "vue";
 import { useMediaQuery } from "@vueuse/core";
 import PrimaryButton from "@/Components/PrimaryButton.vue";
-import { useEmits } from "@/Composables/useEmits";
 import { router } from "@inertiajs/vue3";
 import { useTable } from "@/Composables/useTable";
 import { usePage } from "@inertiajs/vue3";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
+import { validationMessage } from "@/Composables/useValidationMessage.js";
 
 const { spinning } = useTable();
 const page = usePage();
-const { formData, openModal, isEdit } = useGlobalVariables();
+// `errors` is the shared bag inertiaProgressLifecyle fills on validation failure.
+const { formData, openModal, isEdit, errors } = useGlobalVariables();
 const { inertiaProgressLifecyle } = useHelpers();
 const { getRoute } = useDomainRoutes();
 
-const props = defineProps({
-    visible: {
-        type: Boolean,
-        default: false,
-    },
-});
+const isMdUp = useMediaQuery("(min-width: 768px)");
+const modalWidth = computed(() => (isMdUp.value ? 520 : "calc(100vw - 24px)"));
+const modalRootStyle = computed(() =>
+    isMdUp.value ? {} : { maxWidth: "100vw", top: "12px", paddingBottom: 0 },
+);
 
-const { emitClose, emitEvent } = useEmits();
+// Start each open with no leftover errors from a previous attempt.
+watch(openModal, (open) => {
+    if (open) {
+        errors.value = {};
+    }
+});
 
 const domainOptions = computed(() => {
     const list = Array.isArray(page?.props?.domains) ? page.props.domains : [];
     return list.map((item) => ({ label: item.name, value: item.name_slug }));
 });
 
-const errors = ref({});
 const handleSave = () => {
-    console.log("current route", getRoute("categories.store"));
     router.post(
         getRoute("categories.store"),
         formData.value,
@@ -62,39 +65,39 @@ const handleUpdate = () => {
         :maskClosable="false"
     >
         <a-form layout="vertical">
-            <a-form-item 
-                label="Name" 
-                :validate-status="errors.name ? 'error' : ''"
-                :help="errors.name || ''"
+            <a-form-item
+                label="Name"
+                :validate-status="validationMessage(errors, 'name') ? 'error' : ''"
+                :help="validationMessage(errors, 'name')"
             >
-                <a-input 
-                    v-model:value="formData.name" 
+                <a-input
+                    v-model:value="formData.name"
                     placeholder="Enter category name"
                     size="large"
                 />
             </a-form-item>
-            
-            <a-form-item 
-                label="Description" 
-                :validate-status="errors.description ? 'error' : ''"
-                :help="errors.description || ''"
+
+            <a-form-item
+                label="Description"
+                :validate-status="validationMessage(errors, 'description') ? 'error' : ''"
+                :help="validationMessage(errors, 'description')"
             >
-                <a-textarea 
-                    v-model:value="formData.description" 
+                <a-textarea
+                    v-model:value="formData.description"
                     placeholder="Enter category description"
                     :rows="4"
                     size="large"
                 />
             </a-form-item>
-            
+
             <!-- Domain field for global view -->
-            <a-form-item 
+            <a-form-item
                 v-if="page.props.isGlobalView"
-                label="Domain" 
-                :validate-status="errors.domain ? 'error' : ''"
-                :help="errors.domain || ''"
+                label="Domain"
+                :validate-status="validationMessage(errors, 'domain') ? 'error' : ''"
+                :help="validationMessage(errors, 'domain')"
             >
-                <a-select 
+                <a-select
                     v-model:value="formData.domain"
                     :options="domainOptions"
                     placeholder="Select domain"
@@ -102,7 +105,7 @@ const handleUpdate = () => {
                 />
             </a-form-item>
         </a-form>
-        
+
         <template #footer>
             <a-button @click="openModal = false">Cancel</a-button>
 
