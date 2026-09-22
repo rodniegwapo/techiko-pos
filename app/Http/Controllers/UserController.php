@@ -29,12 +29,17 @@ class UserController extends Controller
         $users = $this->userService->getFilteredUsers($request, $currentUser);
         $roles = $this->userService->getManageableRoles($currentUser);
 
+        // An organization's admin can open this page too, and sees only their own organization's
+        // users, so the list of every organization (and the Domain filter and field it feeds) is
+        // for a super user alone.
+        $isSuperUser = $currentUser->isSuperUser();
+
         return Inertia::render('Users/Index', [
             'items' => UserResource::collection($users),
             'roles' => $roles,
             'hierarchy' => UserHierarchyService::getRoleHierarchy(),
-            'isGlobalView' => true,
-            'domains' => \App\Models\Domain::select('id', 'name', 'name_slug')->get(),
+            'isGlobalView' => $isSuperUser,
+            'domains' => $isSuperUser ? \App\Models\Domain::select('id', 'name', 'name_slug')->get() : [],
         ]);
     }
 

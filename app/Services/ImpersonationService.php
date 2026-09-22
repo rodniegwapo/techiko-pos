@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Http\Middleware\StartSessionUnlessRetired;
 use App\Models\ImpersonationLog;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
@@ -49,11 +50,8 @@ class ImpersonationService
             'user_agent' => request()->userAgent(),
         ]);
 
-        // Log in as the target user
-        Auth::login($userToImpersonate);
-
-        // Regenerate session to prevent CSRF issues and ensure fresh session
-        request()->session()->regenerate();
+        // Log in as the target user, in a fresh session
+        $this->signInAs($userToImpersonate);
 
         return $log;
     }
@@ -98,13 +96,29 @@ class ImpersonationService
         // Clear impersonation session data
         Session::forget(['impersonator_id', 'impersonating']);
 
-        // Log back in as the original user
-        Auth::login($originalUser);
-
-        // Regenerate session to prevent session expiry and ensure fresh session
-        request()->session()->regenerate();
+        // Log back in as the original user, in a fresh session
+        $this->signInAs($originalUser);
 
         return $originalUser;
+    }
+
+    /**
+     * Sign the browser in as someone else, in a new session, and retire the one it leaves.
+     *
+     * The page is usually still loading when the switch happens (the till fetches its data one
+     * request after another), and a request sent beforehand answers with the old session: set back
+     * on the browser, that answer would sign it in again as whoever it was a moment ago, or, since
+     * logging in deletes the old session, sign it out altogether. Retiring the old id stops that.
+     * It has to be read first, because Auth::login() has already moved to a new one.
+     */
+    private function signInAs(User $user): void
+    {
+        $previousId = request()->session()->getId();
+
+        Auth::login($user);
+        request()->session()->regenerate();
+
+        StartSessionUnlessRetired::retire($previousId);
     }
 
     /**

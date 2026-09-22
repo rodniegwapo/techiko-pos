@@ -275,8 +275,9 @@ test.describe("Categories as a cashier", () => {
 
     test("can't open the page or see it in the sidebar", async ({ page, serverAs }) => {
         const api = await serverAs("worker-cashier");
+        // Opened directly, with no page to go back to, the refusal is a 403 (a redirect back could loop).
         const res = await api.get(categoriesUrl());
-        expect(new URL(res.url()).pathname, "redirected away").not.toBe(categoriesUrl());
+        expect(res.status(), "refused").toBe(403);
 
         await page.goto("/domains/jollibee-corp/customers");
         const sidebar = page.getByRole("complementary");

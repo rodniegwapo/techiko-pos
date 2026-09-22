@@ -104,6 +104,18 @@ class UserPermissionCheckMiddleware
     }
 
     /**
+     * Whether a Referer names a different page on this site, so redirecting to it can't loop.
+     */
+    private function isAnotherPageOfThisApp(Request $request, ?string $referer): bool
+    {
+        if (! $referer || parse_url($referer, PHP_URL_HOST) !== $request->getHost()) {
+            return false;
+        }
+
+        return rtrim($referer, '/') !== rtrim($request->fullUrl(), '/');
+    }
+
+    /**
      * Handle unauthorized access.
      */
     private function unauthorizedResponse(Request $request): Response
@@ -116,9 +128,18 @@ class UserPermissionCheckMiddleware
             ], 403);
         }
 
-        // Web request → redirect with flash message
-        return redirect()
-            ->back()
-            ->with('error', 'You do not have permission to access this page.');
+        // Back to the page the visit came from, which says why. Inertia visits and links followed
+        // from another page of the app name that page in their Referer.
+        $from = $request->headers->get('referer');
+        if ($request->header('X-Inertia') || $this->isAnotherPageOfThisApp($request, $from)) {
+            return redirect()
+                ->back()
+                ->with('error', 'You do not have permission to access this page.');
+        }
+
+        // Nowhere safe to go back to: a page typed in, refreshed or opened in a new tab. Laravel's
+        // remembered previous URL is no help — a refused page load is remembered too, so "back"
+        // sent the browser to this same page (or between two refused ones) until it gave up.
+        abort(403, 'You do not have permission to access this page.');
     }
 }
