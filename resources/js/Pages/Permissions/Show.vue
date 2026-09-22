@@ -9,7 +9,6 @@ import {
 } from "@tabler/icons-vue";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
-import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 import { useHelpers } from "@/Composables/useHelpers";
 
 const props = defineProps({
@@ -18,14 +17,13 @@ const props = defineProps({
 });
 
 const { formatDateTime } = useHelpers();
-const isSuperUser = computed(() => usePage().props.auth?.user?.data?.is_super_user || false);
 
-// Computed
-const canEdit = computed(() => usePermissionsV2('permissions.update') || isSuperUser.value);
+// The controller sends a PermissionResource, which wraps the permission in `data`.
+const details = computed(() => props.permission?.data ?? {});
 
 // Methods
 const handleEdit = () => {
-    router.visit(route("permissions.edit", props.permission.id));
+    router.visit(route("permissions.edit", details.value.id));
 };
 
 const handleBack = () => {
@@ -44,7 +42,7 @@ const handleBack = () => {
                 <template #title>
                     <div class="flex items-center gap-3">
                         <IconShield class="text-blue-500" size="24" />
-                        <span>{{ permission.name }}</span>
+                        <span>{{ details.name }}</span>
                     </div>
                 </template>
                 <template #extra>
@@ -74,7 +72,7 @@ const handleBack = () => {
                             <div class="flex items-center gap-2">
                                 <IconShield class="text-blue-500" size="16" />
                                 <span class="text-gray-900 font-mono w-fit">{{
-                                    permission.data?.name || "N/A"
+                                    details.name || "N/A"
                                 }}</span>
                             </div>
                         </div>
@@ -86,7 +84,11 @@ const handleBack = () => {
                                 Module
                             </label>
                             <a-tag color="blue" class="capitalize w-fit">
-                                {{ permission.data?.module }}
+                                {{
+                                    details.module?.display_name ||
+                                    details.module?.name ||
+                                    "Unknown"
+                                }}
                             </a-tag>
                         </div>
 
@@ -97,7 +99,7 @@ const handleBack = () => {
                                 Action
                             </label>
                             <a-tag color="green" class="capitalize w-fit">
-                                {{ permission.data?.action }}
+                                {{ details.action }}
                             </a-tag>
                         </div>
                     </div>
@@ -111,7 +113,7 @@ const handleBack = () => {
                                 Guard Name
                             </label>
                             <span class="text-gray-900">{{
-                                permission?.data?.name || "N/A"
+                                details.guard_name || "N/A"
                             }}</span>
                         </div>
 
@@ -122,7 +124,7 @@ const handleBack = () => {
                                 Created At
                             </label>
                             <span class="text-gray-900">{{
-                                formatDateTime(permission?.data.created_at)
+                                formatDateTime(details.created_at)
                             }}</span>
                         </div>
 
@@ -133,7 +135,7 @@ const handleBack = () => {
                                 Updated At
                             </label>
                             <span class="text-gray-900">{{
-                                formatDateTime(permission?.data.updated_at)
+                                formatDateTime(details.updated_at)
                             }}</span>
                         </div>
                     </div>
