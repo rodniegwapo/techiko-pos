@@ -564,3 +564,117 @@ test.describe("Users access (API)", () => {
         await expect(page).toHaveURL(/\/login$/);
     });
 });
+
+/**
+ * Verifying a user's email. An account made on this page starts unverified and is sent no
+ * verification email, so until someone verifies it here the `verified` middleware keeps it out.
+ */
+test.describe("Verifying a user", () => {
+    /** Makes an unverified user over HTTP, in the given organization, and remembers it for cleanup. */
+    async function makeUnverified(api, { path = usersPath, domain } = {}) {
+        const email = uniqueEmail();
+        const res = await apiJson(api, "POST", path, {
+            name: "E2E Unverified",
+            email,
+            password: PASSWORD,
+            password_confirmation: PASSWORD,
+            role_id: CASHIER_ROLE_ID,
+            ...(domain ? { domain } : {}),
+        });
+        expect(res.status, `create ${email}`).toBe(201);
+        const user = res.body.user.data ?? res.body.user;
+        created.push(user.id);
+        expect(user.email_verified_at, "made unverified").toBeFalsy();
+
+        return user;
+    }
+
+    /** A user as the list shows them, read fresh. */
+    async function reread(api, user, path = usersPath) {
+        const props = await responseProps(await api.get(`${path}?search=${encodeURIComponent(user.email)}`));
+        return props.items.data.find((u) => u.id === user.id);
+    }
+
+    const verify = (api, user) => apiJson(api, "PATCH", `/api/users/${user.id}/verify-email`);
+
+    test.describe("on the page (admin)", () => {
+        test.use({ account: "admin" });
+
+        test("a user added on the form can be verified from the list", async ({ page }) => {
+            const email = uniqueEmail();
+            await openUsers(page);
+            await addUser(page, { name: "E2E Needs Verifying", email });
+            await expect(notice(page, "User Created")).toBeVisible({ timeout: 20_000 });
+            const user = await remember(page, email);
+            expect(user, "the user was made").toBeTruthy();
+
+            await search(page, email);
+            const row = rowWith(page, email);
+            await expect(row, "flagged as unverified").toContainText("Unverified");
+
+            await row.getByRole("button", { name: "Verify Email" }).click();
+            await page.locator(".ant-modal-confirm").getByRole("button", { name: "Yes, Verify" }).click();
+
+            await expect(notice(page, "User Verified")).toBeVisible();
+            await expect(row).not.toContainText("Unverified");
+            await expect(row.getByRole("button", { name: "Verify Email" }), "nothing left to verify").toHaveCount(0);
+            expect((await reread(page.request, user)).email_verified_at, "stored").toBeTruthy();
+        });
+
+        test("verified users are offered no verification", async ({ page }) => {
+            await openUsers(page);
+            await search(page, USERS.cashier.email);
+
+            const row = rowWith(page, USERS.cashier.email);
+            await expect(row).toHaveCount(1);
+            await expect(row).not.toContainText("Unverified");
+            await expect(row.getByRole("button", { name: "Verify Email" })).toHaveCount(0);
+        });
+    });
+
+    test("verifying someone twice changes nothing the second time", async ({ serverAs }) => {
+        const api = await serverAs("admin");
+        const user = await makeUnverified(api);
+
+        expect((await verify(api, user)).status).toBe(200);
+        const first = (await reread(api, user)).email_verified_at;
+        const again = await verify(api, user);
+
+        expect(again.status).toBe(200);
+        expect(again.body?.message).toMatch(/already verified/i);
+        expect((await reread(api, user)).email_verified_at, "the first verification stands").toBe(first);
+    });
+
+    for (const account of ["manager", "cashier"]) {
+        test(`a ${account} can't verify a user`, async ({ serverAs }) => {
+            const admin = await serverAs("admin");
+            const user = await makeUnverified(admin);
+
+            const res = await verify(await serverAs(account), user);
+
+            // Neither role holds users.verify-email, even where a manager may edit a cashier.
+            expect(res.status).toBe(403);
+            expect((await reread(admin, user)).email_verified_at, "still unverified").toBeFalsy();
+        });
+    }
+
+    test("an admin can't verify another organization's user", async ({ serverAs }) => {
+        const superUser = await serverAs("super");
+        const user = await makeUnverified(superUser, { path: "/api/users", domain: "mcdonalds-corp" });
+
+        const res = await verify(await serverAs("admin"), user);
+
+        expect(res.status).toBe(403);
+        expect((await reread(superUser, user, "/domains/mcdonalds-corp/users")).email_verified_at, "still unverified").toBeFalsy();
+    });
+
+    test("a super user can verify a user in any organization", async ({ serverAs }) => {
+        const superUser = await serverAs("super");
+        const user = await makeUnverified(superUser, { path: "/api/users", domain: "mcdonalds-corp" });
+
+        const res = await verify(superUser, user);
+
+        expect(res.status).toBe(200);
+        expect((await reread(superUser, user, "/domains/mcdonalds-corp/users")).email_verified_at).toBeTruthy();
+    });
+});

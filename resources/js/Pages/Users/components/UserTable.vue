@@ -9,6 +9,7 @@ import {
     IconWorld,
     IconUserCheck,
     IconKey,
+    IconMailCheck,
 } from "@tabler/icons-vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { Modal, notification } from "ant-design-vue";
@@ -399,6 +400,73 @@ const handleStatusToggle = async (user) => {
     }
 };
 
+// Email verification: accounts made on this page start unverified and are sent no email.
+const verifyLoading = ref({});
+
+const isUnverified = (user) => !unwrapUser(user).email_verified_at;
+
+// Mirrors UserPolicy::update plus the users.verify-email permission, which managers don't hold.
+const canVerify = (user) => {
+    const userData = unwrapUser(user);
+    const actor = currentUser.value;
+
+    if (!isUnverified(user) || !actor || userData.id === actor.id) {
+        return false;
+    }
+
+    if (isSuperUser.value) {
+        return true;
+    }
+
+    if (!hasPermission("users.verify-email") || userData.is_super_user) {
+        return false;
+    }
+
+    const targetIsSuperAdmin = userData.roles?.some(
+        (role) => role.name.toLowerCase() === "super admin",
+    );
+    const actorIsSuperAdmin = actor.roles?.some(
+        (role) => role.name.toLowerCase() === "super admin",
+    );
+
+    return !targetIsSuperAdmin || actorIsSuperAdmin;
+};
+
+const handleVerify = (user) => {
+    const userData = unwrapUser(user);
+
+    Modal.confirm({
+        title: "Verify Email",
+        content: `Verify ${userData.name}'s email? They'll be able to sign in and use the app.`,
+        okText: "Yes, Verify",
+        okType: "primary",
+        cancelText: "Cancel",
+        onOk: async () => {
+            verifyLoading.value[userData.id] = true;
+            try {
+                const response = await axios.patch(
+                    `/api/users/${userData.id}/verify-email`,
+                );
+                notification.success({
+                    message: "User Verified",
+                    description: response.data.message,
+                });
+                emit("refresh");
+            } catch (error) {
+                console.error("Verify email error:", error);
+                notification.error({
+                    message: "Verification Failed",
+                    description:
+                        error.response?.data?.message ||
+                        "Failed to verify user's email",
+                });
+            } finally {
+                verifyLoading.value[userData.id] = false;
+            }
+        },
+    });
+};
+
 // Impersonation functionality
 const canImpersonate = (user) => {
     const userData = user.data || user;
@@ -501,6 +569,13 @@ function onMobilePaginationChange(pageNum) {
                         </div>
                         <div class="text-sm text-gray-500">
                             {{ (record.data || record).email }}
+                            <a-tag
+                                v-if="isUnverified(record)"
+                                color="warning"
+                                class="ml-1"
+                            >
+                                Unverified
+                            </a-tag>
                         </div>
                     </div>
                 </div>
@@ -635,6 +710,16 @@ function onMobilePaginationChange(pageNum) {
                     </IconTooltipButton>
 
                     <IconTooltipButton
+                        v-if="canVerify(record)"
+                        hover="group-hover:bg-teal-500"
+                        name="Verify Email"
+                        :loading="verifyLoading[(record.data || record).id]"
+                        @click="handleVerify(record)"
+                    >
+                        <IconMailCheck size="20" class="mx-auto" />
+                    </IconTooltipButton>
+
+                    <IconTooltipButton
                         v-if="canSetPin(record)"
                         hover="group-hover:bg-amber-500"
                         name="Set PIN"
@@ -699,6 +784,13 @@ function onMobilePaginationChange(pageNum) {
                             <div class="mt-1 truncate text-sm text-gray-600">
                                 {{ unwrapUser(record).email }}
                             </div>
+                            <a-tag
+                                v-if="isUnverified(record)"
+                                color="warning"
+                                class="m-0 mt-1"
+                            >
+                                Unverified
+                            </a-tag>
                             <div class="mt-2 flex flex-wrap gap-1">
                                 <a-tag
                                     v-for="role in unwrapUser(record).roles"
@@ -776,6 +868,17 @@ function onMobilePaginationChange(pageNum) {
                                     <IconEdit size="18" />
                                 </template>
                                 Edit user
+                            </a-button>
+                            <a-button
+                                v-if="canVerify(record)"
+                                class="flex items-center justify-center gap-2"
+                                :loading="verifyLoading[unwrapUser(record).id]"
+                                @click="handleVerify(record)"
+                            >
+                                <template #icon>
+                                    <IconMailCheck size="18" />
+                                </template>
+                                Verify email
                             </a-button>
                             <a-button
                                 v-if="canSetPin(record)"

@@ -93,6 +93,7 @@ Route::middleware(['auth:sanctum', 'user.permission'])->group(function () {
      */
     Route::get('/users/roles', [UserController::class, 'getRoles'])->name('api.users.roles');
     Route::patch('/users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('api.users.toggle-status');
+    Route::patch('/users/{user}/verify-email', [UserController::class, 'verifyEmail'])->name('api.users.verify-email');
 
     Route::apiResource('users', UserController::class)->names([
         'index'   => 'api.users.index',
