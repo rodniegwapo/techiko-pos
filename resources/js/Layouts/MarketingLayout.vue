@@ -33,15 +33,10 @@ watch(
 </script>
 
 <template>
-    <div
-        class="min-h-screen flex flex-col bg-gray-50 text-gray-800"
-    >
-        <header
-            class="border-b border-gray-200 bg-white shadow-sm"
-        >
-            <div
-                class="mx-auto max-w-6xl px-4 py-4"
-            >
+    <div class="min-h-screen flex flex-col bg-gray-50 text-gray-800">
+        sdaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaasddddsaaaaaaaaaaaaaaaa
+        <header class="border-b border-gray-200 bg-white shadow-sm">
+            <div class="mx-auto max-w-6xl px-4 py-4">
                 <div
                     class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between"
                 >
@@ -105,7 +100,9 @@ watch(
                             v-for="item in nav"
                             :key="`desktop-${item.href}`"
                             :href="route(item.href)"
-                            :aria-current="isNavActive(item.href) ? 'page' : undefined"
+                            :aria-current="
+                                isNavActive(item.href) ? 'page' : undefined
+                            "
                             :class="[
                                 'rounded-lg px-3 py-2 text-sm transition',
                                 isNavActive(item.href)
@@ -134,7 +131,9 @@ watch(
                             v-for="item in nav"
                             :key="`mobile-${item.href}`"
                             :href="route(item.href)"
-                            :aria-current="isNavActive(item.href) ? 'page' : undefined"
+                            :aria-current="
+                                isNavActive(item.href) ? 'page' : undefined
+                            "
                             :class="[
                                 'block w-full rounded-lg px-4 py-3 text-left text-sm transition',
                                 isNavActive(item.href)
