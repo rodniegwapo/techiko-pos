@@ -34,7 +34,6 @@ watch(
 
 <template>
     <div class="min-h-screen flex flex-col bg-gray-50 text-gray-800">
-        sdaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaasddddsaaaaaaaaaaaaaaaa
         <header class="border-b border-gray-200 bg-white shadow-sm">
             <div class="mx-auto max-w-6xl px-4 py-4">
                 <div
