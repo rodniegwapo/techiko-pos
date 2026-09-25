@@ -1,0 +1,10 @@
+# Deploys this Laravel app to shared hosting where the web server's document
+# root points at the repo root instead of /public (e.g. Hostinger's Git
+# auto-deploy, which can only target a folder inside the document root).
+# Routes every request into public/ so app code, .env, vendor/, etc. are
+# never directly reachable over HTTP.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
