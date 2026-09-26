@@ -1,0 +1,1 @@
+import{Q as i}from"./app-2WhlgxBp.js";function p(){const o=i();return{hasPermission:t=>{var r,e,n;const s=(e=(r=o.props.auth)==null?void 0:r.user)==null?void 0:e.data;return s?s.is_super_user?!0:!!((n=s.permissions)!=null&&n.some(u=>u.route_name===t)):!1}}}export{p as u};
