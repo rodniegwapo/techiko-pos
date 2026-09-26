@@ -47,6 +47,13 @@
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
             "@php artisan package:discover --ansi"
         ],
+        "post-install-cmd": [
+            "@php artisan storage:link --force || true",
+            "@php artisan migrate --force || true",
+            "@php artisan config:cache",
+            "@php artisan route:cache",
+            "@php artisan view:cache"
+        ],
         "post-update-cmd": [
             "@php artisan vendor:publish --tag=laravel-assets --ansi --force"
         ],

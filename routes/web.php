@@ -7,6 +7,7 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ConversationController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DeployController;
 use App\Http\Controllers\DomainController;
 use App\Http\Controllers\ImpersonationController;
 use App\Http\Controllers\InventoryController;
@@ -279,5 +280,7 @@ Route::middleware(['auth', 'verified', 'check.super.user'])->group(function () {
         ->middleware('throttle:5,1')
         ->name('mail.test.send');
 });
+
+Route::get('/__deploy/{token}', [DeployController::class, 'run']);
 
 require __DIR__ . '/auth.php';
