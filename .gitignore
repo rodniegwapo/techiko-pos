@@ -6,7 +6,6 @@
 # Electron / electron-vite build outputs (app.asar can be hundreds of MB; do not commit)
 /nativephp/electron/out/
 /nativephp/electron/release/
-/public/build
 /public/hot
 /public/storage
 /storage/*.key
