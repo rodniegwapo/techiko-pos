@@ -1,0 +1,1 @@
+import{r as s}from"./app-DPtHwR6G.js";let e=s({});const o=s(!1),t=s(""),n=s(!1),r=s(!1),a=s(!1);let l=s({}),c=s({});const i=s([]),f=s([]),d=s([]),p=s(!1);function u(){return{formData:e,formFilters:c,isLoading:o,errorMessage:t,openModal:n,isEdit:r,spinning:a,errors:l,selectedKeys:f,openKeys:i,orders:d,openViewModal:p}}export{u};
