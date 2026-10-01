@@ -158,6 +158,14 @@ class PermissionModuleSeeder extends Seeder
                 'is_active' => true,
             ],
             [
+                'name' => 'sales-history',
+                'display_name' => 'Sales History',
+                'icon' => 'history',
+                'description' => 'Browse past sales, reprint receipts and export',
+                'sort_order' => 18,
+                'is_active' => true,
+            ],
+            [
                 'name' => 'domains',
                 'display_name' => 'Domains',
                 'icon' => 'world',
