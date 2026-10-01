@@ -1,4 +1,5 @@
 import { test, expect } from "../support/fixtures.js";
+import { pickSelectOption } from "../support/antd.js";
 import { pageProps } from "../support/inertia.js";
 import { fixtureIds } from "../support/sales.js";
 
@@ -61,6 +62,38 @@ test.describe("Sales history (admin)", () => {
         // The reprint source is rendered (clicking it opens the browser's print dialog, so it isn't clicked).
         await expect(page.locator("#sale-receipt-print-area")).toContainText(sale.invoice_number, { useInnerText: false });
         await expect(page.getByRole("button", { name: "Reprint receipt" })).toBeEnabled();
+    });
+
+    test("filters by payment method from the filter dropdown, with a removable chip", async ({ page }) => {
+        await page.goto(historyPath + rangeQuery());
+
+        await page.locator("button:has(.anticon-filter)").click();
+        const popover = page.locator(".ant-popover:not(.ant-popover-hidden)").filter({ hasText: "Filters:" });
+        const loaded = page.waitForResponse((r) => new URL(r.url()).searchParams.get("payment_method") === "card");
+        await pickSelectOption(page, popover.locator(".ant-form-item").filter({ hasText: "Payment method" }), 0, "Card");
+        await loaded;
+
+        const chip = page.locator(".ant-tag-green", { hasText: "Card" });
+        await expect(chip).toBeVisible();
+        const count = await rows(page).count();
+        for (let i = 0; i < count; i++) {
+            await expect(rows(page).nth(i)).toContainText("Card");
+        }
+
+        const cleared = page.waitForResponse((r) => r.url().includes("/sales-history") && !new URL(r.url()).searchParams.has("payment_method"));
+        await chip.locator(".anticon-close").click();
+        await cleared;
+        await expect(chip).toHaveCount(0);
+    });
+
+    test("summary cards show the period's totals", async ({ page }) => {
+        await page.goto(historyPath + rangeQuery());
+
+        const { summary } = await pageProps(page);
+        await expect(page.getByTestId("summary-sales")).toContainText(String(summary.sales_count));
+        await expect(page.getByTestId("summary-net")).toContainText("Net total");
+        await expect(page.getByTestId("summary-voids")).toContainText(String(summary.sales_with_voids));
+        await expect(page.getByTestId("summary-sales").locator("svg")).toBeVisible();
     });
 
     test("exports the filtered sales as CSV", async ({ page }) => {

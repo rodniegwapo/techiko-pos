@@ -3,15 +3,27 @@ import { computed, ref } from "vue";
 import { Head, router } from "@inertiajs/vue3";
 import { watchDebounced } from "@vueuse/core";
 import dayjs from "dayjs";
+import {
+    IconReceipt2,
+    IconCash,
+    IconDiscount2,
+    IconReceiptTax,
+    IconCoins,
+    IconReceiptOff,
+    IconCalendarEvent,
+} from "@tabler/icons-vue";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
 import ContentLayout from "@/Components/ContentLayout.vue";
 import RefreshButton from "@/Components/buttons/Refresh.vue";
+import FilterDropdown from "@/Components/filters/FilterDropdown.vue";
+import ActiveFilters from "@/Components/filters/ActiveFilters.vue";
 import SaleDetailDrawer from "./components/SaleDetailDrawer.vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useHelpers } from "@/Composables/useHelpers";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
+import { useFilters, toLabel } from "@/Composables/useFilters";
 
 const props = defineProps({
     items: { type: Object, default: () => ({ data: [], meta: {} }) },
@@ -27,24 +39,42 @@ const { spinning } = useGlobalVariables();
 const { formattedTotal } = useHelpers();
 const { hasPermission } = usePermissionsV2();
 
+const capitalize = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+
 /*** === FILTER STATE (seeded from the server's resolved filters) === ***/
-const dateRange = ref([
-    dayjs(props.filters.start_date),
-    dayjs(props.filters.end_date),
-]);
-const locationId = ref(props.filters.location_id ?? undefined);
-const userId = ref(props.restrictedToOwnSales ? undefined : props.filters.user_id ?? undefined);
-const paymentMethod = ref(props.filters.payment_method ?? undefined);
-const paymentStatus = ref(props.filters.payment_status ?? undefined);
+// Keys differ from the query param names on purpose: useFilters seeds any key it finds in the URL
+// as a string, which would not match the numeric ids the selects use.
+const dateRange = ref(
+    props.filters.start_date
+        ? [dayjs(props.filters.start_date), dayjs(props.filters.end_date)]
+        : null,
+);
+const location = ref(props.filters.location_id ?? null);
+const cashier = ref(props.restrictedToOwnSales ? null : props.filters.user_id ?? null);
+const payment = ref(props.filters.payment_method ?? null);
+const status = ref(props.filters.payment_status ?? null);
 const search = ref(props.filters.search ?? "");
 
+const locationOptions = computed(() =>
+    (props.options.locations || []).map((l) => ({ value: l.id, label: l.name })),
+);
+const cashierOptions = computed(() =>
+    (props.options.cashiers || []).map((u) => ({ value: u.id, label: u.name })),
+);
+const paymentOptions = computed(() =>
+    (props.options.payment_methods || []).map((m) => ({ value: m, label: capitalize(m) })),
+);
+const statusOptions = computed(() =>
+    (props.options.statuses || []).map((s) => ({ value: s, label: capitalize(s) })),
+);
+
 const queryParams = (extra = {}) => ({
-    start_date: dateRange.value?.[0]?.format("YYYY-MM-DD"),
-    end_date: dateRange.value?.[1]?.format("YYYY-MM-DD"),
-    location_id: locationId.value || undefined,
-    user_id: userId.value || undefined,
-    payment_method: paymentMethod.value || undefined,
-    payment_status: paymentStatus.value || undefined,
+    start_date: dateRange.value?.[0] ? dayjs(dateRange.value[0]).format("YYYY-MM-DD") : undefined,
+    end_date: dateRange.value?.[1] ? dayjs(dateRange.value[1]).format("YYYY-MM-DD") : undefined,
+    location_id: location.value || undefined,
+    user_id: cashier.value || undefined,
+    payment_method: payment.value || undefined,
+    payment_status: status.value || undefined,
     search: search.value || undefined,
     per_page: props.items.meta?.per_page,
     ...extra,
@@ -62,10 +92,50 @@ const load = (extra = {}) => {
 
 watchDebounced(search, () => load(), { debounce: 400 });
 
-const setToday = () => {
-    dateRange.value = [dayjs(), dayjs()];
-    load();
-};
+const rangeLabel = (v) =>
+    Array.isArray(v) && v[0] && v[1]
+        ? `${dayjs(v[0]).format("MMM D, YYYY")} – ${dayjs(v[1]).format("MMM D, YYYY")}`
+        : null;
+
+const filterConfigs = [
+    { label: "Date", key: "date", ref: dateRange, getLabel: rangeLabel },
+    ...(props.restrictedToOwnSales
+        ? []
+        : [
+              { label: "Location", key: "location", ref: location, getLabel: toLabel(locationOptions) },
+              { label: "Cashier", key: "cashier", ref: cashier, getLabel: toLabel(cashierOptions) },
+          ]),
+    { label: "Payment", key: "payment", ref: payment, getLabel: toLabel(paymentOptions) },
+    { label: "Status", key: "status", ref: status, getLabel: toLabel(statusOptions) },
+];
+
+const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
+    getItems: () => load(),
+    configs: filterConfigs,
+});
+
+const filtersConfig = computed(() => [
+    { key: "date", label: "Date", type: "range" },
+    ...(props.restrictedToOwnSales
+        ? []
+        : [
+              { key: "location", label: "Location", type: "select", options: locationOptions.value },
+              { key: "cashier", label: "Cashier", type: "select", options: cashierOptions.value },
+          ]),
+    { key: "payment", label: "Payment method", type: "select", options: paymentOptions.value },
+    { key: "status", label: "Status", type: "select", options: statusOptions.value },
+]);
+
+/** The period the server actually applied (it falls back to today when no date is chosen). */
+const periodLabel = computed(() => {
+    const start = dayjs(props.filters.start_date);
+    const end = dayjs(props.filters.end_date);
+    if (!start.isValid()) return "";
+    if (start.isSame(end, "day")) {
+        return start.isSame(dayjs(), "day") ? `Today, ${start.format("MMM D, YYYY")}` : start.format("ddd, MMM D, YYYY");
+    }
+    return `${start.format("MMM D, YYYY")} – ${end.format("MMM D, YYYY")}`;
+});
 
 /*** === TABLE === ***/
 const pagination = computed(() => ({
@@ -79,8 +149,7 @@ const pagination = computed(() => ({
 
 const handleTableChange = (p) => load({ page: p.current, per_page: p.pageSize });
 
-const statusColor = (status) =>
-    ({ paid: "green", partial: "orange", refunded: "red" })[status] || "default";
+const statusColor = (s) => ({ paid: "green", partial: "orange", refunded: "red" })[s] || "default";
 
 const columns = [
     { title: "Date / time", dataIndex: "transaction_date_display", key: "date", width: 170 },
@@ -110,14 +179,66 @@ const exportUrl = computed(() => {
     return `${base}?${new URLSearchParams(params).toString()}`;
 });
 
-const summaryCards = computed(() => [
-    { label: "Sales", value: props.summary.sales_count ?? 0 },
-    { label: "Gross (before discounts)", value: formattedTotal(props.summary.gross ?? 0) },
-    { label: "Discounts", value: formattedTotal(props.summary.discounts ?? 0) },
-    { label: "VAT", value: formattedTotal(props.summary.vat ?? 0) },
-    { label: "Net total", value: formattedTotal(props.summary.net ?? 0) },
-    { label: "Sales with voids", value: props.summary.sales_with_voids ?? 0 },
-]);
+/*** === SUMMARY CARDS === ***/
+const percent = (part, whole) => (whole > 0 ? `${((part / whole) * 100).toFixed(1)}%` : "0%");
+
+const summaryCards = computed(() => {
+    const s = props.summary;
+    const count = s.sales_count ?? 0;
+    const gross = s.gross ?? 0;
+
+    return [
+        {
+            key: "sales",
+            label: "Sales",
+            value: count.toLocaleString(),
+            hint: count ? `Avg ${formattedTotal((s.net ?? 0) / count)} per sale` : "No sales in this period",
+            icon: IconReceipt2,
+            tone: "bg-blue-50 text-blue-600",
+        },
+        {
+            key: "gross",
+            label: "Gross sales",
+            value: formattedTotal(gross),
+            hint: "Before discounts",
+            icon: IconCash,
+            tone: "bg-sky-50 text-sky-600",
+        },
+        {
+            key: "discounts",
+            label: "Discounts",
+            value: formattedTotal(s.discounts ?? 0),
+            hint: `${percent(s.discounts ?? 0, gross)} of gross`,
+            icon: IconDiscount2,
+            tone: "bg-amber-50 text-amber-600",
+        },
+        {
+            key: "vat",
+            label: "VAT",
+            value: formattedTotal(s.vat ?? 0),
+            hint: "Output tax on these sales",
+            icon: IconReceiptTax,
+            tone: "bg-violet-50 text-violet-600",
+        },
+        {
+            key: "net",
+            label: "Net total",
+            value: formattedTotal(s.net ?? 0),
+            hint: "What customers paid",
+            icon: IconCoins,
+            tone: "bg-green-50 text-green-700",
+            highlight: true,
+        },
+        {
+            key: "voids",
+            label: "Sales with voids",
+            value: (s.sales_with_voids ?? 0).toLocaleString(),
+            hint: `${percent(s.sales_with_voids ?? 0, count)} of sales`,
+            icon: IconReceiptOff,
+            tone: "bg-red-50 text-red-600",
+        },
+    ];
+});
 </script>
 
 <template>
@@ -126,7 +247,7 @@ const summaryCards = computed(() => [
         <ContentHeader class="mb-4 md:mb-6" title="Sales History" />
         <ContentLayout
             :title="restrictedToOwnSales ? 'My sales' : 'All sales'"
-            filter-class="flex flex-wrap items-end justify-end gap-2 w-full min-w-0"
+            filter-class="flex flex-wrap items-center justify-end gap-2 w-full min-w-0"
         >
             <template #filters>
                 <refresh-button :loading="spinning" @click="load({ page: pagination.current })" />
@@ -134,52 +255,9 @@ const summaryCards = computed(() => [
                     v-model:value="search"
                     placeholder="Invoice # or customer"
                     allow-clear
-                    style="width: 220px; max-width: 100%"
+                    style="width: 260px; max-width: 100%"
                 />
-                <a-range-picker
-                    v-model:value="dateRange"
-                    format="YYYY-MM-DD"
-                    :allow-clear="false"
-                    style="width: 270px; max-width: 100%"
-                    @change="load()"
-                />
-                <a-button @click="setToday">Today</a-button>
-                <a-select
-                    v-if="!restrictedToOwnSales && options.locations?.length"
-                    v-model:value="locationId"
-                    allow-clear
-                    placeholder="All locations"
-                    style="width: 170px; max-width: 100%"
-                    :options="options.locations.map((l) => ({ value: l.id, label: l.name }))"
-                    @change="load()"
-                />
-                <a-select
-                    v-if="!restrictedToOwnSales"
-                    v-model:value="userId"
-                    allow-clear
-                    show-search
-                    option-filter-prop="label"
-                    placeholder="All cashiers"
-                    style="width: 170px; max-width: 100%"
-                    :options="(options.cashiers || []).map((u) => ({ value: u.id, label: u.name }))"
-                    @change="load()"
-                />
-                <a-select
-                    v-model:value="paymentMethod"
-                    allow-clear
-                    placeholder="Any payment"
-                    style="width: 140px; max-width: 100%"
-                    :options="(options.payment_methods || []).map((m) => ({ value: m, label: m }))"
-                    @change="load()"
-                />
-                <a-select
-                    v-model:value="paymentStatus"
-                    allow-clear
-                    placeholder="Any status"
-                    style="width: 130px; max-width: 100%"
-                    :options="(options.statuses || []).map((s) => ({ value: s, label: s }))"
-                    @change="load()"
-                />
+                <FilterDropdown v-model="filters" :filters="filtersConfig" />
                 <a
                     v-if="hasPermission('sales-history.export')"
                     :href="exportUrl"
@@ -189,16 +267,47 @@ const summaryCards = computed(() => [
                 </a>
             </template>
 
+            <template #activeFilters>
+                <ActiveFilters
+                    :filters="activeFilters"
+                    @remove-filter="handleClearSelectedFilter"
+                    @clear-all="() => Object.keys(filters).forEach((k) => (filters[k] = null))"
+                />
+            </template>
+
             <template #table>
                 <div class="space-y-4 px-4 pb-6 md:px-6">
-                    <div class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+                    <div class="flex items-center gap-2 text-sm text-gray-600">
+                        <IconCalendarEvent :size="18" class="text-gray-400" />
+                        <span data-testid="sales-history-period">{{ periodLabel }}</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
                         <div
                             v-for="card in summaryCards"
-                            :key="card.label"
-                            class="rounded-lg border border-gray-200 bg-white p-3 shadow-sm"
+                            :key="card.key"
+                            :data-testid="`summary-${card.key}`"
+                            class="flex items-start gap-3 rounded-xl border bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
+                            :class="card.highlight ? 'border-green-200 ring-1 ring-green-100' : 'border-gray-200'"
                         >
-                            <div class="text-xs font-medium text-gray-500">{{ card.label }}</div>
-                            <div class="mt-1 text-lg font-semibold text-gray-900">{{ card.value }}</div>
+                            <div
+                                class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg"
+                                :class="card.tone"
+                            >
+                                <component :is="card.icon" :size="24" :stroke-width="1.75" />
+                            </div>
+                            <div class="min-w-0">
+                                <div class="text-xs font-medium uppercase tracking-wide text-gray-500">
+                                    {{ card.label }}
+                                </div>
+                                <div
+                                    class="mt-0.5 truncate text-xl font-semibold"
+                                    :class="card.highlight ? 'text-green-700' : 'text-gray-900'"
+                                >
+                                    {{ card.value }}
+                                </div>
+                                <div class="mt-0.5 truncate text-xs text-gray-500">{{ card.hint }}</div>
+                            </div>
                         </div>
                     </div>
 
@@ -222,7 +331,7 @@ const summaryCards = computed(() => [
                                 </a-tag>
                             </template>
                             <template v-else-if="column.key === 'payment'">
-                                {{ record.payment_method }}
+                                {{ capitalize(record.payment_method) }}
                                 <span v-if="record.payment_card_type" class="text-gray-500"> · {{ record.payment_card_type }}</span>
                             </template>
                             <template v-else-if="column.key === 'status'">
