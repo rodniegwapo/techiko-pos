@@ -72,6 +72,9 @@ test.describe("Sales history (admin)", () => {
         const loaded = page.waitForResponse((r) => new URL(r.url()).searchParams.get("payment_method") === "card");
         await pickSelectOption(page, popover.locator(".ant-form-item").filter({ hasText: "Payment method" }), 0, "Card");
         await loaded;
+        // Close the popover; it sits over the active-filter chips.
+        await page.locator("button:has(.anticon-filter)").click();
+        await expect(popover).toBeHidden();
 
         const chip = page.locator(".ant-tag-green", { hasText: "Card" });
         await expect(chip).toBeVisible();

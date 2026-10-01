@@ -202,7 +202,7 @@ const summaryCards = computed(() => {
             value: formattedTotal(gross),
             hint: "Before discounts",
             icon: IconCash,
-            tone: "bg-sky-50 text-sky-600",
+            tone: "bg-teal-50 text-teal-600",
         },
         {
             key: "discounts",
@@ -218,7 +218,7 @@ const summaryCards = computed(() => {
             value: formattedTotal(s.vat ?? 0),
             hint: "Output tax on these sales",
             icon: IconReceiptTax,
-            tone: "bg-violet-50 text-violet-600",
+            tone: "bg-purple-50 text-purple-600",
         },
         {
             key: "net",
