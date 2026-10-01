@@ -16,6 +16,7 @@ import {
     IconCreditCard,
     IconWallet,
     IconReportMoney,
+    IconReceipt,
     IconAccessPointOff,
     IconSettings,
     IconMessages,
@@ -134,6 +135,14 @@ const menuItems = [
         icon: IconAccessPointOff,
         routeName: "sales.offline-transactions",
         path: "/sales/offline-transactions",
+        domainOnly: true,
+    },
+    {
+        key: "sales-history",
+        title: "Sales History",
+        icon: IconReceipt,
+        routeName: "sales-history.index",
+        path: "/sales-history",
         domainOnly: true,
     },
     {

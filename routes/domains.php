@@ -16,6 +16,7 @@ use App\Http\Controllers\Domains\PayMongoQrPhController;
 use App\Http\Controllers\Domains\ProductController;
 use App\Http\Controllers\Domains\SaleController;
 use App\Http\Controllers\Domains\SaleDiscountController;
+use App\Http\Controllers\Domains\SalesHistoryController;
 use App\Http\Controllers\Domains\SharedCatalogLookupController;
 use App\Http\Controllers\Domains\UserController;
 use App\Http\Controllers\Domains\UserPinController;
@@ -169,6 +170,11 @@ Route::prefix('domains/{domain:name_slug}')
         Route::get('/vat-report/export-json', [VatReportController::class, 'exportJson'])->name('vat-report.export-json');
         Route::get('/vat-report/export', [VatReportController::class, 'export'])->name('vat-report.export');
         Route::get('/vat-report', [VatReportController::class, 'index'])->name('vat-report.index');
+
+        // Sales history (read-only list of completed sales, receipt reprint, CSV)
+        Route::get('/sales-history', [SalesHistoryController::class, 'index'])->name('sales-history.index');
+        Route::get('/sales-history/export', [SalesHistoryController::class, 'export'])->name('sales-history.export');
+        Route::get('/sales-history/{sale}', [SalesHistoryController::class, 'show'])->whereNumber('sale')->name('sales-history.show');
 
         // Wallet — money movement (cash control + ledger); distinct URL from card-type setup
         Route::get('/wallet/money-movement', [PaymentCardTypeController::class, 'moneyMovement'])->name('wallet.money-movement');
