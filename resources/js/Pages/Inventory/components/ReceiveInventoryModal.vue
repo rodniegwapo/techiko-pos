@@ -6,6 +6,7 @@ import { IconPlus, IconTrash, IconSearch, IconShoppingCart, IconAlertTriangle, I
 import { notification } from "ant-design-vue";
 import axios from "axios";
 import { usePage } from "@inertiajs/vue3";
+import { useHelpers } from "@/Composables/useHelpers";
 
 const page = usePage();
 const isMdUp = useMediaQuery("(min-width: 768px)");
@@ -36,7 +37,10 @@ const REFERENCE_TYPES = [
   "PromotionalGiveaway",
 ];
 
-const referenceTypeSelectOptions = REFERENCE_TYPES.map((t) => ({ label: t, value: t }));
+const { humanize } = useHelpers();
+
+// Show "Stock Adjustment", but send the stored value "StockAdjustment".
+const referenceTypeSelectOptions = REFERENCE_TYPES.map((t) => ({ label: humanize(t), value: t }));
 
 const emit = defineEmits(["success", "update:visible"]);
 

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Traits\Searchable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 class StockAdjustment extends Model
 {
@@ -127,14 +128,16 @@ class StockAdjustment extends Model
             throw new \Exception('Adjustment cannot be approved in current status: '.$this->status);
         }
 
-        $this->update([
-            'status' => 'approved',
-            'approved_at' => now(),
-            'approved_by' => $approver->id,
-        ]);
+        DB::transaction(function () use ($approver) {
+            $this->update([
+                'status' => 'approved',
+                'approved_at' => now(),
+                'approved_by' => $approver->id,
+            ]);
 
-        // Process the adjustment items
-        $this->processAdjustmentItems();
+            // Process the adjustment items
+            $this->processAdjustmentItems();
+        });
 
         return $this;
     }

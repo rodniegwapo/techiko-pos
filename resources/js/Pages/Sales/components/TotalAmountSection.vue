@@ -67,6 +67,11 @@ const props = defineProps({
         type: Boolean,
         default: false,
     },
+    // The parent renders its own pay button and calls the exposed proceed().
+    hideProceedButton: {
+        type: Boolean,
+        default: false,
+    },
 });
 
 const {
@@ -625,6 +630,41 @@ const creditLimitSufficient = computed(() => {
     if (paymentMethod.value !== "credit" || !creditInfo.value) return true;
     return creditInfo.value.availableCredit >= grandTotalDisplay.value;
 });
+
+const proceedPaymentDisabled = computed(
+    () =>
+        proceedPaymentLoading.value ||
+        (paymentMethod.value !== "credit" &&
+            amountReceived.value < grandTotalDisplay.value) ||
+        (paymentMethod.value === "credit" && !creditLimitSufficient.value) ||
+        (paymentMethod.value === "card" && !selectedPaymentCardTypeId.value) ||
+        orders.value.length == 0,
+);
+
+const offlineSaveDisabled = computed(
+    () =>
+        orders.value.length == 0 ||
+        (paymentMethod.value === "card" && !selectedPaymentCardTypeId.value),
+);
+
+// Lets a parent own the pay button (the Modern layout's footer "Charge" button).
+function proceed() {
+    if (!salesCartIsOnline.value) {
+        if (!offlineSaveDisabled.value) emit("save-offline-sale");
+        return;
+    }
+    if (!proceedPaymentDisabled.value) handleProceedPaymentConfirmation();
+}
+
+defineExpose({
+    proceed,
+    canProceed: computed(() =>
+        salesCartIsOnline.value
+            ? !proceedPaymentDisabled.value
+            : !offlineSaveDisabled.value,
+    ),
+    loading: proceedPaymentLoading,
+});
 </script>
 
 <template>
@@ -877,7 +917,7 @@ const creditLimitSufficient = computed(() => {
                 </div>
 
                 <!-- Proceed Payment / Offline save -->
-                <div class="flex flex-col gap-2">
+                <div v-if="!hideProceedButton" class="flex flex-col gap-2">
                     <div class="invisible">Proceed Payment</div>
                     <a-button
                         v-if="salesCartIsOnline"
@@ -887,16 +927,7 @@ const creditLimitSufficient = computed(() => {
                             disabledPaymentButtonColor,
                         ]"
                         @click="handleProceedPaymentConfirmation"
-                        :disabled="
-                            proceedPaymentLoading ||
-                            (paymentMethod !== 'credit' &&
-                                amountReceived < grandTotalDisplay) ||
-                            (paymentMethod === 'credit' &&
-                                !creditLimitSufficient) ||
-                            (paymentMethod === 'card' &&
-                                !selectedPaymentCardTypeId) ||
-                            orders.length == 0
-                        "
+                        :disabled="proceedPaymentDisabled"
                         :loading="proceedPaymentLoading"
                     >
                         Proceed Payment
@@ -909,11 +940,7 @@ const creditLimitSufficient = computed(() => {
                                 ? 'w-full bg-amber-700 border-amber-700 hover:bg-amber-600'
                                 : 'w-[300px] bg-amber-700 border-amber-700 hover:bg-amber-600'
                         "
-                        :disabled="
-                            orders.length == 0 ||
-                            (paymentMethod === 'card' &&
-                                !selectedPaymentCardTypeId)
-                        "
+                        :disabled="offlineSaveDisabled"
                         @click="emit('save-offline-sale')"
                     >
                         Save as offline sale

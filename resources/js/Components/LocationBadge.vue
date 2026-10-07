@@ -84,7 +84,7 @@ const switchLocation = async (location) => {
 </script>
 
 <template>
-    <div v-if="shouldShowBadge" class="fixed top-4 right-4 z-50">
+    <div v-if="shouldShowBadge" class="location-badge mb-3 flex justify-end">
         <a-popover
             v-model:open="visible"
             placement="bottomRight"

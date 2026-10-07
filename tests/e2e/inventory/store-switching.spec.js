@@ -17,12 +17,14 @@ test.describe("Switching stores with the location badge (admin)", () => {
         const { mainLocation, branchLocation } = fixture();
         await page.goto(jb("/inventory"));
 
-        await page.locator("div.fixed.top-4.right-4").getByRole("button").click();
+        await page.locator(".location-badge").getByRole("button").click();
         const popover = page.locator(".ant-popover:not(.ant-popover-hidden)").filter({ hasText: "Switch Location" });
         await popover.getByText(branchLocation.name, { exact: true }).click();
 
         await expect(page).toHaveURL((url) => url.searchParams.get("location_id") === String(branchLocation.id));
-        await expect(page.getByRole("main").getByText(branchLocation.name, { exact: true })).toBeVisible();
+        // Both the store picker and the dashboard name the new store.
+        await expect(page.locator(".location-badge").getByText(branchLocation.name, { exact: true })).toBeVisible();
+        await expect(page.getByRole("main").getByText(branchLocation.name, { exact: true })).toHaveCount(2);
 
         // Everyone else still works in the organization's default store.
         const otherAdmin = await serverAs("admin");
@@ -34,7 +36,7 @@ test.describe("Switching stores with the location badge (admin)", () => {
     test("the switched store follows the admin to other pages", async ({ page }) => {
         const { branchLocation } = fixture();
         await page.goto(jb("/inventory"));
-        await page.locator("div.fixed.top-4.right-4").getByRole("button").click();
+        await page.locator(".location-badge").getByRole("button").click();
         await page.locator(".ant-popover:not(.ant-popover-hidden)").getByText(branchLocation.name, { exact: true }).click();
         await expect(page).toHaveURL((url) => url.searchParams.get("location_id") === String(branchLocation.id));
 

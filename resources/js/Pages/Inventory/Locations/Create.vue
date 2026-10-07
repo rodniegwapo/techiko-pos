@@ -13,9 +13,11 @@ import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
 import ContentLayout from "@/Components/ContentLayout.vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
+import { useHelpers } from "@/Composables/useHelpers";
 
 const page = usePage();
 const { getRoute } = useDomainRoutes();
+const { confirmAction } = useHelpers();
 
 const props = defineProps({
   locationTypes: Array,
@@ -45,7 +47,14 @@ const goBack = () => {
   router.visit(getRoute("inventory.locations.index"));
 };
 
-const submit = () => {
+const submit = async () => {
+  const confirmed = await confirmAction({
+    title: "Create this location?",
+    content: `"${form.name}" will be added as a ${form.type}.`,
+    okText: "Create",
+  });
+  if (!confirmed) return;
+
   loading.value = true;
   errors.value = {};
 

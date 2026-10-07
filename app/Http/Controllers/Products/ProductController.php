@@ -169,6 +169,9 @@ class ProductController extends Controller
         }
 
         $data = $request->validate($rules, [], [
+            'SKU' => 'SKU',
+            'sold_type' => 'sold type',
+            'category_id' => 'category',
             'representation_image' => 'product image',
         ]);
 

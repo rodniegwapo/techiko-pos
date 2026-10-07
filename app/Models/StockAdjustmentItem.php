@@ -87,6 +87,9 @@ class StockAdjustmentItem extends Model
 
         $inventoryService = app(InventoryService::class);
 
+        // The store only lists products assigned to it, so make sure an adjusted product shows there.
+        $inventoryService->ensureProductAssignedToLocation($this->product, $this->stockAdjustment->location);
+
         // Determine movement type based on adjustment reason
         $movementType = $this->getMovementType();
 

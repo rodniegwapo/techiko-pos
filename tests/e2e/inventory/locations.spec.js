@@ -263,6 +263,33 @@ test.describe("Location actions (admin)", () => {
         await expect(nameField).toHaveValue(location.name);
     });
 
+    test("saving an edited store asks first, and cancelling sends nothing", async ({ page }) => {
+        const location = await createLocation(page);
+        await page.goto(`${locationsPath}/${location.id}/edit`);
+        const nameField = page.locator(".ant-form-item").filter({ hasText: "Location Name" }).locator("input");
+        await expect(nameField).toHaveValue(location.name);
+
+        let updates = 0;
+        page.on("request", (r) => {
+            if (r.method() === "PUT" && r.url().includes(`/inventory/locations/${location.id}`)) updates++;
+        });
+
+        await page.getByRole("button", { name: "Update Location" }).click();
+        const confirm = page.locator(".ant-modal-confirm").filter({ hasText: "Save changes to this location?" });
+        await expect(confirm).toBeVisible();
+        await confirm.getByRole("button", { name: "Cancel" }).click();
+        await expect(confirm).toBeHidden();
+        expect(updates).toBe(0);
+
+        await page.getByRole("button", { name: "Update Location" }).click();
+        const saved = page.waitForResponse(
+            (r) => r.request().method() === "PUT" && r.url().includes(`/inventory/locations/${location.id}`),
+        );
+        await confirm.getByRole("button", { name: "Save" }).click();
+        expect((await saved).status()).toBeLessThan(400);
+        await expect(confirm).toBeHidden();
+    });
+
     test("View Details opens the store's page with its stock summary", async ({ page }) => {
         await openLocations(page, listUrl(`?search=${fixture().store.code}`));
 

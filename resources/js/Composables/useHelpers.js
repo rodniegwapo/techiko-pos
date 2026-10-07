@@ -218,6 +218,30 @@ export function useHelpers() {
         return dayjs(date).format("MMMM DD, YYYY HH:mm");
     };
 
+    // Turn a code value into words: "StockAdjustment" / "stock_adjustment" -> "Stock Adjustment"
+    const humanize = (value) => {
+        if (value === null || value === undefined) return "";
+        return String(value)
+            .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+            .replace(/[_-]+/g, " ")
+            .trim()
+            .replace(/\b\w/g, (c) => c.toUpperCase());
+    };
+
+    // Ask before an action that saves; resolves true when confirmed, false when cancelled.
+    const confirmAction = ({ title, content, okText = "Confirm", cancelText = "Cancel" }) =>
+        new Promise((resolve) => {
+            Modal.confirm({
+                title,
+                icon: createVNode(ExclamationCircleOutlined),
+                content,
+                okText,
+                cancelText,
+                onOk: () => resolve(true),
+                onCancel: () => resolve(false),
+            });
+        });
+
     // Show notification
     const showNotification = (type, title, message) => {
         // You can implement this with ant-design-vue notification
@@ -230,6 +254,8 @@ export function useHelpers() {
 
     return {
         confirmDelete,
+        confirmAction,
+        humanize,
         inertiaProgressLifecyle,
         showModal,
         getDeviceId,

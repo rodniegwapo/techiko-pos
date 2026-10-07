@@ -106,6 +106,7 @@ class ProductController extends Controller
             'location_id.exists' => 'The selected store does not belong to this organization.',
         ], [
             'name' => 'product name',
+            'SKU' => 'SKU',
             'sold_type' => 'sold type',
             'category_id' => 'category',
             'location_id' => 'location',

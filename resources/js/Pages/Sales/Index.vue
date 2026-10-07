@@ -96,7 +96,20 @@ function onCoffeeshopPaymentSuccess() {
     goToOrderStep();
 }
 
+// The footer button moves to the payment step, then on that step it takes the payment
+// (the payment pane's own Proceed Payment button is hidden in this layout).
+const coffeeshopPayment = ref(null);
+const coffeeshopChargeDisabled = computed(() =>
+    checkoutStep.value === "payment"
+        ? !coffeeshopPayment.value?.canProceed
+        : orders.value.length === 0,
+);
+
 function onCoffeeshopChargeClick() {
+    if (checkoutStep.value === "payment") {
+        coffeeshopPayment.value?.proceed();
+        return;
+    }
     goToPaymentStep();
 }
 
@@ -1624,6 +1637,8 @@ watch(
                                         class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
                                     >
                                         <total-amount-section
+                                            ref="coffeeshopPayment"
+                                            hide-proceed-button
                                             layout="compact"
                                             coffeeshop-skin
                                             :selected-customer="
@@ -1674,7 +1689,6 @@ watch(
                             </div>
 
                             <div
-                                v-show="checkoutStep === 'order'"
                                 class="cs-rail-charge mt-3 flex shrink-0 items-center justify-between gap-3 border-t border-[var(--cs-border)] bg-[var(--cs-panel)] pt-3"
                             >
                                 <div class="min-w-0">
@@ -1690,15 +1704,30 @@ watch(
                                     </p>
                                 </div>
                                 <a-button
+                                    v-if="checkoutStep === 'order'"
                                     type="primary"
                                     size="large"
                                     class="cs-charge-btn shrink-0 rounded-full px-5"
-                                    :disabled="orders.length === 0"
+                                    :disabled="coffeeshopChargeDisabled"
                                     aria-label="Continue to checkout"
                                     @click="onCoffeeshopChargeClick"
                                 >
-                                    Charge
-                                    {{ formattedTotal(grandTotalDisplay) }}
+                                    Checkout
+                                </a-button>
+                                <a-button
+                                    v-else
+                                    type="primary"
+                                    size="large"
+                                    class="cs-charge-btn shrink-0 rounded-full px-5"
+                                    :disabled="coffeeshopChargeDisabled"
+                                    :loading="coffeeshopPayment?.loading"
+                                    @click="onCoffeeshopChargeClick"
+                                >
+                                    <template v-if="salesCartIsOnline">
+                                        Charge
+                                        {{ formattedTotal(grandTotalDisplay) }}
+                                    </template>
+                                    <template v-else>Save offline sale</template>
                                 </a-button>
                             </div>
                         </div>
@@ -1815,7 +1844,7 @@ watch(
                             aria-label="Continue to checkout"
                             @click="goToPaymentStep"
                         >
-                            Pay
+                            Checkout
                         </a-button>
                     </div>
                 </template>

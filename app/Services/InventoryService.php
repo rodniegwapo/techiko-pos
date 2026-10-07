@@ -663,6 +663,9 @@ class InventoryService
                 'notes' => $notes ?? "Transfer to {$toLocation->name}",
             ]);
 
+            // The destination store only lists products assigned to it, so assign the product there first.
+            $this->ensureProductAssignedToLocation($product, $toLocation);
+
             // Record transfer in
             $this->recordMovement([
                 'product_id' => $product->id,

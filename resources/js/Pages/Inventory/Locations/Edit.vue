@@ -8,6 +8,9 @@ import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
 import ContentLayout from "@/Components/ContentLayout.vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
+import { useHelpers } from "@/Composables/useHelpers";
+
+const { confirmAction } = useHelpers();
 
 const props = defineProps({
   location: Object,
@@ -53,7 +56,14 @@ const goBack = () => {
   router.visit(getRoute("inventory.locations.index"));
 };
 
-const submit = () => {
+const submit = async () => {
+  const confirmed = await confirmAction({
+    title: "Save changes to this location?",
+    content: `"${form.name}" will be updated.`,
+    okText: "Save",
+  });
+  if (!confirmed) return;
+
   loading.value = true;
   errors.value = {};
 

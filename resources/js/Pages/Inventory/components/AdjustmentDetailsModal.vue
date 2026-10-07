@@ -13,9 +13,13 @@ import {
   IconClock
 } from "@tabler/icons-vue";
 import { useHelpers } from "@/Composables/useHelpers";
+import { usePermissionsV2 } from "@/Composables/usePermissionV2";
+import { useStockAdjustmentActions } from "@/Composables/useStockAdjustmentActions";
 import axios from "axios";
 
 const { formatCurrency, formatDate, formatDateTime } = useHelpers();
+const { hasPermission } = usePermissionsV2();
+const { approveAdjustment, rejectAdjustment } = useStockAdjustmentActions();
 const isMdUp = useMediaQuery("(min-width: 768px)");
 const modalWidth = computed(() =>
   isMdUp.value ? 900 : "calc(100vw - 24px)",
@@ -48,6 +52,17 @@ const fullAdjustment = ref(null);
 const handleClose = () => {
   emit('update:visible', false);
 };
+
+const canApprove = computed(() => hasPermission('inventory.adjustments.approve'));
+const canReject = computed(() => hasPermission('inventory.adjustments.reject'));
+
+const afterAction = () => {
+  emit('refresh');
+  handleClose();
+};
+
+const approve = () => approveAdjustment(displayAdjustment.value, afterAction);
+const reject = () => rejectAdjustment(displayAdjustment.value, afterAction);
 
 // Fetch full adjustment details with items
 const fetchAdjustmentDetails = async (adjustmentId) => {
@@ -339,14 +354,17 @@ const totalQuantityAdjusted = computed(() => {
       </div>
 
       <!-- Action Buttons (if applicable) -->
-      <div v-if="displayAdjustment.status === 'pending_approval'" class="flex justify-end space-x-2 pt-4 border-t">
+      <div
+        v-if="displayAdjustment.status === 'pending_approval' && (canApprove || canReject)"
+        class="flex justify-end space-x-2 pt-4 border-t"
+      >
         <a-button type="default" @click="handleClose">
           Close
         </a-button>
-        <a-button type="danger">
+        <a-button v-if="canReject" danger @click="reject">
           Reject
         </a-button>
-        <a-button type="primary">
+        <a-button v-if="canApprove" type="primary" @click="approve">
           Approve
         </a-button>
       </div>
