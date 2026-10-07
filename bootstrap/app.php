@@ -54,6 +54,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'check.super.user' => \App\Http\Middleware\CheckSuperUser::class,
             'user.permission' => \App\Http\Middleware\UserPermissionCheckMiddleware::class,
             'role.access' => \App\Http\Middleware\RoleBasedAccessControl::class,
+            'location.sellable' => \App\Http\Middleware\EnsureSellableLocation::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

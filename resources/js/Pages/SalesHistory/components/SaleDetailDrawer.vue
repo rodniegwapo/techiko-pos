@@ -76,7 +76,7 @@ const itemColumns = [
                         <a-tag v-if="sale.is_credit_sale" color="purple">credit</a-tag>
                     </a-descriptions-item>
                     <a-descriptions-item label="Payment" :span="2">
-                        {{ sale.payment_method }}<span v-if="sale.payment_card_type"> · {{ sale.payment_card_type }}</span>
+                        {{ sale.payment_method }}<span v-if="sale.payment_card_type"> · {{ sale.payment_card_type }}</span><span v-if="sale.payment_reference"> · Ref {{ sale.payment_reference }}</span>
                     </a-descriptions-item>
                     <a-descriptions-item v-if="sale.notes" label="Notes" :span="2">{{ sale.notes }}</a-descriptions-item>
                 </a-descriptions>

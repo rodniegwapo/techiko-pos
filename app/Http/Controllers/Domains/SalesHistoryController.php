@@ -28,7 +28,7 @@ class SalesHistoryController extends Controller
     /** Statuses a sale can have once it has left the cart. */
     private const STATUSES = ['paid', 'partial', 'refunded'];
 
-    private const PAYMENT_METHODS = ['cash', 'card', 'e-wallet', 'credit'];
+    private const PAYMENT_METHODS = ['cash', 'card', 'e-wallet', 'bank', 'credit'];
 
     public function index(Request $request, Domain $domain)
     {
@@ -148,6 +148,7 @@ class SalesHistoryController extends Controller
             'location_name' => $sale->location?->name,
             'payment_method' => $sale->payment_method,
             'payment_card_type' => $sale->paymentCardType?->name,
+            'payment_reference' => $sale->payment_reference,
             'payment_status' => $sale->payment_status,
             'is_credit_sale' => (bool) $sale->is_credit_sale,
             'notes' => $sale->notes,
@@ -258,7 +259,7 @@ class SalesHistoryController extends Controller
             fprintf($out, chr(0xEF).chr(0xBB).chr(0xBF));
             fputcsv($out, [
                 'invoice_number', 'transaction_date', 'cashier', 'customer', 'location',
-                'payment_method', 'card_type', 'payment_status', 'items', 'voided_items',
+                'payment_method', 'payment_channel', 'payment_reference', 'payment_status', 'items', 'voided_items',
                 'total_amount', 'discount_amount', 'tax_amount', 'grand_total',
             ]);
 
@@ -272,6 +273,7 @@ class SalesHistoryController extends Controller
                     $row['location_name'] ?? '',
                     $row['payment_method'] ?? '',
                     $row['payment_card_type'] ?? '',
+                    $row['payment_reference'] ?? '',
                     $row['payment_status'],
                     $row['items_count'],
                     $row['voided_items_count'],

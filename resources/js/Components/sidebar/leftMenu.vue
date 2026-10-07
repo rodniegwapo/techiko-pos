@@ -159,7 +159,7 @@ const menuItems = [
             },
             {
                 key: "wallet-card-terminals",
-                title: "Card terminals",
+                title: "Payment channels",
                 routeName: "payment-card-types.index",
                 path: "/payment-card-types",
             },
@@ -425,6 +425,14 @@ const menus = computed(() => {
 
                 // Coffeeshop layout: Offline sales page is hidden
                 if (item.key === "offline-sales" && isCoffeeshopLayout.value) {
+                    return false;
+                }
+
+                // A warehouse doesn't sell, so there's no Sales screen there (Sales History stays).
+                if (
+                    ["sales", "offline-sales"].includes(item.key) &&
+                    page.props.currentLocation?.type === "warehouse"
+                ) {
                     return false;
                 }
 

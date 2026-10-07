@@ -148,18 +148,18 @@ test.describe("Finding the way to card terminals", () => {
         const { day } = dateWindow();
         await MoneyMovementPage.open(page, day(0));
 
-        await expect(page.getByText("Need to edit card rails?")).toBeVisible();
-        await page.getByRole("button", { name: "Open card terminals" }).click();
+        await expect(page.getByText("Need to edit card terminals, e-wallets or banks?")).toBeVisible();
+        await page.getByRole("button", { name: "Open payment channels" }).click();
 
         await expect(page).toHaveURL(/\/payment-card-types/);
-        await expect(page.getByRole("heading", { name: "Payment card types" })).toBeVisible();
+        await expect(page.getByRole("heading", { name: "Payment channels" })).toBeVisible();
     });
 
     test("and takes the day being looked at with it", async ({ page }) => {
         const { day } = dateWindow();
         await MoneyMovementPage.open(page, day(0));
 
-        await page.getByRole("button", { name: "Open card terminals" }).click();
+        await page.getByRole("button", { name: "Open payment channels" }).click();
 
         await expect(page).toHaveURL(new RegExp(`business_date=${day(0)}`));
     });

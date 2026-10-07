@@ -32,6 +32,7 @@ class SalesHistoryResource extends JsonResource
             'location_name' => $this->location?->name,
             'payment_method' => $this->payment_method,
             'payment_card_type' => $this->paymentCardType?->name,
+            'payment_reference' => $this->payment_reference,
             'payment_status' => $this->payment_status,
             'is_credit_sale' => (bool) $this->is_credit_sale,
             'total_amount' => round((float) $this->total_amount, 2),

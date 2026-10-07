@@ -25,10 +25,14 @@ const vatLabel = computed(() => {
 });
 
 const paymentLabel = computed(() => {
-    const method = (props.sale.payment_method || "").toUpperCase();
-    return props.sale.payment_card_type
-        ? `${method} · ${props.sale.payment_card_type}`
-        : method;
+    // e.g. "E-WALLET · GCash · Ref 1234"
+    return [
+        (props.sale.payment_method || "").toUpperCase(),
+        props.sale.payment_card_type,
+        props.sale.payment_reference ? `Ref ${props.sale.payment_reference}` : null,
+    ]
+        .filter(Boolean)
+        .join(" · ");
 });
 </script>
 

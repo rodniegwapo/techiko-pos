@@ -66,8 +66,21 @@ const switchLocation = async (location) => {
         // Close popover
         visible.value = false;
 
-        // Full page reload with new location in URL
+        // Full page reload with new location in URL. A warehouse doesn't sell, so leaving a sales
+        // screen for one goes to its Inventory dashboard instead.
         const url = new URL(window.location);
+        const onSalesScreen = /\/sales(\/|$)/.test(url.pathname);
+        if (location.type === "warehouse" && onSalesScreen) {
+            const inventory = new URL(
+                window.route("domains.inventory.index", {
+                    domain: currentDomain.value.name_slug,
+                }),
+                window.location.origin,
+            );
+            inventory.searchParams.set("location_id", location.id);
+            window.location.href = inventory.toString();
+            return;
+        }
         url.searchParams.set("location_id", location.id);
         window.location.href = url.toString();
     } catch (error) {

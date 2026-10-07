@@ -11,6 +11,7 @@ import { useCredit } from "@/Composables/useCredit";
 import { useSaleTotals } from "@/Composables/useSaleTotals";
 import { ref, computed, createVNode, toRefs, watch, inject } from "vue";
 import { Modal, notification } from "ant-design-vue";
+import { DownOutlined } from "@ant-design/icons-vue";
 import { ExclamationCircleOutlined } from "@ant-design/icons-vue";
 import axios from "axios";
 import { usePage } from "@inertiajs/vue3";
@@ -42,6 +43,8 @@ const props = defineProps({
     /** Cached card types from parent (refreshed while online) for offline modal */
     cachedPaymentCardTypes: { type: Array, default: () => [] },
     offlinePaymentCardTypeId: { type: [Number, String], default: null },
+    /** E-wallet / bank reference no. kept with an offline sale */
+    offlinePaymentReference: { type: String, default: "" },
     salesSettings: {
         type: Object,
         default: () => ({
@@ -91,6 +94,7 @@ const emit = defineEmits([
     "payment-success",
     "update:offlinePaymentMethod",
     "update:offlinePaymentCardTypeId",
+    "update:offlinePaymentReference",
 ]);
 
 const {
@@ -356,6 +360,48 @@ const cardTypeModalOpen = ref(false);
 const selectedPaymentCardTypeId = ref(null);
 const paymentMethod = ref("cash");
 
+/** Card, e-wallet and bank payments name the channel used: a terminal, GCash, BDO… */
+const CHANNEL_KIND = { card: "card", "e-wallet": "ewallet", bank: "bank" };
+const CHANNEL_LABEL = { card: "card type", ewallet: "e-wallet", bank: "bank" };
+const channelKind = computed(() => CHANNEL_KIND[paymentMethod.value] ?? null);
+/** Less common ways to pay, kept behind the "Other" button so the main choices stay short. */
+const OTHER_METHODS = [
+    { value: "e-wallet", label: "E-wallet" },
+    { value: "bank", label: "Bank" },
+];
+const otherMethodSelected = computed(() =>
+    OTHER_METHODS.some((m) => m.value === paymentMethod.value),
+);
+const otherMethodLabel = computed(
+    () =>
+        OTHER_METHODS.find((m) => m.value === paymentMethod.value)?.label ??
+        "Other",
+);
+const needsChannel = computed(() => channelKind.value !== null);
+const missingChannel = computed(
+    () => needsChannel.value && !selectedPaymentCardTypeId.value,
+);
+/** Optional reference no. for e-wallet and bank payments (e.g. the GCash ref). */
+const paymentReference = ref(props.offlinePaymentReference || "");
+const takesReference = computed(
+    () => channelKind.value === "ewallet" || channelKind.value === "bank",
+);
+/** The channel picked, as the picker returned it (it may be newer than the saved list). */
+const selectedChannel = ref(null);
+const channelById = (id) =>
+    (selectedChannel.value?.id === id ? selectedChannel.value : null) ??
+    (props.cachedPaymentCardTypes || []).find((t) => t.id === id) ??
+    null;
+const selectedChannelName = computed(
+    () => channelById(selectedPaymentCardTypeId.value)?.name ?? null,
+);
+
+watch(paymentReference, (ref) => {
+    if (!salesCartIsOnline.value) {
+        emit("update:offlinePaymentReference", ref);
+    }
+});
+
 watch(
     () => props.offlinePaymentCardTypeId,
     (v) => {
@@ -372,8 +418,9 @@ watch(selectedPaymentCardTypeId, (id) => {
     }
 });
 
-function onCardTypeModalConfirm(id) {
+function onCardTypeModalConfirm(id, channel = null) {
     selectedPaymentCardTypeId.value = id;
+    selectedChannel.value = channel;
 }
 
 function onCardTypeModalCancel() {
@@ -435,17 +482,14 @@ const handleProceedPayment = async () => {
             }
         }
 
-        if (
-            paymentMethod.value === "card" &&
-            !selectedPaymentCardTypeId.value
-        ) {
+        if (missingChannel.value) {
+            const label = CHANNEL_LABEL[channelKind.value];
             notification.error({
-                message: "Card type required",
-                description:
-                    "Choose a card payment type before completing checkout.",
+                message: `${label[0].toUpperCase()}${label.slice(1)} required`,
+                description: `Choose the ${label} used before completing checkout.`,
             });
             cardTypeModalOpen.value = true;
-            throw new Error("Card type required");
+            throw new Error("Payment channel required");
         }
 
         // Single API call to process payment and loyalty together
@@ -455,8 +499,11 @@ const handleProceedPayment = async () => {
             payment_method: paymentMethod.value,
             loyalty_points_to_redeem: Number(loyaltyPointsDraft.value ?? 0),
         };
-        if (paymentMethod.value === "card" && selectedPaymentCardTypeId.value) {
+        if (needsChannel.value && selectedPaymentCardTypeId.value) {
             body.payment_card_type_id = selectedPaymentCardTypeId.value;
+        }
+        if (takesReference.value && paymentReference.value.trim()) {
+            body.payment_reference = paymentReference.value.trim();
         }
         const response = await axios.post(
             getRoute("sales.payment.store", {
@@ -468,6 +515,7 @@ const handleProceedPayment = async () => {
         // Clean up and finalize
         amountReceived.value = 0;
         selectedPaymentCardTypeId.value = null;
+        paymentReference.value = "";
         paymentMethod.value = "cash";
 
         // Show success notification based on response
@@ -557,10 +605,22 @@ watch(paymentMethod, (v) => {
     if (!salesCartIsOnline.value) {
         emit("update:offlinePaymentMethod", v);
     }
-    if (v === "card") {
-        cardTypeModalOpen.value = true;
-    } else {
+    const kind = CHANNEL_KIND[v];
+    if (!kind) {
         selectedPaymentCardTypeId.value = null;
+        paymentReference.value = "";
+        return;
+    }
+    // A channel picked for another method (say a card terminal, now paying by GCash) no longer fits.
+    const picked = channelById(selectedPaymentCardTypeId.value);
+    if (picked && (picked.kind || "card") !== kind) {
+        selectedPaymentCardTypeId.value = null;
+    }
+    if (kind === "card") {
+        paymentReference.value = "";
+    }
+    if (!selectedPaymentCardTypeId.value) {
+        cardTypeModalOpen.value = true;
     }
 });
 
@@ -637,14 +697,13 @@ const proceedPaymentDisabled = computed(
         (paymentMethod.value !== "credit" &&
             amountReceived.value < grandTotalDisplay.value) ||
         (paymentMethod.value === "credit" && !creditLimitSufficient.value) ||
-        (paymentMethod.value === "card" && !selectedPaymentCardTypeId.value) ||
+        missingChannel.value ||
         orders.value.length == 0,
 );
 
 const offlineSaveDisabled = computed(
     () =>
-        orders.value.length == 0 ||
-        (paymentMethod.value === "card" && !selectedPaymentCardTypeId.value),
+        orders.value.length == 0 || missingChannel.value,
 );
 
 // Lets a parent own the pay button (the Modern layout's footer "Charge" button).
@@ -821,24 +880,78 @@ defineExpose({
                     <span class="text-gray-700 whitespace-nowrap"
                         >Payment method</span
                     >
-                    <a-radio-group
-                        v-model:value="paymentMethod"
-                        button-style="solid"
-                        :class="
-                            layout === 'compact'
-                                ? 'flex w-full [&>.ant-radio-button-wrapper]:flex-1 [&>.ant-radio-button-wrapper]:text-center'
-                                : ''
-                        "
+                    <!-- The usual ways to pay, plus "Other" for e-wallet and bank -->
+                    <div
+                        class="flex items-stretch gap-2"
+                        :class="layout === 'compact' ? 'w-full' : ''"
                     >
-                        <a-radio-button value="cash">Cash</a-radio-button>
-                        <a-radio-button value="card">Card</a-radio-button>
-                        <a-radio-button
-                            value="credit"
-                            :disabled="!salesCartIsOnline || !canUseCredit"
+                        <a-radio-group
+                            v-model:value="paymentMethod"
+                            button-style="solid"
+                            :class="
+                                layout === 'compact'
+                                    ? 'flex min-w-0 flex-1 [&>.ant-radio-button-wrapper]:flex-1 [&>.ant-radio-button-wrapper]:text-center'
+                                    : ''
+                            "
                         >
-                            Credit
-                        </a-radio-button>
-                    </a-radio-group>
+                            <a-radio-button value="cash">Cash</a-radio-button>
+                            <a-radio-button value="card">Card</a-radio-button>
+                            <a-radio-button
+                                value="credit"
+                                :disabled="!salesCartIsOnline || !canUseCredit"
+                            >
+                                Credit
+                            </a-radio-button>
+                        </a-radio-group>
+                        <a-dropdown :trigger="['click']" placement="bottomRight">
+                            <a-button
+                                :type="otherMethodSelected ? 'primary' : 'default'"
+                                aria-label="Other payment methods"
+                                class="shrink-0"
+                            >
+                                {{ otherMethodLabel }}
+                                <DownOutlined class="text-xs" />
+                            </a-button>
+                            <template #overlay>
+                                <a-menu
+                                    :selected-keys="otherMethodSelected ? [paymentMethod] : []"
+                                    @click="({ key }) => (paymentMethod = key)"
+                                >
+                                    <a-menu-item
+                                        v-for="m in OTHER_METHODS"
+                                        :key="m.value"
+                                        >{{ m.label }}</a-menu-item
+                                    >
+                                </a-menu>
+                            </template>
+                        </a-dropdown>
+                    </div>
+                    <!-- Channel picked for card / e-wallet / bank, and the e-wallet or bank reference no. -->
+                    <div
+                        v-if="needsChannel"
+                        class="mt-2 flex flex-col gap-2 text-sm"
+                    >
+                        <div class="flex items-center gap-2">
+                            <span class="text-gray-600">
+                                {{ selectedChannelName || "No " + CHANNEL_LABEL[channelKind] + " chosen" }}
+                            </span>
+                            <a-button
+                                type="link"
+                                size="small"
+                                class="h-auto p-0"
+                                @click="cardTypeModalOpen = true"
+                            >
+                                {{ selectedPaymentCardTypeId ? "Change" : "Choose" }}
+                            </a-button>
+                        </div>
+                        <a-input
+                            v-if="takesReference"
+                            v-model:value="paymentReference"
+                            :maxlength="100"
+                            placeholder="Reference no. (optional)"
+                            aria-label="Reference no."
+                        />
+                    </div>
                     <!-- Credit Information Display -->
                     <div
                         v-if="paymentMethod === 'credit' && creditInfo"
@@ -964,6 +1077,7 @@ defineExpose({
                 :use-network="salesCartIsOnline"
                 :cached-types="cachedPaymentCardTypes"
                 :initial-selected-id="selectedPaymentCardTypeId"
+                :kind="channelKind || 'card'"
                 @confirm="onCardTypeModalConfirm"
                 @cancel="onCardTypeModalCancel"
             />

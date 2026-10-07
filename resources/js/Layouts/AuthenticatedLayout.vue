@@ -150,6 +150,15 @@ onMounted(() => {
             >
                 <!-- Store switcher sits above the page so it never covers header actions -->
                 <LocationBadge />
+                <!-- Why the user was sent here, e.g. away from a warehouse's sales screen -->
+                <a-alert
+                    v-if="page.props.flash?.notice"
+                    :message="page.props.flash.notice"
+                    type="info"
+                    show-icon
+                    closable
+                    class="mb-3"
+                />
                 <slot />
             </div>
             <div>

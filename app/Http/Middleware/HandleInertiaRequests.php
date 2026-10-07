@@ -47,6 +47,8 @@ class HandleInertiaRequests extends Middleware
             'flash' => [
                 'success' => $request->session()->get('success'),
                 'error' => $request->session()->get('error'),
+                // Shown once by the layout: why the user was sent away from a page (e.g. a warehouse's sales screen).
+                'notice' => $request->session()->get('notice'),
             ],
             'auth' => [
                 'user' => $user ? AuthUserResource::make($user->load('roles', 'permissions')) : null,

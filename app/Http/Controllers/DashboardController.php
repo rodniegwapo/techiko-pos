@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers;
 use App\Models\Sale;
 use App\Models\Customer;
 use App\Models\Product\Product;
@@ -40,7 +41,7 @@ class DashboardController extends Controller
             // the org dashboard would be denied and redirected back here, looping.
             $routeName = $user->getAllPermissions()->contains('route_name', 'dashboard')
                 ? 'domains.dashboard'
-                : 'domains.sales.index';
+                : Helpers::homeRouteFor($user);
 
             return redirect()->route($routeName, ['domain' => $user->domain]);
         }

@@ -231,6 +231,16 @@ class E2ESalesSeeder extends Seeder
             ['is_active' => false, 'location_id' => $location->id, 'sort_order' => 99]
         );
 
+        // An e-wallet and a bank, for paying by E-wallet / Bank at checkout.
+        PaymentCardType::updateOrCreate(
+            ['domain' => self::DOMAIN, 'name' => 'E2E GCash'],
+            ['kind' => 'ewallet', 'is_active' => true, 'location_id' => $location->id, 'sort_order' => 0]
+        );
+        PaymentCardType::updateOrCreate(
+            ['domain' => self::DOMAIN, 'name' => 'E2E BDO'],
+            ['kind' => 'bank', 'is_active' => true, 'location_id' => $location->id, 'sort_order' => 0]
+        );
+
         // Another organization's card type, for cross-organization checks.
         $otherLocation = InventoryLocation::where('code', 'MC-MAIN')->first();
         if ($otherLocation) {

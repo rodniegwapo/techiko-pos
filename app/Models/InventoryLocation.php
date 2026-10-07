@@ -110,6 +110,12 @@ class InventoryLocation extends Model
         return $query->where('is_active', true);
     }
 
+    /** Warehouses hold and move stock but don't sell. */
+    public function isWarehouse(): bool
+    {
+        return $this->type === 'warehouse';
+    }
+
     /**
      * Get the default location for a specific domain
      */

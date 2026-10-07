@@ -107,7 +107,7 @@ const pageTitle = computed(() => {
     if (props.moneyDetailsCardType?.name) {
         return `Money — ${props.moneyDetailsCardType.name}`;
     }
-    return "Card terminals";
+    return "Payment channels";
 });
 
 const headTitle = computed(() => pageTitle.value);
@@ -187,7 +187,7 @@ const activeBusinessDate = computed(() => {
     );
 });
 
-/** Money movement page defaults to collapsed cash control; card terminals page expands it. */
+/** Money movement page defaults to collapsed cash control; the payment channels page expands it. */
 const cashControlExpanded = ref(true);
 
 function syncCashControlExpandedToPage() {
@@ -576,9 +576,9 @@ async function reopenShift() {
             class="mb-6 max-w-7xl flex flex-wrap items-center gap-3 text-sm"
         >
             <template v-if="isMoneyMovementPage && canViewCardTypes">
-                <span class="text-gray-600">Need to edit card rails?</span>
+                <span class="text-gray-600">Need to edit card terminals, e-wallets or banks?</span>
                 <a-button type="link" class="h-auto p-0" @click="goToCardTypes">
-                    Open card terminals
+                    Open payment channels
                 </a-button>
             </template>
             <template v-else-if="!isMoneyMovementPage && canViewMoneyMovement">

@@ -272,6 +272,13 @@ export class SalesPage {
         return this.page.locator(".ant-radio-button-wrapper").filter({ hasText: label });
     }
 
+    /** E-wallet and Bank sit behind the "Other" button next to Cash / Card / Credit. */
+    async chooseOtherPayment(label) {
+        await this.page.getByRole("button", { name: "Other payment methods" }).click();
+        await this.page.getByRole("menuitem", { name: label, exact: true }).click();
+        await expect(this.page.getByRole("button", { name: "Other payment methods" })).toContainText(label);
+    }
+
     async choosePayment(label) {
         await expect(async () => {
             await this.paymentMethod(label).click();

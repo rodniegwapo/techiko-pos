@@ -630,6 +630,54 @@ class InventoryService
     }
 
     /**
+     * Move several products from one store to another in one go: all of them move, or none do.
+     * Every product short at the source is reported together, not just the first.
+     *
+     * @param  array<int, array{product: Product, quantity: float}>  $items
+     */
+    public function transferMany(array $items, InventoryLocation $fromLocation, InventoryLocation $toLocation, User $user, ?string $notes = null): void
+    {
+        DB::transaction(function () use ($items, $fromLocation, $toLocation, $user, $notes) {
+            // Check before moving anything; a product listed twice needs both rows' worth.
+            $requested = [];
+            foreach ($items as $item) {
+                $id = $item['product']->id;
+                $requested[$id] = ($requested[$id] ?? 0) + $item['quantity'];
+            }
+
+            $short = [];
+            foreach ($items as $item) {
+                $product = $item['product'];
+                if (! isset($requested[$product->id])) {
+                    continue; // already checked
+                }
+                $wanted = $requested[$product->id];
+                unset($requested[$product->id]);
+
+                $inventory = $this->getOrCreateInventory($product, $fromLocation);
+                if (! $inventory->isInStock($wanted)) {
+                    $available = max(0, (int) $inventory->quantity_available);
+                    $short[] = [
+                        'product_id' => $product->id,
+                        'product_name' => $product->name,
+                        'requested_quantity' => (int) $wanted,
+                        'available_quantity' => $available,
+                        'shortage' => (int) $wanted - $available,
+                    ];
+                }
+            }
+
+            if ($short !== []) {
+                throw new InsufficientStockException($short);
+            }
+
+            foreach ($items as $item) {
+                $this->transferInventory($item['product'], $fromLocation, $toLocation, $item['quantity'], $user, $notes);
+            }
+        });
+    }
+
+    /**
      * Transfer inventory between locations
      */
     public function transferInventory(Product $product, InventoryLocation $fromLocation, InventoryLocation $toLocation, float $quantity, User $user, ?string $notes = null): bool

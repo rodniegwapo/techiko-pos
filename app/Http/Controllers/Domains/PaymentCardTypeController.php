@@ -69,6 +69,7 @@ class PaymentCardTypeController extends Controller
         $props['moneyDetailsCardType'] = [
             'id' => (int) $paymentCardType->id,
             'name' => (string) $paymentCardType->name,
+            'kind' => (string) ($paymentCardType->kind ?? 'card'),
             'is_active' => (bool) $paymentCardType->is_active,
         ];
 
@@ -100,6 +101,8 @@ class PaymentCardTypeController extends Controller
             'cardTypes' => $types,
             'walletCashTotals' => $walletCashTotals,
             'walletCreditTotals' => $walletCreditTotals,
+            'walletEwalletTotals' => $this->paidSalesTotalsByPaymentMethod($domain, $location, 'e-wallet'),
+            'walletBankTotals' => $this->paidSalesTotalsByPaymentMethod($domain, $location, 'bank'),
             'ledger' => null,
             'runningCashBalance' => null,
             'activeLocation' => [
@@ -358,18 +361,20 @@ class PaymentCardTypeController extends Controller
     }
 
     /**
-     * JSON list for Sales modal (active types only).
+     * JSON list for the Sales channel picker (active channels only; `?kind=` for one kind).
      */
     public function list(Request $request, Domain $domain)
     {
         $location = WalletLocationResolver::resolve($request, $domain);
+        $kind = in_array($request->input('kind'), PaymentCardType::KINDS, true) ? $request->input('kind') : null;
 
         $types = PaymentCardType::query()
             ->forDomainLocation($domain->name_slug, $location->id)
             ->active()
+            ->when($kind, fn ($q) => $q->ofKind($kind))
             ->orderBy('sort_order')
             ->orderBy('name')
-            ->get(['id', 'name', 'is_active']);
+            ->get(['id', 'name', 'kind', 'is_active']);
 
         return response()->json(['data' => $types]);
     }
@@ -380,6 +385,7 @@ class PaymentCardTypeController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255', $this->uniqueNameInLocation($domain, $location)],
+            'kind' => ['nullable', Rule::in(PaymentCardType::KINDS)],
             'sort_order' => ['nullable', 'integer', 'min:0', 'max:65535'],
         ], $this->uniqueNameMessage());
 
@@ -387,6 +393,7 @@ class PaymentCardTypeController extends Controller
             'domain' => $domain->name_slug,
             'location_id' => $location->id,
             'name' => $validated['name'],
+            'kind' => $validated['kind'] ?? 'card',
             'is_active' => true,
             'sort_order' => $validated['sort_order'] ?? 0,
         ]);
@@ -410,6 +417,7 @@ class PaymentCardTypeController extends Controller
                 'max:255',
                 $this->uniqueNameInLocation($domain, $location)->ignore($paymentCardType->id),
             ],
+            'kind' => ['sometimes', Rule::in(PaymentCardType::KINDS)],
             'is_active' => ['sometimes', 'boolean'],
             'sort_order' => ['nullable', 'integer', 'min:0', 'max:65535'],
         ], $this->uniqueNameMessage());
@@ -454,7 +462,8 @@ class PaymentCardTypeController extends Controller
             ->where('location_id', $location->id)
             ->where('payment_card_type_id', $paymentCardType->id)
             ->where('payment_status', 'paid')
-            ->where('payment_method', 'card');
+            // Card sales for a terminal, e-wallet sales for GCash, bank sales for a bank account.
+            ->where('payment_method', PaymentCardType::methodForKind($paymentCardType->kind ?? 'card'));
 
         $todayTotal = (clone $base)
             ->whereDate('transaction_date', now()->toDateString())
@@ -515,7 +524,7 @@ class PaymentCardTypeController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Card type deactivated because it is used on past sales.',
+                'message' => 'Payment channel deactivated because it is used on past sales.',
             ]);
         }
 
@@ -523,11 +532,11 @@ class PaymentCardTypeController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Card type deleted.',
+            'message' => 'Payment channel deleted.',
         ]);
     }
 
-    /** Card type names must be unique per store, or cashiers can't tell them apart at checkout. */
+    /** Channel names must be unique per store, or cashiers can't tell them apart at checkout. */
     private function uniqueNameInLocation(Domain $domain, InventoryLocation $location): Unique
     {
         return Rule::unique('payment_card_types', 'name')
@@ -538,7 +547,7 @@ class PaymentCardTypeController extends Controller
     /** @return array<string, string> */
     private function uniqueNameMessage(): array
     {
-        return ['name.unique' => 'A card type with this name already exists at this store.'];
+        return ['name.unique' => 'A payment channel with this name already exists at this store.'];
     }
 
     private function ensureInDomainLocation(Domain $domain, InventoryLocation $location, PaymentCardType $paymentCardType): void

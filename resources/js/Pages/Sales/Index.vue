@@ -162,6 +162,9 @@ const cashierUserId = computed(() => page.props.auth?.user?.data?.id);
 
 const offlinePaymentMethod = ref("cash");
 const offlinePaymentCardTypeId = ref(null);
+const offlinePaymentReference = ref("");
+/** Payment methods paid through a channel (card terminal, e-wallet, bank). */
+const CHANNEL_METHODS = ["card", "e-wallet", "bank"];
 const offlineProductLookup = ref([]);
 const cachedPaymentCardTypes = ref([]);
 
@@ -423,10 +426,9 @@ async function persistOfflineCartToDexie() {
         user_id: cashierUserId.value,
         line_items: ordersToLineItems(orders.value),
         payment_method: offlinePaymentMethod.value,
-        payment_card_type_id:
-            offlinePaymentMethod.value === "card"
-                ? (offlinePaymentCardTypeId.value ?? null)
-                : null,
+        payment_card_type_id: CHANNEL_METHODS.includes(offlinePaymentMethod.value)
+            ? (offlinePaymentCardTypeId.value ?? null)
+            : null,
         location_id: activeLocationId.value ?? null,
         customer_id: selectedCustomer.value?.id ?? null,
         customer_snapshot: selectedCustomer.value
@@ -953,9 +955,14 @@ async function resumeServerCartMode() {
 
 function syncOfflinePaymentMethod(v) {
     offlinePaymentMethod.value = v;
-    if (v !== "card") {
+    if (!CHANNEL_METHODS.includes(v)) {
         offlinePaymentCardTypeId.value = null;
+        offlinePaymentReference.value = "";
     }
+}
+
+function syncOfflinePaymentReference(v) {
+    offlinePaymentReference.value = v ?? "";
 }
 
 function syncOfflinePaymentCardTypeId(v) {
@@ -985,19 +992,19 @@ async function completeOfflineSale() {
     let payment = offlinePaymentMethod.value || "cash";
     if (payment === "credit") {
         message.error(
-            "Credit payments cannot be saved offline. Choose cash or card.",
+            "Credit payments cannot be saved offline. Choose cash, card, e-wallet or bank.",
         );
         return;
     }
-    if (payment !== "cash" && payment !== "card") {
+    if (payment !== "cash" && !CHANNEL_METHODS.includes(payment)) {
         payment = "cash";
     }
-    if (payment === "card" && !offlinePaymentCardTypeId.value) {
-        message.error(
-            "Select a card payment type (Pay in Card) before saving offline.",
-        );
+    const channelWord = { card: "card payment type", "e-wallet": "e-wallet", bank: "bank" }[payment];
+    if (channelWord && !offlinePaymentCardTypeId.value) {
+        message.error(`Select the ${channelWord} before saving offline.`);
         return;
     }
+    const reference = String(offlinePaymentReference.value || "").trim();
     const clientMutationId = uuidv4();
     const payload = {
         items: lines.map((l) => ({
@@ -1006,8 +1013,13 @@ async function completeOfflineSale() {
             unit_price: Number(l.unit_price),
         })),
         payment_method: payment,
-        payment_card_type_id:
-            payment === "card" ? Number(offlinePaymentCardTypeId.value) : null,
+        payment_card_type_id: CHANNEL_METHODS.includes(payment)
+            ? Number(offlinePaymentCardTypeId.value)
+            : null,
+        payment_reference:
+            (payment === "e-wallet" || payment === "bank") && reference
+                ? reference
+                : null,
         location_id: activeLocationId.value,
         cashier_user_id: cashierUserId.value,
         notes: null,
@@ -1034,6 +1046,7 @@ async function completeOfflineSale() {
         orderDiscountId.value = "";
         offlinePaymentMethod.value = "cash";
         offlinePaymentCardTypeId.value = null;
+        offlinePaymentReference.value = "";
         offlineProductLookup.value = [];
         forceOfflineCartMode.value = false;
         message.success("Saved locally. Review under Offline transactions.");
@@ -1693,6 +1706,8 @@ watch(
                                             @update:offline-payment-card-type-id="
                                                 syncOfflinePaymentCardTypeId
                                             "
+                                            :offline-payment-reference="offlinePaymentReference"
+                                            @update:offline-payment-reference="syncOfflinePaymentReference"
                                             @save-offline-sale="
                                                 completeOfflineSale
                                             "
@@ -1828,6 +1843,8 @@ watch(
                         @update:offline-payment-card-type-id="
                             syncOfflinePaymentCardTypeId
                         "
+                        :offline-payment-reference="offlinePaymentReference"
+                        @update:offline-payment-reference="syncOfflinePaymentReference"
                         @save-offline-sale="completeOfflineSale"
                     />
                 </template>
@@ -1884,6 +1901,8 @@ watch(
                 @update:offline-payment-card-type-id="
                     syncOfflinePaymentCardTypeId
                 "
+                :offline-payment-reference="offlinePaymentReference"
+                @update:offline-payment-reference="syncOfflinePaymentReference"
                 @save-offline-sale="completeOfflineSale"
             />
         </template>

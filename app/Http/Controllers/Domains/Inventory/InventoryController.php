@@ -15,6 +15,7 @@ use App\Models\InventoryMovement;
 use App\Models\Product\Product;
 use App\Models\ProductInventory;
 use App\Services\InventoryService;
+use App\Traits\HandlesStockTransfers;
 use App\Traits\LocationCategoryScoping;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -23,6 +24,7 @@ use Inertia\Inertia;
 
 class InventoryController extends Controller
 {
+    use HandlesStockTransfers;
     use LocationCategoryScoping;
 
     public function __construct(private InventoryService $inventoryService) {}
@@ -360,37 +362,25 @@ class InventoryController extends Controller
 
     public function transfer(Request $request, Domain $domain)
     {
-        $validated = $request->validate([
-            'product_id' => 'required|exists:products,id',
-            'from_location_id' => 'required|exists:inventory_locations,id',
-            'to_location_id' => 'required|exists:inventory_locations,id|different:from_location_id',
-            'quantity' => 'required|integer|min:1',
-            'notes' => 'nullable|string|max:500',
-        ]);
+        $transfer = $this->validatedTransfer($request);
 
-        $product = Product::where('domain', $domain->name_slug)->findOrFail($validated['product_id']);
-        $fromLocation = InventoryLocation::forDomain($domain->name_slug)->findOrFail($validated['from_location_id']);
-        $toLocation = InventoryLocation::forDomain($domain->name_slug)->findOrFail($validated['to_location_id']);
+        // Looked up within the organization, so another organization's product or store is not found.
+        $fromLocation = InventoryLocation::forDomain($domain->name_slug)->findOrFail($transfer['from_location_id']);
+        $toLocation = InventoryLocation::forDomain($domain->name_slug)->findOrFail($transfer['to_location_id']);
+        $products = Product::where('domain', $domain->name_slug)
+            ->whereIn('id', array_column($transfer['rows'], 'product_id'))
+            ->get()
+            ->keyBy('id');
+
+        $items = array_map(fn ($row) => [
+            'product' => $products[$row['product_id']] ?? abort(404),
+            'quantity' => $row['quantity'],
+        ], $transfer['rows']);
 
         try {
-            $this->inventoryService->transferInventory(
-                $product,
-                $fromLocation,
-                $toLocation,
-                $validated['quantity'],
-                auth()->user(),
-                $validated['notes'] ?? null
-            );
+            $this->inventoryService->transferMany($items, $fromLocation, $toLocation, auth()->user(), $transfer['notes']);
         } catch (InsufficientStockException $e) {
-            $item = $e->getUnavailableItems()[0] ?? null;
-            $available = $item['available_quantity'] ?? 0;
-            $message = "Only {$available} units available at source location";
-
-            return response()->json([
-                'success' => false,
-                'errors' => ['quantity' => [$message]],
-                'message' => $message,
-            ], 422);
+            return $this->transferShortageResponse($e, $transfer, $fromLocation);
         }
 
         return response()->noContent(200);

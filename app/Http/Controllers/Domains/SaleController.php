@@ -8,6 +8,7 @@ use App\Events\PaymentCompleted;
 use App\Exceptions\InsufficientStockException;
 use App\Helpers;
 use App\Http\Controllers\Controller;
+use App\Http\Middleware\EnsureSellableLocation;
 use App\Http\Resources\ProductResource;
 use App\Models\Category;
 use App\Models\Customer;
@@ -15,6 +16,7 @@ use App\Models\Domain;
 use App\Models\InventoryLocation;
 use App\Models\MandatoryDiscount;
 use App\Models\OfflineSaleSync;
+use App\Models\PaymentCardType;
 use App\Models\Product\Discount;
 use App\Models\Product\Product;
 use App\Models\Sale;
@@ -260,29 +262,23 @@ class SaleController extends Controller
             'customer_id' => ['nullable', $this->customerInDomainRule($domain)],
             'sale_amount' => 'nullable|numeric|min:0',
             'loyalty_points_to_redeem' => 'nullable|integer|min:0',
-            'payment_method' => 'required|string|in:cash,card,e-wallet,credit',
+            'payment_method' => 'required|string|in:cash,card,e-wallet,bank,credit',
         ]);
 
-        if (($validated['payment_method'] ?? '') === 'card') {
-            $validated = array_merge($validated, $request->validate([
-                'payment_card_type_id' => [
-                    'required',
-                    'integer',
-                    Rule::exists('payment_card_types', 'id')->where(function ($q) use ($domain) {
-                        $q->where('domain', $domain->name_slug)->where('is_active', true);
-                    }),
-                ],
-            ]));
-        } else {
-            $validated['payment_card_type_id'] = null;
-        }
+        $location = Helpers::getActiveLocation($domain);
+
+        // Card, e-wallet and bank payments name the channel used (terminal, GCash, BDO…) at this store.
+        $validated = array_merge($validated, $this->validatedPaymentChannel(
+            $request->all(),
+            $domain,
+            $validated['payment_method'],
+            $sale->location_id ?? $location?->id,
+        ));
 
         $validated['customer_id'] ??= null;
 
         $loyaltyResults = null;
         $creditResults = null;
-
-        $location = Helpers::getActiveLocation($domain);
         $redemptionService = app(LoyaltyRedemptionService::class);
 
         try {
@@ -386,6 +382,7 @@ class SaleController extends Controller
                     $sale->update([
                         'payment_method' => $validated['payment_method'],
                         'payment_card_type_id' => $validated['payment_card_type_id'] ?? null,
+                        'payment_reference' => $validated['payment_reference'] ?? null,
                         'location_id' => $location->id,
                         'payment_status' => 'paid',
                     ]);
@@ -444,6 +441,48 @@ class SaleController extends Controller
     }
 
     /** `exists` rule limited to this organization's customers. */
+    /**
+     * For card, e-wallet and bank payments: the channel used (a card terminal, GCash, BDO…), which
+     * must be an active channel of that kind at the sale's store, plus an optional reference number.
+     * Cash and credit carry neither.
+     *
+     * @return array{payment_card_type_id: ?int, payment_reference: ?string}
+     */
+    protected function validatedPaymentChannel(array $input, Domain $domain, string $method, ?int $locationId): array
+    {
+        $kind = PaymentCardType::KIND_FOR_METHOD[$method] ?? null;
+        if (! $kind) {
+            return ['payment_card_type_id' => null, 'payment_reference' => null];
+        }
+
+        $label = ['card' => 'card type', 'ewallet' => 'e-wallet', 'bank' => 'bank'][$kind];
+
+        $validated = Validator::make($input, [
+            'payment_card_type_id' => [
+                'required',
+                'integer',
+                Rule::exists('payment_card_types', 'id')->where(function ($q) use ($domain, $kind, $locationId) {
+                    $q->where('domain', $domain->name_slug)
+                        ->where('kind', $kind)
+                        ->where('is_active', true)
+                        ->when($locationId, fn ($q) => $q->where('location_id', $locationId));
+                }),
+            ],
+            'payment_reference' => ['nullable', 'string', 'max:100'],
+        ], [
+            'payment_card_type_id.required' => "Choose the {$label} used for this payment.",
+            'payment_card_type_id.exists' => "That {$label} isn't available at this store.",
+        ])->validate();
+
+        $reference = trim((string) ($validated['payment_reference'] ?? ''));
+
+        return [
+            'payment_card_type_id' => (int) $validated['payment_card_type_id'],
+            // Card payments have no reference to keep.
+            'payment_reference' => $kind !== 'card' && $reference !== '' ? $reference : null,
+        ];
+    }
+
     protected function customerInDomainRule(Domain $domain)
     {
         return Rule::exists('customers', 'id')->where('domain', $domain->name_slug);
@@ -1276,13 +1315,14 @@ class SaleController extends Controller
             'sales.*.payload.items.*.product_id' => ['required', 'integer', 'exists:products,id'],
             'sales.*.payload.items.*.quantity' => ['required', 'integer', 'min:1'],
             'sales.*.payload.items.*.unit_price' => ['required', 'numeric', 'min:0'],
-            'sales.*.payload.payment_method' => ['required', 'string', 'in:cash,card,e-wallet'],
+            'sales.*.payload.payment_method' => ['required', 'string', 'in:cash,card,e-wallet,bank'],
             'sales.*.payload.location_id' => ['required', 'integer'],
             'sales.*.payload.customer_id' => ['nullable', 'integer', 'exists:customers,id'],
             'sales.*.payload.notes' => ['nullable', 'string', 'max:2000'],
             'sales.*.payload.recorded_at' => ['nullable', 'date'],
             'sales.*.payload.cashier_user_id' => ['required', 'integer', 'exists:users,id'],
             'sales.*.payload.payment_card_type_id' => ['nullable', 'integer'],
+            'sales.*.payload.payment_reference' => ['nullable', 'string', 'max:100'],
         ]);
 
         $results = [];
@@ -1331,6 +1371,11 @@ class SaleController extends Controller
                 'location_id' => ['Invalid or inactive location for this organization.'],
             ]);
         }
+        if ($location->isWarehouse()) {
+            throw ValidationException::withMessages([
+                'location_id' => [EnsureSellableLocation::MESSAGE],
+            ]);
+        }
 
         $cashier = User::findOrFail((int) $payload['cashier_user_id']);
         if (! $cashier->isSuperUser() && $cashier->domain !== $domain->name_slug) {
@@ -1364,17 +1409,7 @@ class SaleController extends Controller
             }
         }
 
-        if (($payload['payment_method'] ?? '') === 'card') {
-            Validator::make($payload, [
-                'payment_card_type_id' => [
-                    'required',
-                    'integer',
-                    Rule::exists('payment_card_types', 'id')->where(function ($q) use ($domain) {
-                        $q->where('domain', $domain->name_slug)->where('is_active', true);
-                    }),
-                ],
-            ])->validate();
-        }
+        $channel = $this->validatedPaymentChannel($payload, $domain, $payload['payment_method'] ?? 'cash', $location->id);
 
         if (! $domain->salesAllowsOverselling()) {
             $stockItems = collect($payload['items'])->map(function (array $row) {
@@ -1394,7 +1429,7 @@ class SaleController extends Controller
             }
         }
 
-        return DB::transaction(function () use ($domain, $clientMutationId, $payload, $location, $cashier) {
+        return DB::transaction(function () use ($domain, $clientMutationId, $payload, $location, $cashier, $channel) {
             $syncRow = null;
 
             try {
@@ -1442,9 +1477,8 @@ class SaleController extends Controller
                     'transaction_date' => $transactionDate,
                     'customer_id' => $payload['customer_id'] ?? null,
                     'payment_method' => $payload['payment_method'],
-                    'payment_card_type_id' => ($payload['payment_method'] ?? '') === 'card'
-                        ? ($payload['payment_card_type_id'] ?? null)
-                        : null,
+                    'payment_card_type_id' => $channel['payment_card_type_id'],
+                    'payment_reference' => $channel['payment_reference'],
                     'notes' => $payload['notes'] ?? null,
                     'tax_amount' => 0,
                 ]);
@@ -1467,9 +1501,8 @@ class SaleController extends Controller
                 $sale->refresh();
                 $sale->update([
                     'payment_method' => $payload['payment_method'],
-                    'payment_card_type_id' => ($payload['payment_method'] ?? '') === 'card'
-                        ? ($payload['payment_card_type_id'] ?? null)
-                        : null,
+                    'payment_card_type_id' => $channel['payment_card_type_id'],
+                    'payment_reference' => $channel['payment_reference'],
                     'location_id' => $location->id,
                     'payment_status' => 'paid',
                 ]);

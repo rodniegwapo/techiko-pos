@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Helpers;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Providers\AppServiceProvider;
@@ -43,7 +44,7 @@ class PublicVerifyEmailController extends Controller
 
         if ($user->domain) {
             return redirect()->intended(
-                route('domains.sales.index', ['domain' => $user->domain]).'?verified=1'
+                route(Helpers::homeRouteFor($user), ['domain' => $user->domain]).'?verified=1'
             );
         }
 
