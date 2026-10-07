@@ -14,6 +14,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -43,6 +44,19 @@ class SalesHistoryController extends Controller
             ->first();
         $salesWithVoids = (clone $query)->whereHas('saleItems', fn ($q) => $q->onlyTrashed())->count();
 
+        // Profit reveals product costs, so only staff who see all sales get it.
+        $profitSummary = [];
+        if ($this->canSeeAllSales($request->user())) {
+            // Voided lines are soft-deleted, so they drop out of cost of goods sold on their own.
+            $soldItems = SaleItem::query()->whereIn('sale_id', (clone $query)->select('sales.id'));
+            $cogs = (float) (clone $soldItems)->whereNotNull('unit_cost')->sum(DB::raw('unit_cost * quantity'));
+            $profitSummary = [
+                'cogs' => round($cogs, 2),
+                'profit' => round((float) $summary->net - (float) $summary->vat - $cogs, 2),
+                'items_missing_cost' => (clone $soldItems)->whereNull('unit_cost')->count(),
+            ];
+        }
+
         $perPage = min(max((int) $request->input('per_page', 20), 1), 100);
 
         $sales = $this->withListRelations($query)
@@ -69,6 +83,7 @@ class SalesHistoryController extends Controller
                 'vat' => round((float) $summary->vat, 2),
                 'net' => round((float) $summary->net, 2),
                 'sales_with_voids' => $salesWithVoids,
+                ...$profitSummary,
             ],
             'options' => [
                 'locations' => $this->canSeeAllSales($request->user())
@@ -121,6 +136,9 @@ class SalesHistoryController extends Controller
         $timezone = config('app.timezone', 'UTC');
         $date = $sale->transaction_date ? Carbon::parse($sale->transaction_date)->timezone($timezone) : null;
 
+        // Product costs are management information, so staff limited to their own sales don't get them.
+        $profit = $this->canSeeAllSales($request->user()) ? $this->profitBreakdown($sale, $items) : null;
+
         return response()->json([
             'id' => $sale->id,
             'invoice_number' => $sale->invoice_number,
@@ -170,7 +188,41 @@ class SalesHistoryController extends Controller
                 'approved_by' => $log->approver?->name,
                 'voided_at' => $log->created_at?->timezone($timezone)->format('Y-m-d h:i A'),
             ])->values(),
+            'profit' => $profit,
         ]);
+    }
+
+    /**
+     * Gross profit of one sale: what was paid less VAT, less the cost of the items still on it.
+     * Voided lines are excluded; lines whose product had no cost are listed but count as zero.
+     */
+    private function profitBreakdown(Sale $sale, $items): array
+    {
+        $grandTotal = (float) $sale->grand_total;
+        $vat = (float) $sale->tax_amount;
+        $revenue = $grandTotal - $vat;
+
+        $lines = $items->reject(fn (SaleItem $item) => $item->trashed())
+            ->map(fn (SaleItem $item) => [
+                'product_name' => $item->product?->name ?? 'Deleted product',
+                'quantity' => (float) $item->quantity,
+                'unit_cost' => $item->unit_cost === null ? null : round((float) $item->unit_cost, 2),
+                'line_cost' => $item->unit_cost === null ? null : round((float) $item->unit_cost * (float) $item->quantity, 2),
+            ])->values();
+
+        $cogs = (float) $lines->sum(fn ($line) => $line['line_cost'] ?? 0);
+        $profit = $revenue - $cogs;
+
+        return [
+            'grand_total' => round($grandTotal, 2),
+            'vat' => round($vat, 2),
+            'revenue' => round($revenue, 2),
+            'cogs' => round($cogs, 2),
+            'profit' => round($profit, 2),
+            'margin_percent' => $revenue > 0 ? round($profit / $revenue * 100, 1) : null,
+            'items_missing_cost' => $lines->whereNull('unit_cost')->count(),
+            'lines' => $lines,
+        ];
     }
 
     /**

@@ -11,8 +11,20 @@ class SaleItem extends Model
     
     protected $guarded = [];
 
+    protected $casts = [
+        'unit_cost' => 'decimal:4',
+    ];
+
     protected static function booted()
     {
+        // Freeze the product's cost on the line when it is first added, so later cost edits
+        // don't rewrite the profit of sales already made.
+        static::creating(function (SaleItem $item) {
+            if ($item->unit_cost === null && $item->product_id) {
+                $item->unit_cost = \App\Models\Product\Product::whereKey($item->product_id)->value('cost');
+            }
+        });
+
         // Auto-calculate subtotal before saving
         static::saving(function (SaleItem $item) {
             $lineSubtotal = $item->unit_price * $item->quantity;

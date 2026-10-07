@@ -10,6 +10,7 @@ import {
     IconReceiptTax,
     IconCoins,
     IconReceiptOff,
+    IconTrendingUp,
     IconCalendarEvent,
 } from "@tabler/icons-vue";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
@@ -230,6 +231,17 @@ const summaryCards = computed(() => {
             highlight: true,
         },
         {
+            key: "profit",
+            label: "Gross profit",
+            value: formattedTotal(s.profit ?? 0),
+            // Lines without a cost count as zero cost, so say so rather than show an inflated margin.
+            hint: s.items_missing_cost
+                ? `${s.items_missing_cost.toLocaleString()} item(s) missing cost`
+                : `${percent(s.profit ?? 0, (s.net ?? 0) - (s.vat ?? 0))} margin, ex-VAT`,
+            icon: IconTrendingUp,
+            tone: "bg-emerald-50 text-emerald-600",
+        },
+        {
             key: "voids",
             label: "Sales with voids",
             value: (s.sales_with_voids ?? 0).toLocaleString(),
@@ -237,7 +249,8 @@ const summaryCards = computed(() => {
             icon: IconReceiptOff,
             tone: "bg-red-50 text-red-600",
         },
-    ];
+        // The server leaves profit out for staff who only see their own sales.
+    ].filter((card) => card.key !== "profit" || s.profit !== undefined);
 });
 </script>
 
@@ -282,7 +295,7 @@ const summaryCards = computed(() => {
                         <span data-testid="sales-history-period">{{ periodLabel }}</span>
                     </div>
 
-                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                         <div
                             v-for="card in summaryCards"
                             :key="card.key"
