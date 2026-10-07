@@ -150,6 +150,31 @@ test.describe("Create product", () => {
         await expect(form.error("Sold Type")).toContainText("sold type field is required");
     });
 
+    test("Generate fills a SKU from the name and a scannable in-store barcode", async ({ page }) => {
+        const form = await openCreate(page);
+        await form.fill({ name: "Ice Pod Formula" });
+
+        await page.getByRole("button", { name: "Generate SKU" }).click();
+        await page.getByRole("button", { name: "Generate barcode" }).click();
+
+        await expect(page.getByPlaceholder("Enter SKU")).toHaveValue(/^IPF-[A-Z2-9]{5}$/);
+        const barcode = await page.getByPlaceholder("Enter barcode").inputValue();
+        expect(barcode).toMatch(/^2\d{12}$/);
+        // EAN-13 check digit: weights 1,3,1,3… over the first 12 digits.
+        const sum = [...barcode.slice(0, 12)].reduce((acc, d, i) => acc + Number(d) * (i % 2 ? 3 : 1), 0);
+        expect(Number(barcode[12])).toBe((10 - (sum % 10)) % 10);
+    });
+
+    test("Track stock can be turned off, which hides the low stock level", async ({ page }) => {
+        await openCreate(page);
+        await expect(page.getByLabel("Low stock level")).toBeVisible();
+
+        await page.getByRole("switch", { name: "Track stock" }).click();
+
+        await expect(page.getByLabel("Low stock level")).toHaveCount(0);
+        await expect(page.getByText("Stock isn't counted")).toBeVisible();
+    });
+
     test("creates a product and it appears in the store's list", async ({ page }, testInfo) => {
         const values = newProductValues("Create");
         const form = await openCreate(page);
@@ -247,6 +272,8 @@ test.describe("Edit product", () => {
         await form.submit("Update Product");
 
         await expect(toast(page, "Product updated successfully")).toBeVisible();
+        // Saving goes back to the items list.
+        await expect(page).toHaveURL(new RegExp(`${productsUrl()}(\\?.*)?$`));
         const list = await ProductsPage.open(page);
         await list.search(`${values.name} Renamed`);
         await expect(list.row(`${values.name} Renamed`)).toContainText("42");

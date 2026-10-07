@@ -162,6 +162,8 @@ class ProductController extends Controller
                 'max:2048',
             ],
             'category_id' => ['nullable', 'exists:categories,id'],
+            'track_inventory' => ['sometimes', 'boolean'],
+            'reorder_level' => ['nullable', 'numeric', 'min:0'],
         ];
 
         if ($request->has('domain') && $request->domain) {
@@ -184,6 +186,10 @@ class ProductController extends Controller
         }
         if (! empty($data['barcode'])) {
             $data['barcode'] = BarcodeNormalizer::normalize($data['barcode']);
+        }
+        // reorder_level is NOT NULL; a cleared "Low stock level" means no threshold.
+        if (array_key_exists('reorder_level', $data) && $data['reorder_level'] === null) {
+            $data['reorder_level'] = 0;
         }
 
         unset($data['representation_image']);

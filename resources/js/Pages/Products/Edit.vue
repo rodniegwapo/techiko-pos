@@ -5,6 +5,11 @@ import { watchDebounced } from "@vueuse/core";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
 import ContentLayout from "@/Components/ContentLayout.vue";
+import ProductStockFields from "./components/ProductStockFields.vue";
+import {
+    generateInternalBarcode,
+    generateSku,
+} from "@/Composables/useProductCodes";
 import { useBarcodeScanner } from "@/Composables/useBarcodeScanner";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useSharedCatalogLookup } from "@/Composables/useSharedCatalogLookup";
@@ -51,6 +56,8 @@ const form = useForm({
     representation_type: props.product.representation_type || "color",
     representation: props.product.representation,
     representation_image: null,
+    track_inventory: props.product.track_inventory ?? true,
+    reorder_level: Number(props.product.reorder_level ?? 0),
 });
 
 const imageFileList = ref(
@@ -460,7 +467,18 @@ useBarcodeScanner((code) => {
                                         v-model:value="form.SKU"
                                         placeholder="Enter SKU"
                                         size="large"
-                                    />
+                                    >
+                                        <template #suffix>
+                                            <a-button
+                                                type="link"
+                                                size="small"
+                                                class="h-auto p-0"
+                                                aria-label="Generate SKU"
+                                                @click="form.SKU = generateSku(form.name)"
+                                                >Generate</a-button
+                                            >
+                                        </template>
+                                    </a-input>
                                 </a-form-item>
 
                                 <a-form-item
@@ -480,7 +498,18 @@ useBarcodeScanner((code) => {
                                         v-model:value="form.barcode"
                                         placeholder="Enter barcode"
                                         size="large"
-                                    />
+                                    >
+                                        <template #suffix>
+                                            <a-button
+                                                type="link"
+                                                size="small"
+                                                class="h-auto p-0"
+                                                aria-label="Generate barcode"
+                                                @click="form.barcode = generateInternalBarcode()"
+                                                >Generate</a-button
+                                            >
+                                        </template>
+                                    </a-input>
                                 </a-form-item>
                             </div>
 
@@ -507,6 +536,11 @@ useBarcodeScanner((code) => {
                                     :message="`Suggested category (hint only): ${sharedCategoryHint}`"
                                 />
                             </div>
+                        </section>
+
+                        <section class="space-y-4 rounded-lg bg-gray-50 p-4">
+                            <h4 class="font-semibold text-gray-900">Stock</h4>
+                            <ProductStockFields :form="form" />
                         </section>
 
                         <section class="space-y-4 rounded-lg bg-gray-50 p-4">

@@ -66,6 +66,7 @@ class SaleController extends Controller
                 'apply_vat_automatically' => $vat['apply_vat_automatically'],
                 'vat_rate_percent' => $vat['vat_rate_percent'],
                 'vat_pricing_mode' => $vat['vat_pricing_mode'],
+                'hide_out_of_stock' => $domain->salesHidesOutOfStock(),
             ],
             'loyaltyRedemptionSettings' => [
                 'points_per_currency_unit' => (float) config('loyalty.points_per_currency_unit', 100),
@@ -83,6 +84,8 @@ class SaleController extends Controller
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
             'search' => ['nullable', 'string'],
             'category' => ['nullable', 'string'],
+            // Barcode lookups must find an item even when the list hides out-of-stock products.
+            'include_out_of_stock' => ['nullable', 'boolean'],
         ]);
 
         $perPage = min((int) ($validated['per_page'] ?? 30), 100);
@@ -118,11 +121,21 @@ class SaleController extends Controller
                 'inventories' => fn ($q) => $q->where('location_id', $location->id),
             ]);
 
+        // Filtered before counting so the page count matches what is shown.
+        if ($domain->salesHidesOutOfStock() && ! $request->boolean('include_out_of_stock')) {
+            $base->where(function ($q) use ($location) {
+                $q->where('track_inventory', false)
+                    ->orWhereHas('inventories', fn ($iq) => $iq
+                        ->where('location_id', $location->id)
+                        ->where('quantity_available', '>', 0));
+            });
+        }
+
         $total = (clone $base)->count();
         $lastPage = max(1, (int) ceil($total / $perPage));
 
         $products = (clone $base)
-            ->orderBy('id')
+            ->orderBy('name')->orderBy('id')
             ->forPage($page, $perPage)
             ->get();
 
@@ -178,7 +191,7 @@ class SaleController extends Controller
         $lastPage = max(1, (int) ceil($total / $perPage));
 
         $products = (clone $base)
-            ->orderBy('id')
+            ->orderBy('name')->orderBy('id')
             ->forPage($page, $perPage)
             ->get();
 

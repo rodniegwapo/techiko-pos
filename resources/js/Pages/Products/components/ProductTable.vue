@@ -128,6 +128,17 @@ function categoryName(record) {
     return record.category?.name || "Uncategorized";
 }
 
+/** "Low" / "Out" next to the store quantity; nothing when in stock or not tracked. */
+function stockTag(record) {
+    if (record.location_stock_status === "low_stock") {
+        return { label: "Low", color: "orange" };
+    }
+    if (record.location_stock_status === "out_of_stock") {
+        return { label: "Out", color: "red" };
+    }
+    return null;
+}
+
 function storeQtyLabel(record) {
     if (!record.track_inventory) return "N/A";
     return String(record.location_quantity_available ?? 0);
@@ -228,9 +239,17 @@ function onMobilePaginationChange(pageNum) {
                 <span v-if="!record.track_inventory" class="text-gray-400"
                     >N/A</span
                 >
-                <span v-else class="font-medium">{{
-                    record.location_quantity_available ?? 0
-                }}</span>
+                <span v-else class="inline-flex items-center gap-2">
+                    <span class="font-medium">{{
+                        record.location_quantity_available ?? 0
+                    }}</span>
+                    <a-tag
+                        v-if="stockTag(record)"
+                        :color="stockTag(record).color"
+                        class="m-0"
+                        >{{ stockTag(record).label }}</a-tag
+                    >
+                </span>
             </template>
             <template v-if="column.key == 'action'">
                 <div class="flex items-center gap-2">
@@ -354,6 +373,12 @@ function onMobilePaginationChange(pageNum) {
                                     "
                                 >
                                     {{ storeQtyLabel(record) }}
+                                    <a-tag
+                                        v-if="stockTag(record)"
+                                        :color="stockTag(record).color"
+                                        class="ml-1 mr-0"
+                                        >{{ stockTag(record).label }}</a-tag
+                                    >
                                 </span>
                             </template>
                             <template v-if="showSuperUserDomain">

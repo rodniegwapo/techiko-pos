@@ -609,6 +609,8 @@ const handleScanAndAdd = async (scannedCode) => {
                 per_page: 100,
                 search: code || undefined,
                 category: category.value || undefined,
+                // A scanned item is found even when the list hides out-of-stock products.
+                include_out_of_stock: 1,
                 ...(locationId != null && locationId !== ""
                     ? { location_id: locationId }
                     : {}),
@@ -1226,6 +1228,13 @@ const getProducts = async ({ append = false } = {}) => {
             const q = String(search.value || "")
                 .trim()
                 .toLowerCase();
+            if (salesSettings.value?.hide_out_of_stock) {
+                filtered = filtered.filter(
+                    (p) =>
+                        !p.track_inventory ||
+                        Number(p.location_quantity_available ?? 0) > 0,
+                );
+            }
             if (q) {
                 filtered = filtered.filter(
                     (p) =>
@@ -1238,6 +1247,10 @@ const getProducts = async ({ append = false } = {}) => {
                             .includes(q),
                 );
             }
+            // Same A–Z order as the online list.
+            filtered.sort((a, b) =>
+                String(a.name || "").localeCompare(String(b.name || "")),
+            );
             products.value = filtered.slice(0, 500);
         } finally {
             loading.value = false;

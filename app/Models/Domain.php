@@ -211,4 +211,12 @@ class Domain extends Model
 
         return (bool) ($s['allow_overselling'] ?? false);
     }
+
+    /** When true, the POS product list leaves out tracked products with nothing available at the store. */
+    public function salesHidesOutOfStock(): bool
+    {
+        $s = $this->settings['sales'] ?? [];
+
+        return (bool) ($s['hide_out_of_stock'] ?? false);
+    }
 }

@@ -74,7 +74,8 @@ class InventoryController extends Controller
                     $query->where('quantity_available', '>', 0);
                     break;
                 case 'low_stock':
-                    $query->whereRaw('quantity_available <= (SELECT reorder_level FROM products WHERE products.id = product_inventory.product_id)');
+                    // The store's own low stock level, else the product's.
+                    $query->whereRaw('quantity_available <= COALESCE(product_inventory.location_reorder_level, (SELECT reorder_level FROM products WHERE products.id = product_inventory.product_id))');
                     break;
                 case 'out_of_stock':
                     $query->where('quantity_available', '<=', 0);
@@ -268,6 +269,8 @@ class InventoryController extends Controller
                 'location' => null,
                 'summary' => [
                     'total_value' => 0,
+                    'total_retail_value' => 0,
+                    'potential_profit' => 0,
                     'total_quantity' => 0,
                     'total_products' => 0,
                 ],
@@ -287,9 +290,12 @@ class InventoryController extends Controller
 
         $totalValue = $inventories->sum('total_value');
         $totalQuantity = $inventories->sum('quantity_on_hand');
+        // What the stock would sell for at today's prices, next to what it cost.
+        $retailValue = fn ($inventory) => round((float) $inventory->quantity_on_hand * (float) $inventory->product->price, 2);
+        $totalRetailValue = round($inventories->sum($retailValue), 2);
 
         // Every row is stock at $location, so its organization is known without loading it per row.
-        $valuationData = $inventories->map(function ($inventory) use ($location) {
+        $valuationData = $inventories->map(function ($inventory) use ($location, $retailValue) {
             return [
                 'product_id' => $inventory->product_id,
                 'product_name' => $inventory->product->name,
@@ -297,6 +303,8 @@ class InventoryController extends Controller
                 'quantity_on_hand' => $inventory->quantity_on_hand,
                 'average_cost' => $inventory->average_cost,
                 'total_value' => $inventory->total_value,
+                'price' => $inventory->product->price,
+                'retail_value' => $retailValue($inventory),
                 'last_movement_at' => $inventory->last_movement_at,
                 'domain' => $location->domain ?? 'N/A',
             ];
@@ -306,6 +314,8 @@ class InventoryController extends Controller
             'location' => $location,
             'summary' => [
                 'total_value' => $totalValue,
+                'total_retail_value' => $totalRetailValue,
+                'potential_profit' => round($totalRetailValue - (float) $totalValue, 2),
                 'total_quantity' => $totalQuantity,
                 'total_products' => $inventories->count(),
             ],

@@ -126,6 +126,11 @@ class ProductController extends Controller
         $barcode = BarcodeNormalizer::normalize($validated['barcode'] ?? null);
         $validated['barcode'] = $barcode === '' ? null : $barcode;
 
+        // reorder_level is NOT NULL; a cleared "Low stock level" means no threshold.
+        if (array_key_exists('reorder_level', $validated) && $validated['reorder_level'] === null) {
+            $validated['reorder_level'] = 0;
+        }
+
         // Request-only fields — not columns on products
         unset($validated['location_id'], $validated['representation_image']);
 
@@ -140,6 +145,11 @@ class ProductController extends Controller
     {
         $norm = BarcodeNormalizer::normalize((string) $product->barcode);
         if ($norm === '') {
+            return;
+        }
+
+        // A shop's own code (GS1 in-store range, e.g. from "Generate") isn't a real product barcode.
+        if (preg_match('/^2\d{12}$/', $norm)) {
             return;
         }
 
@@ -220,7 +230,72 @@ class ProductController extends Controller
             ->when($request->sold_type, fn ($q, $soldType) => $q->where('sold_type', $soldType))
             // Price and cost filters (number inputs) match the exact amount.
             ->when(is_numeric($request->price), fn ($q) => $q->where('price', (float) $request->price))
-            ->when(is_numeric($request->cost), fn ($q) => $q->where('cost', (float) $request->cost));
+            ->when(is_numeric($request->cost), fn ($q) => $q->where('cost', (float) $request->cost))
+            ->when(is_numeric($request->price_min), fn ($q) => $q->where('price', '>=', (float) $request->price_min))
+            ->when(is_numeric($request->price_max), fn ($q) => $q->where('price', '<=', (float) $request->price_max))
+            ->when(in_array($request->track_stock, ['yes', 'no'], true), fn ($q) => $q->where('track_inventory', $request->track_stock === 'yes'));
+    }
+
+    /** The store's low stock level: its own override, else the product's. */
+    private const LOW_STOCK_LEVEL_SQL = 'COALESCE(product_inventory.location_reorder_level, products.reorder_level, 0)';
+
+    /**
+     * Narrow to tracked products that are in stock, low or out at the store. A product with no
+     * stock row at the store counts as out of stock.
+     */
+    private function applyStockStatus(Builder $query, string $status, InventoryLocation $location): void
+    {
+        $query->where('track_inventory', true);
+        $atStore = fn ($q) => $q->where('location_id', $location->id);
+
+        match ($status) {
+            'out' => $query->whereDoesntHave('inventories', fn ($q) => $atStore($q)->where('quantity_available', '>', 0)),
+            'low' => $query->whereHas('inventories', fn ($q) => $atStore($q)
+                ->where('quantity_available', '>', 0)
+                ->whereRaw(self::LOW_STOCK_LEVEL_SQL.' > 0')
+                ->whereRaw('quantity_available <= '.self::LOW_STOCK_LEVEL_SQL)),
+            'in' => $query->whereHas('inventories', fn ($q) => $atStore($q)
+                ->where('quantity_available', '>', 0)
+                ->whereRaw('quantity_available > '.self::LOW_STOCK_LEVEL_SQL)),
+            default => null,
+        };
+    }
+
+    /** @return array{low: int, out: int} how many of the store's products are low or out of stock */
+    private function stockCounts(Domain $domain, InventoryLocation $location): array
+    {
+        $atStore = fn () => Product::query()
+            ->where('domain', $domain->name_slug)
+            ->whereHas('activeLocations', fn ($q) => $q->where('inventory_locations.id', $location->id));
+
+        $counts = [];
+        foreach (['low', 'out'] as $status) {
+            $query = $atStore();
+            $this->applyStockStatus($query, $status, $location);
+            $counts[$status] = $query->count();
+        }
+
+        return $counts;
+    }
+
+    /** Sort options for the products list; newest first unless asked otherwise. */
+    private function applySort(Builder $query, ?string $sort, ?InventoryLocation $location): void
+    {
+        match ($sort) {
+            'name' => $query->orderBy('name')->orderBy('id'),
+            'price_asc' => $query->orderBy('price')->orderBy('id'),
+            'price_desc' => $query->orderByDesc('price')->orderBy('id'),
+            'qty_asc' => $location
+                ? $query->orderBy(
+                    ProductInventory::query()
+                        ->select('quantity_available')
+                        ->whereColumn('product_inventory.product_id', 'products.id')
+                        ->where('location_id', $location->id)
+                        ->limit(1)
+                )->orderBy('id')
+                : $query->latest(),
+            default => $query->latest(),
+        };
     }
 
     /**
@@ -334,10 +409,11 @@ class ProductController extends Controller
     /**
      * Standard response for products index.
      */
-    private function respondWithIndex($products, $categoriesQuery, $location, Domain $domain)
+    private function respondWithIndex($products, $categoriesQuery, $location, Domain $domain, array $stockCounts = ['low' => 0, 'out' => 0])
     {
         return Inertia::render('Products/Index', [
             'items' => ProductResource::collection($products),
+            'stockCounts' => $stockCounts,
             'categories' => $categoriesQuery->get(),
             'sold_by_types' => ProductSoldType::all(),
             'isGlobalView' => false,
@@ -363,17 +439,27 @@ class ProductController extends Controller
                 ])
                 // The delete dialog says how many stores carry the product.
                 ->withCount(['activeLocations as store_count']);
+
+            if (in_array($request->stock_status, ['in', 'low', 'out'], true)) {
+                $this->applyStockStatus($query, $request->stock_status, $location);
+            }
         } else {
             $query->whereRaw('0 = 1');
         }
 
-        $query->latest();
+        $this->applySort($query, $request->sort, $location);
 
         $products = $query->paginate(15);
 
         $categoriesQuery = $this->buildCategoriesQuery($domain, $location);
 
-        return $this->respondWithIndex($products, $categoriesQuery, $location, $domain);
+        return $this->respondWithIndex(
+            $products,
+            $categoriesQuery,
+            $location,
+            $domain,
+            $location ? $this->stockCounts($domain, $location) : ['low' => 0, 'out' => 0],
+        );
     }
 
     /**
@@ -446,7 +532,13 @@ class ProductController extends Controller
 
         $this->queueSharedCatalogSuggestionIfNeeded($request, $domain, $product);
 
-        return redirect()->back()->with('success', 'Product updated successfully');
+        // Back to the items list (in the same store) once the edit is saved.
+        return redirect()
+            ->route('domains.products.index', array_filter([
+                'domain' => $domain->name_slug,
+                'location_id' => $request->input('location_id') ?: $request->query('location_id'),
+            ]))
+            ->with('success', 'Product updated successfully');
     }
 
     /**
