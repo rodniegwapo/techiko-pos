@@ -13,13 +13,14 @@ import { useHelpers } from "@/Composables/useHelpers";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
+import DeleteProductModal from "./DeleteProductModal.vue";
 
 import { usePage, router } from "@inertiajs/vue3";
 
 const page = usePage();
 const emit = defineEmits(["handleTableChange"]);
 
-const { confirmDelete, formatCurrency, formatDate } = useHelpers();
+const { formatCurrency, formatDate } = useHelpers();
 const { spinning } = useGlobalVariables();
 const { getRoute, getLocationQueryFromPage } = useDomainRoutes();
 const { hasPermission } = usePermissionsV2();
@@ -145,12 +146,13 @@ function productSubtitle(record) {
     return parts.join(" · ");
 }
 
+const deleteModalOpen = ref(false);
+const productToDelete = ref(null);
+
+/** Opens the dialog that asks whether to remove the product from this store or everywhere. */
 const handleDeleteCategory = (record) => {
-    confirmDelete(
-        "products.destroy",
-        { product: record.id },
-        "Do you want to delete this item ?",
-    );
+    productToDelete.value = record;
+    deleteModalOpen.value = true;
 };
 
 const handleClickEdit = (record) => {
@@ -667,4 +669,10 @@ function onMobilePaginationChange(pageNum) {
             </div>
         </div>
     </a-modal>
+
+    <DeleteProductModal
+        v-model:open="deleteModalOpen"
+        :product="productToDelete"
+        :current-location="currentLocation"
+    />
 </template>

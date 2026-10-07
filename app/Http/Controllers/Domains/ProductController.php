@@ -10,6 +10,7 @@ use App\Models\Domain;
 use App\Models\InventoryLocation;
 use App\Models\Product\Product;
 use App\Models\Product\ProductSoldType;
+use App\Models\ProductInventory;
 use App\Models\SharedProduct;
 use App\Models\SharedProductSuggestion;
 use App\Services\DomainSubscriptionService;
@@ -359,7 +360,9 @@ class ProductController extends Controller
             })
                 ->with([
                     'inventories' => fn ($iq) => $iq->where('location_id', $location->id),
-                ]);
+                ])
+                // The delete dialog says how many stores carry the product.
+                ->withCount(['activeLocations as store_count']);
         } else {
             $query->whereRaw('0 = 1');
         }
@@ -449,16 +452,68 @@ class ProductController extends Controller
     /**
      * Remove the specified product from the domain.
      */
-    public function destroy(Domain $domain, Product $product)
+    public function destroy(Request $request, Domain $domain, Product $product)
     {
         // Ensure product belongs to this domain
         if ($product->domain !== $domain->name_slug) {
             abort(403, 'Product does not belong to this domain');
         }
 
+        $validated = $request->validate([
+            'scope' => ['nullable', 'in:store,all'],
+            'location_id' => ['required_if:scope,store', 'nullable', 'integer'],
+        ]);
+
+        if (($validated['scope'] ?? 'all') === 'store') {
+            return $this->removeFromStore($product, (int) $validated['location_id'], $domain);
+        }
+
         $product->delete();
 
         return redirect()->back()->with('success', 'Product deleted successfully');
+    }
+
+    /**
+     * Take a product off one store's list, leaving it in the organization and at its other stores.
+     * Refused while the store still holds stock, so no stock drops out of the store's records.
+     */
+    private function removeFromStore(Product $product, int $locationId, Domain $domain)
+    {
+        $location = InventoryLocation::query()
+            ->whereKey($locationId)
+            ->where('domain', $domain->name_slug)
+            ->firstOrFail();
+
+        if (! $product->isAvailableAt($location)) {
+            return redirect()->back()->with('error', "{$product->name} isn't in {$location->name}.");
+        }
+
+        // A product in no store can't be offered back under "Add existing to store", so the last
+        // store can only be left by deleting the product everywhere.
+        if (! $product->activeLocations()->where('inventory_locations.id', '!=', $location->id)->exists()) {
+            return redirect()->back()->with(
+                'error',
+                "{$location->name} is the only store with {$product->name}. Delete it everywhere instead.",
+            );
+        }
+
+        $onHand = (float) ProductInventory::query()
+            ->where('product_id', $product->id)
+            ->where('location_id', $location->id)
+            ->value('quantity_on_hand');
+
+        if ($product->track_inventory && $onHand > 0) {
+            $quantity = rtrim(rtrim(number_format($onHand, 2, '.', ''), '0'), '.');
+
+            return redirect()->back()->with(
+                'error',
+                "{$location->name} still has {$quantity} of {$product->name} in stock. Transfer it or adjust it to 0 first.",
+            );
+        }
+
+        $product->removeFromLocation($location);
+
+        return redirect()->back()->with('success', "{$product->name} was removed from {$location->name}.");
     }
 
     /**
