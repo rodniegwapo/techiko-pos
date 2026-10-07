@@ -232,7 +232,7 @@ const summaryCards = computed(() => {
         },
         {
             key: "profit",
-            label: "Gross profit",
+            label: "Profit",
             value: formattedTotal(s.profit ?? 0),
             // Lines without a cost count as zero cost, so say so rather than show an inflated margin.
             hint: s.items_missing_cost

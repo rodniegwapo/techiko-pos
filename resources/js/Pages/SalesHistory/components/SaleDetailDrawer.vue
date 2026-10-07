@@ -145,7 +145,7 @@ const itemColumns = [
                         </div>
                         <div class="flex justify-between border-t pt-1 font-semibold text-emerald-700">
                             <span>
-                                Gross profit
+                                Profit
                                 <span v-if="sale.profit.margin_percent !== null" class="text-xs font-normal">
                                     ({{ sale.profit.margin_percent }}% margin)
                                 </span>
@@ -154,7 +154,7 @@ const itemColumns = [
                         </div>
                     </div>
                     <p class="mb-0 mt-2 text-xs text-gray-500">
-                        Gross profit is what the customer paid, minus VAT, minus what the items cost you.
+                        Profit is what the customer paid, minus VAT, minus what the items cost you. Expenses like rent and salaries are not included.
                         Each item uses the cost it had when it was sold, so later cost changes don't affect it.
                         Voided items are not counted.
                     </p>
