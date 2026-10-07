@@ -317,6 +317,9 @@ class SaleController extends Controller
                     $sale->recalcTotals();
                 }
 
+                // Re-total with the current VAT settings: they may have changed since the cart was last touched.
+                $sale->recalcTotals();
+
                 // 1. Complete sale and process inventory
                 $sale->refresh();
                 $this->saleService->completeSale($sale, auth()->user());

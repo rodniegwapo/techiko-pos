@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Domains;
 
 use App\Http\Controllers\Controller;
 use App\Models\Domain;
+use App\Models\Sale;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -34,6 +35,7 @@ class DomainSettingsController extends Controller
             'allow_overselling' => ['sometimes', 'boolean'],
         ]);
 
+        $vatBefore = $domain->salesVatSettings();
         $current = $domain->settings ?? [];
         $sales = $current['sales'] ?? [];
 
@@ -52,6 +54,11 @@ class DomainSettingsController extends Controller
 
         $current['sales'] = $sales;
         $domain->update(['settings' => $current]);
+
+        // Open carts store their VAT, so re-total them or they'd keep charging under the old setting.
+        if ($domain->salesVatSettings() != $vatBefore) {
+            Sale::query()->where('domain', $domain->name_slug)->pending()->get()->each->recalcTotals();
+        }
 
         return redirect()->route('domains.settings.index', ['domain' => $domain])
             ->with('success', 'Settings saved.');

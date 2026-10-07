@@ -65,7 +65,7 @@ const paymentLabel = computed(() => {
             <span>Loyalty ({{ sale.loyalty_points_redeemed }} pts)</span>
             <span>-{{ formattedTotal(sale.loyalty_discount_amount) }}</span>
         </div>
-        <div class="row"><span>{{ vatLabel }}</span><span>{{ formattedTotal(sale.tax_amount) }}</span></div>
+        <div v-if="Number(sale.tax_amount) > 0" class="row"><span>{{ vatLabel }}</span><span>{{ formattedTotal(sale.tax_amount) }}</span></div>
         <div class="row bold big"><span>TOTAL</span><span>{{ formattedTotal(sale.grand_total) }}</span></div>
         <div class="row"><span>Paid by</span><span>{{ paymentLabel }}</span></div>
 
