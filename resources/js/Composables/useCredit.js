@@ -61,7 +61,7 @@ export function useCredit() {
     /**
      * Record a payment
      */
-    const recordPayment = async (customerId, data) => {
+    const recordPayment = async (customerId, data, { successMessage = 'Payment recorded successfully' } = {}) => {
         try {
             loading.value = true;
             const response = await axios.post(
@@ -77,7 +77,7 @@ export function useCredit() {
 
             notification.success({
                 message: 'Success',
-                description: 'Payment recorded successfully',
+                description: successMessage,
             });
 
             return response.data;

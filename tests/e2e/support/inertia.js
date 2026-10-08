@@ -11,6 +11,19 @@ export async function pageProps(page) {
 
 /** Props from the HTML of an HTTP response (the same `data-page` attribute, still HTML-escaped). */
 export async function responseProps(response) {
+    return (await responsePage(response)).props;
+}
+
+/**
+ * The asset version of the Inertia page in an HTTP response. Inertia's router sends it back as
+ * X-Inertia-Version; a visit without it gets 409 (assets changed, reload) instead of an answer.
+ */
+export async function responseVersion(response) {
+    return (await responsePage(response)).version;
+}
+
+/** The whole Inertia page object from the HTML of an HTTP response. */
+async function responsePage(response) {
     const html = await response.text();
     const escaped = html.match(/data-page="([^"]*)"/)?.[1];
     if (!escaped) {
@@ -24,7 +37,7 @@ export async function responseProps(response) {
         .replaceAll("&gt;", ">")
         .replaceAll("&amp;", "&");
 
-    return JSON.parse(json).props;
+    return JSON.parse(json);
 }
 
 /** Inertia component name of the current full page load, e.g. "Dashboard/Index". */

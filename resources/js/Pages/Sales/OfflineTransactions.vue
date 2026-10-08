@@ -277,6 +277,11 @@ function lineTotals(items) {
 
 function paymentDisplay(record) {
     const method = record.payload?.payment_method || "—";
+    if (method === "split") {
+        return (record.payload?.payments || [])
+            .map((p) => `${p.method} ${Number(p.amount).toFixed(2)}`)
+            .join(" + ");
+    }
     const name = record.payload?.payment_card_type_name;
     const ref = record.payload?.payment_reference;
     let text = method;

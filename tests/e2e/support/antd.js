@@ -13,7 +13,8 @@ export async function pickSelectOption(page, scope, selectIndex, optionText) {
 
     // Options are virtualized, so far-down ones aren't in the DOM until scrolled to.
     // (Typing doesn't always help: some selects filter on option values, not labels.)
-    const option = dropdown.locator(`.ant-select-item-option[title*="${optionText.replaceAll('"', '\\"')}"]`).first();
+    // Case-insensitive ("i"): labels may be capitalized ("Cashier") where callers pass the value ("cashier").
+    const option = dropdown.locator(`.ant-select-item-option[title*="${optionText.replaceAll('"', '\\"')}" i]`).first();
     const holder = dropdown.locator(".rc-virtual-list-holder");
     for (let i = 0; i < 30 && !(await option.isVisible()); i++) {
         await holder.evaluate((el) => (el.scrollTop += 120));

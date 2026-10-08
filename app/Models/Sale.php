@@ -62,6 +62,12 @@ class Sale extends Model
         return $this->belongsTo(PaymentCardType::class);
     }
 
+    /** The parts of a sale paid in parts (payment_method 'split'); empty for a sale paid one way. */
+    public function payments()
+    {
+        return $this->hasMany(SalePayment::class)->orderBy('id');
+    }
+
     public function recalcTotals(): void
     {
         $itemsTotal = $this->saleItems()

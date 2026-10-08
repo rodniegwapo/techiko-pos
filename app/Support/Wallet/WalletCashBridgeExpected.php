@@ -143,6 +143,27 @@ final class WalletCashBridgeExpected
             $out[(string) $row->day] = (float) $row->total;
         }
 
+        // And the cash part of sales paid in parts.
+        $splitDayExpr = self::sqlDateColumn('sales.transaction_date');
+        $splitRows = Sale::query()
+            ->join('sale_payments', 'sale_payments.sale_id', '=', 'sales.id')
+            ->where('sales.domain', $domainSlug)
+            ->where('sales.location_id', $locationId)
+            ->where('sales.payment_status', 'paid')
+            ->where('sales.payment_method', 'split')
+            ->where('sale_payments.method', 'cash')
+            ->whereDate('sales.transaction_date', '>=', $rangeStart)
+            ->whereDate('sales.transaction_date', '<=', $rangeEnd)
+            ->selectRaw("{$splitDayExpr} as day")
+            ->selectRaw('SUM(sale_payments.amount) as total')
+            ->groupBy(DB::raw($splitDayExpr))
+            ->get();
+
+        foreach ($splitRows as $row) {
+            $day = (string) $row->day;
+            $out[$day] = round(($out[$day] ?? 0) + (float) $row->total, 2);
+        }
+
         return $out;
     }
 

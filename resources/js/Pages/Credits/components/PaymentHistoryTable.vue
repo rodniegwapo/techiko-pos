@@ -34,9 +34,17 @@
       </template>
 
       <template v-if="column.key === 'status'">
-        <a-tag v-if="record.paid_at" color="success">Paid</a-tag>
-        <a-tag v-else-if="record.isOverdue" color="error">Overdue</a-tag>
-        <a-tag v-else color="default">Pending</a-tag>
+        <template v-if="record.transaction_type === 'credit'">
+          <a-tag v-if="record.paid_at" color="success">Paid</a-tag>
+          <a-tag v-else-if="record.is_overdue" color="error">Overdue</a-tag>
+          <a-tag v-else-if="Number(record.paid_amount) > 0" color="warning">Partly paid</a-tag>
+          <a-tag v-else color="default">Pending</a-tag>
+          <div v-if="record.installments?.length" class="text-xs text-gray-400 mt-1">
+            {{ record.installments.filter((i) => i.paid_at).length }}/{{ record.installments.length }} installments paid
+          </div>
+        </template>
+        <span v-else-if="record.payment_method" class="text-gray-500 capitalize">{{ record.payment_method }}</span>
+        <span v-else class="text-gray-400">-</span>
       </template>
     </template>
   </a-table>

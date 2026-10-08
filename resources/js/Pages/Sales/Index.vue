@@ -52,6 +52,8 @@ import { usePage, Head, Link } from "@inertiajs/vue3";
 import { useFilters, toLabel } from "@/Composables/useFilters";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { notifyInsufficientStock } from "@/Composables/useCartStockNotification";
+import { hasModifiers } from "@/Composables/useProductModifiers";
+import ModifierPickerModal from "./components/ModifierPickerModal.vue";
 
 const page = usePage();
 const { getRoute, getLocationQueryFromPage } = useDomainRoutes();
@@ -163,6 +165,8 @@ const cashierUserId = computed(() => page.props.auth?.user?.data?.id);
 const offlinePaymentMethod = ref("cash");
 const offlinePaymentCardTypeId = ref(null);
 const offlinePaymentReference = ref("");
+/** The parts of an offline sale paid in parts (payment method "split"). */
+const offlinePayments = ref([]);
 /** Payment methods paid through a channel (card terminal, e-wallet, bank). */
 const CHANNEL_METHODS = ["card", "e-wallet", "bank"];
 const offlineProductLookup = ref([]);
@@ -393,6 +397,10 @@ function ordersToLineItems(ordersList) {
         name: o.name,
         representation_type: o.representation_type ?? null,
         representation: o.representation ?? null,
+        modifier_ids: o.modifier_ids ?? [],
+        modifier_key: o.modifier_key ?? null,
+        modifiers: o.modifiers ?? [],
+        notes: o.notes ?? null,
     }));
 }
 
@@ -410,6 +418,11 @@ function lineItemsToOrders(lines) {
         discounts: [],
         representation_type: li.representation_type ?? null,
         representation: li.representation ?? null,
+        line_key: `${li.product_id}|${li.modifier_key ?? ""}|${li.notes ?? ""}`,
+        modifier_ids: li.modifier_ids ?? [],
+        modifier_key: li.modifier_key ?? null,
+        modifiers: li.modifiers ?? [],
+        notes: li.notes ?? null,
     }));
 }
 
@@ -461,7 +474,9 @@ async function hydrateFromOfflineCart() {
     orderDiscountAmount.value = 0;
     orderDiscountId.value = "";
     currentSale.value = null;
-    offlinePaymentMethod.value = row.payment_method || "cash";
+    // The parts of a split payment aren't kept with the cart, so it comes back as cash to re-enter.
+    offlinePaymentMethod.value =
+        row.payment_method && row.payment_method !== "split" ? row.payment_method : "cash";
     offlinePaymentCardTypeId.value = row.payment_card_type_id ?? null;
     if (row.product_lookup?.length) {
         offlineProductLookup.value = row.product_lookup;
@@ -669,8 +684,25 @@ const handleScanAndAdd = async (scannedCode) => {
     }
 };
 
+// A scanned product with options (Size, Add-ons…) asks for them before it goes into the cart.
+const pickerProduct = ref(null);
+const pickerOpen = ref(false);
+
+/**
+ * @param {object} product
+ * @param {{ suppressPageLoading?: boolean, line?: object|null }} options  line: the options picked
+ *        (from lineOptions()), for a product that has them
+ */
 const addToCart = async (product, options = {}) => {
     const suppressPageLoading = options.suppressPageLoading === true;
+    const line = options.line ?? null;
+
+    if (!line && hasModifiers(product)) {
+        pickerProduct.value = product;
+        pickerOpen.value = true;
+        return false;
+    }
+
     try {
         if (!suppressPageLoading) {
             loading.value = true;
@@ -678,11 +710,18 @@ const addToCart = async (product, options = {}) => {
         mergeProductLookup([product]);
 
         if (!salesCartIsOnline.value) {
-            const idx = orders.value.findIndex((o) => o.id === product.id);
+            // The same product with the same options and note is the same line.
+            const idx = orders.value.findIndex(
+                (o) =>
+                    o.id === product.id &&
+                    (o.modifier_key ?? null) === (line?.modifier_key ?? null) &&
+                    (o.notes ?? null) === (line?.notes ?? null),
+            );
             if (idx === -1) {
-                const price = parseFloat(product.price) || 0;
+                const price = line ? line.unit_price : parseFloat(product.price) || 0;
                 orders.value.push({
                     id: product.id,
+                    line_key: `${product.id}|${line?.modifier_key ?? ""}|${line?.notes ?? ""}`,
                     name: product.name,
                     price,
                     quantity: 1,
@@ -694,6 +733,10 @@ const addToCart = async (product, options = {}) => {
                     discounts: [],
                     representation_type: product.representation_type ?? null,
                     representation: product.representation ?? null,
+                    modifier_ids: line?.modifier_ids ?? [],
+                    modifier_key: line?.modifier_key ?? null,
+                    modifiers: line?.modifiers ?? [],
+                    notes: line?.notes ?? null,
                 });
             } else {
                 const o = orders.value[idx];
@@ -710,6 +753,7 @@ const addToCart = async (product, options = {}) => {
         await axios.post(route, {
             product_id: product.id,
             quantity: 1,
+            ...(line ? { modifier_ids: line.modifier_ids, notes: line.notes } : {}),
         });
 
         await loadCurrentPendingSale();
@@ -831,8 +875,22 @@ const transformCartItems = (items) => {
     return items.map((item) => {
         const productName = item.product?.name || "Unknown Product";
 
+        const modifiers = (item.modifiers || []).map((m) => ({
+            id: m.modifier_id,
+            group_name: m.group_name,
+            name: m.name,
+            price_delta: Number(m.price_delta) || 0,
+        }));
+
         return {
             id: item.product_id,
+            // The line itself: one product can be on several lines with different options.
+            sale_item_id: item.id,
+            line_key: `sale-item-${item.id}`,
+            modifier_ids: modifiers.map((m) => m.id).filter(Boolean),
+            modifier_key: item.modifier_key ?? null,
+            modifiers,
+            notes: item.notes ?? null,
             name: productName,
             price: item.unit_price,
             quantity: item.quantity,
@@ -882,8 +940,16 @@ const handleCustomerChanged = async (customer) => {
     }
 };
 
+// The offline cart line a change is for: by its line key (one product may be on several lines
+// with different options), else by product.
+function findOfflineLine(line) {
+    return line?.line_key
+        ? orders.value.findIndex((o) => (o.line_key ?? o.id) === line.line_key)
+        : orders.value.findIndex((o) => o.id === line?.id);
+}
+
 function onOfflineCartAdd(product) {
-    const idx = orders.value.findIndex((o) => o.id === product.id);
+    const idx = findOfflineLine(product);
     if (idx === -1) {
         const price = parseFloat(product.price) || 0;
         orders.value.push({
@@ -909,7 +975,7 @@ function onOfflineCartAdd(product) {
 }
 
 function onOfflineCartSubtract(product) {
-    const idx = orders.value.findIndex((o) => o.id === product.id);
+    const idx = findOfflineLine(product);
     if (idx === -1) return;
     const o = orders.value[idx];
     const next = Math.max(0, (parseInt(o.quantity, 10) || 0) - 1);
@@ -923,7 +989,7 @@ function onOfflineCartSubtract(product) {
 }
 
 function onOfflineCartSetQty(product, quantity) {
-    const idx = orders.value.findIndex((o) => o.id === product.id);
+    const idx = findOfflineLine(product);
     if (idx === -1) return;
     const q = parseInt(quantity, 10);
     if (isNaN(q) || q < 0) return;
@@ -938,7 +1004,7 @@ function onOfflineCartSetQty(product, quantity) {
 }
 
 function onOfflineCartRemove(product) {
-    const idx = orders.value.findIndex((o) => o.id === product.id);
+    const idx = findOfflineLine(product);
     if (idx !== -1) {
         orders.value.splice(idx, 1);
         persistOfflineCartToDexie();
@@ -958,6 +1024,9 @@ function syncOfflinePaymentMethod(v) {
     if (!CHANNEL_METHODS.includes(v)) {
         offlinePaymentCardTypeId.value = null;
         offlinePaymentReference.value = "";
+    }
+    if (v !== "split") {
+        offlinePayments.value = [];
     }
 }
 
@@ -996,7 +1065,12 @@ async function completeOfflineSale() {
         );
         return;
     }
-    if (payment !== "cash" && !CHANNEL_METHODS.includes(payment)) {
+    const isSplit = payment === "split";
+    if (isSplit && offlinePayments.value.length < 2) {
+        message.error("Enter the parts of the split payment before saving offline.");
+        return;
+    }
+    if (!isSplit && payment !== "cash" && !CHANNEL_METHODS.includes(payment)) {
         payment = "cash";
     }
     const channelWord = { card: "card payment type", "e-wallet": "e-wallet", bank: "bank" }[payment];
@@ -1011,6 +1085,8 @@ async function completeOfflineSale() {
             product_id: Number(l.product_id),
             quantity: Number(l.quantity),
             unit_price: Number(l.unit_price),
+            ...(l.modifier_ids?.length ? { modifier_ids: l.modifier_ids } : {}),
+            ...(l.notes ? { notes: l.notes } : {}),
         })),
         payment_method: payment,
         payment_card_type_id: CHANNEL_METHODS.includes(payment)
@@ -1020,6 +1096,7 @@ async function completeOfflineSale() {
             (payment === "e-wallet" || payment === "bank") && reference
                 ? reference
                 : null,
+        ...(isSplit ? { payments: offlinePayments.value } : {}),
         location_id: activeLocationId.value,
         cashier_user_id: cashierUserId.value,
         notes: null,
@@ -1047,6 +1124,7 @@ async function completeOfflineSale() {
         offlinePaymentMethod.value = "cash";
         offlinePaymentCardTypeId.value = null;
         offlinePaymentReference.value = "";
+        offlinePayments.value = [];
         offlineProductLookup.value = [];
         forceOfflineCartMode.value = false;
         message.success("Saved locally. Review under Offline transactions.");
@@ -1505,7 +1583,7 @@ watch(
                         :layout="productTableLayout"
                         :variant="productTableVariant"
                         @cart-updated="loadCurrentPendingSale"
-                        @offline-add-product="addToCart"
+                        @offline-add-product="(p, line) => addToCart(p, { line })"
                         @load-more="loadMoreProducts"
                     />
                 </template>
@@ -1708,6 +1786,7 @@ watch(
                                             "
                                             :offline-payment-reference="offlinePaymentReference"
                                             @update:offline-payment-reference="syncOfflinePaymentReference"
+                                            @update:offline-payments="(v) => (offlinePayments = v)"
                                             @save-offline-sale="
                                                 completeOfflineSale
                                             "
@@ -1845,6 +1924,7 @@ watch(
                         "
                         :offline-payment-reference="offlinePaymentReference"
                         @update:offline-payment-reference="syncOfflinePaymentReference"
+                        @update:offline-payments="(v) => (offlinePayments = v)"
                         @save-offline-sale="completeOfflineSale"
                     />
                 </template>
@@ -1903,8 +1983,15 @@ watch(
                 "
                 :offline-payment-reference="offlinePaymentReference"
                 @update:offline-payment-reference="syncOfflinePaymentReference"
+                @update:offline-payments="(v) => (offlinePayments = v)"
                 @save-offline-sale="completeOfflineSale"
             />
         </template>
+
+        <ModifierPickerModal
+            v-model:open="pickerOpen"
+            :product="pickerProduct"
+            @confirm="(line) => addToCart(pickerProduct, { line })"
+        />
     </AuthenticatedLayout>
 </template>

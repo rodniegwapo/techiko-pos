@@ -7,6 +7,7 @@ use App\Models\Domain;
 use App\Models\InventoryLocation;
 use App\Models\PaymentCardType;
 use App\Models\Sale;
+use App\Models\SalePayment;
 use App\Models\User;
 use App\Models\WalletCashCountSubmission;
 use App\Models\WalletCashMovement;
@@ -343,16 +344,18 @@ class PaymentCardTypeController extends Controller
         $base = Sale::query()
             ->where('domain', $domain->name_slug)
             ->where('location_id', $location->id)
-            ->where('payment_status', 'paid')
-            ->where('payment_method', $paymentMethod);
+            ->where('payment_status', 'paid');
 
-        $todayTotal = (clone $base)
-            ->whereDate('transaction_date', now()->toDateString())
-            ->sum('grand_total');
+        // Sales paid this way, and this way's part of sales paid in parts.
+        $todayTotal = SalePayment::totalFor(
+            (clone $base)->whereDate('transaction_date', now()->toDateString()),
+            $paymentMethod
+        );
 
-        $yesterdayTotal = (clone $base)
-            ->whereDate('transaction_date', now()->subDay()->toDateString())
-            ->sum('grand_total');
+        $yesterdayTotal = SalePayment::totalFor(
+            (clone $base)->whereDate('transaction_date', now()->subDay()->toDateString()),
+            $paymentMethod
+        );
 
         return [
             'today_total' => (float) $todayTotal,
@@ -457,23 +460,35 @@ class PaymentCardTypeController extends Controller
         $perPage = max(1, min(100, (int) $request->input('per_page', 20)));
         $page = max(1, (int) $request->input('page', 1));
 
-        $base = Sale::query()
+        // Card sales for a terminal, e-wallet sales for GCash, bank sales for a bank account.
+        $method = PaymentCardType::methodForKind($paymentCardType->kind ?? 'card');
+        $channelId = $paymentCardType->id;
+
+        $paidHere = Sale::query()
             ->where('domain', $domain->name_slug)
             ->where('location_id', $location->id)
-            ->where('payment_card_type_id', $paymentCardType->id)
-            ->where('payment_status', 'paid')
-            // Card sales for a terminal, e-wallet sales for GCash, bank sales for a bank account.
-            ->where('payment_method', PaymentCardType::methodForKind($paymentCardType->kind ?? 'card'));
+            ->where('payment_status', 'paid');
 
-        $todayTotal = (clone $base)
-            ->whereDate('transaction_date', now()->toDateString())
-            ->sum('grand_total');
+        $todayTotal = SalePayment::totalFor(
+            (clone $paidHere)->whereDate('transaction_date', now()->toDateString()),
+            $method,
+            $channelId
+        );
 
-        $yesterdayTotal = (clone $base)
-            ->whereDate('transaction_date', now()->subDay()->toDateString())
-            ->sum('grand_total');
+        $yesterdayTotal = SalePayment::totalFor(
+            (clone $paidHere)->whereDate('transaction_date', now()->subDay()->toDateString()),
+            $method,
+            $channelId
+        );
 
-        $historyBase = clone $base;
+        // Sales paid wholly through this channel, and split sales with a part paid through it.
+        $partHere = fn ($q) => $q->where('method', $method)->where('payment_card_type_id', $channelId);
+        $historyBase = (clone $paidHere)
+            ->where(function ($q) use ($method, $channelId, $partHere) {
+                $q->where(fn ($single) => $single->where('payment_method', $method)->where('payment_card_type_id', $channelId))
+                    ->orWhere(fn ($split) => $split->where('payment_method', 'split')->whereHas('payments', $partHere));
+            })
+            ->with(['payments' => $partHere]);
 
         $search = trim((string) ($validated['search'] ?? ''));
         if ($search !== '') {
@@ -501,7 +516,11 @@ class PaymentCardTypeController extends Controller
                 return [
                     'id' => $sale->id,
                     'invoice_number' => $sale->invoice_number,
-                    'grand_total' => (float) $sale->grand_total,
+                    // For a split sale, only what went through this channel.
+                    'grand_total' => $sale->payment_method === 'split'
+                        ? round((float) $sale->payments->sum('amount'), 2)
+                        : (float) $sale->grand_total,
+                    'is_split' => $sale->payment_method === 'split',
                     'transaction_date' => $ts ? $ts->toIso8601String() : null,
                 ];
             })

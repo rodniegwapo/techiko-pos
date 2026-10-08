@@ -76,7 +76,15 @@ const itemColumns = [
                         <a-tag v-if="sale.is_credit_sale" color="purple">credit</a-tag>
                     </a-descriptions-item>
                     <a-descriptions-item label="Payment" :span="2">
-                        {{ sale.payment_method }}<span v-if="sale.payment_card_type"> · {{ sale.payment_card_type }}</span><span v-if="sale.payment_reference"> · Ref {{ sale.payment_reference }}</span>
+                        <template v-if="sale.payments?.length">
+                            <a-tag color="blue">split</a-tag>
+                            <div v-for="(p, i) in sale.payments" :key="i" class="text-sm">
+                                {{ p.label }} · {{ formattedTotal(p.amount) }}<span v-if="p.tendered != null && p.tendered > p.amount" class="text-gray-500"> (tendered {{ formattedTotal(p.tendered) }})</span><span v-if="p.reference" class="text-gray-500"> · Ref {{ p.reference }}</span>
+                            </div>
+                        </template>
+                        <template v-else>
+                            {{ sale.payment_method }}<span v-if="sale.payment_card_type"> · {{ sale.payment_card_type }}</span><span v-if="sale.payment_reference"> · Ref {{ sale.payment_reference }}</span>
+                        </template>
                     </a-descriptions-item>
                     <a-descriptions-item v-if="sale.notes" label="Notes" :span="2">{{ sale.notes }}</a-descriptions-item>
                 </a-descriptions>
@@ -93,6 +101,9 @@ const itemColumns = [
                         <template #bodyCell="{ column, record }">
                             <template v-if="column.key === 'product_name'">
                                 <span :class="{ 'text-gray-400 line-through': record.voided }">{{ record.product_name }}</span>
+                                <div v-if="record.modifiers?.length || record.notes" class="text-xs text-gray-500">
+                                    {{ (record.modifiers || []).map((m) => m.name).join(", ") }}<span v-if="record.notes"><span v-if="record.modifiers?.length"> · </span>{{ record.notes }}</span>
+                                </div>
                                 <a-tag v-if="record.voided" color="red" class="ml-2">Voided</a-tag>
                             </template>
                             <template v-else-if="['unit_price', 'discount', 'subtotal'].includes(column.key)">

@@ -159,6 +159,9 @@ const handleAddOrder = async (product) => {
         await axios.post(route, {
             product_id: product.id,
             quantity: 1,
+            // Onto the same line: the same options and note.
+            ...(product.modifier_ids?.length ? { modifier_ids: product.modifier_ids } : {}),
+            ...(product.notes ? { notes: product.notes } : {}),
         });
 
         // Emit event to parent to refresh cart data
@@ -188,6 +191,7 @@ const handleSubtractOrder = async (product) => {
         await axios.patch(route, {
             product_id: product.id,
             quantity: Math.max(0, product.quantity - 1),
+            sale_item_id: product.sale_item_id ?? undefined,
         });
 
         // Emit event to parent to refresh cart data
@@ -216,6 +220,7 @@ const handleUpdateQuantity = async (product, quantity) => {
     await axios.patch(route, {
         product_id: product.id,
         quantity: quantity,
+        sale_item_id: product.sale_item_id ?? undefined,
     });
 
     // Emit event to parent to refresh cart data
@@ -237,7 +242,7 @@ const removeOrder = async (product) => {
         const userId = page.props.auth.user.data.id;
         const route = getRoute("users.sales.cart.remove", { user: userId });
         await axios.delete(route, {
-            data: { product_id: product.id },
+            data: { product_id: product.id, sale_item_id: product.sale_item_id ?? undefined },
         });
 
         // Emit event to parent to refresh cart data
@@ -250,69 +255,72 @@ const removeOrder = async (product) => {
 // Optimistic UI click handlers with direct API calls
 const onAddClick = async (product) => {
     // Prevent multiple rapid clicks
-    if (loadingStates.value[product.id]) return;
+    if (loadingStates.value[lineKey(product)]) return;
 
     // Set loading state
-    loadingStates.value[product.id] = true;
+    loadingStates.value[lineKey(product)] = true;
 
     // Immediately update UI optimistically
-    if (!optimisticQuantities.value[product.id]) {
-        optimisticQuantities.value[product.id] = product.quantity;
+    if (!optimisticQuantities.value[lineKey(product)]) {
+        optimisticQuantities.value[lineKey(product)] = product.quantity;
     }
-    optimisticQuantities.value[product.id] += 1;
+    optimisticQuantities.value[lineKey(product)] += 1;
 
     try {
         // Call the API directly
         await handleAddOrder(product);
         // Clear optimistic state after successful API call
-        delete optimisticQuantities.value[product.id];
+        delete optimisticQuantities.value[lineKey(product)];
     } catch (error) {
         // Revert optimistic state on error
-        optimisticQuantities.value[product.id] = product.quantity;
+        optimisticQuantities.value[lineKey(product)] = product.quantity;
     } finally {
         // Clear loading state
-        loadingStates.value[product.id] = false;
+        loadingStates.value[lineKey(product)] = false;
     }
 };
 
 const onSubtractClick = async (product) => {
     // Prevent multiple rapid clicks
-    if (loadingStates.value[product.id]) return;
+    if (loadingStates.value[lineKey(product)]) return;
 
     // Set loading state
-    loadingStates.value[product.id] = true;
+    loadingStates.value[lineKey(product)] = true;
 
     // Immediately update UI optimistically
-    if (!optimisticQuantities.value[product.id]) {
-        optimisticQuantities.value[product.id] = product.quantity;
+    if (!optimisticQuantities.value[lineKey(product)]) {
+        optimisticQuantities.value[lineKey(product)] = product.quantity;
     }
-    optimisticQuantities.value[product.id] = Math.max(
+    optimisticQuantities.value[lineKey(product)] = Math.max(
         0,
-        optimisticQuantities.value[product.id] - 1,
+        optimisticQuantities.value[lineKey(product)] - 1,
     );
 
     try {
         // Call the API directly
         await handleSubtractOrder(product);
         // Clear optimistic state after successful API call
-        delete optimisticQuantities.value[product.id];
+        delete optimisticQuantities.value[lineKey(product)];
     } catch (error) {
         // Revert optimistic state on error
-        optimisticQuantities.value[product.id] = product.quantity;
+        optimisticQuantities.value[lineKey(product)] = product.quantity;
     } finally {
         // Clear loading state
-        loadingStates.value[product.id] = false;
+        loadingStates.value[lineKey(product)] = false;
     }
 };
 
+// A cart line: one product can be on several lines with different options (Size, Add-ons…).
+const lineKey = (o) => o.line_key ?? o.id;
+
 // Helper function to get display quantity (optimistic or actual)
 const getDisplayQuantity = (order) => {
-    return optimisticQuantities.value[order.id] ?? order.quantity;
+    return optimisticQuantities.value[lineKey(order)] ?? order.quantity;
 };
 
 // Open quantity modal
 const toggleQuantityEdit = (order) => {
-    if (loadingStates.value[order.id]) return;
+    if (loadingStates.value[lineKey(order)]) return;
 
     selectedOrder.value = order;
     tempQuantity.value = getDisplayQuantity(order);
@@ -330,7 +338,7 @@ const toggleQuantityEdit = (order) => {
 
 // Finish quantity editing
 const finishQuantityEdit = (order) => {
-    editingQuantity.value[order.id] = false;
+    editingQuantity.value[lineKey(order)] = false;
 };
 
 // Save quantity from modal
@@ -444,6 +452,7 @@ const handleSubmitVoid = async ({ pin_code, reason }) => {
             emit("offline-cart-remove", {
                 id: voidLine.value.product_id,
                 name: voidLine.value.sale_item,
+                line_key: voidLine.value.line_key,
             });
             openvoidModal.value = false;
             voidLine.value = null;
@@ -459,11 +468,12 @@ const handleSubmitVoid = async ({ pin_code, reason }) => {
             }),
             {
                 product_id: voidLine.value.product_id,
+                sale_item_id: voidLine.value.sale_item_id ?? undefined,
                 pin_code,
                 reason,
             },
         );
-        removeOrder({ id: voidLine.value.product_id });
+        removeOrder({ id: voidLine.value.product_id, sale_item_id: voidLine.value.sale_item_id });
         openvoidModal.value = false;
         voidLine.value = null;
         errors.value = {};
@@ -1347,6 +1357,13 @@ defineExpose({
                                                 >
                                                     {{ order.name }}
                                                 </div>
+                                                <div
+                                                    v-if="order.modifiers?.length || order.notes"
+                                                    class="text-xs text-gray-500"
+                                                    data-testid="cart-line-options"
+                                                >
+                                                    {{ (order.modifiers || []).map((m) => m.name).join(", ") }}<span v-if="order.notes"><span v-if="order.modifiers?.length"> · </span>{{ order.notes }}</span>
+                                                </div>
 
                                                 <div
                                                     class="flex items-center gap-2"
@@ -1359,9 +1376,7 @@ defineExpose({
                                                             type="text"
                                                             size="small"
                                                             :disabled="
-                                                                loadingStates[
-                                                                    order.id
-                                                                ] ||
+                                                                loadingStates[lineKey(order)] ||
                                                                 getDisplayQuantity(
                                                                     order,
                                                                 ) <= 0
@@ -1399,9 +1414,7 @@ defineExpose({
                                                     >
                                                         <span
                                                             v-if="
-                                                                loadingStates[
-                                                                    order.id
-                                                                ]
+                                                                loadingStates[lineKey(order)]
                                                             "
                                                             class="quantity-loading text-xs"
                                                         >
@@ -1426,9 +1439,7 @@ defineExpose({
                                                             type="text"
                                                             size="small"
                                                             :disabled="
-                                                                loadingStates[
-                                                                    order.id
-                                                                ]
+                                                                loadingStates[lineKey(order)]
                                                             "
                                                             @click.stop="
                                                                 onAddClick(
@@ -1452,9 +1463,7 @@ defineExpose({
                                                     {{ order.price }} x
                                                     <span
                                                         v-if="
-                                                            loadingStates[
-                                                                order.id
-                                                            ]
+                                                            loadingStates[lineKey(order)]
                                                         "
                                                         class="animate-pulse bg-gray-200 rounded px-1"
                                                     >

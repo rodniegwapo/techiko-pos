@@ -85,6 +85,12 @@
                                             "Unknown Product"
                                         }}
                                     </h4>
+                                    <span
+                                        v-if="item.modifiers?.length || item.notes"
+                                        class="text-sm text-gray-500"
+                                    >
+                                        {{ (item.modifiers || []).map((m) => m.name).join(", ") }}<span v-if="item.notes"><span v-if="item.modifiers?.length"> · </span>{{ item.notes }}</span>
+                                    </span>
                                     <div
                                         v-if="
                                             item.discount && item.discount > 0

@@ -1,6 +1,6 @@
 import { test, expect, apiJson } from "../support/fixtures.js";
 import { pickSelectOption, notice } from "../support/antd.js";
-import { pageProps, responseProps } from "../support/inertia.js";
+import { pageProps, responseProps, responseVersion } from "../support/inertia.js";
 import { USERS } from "../support/users.js";
 
 /**
@@ -321,7 +321,7 @@ test.describe("Global users access", () => {
     test("a refused visit from inside the app goes back to where it came from", async ({ serverAs }) => {
         const api = await serverAs("cashier");
         const from = `/domains/${JOLLIBEE.slug}/sales`;
-        await api.get(from);
+        const version = await responseVersion(await api.get(from));
 
         // An Inertia visit isn't remembered as the previous page, so going back is safe.
         const res = await api.get(usersPath, {
@@ -329,6 +329,7 @@ test.describe("Global users access", () => {
             // What Inertia's router sends; with Accept */* Laravel would take it for a JSON call.
             headers: {
                 "X-Inertia": "true",
+                "X-Inertia-Version": version ?? "",
                 "X-Requested-With": "XMLHttpRequest",
                 Accept: "text/html, application/xhtml+xml",
                 Referer: `http://techiko-pos.test${from}`,

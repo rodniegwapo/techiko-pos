@@ -6,6 +6,7 @@
     :loading="loading"
     :pagination="{ pageSize: 10 }"
     :row-class-name="(_, index) => (index % 2 === 1 ? 'bg-gray-50 group' : 'group')"
+    :row-expandable="(record) => record.installments?.length > 0"
     row-key="id"
   >
     <template #bodyCell="{ column, record }">
@@ -13,6 +14,9 @@
         <span>
           {{ record.reference_number || record.sale?.invoice_number || "N/A" }}
         </span>
+        <a-tag v-if="record.installments?.length" color="blue" class="ml-2">
+          {{ record.installments.length }} installments
+        </a-tag>
       </template>
 
       <template v-if="column.key === 'date'">
@@ -20,25 +24,27 @@
       </template>
 
       <template v-if="column.key === 'amount'">
+        <span class="text-gray-700">{{ peso(record.amount) }}</span>
+      </template>
+
+      <template v-if="column.key === 'remaining'">
         <span class="font-medium text-red-600">
-          ₱{{
-            record.amount.toLocaleString("en-US", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })
-          }}
+          {{ peso(record.remaining ?? record.amount) }}
         </span>
       </template>
 
       <template v-if="column.key === 'due_date'">
-        <span :class="getDueDateClass(record.due_date)">
-          {{ formatDate(record.due_date) }}
+        <span :class="dueClass(record)">
+          {{ formatDate(nextDue(record)) }}
         </span>
+        <div v-if="record.installments?.length" class="text-xs text-gray-400">
+          next installment
+        </div>
       </template>
 
       <template v-if="column.key === 'days_overdue'">
-        <span v-if="getDaysOverdue(record.due_date) > 0" class="text-red-600 font-medium">
-          {{ getDaysOverdue(record.due_date) }} days
+        <span v-if="record.days_overdue > 0" class="text-red-600 font-medium">
+          {{ record.days_overdue }} days
         </span>
         <span v-else class="text-gray-400">-</span>
       </template>
@@ -63,6 +69,34 @@
           </IconTooltipButton>
         </div>
       </template>
+    </template>
+
+    <template #expandedRowRender="{ record }">
+      <a-table
+        :columns="installmentColumns"
+        :data-source="record.installments"
+        :pagination="false"
+        size="small"
+        row-key="id"
+      >
+        <template #bodyCell="{ column, record: installment }">
+          <template v-if="column.key === 'due_date'">
+            {{ formatDate(installment.due_date) }}
+          </template>
+          <template v-else-if="column.key === 'amount'">
+            {{ peso(installment.amount) }}
+          </template>
+          <template v-else-if="column.key === 'paid_amount'">
+            {{ peso(installment.paid_amount) }}
+          </template>
+          <template v-else-if="column.key === 'status'">
+            <a-tag v-if="installment.paid_at" color="success">Paid</a-tag>
+            <a-tag v-else-if="installment.is_overdue" color="error">Overdue</a-tag>
+            <a-tag v-else-if="Number(installment.paid_amount) > 0" color="warning">Partly paid</a-tag>
+            <a-tag v-else>Due</a-tag>
+          </template>
+        </template>
+      </a-table>
     </template>
   </a-table>
 </template>
@@ -90,20 +124,23 @@ const columns = computed(() => [
     title: "Date",
     key: "date",
     dataIndex: "created_at",
-    sorter: true,
   },
   {
     title: "Amount",
     key: "amount",
     dataIndex: "amount",
     align: "right",
-    sorter: true,
+  },
+  {
+    title: "Remaining",
+    key: "remaining",
+    dataIndex: "remaining",
+    align: "right",
   },
   {
     title: "Due Date",
     key: "due_date",
     dataIndex: "due_date",
-    sorter: true,
   },
   {
     title: "Days Overdue",
@@ -117,6 +154,20 @@ const columns = computed(() => [
   },
 ]);
 
+const installmentColumns = [
+  { title: "#", dataIndex: "seq", key: "seq", width: 48 },
+  { title: "Due", key: "due_date" },
+  { title: "Amount", key: "amount", align: "right" },
+  { title: "Paid", key: "paid_amount", align: "right" },
+  { title: "Status", key: "status", align: "center" },
+];
+
+const peso = (v) =>
+  `₱${Number(v || 0).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+
 const formatDate = (date) => {
   if (!date) return "-";
   return new Date(date).toLocaleDateString("en-US", {
@@ -126,19 +177,18 @@ const formatDate = (date) => {
   });
 };
 
-const getDaysOverdue = (dueDate) => {
-  if (!dueDate) return 0;
-  const due = new Date(dueDate);
-  const now = new Date();
-  const diffTime = now - due;
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  return diffDays > 0 ? diffDays : 0;
+// For an installment plan, what matters is the earliest installment still unpaid.
+const nextDue = (record) => {
+  const unpaid = (record.installments || []).find((i) => !i.paid_at);
+  return unpaid ? unpaid.due_date : record.due_date;
 };
 
-const getDueDateClass = (dueDate) => {
-  const daysOverdue = getDaysOverdue(dueDate);
-  if (daysOverdue > 0) return "text-red-600 font-medium";
-  if (daysOverdue === 0) return "text-orange-600 font-medium";
+const dueClass = (record) => {
+  if (record.is_overdue) return "text-red-600 font-medium";
+  const due = nextDue(record);
+  if (due && new Date(due).toDateString() === new Date().toDateString()) {
+    return "text-orange-600 font-medium";
+  }
   return "text-gray-600";
 };
 </script>

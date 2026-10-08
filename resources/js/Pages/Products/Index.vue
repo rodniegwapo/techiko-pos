@@ -241,6 +241,14 @@ const hasMultipleStores = computed(() => {
                     class="w-full min-w-0 md:max-w-[300px]"
                 />
 
+                <Link
+                    v-if="hasPermission('products.modifier-groups.index')"
+                    class="block w-full md:w-auto"
+                    :href="getRoute('products.modifier-groups.index')"
+                >
+                    <a-button class="w-full md:w-auto">Modifiers</a-button>
+                </Link>
+
                 <template v-if="canCreate">
                 <Link
                     v-if="!productsAtCapacity"

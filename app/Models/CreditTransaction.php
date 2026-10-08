@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 
 class CreditTransaction extends Model
 {
@@ -143,6 +144,11 @@ class CreditTransaction extends Model
             'paid_amount' => $this->amount,
             'paid_at' => now(),
         ]);
+
+        $this->installments()->whereNull('paid_at')->update([
+            'paid_amount' => DB::raw('amount'),
+            'paid_at' => now(),
+        ]);
     }
 
     public function getDaysOverdue(): ?int
@@ -157,5 +163,11 @@ class CreditTransaction extends Model
             : $this->due_date;
 
         return (int) $since->diffInDays(today());
+    }
+
+    /** Appended on request (lists of charges), not on every row: it needs the installments. */
+    public function getDaysOverdueAttribute(): ?int
+    {
+        return $this->getDaysOverdue();
     }
 }

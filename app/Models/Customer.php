@@ -207,7 +207,7 @@ class Customer extends Model
         return $this->getAvailableCredit() >= $amount;
     }
 
-    public function addCreditTransaction(string $type, float $amount, ?int $saleId = null, ?string $referenceNumber = null, ?string $notes = null, ?\DateTime $dueDate = null): CreditTransaction
+    public function addCreditTransaction(string $type, float $amount, ?int $saleId = null, ?string $referenceNumber = null, ?string $notes = null, ?\DateTime $dueDate = null, ?string $paymentMethod = null): CreditTransaction
     {
         $balanceBefore = (float) $this->credit_balance;
 
@@ -244,6 +244,7 @@ class Customer extends Model
             'due_date' => $dueDate ?? ($type === 'credit' ? now()->addDays($this->credit_terms_days) : null),
             'reference_number' => $referenceNumber,
             'notes' => $notes,
+            'payment_method' => $paymentMethod,
             'user_id' => $userId,
             'domain' => $this->domain ?? null,
         ]);
@@ -255,20 +256,21 @@ class Customer extends Model
     {
         return $this->creditTransactions()
             ->overdue()
+            ->with('installments')
             ->orderBy('due_date', 'asc')
             ->get();
     }
 
+    /** What is late: the unpaid part of late installments, or what is left on charges past due. */
     public function getTotalOverdueAmount(): float
     {
-        return $this->creditTransactions()
-            ->overdue()
-            ->sum('amount');
+        return round($this->getOverdueTransactions()->sum(fn ($t) => $t->overdueAmount()), 2);
     }
 
     public function getCreditHistory(int $limit = 50)
     {
         return $this->creditTransactions()
+            ->with('installments')
             ->orderBy('created_at', 'desc')
             ->limit($limit)
             ->get();

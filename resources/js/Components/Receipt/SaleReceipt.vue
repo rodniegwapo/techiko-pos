@@ -51,6 +51,10 @@ const paymentLabel = computed(() => {
 
         <div v-for="item in items" :key="item.id" class="item">
             <div>{{ item.product_name }}</div>
+            <div v-for="(m, i) in item.modifiers || []" :key="i" class="muted">
+                  + {{ m.name }}<template v-if="m.price_delta"> ({{ formattedTotal(m.price_delta) }})</template>
+            </div>
+            <div v-if="item.notes" class="muted">  * {{ item.notes }}</div>
             <div class="row">
                 <span>{{ item.quantity }} x {{ formattedTotal(item.unit_price) }}</span>
                 <span>{{ formattedTotal(item.subtotal) }}</span>
@@ -71,7 +75,19 @@ const paymentLabel = computed(() => {
         </div>
         <div v-if="Number(sale.tax_amount) > 0" class="row"><span>{{ vatLabel }}</span><span>{{ formattedTotal(sale.tax_amount) }}</span></div>
         <div class="row bold big"><span>TOTAL</span><span>{{ formattedTotal(sale.grand_total) }}</span></div>
-        <div class="row"><span>Paid by</span><span>{{ paymentLabel }}</span></div>
+        <template v-if="sale.payments?.length">
+            <div class="row"><span>Paid by</span><span>SPLIT</span></div>
+            <template v-for="(p, i) in sale.payments" :key="i">
+                <div class="row">
+                    <span>  {{ p.label }}<template v-if="p.reference"> · Ref {{ p.reference }}</template></span>
+                    <span>{{ formattedTotal(p.tendered ?? p.amount) }}</span>
+                </div>
+                <div v-if="p.tendered != null && p.tendered > p.amount" class="row muted">
+                    <span>  Change</span><span>{{ formattedTotal(p.tendered - p.amount) }}</span>
+                </div>
+            </template>
+        </template>
+        <div v-else class="row"><span>Paid by</span><span>{{ paymentLabel }}</span></div>
 
         <div class="rule" />
         <div class="center">Thank you!</div>

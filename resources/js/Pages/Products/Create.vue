@@ -6,6 +6,7 @@ import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
 import ContentLayout from "@/Components/ContentLayout.vue";
 import ProductStockFields from "./components/ProductStockFields.vue";
+import ProductModifierGroupsField from "./components/ProductModifierGroupsField.vue";
 import {
     generateInternalBarcode,
     generateSku,
@@ -25,6 +26,10 @@ const page = usePage();
 const { getRoute, hrefWithPreservedLocationId } = useDomainRoutes();
 
 const props = defineProps({
+    modifierGroups: {
+        type: Array,
+        default: () => [],
+    },
     categories: {
         type: Array,
         default: () => [],
@@ -57,6 +62,9 @@ const form = useForm({
     representation_image: null,
     track_inventory: true,
     reorder_level: 0,
+    // The form always says it sent the modifier field, so clearing it clears them.
+    modifier_groups_present: true,
+    modifier_group_ids: [],
 });
 
 const imageFileList = ref([]);
@@ -587,6 +595,7 @@ const handleSave = () => {
                                     Stock
                                 </h4>
                                 <ProductStockFields :form="form" />
+                                <ProductModifierGroupsField :form="form" :groups="modifierGroups" />
                             </section>
 
                             <section

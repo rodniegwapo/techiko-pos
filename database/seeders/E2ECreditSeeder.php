@@ -55,9 +55,15 @@ class E2ECreditSeeder extends Seeder
                 $payable[] = $this->account("E2E Cred Payable {$n}", self::DOMAIN, limit: 1000, owed: 500, dueInDays: 15);
             }
 
+            // Nothing owed, for charging by hand in installments (credits/installments.spec.js).
+            $installments = [];
+            for ($n = 1; $n <= self::WORKER_ACCOUNTS; $n++) {
+                $installments[] = $this->account("E2E Cred Installments {$n}", self::DOMAIN, limit: 5000, owed: 0, dueInDays: null);
+            }
+
             $other = $this->account('E2E Cred Elsewhere', self::OTHER_DOMAIN, limit: 800, owed: 600, dueInDays: -5);
 
-            return compact('overdue', 'atLimit', 'goodStanding', 'disabled', 'payable', 'other');
+            return compact('overdue', 'atLimit', 'goodStanding', 'disabled', 'payable', 'installments', 'other');
         });
 
         $path = env('E2E_FIXTURES_FILE', base_path('tests/e2e/.fixtures.json'));

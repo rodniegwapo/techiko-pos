@@ -3,6 +3,7 @@
 namespace App\Support\Wallet;
 
 use App\Models\Sale;
+use App\Models\SalePayment;
 use App\Models\WalletCashMovement;
 use App\Models\WalletCashReconciliation;
 
@@ -30,7 +31,6 @@ final class WalletCashDailyExpected
             ->where('domain', $domainSlug)
             ->where('location_id', $locationId)
             ->where('payment_status', 'paid')
-            ->where('payment_method', 'cash')
             ->whereDate('transaction_date', $businessDate);
 
         // Mirror physical ledger: exclude book-only AUTO_CC_* except end-shift cashout (cash leaves drawer).
@@ -48,7 +48,8 @@ final class WalletCashDailyExpected
             $movementBase->where('created_at', '>', $openingBasisAt);
         }
 
-        $paidCashSales = round((float) $salesQuery->sum('grand_total'), 2);
+        // Cash sales, and the cash part of sales paid in parts.
+        $paidCashSales = SalePayment::totalFor($salesQuery, 'cash');
         $manualIn = round((float) (clone $movementBase)->where('direction', 'in')->sum('amount'), 2);
         $manualOut = round((float) (clone $movementBase)->where('direction', 'out')->sum('amount'), 2);
         $expectedCash = round($openingCash + $paidCashSales + $manualIn - $manualOut, 2);

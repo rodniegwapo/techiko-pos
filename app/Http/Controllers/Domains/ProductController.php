@@ -8,6 +8,7 @@ use App\Http\Resources\ProductResource;
 use App\Models\Category;
 use App\Models\Domain;
 use App\Models\InventoryLocation;
+use App\Models\ModifierGroup;
 use App\Models\Product\Product;
 use App\Models\Product\ProductSoldType;
 use App\Models\ProductInventory;
@@ -102,7 +103,12 @@ class ProductController extends Controller
                     ? Rule::exists('inventory_locations', 'id')->where('domain', $domainSlug)
                     : 'exists:inventory_locations,id',
             ],
+
+            'modifier_groups_present' => ['nullable', 'boolean'],
+            'modifier_group_ids' => ['nullable', 'array'],
+            'modifier_group_ids.*' => ['integer', Rule::exists('modifier_groups', 'id')->where('domain', $domainSlug ?? '')],
         ], [
+            'modifier_group_ids.*.exists' => 'The selected modifier group does not belong to this organization.',
             'category_id.exists' => 'The selected category does not belong to this organization.',
             'location_id.exists' => 'The selected store does not belong to this organization.',
         ], [
@@ -132,7 +138,12 @@ class ProductController extends Controller
         }
 
         // Request-only fields — not columns on products
-        unset($validated['location_id'], $validated['representation_image']);
+        unset(
+            $validated['location_id'],
+            $validated['representation_image'],
+            $validated['modifier_groups_present'],
+            $validated['modifier_group_ids'],
+        );
 
         return $validated;
     }
@@ -487,6 +498,10 @@ class ProductController extends Controller
 
         $product = Product::create($validated);
 
+        if ($domain) {
+            $this->syncModifierGroups($request, $domain, $product);
+        }
+
         $location = $this->resolveActiveLocation($request, $domain)
             ?: ($request->location_id ? InventoryLocation::find($request->location_id) : null);
 
@@ -522,6 +537,7 @@ class ProductController extends Controller
         );
         $product->update($validated);
         $product->refresh();
+        $this->syncModifierGroups($request, $domain, $product);
 
         if ($request->filled('location_id')) {
             $location = InventoryLocation::find($request->input('location_id'));
@@ -621,6 +637,7 @@ class ProductController extends Controller
 
         return Inertia::render('Products/Create', [
             'categories' => $categories,
+            'modifierGroups' => $this->modifierGroupOptions($domain),
             'sold_by_types' => ProductSoldType::all(),
             'isGlobalView' => false,
             'currentLocation' => $location,
@@ -651,11 +668,40 @@ class ProductController extends Controller
                     $product->representation,
                     $product->representation_type,
                 ),
+                'modifier_group_ids' => $product->modifierGroups()->pluck('modifier_groups.id'),
             ],
             'categories' => $categories,
+            'modifierGroups' => $this->modifierGroupOptions($domain),
             'sold_by_types' => ProductSoldType::all(),
             'isGlobalView' => false,
             'currentLocation' => $location,
         ]);
+    }
+
+    /** The organization's modifier groups, for the product form's "Modifiers" field. */
+    private function modifierGroupOptions(Domain $domain)
+    {
+        return ModifierGroup::forDomain($domain->name_slug)
+            ->withCount('modifiers')
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['id', 'name', 'selection', 'is_required']);
+    }
+
+    /**
+     * Attach the modifier groups picked on the product form. The form says it sent the field
+     * (modifier_groups_present), so an empty pick clears them while other callers leave them be.
+     */
+    private function syncModifierGroups(Request $request, Domain $domain, Product $product): void
+    {
+        if (! $request->boolean('modifier_groups_present')) {
+            return;
+        }
+
+        // Checked with the rest of the form in validatedData().
+        $ids = array_values(array_unique(array_map('intval', $request->input('modifier_group_ids', []))));
+        $product->modifierGroups()->sync(
+            collect($ids)->mapWithKeys(fn ($id, $i) => [$id => ['sort_order' => $i]])->all()
+        );
     }
 }

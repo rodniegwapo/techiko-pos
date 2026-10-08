@@ -47,6 +47,25 @@ class SaleItem extends Model
         return $this->belongsToMany(\App\Models\Product\Discount::class);
     }
 
+    /** The options picked on this line (Large, Extra shot…), as they were priced when rung up. */
+    public function modifiers()
+    {
+        return $this->hasMany(SaleItemModifier::class)->orderBy('id');
+    }
+
+    /** @return list<array{group_name: string, name: string, price_delta: float}> */
+    public function modifierSummary(): array
+    {
+        return $this->modifiers
+            ->map(fn (SaleItemModifier $m) => [
+                'group_name' => $m->group_name,
+                'name' => $m->name,
+                'price_delta' => round((float) $m->price_delta, 2),
+            ])
+            ->values()
+            ->all();
+    }
+
     public function setDiscountAmount(?string $type, ?float $discountAmount): void
     {
         $lineSubtotal = $this->unit_price * $this->quantity;

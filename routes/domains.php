@@ -11,6 +11,7 @@ use App\Http\Controllers\Domains\Inventory\StockAdjustmentController;
 use App\Http\Controllers\Domains\LoyaltyController;
 use App\Http\Controllers\Domains\LoyaltyTierController;
 use App\Http\Controllers\Domains\ManualBillingController;
+use App\Http\Controllers\Domains\ModifierGroupController;
 use App\Http\Controllers\Domains\PaymentCardTypeController;
 use App\Http\Controllers\Domains\PayMongoQrPhController;
 use App\Http\Controllers\Domains\ProductController;
@@ -128,6 +129,11 @@ Route::prefix('domains/{domain:name_slug}')
             ->name('products.assignable');
         Route::post('products/{product}/attach-location', [ProductController::class, 'attachLocation'])
             ->name('products.attach-location');
+
+        // Product modifiers (add-ons): option groups such as Size or Add-ons, picked when a product is rung up
+        Route::resource('modifier-groups', ModifierGroupController::class)
+            ->only(['index', 'store', 'update', 'destroy'])
+            ->names('products.modifier-groups');
 
         Route::resource('products', ProductController::class)
             ->only(['index', 'store', 'update', 'destroy', 'create', 'edit'])

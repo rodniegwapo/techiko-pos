@@ -24,6 +24,7 @@ use App\Models\User;
 use App\Services\CreditService;
 use App\Services\InventoryService;
 use App\Services\LoyaltyRedemptionService;
+use App\Services\ProductModifierService;
 use App\Services\SaleService;
 use App\Traits\LocationCategoryScoping;
 use Carbon\Carbon;
@@ -40,6 +41,18 @@ use Inertia\Inertia;
 class SaleController extends Controller
 {
     use LocationCategoryScoping;
+
+    /** The options picked for a product being added (Size, Add-ons…) and a note for the line. */
+    private const LINE_OPTION_RULES = [
+        'modifier_ids' => 'nullable|array|max:30',
+        'modifier_ids.*' => 'integer',
+        'notes' => 'nullable|string|max:200',
+    ];
+
+    /** Which cart line a change is for: sale_item_id names it; without one, the product's first line. */
+    private const LINE_TARGET_RULES = [
+        'sale_item_id' => 'nullable|integer',
+    ];
 
     protected $saleService;
 
@@ -121,6 +134,7 @@ class SaleController extends Controller
             ->with([
                 'category',
                 'inventories' => fn ($q) => $q->where('location_id', $location->id),
+                'modifierGroups.activeModifiers',
             ]);
 
         // Filtered before counting so the page count matches what is shown.
@@ -187,6 +201,7 @@ class SaleController extends Controller
             ->with([
                 'category',
                 'inventories' => fn ($q) => $q->where('location_id', $location->id),
+                'modifierGroups.activeModifiers',
             ]);
 
         $total = (clone $base)->count();
@@ -262,18 +277,29 @@ class SaleController extends Controller
             'customer_id' => ['nullable', $this->customerInDomainRule($domain)],
             'sale_amount' => 'nullable|numeric|min:0',
             'loyalty_points_to_redeem' => 'nullable|integer|min:0',
-            'payment_method' => 'required|string|in:cash,card,e-wallet,bank,credit',
+            'payment_method' => 'required|string|in:cash,card,e-wallet,bank,credit,split',
+            ...$this->splitPaymentRules(allowCredit: true),
         ]);
 
         $location = Helpers::getActiveLocation($domain);
+        $isSplit = $validated['payment_method'] === 'split';
 
         // Card, e-wallet and bank payments name the channel used (terminal, GCash, BDO…) at this store.
-        $validated = array_merge($validated, $this->validatedPaymentChannel(
-            $request->all(),
-            $domain,
-            $validated['payment_method'],
-            $sale->location_id ?? $location?->id,
-        ));
+        if ($isSplit) {
+            $validated['payments'] = $this->validatedSplitPayments(
+                $validated['payments'],
+                $request->input('payments', []),
+                $domain,
+                $sale->location_id ?? $location?->id,
+            );
+        } else {
+            $validated = array_merge($validated, $this->validatedPaymentChannel(
+                $request->all(),
+                $domain,
+                $validated['payment_method'],
+                $sale->location_id ?? $location?->id,
+            ));
+        }
 
         $validated['customer_id'] ??= null;
 
@@ -285,6 +311,7 @@ class SaleController extends Controller
             DB::transaction(function () use (
                 $sale,
                 $validated,
+                $isSplit,
                 &$loyaltyResults,
                 &$creditResults,
                 $location,
@@ -329,6 +356,11 @@ class SaleController extends Controller
                 // Re-total with the current VAT settings: they may have changed since the cart was last touched.
                 $sale->recalcTotals();
 
+                // A split payment has to cover the total, now that the total is final.
+                $splitParts = $isSplit
+                    ? $this->settleSplitPayments($validated['payments'], (float) $sale->fresh()->grand_total)
+                    : [];
+
                 // 1. Complete sale and process inventory
                 $sale->refresh();
                 $this->saleService->completeSale($sale, auth()->user());
@@ -346,8 +378,40 @@ class SaleController extends Controller
                     ]);
                 }
 
-                // 3. Handle credit payment if selected
-                if ($validated['payment_method'] === 'credit') {
+                // 3. A sale paid in parts keeps each part; a credit part goes on the customer's account.
+                if ($isSplit) {
+                    $customer = $validated['customer_id'] ? Customer::findOrFail($validated['customer_id']) : null;
+                    $creditPart = collect($splitParts)->firstWhere('method', 'credit');
+
+                    if ($creditPart) {
+                        if (! $customer) {
+                            throw ValidationException::withMessages(['customer_id' => 'Customer is required for credit payments.']);
+                        }
+
+                        $creditTransaction = $this->creditService->processCreditSale($sale, $customer, (float) $creditPart['amount']);
+
+                        $creditResults = [
+                            'transaction_id' => $creditTransaction->id,
+                            'credit_balance' => $customer->fresh()->credit_balance,
+                            'available_credit' => $customer->fresh()->getAvailableCredit(),
+                        ];
+                    }
+
+                    $sale->refresh();
+                    $sale->update([
+                        'payment_method' => 'split',
+                        'payment_card_type_id' => null,
+                        'payment_reference' => null,
+                        'location_id' => $location->id,
+                        'payment_status' => 'paid',
+                    ]);
+                    $sale->payments()->createMany($splitParts);
+
+                    if ($customer) {
+                        $sale->updateCustomer($customer->id);
+                        $loyaltyResults = $customer->processLoyaltyForSale((float) $sale->fresh()->grand_total);
+                    }
+                } elseif ($validated['payment_method'] === 'credit') {
                     if (! $validated['customer_id']) {
                         throw ValidationException::withMessages(['customer_id' => 'Customer is required for credit payments.']);
                     }
@@ -483,6 +547,100 @@ class SaleController extends Controller
         ];
     }
 
+    /** Rules for the parts of a split payment (2 to 4 of them); offline sales cannot put any on credit. */
+    protected function splitPaymentRules(bool $allowCredit, string $prefix = ''): array
+    {
+        $methods = $allowCredit ? 'cash,card,e-wallet,bank,credit' : 'cash,card,e-wallet,bank';
+
+        return [
+            "{$prefix}payments" => ["required_if:{$prefix}payment_method,split", 'array', 'min:2', 'max:4'],
+            "{$prefix}payments.*.method" => ['required', 'string', "in:{$methods}"],
+            "{$prefix}payments.*.amount" => ['required', 'numeric', 'min:0.01'],
+            "{$prefix}payments.*.payment_card_type_id" => ['nullable', 'integer'],
+            "{$prefix}payments.*.payment_reference" => ['nullable', 'string', 'max:100'],
+        ];
+    }
+
+    /**
+     * Each part of a split payment with the channel it went through, checked as a single payment would be.
+     * Cash and credit can each be used once; card, e-wallet and bank more than once (GCash + Maya).
+     *
+     * @return list<array{method: string, payment_card_type_id: ?int, reference: ?string, amount: float}>
+     */
+    protected function validatedSplitPayments(array $parts, array $rawParts, Domain $domain, ?int $locationId, string $errorPrefix = ''): array
+    {
+        $rows = [];
+        foreach (array_values($parts) as $i => $part) {
+            try {
+                $channel = $this->validatedPaymentChannel($rawParts[$i] ?? $part, $domain, $part['method'], $locationId);
+            } catch (ValidationException $e) {
+                throw ValidationException::withMessages(
+                    collect($e->errors())->mapWithKeys(fn ($m, $k) => ["{$errorPrefix}payments.{$i}.{$k}" => $m])->all()
+                );
+            }
+
+            $rows[] = [
+                'method' => $part['method'],
+                'payment_card_type_id' => $channel['payment_card_type_id'],
+                'reference' => $channel['payment_reference'],
+                'amount' => round((float) $part['amount'], 2),
+            ];
+        }
+
+        $uses = collect($rows)->countBy('method');
+        if (($uses['cash'] ?? 0) > 1 || ($uses['credit'] ?? 0) > 1) {
+            throw ValidationException::withMessages([
+                "{$errorPrefix}payments" => 'Cash and credit can each be used once in a split payment.',
+            ]);
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Check a split payment against the sale's final total. Only cash may come to more than what is left
+     * (the rest is change), so the cash part is kept as what it paid toward the sale, with what was handed over.
+     *
+     * @param  list<array{method: string, payment_card_type_id: ?int, reference: ?string, amount: float}>  $rows
+     * @return list<array{method: string, payment_card_type_id: ?int, reference: ?string, amount: float, tendered: ?float}>
+     */
+    protected function settleSplitPayments(array $rows, float $grandTotal, string $errorPrefix = ''): array
+    {
+        $cents = fn ($v) => (int) round((float) $v * 100);
+        $total = $cents($grandTotal);
+        $nonCash = collect($rows)->where('method', '!=', 'cash')->sum(fn ($r) => $cents($r['amount']));
+        $cash = collect($rows)->where('method', 'cash')->sum(fn ($r) => $cents($r['amount']));
+        $peso = fn (int $c) => '₱'.number_format($c / 100, 2);
+
+        if ($nonCash > $total) {
+            throw ValidationException::withMessages([
+                "{$errorPrefix}payments" => "Card, e-wallet, bank and credit come to {$peso($nonCash)}, more than the {$peso($total)} total. Only cash can be more, for change.",
+            ]);
+        }
+
+        if ($nonCash + $cash < $total) {
+            throw ValidationException::withMessages([
+                "{$errorPrefix}payments" => "The payments come to {$peso($nonCash + $cash)}, short of the {$peso($total)} total.",
+            ]);
+        }
+
+        $settled = [];
+        foreach ($rows as $row) {
+            if ($row['method'] === 'cash') {
+                $applied = $total - $nonCash;
+                // Cash that only went to change paid nothing toward the sale.
+                if ($applied <= 0) {
+                    continue;
+                }
+                $settled[] = [...$row, 'amount' => $applied / 100, 'tendered' => $row['amount']];
+            } else {
+                $settled[] = [...$row, 'tendered' => null];
+            }
+        }
+
+        return $settled;
+    }
+
     protected function customerInDomainRule(Domain $domain)
     {
         return Rule::exists('customers', 'id')->where('domain', $domain->name_slug);
@@ -534,40 +692,35 @@ class SaleController extends Controller
         $validated = $request->validate([
             'product_id' => ['required', $this->productInDomainRule($domain)],
             'quantity' => 'required|integer|min:1',
+            ...self::LINE_OPTION_RULES,
         ]);
 
         $this->ensureSaleBelongsToDomain($sale, $domain);
 
         $saleId = $sale->id;
 
-        DB::transaction(function () use ($validated, $domain, $saleId) {
+        $saleItemId = null;
+
+        DB::transaction(function () use ($validated, $domain, $saleId, &$saleItemId) {
             $sale = Sale::query()->whereKey($saleId)->lockForUpdate()->firstOrFail();
             $this->ensureSaleBelongsToDomain($sale, $domain);
 
-            // Fetch product price from database for security and data integrity
-            $product = Product::findOrFail($validated['product_id']);
-            $unitPrice = $product->price;
-
-            $saleItem = $sale->saleItems()->where('product_id', $validated['product_id'])->first();
-
-            if ($saleItem) {
-                $saleItem->increment('quantity', $validated['quantity']);
-            } else {
-                $sale->saleItems()->create([
-                    'product_id' => $validated['product_id'],
-                    'quantity' => $validated['quantity'],
-                    'unit_price' => $unitPrice,
-                ]);
-            }
+            // Priced from the database (product and options), never from the request.
+            $saleItemId = app(ProductModifierService::class)->addToSale(
+                $sale,
+                Product::findOrFail($validated['product_id']),
+                (int) $validated['quantity'],
+                $validated['modifier_ids'] ?? [],
+                $validated['notes'] ?? null,
+            )->id;
 
             $sale->recalcTotals();
 
             $this->saleService->enforceNoOversellForPendingSale($domain, $sale->fresh());
         });
 
-        $sale->refresh()->load(['saleItems.product', 'saleDiscounts']);
-        $saleItem = $sale->saleItems()->where('product_id', $validated['product_id'])->first();
-        $saleItem?->load('product');
+        $sale->refresh()->load(['saleItems.product', 'saleItems.modifiers', 'saleDiscounts']);
+        $saleItem = $sale->saleItems()->with(['product', 'modifiers'])->find($saleItemId);
 
         return response()->json([
             'success' => true,
@@ -586,13 +739,14 @@ class SaleController extends Controller
     {
         $validated = $request->validate([
             'product_id' => ['required', $this->productInDomainRule($domain)],
+            ...self::LINE_TARGET_RULES,
         ]);
 
-        $sale->saleItems()->where('product_id', $validated['product_id'])->delete();
+        $this->cartLines($sale, $validated)->delete();
         $sale->recalcTotals();
 
         // Refresh the sale with all relationships
-        $sale->load(['saleItems.product', 'saleDiscounts']);
+        $sale->load(['saleItems.product', 'saleItems.modifiers', 'saleDiscounts']);
 
         return response()->json([
             'success' => true,
@@ -611,6 +765,7 @@ class SaleController extends Controller
         $validated = $request->validate([
             'product_id' => ['required', $this->productInDomainRule($domain)],
             'quantity' => 'required|integer|min:1',
+            ...self::LINE_TARGET_RULES,
         ]);
 
         $this->ensureSaleBelongsToDomain($sale, $domain);
@@ -620,9 +775,7 @@ class SaleController extends Controller
             $sale = Sale::query()->whereKey($saleId)->lockForUpdate()->firstOrFail();
             $this->ensureSaleBelongsToDomain($sale, $domain);
 
-            $saleItem = $sale->saleItems()
-                ->where('product_id', $validated['product_id'])
-                ->firstOrFail();
+            $saleItem = $this->cartLines($sale, $validated)->firstOrFail();
 
             $saleItem->update(['quantity' => $validated['quantity']]);
             $sale->recalcTotals();
@@ -630,11 +783,9 @@ class SaleController extends Controller
             $this->saleService->enforceNoOversellForPendingSale($domain, $sale->fresh());
         });
 
-        $sale->refresh()->load(['saleItems.product', 'saleDiscounts']);
-        $saleItem = $sale->saleItems()
-            ->where('product_id', $validated['product_id'])
-            ->firstOrFail();
-        $saleItem->load('product');
+        $sale->refresh()->load(['saleItems.product', 'saleItems.modifiers', 'saleDiscounts']);
+        $saleItem = $this->cartLines($sale, $validated)->firstOrFail();
+        $saleItem->load(['product', 'modifiers']);
 
         return response()->json([
             'success' => true,
@@ -651,7 +802,7 @@ class SaleController extends Controller
      */
     public function getCartState(Request $request, Domain $domain, Sale $sale)
     {
-        $sale->load(['saleItems.product', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount']);
+        $sale->load(['saleItems.product', 'saleItems.modifiers', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount']);
 
         return response()->json([
             'success' => true,
@@ -715,6 +866,7 @@ class SaleController extends Controller
             'pin_code' => 'required|string',
             'reason' => 'nullable|string',
             'product_id' => 'required|integer',
+            ...self::LINE_TARGET_RULES,
         ]);
 
         $saleItem = $this->saleService->voidItem($sale, $validated, auth()->user());
@@ -727,10 +879,25 @@ class SaleController extends Controller
 
     public function findSaleItem(Request $request, Domain $domain, Sale $sale)
     {
-        return $sale->saleItems()
-            ->with('discounts') // Load the discounts relationship
-            ->where('product_id', $request->product_id)
+        return $this->cartLines($sale, $request->only(['product_id', 'sale_item_id']))
+            ->with(['discounts', 'modifiers'])
             ->first();
+    }
+
+    /**
+     * The cart line(s) a request is about: the line named by sale_item_id, or, for callers that only
+     * know the product, that product's lines.
+     *
+     * @param  array{product_id?: mixed, sale_item_id?: mixed}  $target
+     */
+    protected function cartLines(Sale $sale, array $target)
+    {
+        return $sale->saleItems()
+            ->when(
+                $target['sale_item_id'] ?? null,
+                fn ($q, $id) => $q->whereKey((int) $id),
+                fn ($q) => $q->where('product_id', $target['product_id'] ?? 0)->orderBy('id')
+            );
     }
 
     public function assignCustomer(Request $request, Domain $domain, Sale $sale)
@@ -973,6 +1140,7 @@ class SaleController extends Controller
         $validated = $request->validate([
             'product_id' => ['required', $this->productInDomainRule($domain)],
             'quantity' => 'required|integer|min:1',
+            ...self::LINE_OPTION_RULES,
         ]);
 
         $saleId = $sale->id;
@@ -980,20 +1148,14 @@ class SaleController extends Controller
         DB::transaction(function () use ($validated, $domain, $saleId) {
             $saleLocked = Sale::query()->whereKey($saleId)->lockForUpdate()->firstOrFail();
 
-            $product = Product::findOrFail($validated['product_id']);
-            $unitPrice = $product->price;
-
-            $saleItem = $saleLocked->saleItems()->where('product_id', $validated['product_id'])->first();
-
-            if ($saleItem) {
-                $saleItem->increment('quantity', $validated['quantity']);
-            } else {
-                $saleLocked->saleItems()->create([
-                    'product_id' => $validated['product_id'],
-                    'quantity' => $validated['quantity'],
-                    'unit_price' => $unitPrice,
-                ]);
-            }
+            // Priced from the database (product and options), never from the request.
+            app(ProductModifierService::class)->addToSale(
+                $saleLocked,
+                Product::findOrFail($validated['product_id']),
+                (int) $validated['quantity'],
+                $validated['modifier_ids'] ?? [],
+                $validated['notes'] ?? null,
+            );
 
             $saleLocked->recalcTotals();
 
@@ -1002,7 +1164,7 @@ class SaleController extends Controller
 
         $sale = Sale::query()
             ->whereKey($saleId)
-            ->with(['saleItems.product', 'saleDiscounts'])
+            ->with(['saleItems.product', 'saleItems.modifiers', 'saleDiscounts'])
             ->firstOrFail();
 
         return response()->json([
@@ -1028,7 +1190,7 @@ class SaleController extends Controller
         $query = Sale::forDomain($domain->name_slug)
             ->pending()
             ->orderBy('created_at', 'desc')
-            ->with(['saleItems.product', 'saleItems.discounts', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount']);
+            ->with(['saleItems.product', 'saleItems.modifiers', 'saleItems.discounts', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount']);
 
         // Apply location-based filtering based on user role
         if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
@@ -1151,6 +1313,7 @@ class SaleController extends Controller
         $validated = $request->validate([
             'product_id' => ['required', $this->productInDomainRule($domain)],
             'quantity' => 'required|integer|min:1',
+            ...self::LINE_TARGET_RULES,
         ]);
 
         $saleId = $sale->id;
@@ -1158,9 +1321,7 @@ class SaleController extends Controller
         DB::transaction(function () use ($validated, $domain, $saleId) {
             $saleLocked = Sale::query()->whereKey($saleId)->lockForUpdate()->firstOrFail();
 
-            $saleItem = $saleLocked->saleItems()
-                ->where('product_id', $validated['product_id'])
-                ->firstOrFail();
+            $saleItem = $this->cartLines($saleLocked, $validated)->firstOrFail();
 
             $saleItem->update(['quantity' => $validated['quantity']]);
             $saleLocked->recalcTotals();
@@ -1168,7 +1329,7 @@ class SaleController extends Controller
             $this->saleService->enforceNoOversellForPendingSale($domain, $saleLocked->fresh());
         });
 
-        $sale->refresh()->load(['saleItems.product', 'saleDiscounts']);
+        $sale->refresh()->load(['saleItems.product', 'saleItems.modifiers', 'saleDiscounts']);
 
         return response()->json([
             'success' => true,
@@ -1218,12 +1379,13 @@ class SaleController extends Controller
 
         $validated = $request->validate([
             'product_id' => ['required', $this->productInDomainRule($domain)],
+            ...self::LINE_TARGET_RULES,
         ]);
 
-        $sale->saleItems()->where('product_id', $validated['product_id'])->delete();
+        $this->cartLines($sale, $validated)->delete();
         $sale->recalcTotals();
 
-        $sale->load(['saleItems.product', 'saleDiscounts']);
+        $sale->load(['saleItems.product', 'saleItems.modifiers', 'saleDiscounts']);
 
         return response()->json([
             'success' => true,
@@ -1248,7 +1410,7 @@ class SaleController extends Controller
             ->pending()
             ->where('user_id', $userId)
             ->orderBy('created_at', 'desc')
-            ->with(['saleItems.product', 'saleItems.discounts', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount']);
+            ->with(['saleItems.product', 'saleItems.modifiers', 'saleItems.discounts', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount']);
 
         // Apply location-based filtering based on user role
         if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
@@ -1315,7 +1477,11 @@ class SaleController extends Controller
             'sales.*.payload.items.*.product_id' => ['required', 'integer', 'exists:products,id'],
             'sales.*.payload.items.*.quantity' => ['required', 'integer', 'min:1'],
             'sales.*.payload.items.*.unit_price' => ['required', 'numeric', 'min:0'],
-            'sales.*.payload.payment_method' => ['required', 'string', 'in:cash,card,e-wallet,bank'],
+            'sales.*.payload.items.*.modifier_ids' => ['nullable', 'array', 'max:30'],
+            'sales.*.payload.items.*.modifier_ids.*' => ['integer'],
+            'sales.*.payload.items.*.notes' => ['nullable', 'string', 'max:200'],
+            'sales.*.payload.payment_method' => ['required', 'string', 'in:cash,card,e-wallet,bank,split'],
+            ...$this->splitPaymentRules(allowCredit: false, prefix: 'sales.*.payload.'),
             'sales.*.payload.location_id' => ['required', 'integer'],
             'sales.*.payload.customer_id' => ['nullable', 'integer', 'exists:customers,id'],
             'sales.*.payload.notes' => ['nullable', 'string', 'max:2000'],
@@ -1409,7 +1575,13 @@ class SaleController extends Controller
             }
         }
 
-        $channel = $this->validatedPaymentChannel($payload, $domain, $payload['payment_method'] ?? 'cash', $location->id);
+        $isSplit = ($payload['payment_method'] ?? 'cash') === 'split';
+        $splitRows = $isSplit
+            ? $this->validatedSplitPayments($payload['payments'], $payload['payments'], $domain, $location->id)
+            : [];
+        $channel = $isSplit
+            ? ['payment_card_type_id' => null, 'payment_reference' => null]
+            : $this->validatedPaymentChannel($payload, $domain, $payload['payment_method'] ?? 'cash', $location->id);
 
         if (! $domain->salesAllowsOverselling()) {
             $stockItems = collect($payload['items'])->map(function (array $row) {
@@ -1429,7 +1601,7 @@ class SaleController extends Controller
             }
         }
 
-        return DB::transaction(function () use ($domain, $clientMutationId, $payload, $location, $cashier, $channel) {
+        return DB::transaction(function () use ($domain, $clientMutationId, $payload, $location, $cashier, $channel, $isSplit, $splitRows) {
             $syncRow = null;
 
             try {
@@ -1484,6 +1656,19 @@ class SaleController extends Controller
                 ]);
 
                 foreach ($payload['items'] as $row) {
+                    // Lines with options (or a note) are priced here from the product and its options.
+                    if (! empty($row['modifier_ids']) || ! empty($row['notes'])) {
+                        app(ProductModifierService::class)->addToSale(
+                            $sale,
+                            Product::findOrFail((int) $row['product_id']),
+                            (int) $row['quantity'],
+                            $row['modifier_ids'] ?? [],
+                            $row['notes'] ?? null,
+                        );
+
+                        continue;
+                    }
+
                     $sale->saleItems()->create([
                         'product_id' => (int) $row['product_id'],
                         'quantity' => (int) $row['quantity'],
@@ -1492,6 +1677,10 @@ class SaleController extends Controller
                 }
 
                 $sale->recalcTotals();
+
+                $splitParts = $isSplit
+                    ? $this->settleSplitPayments($splitRows, (float) $sale->fresh()->grand_total)
+                    : [];
 
                 $this->saleService->completeSale($sale, $cashier, $location);
                 if ($this->saleService->oversellingAdjustmentEnabled($domain->name_slug)) {
@@ -1506,6 +1695,9 @@ class SaleController extends Controller
                     'location_id' => $location->id,
                     'payment_status' => 'paid',
                 ]);
+                if ($splitParts !== []) {
+                    $sale->payments()->createMany($splitParts);
+                }
 
                 OfflineSaleSync::query()
                     ->whereKey($syncRow->id)

@@ -136,8 +136,13 @@ class SaleService
 
     public function voidItem(Sale $sale, array $validated, $currentUser)
     {
+        // The line named, or (for callers that only know the product) the product's first line.
         $saleItem = $sale->saleItems()
-            ->where('product_id', $validated['product_id'])
+            ->when(
+                $validated['sale_item_id'] ?? null,
+                fn ($q, $id) => $q->whereKey((int) $id),
+                fn ($q) => $q->where('product_id', $validated['product_id'])->orderBy('id')
+            )
             ->firstOrFail();
 
         // Check PIN and get approver

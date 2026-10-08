@@ -93,6 +93,14 @@ class Product extends Model
         return $this->hasMany(SaleItem::class);
     }
 
+    /** The option groups picked when this product is rung up (Size, Add-ons…), in their order. */
+    public function modifierGroups()
+    {
+        return $this->belongsToMany(\App\Models\ModifierGroup::class, 'product_modifier_group')
+            ->withPivot('sort_order')
+            ->orderBy('product_modifier_group.sort_order')
+            ->orderBy('modifier_groups.id');
+    }
 
 
     /**

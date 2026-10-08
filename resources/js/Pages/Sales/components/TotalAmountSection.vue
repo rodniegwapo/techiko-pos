@@ -3,6 +3,12 @@ import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import ApplyOrderDiscountModal from "./ApplyOrderDiscountModal.vue";
 import CardPaymentTypeModal from "./CardPaymentTypeModal.vue";
 import LoyaltyRedemptionModal from "./LoyaltyRedemptionModal.vue";
+import SplitPaymentPanel from "./SplitPaymentPanel.vue";
+import {
+    newSplitRow,
+    splitPayload,
+    splitProblem,
+} from "@/Composables/useSplitPayment";
 import { IconDiscount, IconGift, IconArrowRightToArc } from "@tabler/icons-vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
@@ -95,6 +101,7 @@ const emit = defineEmits([
     "update:offlinePaymentMethod",
     "update:offlinePaymentCardTypeId",
     "update:offlinePaymentReference",
+    "update:offlinePayments",
 ]);
 
 const {
@@ -368,7 +375,43 @@ const channelKind = computed(() => CHANNEL_KIND[paymentMethod.value] ?? null);
 const OTHER_METHODS = [
     { value: "e-wallet", label: "E-wallet" },
     { value: "bank", label: "Bank" },
+    { value: "split", label: "Split payment" },
 ];
+
+/** A sale paid in parts (cash + GCash, card + credit…). */
+const isSplit = computed(() => paymentMethod.value === "split");
+const splitRows = ref([]);
+const splitIssue = computed(() =>
+    isSplit.value
+        ? splitProblem(splitRows.value, grandTotalDisplay.value, {
+              allowCredit: salesCartIsOnline.value,
+          })
+        : null,
+);
+const splitCreditOverLimit = computed(() => {
+    const credit = splitRows.value.find((r) => r.method === "credit");
+    return (
+        isSplit.value &&
+        !!credit &&
+        Number(credit.amount || 0) > Number(creditInfo.value?.availableCredit ?? 0)
+    );
+});
+
+watch(isSplit, (split) => {
+    if (split && splitRows.value.length < 2) {
+        splitRows.value = [newSplitRow("cash"), newSplitRow("e-wallet")];
+    }
+});
+
+watch(
+    splitRows,
+    (rows) => {
+        if (!salesCartIsOnline.value) {
+            emit("update:offlinePayments", isSplit.value ? splitPayload(rows) : []);
+        }
+    },
+    { deep: true },
+);
 const otherMethodSelected = computed(() =>
     OTHER_METHODS.some((m) => m.value === paymentMethod.value),
 );
@@ -482,6 +525,20 @@ const handleProceedPayment = async () => {
             }
         }
 
+        if (isSplit.value) {
+            if (splitIssue.value) {
+                notification.error({ message: "Split payment", description: splitIssue.value });
+                throw new Error(splitIssue.value);
+            }
+            if (splitRows.value.some((r) => r.method === "credit") && !props.selectedCustomer?.id) {
+                notification.error({
+                    message: "Error",
+                    description: "Customer is required for credit payments.",
+                });
+                throw new Error("Customer required for credit payment");
+            }
+        }
+
         if (missingChannel.value) {
             const label = CHANNEL_LABEL[channelKind.value];
             notification.error({
@@ -505,6 +562,9 @@ const handleProceedPayment = async () => {
         if (takesReference.value && paymentReference.value.trim()) {
             body.payment_reference = paymentReference.value.trim();
         }
+        if (isSplit.value) {
+            body.payments = splitPayload(splitRows.value);
+        }
         const response = await axios.post(
             getRoute("sales.payment.store", {
                 sale: orderId.value,
@@ -517,6 +577,7 @@ const handleProceedPayment = async () => {
         selectedPaymentCardTypeId.value = null;
         paymentReference.value = "";
         paymentMethod.value = "cash";
+        splitRows.value = [];
 
         // Show success notification based on response
         const loyaltyResults = response.data.loyalty_results;
@@ -580,6 +641,11 @@ const handleProceedPayment = async () => {
 const disabledPaymentButtonColor = computed(() => {
     if (paymentMethod.value === "credit") {
         if (!creditLimitSufficient.value) return "";
+        if (orders.value.length == 0) return "";
+        return "bg-green-700 border-green-700 hover:bg-green-600";
+    }
+    if (isSplit.value) {
+        if (splitIssue.value || splitCreditOverLimit.value) return "";
         if (orders.value.length == 0) return "";
         return "bg-green-700 border-green-700 hover:bg-green-600";
     }
@@ -695,15 +761,19 @@ const proceedPaymentDisabled = computed(
     () =>
         proceedPaymentLoading.value ||
         (paymentMethod.value !== "credit" &&
+            !isSplit.value &&
             amountReceived.value < grandTotalDisplay.value) ||
         (paymentMethod.value === "credit" && !creditLimitSufficient.value) ||
+        (isSplit.value && (!!splitIssue.value || splitCreditOverLimit.value)) ||
         missingChannel.value ||
         orders.value.length == 0,
 );
 
 const offlineSaveDisabled = computed(
     () =>
-        orders.value.length == 0 || missingChannel.value,
+        orders.value.length == 0 ||
+        missingChannel.value ||
+        (isSplit.value && !!splitIssue.value),
 );
 
 // Lets a parent own the pay button (the Modern layout's footer "Charge" button).
@@ -881,9 +951,11 @@ defineExpose({
                         >Payment method</span
                     >
                     <!-- The usual ways to pay, plus "Other" for e-wallet and bank -->
+                    <!-- In the narrow checkout panel "Other" wraps under Cash / Card / Credit;
+                         side by side it covered Credit. -->
                     <div
                         class="flex items-stretch gap-2"
-                        :class="layout === 'compact' ? 'w-full' : ''"
+                        :class="layout === 'compact' ? 'w-full flex-wrap' : ''"
                     >
                         <a-radio-group
                             v-model:value="paymentMethod"
@@ -908,6 +980,7 @@ defineExpose({
                                 :type="otherMethodSelected ? 'primary' : 'default'"
                                 aria-label="Other payment methods"
                                 class="shrink-0"
+                                :class="layout === 'compact' ? 'w-full' : ''"
                             >
                                 {{ otherMethodLabel }}
                                 <DownOutlined class="text-xs" />
@@ -997,11 +1070,22 @@ defineExpose({
                             </div>
                         </div>
                     </div>
+                    <!-- Split payment: each part with its own method and amount -->
+                    <split-payment-panel
+                        v-if="isSplit"
+                        v-model="splitRows"
+                        class="mt-2"
+                        :grand-total="Number(grandTotalDisplay) || 0"
+                        :allow-credit="salesCartIsOnline && !!canUseCredit"
+                        :available-credit="Number(creditInfo?.availableCredit ?? 0)"
+                        :use-network="salesCartIsOnline"
+                        :cached-payment-card-types="cachedPaymentCardTypes"
+                    />
                 </div>
 
                 <!-- Amount Received (only show for non-credit payments) -->
                 <div
-                    v-if="paymentMethod !== 'credit'"
+                    v-if="paymentMethod !== 'credit' && !isSplit"
                     class="flex items-start flex-col gap-2"
                 >
                     <span class="text-gray-700 whitespace-nowrap"
@@ -1022,7 +1106,7 @@ defineExpose({
 
                 <!-- Change (only show for non-credit payments) -->
                 <div
-                    v-if="paymentMethod !== 'credit'"
+                    v-if="paymentMethod !== 'credit' && !isSplit"
                     class="flex items-start flex-col gap-2"
                 >
                     <span class="text-gray-700 whitespace-nowrap">Change:</span>

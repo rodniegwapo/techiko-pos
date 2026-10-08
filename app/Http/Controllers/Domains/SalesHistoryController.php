@@ -28,7 +28,7 @@ class SalesHistoryController extends Controller
     /** Statuses a sale can have once it has left the cart. */
     private const STATUSES = ['paid', 'partial', 'refunded'];
 
-    private const PAYMENT_METHODS = ['cash', 'card', 'e-wallet', 'bank', 'credit'];
+    private const PAYMENT_METHODS = ['cash', 'card', 'e-wallet', 'bank', 'credit', 'split'];
 
     public function index(Request $request, Domain $domain)
     {
@@ -117,13 +117,14 @@ class SalesHistoryController extends Controller
             'user:id,name',
             'location:id,name',
             'paymentCardType:id,name',
+            'payments.paymentCardType:id,name',
             'saleDiscounts.discount:id,name',
             'saleDiscounts.mandatoryDiscount:id,name',
         ]);
 
         $items = SaleItem::withTrashed()
             ->where('sale_id', $sale->id)
-            ->with('product:id,name')
+            ->with(['product:id,name', 'modifiers'])
             ->orderBy('id')
             ->get();
 
@@ -149,6 +150,7 @@ class SalesHistoryController extends Controller
             'payment_method' => $sale->payment_method,
             'payment_card_type' => $sale->paymentCardType?->name,
             'payment_reference' => $sale->payment_reference,
+            'payments' => $sale->payments->map->toDisplayArray()->all(),
             'payment_status' => $sale->payment_status,
             'is_credit_sale' => (bool) $sale->is_credit_sale,
             'notes' => $sale->notes,
@@ -162,6 +164,8 @@ class SalesHistoryController extends Controller
             'items' => $items->map(fn (SaleItem $item) => [
                 'id' => $item->id,
                 'product_name' => $item->product?->name ?? 'Deleted product',
+                'modifiers' => $item->modifierSummary(),
+                'notes' => $item->notes,
                 'quantity' => (float) $item->quantity,
                 'unit_price' => round((float) $item->unit_price, 2),
                 'discount' => round((float) $item->discount, 2),
@@ -206,6 +210,8 @@ class SalesHistoryController extends Controller
         $lines = $items->reject(fn (SaleItem $item) => $item->trashed())
             ->map(fn (SaleItem $item) => [
                 'product_name' => $item->product?->name ?? 'Deleted product',
+                'modifiers' => $item->modifierSummary(),
+                'notes' => $item->notes,
                 'quantity' => (float) $item->quantity,
                 'unit_cost' => $item->unit_cost === null ? null : round((float) $item->unit_cost, 2),
                 'line_cost' => $item->unit_cost === null ? null : round((float) $item->unit_cost * (float) $item->quantity, 2),
@@ -340,7 +346,12 @@ class SalesHistoryController extends Controller
             ->whereIn('payment_status', $filters['payment_status'] ? [$filters['payment_status']] : self::STATUSES)
             ->when($filters['location_id'], fn ($q, $id) => $q->where('location_id', $id))
             ->when($filters['user_id'], fn ($q, $id) => $q->where('user_id', $id))
-            ->when($filters['payment_method'], fn ($q, $method) => $q->where('payment_method', $method))
+            // A method also finds the sales paid partly that way ("split" finds every sale paid in parts).
+            ->when($filters['payment_method'], fn ($q, $method) => $q->where(function ($q) use ($method) {
+                $q->where('payment_method', $method)
+                    ->orWhere(fn ($split) => $split->where('payment_method', 'split')
+                        ->whereHas('payments', fn ($p) => $p->where('method', $method)));
+            }))
             ->when($filters['search'], function ($q, $search) {
                 $q->where(function ($q) use ($search) {
                     $q->where('invoice_number', 'like', "%{$search}%")
@@ -352,7 +363,7 @@ class SalesHistoryController extends Controller
     private function withListRelations(Builder $query): Builder
     {
         return $query
-            ->with(['user:id,name', 'customer:id,name', 'location:id,name', 'paymentCardType:id,name'])
+            ->with(['user:id,name', 'customer:id,name', 'location:id,name', 'paymentCardType:id,name', 'payments.paymentCardType:id,name'])
             ->withCount([
                 'saleItems as items_count',
                 'saleItems as voided_items_count' => fn ($q) => $q->onlyTrashed(),

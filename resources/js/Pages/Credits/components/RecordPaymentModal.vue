@@ -52,11 +52,16 @@
                     <a-select-option value="cash">Cash</a-select-option>
                     <a-select-option value="card">Card</a-select-option>
                     <a-select-option value="e-wallet">E-Wallet</a-select-option>
+                    <a-select-option value="bank">Bank</a-select-option>
                 </a-select>
             </a-form-item>
 
             <!-- Apply to Invoices -->
-            <a-form-item class="md:col-span-2" label="Apply to Invoices (Optional)">
+            <a-form-item
+                class="md:col-span-2"
+                label="Apply to Invoices (Optional)"
+                extra="Ticked invoices are paid first, then the oldest. A smaller amount pays them in part, earliest installment first."
+            >
                 <a-checkbox-group v-model:value="formData.transaction_ids">
                     <div class="space-y-2 max-h-48 overflow-y-auto">
                         <a-checkbox
@@ -72,11 +77,18 @@
                                 }}</span>
                                 <span class="ml-4 text-gray-500">
                                     ₱{{
-                                        invoice.amount.toLocaleString("en-US", {
+                                        Number(
+                                            invoice.remaining ?? invoice.amount
+                                        ).toLocaleString("en-US", {
                                             minimumFractionDigits: 2,
                                             maximumFractionDigits: 2,
                                         })
                                     }}
+                                    <span
+                                        v-if="Number(invoice.paid_amount) > 0"
+                                        class="text-xs"
+                                        >left</span
+                                    >
                                 </span>
                             </div>
                         </a-checkbox>
@@ -130,6 +142,10 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    preselectedInvoiceId: {
+        type: Number,
+        default: null,
+    },
 });
 
 // Emits
@@ -163,7 +179,9 @@ watch(
             formData.value = {
                 amount: null,
                 payment_method: "cash",
-                transaction_ids: [],
+                transaction_ids: props.preselectedInvoiceId
+                    ? [props.preselectedInvoiceId]
+                    : [],
                 reference_number: "",
                 notes: "",
             };
