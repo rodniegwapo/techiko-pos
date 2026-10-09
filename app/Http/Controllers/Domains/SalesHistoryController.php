@@ -10,12 +10,12 @@ use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\User;
 use App\Models\VoidLog;
+use App\Services\Reports\ProfitAndLossService;
 use App\Services\SaleService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -52,13 +52,12 @@ class SalesHistoryController extends Controller
         // Profit reveals product costs, so only staff who see all sales get it.
         $profitSummary = [];
         if ($this->canSeeAllSales($request->user())) {
-            // Voided lines are soft-deleted, so they drop out of cost of goods sold on their own.
-            $soldItems = SaleItem::query()->whereIn('sale_id', (clone $counted)->select('sales.id'));
-            $cogs = (float) (clone $soldItems)->whereNotNull('unit_cost')->sum(DB::raw('unit_cost * quantity'));
+            // Voided sales are excluded; voided lines are soft-deleted, so they drop out on their own.
+            ['cogs' => $cogs, 'items_missing_cost' => $missingCost] = ProfitAndLossService::costOfGoodsSold($counted);
             $profitSummary = [
                 'cogs' => round($cogs, 2),
                 'profit' => round((float) $summary->net - (float) $summary->vat - $cogs, 2),
-                'items_missing_cost' => (clone $soldItems)->whereNull('unit_cost')->count(),
+                'items_missing_cost' => $missingCost,
             ];
         }
 

@@ -15,7 +15,7 @@ import {
     IconKey,
     IconCreditCard,
     IconWallet,
-    IconReportMoney,
+    IconReportAnalytics,
     IconReceipt,
     IconAccessPointOff,
     IconSettings,
@@ -144,6 +144,69 @@ const menuItems = [
         routeName: "sales-history.index",
         path: "/sales-history",
         domainOnly: true,
+    },
+    {
+        key: "finance-group",
+        title: "Finance",
+        icon: IconReportAnalytics,
+        domainOnly: true,
+        children: [
+            {
+                key: "finance-dashboard",
+                title: "Overview",
+                routeName: "finance.dashboard",
+                path: "/finance",
+            },
+            {
+                // The income statement is the Profit & Loss report.
+                key: "profit-loss",
+                title: "Income statement",
+                routeName: "profit-loss.index",
+                path: "/profit-loss",
+            },
+            {
+                key: "finance-cash-flow",
+                title: "Cash flow",
+                routeName: "finance.cash-flow",
+                path: "/finance/cash-flow",
+            },
+            {
+                key: "finance-balance-sheet",
+                title: "Balance sheet",
+                routeName: "finance.balance-sheet",
+                path: "/finance/balance-sheet",
+            },
+            {
+                key: "finance-receivables",
+                title: "Customer credit",
+                routeName: "finance.receivables",
+                path: "/finance/receivables",
+            },
+            {
+                key: "finance-payables",
+                title: "Supplier bills",
+                routeName: "finance.payables.index",
+                path: "/finance/payables",
+            },
+            {
+                key: "expenses",
+                title: "Expenses",
+                routeName: "expenses.index",
+                path: "/expenses",
+            },
+            {
+                key: "finance-other-income",
+                title: "Other income",
+                routeName: "finance.other-income.index",
+                path: "/finance/other-income",
+            },
+            {
+                key: "vat-report",
+                title: "VAT report",
+                routeName: "vat-report.index",
+                path: "/vat-report",
+            },
+        ],
     },
     {
         key: "wallet-group",
@@ -307,14 +370,6 @@ const menuItems = [
         icon: IconUserCog,
         routeName: "users.index",
         path: "/users",
-    },
-    {
-        key: "vat-report",
-        title: "VAT report",
-        icon: IconReportMoney,
-        routeName: "vat-report.index",
-        path: "/vat-report",
-        domainOnly: true,
     },
     {
         key: "organization-settings",

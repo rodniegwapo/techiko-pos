@@ -162,6 +162,26 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
 
             'vat-report.index' => 'View VAT Report',
 
+            // Finance
+            'finance.dashboard' => 'View finance dashboard',
+            'finance.income-statement' => 'View income statement',
+            'finance.receivables' => 'View customer credit summary',
+            'finance.explain' => 'Ask the AI to explain finances',
+            'finance.cash-flow' => 'View cash flow statement',
+            'finance.balance-sheet' => 'View balance sheet',
+            'finance.other-income.index' => 'View other income',
+            'finance.other-income.store' => 'Record other income',
+            'finance.other-income.update' => 'Edit other income',
+            'finance.other-income.destroy' => 'Delete other income',
+            'finance.payables.index' => 'View supplier bills',
+            'finance.suppliers.store' => 'Add suppliers',
+            'finance.suppliers.update' => 'Edit suppliers',
+            'finance.bills.store' => 'Record supplier bills',
+            'finance.bills.update' => 'Edit supplier bills',
+            'finance.bills.destroy' => 'Delete supplier bills',
+            'finance.bill-payments.store' => 'Record supplier payments',
+            'finance.bill-payments.destroy' => 'Delete supplier payments',
+
             // Customers
             'customers.index' => 'View Customers',
             'customers.create' => 'Create Customer',

@@ -30,7 +30,7 @@ class WalletLedgerViewData
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
             'payment_card_type_id' => ['sometimes', 'nullable', 'integer', 'exists:payment_card_types,id'],
             'rail' => ['sometimes', 'nullable', 'string', 'in:cash_register'],
-            'kind' => ['sometimes', 'nullable', 'string', 'in:'.implode(',', WalletCashMovement::KINDS)],
+            'kind' => ['sometimes', 'nullable', 'string', 'in:'.implode(',', [...WalletCashMovement::KINDS, ...WalletCashMovement::SYSTEM_KINDS])],
         ]);
 
         $perPage = max(1, min(100, (int) $request->input('per_page', 20)));

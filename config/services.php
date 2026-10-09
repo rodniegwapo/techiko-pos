@@ -31,4 +31,11 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    // Finance pages' "Explain this" assistant. Leave the key empty to turn the AI off;
+    // the reports, health check and suggestions still work without it.
+    'anthropic' => [
+        'key' => env('ANTHROPIC_API_KEY', ''),
+        'model' => env('ANTHROPIC_FINANCE_MODEL', 'claude-haiku-5-5'),
+    ],
+
 ];

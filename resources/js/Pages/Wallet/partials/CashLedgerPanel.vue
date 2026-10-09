@@ -93,6 +93,13 @@ const KIND_LABELS = {
     adjustment: "Adjustment",
 };
 
+/** Read-only here: written by Expenses, Supplier bills and Other income, so filterable but not offered in the entry form. */
+const SYSTEM_KIND_LABELS = {
+    expense: "Expense",
+    supplier_payment: "Supplier payment",
+    other_income: "Other income",
+};
+
 /** Stable backend tokens in `notes` for system-generated cash-control lines. */
 const AUTO_CC_NOTE_LABELS = {
     AUTO_CC_OPENING: "Opening cash (saved)",
@@ -123,7 +130,7 @@ function kindCellLabel(record) {
     if (fr) {
         return fr;
     }
-    return KIND_LABELS[record.kind] ?? record.kind;
+    return KIND_LABELS[record.kind] ?? SYSTEM_KIND_LABELS[record.kind] ?? record.kind;
 }
 
 const filterForm = reactive({
@@ -521,7 +528,7 @@ watch(
                             placeholder="All kinds"
                             class="w-full"
                             :options="[
-                                ...Object.entries(KIND_LABELS).map(
+                                ...Object.entries({ ...KIND_LABELS, ...SYSTEM_KIND_LABELS }).map(
                                     ([value, label]) => ({ value, label }),
                                 ),
                             ]"
