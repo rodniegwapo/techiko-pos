@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from "vue";
-import { Head } from "@inertiajs/vue3";
+import { Head, Link } from "@inertiajs/vue3";
+import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
 import ContentLayout from "@/Components/ContentLayout.vue";
@@ -24,6 +25,7 @@ const props = defineProps({
 });
 
 const { formattedTotal } = useHelpers();
+const { getRoute } = useDomainRoutes();
 const { filters, filtersConfig, activeFilters, handleClearSelectedFilter, clearAll, load, spinning, periodLabel, previousLabel } =
     useFinanceFilters({ routeName: "finance.cash-flow", serverFilters: () => props.filters, locations: props.locations });
 
@@ -38,6 +40,8 @@ const sections = computed(() => [
             { key: "customer_payments", label: "Paid by customers for sales", note: "Cash, card, e-wallet and bank" },
             { key: "credit_collections", label: "Collected from customers on credit" },
             { key: "other_income", label: "Other income" },
+            { key: "loans_received", label: "Loans received" },
+            { key: "owner_investments", label: "Owner investments", note: "Money the owner put into the business" },
         ].map((r) => ({ ...r, now: props.current.in[r.key], before: props.previous.in[r.key] })),
     },
     {
@@ -46,13 +50,15 @@ const sections = computed(() => [
         total: { label: "Total money out", now: props.current.total_out, before: props.previous.total_out },
         rows: [
             { key: "stock_purchases", label: "Paid to suppliers for stock" },
-            { key: "operating_expenses", label: "Expenses paid", note: "Including expense bills paid to suppliers" },
-            { key: "owner_withdrawals", label: "Owner withdrawals" },
+            { key: "operating_expenses", label: "Expenses paid", note: "Including expense bills paid to suppliers and loan interest" },
+            { key: "loan_repayments", label: "Loan repayments", note: "The principal part; interest is under expenses" },
+            { key: "equipment_purchases", label: "Equipment and other assets bought" },
+            { key: "owner_withdrawals", label: "Owner withdrawals", note: "End-of-shift cash-outs are not counted: that money stays in the business" },
         ].map((r) => ({ ...r, now: props.current.out[r.key], before: props.previous.out[r.key] })),
     },
 ]);
 
-const pending = ["Loan received or repaid", "Owner investments", "Equipment bought"];
+const accounts = computed(() => props.current.account_balances ?? { accounts: [] });
 </script>
 
 <template>
@@ -113,6 +119,14 @@ const pending = ["Loan received or repaid", "Owner investments", "Equipment boug
                                 </tbody>
                             </template>
                             <tbody>
+                                <tr class="border-t border-gray-200">
+                                    <td class="px-4 py-3">
+                                        <span class="text-gray-700">± Drawer top-ups and adjustments</span>
+                                        <div class="text-xs text-gray-500">Float added to the drawer and cash count differences</div>
+                                    </td>
+                                    <td class="px-4 py-3 text-right text-gray-900">{{ formattedTotal(current.other_movements) }}</td>
+                                    <td class="px-4 py-3 text-right text-gray-500">{{ formattedTotal(previous.other_movements) }}</td>
+                                </tr>
                                 <tr class="border-t-2 border-gray-300 bg-gray-50/60">
                                     <td class="px-4 py-3 font-semibold text-gray-900">Net change in money</td>
                                     <td class="px-4 py-3 text-right font-semibold" :class="current.net_change < 0 ? 'text-red-600' : 'text-gray-900'">
@@ -120,13 +134,36 @@ const pending = ["Loan received or repaid", "Owner investments", "Equipment boug
                                     </td>
                                     <td class="px-4 py-3 text-right text-gray-500">{{ formattedTotal(previous.net_change) }}</td>
                                 </tr>
-                                <tr v-for="item in pending" :key="item" class="border-t border-gray-100 text-gray-400">
-                                    <td class="px-4 py-2">{{ item }}</td>
-                                    <td colspan="2" class="px-4 py-2 text-right text-xs">Not recorded in Techiko yet</td>
-                                </tr>
                             </tbody>
                         </table>
                     </div>
+
+                    <section class="space-y-3 rounded-lg border border-gray-200 bg-white p-4" data-testid="account-balances">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <h2 class="text-base font-semibold text-gray-900">Bank and e-wallet balances</h2>
+                            <Link :href="getRoute('finance.balance-items.index')" class="text-sm text-blue-600 hover:underline">Update balances</Link>
+                        </div>
+                        <p v-if="!accounts.accounts.length" class="text-sm text-gray-500">
+                            No bank or e-wallet accounts yet. Add them under Accounts, loans &amp; assets to see your full cash position.
+                        </p>
+                        <table v-else class="w-full text-sm">
+                            <thead class="text-xs uppercase tracking-wide text-gray-500">
+                                <tr>
+                                    <th class="py-2 text-left font-medium">Account</th>
+                                    <th class="py-2 text-right font-medium">Start of period</th>
+                                    <th class="py-2 text-right font-medium">End of period</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="a in accounts.accounts" :key="a.id" class="border-t border-gray-100">
+                                    <td class="py-2 text-gray-700">{{ a.name }}<span v-if="a.as_of" class="text-xs text-gray-400"> · as of {{ a.as_of }}</span></td>
+                                    <td class="py-2 text-right text-gray-500">{{ a.opening === null ? "—" : formattedTotal(a.opening) }}</td>
+                                    <td class="py-2 text-right text-gray-900">{{ formattedTotal(a.balance) }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <p class="text-xs text-gray-500">Balances are the ones you entered, not a live bank feed.</p>
+                    </section>
 
                     <section class="space-y-3 rounded-lg border border-gray-200 bg-white p-4" data-testid="profit-vs-cash">
                         <div class="flex flex-wrap items-center justify-between gap-2">

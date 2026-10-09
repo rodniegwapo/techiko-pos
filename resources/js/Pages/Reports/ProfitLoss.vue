@@ -287,6 +287,17 @@ const printColumns = [
                                                 <a-tooltip v-if="HINTS[row.key]" :title="HINTS[row.key]">
                                                     <IconInfoCircle :size="14" class="text-gray-400" />
                                                 </a-tooltip>
+                                                <ExplainButton
+                                                    v-if="row.type !== 'detail'"
+                                                    class="no-print ml-2"
+                                                    topic="metric"
+                                                    :metric="row.label"
+                                                    :filters="financeFilters"
+                                                    :ai-enabled="aiEnabled"
+                                                    :title="row.label"
+                                                    label="Explain"
+                                                    link
+                                                />
                                             </span>
                                         </td>
                                         <td

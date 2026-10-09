@@ -21,6 +21,9 @@ class FinancialInsightService
     /** Products earning less than this on each sale are flagged. */
     private const LOW_MARGIN_PCT = 15.0;
 
+    /** Best sellers earning less than this on each sale are worth a price review. */
+    private const THIN_MARGIN_PCT = 20.0;
+
     /** Stock lasting longer than this many days at the current pace is "high". */
     private const HIGH_STOCK_DAYS = 90;
 
@@ -146,8 +149,39 @@ class FinancialInsightService
             ];
         }
 
+        $slow = $overview['products']['slow_movers'] ?? [];
+        if ($slow !== []) {
+            $names = implode(', ', array_map(
+                fn ($p) => $p['name'].($p['days_of_stock'] === null ? ' (no sales in 30 days)' : ' (~'.$p['days_of_stock'].' days of stock)'),
+                array_slice($slow, 0, 3),
+            ));
+            $out[] = [
+                'key' => 'slow_movers',
+                'priority' => 2,
+                'title' => 'Reduce purchases of slow-moving products',
+                'detail' => self::peso(array_sum(array_column($slow, 'value'))).' is tied up in stock that sells slowly: '.$names.'.',
+            ];
+        }
+
+        $thin = array_values(array_filter(
+            $overview['products']['best_sellers'] ?? [],
+            // Below LOW_MARGIN_PCT they are already named under "low profit margins".
+            fn ($p) => $p['sales'] > 0 && $p['margin_pct'] >= self::LOW_MARGIN_PCT && $p['margin_pct'] < self::THIN_MARGIN_PCT,
+        ));
+        if ($thin !== []) {
+            $out[] = [
+                'key' => 'thin_margin_best_sellers',
+                'priority' => 2,
+                'title' => 'Review profit margins on your best sellers',
+                'detail' => 'These sell a lot but earn little on each sale: '.implode(', ', array_map(
+                    fn ($p) => $p['name'].' ('.$p['margin_pct'].'%)',
+                    array_slice($thin, 0, 3),
+                )).'. A small price change here adds up quickly.',
+            ];
+        }
+
         $stockDays = $this->stockDays($overview);
-        if ($stockDays !== null && $stockDays > self::HIGH_STOCK_DAYS) {
+        if ($slow === [] && $stockDays !== null && $stockDays > self::HIGH_STOCK_DAYS) {
             $out[] = [
                 'key' => 'high_inventory',
                 'priority' => 2,
@@ -285,7 +319,8 @@ class FinancialInsightService
             default => ['Stable', 'neutral'],
         };
 
-        $top = $overview['expense_breakdown'][0] ?? null;
+        // The largest running cost; other expenses (loan interest, losses) sit below operating profit.
+        $top = collect($overview['expense_breakdown'])->first(fn ($row) => ($row['type'] ?? 'operating') === 'operating');
 
         return [
             'key' => 'expenses',
@@ -334,6 +369,28 @@ class FinancialInsightService
     /** @param  array<string, mixed>  $overview */
     private function cashHealth(array $overview): array
     {
+        // With history: is the cash on hand (drawers, bank, e-wallets) going up or down?
+        $position = $overview['position'] ?? null;
+        if ($position !== null) {
+            $change = $position['changes']['cash_balance'];
+            $then = $position['then']['cash_balance'];
+            [$status, $tone] = $this->trend($position['now']['cash_balance'], $then, $change['pct']);
+            if ($change['pct'] !== null && $change['pct'] <= -10) {
+                [$status, $tone] = ['Needs attention', 'bad'];
+            } elseif ($status === 'Declining') {
+                $tone = 'warning';
+            }
+
+            return [
+                'key' => 'cash',
+                'label' => 'Cash',
+                'status' => $status,
+                'tone' => $tone,
+                'detail' => 'Cash on hand (drawers, bank and e-wallets) is '.self::peso($position['now']['cash_balance'])
+                    .self::since($change, $then, $position['as_of']).'.',
+            ];
+        }
+
         $change = $overview['changes']['total_received'];
         [$status, $tone] = $this->trend(
             $overview['money_in']['total_received'],
@@ -380,8 +437,34 @@ class FinancialInsightService
             'label' => 'Inventory',
             'status' => $status,
             'tone' => $tone,
-            'detail' => $value.' of stock on hand, '.self::duration($days).' of sales at the current pace.',
+            'detail' => $value.' of stock on hand, '.self::duration($days).' of sales at the current pace'
+                .$this->positionNote($overview, 'inventory_value', 'whole business: ').'.',
         ];
+    }
+
+    /** " (up 12% from ₱X on Sep 30)" for a whole-business balance with history, or nothing. */
+    private function positionNote(array $overview, string $key, string $prefix = ''): string
+    {
+        $position = $overview['position'] ?? null;
+        if ($position === null) {
+            return '';
+        }
+
+        return ' ('.$prefix.ltrim(self::since($position['changes'][$key], $position['then'][$key], $position['as_of']), ', ').')';
+    }
+
+    /** @param  array{amount: float, pct: float|null}  $change */
+    private static function since(array $change, float|int $then, string $asOf): string
+    {
+        $date = \Carbon\Carbon::parse($asOf)->format('M j');
+        if ($change['pct'] === null) {
+            return ', it was '.self::peso($then).' on '.$date;
+        }
+        if ($change['pct'] == 0) {
+            return ', the same as on '.$date;
+        }
+
+        return ', '.($change['pct'] > 0 ? 'up ' : 'down ').abs($change['pct']).'% from '.self::peso($then).' on '.$date;
     }
 
     /** @param  array<string, mixed>  $overview */
@@ -391,11 +474,15 @@ class FinancialInsightService
         $new = $ar['period']['new_credit'];
         $collected = $ar['period']['collected'];
 
+        // With history, how much customers owe now against the end of the period before.
+        $owedPct = ($overview['position'] ?? null)['changes']['receivables']['pct'] ?? null;
+
         [$status, $tone] = match (true) {
             $ar['outstanding'] <= 0 => ['None owed', 'good'],
             $ar['overdue_pct'] >= self::OVERDUE_ALERT_PCT => ['Needs attention', 'bad'],
-            $new > $collected * 1.2 && $new > 0 => ['Increasing', 'warning'],
-            $collected > $new => ['Improving', 'good'],
+            $owedPct !== null && $owedPct >= 10 => ['Increasing', 'warning'],
+            $owedPct === null && $new > $collected * 1.2 && $new > 0 => ['Increasing', 'warning'],
+            ($owedPct !== null && $owedPct <= -10) || ($owedPct === null && $collected > $new) => ['Improving', 'good'],
             default => ['Stable', 'neutral'],
         };
 
@@ -404,8 +491,9 @@ class FinancialInsightService
             'label' => 'Customer credit',
             'status' => $status,
             'tone' => $tone,
-            'detail' => 'Customers owe '.self::peso($ar['outstanding']).', of which '.self::peso($ar['overdue'])
-                .' is overdue. This period: '.self::peso($new).' given on credit, '.self::peso($collected).' collected.',
+            'detail' => 'Customers owe '.self::peso($ar['outstanding']).$this->positionNote($overview, 'receivables')
+                .', of which '.self::peso($ar['overdue']).' is overdue. This period: '.self::peso($new).' given on credit, '
+                .self::peso($collected).' collected.',
         ];
     }
 

@@ -150,6 +150,132 @@ test.describe("Supplier bills and other income as admin", () => {
     });
 });
 
+test.describe("Accounts, loans, assets and reviews as admin", () => {
+    test.use({ account: "admin" });
+
+    /** Saves the open modal whose title contains `title`. */
+    const save = (page, title, button = "Save") =>
+        page.locator(".ant-modal:visible", { hasText: title }).getByRole("button", { name: button }).click();
+    const input = (scope, testId) => scope.getByTestId(testId).locator("input").or(scope.getByTestId(testId)).first();
+
+    test("records a bank balance, a loan with repayment, equipment and an owner investment", async ({ page }) => {
+        const stamp = Date.now();
+        await page.goto(url("/finance/assets-and-loans"));
+
+        // Bank account with a starting balance, then a newer balance.
+        await page.getByTestId("add-account").click();
+        await input(page.getByTestId("account-form"), "account-name").fill(`E2E Bank ${stamp}`);
+        await input(page.getByTestId("account-form"), "account-balance").fill("15000");
+        await save(page, "Add bank or e-wallet account");
+        await expect(page.locator(".ant-message")).toContainText("Account saved");
+        const accountRow = page.getByTestId("account-table").locator("tr", { hasText: `E2E Bank ${stamp}` });
+        await expect(accountRow).toContainText("₱15,000.00");
+        await accountRow.getByTestId("update-balance").click();
+        await input(page.getByTestId("balance-form"), "balance-amount").fill("18250.50");
+        await save(page, "Update balance");
+        await expect(page.getByTestId("account-table").locator("tr", { hasText: `E2E Bank ${stamp}` })).toContainText("₱18,250.50");
+
+        // Loan received by bank, then repaid in part with interest.
+        await page.getByRole("tab", { name: "Loans" }).click();
+        await page.getByTestId("add-loan").click();
+        await input(page.getByTestId("loan-form"), "loan-lender").fill(`E2E Lender ${stamp}`);
+        await input(page.getByTestId("loan-form"), "loan-principal").fill("20000");
+        await page.getByTestId("loan-form").getByTestId("payment-method").click();
+        await pickOption(page, "Bank transfer");
+        await save(page, "Record loan");
+        const loanRow = page.getByTestId("loan-table").locator("tr", { hasText: `E2E Lender ${stamp}` });
+        await expect(loanRow).toContainText("₱20,000.00");
+        await loanRow.getByTestId("repay-loan").click();
+        await input(page.getByTestId("repay-form"), "repay-principal").fill("5000");
+        await input(page.getByTestId("repay-form"), "repay-interest").fill("250");
+        await page.getByTestId("repay-form").getByTestId("payment-method").click();
+        await pickOption(page, "Bank transfer");
+        await save(page, "Repay:");
+        await expect(page.locator(".ant-message")).toContainText("Repayment recorded");
+        await expect(page.getByTestId("loan-table").locator("tr", { hasText: `E2E Lender ${stamp}` })).toContainText("₱15,000.00");
+
+        // Equipment.
+        await page.getByRole("tab", { name: "Equipment & assets" }).click();
+        await page.getByTestId("add-asset").click();
+        await input(page.getByTestId("asset-form"), "asset-name").fill(`E2E Freezer ${stamp}`);
+        await input(page.getByTestId("asset-form"), "asset-cost").fill("24000");
+        await page.getByTestId("asset-form").getByTestId("payment-method").click();
+        await pickOption(page, "Bank transfer");
+        await save(page, "Record equipment or other asset");
+        await expect(page.getByTestId("asset-table")).toContainText(`E2E Freezer ${stamp}`);
+
+        // Owner investment.
+        await page.getByRole("tab", { name: "Owner investments" }).click();
+        await page.getByTestId("add-investment").click();
+        await input(page.getByTestId("investment-form"), "investment-amount").fill("10000");
+        await page.getByTestId("investment-form").getByTestId("payment-method").click();
+        await pickOption(page, "Bank transfer");
+        await save(page, "Record owner investment");
+        await expect(page.locator(".ant-message")).toContainText("Investment saved");
+
+        // They all reach the balance sheet.
+        await page.goto(url("/finance/balance-sheet"));
+        const { balanceSheet } = await pageProps(page);
+        expect(balanceSheet.accounts.map((a) => a.name)).toContain(`E2E Bank ${stamp}`);
+        expect(balanceSheet.loans.map((l) => l.lender)).toContain(`E2E Lender ${stamp}`);
+        expect(balanceSheet.fixed_assets.map((a) => a.name)).toContain(`E2E Freezer ${stamp}`);
+        await expect(page.getByTestId("owner-equity")).toBeVisible();
+    });
+
+    test("records another amount owed and shows it with accumulated profit on the balance sheet", async ({ page }) => {
+        const stamp = Date.now();
+        await page.goto(url("/finance/assets-and-loans?tab=liabilities"));
+
+        await page.getByTestId("add-liability").click();
+        await input(page.getByTestId("liability-form"), "liability-name").fill(`E2E VAT due ${stamp}`);
+        await input(page.getByTestId("liability-form"), "liability-amount").fill("3200");
+        await save(page, "Record amount owed");
+        await expect(page.locator(".ant-message")).toContainText("Liability saved");
+        await expect(page.getByTestId("liability-table")).toContainText(`E2E VAT due ${stamp}`);
+
+        await page.goto(url("/finance/balance-sheet"));
+        const { balanceSheet } = await pageProps(page);
+        expect(balanceSheet.other_liabilities.map((l) => l.name)).toContain(`E2E VAT due ${stamp}`);
+        for (const key of ["owner_contributions", "accumulated_profit", "other_changes"]) {
+            await expect(page.getByTestId(`equity-${key}`)).toBeVisible();
+        }
+        // Owner's equity adds up: contributions + accumulated profit + other changes = net worth.
+        const sum = balanceSheet.equity.reduce((total, row) => total + row.amount, 0);
+        expect(sum).toBeCloseTo(balanceSheet.net_worth, 2);
+    });
+
+    test("writes and shows last month's business review", async ({ page }) => {
+        await page.goto(url("/finance/reviews"));
+        const generate = page.getByTestId("generate-review");
+        if (await generate.count()) {
+            await generate.click();
+            await expect(page.locator(".ant-message")).toContainText("Review ready");
+        }
+        await expect(page.getByTestId("review")).toBeVisible();
+        for (const id of ["went-well", "needs-attention", "actions"]) {
+            await expect(page.getByTestId(id)).toBeVisible();
+        }
+    });
+
+    test("overview has the question box and the statement explains each line", async ({ page }) => {
+        await page.goto(url("/finance"));
+        const panel = page.getByTestId("ask-panel");
+        await expect(panel).toBeVisible();
+        const { aiEnabled } = await pageProps(page);
+        if (!aiEnabled) {
+            await expect(panel).toContainText("not set up yet");
+            const res = await postJson(page, url("/finance/ask"), { question: "How much profit did I make?" });
+            expect(res.status).toBe(503);
+        } else {
+            await expect(page.getByTestId("ask-input")).toBeVisible();
+        }
+
+        await page.goto(url("/profit-loss"));
+        // One "Explain" per statement line (not for the category details).
+        expect(await page.getByTestId("pnl-statement").getByTestId("finance-explain").count()).toBeGreaterThanOrEqual(6);
+    });
+});
+
 test.describe("Finance as cashier", () => {
     test.use({ account: "cashier" });
 
@@ -159,7 +285,7 @@ test.describe("Finance as cashier", () => {
 
         // Opened directly (no page to go back to), a refused page answers 403.
         const api = await serverAs("cashier");
-        for (const path of ["/finance", "/finance/cash-flow", "/finance/balance-sheet", "/finance/receivables", "/finance/payables", "/finance/other-income", "/profit-loss"]) {
+        for (const path of ["/finance", "/finance/cash-flow", "/finance/balance-sheet", "/finance/receivables", "/finance/payables", "/finance/other-income", "/finance/assets-and-loans", "/finance/reviews", "/profit-loss"]) {
             const res = await api.get(url(path));
             expect(res.status(), `${path} should not open for a cashier`).toBe(403);
         }

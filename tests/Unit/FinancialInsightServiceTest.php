@@ -160,6 +160,37 @@ class FinancialInsightServiceTest extends TestCase
         $this->assertStringContainsString('Utilities', $rec['detail']);
     }
 
+    public function test_slow_movers_and_thin_margin_best_sellers_are_named(): void
+    {
+        $service = new FinancialInsightService;
+        $overview = $this->overview([
+            'products' => [
+                'slow_movers' => [
+                    ['name' => 'Canned Tuna', 'value' => 5000, 'days_of_stock' => null],
+                    ['name' => 'Soy Sauce', 'value' => 1500, 'days_of_stock' => 140],
+                ],
+                'best_sellers' => [
+                    ['name' => 'Iced Coffee', 'sales' => 9000, 'margin_pct' => 18.0], // thin: worth a price review
+                    ['name' => 'Water', 'sales' => 8000, 'margin_pct' => 10.0],       // already a low-margin product
+                    ['name' => 'Bread', 'sales' => 7000, 'margin_pct' => 45.0],
+                ],
+            ],
+        ]);
+
+        $recs = collect($service->recommendations($overview))->keyBy('key');
+
+        $this->assertStringContainsString('₱6,500.00', $recs['slow_movers']['detail']);
+        $this->assertStringContainsString('Canned Tuna (no sales in 30 days)', $recs['slow_movers']['detail']);
+        $this->assertStringContainsString('Soy Sauce (~140 days of stock)', $recs['slow_movers']['detail']);
+
+        $this->assertStringContainsString('Iced Coffee (18%)', $recs['thin_margin_best_sellers']['detail']);
+        $this->assertStringNotContainsString('Water', $recs['thin_margin_best_sellers']['detail']);
+        $this->assertStringNotContainsString('Bread', $recs['thin_margin_best_sellers']['detail']);
+
+        // Slow movers already explain the stock; the overall "high inventory" note isn't repeated.
+        $this->assertFalse($recs->has('high_inventory'));
+    }
+
     public function test_peso_formatting(): void
     {
         $this->assertSame('₱1,234.50', FinancialInsightService::peso(1234.5));

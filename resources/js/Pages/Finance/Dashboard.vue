@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from "vue";
-import { Head } from "@inertiajs/vue3";
+import { Head, Link } from "@inertiajs/vue3";
+import dayjs from "dayjs";
 import VueApexCharts from "vue3-apexcharts";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
@@ -15,6 +16,8 @@ import FinancePeriod from "./components/FinancePeriod.vue";
 import ExplainButton from "./components/ExplainButton.vue";
 import MetricCard from "./components/MetricCard.vue";
 import HealthSummary from "./components/HealthSummary.vue";
+import AskPanel from "./components/AskPanel.vue";
+import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 
 const props = defineProps({
     filters: { type: Object, required: true },
@@ -25,9 +28,12 @@ const props = defineProps({
     health: { type: Array, default: () => [] },
     recommendations: { type: Array, default: () => [] },
     trend: { type: Array, default: () => [] },
+    latestReview: { type: Object, default: null },
+    suggestedQuestions: { type: Array, default: () => [] },
 });
 
 const { formattedTotal } = useHelpers();
+const { getRoute } = useDomainRoutes();
 const { filters, filtersConfig, activeFilters, handleClearSelectedFilter, clearAll, load, spinning, periodLabel, previousLabel } =
     useFinanceFilters({ routeName: "finance.dashboard", serverFilters: () => props.filters, locations: props.locations });
 
@@ -37,10 +43,33 @@ const ar = computed(() => props.overview.receivables);
 const ap = computed(() => props.overview.payables);
 const moneyIn = computed(() => props.overview.money_in);
 
-const notTracked = [
-    { label: "Bank accounts", hint: "Balances held in the bank" },
-    { label: "Loans", hint: "What you borrowed and repay" },
-    { label: "Equipment", hint: "Fixtures, machines, vehicles" },
+/** Cash on hand: what the drawers should hold today plus the bank and e-wallet balances entered. */
+const cashBalance = computed(() => {
+    const drawer = props.overview.cash_in_drawer.amount;
+    const accounts = props.overview.account_balances?.closing_total ?? 0;
+    return { drawer, accounts, total: Math.round((drawer + accounts) * 100) / 100 };
+});
+
+/**
+ * Balances against the end of the previous period, from the daily snapshots (whole business).
+ * Empty until enough history exists, so those cards show no comparison yet.
+ */
+const positionChange = computed(() => props.overview.position?.changes ?? {});
+
+/** Largest running cost (other expenses such as loan interest sit below operating profit). */
+const biggestOperating = computed(() => props.overview.expense_breakdown.find((row) => row.type === "operating") ?? null);
+
+const reviewLabel = computed(() =>
+    props.latestReview ? dayjs(`${props.latestReview.month}-01`).format("MMMM YYYY") : "",
+);
+
+const slowColumns = [
+    { title: "Product", dataIndex: "name", key: "name", ellipsis: true },
+    { title: "Tied up", dataIndex: "value", key: "value", align: "right", customRender: ({ text }) => formattedTotal(text) },
+    {
+        title: "Lasts", dataIndex: "days_of_stock", key: "days", align: "right", width: 120,
+        customRender: ({ text }) => (text === null ? "Not sold (30d)" : `~${text} days`),
+    },
 ];
 
 const moneyInRows = computed(() =>
@@ -108,6 +137,15 @@ const productColumns = [
                     <FinanceNav active="finance.dashboard" :filters="props.filters" />
                     <FinancePeriod :label="periodLabel" :previous="previousLabel" />
 
+                    <a-alert v-if="latestReview && !latestReview.read_at" type="success" show-icon data-testid="review-ready">
+                        <template #message>
+                            Your {{ reviewLabel }} business review is ready.
+                            <Link :href="`${getRoute('finance.reviews.index')}?month=${latestReview.month}`" class="font-medium text-blue-600 hover:underline">
+                                Read it
+                            </Link>
+                        </template>
+                    </a-alert>
+
                     <a-alert
                         v-if="current.items_missing_cost > 0"
                         type="warning"
@@ -135,7 +173,7 @@ const productColumns = [
                             </template>
                         </MetricCard>
                         <MetricCard label="Operating expenses" :value="current.operating_expenses" :change="changes.operating_expenses" :up-is-good="false"
-                            :hint="overview.expense_breakdown[0] ? `Biggest: ${overview.expense_breakdown[0].name}` : 'Rent, salaries, utilities…'">
+                            :hint="biggestOperating ? `Biggest: ${biggestOperating.name}` : 'Rent, salaries, utilities…'">
                             <template #action>
                                 <ExplainButton topic="expenses" :filters="props.filters" :ai-enabled="aiEnabled" title="Your expenses" label="Explain" link />
                             </template>
@@ -152,35 +190,31 @@ const productColumns = [
                                 <ExplainButton topic="cash_flow" :filters="props.filters" :ai-enabled="aiEnabled" title="Your cash flow" label="Explain" link />
                             </template>
                         </MetricCard>
-                        <MetricCard label="Customers owe you" :value="ar.outstanding" :hint="`${formattedTotal(ar.overdue)} overdue · ${ar.customers_owing} customer(s)`">
+                        <MetricCard label="Customers owe you" :value="ar.outstanding" :change="positionChange.receivables" :up-is-good="false" :hint="`${formattedTotal(ar.overdue)} overdue · ${ar.customers_owing} customer(s)`">
                             <template #action>
                                 <ExplainButton topic="receivables" :filters="props.filters" :ai-enabled="aiEnabled" title="Customer credit" label="Explain" link />
                             </template>
                         </MetricCard>
-                        <MetricCard label="You owe suppliers" :value="ap.outstanding"
+                        <MetricCard label="You owe suppliers" :value="ap.outstanding" :change="positionChange.payables" :up-is-good="false"
                             :hint="`${formattedTotal(ap.overdue)} overdue · ${formattedTotal(ap.due_within_7_days)} due in 7 days`">
                             <template #action>
                                 <ExplainButton topic="payables" :filters="props.filters" :ai-enabled="aiEnabled" title="Supplier bills" label="Explain" link />
                             </template>
                         </MetricCard>
-                        <MetricCard label="Inventory value (today)" :value="overview.inventory_value" hint="What your stock on hand cost">
+                        <MetricCard label="Inventory value (today)" :value="overview.inventory_value" :change="overview.location_id ? null : positionChange.inventory_value" :up-is-good="false" hint="What your stock on hand cost">
                             <template #action>
                                 <ExplainButton topic="metric" metric="Inventory value" :filters="props.filters" :ai-enabled="aiEnabled" title="Inventory value" label="Explain" link />
                             </template>
                         </MetricCard>
-                        <MetricCard label="Cash in drawer (today)" :value="overview.cash_in_drawer.amount"
-                            :muted="overview.cash_in_drawer.locations_counted === 0"
-                            :hint="overview.cash_in_drawer.locations_counted === 0 ? 'No opening cash recorded today' : 'Expected cash from today\'s cash control'" />
-                        <div class="flex h-full flex-col gap-2 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 md:col-span-1 xl:col-span-3">
-                            <span class="text-xs font-medium text-gray-500">Not recorded yet</span>
-                            <div class="grid grid-cols-1 gap-2 md:grid-cols-3">
-                                <div v-for="item in notTracked" :key="item.label" class="text-sm">
-                                    <span class="font-medium text-gray-500">{{ item.label }}</span>
-                                    <span class="block text-xs text-gray-400">{{ item.hint }}</span>
-                                </div>
-                            </div>
-                        </div>
+                        <MetricCard label="Cash balance (today)" :value="cashBalance.total" :change="overview.location_id ? null : positionChange.cash_balance"
+                            :hint="`Drawers ${formattedTotal(cashBalance.drawer)} · Bank & e-wallets ${formattedTotal(cashBalance.accounts)} (as last entered)`">
+                            <template #action>
+                                <ExplainButton topic="balance_sheet" :filters="props.filters" :ai-enabled="aiEnabled" title="Your financial position" label="Explain" link />
+                            </template>
+                        </MetricCard>
                     </div>
+
+                    <AskPanel :ai-enabled="aiEnabled" :suggestions="suggestedQuestions" :location-id="props.filters.location_id" />
 
                     <!-- Health check -->
                     <section class="space-y-3">
@@ -229,7 +263,14 @@ const productColumns = [
                         </section>
                     </div>
 
-                    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                    <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">
+                        <section class="space-y-3">
+                            <h2 class="text-base font-semibold text-gray-900">Slow-moving stock</h2>
+                            <a-table :columns="slowColumns" :data-source="overview.products.slow_movers" :pagination="false"
+                                row-key="product_id" size="small" bordered class="bg-white" :scroll="{ x: 380 }" data-testid="slow-movers"
+                                :locale="{ emptyText: 'Nothing is sitting on the shelf too long.' }" />
+                            <p class="text-xs text-gray-500">More than 90 days of stock at the last 30 days' pace, or not sold in 30 days.</p>
+                        </section>
                         <section class="space-y-3">
                             <h2 class="text-base font-semibold text-gray-900">Best sellers</h2>
                             <a-table :columns="productColumns" :data-source="overview.products.best_sellers" :pagination="false"

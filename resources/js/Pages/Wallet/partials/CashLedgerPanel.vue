@@ -98,6 +98,10 @@ const SYSTEM_KIND_LABELS = {
     expense: "Expense",
     supplier_payment: "Supplier payment",
     other_income: "Other income",
+    loan_received: "Loan received",
+    loan_payment: "Loan repayment",
+    asset_purchase: "Equipment / asset bought",
+    owner_investment: "Owner investment",
 };
 
 /** Stable backend tokens in `notes` for system-generated cash-control lines. */

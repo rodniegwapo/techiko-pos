@@ -8,7 +8,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
 /**
- * Keeps a supplier payment or other income in step with the store's wallet ledger, the same way
+ * Keeps a finance record (supplier payment, other income, loan, asset purchase, owner investment)
+ * in step with the store's wallet ledger, the same way
  * ExpenseService does for expenses: paid from (or into) the cash register means a ledger line,
  * linked through the record's wallet_cash_movement_id, and a closed shift can't be changed.
  */
@@ -18,8 +19,10 @@ class CashRegisterPosting
      * Create, move or remove the record's ledger line to match it as it is now. Call before
      * saving the record (it sets wallet_cash_movement_id).
      */
-    public function sync(Model $record, string $kind, string $direction, string $date, string $notes, string $dateField): void
+    public function sync(Model $record, string $kind, string $direction, string $date, string $notes, string $dateField, ?float $amount = null): void
     {
+        $amount ??= (float) $record->amount;
+
         $movement = $record->wallet_cash_movement_id
             ? WalletCashMovement::query()->find($record->wallet_cash_movement_id)
             : null;
@@ -38,7 +41,7 @@ class CashRegisterPosting
             'location_id' => $record->location_id,
             'payment_card_type_id' => null,
             'direction' => $direction,
-            'amount' => $record->amount,
+            'amount' => round($amount, 2),
             'kind' => $kind,
             'notes' => Str::limit($notes, 250),
             'movement_date' => $date,

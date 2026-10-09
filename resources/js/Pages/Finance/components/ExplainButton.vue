@@ -4,6 +4,7 @@ import axios from "axios";
 import { useMediaQuery } from "@vueuse/core";
 import { IconSparkles } from "@tabler/icons-vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
+import { answerSections } from "../composables/answerSections";
 
 /**
  * "Explain this": asks the AI assistant to put the figures on the page into plain words.
@@ -32,22 +33,7 @@ const isMdUp = useMediaQuery("(min-width: 768px)");
 const drawerWidth = computed(() => (isMdUp.value ? 480 : "100%"));
 
 /** Splits the answer into its summary, "What to watch" and "Suggested next steps" parts. */
-const sections = computed(() => {
-    if (!answer.value?.text) return [];
-    const out = [{ heading: null, paragraphs: [], bullets: [] }];
-    for (const raw of answer.value.text.split("\n")) {
-        const line = raw.trim();
-        if (!line) continue;
-        if (/^(what to watch|suggested next steps)\s*:?$/i.test(line)) {
-            out.push({ heading: line.replace(/:$/, ""), paragraphs: [], bullets: [] });
-            continue;
-        }
-        const current = out[out.length - 1];
-        if (/^[-•*]\s+/.test(line)) current.bullets.push(line.replace(/^[-•*]\s+/, ""));
-        else current.paragraphs.push(line);
-    }
-    return out.filter((s) => s.paragraphs.length || s.bullets.length);
-});
+const sections = computed(() => answerSections(answer.value?.text));
 
 async function fetchExplanation() {
     loading.value = true;

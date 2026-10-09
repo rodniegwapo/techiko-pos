@@ -4,6 +4,7 @@ namespace App\Services\Reports;
 
 use App\Models\Expense;
 use App\Models\ExpenseCategory;
+use App\Models\Finance\FixedAsset;
 use App\Models\Finance\OtherIncome;
 use App\Models\Finance\SupplierBill;
 use App\Models\Sale;
@@ -19,7 +20,8 @@ use Illuminate\Support\Facades\DB;
  * − Cost of goods sold (cost frozen on each sold line)
  * − Inventory losses (approved stock write-offs, at cost)
  * = Gross profit
- * − Operating expenses (Expenses module, plus running costs billed by suppliers)
+ * − Operating expenses (Expenses module, running costs billed by suppliers, and depreciation:
+ *   the part of equipment's cost used up in the period)
  * = Operating profit
  * + Other income
  * − Other expenses (categories of type "other": interest, losses, one-off costs)
@@ -190,11 +192,24 @@ class ProfitAndLossService
                 'amount' => round($amount, 2),
             ];
         }
+        // Equipment and other assets: the part of their cost used up in the period.
+        $assets = FixedAsset::query()
+            ->forDomain($domainSlug)
+            ->whereNotNull('useful_life_months')
+            ->where('purchase_date', '<=', $end->toDateString())
+            ->get();
+        $depreciation = fn ($list) => round($list->sum(fn (FixedAsset $a) => $a->depreciationBetween($start, $end)), 2);
+        $storeDepreciation = $depreciation($assets->when($locationId !== null, fn ($c) => $c->where('location_id', $locationId)));
+        if ($storeDepreciation > 0) {
+            $lines['operating'][] = ['key' => 'depreciation', 'label' => 'Depreciation (equipment and other assets)', 'amount' => $storeDepreciation];
+        }
+
         $byAmount = fn (array $rows) => collect($rows)->sortByDesc('amount')->values()->all();
 
         $excluded = $locationId !== null
             ? round((float) (clone $recorded)->whereNull('location_id')->sum('amount')
-                + (float) (clone $billed)->whereNull('location_id')->sum('amount'), 2)
+                + (float) (clone $billed)->whereNull('location_id')->sum('amount')
+                + $depreciation($assets->whereNull('location_id')), 2)
             : null;
 
         return [

@@ -7,6 +7,8 @@ use App\Http\Controllers\Domains\DashboardController;
 use App\Http\Controllers\Domains\DomainSettingsController;
 use App\Http\Controllers\Domains\ExpenseCategoryController;
 use App\Http\Controllers\Domains\ExpenseController;
+use App\Http\Controllers\Domains\Finance\BalanceItemsController;
+use App\Http\Controllers\Domains\Finance\MonthlyReviewController;
 use App\Http\Controllers\Domains\Finance\OtherIncomeController;
 use App\Http\Controllers\Domains\Finance\PayablesController;
 use App\Http\Controllers\Domains\FinanceController;
@@ -236,6 +238,32 @@ Route::prefix('domains/{domain:name_slug}')
             Route::delete('/bills/{bill}', [PayablesController::class, 'destroyBill'])->name('bills.destroy');
             Route::post('/bills/{bill}/payments', [PayablesController::class, 'storePayment'])->name('bill-payments.store');
             Route::delete('/bill-payments/{payment}', [PayablesController::class, 'destroyPayment'])->name('bill-payments.destroy');
+
+            // Bank and e-wallet balances, loans, equipment and owner investments (balance sheet / cash flow)
+            Route::get('/assets-and-loans', [BalanceItemsController::class, 'index'])->name('balance-items.index');
+            Route::post('/accounts', [BalanceItemsController::class, 'storeAccount'])->name('accounts.store');
+            Route::put('/accounts/{account}', [BalanceItemsController::class, 'updateAccount'])->name('accounts.update');
+            Route::post('/accounts/{account}/balances', [BalanceItemsController::class, 'storeAccountBalance'])->name('account-balances.store');
+            Route::delete('/account-balances/{balance}', [BalanceItemsController::class, 'destroyAccountBalance'])->name('account-balances.destroy');
+            Route::post('/loans', [BalanceItemsController::class, 'storeLoan'])->name('loans.store');
+            Route::put('/loans/{loan}', [BalanceItemsController::class, 'updateLoan'])->name('loans.update');
+            Route::delete('/loans/{loan}', [BalanceItemsController::class, 'destroyLoan'])->name('loans.destroy');
+            Route::post('/loans/{loan}/payments', [BalanceItemsController::class, 'storeLoanPayment'])->name('loan-payments.store');
+            Route::delete('/loan-payments/{payment}', [BalanceItemsController::class, 'destroyLoanPayment'])->name('loan-payments.destroy');
+            Route::post('/assets', [BalanceItemsController::class, 'storeAsset'])->name('assets.store');
+            Route::put('/assets/{asset}', [BalanceItemsController::class, 'updateAsset'])->name('assets.update');
+            Route::delete('/assets/{asset}', [BalanceItemsController::class, 'destroyAsset'])->name('assets.destroy');
+            Route::post('/owner-investments', [BalanceItemsController::class, 'storeInvestment'])->name('owner-investments.store');
+            Route::put('/owner-investments/{investment}', [BalanceItemsController::class, 'updateInvestment'])->name('owner-investments.update');
+            Route::delete('/owner-investments/{investment}', [BalanceItemsController::class, 'destroyInvestment'])->name('owner-investments.destroy');
+            Route::post('/other-liabilities', [BalanceItemsController::class, 'storeLiability'])->name('other-liabilities.store');
+            Route::put('/other-liabilities/{liability}', [BalanceItemsController::class, 'updateLiability'])->name('other-liabilities.update');
+            Route::delete('/other-liabilities/{liability}', [BalanceItemsController::class, 'destroyLiability'])->name('other-liabilities.destroy');
+
+            // "Ask about your business" and the monthly business reviews
+            Route::post('/ask', [FinanceController::class, 'ask'])->name('ask');
+            Route::get('/reviews', [MonthlyReviewController::class, 'index'])->name('reviews.index');
+            Route::post('/reviews', [MonthlyReviewController::class, 'generate'])->name('reviews.generate');
         });
 
         // Wallet — money movement (cash control + ledger); distinct URL from card-type setup

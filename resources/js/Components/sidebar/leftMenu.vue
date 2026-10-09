@@ -201,6 +201,18 @@ const menuItems = [
                 path: "/finance/other-income",
             },
             {
+                key: "finance-balance-items",
+                title: "Accounts, loans & assets",
+                routeName: "finance.balance-items.index",
+                path: "/finance/assets-and-loans",
+            },
+            {
+                key: "finance-reviews",
+                title: "Monthly reviews",
+                routeName: "finance.reviews.index",
+                path: "/finance/reviews",
+            },
+            {
                 key: "vat-report",
                 title: "VAT report",
                 routeName: "vat-report.index",

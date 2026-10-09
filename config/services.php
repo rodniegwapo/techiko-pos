@@ -36,6 +36,10 @@ return [
     'anthropic' => [
         'key' => env('ANTHROPIC_API_KEY', ''),
         'model' => env('ANTHROPIC_FINANCE_MODEL', 'claude-haiku-5-5'),
+        // "Ask about your business" questions (tool use; needs more judgment than explanations).
+        'question_model' => env('ANTHROPIC_FINANCE_QUESTION_MODEL', 'claude-sonnet-5-5'),
+        // Questions one business may ask per day, to keep API costs predictable.
+        'daily_question_limit' => (int) env('ANTHROPIC_FINANCE_DAILY_QUESTIONS', 30),
     ],
 
 ];

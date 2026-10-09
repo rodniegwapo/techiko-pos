@@ -4,34 +4,51 @@ namespace App\Http\Controllers\Domains;
 
 use App\Http\Controllers\Controller;
 use App\Models\Domain;
+use App\Models\Finance\MonthlyReview;
 use App\Models\InventoryLocation;
+use App\Services\Ai\FinanceTools;
 use App\Services\Ai\FinancialAssistant;
 use App\Services\Finance\FinancialInsightService;
 use App\Services\Finance\FinancialReportService;
+use App\Services\Finance\FinancialSnapshotService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use RuntimeException;
 
 /**
- * The owner's view of the money: a dashboard, a simple income statement and customer credit,
- * each with an "Explain this" button that puts the figures into plain words.
+ * The owner's view of the money: the Finance overview, cash flow, balance sheet and customer
+ * credit, each with an "Explain this" button that puts the figures into plain words, plus
+ * "Ask about your business" for the owner's own questions.
  */
 class FinanceController extends Controller
 {
+    private const SUGGESTED_QUESTIONS = [
+        'How much profit did I make this month?',
+        'Why is my profit lower than last month?',
+        'Which month was my most profitable?',
+        'What are my biggest expenses?',
+        'Why is my cash balance low?',
+        'What should I pay attention to?',
+    ];
+
     public function __construct(
         private readonly FinancialReportService $reports,
         private readonly FinancialInsightService $insights,
         private readonly FinancialAssistant $assistant,
+        private readonly FinancialSnapshotService $snapshots,
     ) {}
 
     public function dashboard(Request $request, Domain $domain)
     {
         [$period, $locationId] = $this->resolveFilters($request, $domain);
+        // History builds up from visits too, where the nightly snapshot doesn't run.
+        $this->snapshots->capture($domain->name_slug, refresh: false);
         $overview = $this->reports->overview($domain->name_slug, $locationId, $period);
 
         return Inertia::render('Finance/Dashboard', [
@@ -40,6 +57,60 @@ class FinanceController extends Controller
             'health' => $this->insights->health($overview),
             'recommendations' => $this->insights->recommendations($overview),
             'trend' => $this->reports->monthlyTrend($domain->name_slug, $locationId),
+            // The newest monthly review, flagged until it has been opened.
+            'latestReview' => MonthlyReview::query()->forDomain($domain->name_slug)->orderByDesc('month')->first(['id', 'month', 'read_at', 'figures']),
+            'suggestedQuestions' => self::SUGGESTED_QUESTIONS,
+        ]);
+    }
+
+    /**
+     * "Ask about your business": Claude answers from the business's own figures, fetched through
+     * FinanceTools. Limited per business per day to keep API costs predictable.
+     */
+    public function ask(Request $request, Domain $domain): JsonResponse
+    {
+        $validated = $request->validate([
+            'question' => ['required', 'string', 'min:3', 'max:500'],
+            'history' => ['nullable', 'array', 'max:4'],
+            'history.*.question' => ['required', 'string', 'max:500'],
+            'history.*.answer' => ['required', 'string', 'max:4000'],
+            'language' => ['nullable', Rule::in(FinancialAssistant::LANGUAGES)],
+            'location_id' => ['nullable', 'integer'],
+        ]);
+
+        if (! $this->assistant->isConfigured()) {
+            return response()->json(['message' => 'The AI assistant is not set up yet. Ask your administrator to add an Anthropic API key.'], 503);
+        }
+
+        $limit = (int) config('services.anthropic.daily_question_limit', 30);
+        $counter = 'finance-ai-questions:'.$domain->name_slug.':'.today()->toDateString();
+        $asked = (int) Cache::get($counter, 0);
+        if ($asked >= $limit) {
+            return response()->json(['message' => "You've reached today's limit of {$limit} questions. The reports and explanations still work; questions open again tomorrow."], 429);
+        }
+        Cache::put($counter, $asked + 1, now()->endOfDay());
+
+        $locationId = isset($validated['location_id'])
+            && InventoryLocation::query()->forDomain($domain->name_slug)->whereKey($validated['location_id'])->exists()
+            ? (int) $validated['location_id']
+            : null;
+
+        try {
+            $answer = $this->assistant->answer(
+                $validated['question'],
+                $validated['history'] ?? [],
+                new FinanceTools($this->reports, $this->insights, $domain->name_slug, $locationId),
+                $domain->name,
+                $validated['language'] ?? 'en',
+            );
+        } catch (RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 502);
+        }
+
+        return response()->json([
+            'answer' => $answer,
+            'remaining' => max(0, $limit - $asked - 1),
+            'disclaimer' => 'AI answer from your POS records. Suggestions only, not professional financial advice.',
         ]);
     }
 
@@ -83,6 +154,7 @@ class FinanceController extends Controller
     public function balanceSheet(Request $request, Domain $domain)
     {
         [$period, $locationId] = $this->resolveFilters($request, $domain);
+        $this->snapshots->capture($domain->name_slug, refresh: false);
 
         return Inertia::render('Finance/BalanceSheet', [
             ...$this->sharedProps($domain, $period, $locationId),
@@ -193,7 +265,8 @@ class FinanceController extends Controller
                 'Stock bought from suppliers is not an expense: it becomes cost of goods sold when sold.',
                 'Customer credit and supplier bills cover the whole business, not one location.',
                 'Inventory value, cash in drawer and the balance sheet are as of today, not the end of the period.',
-                'Not recorded in the system yet: '.implode(', ', $overview['not_tracked']).'.',
+                'Bank and e-wallet balances are what the owner last entered; each has an as_of date.',
+                ...($overview['not_tracked'] ? ['Not recorded in the system yet: '.implode(', ', $overview['not_tracked']).'.'] : []),
             ],
         ];
     }

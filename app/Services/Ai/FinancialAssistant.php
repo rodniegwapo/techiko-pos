@@ -17,7 +17,24 @@ use RuntimeException;
  */
 class FinancialAssistant
 {
-    public const TOPICS = ['overview', 'health', 'income_statement', 'receivables', 'payables', 'cash_flow', 'balance_sheet', 'expenses', 'metric'];
+    public const TOPICS = ['overview', 'health', 'income_statement', 'receivables', 'payables', 'cash_flow', 'balance_sheet', 'expenses', 'review', 'metric'];
+
+    /** Steps (tool calls and the answer) a question may take before giving up. */
+    private const MAX_QUESTION_STEPS = 8;
+
+    private const QUESTION_PROMPT = <<<'PROMPT'
+You are the financial assistant inside Techiko POS, a point-of-sale system used by small businesses in the Philippines. The owner is asking about their own business. Answer the way a trusted, plain-spoken bookkeeper friend would.
+
+Use the tools to get the figures you need; they read the business's own records. Rules:
+- Base every number on what the tools return. Don't guess or invent figures. When you combine figures (a difference, a share), say which figures you used.
+- If the tools can't answer the question, say so plainly and suggest which Finance page would help.
+- Amounts are in Philippine pesos; write them like ₱12,345. Name the dates you looked at.
+- "revenue" excludes VAT. Gross profit = revenue − cost of goods sold (and stock written off). Net profit = gross profit − operating expenses + other income − other expenses. If "expenses_recorded" is false, say net profit is overstated until expenses are recorded.
+- Customers are anonymised (Customer A, B…); refer the owner to the Customer credit page for names.
+- Avoid accounting jargon. Suggestions are things to consider, never guarantees or professional financial advice.
+
+Answer in plain text: a direct answer in 1 to 4 sentences, then, only if useful, up to 3 lines starting with "- " for details or next steps. Keep it under 150 words. No markdown headings, bold or tables.
+PROMPT;
 
     public const LANGUAGES = ['en', 'taglish'];
 
@@ -28,8 +45,8 @@ You are given a JSON fact sheet. Every figure in it was calculated by the POS fr
 - Use only the figures in the fact sheet. Never invent, estimate or recalculate a number; if a figure you would need is missing, say it isn't available.
 - Amounts are in Philippine pesos; write them like ₱12,345.
 - "revenue" is what customers paid less the VAT collected. "gross_profit" is revenue less what the goods sold cost (cogs). "net_profit" is gross profit less operating expenses, plus other income, less other expenses. If "expenses_recorded" is false, no expenses have been entered yet: say net profit is overstated until they are.
-- Profit and cash are different things. The cash_flow section shows money in and out, and its "bridge" lists why the change in money differs from net profit (credit sales not collected, stock bought, bills not yet paid, owner withdrawals). Use it when asked about cash.
-- Bank balances, loans, equipment and owner investments are not recorded in the system; the balance sheet leaves them out.
+- Profit and cash are different things. The cash_flow section shows money in and out, and its "bridge" lists why the change in money differs from net profit (credit sales not collected, stock bought, bills not yet paid, loans, equipment bought, owner withdrawals). Use it when asked about cash.
+- Bank and e-wallet balances are what the owner last entered, each with an "as_of" date; say how current they are. Equipment is shown at its value after depreciation.
 - Explain why numbers moved by comparing with the previous period, when the fact sheet has it.
 - Avoid accounting jargon. If you must use a term, explain it in a few words.
 - Any suggestion is a suggestion for the owner to consider, never a guarantee or professional financial advice.
@@ -50,6 +67,7 @@ PROMPT;
         'cash_flow' => 'Explain my cash flow: where did my money come from, where did it go, and why did my cash change differently from my profit?',
         'balance_sheet' => 'Explain my financial position: what does my business own, what does it owe, and what is it worth?',
         'expenses' => 'Explain my expenses: where is my money going, which costs grew, and am I spending too much compared with my sales?',
+        'review' => 'This is my monthly business review. Summarize how the month went compared with the month before, and what matters most for next month.',
     ];
 
     public function isConfigured(): bool
@@ -81,29 +99,85 @@ PROMPT;
             return ['text' => $cached, 'cached' => true];
         }
 
-        $text = $this->ask($question, $facts);
+        $message = $this->send(fn (Client $client) => $client->messages->create(
+            model: $this->model(),
+            maxTokens: 4000,
+            system: self::SYSTEM_PROMPT,
+            outputConfig: ['effort' => 'low'],
+            messages: [[
+                'role' => 'user',
+                'content' => "<fact_sheet>\n".json_encode($facts, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
+                    ."\n</fact_sheet>\n\n".$question,
+            ]],
+        ));
+        $text = $this->textOf($message);
         Cache::put($cacheKey, $text, now()->addHours(6));
 
         return ['text' => $text, 'cached' => false];
     }
 
-    /** @param  array<string, mixed>  $facts */
-    private function ask(string $question, array $facts): string
+    /**
+     * Answers an owner's own question about the business. Claude calls the finance tools for the
+     * figures it needs (as many rounds as it takes, within a limit), then answers in plain words.
+     *
+     * @param  list<array{question: string, answer: string}>  $history  The last few questions and answers, for follow-ups.
+     */
+    public function answer(string $question, array $history, FinanceTools $tools, string $businessName, string $language = 'en'): string
+    {
+        if (! $this->isConfigured()) {
+            throw new RuntimeException('The AI assistant is not set up yet. Add ANTHROPIC_API_KEY to the server settings.');
+        }
+
+        $messages = [];
+        foreach (array_slice($history, -4) as $turn) {
+            $messages[] = ['role' => 'user', 'content' => (string) $turn['question']];
+            $messages[] = ['role' => 'assistant', 'content' => (string) $turn['answer']];
+        }
+        $messages[] = ['role' => 'user', 'content' => $language === 'taglish'
+            ? $question."\n\n(Answer in Taglish, a natural mix of Tagalog and English.)"
+            : $question];
+
+        $system = self::QUESTION_PROMPT."\n\nBusiness: ".$businessName.'. Today is '.today()->format('l, F j, Y').' ('.today()->toDateString().').';
+
+        for ($step = 0; $step < self::MAX_QUESTION_STEPS; $step++) {
+            $response = $this->send(fn (Client $client) => $client->messages->create(
+                model: $this->questionModel(),
+                maxTokens: 8000,
+                system: $system,
+                tools: $tools->definitions(),
+                outputConfig: ['effort' => 'low'],
+                messages: $messages,
+            ));
+
+            if ($response->stopReason !== 'tool_use') {
+                return $this->textOf($response);
+            }
+
+            $results = [];
+            foreach ($response->content as $block) {
+                if ($block->type === 'tool_use') {
+                    $results[] = [
+                        'type' => 'tool_result',
+                        'toolUseID' => $block->id,
+                        'content' => $tools->run($block->name, (array) $block->input),
+                    ];
+                }
+            }
+            // The assistant turn goes back unchanged (thinking blocks included), then the results.
+            $messages[] = ['role' => 'assistant', 'content' => $response->content];
+            $messages[] = ['role' => 'user', 'content' => $results];
+        }
+
+        throw new RuntimeException('That question needed too many steps to answer. Try asking something more specific.');
+    }
+
+    /** Runs one API call, turning API failures into messages an owner can act on. */
+    private function send(callable $call): object
     {
         $client = new Client(apiKey: (string) config('services.anthropic.key'));
 
         try {
-            $message = $client->messages->create(
-                model: $this->model(),
-                maxTokens: 4000,
-                system: self::SYSTEM_PROMPT,
-                outputConfig: ['effort' => 'low'],
-                messages: [[
-                    'role' => 'user',
-                    'content' => "<fact_sheet>\n".json_encode($facts, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
-                        ."\n</fact_sheet>\n\n".$question,
-                ]],
-            );
+            $message = $call($client);
         } catch (RateLimitException $e) {
             throw new RuntimeException('The AI assistant is busy right now. Please try again in a minute.', 0, $e);
         } catch (APIStatusException $e) {
@@ -118,6 +192,11 @@ PROMPT;
             throw new RuntimeException('The AI assistant could not answer this one. The figures on the page are still accurate.');
         }
 
+        return $message;
+    }
+
+    private function textOf(object $message): string
+    {
         $text = '';
         foreach ($message->content as $block) {
             if ($block->type === 'text') {
@@ -135,5 +214,11 @@ PROMPT;
     private function model(): string
     {
         return (string) config('services.anthropic.model', 'claude-haiku-5-5');
+    }
+
+    /** Questions need judgment about which figures to fetch, so they use a stronger model. */
+    private function questionModel(): string
+    {
+        return (string) config('services.anthropic.question_model', 'claude-sonnet-5-5');
     }
 }

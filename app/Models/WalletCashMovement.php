@@ -31,6 +31,10 @@ class WalletCashMovement extends Model
         self::KIND_EXPENSE,
         'supplier_payment',
         'other_income',
+        'loan_received',
+        'loan_payment',
+        'asset_purchase',
+        'owner_investment',
     ];
 
     protected $casts = [

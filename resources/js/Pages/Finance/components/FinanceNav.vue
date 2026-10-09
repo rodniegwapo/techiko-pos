@@ -23,9 +23,13 @@ const tabs = [
     { routeName: "finance.payables.index", label: "Supplier bills" },
     { routeName: "expenses.index", label: "Expenses", dates: true },
     { routeName: "finance.other-income.index", label: "Other income" },
+    { routeName: "finance.balance-items.index", label: "Accounts, loans & assets", plain: true },
+    { routeName: "finance.reviews.index", label: "Monthly reviews", plain: true },
 ].filter((tab) => hasPermission(tab.routeName));
 
 function href(tab) {
+    // Pages that are not about a period take no filters at all.
+    if (tab.plain) return getRoute(tab.routeName);
     // The Expenses page filters by plain dates rather than a Finance period.
     const query = tab.dates
         ? { start_date: props.filters.start_date, end_date: props.filters.end_date }

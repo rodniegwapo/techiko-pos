@@ -5,6 +5,13 @@ namespace App\Services\Finance;
 use App\Models\CreditTransaction;
 use App\Models\Customer;
 use App\Models\Expense;
+use App\Models\Finance\FinancialAccount;
+use App\Models\Finance\FinancialSnapshot;
+use App\Models\Finance\FixedAsset;
+use App\Models\Finance\Loan;
+use App\Models\Finance\LoanPayment;
+use App\Models\Finance\OtherLiability;
+use App\Models\Finance\OwnerInvestment;
 use App\Models\Finance\SupplierBill;
 use App\Models\Finance\SupplierPayment;
 use App\Models\InventoryLocation;
@@ -14,8 +21,9 @@ use App\Models\SaleItem;
 use App\Models\SalePayment;
 use App\Models\WalletCashMovement;
 use App\Models\WalletCashReconciliation;
-use App\Support\Wallet\WalletCashDailyExpected;
 use App\Services\Reports\ProfitAndLossService;
+use App\Support\Wallet\WalletCashBridgeExpected;
+use App\Support\Wallet\WalletCashDailyExpected;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -25,8 +33,9 @@ use Illuminate\Support\Facades\DB;
  * The AI assistant only puts these figures into words; it never calculates anything itself.
  *
  * Covers what the POS records: sales, cost of goods, inventory, customer credit, the cash drawer,
- * expenses, other income and supplier bills. Bank accounts, loans, equipment and owner
- * investments are not recorded yet, so the balance sheet leaves them out.
+ * expenses, other income, supplier bills, bank and e-wallet balances, loans, equipment and owner
+ * investments. Bank and e-wallet balances are what the owner reads off the account (no bank
+ * feed), so they are only as current as the last balance entered.
  */
 class FinancialReportService
 {
@@ -356,9 +365,18 @@ class FinancialReportService
         $previous = $this->incomeStatement($domain, $locationId, $period['previous_start'], $period['previous_end']);
         $moneyIn = $this->moneyIn($domain, $locationId, $period['start'], $period['end']);
         $previousMoneyIn = $this->moneyIn($domain, $locationId, $period['previous_start'], $period['previous_end']);
+        $receivables = $this->receivables($domain, $period['start'], $period['end'], $period['previous_start'], $period['previous_end']);
+        $payables = $this->payables($domain, $period['start'], $period['end'], $period['previous_start'], $period['previous_end']);
+        $accounts = $this->accountBalances($domain, null, today()->toDateString());
 
         return [
             'period' => $this->describePeriod($period),
+            'position' => $this->positionAtPeriodEnd($domain, $period, [
+                'inventory_value' => $this->inventoryValue($domain, null),
+                'receivables' => $receivables['outstanding'],
+                'cash_balance' => round($this->cashInDrawer($domain, null)['amount'] + $accounts['closing_total'], 2),
+                'payables' => $payables['outstanding'],
+            ]),
             'location_id' => $locationId,
             'current' => $current,
             'previous' => $previous,
@@ -376,27 +394,48 @@ class FinancialReportService
             'expense_breakdown' => $current['expense_breakdown'],
             'previous_expense_breakdown' => $previous['expense_breakdown'],
             'expenses_recorded' => $this->expensesRecorded($domain),
-            'payables' => $this->payables(
-                $domain,
-                $period['start'],
-                $period['end'],
-                $period['previous_start'],
-                $period['previous_end'],
-            ),
+            'payables' => $payables,
             'money_in' => $moneyIn,
             'previous_money_in' => $previousMoneyIn,
             'inventory_value' => $this->inventoryValue($domain, $locationId),
             'cash_in_drawer' => $this->cashInDrawer($domain, $locationId),
-            'receivables' => $this->receivables(
-                $domain,
-                $period['start'],
-                $period['end'],
-                $period['previous_start'],
-                $period['previous_end'],
-            ),
-            'products' => $this->productMargins($domain, $locationId, $period['start'], $period['end']),
-            'not_tracked' => ['bank_balances', 'loans', 'equipment', 'owner_investments'],
+            'receivables' => $receivables,
+            'products' => [
+                ...$this->productMargins($domain, $locationId, $period['start'], $period['end']),
+                'slow_movers' => $this->slowMovers($domain, $locationId, 5),
+            ],
+            'account_balances' => $accounts,
+            'not_tracked' => [],
         ];
+    }
+
+    /**
+     * Inventory, customer credit, cash and supplier balances at the end of the period compared
+     * with the end of the period before (whole business). A period ending today uses today's
+     * live figures; one that ended earlier uses that day's snapshot.
+     *
+     * @param  array<string, float>  $live
+     * @return array<string, mixed>|null Null until the snapshots needed exist.
+     */
+    private function positionAtPeriodEnd(string $domain, array $period, array $live): ?array
+    {
+        $end = $period['end']->toDateString();
+        if ($end < today()->toDateString()) {
+            $snapshot = FinancialSnapshot::query()->forDomain($domain)->whereDate('as_of_date', $end)->first();
+            if ($snapshot === null) {
+                return null;
+            }
+            $live = [
+                'inventory_value' => $snapshot->inventory_value,
+                'receivables' => $snapshot->receivables,
+                'cash_balance' => $snapshot->cashBalance(),
+                'payables' => $snapshot->payables,
+            ];
+        }
+
+        $change = $this->positionChange($domain, $period['previous_end']->toDateString(), $live);
+
+        return $change === null ? null : ['now' => $live, ...$change];
     }
 
     /**
@@ -412,11 +451,13 @@ class FinancialReportService
         $pl = $this->pnl->build($domain, $start, $end, $locationId);
 
         $lines = fn (array $rows, string $type) => array_map(fn ($row) => [
-            'category_id' => (int) str_replace('category-', '', $row['key']),
+            'category_id' => str_starts_with($row['key'], 'category-') ? (int) substr($row['key'], 9) : null,
+            'key' => $row['key'],
             'name' => $row['label'],
             'type' => $type,
             'amount' => $row['amount'],
         ], $rows);
+        $depreciation = collect($pl['expense_lines'])->firstWhere('key', 'depreciation')['amount'] ?? 0.0;
 
         return [
             ...$sales,
@@ -424,6 +465,7 @@ class FinancialReportService
             'gross_profit' => $pl['gross_profit'],
             'gross_margin_pct' => $pl['gross_margin_percent'] ?? 0.0,
             'operating_expenses' => $pl['expenses'],
+            'depreciation' => $depreciation,
             'operating_profit' => $pl['operating_profit'],
             'other_income' => $pl['other_income'],
             'other_expenses' => $pl['other_expenses'],
@@ -528,49 +570,67 @@ class FinancialReportService
      */
     public function cashFlow(string $domain, ?int $locationId, Carbon $start, Carbon $end): array
     {
+        $range = [$start->toDateString(), $end->toDateString()];
         $moneyIn = $this->moneyIn($domain, $locationId, $start, $end);
         $statement = $this->incomeStatement($domain, $locationId, $start, $end);
+        $byStore = fn ($q) => $q->when($locationId, fn ($q, $id) => $q->where('location_id', $id));
 
         $customerPayments = round($moneyIn['cash'] + $moneyIn['card'] + $moneyIn['e-wallet'] + $moneyIn['bank'], 2);
-        $otherIncome = $statement['other_income'];
-
-        $expensesPaid = round((float) Expense::query()
-            ->forDomain($domain)
-            ->whereBetween('expense_date', [$start->toDateString(), $end->toDateString()])
-            ->when($locationId, fn ($q, $id) => $q->where('location_id', $id))
-            ->sum('amount'), 2);
+        $expensesPaid = round((float) $byStore(Expense::query()->forDomain($domain)->whereBetween('expense_date', $range))->sum('amount'), 2);
         $stockPaid = $this->supplierPaidTotal($domain, $locationId, $start, $end, 'inventory');
         $billedExpensesPaid = $this->supplierPaidTotal($domain, $locationId, $start, $end, 'expense');
-        $ownerDraws = round((float) WalletCashMovement::query()
-            ->forDomain($domain)
+        $billedExpenses = round((float) $byStore(SupplierBill::query()->forDomain($domain)->where('bill_type', 'expense')->whereBetween('bill_date', $range))->sum('amount'), 2);
+
+        $loansReceived = round((float) $byStore(Loan::query()->forDomain($domain)->whereBetween('received_date', $range))->sum('principal'), 2);
+        $loanRepaid = round((float) $byStore(LoanPayment::query()->where('domain', $domain)->whereBetween('payment_date', $range))->sum('principal'), 2);
+        $ownerInvested = round((float) $byStore(OwnerInvestment::query()->forDomain($domain)->whereBetween('investment_date', $range))->sum('amount'), 2);
+        $assetsBought = round((float) $byStore(FixedAsset::query()->forDomain($domain)->whereBetween('purchase_date', $range))->sum('cost'), 2);
+
+        $ledger = fn () => $byStore(WalletCashMovement::query()->forDomain($domain)->whereBetween('movement_date', $range));
+        // The end-of-shift cash-out moves the day's cash out of the drawer, not out of the business.
+        $ownerDraws = round((float) $ledger()
             ->where('kind', 'owner_draw')
-            ->whereBetween('movement_date', [$start->toDateString(), $end->toDateString()])
-            ->when($locationId, fn ($q, $id) => $q->where('location_id', $id))
+            ->where(fn ($q) => $q->whereNull('notes')->orWhere('notes', '!=', WalletCashBridgeExpected::NOTE_ENDSHIFT_CASHOUT))
             ->sum('amount'), 2);
+        // Float top-ups and drawer adjustments (including counted-cash differences), but not the
+        // book-only opening line.
+        $otherMovements = round((float) $ledger()
+            ->whereIn('kind', ['cash_sale_topup', 'adjustment'])
+            ->where(fn ($q) => $q->whereNull('notes')->orWhere('notes', '!=', WalletCashBridgeExpected::NOTE_OPENING))
+            ->get(['direction', 'amount'])
+            ->sum(fn ($m) => $m->direction === 'out' ? -(float) $m->amount : (float) $m->amount), 2);
 
         $in = [
             'customer_payments' => $customerPayments,
             'credit_collections' => $moneyIn['credit_collections'],
-            'other_income' => $otherIncome,
+            'other_income' => $statement['other_income'],
+            'loans_received' => $loansReceived,
+            'owner_investments' => $ownerInvested,
         ];
         $out = [
             'stock_purchases' => $stockPaid,
             'operating_expenses' => round($expensesPaid + $billedExpensesPaid, 2),
+            'loan_repayments' => $loanRepaid,
+            'equipment_purchases' => $assetsBought,
             'owner_withdrawals' => $ownerDraws,
         ];
         $totalIn = round(array_sum($in), 2);
         $totalOut = round(array_sum($out), 2);
-        $netChange = round($totalIn - $totalOut, 2);
+        $netChange = round($totalIn - $totalOut + $otherMovements, 2);
 
         // Why profit and money don't move together.
-        $billedExpenses = round((float) collect($statement['expense_breakdown'])->sum('amount') - $expensesPaid, 2);
         $bridge = [
             ['key' => 'vat', 'label' => 'VAT collected (held for the government, not profit)', 'amount' => $statement['vat']],
             ['key' => 'cogs', 'label' => 'Cost of goods sold (stock paid for earlier)', 'amount' => $statement['cogs']],
+            ['key' => 'inventory_losses', 'label' => 'Stock written off (paid for earlier)', 'amount' => $statement['inventory_losses']],
+            ['key' => 'depreciation', 'label' => 'Depreciation (equipment paid for earlier)', 'amount' => $statement['depreciation']],
             ['key' => 'stock_purchases', 'label' => 'Stock bought from suppliers and paid', 'amount' => -$stockPaid],
             ['key' => 'credit', 'label' => 'Sold on credit and not yet collected', 'amount' => round($moneyIn['credit_collections'] - $moneyIn['sold_on_credit'], 2)],
             ['key' => 'unpaid_bills', 'label' => 'Expense bills not yet paid', 'amount' => round($billedExpenses - $billedExpensesPaid, 2)],
-            ['key' => 'owner_withdrawals', 'label' => 'Owner withdrawals', 'amount' => -$ownerDraws],
+            ['key' => 'loans', 'label' => 'Loans received less principal repaid', 'amount' => round($loansReceived - $loanRepaid, 2)],
+            ['key' => 'equipment', 'label' => 'Equipment and other assets bought', 'amount' => -$assetsBought],
+            ['key' => 'owner', 'label' => 'Owner investments less withdrawals', 'amount' => round($ownerInvested - $ownerDraws, 2)],
+            ['key' => 'other_movements', 'label' => 'Drawer top-ups and adjustments', 'amount' => $otherMovements],
         ];
         $explained = $statement['net_profit'] + array_sum(array_column($bridge, 'amount'));
         if (abs($netChange - $explained) >= 0.01) {
@@ -580,49 +640,226 @@ class FinancialReportService
         return [
             'in' => $in,
             'out' => $out,
+            'other_movements' => $otherMovements,
             'total_in' => $totalIn,
             'total_out' => $totalOut,
             'net_change' => $netChange,
             'net_profit' => $statement['net_profit'],
             'bridge' => array_values(array_filter($bridge, fn ($row) => abs($row['amount']) >= 0.01)),
+            'account_balances' => $this->accountBalances($domain, $start->copy()->subDay()->toDateString(), $end->toDateString()),
             'money_in_by_method' => $moneyIn,
         ];
     }
 
     /**
-     * A simple picture of what the business owns and owes today. Whole business only: customer
-     * credit and supplier bills aren't kept per store.
+     * What the business owns and owes today, and what that leaves for the owner. Whole business
+     * only: customer credit, supplier bills, loans and accounts aren't kept per store.
      *
      * @return array<string, mixed>
      */
     public function balanceSheet(string $domain): array
     {
+        $today = today();
         $cash = $this->cashInDrawer($domain, null);
-        $inventory = $this->inventoryValue($domain, null);
+        $accounts = $this->accountBalances($domain, null, $today->toDateString())['accounts'];
         $receivables = round((float) Customer::query()->forDomain($domain)->where('credit_balance', '>', 0)->sum('credit_balance'), 2);
         $payables = round((float) SupplierBill::query()->forDomain($domain)->open()->get()->sum('remaining'), 2);
 
+        $fixedAssets = FixedAsset::query()->forDomain($domain)->get()
+            ->map(fn (FixedAsset $a) => ['name' => $a->name, 'category' => $a->category, 'cost' => (float) $a->cost, 'book_value' => $a->bookValueOn($today)])
+            ->filter(fn ($a) => $a['book_value'] > 0)
+            ->values();
+        $loans = Loan::query()->forDomain($domain)->get()
+            ->map(fn (Loan $l) => ['lender' => $l->lender, 'principal' => (float) $l->principal, 'balance' => $l->balanceOn()])
+            ->filter(fn ($l) => $l['balance'] > 0)
+            ->values();
+
+        $bankTotal = round(collect($accounts)->whereIn('type', ['bank', 'other'])->sum('balance'), 2);
+        $ewalletTotal = round(collect($accounts)->where('type', 'ewallet')->sum('balance'), 2);
+
         $assets = [
             ['key' => 'cash_in_drawer', 'label' => 'Cash in drawers (today, expected)', 'amount' => $cash['amount']],
-            ['key' => 'inventory', 'label' => 'Inventory (at cost)', 'amount' => $inventory],
+            ['key' => 'bank', 'label' => 'Bank accounts', 'amount' => $bankTotal],
+            ['key' => 'ewallet', 'label' => 'E-wallets (GCash, Maya…)', 'amount' => $ewalletTotal],
+            ['key' => 'inventory', 'label' => 'Inventory (at cost)', 'amount' => $this->inventoryValue($domain, null)],
             ['key' => 'receivables', 'label' => 'Owed to you by customers', 'amount' => $receivables],
+            ['key' => 'fixed_assets', 'label' => 'Equipment and other assets (after depreciation)', 'amount' => round($fixedAssets->sum('book_value'), 2)],
         ];
+        $otherLiabilities = OtherLiability::query()->forDomain($domain)->outstandingOn($today->toDateString())->orderBy('incurred_date')->get()
+            ->map(fn (OtherLiability $l) => ['name' => $l->name, 'category' => $l->category, 'amount' => (float) $l->amount, 'due_date' => $l->due_date?->toDateString()])
+            ->values();
+
         $liabilities = [
             ['key' => 'payables', 'label' => 'Owed to suppliers', 'amount' => $payables],
+            ['key' => 'loans', 'label' => 'Loans still owed', 'amount' => round($loans->sum('balance'), 2)],
+            ['key' => 'other_liabilities', 'label' => 'Other amounts owed (taxes, deposits, wages…)', 'amount' => round($otherLiabilities->sum('amount'), 2)],
         ];
         $totalAssets = round(array_sum(array_column($assets, 'amount')), 2);
         $totalLiabilities = round(array_sum(array_column($liabilities, 'amount')), 2);
+        $netWorth = round($totalAssets - $totalLiabilities, 2);
+
+        // Owner's side: what the owner put in (less what was taken out), the profit the business
+        // has made, and whatever is left over.
+        $invested = round((float) OwnerInvestment::query()->forDomain($domain)->sum('amount'), 2);
+        $withdrawn = round((float) WalletCashMovement::query()
+            ->forDomain($domain)
+            ->where('kind', 'owner_draw')
+            ->where(fn ($q) => $q->whereNull('notes')->orWhere('notes', '!=', WalletCashBridgeExpected::NOTE_ENDSHIFT_CASHOUT))
+            ->sum('amount'), 2);
+        $netContributed = round($invested - $withdrawn, 2);
+        ['amount' => $accumulatedProfit, 'since' => $profitSince] = $this->accumulatedProfit($domain);
 
         return [
-            'as_of' => today()->toDateString(),
+            'as_of' => $today->toDateString(),
             'assets' => $assets,
             'liabilities' => $liabilities,
             'total_assets' => $totalAssets,
             'total_liabilities' => $totalLiabilities,
-            'net_worth' => round($totalAssets - $totalLiabilities, 2),
+            'net_worth' => $netWorth,
+            'equity' => [
+                ['key' => 'owner_contributions', 'label' => 'Owner investments less withdrawals', 'amount' => $netContributed],
+                ['key' => 'accumulated_profit', 'label' => 'Accumulated profit (net profit to date)', 'amount' => $accumulatedProfit],
+                // What the records don't explain: balances the business already had before it used
+                // Techiko (stock, cash, equipment never entered as bought), and anything unrecorded.
+                ['key' => 'other_changes', 'label' => 'Opening balances and other changes', 'amount' => round($netWorth - $netContributed - $accumulatedProfit, 2)],
+            ],
+            'profit_since' => $profitSince,
+            'accounts' => $accounts,
+            'fixed_assets' => $fixedAssets->all(),
+            'loans' => $loans->all(),
+            'other_liabilities' => $otherLiabilities->all(),
             'cash_locations_counted' => $cash['locations_counted'],
-            'not_tracked' => ['Bank accounts', 'Equipment and other assets', 'Loans', 'Owner investments'],
+            'accounts_missing' => collect($accounts)->whereNull('as_of')->pluck('name')->all(),
         ];
+    }
+
+    /**
+     * Net profit from the business's first recorded sale up to today: the profit it has made and
+     * kept or paid out, as the income statement counts it.
+     *
+     * @return array{amount: float, since: string|null}
+     */
+    public function accumulatedProfit(string $domain): array
+    {
+        $first = Sale::query()->where('domain', $domain)->where('payment_status', 'paid')->min('transaction_date');
+        if ($first === null) {
+            return ['amount' => 0.0, 'since' => null];
+        }
+        $start = Carbon::parse($first)->startOfDay();
+
+        return [
+            'amount' => round($this->pnl->build($domain, $start, now()->endOfDay())['net_profit'], 2),
+            'since' => $start->toDateString(),
+        ];
+    }
+
+    /**
+     * Where the business stood at the end of the period before, from the daily snapshots, and how
+     * today compares: inventory, customer credit and cash only have a history this way.
+     *
+     * @return array<string, mixed>|null Null until a snapshot that old exists.
+     */
+    public function positionChange(string $domain, string $previousEnd, array $now): ?array
+    {
+        $then = FinancialSnapshot::onOrBefore($domain, $previousEnd);
+        // A much older snapshot would compare against the wrong time; better to say nothing.
+        if ($then === null || $then->as_of_date->lt(Carbon::parse($previousEnd)->subDays(7))) {
+            return null;
+        }
+
+        return [
+            'as_of' => $then->as_of_date->toDateString(),
+            'then' => [
+                'inventory_value' => $then->inventory_value,
+                'receivables' => $then->receivables,
+                'receivables_overdue' => $then->receivables_overdue,
+                'cash_balance' => $then->cashBalance(),
+                'payables' => $then->payables,
+                'net_worth' => $then->net_worth,
+            ],
+            'changes' => collect(['inventory_value', 'receivables', 'cash_balance', 'payables'])
+                ->mapWithKeys(fn ($key) => [$key => self::change($now[$key], match ($key) {
+                    'cash_balance' => $then->cashBalance(),
+                    default => $then->{$key},
+                })])
+                ->all(),
+        ];
+    }
+
+    /**
+     * Balances the owner recorded for each bank and e-wallet account: the latest on or before
+     * each day. A day before the first recorded balance shows null.
+     *
+     * @return array{accounts: list<array<string, mixed>>, opening_total: float|null, closing_total: float}
+     */
+    public function accountBalances(string $domain, ?string $openingDate, string $closingDate): array
+    {
+        $accounts = FinancialAccount::query()->forDomain($domain)->where('is_active', true)->with('paymentCardType')->orderBy('name')->get()
+            ->map(function (FinancialAccount $account) use ($openingDate, $closingDate) {
+                $closing = $account->positionOn($closingDate);
+
+                return [
+                    'id' => $account->id,
+                    'name' => $account->name,
+                    'type' => $account->type,
+                    'opening' => $openingDate ? $account->balanceOn($openingDate) : null,
+                    'balance' => $closing['balance'] ?? 0.0,
+                    'as_of' => $closing['as_of'],
+                    // Sales paid through the linked channel since that balance was entered.
+                    'received_since' => $closing['received'],
+                    'channel' => $account->paymentCardType?->name,
+                ];
+            });
+
+        return [
+            'accounts' => $accounts->all(),
+            'opening_total' => $openingDate && $accounts->isNotEmpty() ? round($accounts->sum(fn ($a) => $a['opening'] ?? 0), 2) : null,
+            'closing_total' => round($accounts->sum('balance'), 2),
+        ];
+    }
+
+    /**
+     * Stock that sells slowly: more than 90 days' worth at the last 30 days' pace, or not sold at
+     * all in that time (days_of_stock null). Most money tied up first.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function slowMovers(string $domain, ?int $locationId, int $limit = 10): array
+    {
+        $since = now()->subDays(30)->startOfDay();
+        $sold = SaleItem::query()
+            ->whereIn('sale_id', $this->paidSales($domain, $locationId, $since, now()->endOfDay())->select('sales.id'))
+            ->groupBy('product_id')
+            ->selectRaw('product_id, SUM(quantity) as quantity')
+            ->pluck('quantity', 'product_id');
+
+        return ProductInventory::query()
+            ->join('products', 'products.id', '=', 'product_inventory.product_id')
+            ->whereIn('product_inventory.location_id', $this->locationIds($domain, $locationId))
+            ->where('product_inventory.quantity_on_hand', '>', 0)
+            ->where('product_inventory.total_value', '>', 0)
+            ->groupBy('product_inventory.product_id', 'products.name')
+            ->select('product_inventory.product_id', 'products.name')
+            ->selectRaw('SUM(product_inventory.quantity_on_hand) as on_hand')
+            ->selectRaw('SUM(product_inventory.total_value) as value')
+            ->get()
+            ->map(function ($row) use ($sold) {
+                $perDay = (float) ($sold[$row->product_id] ?? 0) / 30;
+
+                return [
+                    'product_id' => (int) $row->product_id,
+                    'name' => $row->name,
+                    'on_hand' => (float) $row->on_hand,
+                    'value' => round((float) $row->value, 2),
+                    'sold_30_days' => (float) ($sold[$row->product_id] ?? 0),
+                    'days_of_stock' => $perDay > 0 ? (int) round($row->on_hand / $perDay) : null,
+                ];
+            })
+            ->filter(fn ($p) => $p['days_of_stock'] === null || $p['days_of_stock'] > 90)
+            ->sortByDesc('value')
+            ->take($limit)
+            ->values()
+            ->all();
     }
 
     /** @return array<string, mixed> */
