@@ -41,6 +41,11 @@ const paymentLabel = computed(() => {
         <div class="center bold big">{{ businessName }}</div>
         <div v-if="sale.location_name" class="center">{{ sale.location_name }}</div>
         <div class="center">OFFICIAL RECEIPT (REPRINT)</div>
+        <template v-if="sale.void">
+            <div class="center bold big">*** VOID ***</div>
+            <div class="center">Voided {{ sale.void.voided_at }}</div>
+            <div v-if="sale.void.reason" class="center">{{ sale.void.reason }}</div>
+        </template>
 
         <div class="rule" />
         <div class="row"><span>Invoice #</span><span>{{ sale.invoice_number || `#${sale.id}` }}</span></div>
@@ -90,7 +95,8 @@ const paymentLabel = computed(() => {
         <div v-else class="row"><span>Paid by</span><span>{{ paymentLabel }}</span></div>
 
         <div class="rule" />
-        <div class="center">Thank you!</div>
+        <div v-if="sale.void" class="center bold">*** VOID - NOT A VALID SALE ***</div>
+        <div v-else class="center">Thank you!</div>
     </div>
 </template>
 

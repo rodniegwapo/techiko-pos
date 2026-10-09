@@ -598,31 +598,28 @@ class InventoryService
 
         // Group by category and calculate stock levels
         $categoryData = $products->groupBy('category.name')->map(function ($categoryProducts) use ($location) {
-            $inStock = 0;
-            $lowStock = 0;
-            $outOfStock = 0;
+            // Product names per status, so the chart tooltip can say which products a bar holds.
+            $names = ['in_stock' => [], 'low_stock' => [], 'out_of_stock' => []];
 
             foreach ($categoryProducts as $product) {
                 $stockStatus = $product->getStockStatus($location);
 
-                switch ($stockStatus) {
-                    case 'in_stock':
-                        $inStock++;
-                        break;
-                    case 'low_stock':
-                        $lowStock++;
-                        break;
-                    case 'out_of_stock':
-                        $outOfStock++;
-                        break;
+                if (isset($names[$stockStatus])) {
+                    $names[$stockStatus][] = $product->name;
                 }
             }
 
             return [
+                'category_id' => $categoryProducts->first()->category_id,
                 'name' => $categoryProducts->first()->category->name ?? 'Uncategorized',
-                'in_stock' => $inStock,
-                'low_stock' => $lowStock,
-                'out_of_stock' => $outOfStock,
+                'in_stock' => count($names['in_stock']),
+                'low_stock' => count($names['low_stock']),
+                'out_of_stock' => count($names['out_of_stock']),
+                'products' => array_map(function (array $list) {
+                    sort($list, SORT_NATURAL | SORT_FLAG_CASE);
+
+                    return $list;
+                }, $names),
             ];
         })->values()->toArray();
 

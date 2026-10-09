@@ -56,7 +56,7 @@ test.describe("Inventory dashboard (admin)", () => {
 
         const { report } = await pageProps(page);
         for (const category of fixture().categories) {
-            expect(report.category_stock_data).toContainEqual(category);
+            expect(report.category_stock_data).toContainEqual(expect.objectContaining(category));
         }
         await expect(page.locator(".apexcharts-canvas")).toBeVisible();
     });

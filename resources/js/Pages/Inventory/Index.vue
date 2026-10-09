@@ -123,6 +123,61 @@ const quickActions = computed(() => {
 
 // Chart Setup
 const chartColors = ["#10B981", "#F59E0B", "#EF4444"];
+// Series order matches the bars: In Stock, Low Stock, Out of Stock.
+const chartStatuses = ["in_stock", "low_stock", "out_of_stock"];
+const TOOLTIP_MAX_NAMES = 10;
+
+const escapeHtml = (text) =>
+    String(text ?? "").replace(
+        /[&<>"']/g,
+        (ch) =>
+            ({
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                '"': "&quot;",
+                "'": "&#39;",
+            })[ch],
+    );
+
+// Tooltip lists the products behind the hovered bar segment.
+const stockTooltip = (categories) => ({ seriesIndex, dataPointIndex, w }) => {
+    const category = categories[dataPointIndex];
+    if (!category) return "";
+
+    const status = chartStatuses[seriesIndex];
+    const names = category.products?.[status] || [];
+    const shown = names.slice(0, TOOLTIP_MAX_NAMES);
+    const more = names.length - shown.length;
+
+    const list = shown
+        .map((name) => `<li>${escapeHtml(name)}</li>`)
+        .join("");
+
+    return `
+        <div style="padding:8px 10px;max-width:260px;font-size:12px">
+            <div style="font-weight:600;margin-bottom:4px">${escapeHtml(category.name)}</div>
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+                <span style="width:8px;height:8px;border-radius:50%;background:${chartColors[seriesIndex]}"></span>
+                ${escapeHtml(w.globals.seriesNames[seriesIndex])}: <b>${names.length} product${names.length === 1 ? "" : "s"}</b>
+            </div>
+            <ul style="margin:0;padding-left:16px;white-space:normal">${list}</ul>
+            ${more > 0 ? `<div style="color:#6B7280">and ${more} more</div>` : ""}
+            <div style="color:#6B7280;margin-top:4px">Click to view these products</div>
+        </div>`;
+};
+
+// Clicking a bar segment opens Inventory > Products for that category and stock level.
+const openChartSegment = (categories, seriesIndex, dataPointIndex) => {
+    const category = categories[dataPointIndex];
+    if (!category) return;
+
+    navigateToProducts({
+        stock_status: chartStatuses[seriesIndex],
+        ...(category.category_id ? { category_id: category.category_id } : {}),
+    });
+};
+
 const stockLevelChart = computed(() => {
     const categories = props.report?.category_stock_data || [];
     const series = [
@@ -144,6 +199,16 @@ const stockLevelChart = computed(() => {
                     easing: "easeinout",
                     speed: 800,
                 },
+                events: {
+                    dataPointSelection: (_event, _ctx, { seriesIndex, dataPointIndex }) =>
+                        openChartSegment(categories, seriesIndex, dataPointIndex),
+                    dataPointMouseEnter: (event) => {
+                        if (event?.target) event.target.style.cursor = "pointer";
+                    },
+                },
+            },
+            states: {
+                active: { filter: { type: "none" } },
             },
             plotOptions: {
                 bar: { horizontal: false, columnWidth: "60%", borderRadius: 4 },
@@ -175,11 +240,7 @@ const stockLevelChart = computed(() => {
                 strokeDashArray: 4,
             },
             tooltip: {
-                y: {
-                    formatter: function (val) {
-                        return val.toLocaleString() + " products";
-                    },
-                },
+                custom: stockTooltip(categories),
             },
             responsive: [
                 {

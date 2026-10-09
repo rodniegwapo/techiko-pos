@@ -668,10 +668,9 @@ class SaleController extends Controller
     public function storeDraft(Request $request, Domain $domain)
     {
         $user = $request->user();
-        $userRole = $user->roles()->first();
 
-        if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
-            // Admin/Super Admin: Use Helpers::getActiveLocation()
+        if ($this->worksInSwitchedStore()) {
+            // Not tied to one store: the store picked in the header
             $location = Helpers::getActiveLocation($domain);
             $locationId = $location?->id;
         } else {
@@ -860,6 +859,18 @@ class SaleController extends Controller
         ]);
     }
 
+    /**
+     * Whether the signed-in user's cart lives in the store they picked in the header (anyone not
+     * tied to one store), rather than their assigned store. Same rule as the store switcher, so
+     * the cart and its stock check use the store the POS shows, whatever the role is called.
+     */
+    private function worksInSwitchedStore(): bool
+    {
+        $user = auth()->user();
+
+        return $user !== null && ! $user->hasLocationRestriction();
+    }
+
     public function voidItem(Request $request, Domain $domain, Sale $sale)
     {
         $validated = $request->validate([
@@ -1015,7 +1026,6 @@ class SaleController extends Controller
     {
         $userId = auth()->id();
         $currentUser = auth()->user();
-        $userRole = $currentUser ? $currentUser->roles()->first() : null;
 
         $query = Sale::forDomain($domain->name_slug)
             ->pending()
@@ -1024,8 +1034,8 @@ class SaleController extends Controller
             ->with(['saleItems.product', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount', 'saleItems.discounts']);
 
         // Apply location-based filtering based on user role
-        if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
-            // Admin/Super Admin: Use active location
+        if ($this->worksInSwitchedStore()) {
+            // Not tied to one store: the store picked in the header
             $location = Helpers::getActiveLocation($domain);
             if ($location) {
                 $query->where('location_id', $location->id);
@@ -1056,10 +1066,9 @@ class SaleController extends Controller
 
         // Determine location based on current user's role
         $currentUser = auth()->user();
-        $userRole = $currentUser ? $currentUser->roles()->first() : null;
 
-        if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
-            // Admin/Super Admin: Use Helpers::getActiveLocation()
+        if ($this->worksInSwitchedStore()) {
+            // Not tied to one store: the store picked in the header
             $location = Helpers::getActiveLocation($domain);
             $locationId = $location?->id;
         } else {
@@ -1097,7 +1106,6 @@ class SaleController extends Controller
         $user = $this->cartUserInDomain($request, $domain);
 
         $currentUser = auth()->user();
-        $userRole = $currentUser->roles()->first();
 
         $query = Sale::forDomain($domain->name_slug)
             ->pending()
@@ -1105,8 +1113,8 @@ class SaleController extends Controller
             ->orderBy('created_at', 'desc');
 
         // Apply location-based filtering based on user role
-        if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
-            // Admin/Super Admin: Use active location
+        if ($this->worksInSwitchedStore()) {
+            // Not tied to one store: the store picked in the header
             $location = Helpers::getActiveLocation($domain);
             if ($location) {
                 $query->where('location_id', $location->id);
@@ -1122,10 +1130,9 @@ class SaleController extends Controller
         // If no pending sale exists, create one with location
         if (! $sale) {
             $currentUser = auth()->user();
-            $userRole = $currentUser ? $currentUser->roles()->first() : null;
 
-            if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
-                // Admin/Super Admin: Use Helpers::getActiveLocation()
+            if ($this->worksInSwitchedStore()) {
+                // Not tied to one store: the store picked in the header
                 $location = Helpers::getActiveLocation($domain);
                 $locationId = $location?->id;
             } else {
@@ -1185,7 +1192,6 @@ class SaleController extends Controller
         $userId = $request->route('user');
 
         $currentUser = auth()->user();
-        $userRole = $currentUser->roles()->first();
 
         $query = Sale::forDomain($domain->name_slug)
             ->pending()
@@ -1193,8 +1199,8 @@ class SaleController extends Controller
             ->with(['saleItems.product', 'saleItems.modifiers', 'saleItems.discounts', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount']);
 
         // Apply location-based filtering based on user role
-        if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
-            // Admin/Super Admin: Use active location
+        if ($this->worksInSwitchedStore()) {
+            // Not tied to one store: the store picked in the header
             $location = Helpers::getActiveLocation($domain);
             if ($location) {
                 $query->where('location_id', $location->id);
@@ -1282,15 +1288,14 @@ class SaleController extends Controller
         $userId = $request->route('user');
 
         $currentUser = auth()->user();
-        $userRole = $currentUser->roles()->first();
 
         $query = Sale::forDomain($domain->name_slug)
             ->pending()
             ->orderBy('created_at', 'desc');
 
         // Apply location-based filtering based on user role
-        if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
-            // Admin/Super Admin: Use active location
+        if ($this->worksInSwitchedStore()) {
+            // Not tied to one store: the store picked in the header
             $location = Helpers::getActiveLocation($domain);
             if ($location) {
                 $query->where('location_id', $location->id);
@@ -1349,15 +1354,14 @@ class SaleController extends Controller
         $userId = $request->route('user');
 
         $currentUser = auth()->user();
-        $userRole = $currentUser->roles()->first();
 
         $query = Sale::forDomain($domain->name_slug)
             ->pending()
             ->orderBy('created_at', 'desc');
 
         // Apply location-based filtering based on user role (same as updateUserCartQuantity)
-        if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
-            // Admin/Super Admin: Use active location
+        if ($this->worksInSwitchedStore()) {
+            // Not tied to one store: the store picked in the header
             $location = Helpers::getActiveLocation($domain);
             if ($location) {
                 $query->where('location_id', $location->id);
@@ -1404,7 +1408,6 @@ class SaleController extends Controller
         // Explicitly get the 'user' parameter from the route
         $userId = $request->route('user');
         $currentUser = auth()->user();
-        $userRole = $currentUser ? $currentUser->roles()->first() : null;
 
         $query = Sale::forDomain($domain->name_slug)
             ->pending()
@@ -1413,8 +1416,8 @@ class SaleController extends Controller
             ->with(['saleItems.product', 'saleItems.modifiers', 'saleItems.discounts', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount']);
 
         // Apply location-based filtering based on user role
-        if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
-            // Admin/Super Admin: Use active location
+        if ($this->worksInSwitchedStore()) {
+            // Not tied to one store: the store picked in the header
             $location = Helpers::getActiveLocation($domain);
             if ($location) {
                 $query->where('location_id', $location->id);

@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { FilterOutlined } from '@ant-design/icons-vue'
+import { dateRangePresets } from '@/Composables/useDateRangePresets'
 
 const props = defineProps({
     title: { type: String, default: 'Filters' },
@@ -133,6 +134,7 @@ const countActiveFilters = computed(
                                 v-else-if="filter.type === 'range'"
                                 :value="formState[filter.key]"
                                 @change="(val) => updateValue(filter.key, val)"
+                                :ranges="dateRangePresets()"
                                 format="ddd, MMM DD, YYYY"
                                 :allowClear="true"
                             />

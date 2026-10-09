@@ -186,6 +186,7 @@ Route::prefix('domains/{domain:name_slug}')
         Route::get('/sales-history', [SalesHistoryController::class, 'index'])->name('sales-history.index');
         Route::get('/sales-history/export', [SalesHistoryController::class, 'export'])->name('sales-history.export');
         Route::get('/sales-history/{sale}', [SalesHistoryController::class, 'show'])->whereNumber('sale')->name('sales-history.show');
+        Route::post('/sales-history/{sale}/void', [SalesHistoryController::class, 'void'])->whereNumber('sale')->name('sales-history.void');
 
         // Wallet — money movement (cash control + ledger); distinct URL from card-type setup
         Route::get('/wallet/money-movement', [PaymentCardTypeController::class, 'moneyMovement'])->name('wallet.money-movement');

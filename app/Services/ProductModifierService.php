@@ -83,7 +83,9 @@ class ProductModifierService
             ->first();
 
         if ($line) {
-            $line->increment('quantity', $quantity);
+            // save(), not increment(): increment skips the saving hook that keeps the line subtotal right.
+            $line->quantity += $quantity;
+            $line->save();
 
             return $line;
         }

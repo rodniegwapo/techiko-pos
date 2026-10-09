@@ -89,7 +89,10 @@ const switchLocation = async (location) => {
         // Show error notification
         notification.error({
             message: "Location Update Failed",
-            description: "Failed to switch location. Please try again.",
+            // Show the server's reason (e.g. inactive store, no access) when it gives one.
+            description:
+                error.response?.data?.message ||
+                "Failed to switch location. Please try again.",
             duration: 5,
         });
     }

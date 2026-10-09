@@ -1,11 +1,24 @@
 import { ref, onMounted, onBeforeUnmount } from "vue";
 
-export function useBarcodeScanner(onScan) {
+/**
+ * @param {Function} onScan
+ * @param {{ ignoreDialogs?: boolean }} options  ignoreDialogs: keys typed inside a modal or drawer
+ *        (e.g. a void PIN) are not treated as a scan.
+ */
+export function useBarcodeScanner(onScan, { ignoreDialogs = false } = {}) {
     const barcodeBuffer = ref("");
     const lastKeyTime = ref(0);
     const BARCODE_DELAY = 50; // ms
 
     const handleGlobalKeydown = (e) => {
+        if (
+            ignoreDialogs &&
+            e.target?.closest?.(".ant-modal, .ant-drawer, [role='dialog']")
+        ) {
+            barcodeBuffer.value = "";
+            return;
+        }
+
         const tagName = e.target.tagName;
         const isInput = tagName === "INPUT" || tagName === "TEXTAREA";
 

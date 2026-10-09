@@ -10,6 +10,7 @@ use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\User;
 use App\Models\VoidLog;
+use App\Services\SaleService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -26,7 +27,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class SalesHistoryController extends Controller
 {
     /** Statuses a sale can have once it has left the cart. */
-    private const STATUSES = ['paid', 'partial', 'refunded'];
+    private const STATUSES = ['paid', 'partial', 'refunded', 'voided'];
 
     private const PAYMENT_METHODS = ['cash', 'card', 'e-wallet', 'bank', 'credit', 'split'];
 
@@ -35,20 +36,24 @@ class SalesHistoryController extends Controller
         $filters = $this->resolveFilters($request, $domain);
         $query = $this->baseQuery($domain, $filters);
 
-        $summary = (clone $query)
+        // Voided sales stay in the list but count for nothing in the totals.
+        $counted = (clone $query)->where('payment_status', '!=', 'voided');
+
+        $summary = (clone $counted)
             ->selectRaw('COUNT(*) as sales_count')
             ->selectRaw('COALESCE(SUM(total_amount), 0) as gross')
             ->selectRaw('COALESCE(SUM(discount_amount), 0) as discounts')
             ->selectRaw('COALESCE(SUM(tax_amount), 0) as vat')
             ->selectRaw('COALESCE(SUM(grand_total), 0) as net')
             ->first();
-        $salesWithVoids = (clone $query)->whereHas('saleItems', fn ($q) => $q->onlyTrashed())->count();
+        $salesWithVoids = (clone $counted)->whereHas('saleItems', fn ($q) => $q->onlyTrashed())->count();
+        $voidedSales = (clone $query)->where('payment_status', 'voided')->count();
 
         // Profit reveals product costs, so only staff who see all sales get it.
         $profitSummary = [];
         if ($this->canSeeAllSales($request->user())) {
             // Voided lines are soft-deleted, so they drop out of cost of goods sold on their own.
-            $soldItems = SaleItem::query()->whereIn('sale_id', (clone $query)->select('sales.id'));
+            $soldItems = SaleItem::query()->whereIn('sale_id', (clone $counted)->select('sales.id'));
             $cogs = (float) (clone $soldItems)->whereNotNull('unit_cost')->sum(DB::raw('unit_cost * quantity'));
             $profitSummary = [
                 'cogs' => round($cogs, 2),
@@ -83,6 +88,7 @@ class SalesHistoryController extends Controller
                 'vat' => round((float) $summary->vat, 2),
                 'net' => round((float) $summary->net, 2),
                 'sales_with_voids' => $salesWithVoids,
+                'voided_sales' => $voidedSales,
                 ...$profitSummary,
             ],
             'options' => [
@@ -115,6 +121,8 @@ class SalesHistoryController extends Controller
         $sale->load([
             'customer:id,name',
             'user:id,name',
+            'voidedBy:id,name',
+            'voidApprovedBy:id,name',
             'location:id,name',
             'paymentCardType:id,name',
             'payments.paymentCardType:id,name',
@@ -152,6 +160,13 @@ class SalesHistoryController extends Controller
             'payment_reference' => $sale->payment_reference,
             'payments' => $sale->payments->map->toDisplayArray()->all(),
             'payment_status' => $sale->payment_status,
+            'void' => $sale->payment_status === 'voided' ? [
+                'voided_at' => $sale->voided_at ? Carbon::parse($sale->voided_at)->timezone($timezone)->format('Y-m-d h:i A') : null,
+                'voided_by' => $sale->voidedBy?->name,
+                'approved_by' => $sale->voidApprovedBy?->name,
+                'reason' => $sale->void_reason,
+            ] : null,
+            'can_void' => in_array($sale->payment_status, ['paid', 'partial'], true),
             'is_credit_sale' => (bool) $sale->is_credit_sale,
             'notes' => $sale->notes,
             'total_amount' => round((float) $sale->total_amount, 2),
@@ -169,7 +184,8 @@ class SalesHistoryController extends Controller
                 'quantity' => (float) $item->quantity,
                 'unit_price' => round((float) $item->unit_price, 2),
                 'discount' => round((float) $item->discount, 2),
-                'subtotal' => round((float) $item->subtotal, 2),
+                // Worked out, not read: older lines whose quantity was bumped kept a stale stored subtotal.
+                'subtotal' => round(max(0, (float) $item->unit_price * (float) $item->quantity - (float) $item->discount), 2),
                 'voided' => $item->trashed(),
             ])->values(),
             'discounts' => $sale->saleDiscounts->map(function ($saleDiscount) {
@@ -195,6 +211,28 @@ class SalesHistoryController extends Controller
             ])->values(),
             'profit' => $profit,
         ]);
+    }
+
+    /**
+     * Void a completed sale, approved with a manager PIN (same rule as voiding a cart item).
+     */
+    public function void(Request $request, Domain $domain, Sale $sale, SaleService $saleService): JsonResponse
+    {
+        if ($sale->domain !== $domain->name_slug || ! in_array($sale->payment_status, self::STATUSES, true)) {
+            abort(404);
+        }
+        if (! $this->canSeeAllSales($request->user()) && (int) $sale->user_id !== (int) $request->user()->id) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'pin_code' => ['required', 'string'],
+            'reason' => ['required', 'string', 'max:255'],
+        ]);
+
+        $saleService->voidSale($sale, $request->user(), $validated['pin_code'], trim($validated['reason']));
+
+        return response()->json(['message' => 'Sale voided.']);
     }
 
     /**

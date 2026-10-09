@@ -550,7 +550,8 @@ const processScan = (code) => {
     handleScanAndAdd(trimmed);
 };
 
-useBarcodeScanner(processScan);
+// Keys typed in dialogs (void PIN, payment, discount) must not land in the product search.
+useBarcodeScanner(processScan, { ignoreDialogs: true });
 
 const handleScanAndAdd = async (scannedCode) => {
     const code = String(scannedCode ?? "").trim();

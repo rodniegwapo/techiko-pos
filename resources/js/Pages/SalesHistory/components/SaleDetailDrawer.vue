@@ -2,42 +2,81 @@
 import { computed, ref, watch } from "vue";
 import axios from "axios";
 import { message } from "ant-design-vue";
-import { IconPrinter } from "@tabler/icons-vue";
+import { IconPrinter, IconReceiptOff } from "@tabler/icons-vue";
 import SaleReceipt from "@/Components/Receipt/SaleReceipt.vue";
+import VoidProductModal from "@/Pages/Sales/components/VoidProductModal.vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useHelpers } from "@/Composables/useHelpers";
+import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 
 const props = defineProps({
     saleId: { type: [Number, null], default: null },
     businessName: { type: String, default: "" },
 });
-const emit = defineEmits(["close"]);
+const emit = defineEmits(["close", "voided"]);
 
 const { getRoute } = useDomainRoutes();
 const { formattedTotal } = useHelpers();
+const { hasPermission } = usePermissionsV2();
 
 const loading = ref(false);
 const sale = ref(null);
 
 const open = computed(() => props.saleId !== null);
 
+const loadSale = async (id) => {
+    loading.value = true;
+    try {
+        const { data } = await axios.get(getRoute("sales-history.show", { sale: id }));
+        sale.value = data;
+    } catch (e) {
+        message.error("Could not load this sale.");
+        emit("close");
+    } finally {
+        loading.value = false;
+    }
+};
+
 watch(
     () => props.saleId,
-    async (id) => {
+    (id) => {
         sale.value = null;
         if (id === null) return;
-        loading.value = true;
-        try {
-            const { data } = await axios.get(getRoute("sales-history.show", { sale: id }));
-            sale.value = data;
-        } catch (e) {
-            message.error("Could not load this sale.");
-            emit("close");
-        } finally {
-            loading.value = false;
-        }
+        loadSale(id);
     },
 );
+
+// Void the whole receipt: manager PIN and a reason, like voiding a cart item.
+const canVoid = computed(() => sale.value?.can_void && hasPermission("sales-history.void"));
+const voidVisible = ref(false);
+const voidLoading = ref(false);
+const voidErrors = ref({});
+
+const openVoid = () => {
+    voidErrors.value = {};
+    voidVisible.value = true;
+};
+
+const submitVoid = async ({ pin_code, reason }) => {
+    voidLoading.value = true;
+    voidErrors.value = {};
+    try {
+        await axios.post(getRoute("sales-history.void", { sale: sale.value.id }), { pin_code, reason });
+        voidVisible.value = false;
+        message.success("Sale voided. Its stock was returned to the store.");
+        await loadSale(sale.value.id);
+        emit("voided");
+    } catch (e) {
+        const errors = e.response?.data?.errors || {};
+        voidErrors.value = errors;
+        // Errors not tied to the PIN or reason (e.g. a credit sale already paid on) go in a toast.
+        if (!errors.pin_code && !errors.reason) {
+            message.error(errors.sale?.[0] || e.response?.data?.message || "Could not void this sale.");
+        }
+    } finally {
+        voidLoading.value = false;
+    }
+};
 
 /** vue3-print-nb finds the node by id; bind v-print to a native element so the click always attaches. */
 const printOptions = computed(() => ({
@@ -46,7 +85,7 @@ const printOptions = computed(() => ({
 }));
 
 const statusColor = (status) =>
-    ({ paid: "green", partial: "orange", refunded: "red" })[status] || "default";
+    ({ paid: "green", partial: "orange", refunded: "red", voided: "red" })[status] || "default";
 
 const itemColumns = [
     { title: "Item", key: "product_name", dataIndex: "product_name" },
@@ -66,6 +105,20 @@ const itemColumns = [
     >
         <a-spin :spinning="loading">
             <div v-if="sale" class="space-y-5" data-testid="sale-detail">
+                <a-alert
+                    v-if="sale.void"
+                    type="error"
+                    show-icon
+                    message="This sale was voided"
+                    data-testid="sale-voided"
+                >
+                    <template #description>
+                        {{ sale.void.voided_at }} · by {{ sale.void.voided_by || "—" }}
+                        <span v-if="sale.void.approved_by"> · approved by {{ sale.void.approved_by }}</span>
+                        <div v-if="sale.void.reason">Reason: {{ sale.void.reason }}</div>
+                        <div class="text-xs">Its stock was returned, and it no longer counts in sales totals or the cash drawer.</div>
+                    </template>
+                </a-alert>
                 <a-descriptions :column="2" size="small" bordered>
                     <a-descriptions-item label="Date" :span="2">{{ sale.transaction_date_display }}</a-descriptions-item>
                     <a-descriptions-item label="Cashier">{{ sale.cashier_name || "—" }}</a-descriptions-item>
@@ -209,7 +262,17 @@ const itemColumns = [
         </a-spin>
 
         <template #footer>
-            <div class="flex justify-end">
+            <div class="flex justify-end gap-2">
+                <a-button
+                    v-if="canVoid"
+                    danger
+                    class="flex items-center gap-2"
+                    data-testid="void-sale"
+                    @click="openVoid"
+                >
+                    <template #icon><IconReceiptOff :size="18" /></template>
+                    Void receipt
+                </a-button>
                 <span v-print="printOptions">
                     <a-button type="primary" :disabled="!sale" class="flex items-center gap-2">
                         <template #icon><IconPrinter :size="18" /></template>
@@ -218,5 +281,17 @@ const itemColumns = [
                 </span>
             </div>
         </template>
+
+        <VoidProductModal
+            v-if="sale"
+            v-model:visible="voidVisible"
+            title="Void Receipt"
+            item-field-label="Invoice"
+            :amount="formattedTotal(sale.grand_total)"
+            :item-label="sale.invoice_number || `#${sale.id}`"
+            :submit-loading="voidLoading"
+            :errors="voidErrors"
+            @submit="submitVoid"
+        />
     </a-drawer>
 </template>
