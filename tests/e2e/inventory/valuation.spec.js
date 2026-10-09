@@ -25,9 +25,9 @@ const unitsInStock = () => inStock().reduce((total, p) => total + p.qty, 0);
 const rows = (page) => page.locator(".ant-table-tbody tr.ant-table-row");
 const rowWith = (page, text) => rows(page).filter({ hasText: text });
 const cell = (row, name) =>
-    row.locator("td").nth(["product", "sku", "quantity", "cost", "value", "movement"].indexOf(name));
+    row.locator("td").nth(["product", "sku", "quantity", "cost", "value", "price", "retail", "movement"].indexOf(name));
 
-/** One of the three totals above the table, e.g. card(page, "Total Quantity"). */
+/** One of the totals above the table, e.g. card(page, "Total Quantity"). */
 const card = (page, label) => page.locator("div.bg-gray-50.rounded-lg.p-6").filter({ hasText: label });
 
 async function openValuation(page, url = storeUrl()) {

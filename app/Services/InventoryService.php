@@ -598,35 +598,80 @@ class InventoryService
 
         // Group by category and calculate stock levels
         $categoryData = $products->groupBy('category.name')->map(function ($categoryProducts) use ($location) {
-            $inStock = 0;
-            $lowStock = 0;
-            $outOfStock = 0;
+            // Product names per status, so the chart tooltip can say which products a bar holds.
+            $names = ['in_stock' => [], 'low_stock' => [], 'out_of_stock' => []];
 
             foreach ($categoryProducts as $product) {
                 $stockStatus = $product->getStockStatus($location);
 
-                switch ($stockStatus) {
-                    case 'in_stock':
-                        $inStock++;
-                        break;
-                    case 'low_stock':
-                        $lowStock++;
-                        break;
-                    case 'out_of_stock':
-                        $outOfStock++;
-                        break;
+                if (isset($names[$stockStatus])) {
+                    $names[$stockStatus][] = $product->name;
                 }
             }
 
             return [
+                'category_id' => $categoryProducts->first()->category_id,
                 'name' => $categoryProducts->first()->category->name ?? 'Uncategorized',
-                'in_stock' => $inStock,
-                'low_stock' => $lowStock,
-                'out_of_stock' => $outOfStock,
+                'in_stock' => count($names['in_stock']),
+                'low_stock' => count($names['low_stock']),
+                'out_of_stock' => count($names['out_of_stock']),
+                'products' => array_map(function (array $list) {
+                    sort($list, SORT_NATURAL | SORT_FLAG_CASE);
+
+                    return $list;
+                }, $names),
             ];
         })->values()->toArray();
 
         return $categoryData;
+    }
+
+    /**
+     * Move several products from one store to another in one go: all of them move, or none do.
+     * Every product short at the source is reported together, not just the first.
+     *
+     * @param  array<int, array{product: Product, quantity: float}>  $items
+     */
+    public function transferMany(array $items, InventoryLocation $fromLocation, InventoryLocation $toLocation, User $user, ?string $notes = null): void
+    {
+        DB::transaction(function () use ($items, $fromLocation, $toLocation, $user, $notes) {
+            // Check before moving anything; a product listed twice needs both rows' worth.
+            $requested = [];
+            foreach ($items as $item) {
+                $id = $item['product']->id;
+                $requested[$id] = ($requested[$id] ?? 0) + $item['quantity'];
+            }
+
+            $short = [];
+            foreach ($items as $item) {
+                $product = $item['product'];
+                if (! isset($requested[$product->id])) {
+                    continue; // already checked
+                }
+                $wanted = $requested[$product->id];
+                unset($requested[$product->id]);
+
+                $inventory = $this->getOrCreateInventory($product, $fromLocation);
+                if (! $inventory->isInStock($wanted)) {
+                    $available = max(0, (int) $inventory->quantity_available);
+                    $short[] = [
+                        'product_id' => $product->id,
+                        'product_name' => $product->name,
+                        'requested_quantity' => (int) $wanted,
+                        'available_quantity' => $available,
+                        'shortage' => (int) $wanted - $available,
+                    ];
+                }
+            }
+
+            if ($short !== []) {
+                throw new InsufficientStockException($short);
+            }
+
+            foreach ($items as $item) {
+                $this->transferInventory($item['product'], $fromLocation, $toLocation, $item['quantity'], $user, $notes);
+            }
+        });
     }
 
     /**
@@ -662,6 +707,9 @@ class InventoryService
                 'user_id' => $user->id,
                 'notes' => $notes ?? "Transfer to {$toLocation->name}",
             ]);
+
+            // The destination store only lists products assigned to it, so assign the product there first.
+            $this->ensureProductAssignedToLocation($product, $toLocation);
 
             // Record transfer in
             $this->recordMovement([

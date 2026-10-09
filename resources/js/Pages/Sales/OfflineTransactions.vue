@@ -83,7 +83,17 @@ watch(
 const lineItems = ref([{ product_id: "", quantity: 1, unit_price: "" }]);
 const paymentMethod = ref("cash");
 const selectedPaymentCardTypeId = ref(null);
+const paymentReference = ref("");
 const cardTypes = ref([]);
+
+/** Card, e-wallet and bank payments name the channel used; each lists only its own kind. */
+const CHANNEL_KIND = { card: "card", "e-wallet": "ewallet", bank: "bank" };
+const CHANNEL_LABEL = { card: "Card payment type", ewallet: "E-wallet", bank: "Bank" };
+const channelKind = computed(() => CHANNEL_KIND[paymentMethod.value] ?? null);
+const channelsOfKind = (kind) => cardTypes.value.filter((t) => (t.kind || "card") === kind);
+const channelOptions = computed(() =>
+    channelKind.value ? channelsOfKind(channelKind.value) : [],
+);
 const loadingCardTypes = ref(false);
 const notes = ref("");
 const customerId = ref("");
@@ -111,9 +121,11 @@ async function fetchCardTypes() {
     }
 }
 
-watch(paymentMethod, (v) => {
-    if (v !== "card") {
-        selectedPaymentCardTypeId.value = null;
+watch(paymentMethod, () => {
+    // A channel of another kind (or none, for cash) doesn't carry over.
+    selectedPaymentCardTypeId.value = null;
+    if (!["e-wallet", "bank"].includes(paymentMethod.value)) {
+        paymentReference.value = "";
     }
 });
 
@@ -162,7 +174,7 @@ const captureDisabled = computed(() => {
             Number(r.unit_price) >= 0,
     );
     if (rows.length < 1) return true;
-    if (paymentMethod.value === "card") {
+    if (channelKind.value) {
         if (!hasPermission("payment-card-types.list")) return true;
         if (!selectedPaymentCardTypeId.value) return true;
     }
@@ -172,6 +184,7 @@ const captureDisabled = computed(() => {
 function closeCaptureModal() {
     captureModalVisible.value = false;
     selectedPaymentCardTypeId.value = null;
+    paymentReference.value = "";
     paymentMethod.value = "cash";
 }
 
@@ -185,11 +198,9 @@ async function saveOfflineSale() {
         return;
     }
 
-    if (paymentMethod.value === "card") {
-        if (!selectedPaymentCardTypeId.value) {
-            message.error("Select a card payment type.");
-            return;
-        }
+    if (channelKind.value && !selectedPaymentCardTypeId.value) {
+        message.error(`Select the ${CHANNEL_LABEL[channelKind.value].toLowerCase()}.`);
+        return;
     }
 
     const items = lineItems.value
@@ -215,12 +226,15 @@ async function saveOfflineSale() {
         items,
         payment_method: paymentMethod.value,
         payment_card_type_id:
-            paymentMethod.value === "card" && selectedPaymentCardTypeId.value
+            channelKind.value && selectedPaymentCardTypeId.value
                 ? Number(selectedPaymentCardTypeId.value)
                 : null,
         payment_card_type_name:
-            paymentMethod.value === "card" && selectedType?.name
-                ? selectedType.name
+            channelKind.value && selectedType?.name ? selectedType.name : null,
+        payment_reference:
+            ["e-wallet", "bank"].includes(paymentMethod.value) &&
+            paymentReference.value.trim()
+                ? paymentReference.value.trim()
                 : null,
         location_id: selectedLocationId.value,
         cashier_user_id: cashierUserId.value,
@@ -263,14 +277,20 @@ function lineTotals(items) {
 
 function paymentDisplay(record) {
     const method = record.payload?.payment_method || "—";
+    if (method === "split") {
+        return (record.payload?.payments || [])
+            .map((p) => `${p.method} ${Number(p.amount).toFixed(2)}`)
+            .join(" + ");
+    }
     const name = record.payload?.payment_card_type_name;
-    if (method === "card" && name) {
-        return `card · ${name}`;
+    const ref = record.payload?.payment_reference;
+    let text = method;
+    if (CHANNEL_KIND[method] && name) {
+        text = `${method} · ${name}`;
+    } else if (CHANNEL_KIND[method] && record.payload?.payment_card_type_id) {
+        text = `${method} · #${record.payload.payment_card_type_id}`;
     }
-    if (method === "card" && record.payload?.payment_card_type_id) {
-        return `card · #${record.payload.payment_card_type_id}`;
-    }
-    return method;
+    return ref ? `${text} · Ref ${ref}` : text;
 }
 
 function lineSummary(record) {
@@ -758,30 +778,43 @@ function tableRowClassName(_record, index) {
                         >
                             Card
                         </a-select-option>
-                        <a-select-option value="e-wallet"
+                        <a-select-option
+                            value="e-wallet"
+                            :disabled="
+                                !hasPermission('payment-card-types.list') ||
+                                (!loadingCardTypes && channelsOfKind('ewallet').length === 0)
+                            "
                             >E-wallet</a-select-option
+                        >
+                        <a-select-option
+                            value="bank"
+                            :disabled="
+                                !hasPermission('payment-card-types.list') ||
+                                (!loadingCardTypes && channelsOfKind('bank').length === 0)
+                            "
+                            >Bank</a-select-option
                         >
                     </a-select>
                     <p
                         v-if="
-                            paymentMethod === 'card' &&
+                            channelKind &&
                             !loadingCardTypes &&
-                            cardTypes.length === 0 &&
+                            channelOptions.length === 0 &&
                             hasPermission('payment-card-types.list')
                         "
                         class="mt-1 text-xs text-amber-700"
                     >
-                        No card types configured. Add types in Payment wallet
+                        None set up yet. Add them under Payment channels
                         while online.
                     </p>
                 </div>
                 <div
-                    v-if="paymentMethod === 'card'"
+                    v-if="channelKind"
                     class="md:col-span-2"
                 >
-                    <label class="mb-1 block text-sm text-gray-600"
-                        >Card payment type</label
-                    >
+                    <label class="mb-1 block text-sm text-gray-600">{{
+                        CHANNEL_LABEL[channelKind]
+                    }}</label>
                     <a-select
                         v-model:value="selectedPaymentCardTypeId"
                         class="w-full"
@@ -790,13 +823,22 @@ function tableRowClassName(_record, index) {
                         allow-clear
                     >
                         <a-select-option
-                            v-for="t in cardTypes"
+                            v-for="t in channelOptions"
                             :key="t.id"
                             :value="t.id"
                         >
                             {{ t.name }}
                         </a-select-option>
                     </a-select>
+                </div>
+                <div
+                    v-if="paymentMethod === 'e-wallet' || paymentMethod === 'bank'"
+                    class="md:col-span-2"
+                >
+                    <label class="mb-1 block text-sm text-gray-600"
+                        >Reference no. (optional)</label
+                    >
+                    <a-input v-model:value="paymentReference" :maxlength="100" />
                 </div>
                 <div class="md:col-span-2">
                     <label class="mb-1 block text-sm text-gray-600"

@@ -35,6 +35,7 @@ class CustomerUpdated implements ShouldBroadcast
     {
         $sale = $this->sale->fresh([
             'saleItems.product',
+            'saleItems.modifiers',
             'saleDiscounts',
             'saleItems.discounts',
             'customer'
@@ -56,6 +57,8 @@ class CustomerUpdated implements ShouldBroadcast
                     'id' => $item->id,
                     'product_id' => $item->product_id,
                     'product_name' => $item->product->name ?? 'Unknown Product',
+                    'modifiers' => $item->modifierSummary(),
+                    'notes' => $item->notes,
                     'product_sku' => $item->product->SKU ?? 'N/A',
                     'quantity' => $item->quantity,
                     'unit_price' => (float) $item->unit_price,

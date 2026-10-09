@@ -35,9 +35,14 @@ class ProductResource extends JsonResource
                 $row = $this->inventories->first();
                 $data['location_quantity_available'] = $row?->quantity_available ?? 0;
                 $data['location_quantity_on_hand'] = $row?->quantity_on_hand ?? 0;
+                $data['location_stock_status'] = self::stockStatus(
+                    (float) ($row?->quantity_available ?? 0),
+                    (float) ($row?->location_reorder_level ?? $this->reorder_level ?? 0),
+                );
             } else {
                 $data['location_quantity_available'] = null;
                 $data['location_quantity_on_hand'] = null;
+                $data['location_stock_status'] = null;
             }
             unset($data['inventories']);
         }
@@ -47,5 +52,18 @@ class ProductResource extends JsonResource
         }
 
         return $data;
+    }
+
+    /**
+     * Out when nothing is available; low when at or under the store's low stock level
+     * (the store's own level, else the product's; 0 means no low stock warning).
+     */
+    public static function stockStatus(float $available, float $lowStockLevel): string
+    {
+        if ($available <= 0) {
+            return 'out_of_stock';
+        }
+
+        return $lowStockLevel > 0 && $available <= $lowStockLevel ? 'low_stock' : 'in_stock';
     }
 }

@@ -11,6 +11,7 @@ use App\Http\Controllers\Domains\Inventory\StockAdjustmentController;
 use App\Http\Controllers\Domains\LoyaltyController;
 use App\Http\Controllers\Domains\LoyaltyTierController;
 use App\Http\Controllers\Domains\ManualBillingController;
+use App\Http\Controllers\Domains\ModifierGroupController;
 use App\Http\Controllers\Domains\PaymentCardTypeController;
 use App\Http\Controllers\Domains\PayMongoQrPhController;
 use App\Http\Controllers\Domains\ProductController;
@@ -58,60 +59,65 @@ Route::prefix('domains/{domain:name_slug}')
             Route::post('/sales-chart', [DashboardController::class, 'getSalesChartData'])->name('sales-chart');
         });
 
-        // Sales (Organization-specific)
-        Route::get('/sales', [SaleController::class, 'index'])->name('sales.index');
-        Route::get('/sales/products', [SaleController::class, 'products'])->name('sales.products');
-        Route::get('/sales/offline-catalog', [SaleController::class, 'offlineCatalog'])->name('sales.offline-catalog');
+        // Selling screens and cart API: not available while the active store is a warehouse.
+        Route::middleware('location.sellable')->group(function () {
+            // Sales (Organization-specific)
+            Route::get('/sales', [SaleController::class, 'index'])->name('sales.index');
+            Route::get('/sales/products', [SaleController::class, 'products'])->name('sales.products');
+            Route::get('/sales/offline-catalog', [SaleController::class, 'offlineCatalog'])->name('sales.offline-catalog');
 
-        // User-specific sales routes (handles "no sales id yet" case)
-        Route::prefix('users/{user}')->name('users.')->group(function () {
-            // Create new sale for user (when no sales id yet)
-            Route::post('/sales', [SaleController::class, 'createSaleForUser'])->name('sales.create');
+            // User-specific sales routes (handles "no sales id yet" case)
+            Route::prefix('users/{user}')->name('users.')->group(function () {
+                // Create new sale for user (when no sales id yet)
+                Route::post('/sales', [SaleController::class, 'createSaleForUser'])->name('sales.create');
 
-            // Add item to user's latest pending sale (auto-finds or creates)
-            Route::post('/sales/cart/add', [SaleController::class, 'addItemToUserCart'])->name('sales.cart.add');
+                // Add item to user's latest pending sale (auto-finds or creates)
+                Route::post('/sales/cart/add', [SaleController::class, 'addItemToUserCart'])->name('sales.cart.add');
 
-            // Get user's current pending sale
-            Route::get('/sales/current-pending', [SaleController::class, 'getUserPendingSale'])->name('sales.current-pending');
+                // Get user's current pending sale
+                Route::get('/sales/current-pending', [SaleController::class, 'getUserPendingSale'])->name('sales.current-pending');
 
-            // Other cart operations for user's latest sale
-            Route::patch('/sales/cart/update-quantity', [SaleController::class, 'updateUserCartQuantity'])->name('sales.cart.update-quantity');
-            Route::delete('/sales/cart/remove', [SaleController::class, 'removeFromUserCart'])->name('sales.cart.remove');
-            Route::get('/sales/cart/state', [SaleController::class, 'getUserCartState'])->name('sales.cart.state');
-        });
+                // Other cart operations for user's latest sale
+                Route::patch('/sales/cart/update-quantity', [SaleController::class, 'updateUserCartQuantity'])->name('sales.cart.update-quantity');
+                Route::delete('/sales/cart/remove', [SaleController::class, 'removeFromUserCart'])->name('sales.cart.remove');
+                Route::get('/sales/cart/state', [SaleController::class, 'getUserCartState'])->name('sales.cart.state');
+            });
 
-        // Sales API routes (Organization-specific)
-        Route::prefix('sales')->name('sales.')->group(function () {
-            Route::get('/offline-transactions', [SaleController::class, 'offlineTransactionsPage'])->name('offline-transactions');
-            Route::post('/offline-sync', [SaleController::class, 'offlineSync'])->name('offline-sync');
-            Route::get('/discounts/current', [SaleController::class, 'getCurrentDiscounts'])->name('discounts.current');
+            // Sales API routes (Organization-specific)
+            Route::prefix('sales')->name('sales.')->group(function () {
+                Route::get('/offline-transactions', [SaleController::class, 'offlineTransactionsPage'])->name('offline-transactions');
+                // Each synced sale is checked against its own store instead (a warehouse is refused there).
+                Route::post('/offline-sync', [SaleController::class, 'offlineSync'])->name('offline-sync')
+                    ->withoutMiddleware('location.sellable');
+                Route::get('/discounts/current', [SaleController::class, 'getCurrentDiscounts'])->name('discounts.current');
 
-            Route::post('/draft', [SaleController::class, 'storeDraft'])->name('drafts.store');
-            Route::get('/oversell-statistics', [SaleController::class, 'getOversellStatistics'])->name('oversell.statistics');
+                Route::post('/draft', [SaleController::class, 'storeDraft'])->name('drafts.store');
+                Route::get('/oversell-statistics', [SaleController::class, 'getOversellStatistics'])->name('oversell.statistics');
 
-            // Scoped bindings
-            Route::scopeBindings()->group(function () {
-                Route::post('/{sale}/sales-items/void', [SaleController::class, 'voidItem'])->name('items.void');
-                Route::post('/{sale}/payments', [SaleController::class, 'proceedPayment'])->name('payment.store');
-                Route::patch('/{sale}/loyalty-redemption', [SaleController::class, 'patchLoyaltyRedemption'])->name('loyalty-redemption');
-                // Cart management - database-driven
-                Route::post('/{sale}/cart/add', [SaleController::class, 'addItemToCart'])->name('cart.add');
-                Route::delete('/{sale}/cart/remove', [SaleController::class, 'removeItemFromCart'])->name('cart.remove');
-                Route::patch('/{sale}/cart/update-quantity', [SaleController::class, 'updateItemQuantity'])->name('cart.update-quantity');
-                Route::get('/{sale}/cart/state', [SaleController::class, 'getCartState'])->name('cart.state');
+                // Scoped bindings
+                Route::scopeBindings()->group(function () {
+                    Route::post('/{sale}/sales-items/void', [SaleController::class, 'voidItem'])->name('items.void');
+                    Route::post('/{sale}/payments', [SaleController::class, 'proceedPayment'])->name('payment.store');
+                    Route::patch('/{sale}/loyalty-redemption', [SaleController::class, 'patchLoyaltyRedemption'])->name('loyalty-redemption');
+                    // Cart management - database-driven
+                    Route::post('/{sale}/cart/add', [SaleController::class, 'addItemToCart'])->name('cart.add');
+                    Route::delete('/{sale}/cart/remove', [SaleController::class, 'removeItemFromCart'])->name('cart.remove');
+                    Route::patch('/{sale}/cart/update-quantity', [SaleController::class, 'updateItemQuantity'])->name('cart.update-quantity');
+                    Route::get('/{sale}/cart/state', [SaleController::class, 'getCartState'])->name('cart.state');
 
-                // Discounts - database-driven
-                Route::get('/{sale}/discounts', [SaleDiscountController::class, 'getSaleDiscounts'])->name('discounts.sale');
-                Route::patch('/{sale}/discounts', [SaleDiscountController::class, 'updateSaleDiscounts'])->name('discounts.update');
-                Route::delete('/{sale}/discounts', [SaleDiscountController::class, 'removeSaleDiscounts'])->name('discounts.remove');
+                    // Discounts - database-driven
+                    Route::get('/{sale}/discounts', [SaleDiscountController::class, 'getSaleDiscounts'])->name('discounts.sale');
+                    Route::patch('/{sale}/discounts', [SaleDiscountController::class, 'updateSaleDiscounts'])->name('discounts.update');
+                    Route::delete('/{sale}/discounts', [SaleDiscountController::class, 'removeSaleDiscounts'])->name('discounts.remove');
 
-                // Item-level discounts
-                Route::post('/{sale}/items/{saleItem}/discounts', [SaleDiscountController::class, 'applyItemDiscount'])->name('items.discount.apply');
-                Route::delete('/{sale}/items/{saleItem}/discounts', [SaleDiscountController::class, 'removeItemDiscount'])->name('items.discount.remove');
-                Route::get('/{sale}/find-sale-item', [SaleController::class, 'findSaleItem'])->name('find-sale-item');
-                Route::post('/{sale}/assign-customer', [SaleController::class, 'assignCustomer'])->name('sales.assignCustomer');
-                Route::post('/{sale}/process-loyalty', [SaleController::class, 'processLoyalty'])->name('sales.processLoyalty');
-                Route::post('/{sale}/test-order-event', [SaleController::class, 'testOrderEvent'])->name('sales.testOrderEvent');
+                    // Item-level discounts
+                    Route::post('/{sale}/items/{saleItem}/discounts', [SaleDiscountController::class, 'applyItemDiscount'])->name('items.discount.apply');
+                    Route::delete('/{sale}/items/{saleItem}/discounts', [SaleDiscountController::class, 'removeItemDiscount'])->name('items.discount.remove');
+                    Route::get('/{sale}/find-sale-item', [SaleController::class, 'findSaleItem'])->name('find-sale-item');
+                    Route::post('/{sale}/assign-customer', [SaleController::class, 'assignCustomer'])->name('sales.assignCustomer');
+                    Route::post('/{sale}/process-loyalty', [SaleController::class, 'processLoyalty'])->name('sales.processLoyalty');
+                    Route::post('/{sale}/test-order-event', [SaleController::class, 'testOrderEvent'])->name('sales.testOrderEvent');
+                });
             });
         });
 
@@ -123,6 +129,11 @@ Route::prefix('domains/{domain:name_slug}')
             ->name('products.assignable');
         Route::post('products/{product}/attach-location', [ProductController::class, 'attachLocation'])
             ->name('products.attach-location');
+
+        // Product modifiers (add-ons): option groups such as Size or Add-ons, picked when a product is rung up
+        Route::resource('modifier-groups', ModifierGroupController::class)
+            ->only(['index', 'store', 'update', 'destroy'])
+            ->names('products.modifier-groups');
 
         Route::resource('products', ProductController::class)
             ->only(['index', 'store', 'update', 'destroy', 'create', 'edit'])
@@ -175,6 +186,7 @@ Route::prefix('domains/{domain:name_slug}')
         Route::get('/sales-history', [SalesHistoryController::class, 'index'])->name('sales-history.index');
         Route::get('/sales-history/export', [SalesHistoryController::class, 'export'])->name('sales-history.export');
         Route::get('/sales-history/{sale}', [SalesHistoryController::class, 'show'])->whereNumber('sale')->name('sales-history.show');
+        Route::post('/sales-history/{sale}/void', [SalesHistoryController::class, 'void'])->whereNumber('sale')->name('sales-history.void');
 
         // Wallet — money movement (cash control + ledger); distinct URL from card-type setup
         Route::get('/wallet/money-movement', [PaymentCardTypeController::class, 'moneyMovement'])->name('wallet.money-movement');

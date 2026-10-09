@@ -3,6 +3,9 @@ const defaultTheme = require('tailwindcss/defaultTheme')
 /** @type {import('tailwindcss').Config} */
 module.exports = {
     important: true,
+    // The app has no dark theme; without this, dark: classes follow the OS setting and only the
+    // backgrounds turn dark. Nothing adds a "dark" class, so the app always renders light.
+    darkMode: 'class',
     content: [
         './vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php',
         './storage/framework/views/*.php',

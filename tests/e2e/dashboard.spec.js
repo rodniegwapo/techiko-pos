@@ -24,8 +24,12 @@ const GATED_PAGES = [
 ];
 
 /** Sidebar entry by title, e.g. "Sales" (not "Offline sales"); allows a trailing tag like "Dashboard Global Admin". */
+// The whole name, so "Sales" doesn't also find "Sales History"; Dashboard carries a badge in its
+// name ("Organization", or "Global Admin" for a super user).
 const sidebarItem = (page, title) =>
-    page.getByRole("complementary").getByRole("menuitem", { name: new RegExp(`^${title}(\\s|$)`) });
+    page
+        .getByRole("complementary")
+        .getByRole("menuitem", { name: new RegExp(`^${title}( Organization| Global Admin)?$`) });
 
 const absolute = (path) => new URL(path, test.info().project.use.baseURL).href;
 

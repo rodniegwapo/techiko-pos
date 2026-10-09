@@ -111,6 +111,8 @@ export const E2E = {
         soldOut: { name: "E2E Sold Out", price: 60, stock: 0 },
         // Only security.spec.js touches this one, so its cross-cart probes can't disturb other tests.
         probe: { name: "E2E Security Probe", price: 10, stock: 1000 },
+        // Only modifiers.spec.js uses this: it asks for its "E2E Size" (Regular, or Large +₱20) before adding.
+        latte: { name: "E2E Latte", price: 100, stock: 1000 },
     },
     customers: {
         loyalty: { name: "E2E Loyalty Customer", points: 5000 },

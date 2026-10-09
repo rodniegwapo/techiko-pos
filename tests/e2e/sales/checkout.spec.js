@@ -123,6 +123,50 @@ for (const layout of ["classic", "coffeeshop"]) {
             });
         });
 
+        test.describe("e-wallet and bank", () => {
+            test("E-wallet and Bank are under Other, not shown by default", async ({ page }) => {
+                const sales = await SalesPage.open(page, { layout });
+                await sales.addProduct(products.burger.name);
+                await sales.goToCheckout();
+
+                await expect(sales.paymentMethod("E-wallet")).toHaveCount(0);
+                await expect(page.getByRole("button", { name: "Other payment methods" })).toHaveText(/Other/);
+            });
+
+            test("pays by e-wallet with the e-wallet used and a reference no.", async ({ page }) => {
+                const sales = await SalesPage.open(page, { layout });
+                await sales.addProduct(products.burger.name);
+                await sales.goToCheckout();
+                await sales.chooseOtherPayment("E-wallet");
+
+                const dialog = page.getByRole("dialog", { name: "Which e-wallet?" });
+                await expect(dialog.getByText(cards.visa, { exact: true }), "card terminals aren't e-wallets").toHaveCount(0);
+                await dialog.getByText("E2E GCash", { exact: true }).click();
+                await dialog.getByRole("button", { name: "Use selected e-wallet" }).click();
+                await expect(dialog).toBeHidden();
+                await page.getByRole("textbox", { name: "Reference no." }).fill("GC-12345");
+
+                const paid = page.waitForRequest((r) => r.method() === "POST" && r.url().includes("/payments"));
+                const res = await sales.pay({ amountReceived: 100 });
+                const body = (await paid).postDataJSON();
+
+                expect(res?.status()).toBe(200);
+                expect(body.payment_method).toBe("e-wallet");
+                expect(body.payment_reference).toBe("GC-12345");
+            });
+
+            test("Bank asks which bank, listing only banks", async ({ page }) => {
+                const sales = await SalesPage.open(page, { layout });
+                await sales.addProduct(products.burger.name);
+                await sales.goToCheckout();
+                await sales.chooseOtherPayment("Bank");
+
+                const dialog = page.getByRole("dialog", { name: "Which bank?" });
+                await expect(dialog.getByText("E2E BDO", { exact: true })).toBeVisible();
+                await expect(dialog.getByText("E2E GCash", { exact: true })).toHaveCount(0);
+            });
+        });
+
         test.describe("credit", () => {
             test("Credit is unavailable for walk-in customers", async ({ page }) => {
                 const sales = await SalesPage.open(page, { layout });

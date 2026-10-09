@@ -150,6 +150,31 @@ test.describe("Create product", () => {
         await expect(form.error("Sold Type")).toContainText("sold type field is required");
     });
 
+    test("Generate fills a SKU from the name and a scannable in-store barcode", async ({ page }) => {
+        const form = await openCreate(page);
+        await form.fill({ name: "Ice Pod Formula" });
+
+        await page.getByRole("button", { name: "Generate SKU" }).click();
+        await page.getByRole("button", { name: "Generate barcode" }).click();
+
+        await expect(page.getByPlaceholder("Enter SKU")).toHaveValue(/^IPF-[A-Z2-9]{5}$/);
+        const barcode = await page.getByPlaceholder("Enter barcode").inputValue();
+        expect(barcode).toMatch(/^2\d{12}$/);
+        // EAN-13 check digit: weights 1,3,1,3… over the first 12 digits.
+        const sum = [...barcode.slice(0, 12)].reduce((acc, d, i) => acc + Number(d) * (i % 2 ? 3 : 1), 0);
+        expect(Number(barcode[12])).toBe((10 - (sum % 10)) % 10);
+    });
+
+    test("Track stock can be turned off, which hides the low stock level", async ({ page }) => {
+        await openCreate(page);
+        await expect(page.getByLabel("Low stock level")).toBeVisible();
+
+        await page.getByRole("switch", { name: "Track stock" }).click();
+
+        await expect(page.getByLabel("Low stock level")).toHaveCount(0);
+        await expect(page.getByText("Stock isn't counted")).toBeVisible();
+    });
+
     test("creates a product and it appears in the store's list", async ({ page }, testInfo) => {
         const values = newProductValues("Create");
         const form = await openCreate(page);
@@ -247,6 +272,8 @@ test.describe("Edit product", () => {
         await form.submit("Update Product");
 
         await expect(toast(page, "Product updated successfully")).toBeVisible();
+        // Saving goes back to the items list.
+        await expect(page).toHaveURL(new RegExp(`${productsUrl()}(\\?.*)?$`));
         const list = await ProductsPage.open(page);
         await list.search(`${values.name} Renamed`);
         await expect(list.row(`${values.name} Renamed`)).toContainText("42");
@@ -267,43 +294,89 @@ test.describe("Edit product", () => {
 test.describe("Delete product (admin)", () => {
     test.use({ account: "admin" });
 
-    test("asks for confirmation, and Cancel keeps the product", async ({ page, serverAs }, testInfo) => {
+    /** Creates a product at the fixture store and opens that store's list filtered to it. */
+    async function productAtStore(page, serverAs, testInfo, label) {
         const store = productFixture(testInfo);
         const admin = await serverAs("admin");
-        const values = newProductValues("KeepMe");
+        const values = newProductValues(label);
         await apiJson(admin, "POST", `${productsUrl()}?location_id=${store.storeId}`, {
             name: values.name, SKU: values.sku, barcode: values.barcode, price: 1, sold_type: "Piece", location_id: store.storeId,
         });
         const products = await ProductsPage.open(page, `?location_id=${store.storeId}`);
         await products.search(values.name);
+        return { admin, store, values, products };
+    }
+
+    const deleteDialog = (page) => page.getByRole("dialog").filter({ hasText: "Delete product" });
+
+    test("asks how to delete, and Cancel keeps the product", async ({ page, serverAs }, testInfo) => {
+        const { values, products } = await productAtStore(page, serverAs, testInfo, "KeepMe");
 
         await products.row(values.name).getByRole("button", { name: "Delete Product" }).click();
-        const confirm = page.getByRole("dialog").filter({ hasText: "Confirm Delete" });
-        await expect(confirm).toBeVisible();
+        const dialog = deleteDialog(page);
+        await expect(dialog).toBeVisible();
+        await expect(dialog.getByText(/^Remove from .+ only$/)).toBeVisible();
+        await expect(dialog.locator(".ant-radio-wrapper", { hasText: "Delete everywhere" })).toBeVisible();
         const uncaught = [];
         page.on("pageerror", (e) => uncaught.push(e.message));
-        await confirm.getByRole("button", { name: "Cancel" }).click();
+        await dialog.getByRole("button", { name: "Cancel" }).click();
 
         await expect(products.row(values.name)).toHaveCount(1);
         expect(uncaught, "cancelling shouldn't throw an uncaught error").toEqual([]);
     });
 
-    test("deletes a product after confirming", async ({ page, serverAs }, testInfo) => {
+    test("removing from this store only keeps the product in its other stores", async ({ page, serverAs }, testInfo) => {
         const store = productFixture(testInfo);
+        const { branchLocationId } = productsFixtures();
         const admin = await serverAs("admin");
-        const values = newProductValues("DeleteMe");
+        const values = newProductValues("StoreOnly");
         await apiJson(admin, "POST", `${productsUrl()}?location_id=${store.storeId}`, {
             name: values.name, SKU: values.sku, barcode: values.barcode, price: 1, sold_type: "Piece", location_id: store.storeId,
         });
-        const products = await ProductsPage.open(page, `?location_id=${store.storeId}`);
+        const assignableAtBranch = async () =>
+            (await apiJson(admin, "GET", `${productsUrl("/assignable")}?location_id=${branchLocationId}&search=${encodeURIComponent(values.name)}`)).body.data;
+        const product = (await assignableAtBranch()).find((p) => p.name === values.name);
+        expect(product, "the new product, offered to the branch").toBeTruthy();
+        expect((await apiJson(admin, "POST", productUrl(product.id, "/attach-location"), { location_id: branchLocationId })).status).toBe(200);
+
+        const products = await ProductsPage.open(page, `?location_id=${branchLocationId}`);
         await products.search(values.name);
+        await products.row(values.name).getByRole("button", { name: "Delete Product" }).click();
+        await expect(deleteDialog(page).getByText("It stays in your organization and in 1 other store")).toBeVisible();
+        const removed = page.waitForResponse((r) => r.request().method() === "DELETE");
+        await deleteDialog(page).getByRole("button", { name: "Remove from store" }).click();
+
+        expect((await removed).status()).toBeLessThan(400);
+        await expect(products.row(values.name)).toHaveCount(0);
+        // Gone from the branch only: it is still at the other store, so the branch is offered it again.
+        expect((await assignableAtBranch()).map((p) => p.name)).toContain(values.name);
+    });
+
+    test("a product's only store can't be removed on its own", async ({ page, serverAs }, testInfo) => {
+        const { values, products } = await productAtStore(page, serverAs, testInfo, "OnlyStore");
 
         await products.row(values.name).getByRole("button", { name: "Delete Product" }).click();
+        const dialog = deleteDialog(page);
+        await expect(dialog.getByText(/is the only store with this product/)).toBeVisible();
+        await expect(dialog.getByRole("radio").first()).toBeDisabled();
+        await expect(dialog.getByRole("button", { name: "Delete everywhere" })).toBeEnabled();
+        await dialog.getByRole("button", { name: "Cancel" }).click();
+    });
+
+    test("deleting everywhere removes the product from the organization", async ({ page, serverAs }, testInfo) => {
+        const { admin, values, products } = await productAtStore(page, serverAs, testInfo, "DeleteMe");
+
+        await products.row(values.name).getByRole("button", { name: "Delete Product" }).click();
+        const dialog = deleteDialog(page);
+        await dialog.locator(".ant-radio-wrapper", { hasText: "Delete everywhere" }).click();
         const deleted = page.waitForResponse((r) => r.request().method() === "DELETE");
-        await page.getByRole("dialog").filter({ hasText: "Confirm Delete" }).getByRole("button", { name: "Delete" }).click();
+        await dialog.getByRole("button", { name: "Delete everywhere" }).click();
 
         expect((await deleted).status()).toBeLessThan(400);
         await expect(products.row(values.name)).toHaveCount(0);
+
+        const offered = await apiJson(admin, "GET", `${productsUrl("/assignable")}?location_id=${productsFixtures().branchLocationId}&search=${encodeURIComponent(values.name)}`);
+        expect(offered.body.data.map((p) => p.name)).not.toContain(values.name);
     });
 });
 

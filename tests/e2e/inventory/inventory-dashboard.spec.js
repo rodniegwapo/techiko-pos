@@ -44,7 +44,8 @@ test.describe("Inventory dashboard (admin)", () => {
         await openDashboard(page);
 
         // The header's store picker shows the name too.
-        await expect(page.getByRole("main").getByText(store.name, { exact: true })).toBeVisible();
+        // The store picker above the page names the store too; the dashboard heading comes after it.
+        await expect(page.getByRole("main").getByText(store.name, { exact: true }).last()).toBeVisible();
         await expect(page.getByText(`Store • ${store.address}`)).toBeVisible();
         await expect(locationCode(page)).toHaveText(store.code);
         await expect(page.getByText("Total Inventory Value").locator("xpath=following-sibling::p")).toHaveText(`₱${summary.value.toFixed(2)}`);
@@ -55,7 +56,7 @@ test.describe("Inventory dashboard (admin)", () => {
 
         const { report } = await pageProps(page);
         for (const category of fixture().categories) {
-            expect(report.category_stock_data).toContainEqual(category);
+            expect(report.category_stock_data).toContainEqual(expect.objectContaining(category));
         }
         await expect(page.locator(".apexcharts-canvas")).toBeVisible();
     });
@@ -99,7 +100,8 @@ test.describe("Inventory dashboard (admin)", () => {
 
         await openDashboard(page, inventoryUrl(`?location_id=${branchLocation.id}`));
 
-        await expect(page.getByRole("main").getByText(branchLocation.name, { exact: true })).toBeVisible();
+        // The store picker above the page names the store too; the dashboard heading comes after it.
+        await expect(page.getByRole("main").getByText(branchLocation.name, { exact: true }).last()).toBeVisible();
         await expect(locationCode(page)).toHaveText(branchLocation.code);
     });
 

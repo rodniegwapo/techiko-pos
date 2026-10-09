@@ -155,7 +155,8 @@ class UserService
             ? array_keys(UserHierarchyService::getRoleHierarchy())
             : UserHierarchyService::getManageableRoles($currentUser);
             
-        return Role::whereIn('name', $manageableRoles)->get(['id', 'name']);
+        // Highest role first, so the list reads in hierarchy order.
+        return Role::whereIn('name', $manageableRoles)->orderBy('level')->get(['id', 'name']);
     }
 
     /**

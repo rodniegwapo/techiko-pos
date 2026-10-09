@@ -43,7 +43,10 @@ watch(
         if (!isOpen || !product.value || !orderId.value) return;
 
         const currentProduct = orders.value.find(
-            (order) => order.id === product.value.id,
+            (order) =>
+                product.value.sale_item_id
+                    ? order.sale_item_id === product.value.sale_item_id
+                    : order.id === product.value.id,
         );
 
         if (
@@ -72,7 +75,7 @@ const handleSave = async () => {
 
         const { data: saleItem } = await axios.get(
             getRoute("sales.find-sale-item", { sale: orderId.value }),
-            { params: { product_id: product.value.id } },
+            { params: { product_id: product.value.id, sale_item_id: product.value.sale_item_id ?? undefined } },
         );
 
         if (!saleItem?.id) {
@@ -121,7 +124,7 @@ const handleClearDiscount = async () => {
 
         const { data: saleItem } = await axios.get(
             getRoute("sales.find-sale-item", { sale: orderId.value }),
-            { params: { product_id: product.value.id } },
+            { params: { product_id: product.value.id, sale_item_id: product.value.sale_item_id ?? undefined } },
         );
 
         if (!saleItem?.id) {

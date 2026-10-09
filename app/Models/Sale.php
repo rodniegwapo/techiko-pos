@@ -57,9 +57,26 @@ class Sale extends Model
         return $this->belongsTo(InventoryLocation::class);
     }
 
+    /** Who voided the sale from Sales History, and the manager who approved it. */
+    public function voidedBy()
+    {
+        return $this->belongsTo(User::class, 'voided_by');
+    }
+
+    public function voidApprovedBy()
+    {
+        return $this->belongsTo(User::class, 'void_approved_by');
+    }
+
     public function paymentCardType()
     {
         return $this->belongsTo(PaymentCardType::class);
+    }
+
+    /** The parts of a sale paid in parts (payment_method 'split'); empty for a sale paid one way. */
+    public function payments()
+    {
+        return $this->hasMany(SalePayment::class)->orderBy('id');
     }
 
     public function recalcTotals(): void

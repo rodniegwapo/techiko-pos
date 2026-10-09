@@ -208,6 +208,94 @@ class SalesHistoryTest extends TestCase
             );
     }
 
+    public function test_sale_item_keeps_the_cost_it_was_sold_at(): void
+    {
+        ['domain' => $domain, 'user' => $user] = $this->seedDomainContext();
+        $category = Category::factory()->create(['domain' => $domain->name_slug]);
+        $product = Product::factory()->create(['domain' => $domain->name_slug, 'category_id' => $category->id, 'cost' => 30]);
+
+        $sale = $this->makeSale($domain, $user);
+        $item = SaleItem::query()->create(['sale_id' => $sale->id, 'product_id' => $product->id, 'quantity' => 1, 'unit_price' => 50]);
+
+        $product->update(['cost' => 45]);
+
+        $this->assertEquals(30, (float) $item->fresh()->unit_cost);
+    }
+
+    public function test_summary_profit_excludes_voided_lines_and_flags_missing_costs(): void
+    {
+        ['domain' => $domain, 'user' => $user] = $this->seedDomainContext();
+        $category = Category::factory()->create(['domain' => $domain->name_slug]);
+        $costed = Product::factory()->create(['domain' => $domain->name_slug, 'category_id' => $category->id, 'cost' => 30]);
+        $uncosted = Product::factory()->create(['domain' => $domain->name_slug, 'category_id' => $category->id, 'cost' => null]);
+
+        // Net 112 with 12 VAT → 100 revenue ex-VAT.
+        $sale = $this->makeSale($domain, $user);
+        SaleItem::query()->create(['sale_id' => $sale->id, 'product_id' => $costed->id, 'quantity' => 2, 'unit_price' => 40]);
+        $voided = SaleItem::query()->create(['sale_id' => $sale->id, 'product_id' => $costed->id, 'quantity' => 1, 'unit_price' => 40]);
+        $voided->delete();
+
+        $this->actingAs($user)
+            ->get(route('domains.sales-history.index', ['domain' => $domain->name_slug]))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('summary.cogs', 60)
+                ->where('summary.profit', 40)
+                ->where('summary.items_missing_cost', 0)
+            );
+
+        SaleItem::query()->create(['sale_id' => $sale->id, 'product_id' => $uncosted->id, 'quantity' => 1, 'unit_price' => 20]);
+
+        $this->actingAs($user)
+            ->get(route('domains.sales-history.index', ['domain' => $domain->name_slug]))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('summary.cogs', 60)
+                ->where('summary.items_missing_cost', 1)
+            );
+    }
+
+    public function test_show_explains_the_profit_of_a_sale(): void
+    {
+        ['domain' => $domain, 'user' => $user] = $this->seedDomainContext();
+        $category = Category::factory()->create(['domain' => $domain->name_slug]);
+        $costed = Product::factory()->create(['domain' => $domain->name_slug, 'category_id' => $category->id, 'name' => 'Burger', 'cost' => 30]);
+        $uncosted = Product::factory()->create(['domain' => $domain->name_slug, 'category_id' => $category->id, 'name' => 'Free Sauce', 'cost' => null]);
+
+        // Net 112 with 12 VAT → 100 revenue ex-VAT.
+        $sale = $this->makeSale($domain, $user);
+        SaleItem::query()->create(['sale_id' => $sale->id, 'product_id' => $costed->id, 'quantity' => 2, 'unit_price' => 40]);
+        SaleItem::query()->create(['sale_id' => $sale->id, 'product_id' => $uncosted->id, 'quantity' => 1, 'unit_price' => 20]);
+        SaleItem::query()->create(['sale_id' => $sale->id, 'product_id' => $costed->id, 'quantity' => 1, 'unit_price' => 40])->delete();
+
+        $this->actingAs($user)
+            ->getJson(route('domains.sales-history.show', ['domain' => $domain->name_slug, 'sale' => $sale->id]))
+            ->assertOk()
+            ->assertJsonPath('profit.revenue', 100)
+            ->assertJsonPath('profit.cogs', 60)
+            ->assertJsonPath('profit.profit', 40)
+            ->assertJsonPath('profit.margin_percent', 40)
+            ->assertJsonPath('profit.items_missing_cost', 1)
+            ->assertJsonCount(2, 'profit.lines')
+            ->assertJsonPath('profit.lines.0.product_name', 'Burger')
+            ->assertJsonPath('profit.lines.0.line_cost', 60)
+            ->assertJsonPath('profit.lines.1.unit_cost', null);
+    }
+
+    public function test_cashier_does_not_see_profit(): void
+    {
+        ['domain' => $domain, 'location' => $location] = $this->seedDomainContext();
+        $cashier = $this->makeCashier($domain, $location);
+        $sale = $this->makeSale($domain, $cashier);
+
+        $this->actingAs($cashier)
+            ->get(route('domains.sales-history.index', ['domain' => $domain->name_slug]))
+            ->assertInertia(fn (Assert $page) => $page->missing('summary.profit')->missing('summary.cogs'));
+
+        $this->actingAs($cashier)
+            ->getJson(route('domains.sales-history.show', ['domain' => $domain->name_slug, 'sale' => $sale->id]))
+            ->assertOk()
+            ->assertJsonPath('profit', null);
+    }
+
     public function test_show_is_404_for_another_domains_sale(): void
     {
         ['domain' => $domain, 'user' => $user] = $this->seedDomainContext();

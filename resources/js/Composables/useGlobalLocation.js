@@ -113,7 +113,7 @@ export function useGlobalLocation() {
             // Show error notification
             notification.error({
                 message: 'Location Update Failed',
-                description: 'Failed to update default location. Please try again.',
+                description: error.response?.data?.message || 'Failed to update default location. Please try again.',
                 duration: 5
             })
         }

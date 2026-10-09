@@ -257,7 +257,7 @@ export class SalesPage {
         return { response: await voided, dialog };
     }
 
-    /** Modern layout keeps payment behind "Charge"; Classic shows it in the footer. */
+    /** Modern layout keeps payment behind "Checkout"; Classic shows it in the footer. */
     async goToCheckout() {
         if (this.isModern) {
             await this.page.getByRole("button", { name: "Continue to checkout" }).click();
@@ -272,6 +272,13 @@ export class SalesPage {
         return this.page.locator(".ant-radio-button-wrapper").filter({ hasText: label });
     }
 
+    /** E-wallet and Bank sit behind the "Other" button next to Cash / Card / Credit. */
+    async chooseOtherPayment(label) {
+        await this.page.getByRole("button", { name: "Other payment methods" }).click();
+        await this.page.getByRole("menuitem", { name: label, exact: true }).click();
+        await expect(this.page.getByRole("button", { name: "Other payment methods" })).toContainText(label);
+    }
+
     async choosePayment(label) {
         await expect(async () => {
             await this.paymentMethod(label).click();
@@ -283,11 +290,15 @@ export class SalesPage {
         return this.page.locator('input[type="number"][placeholder="0"]').last();
     }
 
+    /** The button that takes the payment: the footer "Charge ₱…" in Modern, "Proceed Payment" in Classic. */
     get proceedButton() {
+        if (this.isModern) {
+            return this.page.getByRole("button", { name: /^Charge / });
+        }
         return this.page.getByRole("button", { name: "Proceed Payment" });
     }
 
-    /** Clicks Proceed Payment and confirms. Returns the payment response. */
+    /** Clicks the pay button and confirms. Returns the payment response. */
     async pay({ amountReceived } = {}) {
         if (amountReceived !== undefined) {
             await this.amountReceived.fill(String(amountReceived));

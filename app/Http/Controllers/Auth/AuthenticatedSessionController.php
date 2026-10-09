@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Helpers;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Providers\AppServiceProvider;
@@ -43,7 +44,8 @@ class AuthenticatedSessionController extends Controller
 
         // Regular users with domain go to domain-specific dashboard
         if ($user->domain) {
-            return redirect()->route('domains.sales.index', ['domain' => $user->domain]);
+            // The sales screen, or Inventory when their store is a warehouse.
+            return redirect()->route(Helpers::homeRouteFor($user), ['domain' => $user->domain]);
         }
 
         // Users without domain go to global dashboard

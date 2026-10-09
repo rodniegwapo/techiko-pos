@@ -10,10 +10,12 @@ use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\User;
 use App\Models\VoidLog;
+use App\Services\SaleService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -25,23 +27,40 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class SalesHistoryController extends Controller
 {
     /** Statuses a sale can have once it has left the cart. */
-    private const STATUSES = ['paid', 'partial', 'refunded'];
+    private const STATUSES = ['paid', 'partial', 'refunded', 'voided'];
 
-    private const PAYMENT_METHODS = ['cash', 'card', 'e-wallet', 'credit'];
+    private const PAYMENT_METHODS = ['cash', 'card', 'e-wallet', 'bank', 'credit', 'split'];
 
     public function index(Request $request, Domain $domain)
     {
         $filters = $this->resolveFilters($request, $domain);
         $query = $this->baseQuery($domain, $filters);
 
-        $summary = (clone $query)
+        // Voided sales stay in the list but count for nothing in the totals.
+        $counted = (clone $query)->where('payment_status', '!=', 'voided');
+
+        $summary = (clone $counted)
             ->selectRaw('COUNT(*) as sales_count')
             ->selectRaw('COALESCE(SUM(total_amount), 0) as gross')
             ->selectRaw('COALESCE(SUM(discount_amount), 0) as discounts')
             ->selectRaw('COALESCE(SUM(tax_amount), 0) as vat')
             ->selectRaw('COALESCE(SUM(grand_total), 0) as net')
             ->first();
-        $salesWithVoids = (clone $query)->whereHas('saleItems', fn ($q) => $q->onlyTrashed())->count();
+        $salesWithVoids = (clone $counted)->whereHas('saleItems', fn ($q) => $q->onlyTrashed())->count();
+        $voidedSales = (clone $query)->where('payment_status', 'voided')->count();
+
+        // Profit reveals product costs, so only staff who see all sales get it.
+        $profitSummary = [];
+        if ($this->canSeeAllSales($request->user())) {
+            // Voided lines are soft-deleted, so they drop out of cost of goods sold on their own.
+            $soldItems = SaleItem::query()->whereIn('sale_id', (clone $counted)->select('sales.id'));
+            $cogs = (float) (clone $soldItems)->whereNotNull('unit_cost')->sum(DB::raw('unit_cost * quantity'));
+            $profitSummary = [
+                'cogs' => round($cogs, 2),
+                'profit' => round((float) $summary->net - (float) $summary->vat - $cogs, 2),
+                'items_missing_cost' => (clone $soldItems)->whereNull('unit_cost')->count(),
+            ];
+        }
 
         $perPage = min(max((int) $request->input('per_page', 20), 1), 100);
 
@@ -69,6 +88,8 @@ class SalesHistoryController extends Controller
                 'vat' => round((float) $summary->vat, 2),
                 'net' => round((float) $summary->net, 2),
                 'sales_with_voids' => $salesWithVoids,
+                'voided_sales' => $voidedSales,
+                ...$profitSummary,
             ],
             'options' => [
                 'locations' => $this->canSeeAllSales($request->user())
@@ -100,15 +121,18 @@ class SalesHistoryController extends Controller
         $sale->load([
             'customer:id,name',
             'user:id,name',
+            'voidedBy:id,name',
+            'voidApprovedBy:id,name',
             'location:id,name',
             'paymentCardType:id,name',
+            'payments.paymentCardType:id,name',
             'saleDiscounts.discount:id,name',
             'saleDiscounts.mandatoryDiscount:id,name',
         ]);
 
         $items = SaleItem::withTrashed()
             ->where('sale_id', $sale->id)
-            ->with('product:id,name')
+            ->with(['product:id,name', 'modifiers'])
             ->orderBy('id')
             ->get();
 
@@ -121,6 +145,9 @@ class SalesHistoryController extends Controller
         $timezone = config('app.timezone', 'UTC');
         $date = $sale->transaction_date ? Carbon::parse($sale->transaction_date)->timezone($timezone) : null;
 
+        // Product costs are management information, so staff limited to their own sales don't get them.
+        $profit = $this->canSeeAllSales($request->user()) ? $this->profitBreakdown($sale, $items) : null;
+
         return response()->json([
             'id' => $sale->id,
             'invoice_number' => $sale->invoice_number,
@@ -130,7 +157,16 @@ class SalesHistoryController extends Controller
             'location_name' => $sale->location?->name,
             'payment_method' => $sale->payment_method,
             'payment_card_type' => $sale->paymentCardType?->name,
+            'payment_reference' => $sale->payment_reference,
+            'payments' => $sale->payments->map->toDisplayArray()->all(),
             'payment_status' => $sale->payment_status,
+            'void' => $sale->payment_status === 'voided' ? [
+                'voided_at' => $sale->voided_at ? Carbon::parse($sale->voided_at)->timezone($timezone)->format('Y-m-d h:i A') : null,
+                'voided_by' => $sale->voidedBy?->name,
+                'approved_by' => $sale->voidApprovedBy?->name,
+                'reason' => $sale->void_reason,
+            ] : null,
+            'can_void' => in_array($sale->payment_status, ['paid', 'partial'], true),
             'is_credit_sale' => (bool) $sale->is_credit_sale,
             'notes' => $sale->notes,
             'total_amount' => round((float) $sale->total_amount, 2),
@@ -143,10 +179,13 @@ class SalesHistoryController extends Controller
             'items' => $items->map(fn (SaleItem $item) => [
                 'id' => $item->id,
                 'product_name' => $item->product?->name ?? 'Deleted product',
+                'modifiers' => $item->modifierSummary(),
+                'notes' => $item->notes,
                 'quantity' => (float) $item->quantity,
                 'unit_price' => round((float) $item->unit_price, 2),
                 'discount' => round((float) $item->discount, 2),
-                'subtotal' => round((float) $item->subtotal, 2),
+                // Worked out, not read: older lines whose quantity was bumped kept a stale stored subtotal.
+                'subtotal' => round(max(0, (float) $item->unit_price * (float) $item->quantity - (float) $item->discount), 2),
                 'voided' => $item->trashed(),
             ])->values(),
             'discounts' => $sale->saleDiscounts->map(function ($saleDiscount) {
@@ -170,7 +209,65 @@ class SalesHistoryController extends Controller
                 'approved_by' => $log->approver?->name,
                 'voided_at' => $log->created_at?->timezone($timezone)->format('Y-m-d h:i A'),
             ])->values(),
+            'profit' => $profit,
         ]);
+    }
+
+    /**
+     * Void a completed sale, approved with a manager PIN (same rule as voiding a cart item).
+     */
+    public function void(Request $request, Domain $domain, Sale $sale, SaleService $saleService): JsonResponse
+    {
+        if ($sale->domain !== $domain->name_slug || ! in_array($sale->payment_status, self::STATUSES, true)) {
+            abort(404);
+        }
+        if (! $this->canSeeAllSales($request->user()) && (int) $sale->user_id !== (int) $request->user()->id) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'pin_code' => ['required', 'string'],
+            'reason' => ['required', 'string', 'max:255'],
+        ]);
+
+        $saleService->voidSale($sale, $request->user(), $validated['pin_code'], trim($validated['reason']));
+
+        return response()->json(['message' => 'Sale voided.']);
+    }
+
+    /**
+     * Gross profit of one sale: what was paid less VAT, less the cost of the items still on it.
+     * Voided lines are excluded; lines whose product had no cost are listed but count as zero.
+     */
+    private function profitBreakdown(Sale $sale, $items): array
+    {
+        $grandTotal = (float) $sale->grand_total;
+        $vat = (float) $sale->tax_amount;
+        $revenue = $grandTotal - $vat;
+
+        $lines = $items->reject(fn (SaleItem $item) => $item->trashed())
+            ->map(fn (SaleItem $item) => [
+                'product_name' => $item->product?->name ?? 'Deleted product',
+                'modifiers' => $item->modifierSummary(),
+                'notes' => $item->notes,
+                'quantity' => (float) $item->quantity,
+                'unit_cost' => $item->unit_cost === null ? null : round((float) $item->unit_cost, 2),
+                'line_cost' => $item->unit_cost === null ? null : round((float) $item->unit_cost * (float) $item->quantity, 2),
+            ])->values();
+
+        $cogs = (float) $lines->sum(fn ($line) => $line['line_cost'] ?? 0);
+        $profit = $revenue - $cogs;
+
+        return [
+            'grand_total' => round($grandTotal, 2),
+            'vat' => round($vat, 2),
+            'revenue' => round($revenue, 2),
+            'cogs' => round($cogs, 2),
+            'profit' => round($profit, 2),
+            'margin_percent' => $revenue > 0 ? round($profit / $revenue * 100, 1) : null,
+            'items_missing_cost' => $lines->whereNull('unit_cost')->count(),
+            'lines' => $lines,
+        ];
     }
 
     /**
@@ -206,7 +303,7 @@ class SalesHistoryController extends Controller
             fprintf($out, chr(0xEF).chr(0xBB).chr(0xBF));
             fputcsv($out, [
                 'invoice_number', 'transaction_date', 'cashier', 'customer', 'location',
-                'payment_method', 'card_type', 'payment_status', 'items', 'voided_items',
+                'payment_method', 'payment_channel', 'payment_reference', 'payment_status', 'items', 'voided_items',
                 'total_amount', 'discount_amount', 'tax_amount', 'grand_total',
             ]);
 
@@ -220,6 +317,7 @@ class SalesHistoryController extends Controller
                     $row['location_name'] ?? '',
                     $row['payment_method'] ?? '',
                     $row['payment_card_type'] ?? '',
+                    $row['payment_reference'] ?? '',
                     $row['payment_status'],
                     $row['items_count'],
                     $row['voided_items_count'],
@@ -286,7 +384,12 @@ class SalesHistoryController extends Controller
             ->whereIn('payment_status', $filters['payment_status'] ? [$filters['payment_status']] : self::STATUSES)
             ->when($filters['location_id'], fn ($q, $id) => $q->where('location_id', $id))
             ->when($filters['user_id'], fn ($q, $id) => $q->where('user_id', $id))
-            ->when($filters['payment_method'], fn ($q, $method) => $q->where('payment_method', $method))
+            // A method also finds the sales paid partly that way ("split" finds every sale paid in parts).
+            ->when($filters['payment_method'], fn ($q, $method) => $q->where(function ($q) use ($method) {
+                $q->where('payment_method', $method)
+                    ->orWhere(fn ($split) => $split->where('payment_method', 'split')
+                        ->whereHas('payments', fn ($p) => $p->where('method', $method)));
+            }))
             ->when($filters['search'], function ($q, $search) {
                 $q->where(function ($q) use ($search) {
                     $q->where('invoice_number', 'like', "%{$search}%")
@@ -298,7 +401,7 @@ class SalesHistoryController extends Controller
     private function withListRelations(Builder $query): Builder
     {
         return $query
-            ->with(['user:id,name', 'customer:id,name', 'location:id,name', 'paymentCardType:id,name'])
+            ->with(['user:id,name', 'customer:id,name', 'location:id,name', 'paymentCardType:id,name', 'payments.paymentCardType:id,name'])
             ->withCount([
                 'saleItems as items_count',
                 'saleItems as voided_items_count' => fn ($q) => $q->onlyTrashed(),

@@ -7,6 +7,7 @@ use App\Models\Domain;
 use App\Models\InventoryLocation;
 use App\Models\PaymentCardType;
 use App\Models\Sale;
+use App\Models\SalePayment;
 use App\Models\User;
 use App\Models\WalletCashCountSubmission;
 use App\Models\WalletCashMovement;
@@ -69,6 +70,7 @@ class PaymentCardTypeController extends Controller
         $props['moneyDetailsCardType'] = [
             'id' => (int) $paymentCardType->id,
             'name' => (string) $paymentCardType->name,
+            'kind' => (string) ($paymentCardType->kind ?? 'card'),
             'is_active' => (bool) $paymentCardType->is_active,
         ];
 
@@ -100,6 +102,8 @@ class PaymentCardTypeController extends Controller
             'cardTypes' => $types,
             'walletCashTotals' => $walletCashTotals,
             'walletCreditTotals' => $walletCreditTotals,
+            'walletEwalletTotals' => $this->paidSalesTotalsByPaymentMethod($domain, $location, 'e-wallet'),
+            'walletBankTotals' => $this->paidSalesTotalsByPaymentMethod($domain, $location, 'bank'),
             'ledger' => null,
             'runningCashBalance' => null,
             'activeLocation' => [
@@ -340,16 +344,18 @@ class PaymentCardTypeController extends Controller
         $base = Sale::query()
             ->where('domain', $domain->name_slug)
             ->where('location_id', $location->id)
-            ->where('payment_status', 'paid')
-            ->where('payment_method', $paymentMethod);
+            ->where('payment_status', 'paid');
 
-        $todayTotal = (clone $base)
-            ->whereDate('transaction_date', now()->toDateString())
-            ->sum('grand_total');
+        // Sales paid this way, and this way's part of sales paid in parts.
+        $todayTotal = SalePayment::totalFor(
+            (clone $base)->whereDate('transaction_date', now()->toDateString()),
+            $paymentMethod
+        );
 
-        $yesterdayTotal = (clone $base)
-            ->whereDate('transaction_date', now()->subDay()->toDateString())
-            ->sum('grand_total');
+        $yesterdayTotal = SalePayment::totalFor(
+            (clone $base)->whereDate('transaction_date', now()->subDay()->toDateString()),
+            $paymentMethod
+        );
 
         return [
             'today_total' => (float) $todayTotal,
@@ -358,18 +364,20 @@ class PaymentCardTypeController extends Controller
     }
 
     /**
-     * JSON list for Sales modal (active types only).
+     * JSON list for the Sales channel picker (active channels only; `?kind=` for one kind).
      */
     public function list(Request $request, Domain $domain)
     {
         $location = WalletLocationResolver::resolve($request, $domain);
+        $kind = in_array($request->input('kind'), PaymentCardType::KINDS, true) ? $request->input('kind') : null;
 
         $types = PaymentCardType::query()
             ->forDomainLocation($domain->name_slug, $location->id)
             ->active()
+            ->when($kind, fn ($q) => $q->ofKind($kind))
             ->orderBy('sort_order')
             ->orderBy('name')
-            ->get(['id', 'name', 'is_active']);
+            ->get(['id', 'name', 'kind', 'is_active']);
 
         return response()->json(['data' => $types]);
     }
@@ -380,6 +388,7 @@ class PaymentCardTypeController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255', $this->uniqueNameInLocation($domain, $location)],
+            'kind' => ['nullable', Rule::in(PaymentCardType::KINDS)],
             'sort_order' => ['nullable', 'integer', 'min:0', 'max:65535'],
         ], $this->uniqueNameMessage());
 
@@ -387,6 +396,7 @@ class PaymentCardTypeController extends Controller
             'domain' => $domain->name_slug,
             'location_id' => $location->id,
             'name' => $validated['name'],
+            'kind' => $validated['kind'] ?? 'card',
             'is_active' => true,
             'sort_order' => $validated['sort_order'] ?? 0,
         ]);
@@ -410,6 +420,7 @@ class PaymentCardTypeController extends Controller
                 'max:255',
                 $this->uniqueNameInLocation($domain, $location)->ignore($paymentCardType->id),
             ],
+            'kind' => ['sometimes', Rule::in(PaymentCardType::KINDS)],
             'is_active' => ['sometimes', 'boolean'],
             'sort_order' => ['nullable', 'integer', 'min:0', 'max:65535'],
         ], $this->uniqueNameMessage());
@@ -449,22 +460,35 @@ class PaymentCardTypeController extends Controller
         $perPage = max(1, min(100, (int) $request->input('per_page', 20)));
         $page = max(1, (int) $request->input('page', 1));
 
-        $base = Sale::query()
+        // Card sales for a terminal, e-wallet sales for GCash, bank sales for a bank account.
+        $method = PaymentCardType::methodForKind($paymentCardType->kind ?? 'card');
+        $channelId = $paymentCardType->id;
+
+        $paidHere = Sale::query()
             ->where('domain', $domain->name_slug)
             ->where('location_id', $location->id)
-            ->where('payment_card_type_id', $paymentCardType->id)
-            ->where('payment_status', 'paid')
-            ->where('payment_method', 'card');
+            ->where('payment_status', 'paid');
 
-        $todayTotal = (clone $base)
-            ->whereDate('transaction_date', now()->toDateString())
-            ->sum('grand_total');
+        $todayTotal = SalePayment::totalFor(
+            (clone $paidHere)->whereDate('transaction_date', now()->toDateString()),
+            $method,
+            $channelId
+        );
 
-        $yesterdayTotal = (clone $base)
-            ->whereDate('transaction_date', now()->subDay()->toDateString())
-            ->sum('grand_total');
+        $yesterdayTotal = SalePayment::totalFor(
+            (clone $paidHere)->whereDate('transaction_date', now()->subDay()->toDateString()),
+            $method,
+            $channelId
+        );
 
-        $historyBase = clone $base;
+        // Sales paid wholly through this channel, and split sales with a part paid through it.
+        $partHere = fn ($q) => $q->where('method', $method)->where('payment_card_type_id', $channelId);
+        $historyBase = (clone $paidHere)
+            ->where(function ($q) use ($method, $channelId, $partHere) {
+                $q->where(fn ($single) => $single->where('payment_method', $method)->where('payment_card_type_id', $channelId))
+                    ->orWhere(fn ($split) => $split->where('payment_method', 'split')->whereHas('payments', $partHere));
+            })
+            ->with(['payments' => $partHere]);
 
         $search = trim((string) ($validated['search'] ?? ''));
         if ($search !== '') {
@@ -492,7 +516,11 @@ class PaymentCardTypeController extends Controller
                 return [
                     'id' => $sale->id,
                     'invoice_number' => $sale->invoice_number,
-                    'grand_total' => (float) $sale->grand_total,
+                    // For a split sale, only what went through this channel.
+                    'grand_total' => $sale->payment_method === 'split'
+                        ? round((float) $sale->payments->sum('amount'), 2)
+                        : (float) $sale->grand_total,
+                    'is_split' => $sale->payment_method === 'split',
                     'transaction_date' => $ts ? $ts->toIso8601String() : null,
                 ];
             })
@@ -515,7 +543,7 @@ class PaymentCardTypeController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Card type deactivated because it is used on past sales.',
+                'message' => 'Payment channel deactivated because it is used on past sales.',
             ]);
         }
 
@@ -523,11 +551,11 @@ class PaymentCardTypeController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Card type deleted.',
+            'message' => 'Payment channel deleted.',
         ]);
     }
 
-    /** Card type names must be unique per store, or cashiers can't tell them apart at checkout. */
+    /** Channel names must be unique per store, or cashiers can't tell them apart at checkout. */
     private function uniqueNameInLocation(Domain $domain, InventoryLocation $location): Unique
     {
         return Rule::unique('payment_card_types', 'name')
@@ -538,7 +566,7 @@ class PaymentCardTypeController extends Controller
     /** @return array<string, string> */
     private function uniqueNameMessage(): array
     {
-        return ['name.unique' => 'A card type with this name already exists at this store.'];
+        return ['name.unique' => 'A payment channel with this name already exists at this store.'];
     }
 
     private function ensureInDomainLocation(Domain $domain, InventoryLocation $location, PaymentCardType $paymentCardType): void

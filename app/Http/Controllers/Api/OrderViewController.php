@@ -18,6 +18,7 @@ class OrderViewController extends Controller
             // Find the order (sale) by ID
             $order = Sale::with([
                 'saleItems.product',
+                'saleItems.modifiers',
                 'customer.tier'
             ])->findOrFail($orderId);
 
@@ -46,6 +47,8 @@ class OrderViewController extends Controller
                         'id' => $item->id,
                         'product_id' => $item->product_id,
                         'product_name' => $item->product->name ?? 'Unknown Product',
+                        'modifiers' => $item->modifierSummary(),
+                        'notes' => $item->notes,
                         'product_sku' => $item->product->SKU ?? 'N/A',
                         'quantity' => $item->quantity,
                         'unit_price' => (float) $item->unit_price,
@@ -96,6 +99,7 @@ class OrderViewController extends Controller
             // Find the most recent pending order
             $order = Sale::with([
                 'saleItems.product',
+                'saleItems.modifiers',
                 'customer.tier'
             ])
             ->where('payment_status', 'pending')
@@ -127,6 +131,8 @@ class OrderViewController extends Controller
                         'id' => $item->id,
                         'product_id' => $item->product_id,
                         'product_name' => $item->product->name ?? 'Unknown Product',
+                        'modifiers' => $item->modifierSummary(),
+                        'notes' => $item->notes,
                         'product_sku' => $item->product->SKU ?? 'N/A',
                         'quantity' => $item->quantity,
                         'unit_price' => (float) $item->unit_price,

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\CreditTransaction;
 use App\Models\Customer;
 use App\Models\Sale;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
@@ -61,35 +62,9 @@ class CreditService
             throw new \Exception('Payment amount cannot exceed credit balance.');
         }
 
-        // If specific transactions are provided, mark them as paid
-        if (! empty($transactionIds) && $transactionType === 'payment') {
-            $transactions = CreditTransaction::whereIn('id', $transactionIds)
-                ->where('customer_id', $customer->id)
-                ->where('transaction_type', 'credit')
-                ->whereNull('paid_at')
-                ->get();
-
-            foreach ($transactions as $transaction) {
-                $transaction->markAsPaid();
-            }
-
-            // Update related sales if fully paid
-            foreach ($transactions as $transaction) {
-                if ($transaction->sale_id) {
-                    $sale = Sale::find($transaction->sale_id);
-                    if ($sale) {
-                        // Check if all credit transactions for this sale are paid
-                        $unpaidTransactions = CreditTransaction::where('sale_id', $sale->id)
-                            ->where('transaction_type', 'credit')
-                            ->whereNull('paid_at')
-                            ->count();
-
-                        if ($unpaidTransactions === 0) {
-                            $sale->update(['payment_status' => 'paid']);
-                        }
-                    }
-                }
-            }
+        // A payment settles charges: the ones picked first, then the oldest still owed.
+        if ($transactionType === 'payment') {
+            $this->allocatePayment($customer, abs($amount), $transactionIds);
         }
 
         // Create transaction
@@ -98,7 +73,8 @@ class CreditService
             amount: $amount,
             saleId: null,
             referenceNumber: $referenceNumber,
-            notes: $notes ?? ucfirst($transactionType).' transaction'.(! empty($transactionIds) ? ' - Applied to transactions' : '')
+            notes: $notes ?? ucfirst($transactionType).' transaction'.(! empty($transactionIds) ? ' - Applied to transactions' : ''),
+            paymentMethod: $transactionType === 'payment' ? $paymentMethod : null
         );
 
         Log::info('Credit transaction processed', [
@@ -110,6 +86,138 @@ class CreditService
         ]);
 
         return $transaction;
+    }
+
+    /**
+     * Charge a customer on credit by hand (not from a sale), due on one date or split into installments.
+     *
+     * @param  array<int, array{due_date: string, amount: float|int|string}>  $installments
+     */
+    public function processManualCharge(
+        Customer $customer,
+        float $amount,
+        ?string $dueDate = null,
+        array $installments = [],
+        ?string $referenceNumber = null,
+        ?string $notes = null,
+    ): CreditTransaction {
+        $this->checkCreditLimit($customer, $amount);
+
+        // The charge is due when its last installment is.
+        if ($installments !== []) {
+            $dueDate = end($installments)['due_date'];
+        }
+
+        $transaction = $customer->addCreditTransaction(
+            type: 'credit',
+            amount: $amount,
+            referenceNumber: $referenceNumber,
+            notes: $notes ?? 'Manual credit charge',
+            dueDate: $dueDate !== null ? Carbon::parse($dueDate) : null
+        );
+
+        foreach (array_values($installments) as $i => $installment) {
+            $transaction->installments()->create([
+                'seq' => $i + 1,
+                'due_date' => $installment['due_date'],
+                'amount' => round((float) $installment['amount'], 2),
+            ]);
+        }
+
+        Log::info('Manual credit charge recorded', [
+            'customer_id' => $customer->id,
+            'amount' => $amount,
+            'installments' => count($installments),
+            'transaction_id' => $transaction->id,
+        ]);
+
+        return $transaction->load('installments');
+    }
+
+    /**
+     * Put a payment against what the customer owes: the charges picked first, then the oldest
+     * still unpaid. Within a charge paid in installments, the earliest installment is paid first.
+     * A charge, or an installment, is marked paid only once it is paid in full.
+     */
+    protected function allocatePayment(Customer $customer, float $amount, array $transactionIds = []): void
+    {
+        // Work in centavos so partial payments never leave a stray fraction behind.
+        $left = (int) round($amount * 100);
+
+        $unpaid = CreditTransaction::query()
+            ->where('customer_id', $customer->id)
+            ->where('transaction_type', 'credit')
+            ->whereNull('paid_at')
+            ->with('installments')
+            ->orderByRaw('due_date IS NULL, due_date')
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+
+        $picked = array_map('intval', $transactionIds);
+        $charges = $unpaid->sortBy(fn ($c) => in_array($c->id, $picked, true) ? 0 : 1)->values();
+
+        $settledSaleIds = [];
+
+        foreach ($charges as $charge) {
+            if ($left <= 0) {
+                break;
+            }
+
+            $owed = self::cents($charge->amount) - self::cents($charge->paid_amount);
+            $applied = min($left, max(0, $owed));
+            if ($applied === 0) {
+                continue;
+            }
+
+            $toInstallments = $applied;
+            foreach ($charge->installments as $installment) {
+                if ($toInstallments <= 0) {
+                    break;
+                }
+                if ($installment->paid_at !== null) {
+                    continue;
+                }
+
+                $due = self::cents($installment->amount) - self::cents($installment->paid_amount);
+                $part = min($toInstallments, max(0, $due));
+                $toInstallments -= $part;
+
+                $installment->update([
+                    'paid_amount' => (self::cents($installment->paid_amount) + $part) / 100,
+                    'paid_at' => $part >= $due ? now() : null,
+                ]);
+            }
+
+            $left -= $applied;
+            $fullyPaid = $applied >= $owed;
+
+            $charge->update([
+                'paid_amount' => (self::cents($charge->paid_amount) + $applied) / 100,
+                'paid_at' => $fullyPaid ? now() : null,
+            ]);
+
+            if ($fullyPaid && $charge->sale_id) {
+                $settledSaleIds[] = $charge->sale_id;
+            }
+        }
+
+        // A credit sale counts as paid once every charge on it is.
+        foreach (array_unique($settledSaleIds) as $saleId) {
+            $stillOwed = CreditTransaction::where('sale_id', $saleId)
+                ->where('transaction_type', 'credit')
+                ->whereNull('paid_at')
+                ->exists();
+
+            if (! $stillOwed) {
+                Sale::whereKey($saleId)->update(['payment_status' => 'paid']);
+            }
+        }
+    }
+
+    private static function cents($value): int
+    {
+        return (int) round((float) $value * 100);
     }
 
     /**

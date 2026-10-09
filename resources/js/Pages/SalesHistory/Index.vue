@@ -10,6 +10,7 @@ import {
     IconReceiptTax,
     IconCoins,
     IconReceiptOff,
+    IconTrendingUp,
     IconCalendarEvent,
 } from "@tabler/icons-vue";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
@@ -149,7 +150,7 @@ const pagination = computed(() => ({
 
 const handleTableChange = (p) => load({ page: p.current, per_page: p.pageSize });
 
-const statusColor = (s) => ({ paid: "green", partial: "orange", refunded: "red" })[s] || "default";
+const statusColor = (s) => ({ paid: "green", partial: "orange", refunded: "red", voided: "red" })[s] || "default";
 
 const columns = [
     { title: "Date / time", dataIndex: "transaction_date_display", key: "date", width: 170 },
@@ -230,14 +231,29 @@ const summaryCards = computed(() => {
             highlight: true,
         },
         {
+            key: "profit",
+            label: "Profit",
+            value: formattedTotal(s.profit ?? 0),
+            // Lines without a cost count as zero cost, so say so rather than show an inflated margin.
+            hint: s.items_missing_cost
+                ? `${s.items_missing_cost.toLocaleString()} item(s) missing cost`
+                : `${percent(s.profit ?? 0, (s.net ?? 0) - (s.vat ?? 0))} margin, ex-VAT`,
+            icon: IconTrendingUp,
+            tone: "bg-emerald-50 text-emerald-600",
+        },
+        {
             key: "voids",
             label: "Sales with voids",
             value: (s.sales_with_voids ?? 0).toLocaleString(),
-            hint: `${percent(s.sales_with_voids ?? 0, count)} of sales`,
+            // Voided receipts are listed but left out of every total above.
+            hint: s.voided_sales
+                ? `${s.voided_sales.toLocaleString()} voided receipt(s), not counted`
+                : `${percent(s.sales_with_voids ?? 0, count)} of sales`,
             icon: IconReceiptOff,
             tone: "bg-red-50 text-red-600",
         },
-    ];
+        // The server leaves profit out for staff who only see their own sales.
+    ].filter((card) => card.key !== "profit" || s.profit !== undefined);
 });
 </script>
 
@@ -282,7 +298,7 @@ const summaryCards = computed(() => {
                         <span data-testid="sales-history-period">{{ periodLabel }}</span>
                     </div>
 
-                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                         <div
                             v-for="card in summaryCards"
                             :key="card.key"
@@ -339,7 +355,9 @@ const summaryCards = computed(() => {
                                 <a-tag v-if="record.is_credit_sale" color="purple">credit</a-tag>
                             </template>
                             <template v-else-if="column.key === 'grand_total'">
-                                {{ formattedTotal(record.grand_total) }}
+                                <span :class="{ 'text-gray-400 line-through': record.payment_status === 'voided' }">
+                                    {{ formattedTotal(record.grand_total) }}
+                                </span>
                             </template>
                             <template v-else-if="column.key === 'location'">
                                 {{ record.location_name || "—" }}
@@ -354,6 +372,7 @@ const summaryCards = computed(() => {
             :sale-id="selectedSaleId"
             :business-name="domainName"
             @close="selectedSaleId = null"
+            @voided="load({ page: pagination.current })"
         />
     </AuthenticatedLayout>
 </template>

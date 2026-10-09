@@ -4,6 +4,7 @@ namespace App;
 
 use Carbon\Carbon;
 use App\Models\InventoryLocation;
+use App\Models\User;
 
 class Helpers
 {
@@ -35,6 +36,32 @@ class Helpers
     public static function selectedLocationSessionKey(string $domainSlug): string
     {
         return "selected_location.{$domainSlug}";
+    }
+
+    /**
+     * Where an organization user lands (after login, impersonation, or being sent away from a page):
+     * the sales screen, unless their store is a warehouse, which doesn't sell. Then Inventory, or the
+     * dashboard or their profile when they can't open Inventory.
+     */
+    public static function homeRouteFor(User $user, ?InventoryLocation $location = null): string
+    {
+        $location ??= self::getActiveLocation(
+            $user->domain,
+            $user->hasLocationRestriction() ? $user->location_id : null,
+        );
+
+        if (! $location?->isWarehouse()) {
+            return 'domains.sales.index';
+        }
+
+        $can = fn (string $routeName) => $user->isSuperUser()
+            || $user->getAllPermissions()->contains('route_name', $routeName);
+
+        if ($can('inventory.index')) {
+            return 'domains.inventory.index';
+        }
+
+        return $can('dashboard') ? 'domains.dashboard' : 'profile.edit';
     }
 
     /**

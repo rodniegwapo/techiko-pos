@@ -93,6 +93,14 @@ class Product extends Model
         return $this->hasMany(SaleItem::class);
     }
 
+    /** The option groups picked when this product is rung up (Size, Add-ons…), in their order. */
+    public function modifierGroups()
+    {
+        return $this->belongsToMany(\App\Models\ModifierGroup::class, 'product_modifier_group')
+            ->withPivot('sort_order')
+            ->orderBy('product_modifier_group.sort_order')
+            ->orderBy('modifier_groups.id');
+    }
 
 
     /**
@@ -240,7 +248,8 @@ class Product extends Model
         if ($location) {
             return $query->whereHas('inventories', function ($q) use ($location) {
                 $q->where('location_id', $location->id)
-                    ->whereRaw('quantity_available <= products.reorder_level');
+                    // The store's own low stock level, else the product's.
+                    ->whereRaw('quantity_available <= COALESCE(product_inventory.location_reorder_level, products.reorder_level)');
             });
         }
 

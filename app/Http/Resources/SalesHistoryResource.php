@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Models\SalePayment;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -31,7 +32,12 @@ class SalesHistoryResource extends JsonResource
             'customer_name' => $this->customer?->name ?? 'Walk-in',
             'location_name' => $this->location?->name,
             'payment_method' => $this->payment_method,
-            'payment_card_type' => $this->paymentCardType?->name,
+            // For a sale paid in parts, the parts in one line ("Cash 200.00 + GCash 300.00").
+            'payment_card_type' => $this->payment_method === 'split' && $this->relationLoaded('payments')
+                ? SalePayment::breakdown($this->payments)
+                : $this->paymentCardType?->name,
+            'payments' => $this->whenLoaded('payments', fn () => $this->payments->map->toDisplayArray()->all()),
+            'payment_reference' => $this->payment_reference,
             'payment_status' => $this->payment_status,
             'is_credit_sale' => (bool) $this->is_credit_sale,
             'total_amount' => round((float) $this->total_amount, 2),

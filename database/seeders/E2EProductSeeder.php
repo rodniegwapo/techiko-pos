@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Category;
 use App\Models\InventoryLocation;
+use App\Models\InventoryMovement;
 use App\Models\Product\Product;
 use App\Models\ProductInventory;
 use App\Models\SharedProductSuggestion;
@@ -96,6 +97,9 @@ class E2EProductSeeder extends Seeder
         SharedProductSuggestion::query()
             ->where(fn ($q) => $q->whereIn('submitted_product_id', $ids)->orWhere('barcode', 'like', 'E2E-%'))
             ->delete();
+
+        // Stock movements (e.g. from the transfer tests) would otherwise block deleting their products.
+        InventoryMovement::whereIn('product_id', $ids)->delete();
 
         Product::whereIn('id', $ids)->delete();
     }

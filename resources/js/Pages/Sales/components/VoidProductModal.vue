@@ -4,6 +4,8 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 
 const props = defineProps({
     visible: { type: Boolean, default: false },
+    title: { type: String, default: 'Void Product' },
+    itemFieldLabel: { type: String, default: 'Item' },
     submitLoading: { type: Boolean, default: false },
     amount: { type: [String, Number], default: '' },
     itemLabel: { type: String, default: '' },
@@ -32,10 +34,28 @@ watch(
 );
 
 function handleSubmit() {
+    if (props.submitLoading) return;
     emit('submit', {
         pin_code: pinCode.value,
         reason: reason.value,
     });
+}
+
+// Enter submits the void. stop() keeps the key from the POS barcode listener on the page, which
+// would otherwise read the PIN as a scan and put it in the product search.
+function onEnter(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    handleSubmit();
+}
+
+// In the reason box, Shift+Enter still starts a new line.
+function onReasonEnter(event) {
+    if (event.shiftKey) {
+        event.stopPropagation();
+        return;
+    }
+    onEnter(event);
 }
 
 function handleCancel() {
@@ -46,7 +66,7 @@ function handleCancel() {
 <template>
     <a-modal
         :visible="visible"
-        title="Void Product"
+        :title="title"
         :mask-closable="false"
         width="450px"
         @update:visible="emit('update:visible', $event)"
@@ -59,7 +79,7 @@ function handleCancel() {
             <a-form-item label="Amount">
                 <a-input :value="amount" size="large" disabled />
             </a-form-item>
-            <a-form-item label="Item">
+            <a-form-item :label="itemFieldLabel">
                 <a-input :value="itemLabel" size="large" disabled />
             </a-form-item>
             <a-form-item
@@ -72,6 +92,7 @@ function handleCancel() {
                     type="password"
                     size="large"
                     autocomplete="new-password"
+                    @keydown.enter="onEnter"
                 />
             </a-form-item>
             <a-form-item
@@ -79,7 +100,12 @@ function handleCancel() {
                 :validate-status="fieldError('reason') ? 'error' : ''"
                 :help="fieldError('reason')"
             >
-                <a-textarea v-model:value="reason" :rows="3" size="large" />
+                <a-textarea
+                    v-model:value="reason"
+                    :rows="3"
+                    size="large"
+                    @keydown.enter="onReasonEnter"
+                />
             </a-form-item>
         </a-form>
         <template #footer>

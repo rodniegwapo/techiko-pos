@@ -3,6 +3,7 @@ import { ref } from "vue";
 import { Head, router, usePage } from "@inertiajs/vue3";
 import { IconArrowLeft } from "@tabler/icons-vue";
 import { useHelpers } from "@/Composables/useHelpers";
+import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
@@ -26,7 +27,12 @@ const props = defineProps({
     availableCredit: Number,
 });
 
+const { hasPermission } = usePermissionsV2();
+// Charging by hand raises what the customer owes, so it goes with being able to set their credit.
+const canCharge = hasPermission("credits.settings.update");
+
 const showRecordPaymentModal = ref(false);
+const payingInvoiceId = ref(null);
 const showOutstandingOrderModal = ref(false);
 const selectedOutstandingInvoice = ref(null);
 const showCreditTransactionModal = ref(false);
@@ -41,7 +47,9 @@ const handleBack = () => {
     );
 };
 
-const handleRecordPayment = () => {
+// From an invoice's row, that invoice comes ticked; from the header, none is.
+const handleRecordPayment = (invoice = null) => {
+    payingInvoiceId.value = invoice?.id ?? null;
     showRecordPaymentModal.value = true;
 };
 
@@ -102,7 +110,7 @@ const handleSaved = () => {
                         </p>
                     </div>
                     <div class="flex gap-2">
-                        <a-button @click="handleRecordPayment" type="primary">
+                        <a-button @click="handleRecordPayment()" type="primary">
                             Record Payment
                         </a-button>
                         <a-button @click="handleAddTransaction"
@@ -168,6 +176,7 @@ const handleSaved = () => {
             :visible="showRecordPaymentModal"
             :customer="customer"
             :outstanding-invoices="outstandingInvoices"
+            :preselected-invoice-id="payingInvoiceId"
             @close="handleModalClose"
             @saved="handleSaved"
         />
@@ -182,6 +191,8 @@ const handleSaved = () => {
         <CreditTransactionModal
             :visible="showCreditTransactionModal"
             :customer="customer"
+            :available-credit="Number(availableCredit || 0)"
+            :can-charge="canCharge"
             @close="handleModalClose"
             @saved="handleSaved"
         />

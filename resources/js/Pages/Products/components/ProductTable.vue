@@ -13,13 +13,14 @@ import { useHelpers } from "@/Composables/useHelpers";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
+import DeleteProductModal from "./DeleteProductModal.vue";
 
 import { usePage, router } from "@inertiajs/vue3";
 
 const page = usePage();
 const emit = defineEmits(["handleTableChange"]);
 
-const { confirmDelete, formatCurrency, formatDate } = useHelpers();
+const { formatCurrency, formatDate } = useHelpers();
 const { spinning } = useGlobalVariables();
 const { getRoute, getLocationQueryFromPage } = useDomainRoutes();
 const { hasPermission } = usePermissionsV2();
@@ -127,6 +128,17 @@ function categoryName(record) {
     return record.category?.name || "Uncategorized";
 }
 
+/** "Low" / "Out" next to the store quantity; nothing when in stock or not tracked. */
+function stockTag(record) {
+    if (record.location_stock_status === "low_stock") {
+        return { label: "Low", color: "orange" };
+    }
+    if (record.location_stock_status === "out_of_stock") {
+        return { label: "Out", color: "red" };
+    }
+    return null;
+}
+
 function storeQtyLabel(record) {
     if (!record.track_inventory) return "N/A";
     return String(record.location_quantity_available ?? 0);
@@ -145,12 +157,13 @@ function productSubtitle(record) {
     return parts.join(" · ");
 }
 
+const deleteModalOpen = ref(false);
+const productToDelete = ref(null);
+
+/** Opens the dialog that asks whether to remove the product from this store or everywhere. */
 const handleDeleteCategory = (record) => {
-    confirmDelete(
-        "products.destroy",
-        { product: record.id },
-        "Do you want to delete this item ?",
-    );
+    productToDelete.value = record;
+    deleteModalOpen.value = true;
 };
 
 const handleClickEdit = (record) => {
@@ -226,9 +239,17 @@ function onMobilePaginationChange(pageNum) {
                 <span v-if="!record.track_inventory" class="text-gray-400"
                     >N/A</span
                 >
-                <span v-else class="font-medium">{{
-                    record.location_quantity_available ?? 0
-                }}</span>
+                <span v-else class="inline-flex items-center gap-2">
+                    <span class="font-medium">{{
+                        record.location_quantity_available ?? 0
+                    }}</span>
+                    <a-tag
+                        v-if="stockTag(record)"
+                        :color="stockTag(record).color"
+                        class="m-0"
+                        >{{ stockTag(record).label }}</a-tag
+                    >
+                </span>
             </template>
             <template v-if="column.key == 'action'">
                 <div class="flex items-center gap-2">
@@ -352,6 +373,12 @@ function onMobilePaginationChange(pageNum) {
                                     "
                                 >
                                     {{ storeQtyLabel(record) }}
+                                    <a-tag
+                                        v-if="stockTag(record)"
+                                        :color="stockTag(record).color"
+                                        class="ml-1 mr-0"
+                                        >{{ stockTag(record).label }}</a-tag
+                                    >
                                 </span>
                             </template>
                             <template v-if="showSuperUserDomain">
@@ -667,4 +694,10 @@ function onMobilePaginationChange(pageNum) {
             </div>
         </div>
     </a-modal>
+
+    <DeleteProductModal
+        v-model:open="deleteModalOpen"
+        :product="productToDelete"
+        :current-location="currentLocation"
+    />
 </template>

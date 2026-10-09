@@ -43,6 +43,11 @@ const selectedDomain = ref(props.filters?.domain ?? null);
 const totalValue = computed(() => props.summary?.total_value || 0);
 const totalQuantity = computed(() => props.summary?.total_quantity || 0);
 const totalProducts = computed(() => props.summary?.total_products || 0);
+// At sale price: what the stock would sell for, and the margin over its cost.
+const totalRetailValue = computed(() => Number(props.summary?.total_retail_value) || 0);
+const potentialProfit = computed(() => Number(props.summary?.potential_profit) || 0);
+const pesos = (n) =>
+    `₱${Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 // Fetch items
 const getItems = () => {
@@ -141,6 +146,22 @@ const tableColumns = computed(() => {
                     minimumFractionDigits: 2,
                 })}`,
             sorter: (a, b) => a.total_value - b.total_value,
+        },
+        {
+            title: "Sale Price",
+            dataIndex: "price",
+            key: "price",
+            align: "left",
+            customRender: ({ text }) => pesos(text),
+            sorter: (a, b) => a.price - b.price,
+        },
+        {
+            title: "Retail Value",
+            dataIndex: "retail_value",
+            key: "retail_value",
+            align: "left",
+            customRender: ({ text }) => pesos(text),
+            sorter: (a, b) => a.retail_value - b.retail_value,
         },
         {
             title: "Last Movement",
@@ -359,6 +380,44 @@ const printValuation = () => {
                     </div>
                 </div>
 
+                <!-- At sale price -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 px-6 pb-6">
+                    <div class="bg-gray-50 rounded-lg p-6 border">
+                        <div class="flex items-center">
+                            <div class="p-3 rounded-full bg-amber-100 mr-4">
+                                <DollarOutlined
+                                    class="text-2xl text-amber-600"
+                                />
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-600">
+                                    Retail Value (at sale price)
+                                </p>
+                                <p class="text-2xl font-bold text-amber-600">
+                                    {{ pesos(totalRetailValue) }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-6 border">
+                        <div class="flex items-center">
+                            <div class="p-3 rounded-full bg-teal-100 mr-4">
+                                <DollarOutlined
+                                    class="text-2xl text-teal-600"
+                                />
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-600">
+                                    Potential Profit
+                                </p>
+                                <p class="text-2xl font-bold text-teal-600">
+                                    {{ pesos(potentialProfit) }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Valuation Table -->
                 <div class="mb-2">
                     <a-card>
@@ -468,6 +527,22 @@ const printValuation = () => {
                                                         record.average_cost,
                                                     )
                                                 }}
+                                            </span>
+                                            <span class="text-gray-500"
+                                                >Sale price</span
+                                            >
+                                            <span
+                                                class="text-right font-medium text-gray-900"
+                                            >
+                                                {{ formatCurrency(record.price) }}
+                                            </span>
+                                            <span class="text-gray-500"
+                                                >Retail value</span
+                                            >
+                                            <span
+                                                class="text-right font-medium text-gray-900"
+                                            >
+                                                {{ formatCurrency(record.retail_value) }}
                                             </span>
                                             <span class="text-gray-500"
                                                 >Last movement</span

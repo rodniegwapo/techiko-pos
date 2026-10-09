@@ -11,8 +11,20 @@ class SaleItem extends Model
     
     protected $guarded = [];
 
+    protected $casts = [
+        'unit_cost' => 'decimal:4',
+    ];
+
     protected static function booted()
     {
+        // Freeze the product's cost on the line when it is first added, so later cost edits
+        // don't rewrite the profit of sales already made.
+        static::creating(function (SaleItem $item) {
+            if ($item->unit_cost === null && $item->product_id) {
+                $item->unit_cost = \App\Models\Product\Product::whereKey($item->product_id)->value('cost');
+            }
+        });
+
         // Auto-calculate subtotal before saving
         static::saving(function (SaleItem $item) {
             $lineSubtotal = $item->unit_price * $item->quantity;
@@ -33,6 +45,25 @@ class SaleItem extends Model
     public function discounts()
     {
         return $this->belongsToMany(\App\Models\Product\Discount::class);
+    }
+
+    /** The options picked on this line (Large, Extra shot…), as they were priced when rung up. */
+    public function modifiers()
+    {
+        return $this->hasMany(SaleItemModifier::class)->orderBy('id');
+    }
+
+    /** @return list<array{group_name: string, name: string, price_delta: float}> */
+    public function modifierSummary(): array
+    {
+        return $this->modifiers
+            ->map(fn (SaleItemModifier $m) => [
+                'group_name' => $m->group_name,
+                'name' => $m->name,
+                'price_delta' => round((float) $m->price_delta, 2),
+            ])
+            ->values()
+            ->all();
     }
 
     public function setDiscountAmount(?string $type, ?float $discountAmount): void

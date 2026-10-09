@@ -14,6 +14,7 @@ use App\Models\Product\Product;
 use App\Models\ProductInventory;
 use App\Services\InventoryService;
 use App\Traits\MovementTypes;
+use App\Traits\HandlesStockTransfers;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -21,6 +22,7 @@ use Inertia\Inertia;
 
 class InventoryController extends Controller
 {
+    use HandlesStockTransfers;
     use MovementTypes;
 
     public function __construct(private InventoryService $inventoryService) {}
@@ -308,47 +310,31 @@ class InventoryController extends Controller
      */
     public function transfer(Request $request)
     {
-        $validated = $request->validate([
-            'product_id' => 'required|exists:products,id',
-            'from_location_id' => 'required|exists:inventory_locations,id',
-            'to_location_id' => 'required|exists:inventory_locations,id|different:from_location_id',
-            'quantity' => 'required|integer|min:1',
-            'notes' => 'nullable|string|max:500',
-        ]);
+        $transfer = $this->validatedTransfer($request);
 
-        $product = Product::findOrFail($validated['product_id']);
-        $fromLocation = InventoryLocation::findOrFail($validated['from_location_id']);
-        $toLocation = InventoryLocation::findOrFail($validated['to_location_id']);
+        $fromLocation = InventoryLocation::findOrFail($transfer['from_location_id']);
+        $toLocation = InventoryLocation::findOrFail($transfer['to_location_id']);
+        $products = Product::whereIn('id', array_column($transfer['rows'], 'product_id'))->get()->keyBy('id');
 
-        $d1 = (string) $fromLocation->domain;
-        $d2 = (string) $toLocation->domain;
-        $d3 = (string) $product->domain;
-
-        if ($d1 !== $d2 || $d1 !== $d3 || $d2 !== $d3) {
-            throw ValidationException::withMessages([
-                'product_id' => ['Product and both locations must belong to the same domain.'],
-            ]);
+        // Both stores and every product must be in the same organization.
+        $domain = (string) $fromLocation->domain;
+        foreach ($transfer['rows'] as $i => $row) {
+            if ((string) $toLocation->domain !== $domain || (string) $products[$row['product_id']]->domain !== $domain) {
+                throw ValidationException::withMessages([
+                    ($transfer['single'] ? 'product_id' : "items.{$i}.product_id") => ['Product and both locations must belong to the same domain.'],
+                ]);
+            }
         }
 
-        try {
-            $this->inventoryService->transferInventory(
-                $product,
-                $fromLocation,
-                $toLocation,
-                $validated['quantity'],
-                auth()->user(),
-                $validated['notes'] ?? null
-            );
-        } catch (InsufficientStockException $e) {
-            $item = $e->getUnavailableItems()[0] ?? null;
-            $available = $item['available_quantity'] ?? 0;
-            $message = "Only {$available} units available at source location";
+        $items = array_map(fn ($row) => [
+            'product' => $products[$row['product_id']],
+            'quantity' => $row['quantity'],
+        ], $transfer['rows']);
 
-            return response()->json([
-                'success' => false,
-                'errors' => ['quantity' => [$message]],
-                'message' => $message,
-            ], 422);
+        try {
+            $this->inventoryService->transferMany($items, $fromLocation, $toLocation, auth()->user(), $transfer['notes']);
+        } catch (InsufficientStockException $e) {
+            return $this->transferShortageResponse($e, $transfer, $fromLocation);
         }
 
         return response()->json(['success' => true, 'message' => 'Inventory transferred successfully']);

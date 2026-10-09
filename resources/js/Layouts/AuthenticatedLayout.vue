@@ -148,15 +148,23 @@ onMounted(() => {
             <div
                 class="max-w-7xl mx-auto w-full min-w-0 flex-1 p-3 sm:p-4 md:p-6 lg:overflow-auto md:overflow-auto sm:overflow-scroll bg-gray-200 dark:bg-dots-lighter dark:bg-gray-900 selection:bg-red-500 selection:text-white"
             >
+                <!-- Store switcher sits above the page so it never covers header actions -->
+                <LocationBadge />
+                <!-- Why the user was sent here, e.g. away from a warehouse's sales screen -->
+                <a-alert
+                    v-if="page.props.flash?.notice"
+                    :message="page.props.flash.notice"
+                    type="info"
+                    show-icon
+                    closable
+                    class="mb-3"
+                />
                 <slot />
             </div>
             <div>
                 <slot name="content-footer" />
             </div>
         </a-layout-content>
-
-        <!-- Floating Location Badge -->
-        <LocationBadge />
 
         <InquiryChatWidget v-if="user" />
     </a-layout>

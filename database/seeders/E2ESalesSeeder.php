@@ -7,6 +7,7 @@ use App\Models\Customer;
 use App\Models\CreditTransaction;
 use App\Models\InventoryLocation;
 use App\Models\MandatoryDiscount;
+use App\Models\ModifierGroup;
 use App\Models\PaymentCardType;
 use App\Models\Product\Discount;
 use App\Models\Product\Product;
@@ -131,6 +132,8 @@ class E2ESalesSeeder extends Seeder
             ['name' => 'E2E Sold Out', 'price' => 60, 'stock' => 0, 'barcode' => 'E2E000004'],
             // Only security.spec.js uses this, so cross-cart probes can't disturb other tests' carts.
             ['name' => 'E2E Security Probe', 'price' => 10, 'stock' => 1000, 'barcode' => 'E2E000005'],
+            // Only sales/modifiers.spec.js uses this: it has the "E2E Size" options, which ask before adding.
+            ['name' => 'E2E Latte', 'price' => 100, 'stock' => 1000, 'barcode' => 'E2E000006'],
         ];
 
         foreach ($products as $row) {
@@ -168,6 +171,29 @@ class E2ESalesSeeder extends Seeder
                 ]
             );
         }
+
+        $this->seedModifiers();
+    }
+
+    /** "E2E Size" (required: Regular, or Large +₱20) on E2E Latte only. */
+    private function seedModifiers(): void
+    {
+        $size = ModifierGroup::updateOrCreate(
+            ['domain' => self::DOMAIN, 'name' => 'E2E Size'],
+            ['selection' => 'single', 'is_required' => true, 'max_select' => null, 'sort_order' => 0]
+        );
+        foreach ([['Regular', 0], ['Large', 20]] as $i => [$name, $delta]) {
+            $size->modifiers()->updateOrCreate(
+                ['name' => $name],
+                ['price_delta' => $delta, 'cost_delta' => 0, 'is_active' => true, 'sort_order' => $i]
+            );
+        }
+
+        $latte = Product::where('domain', self::DOMAIN)->where('name', 'E2E Latte')->firstOrFail();
+        $latte->modifierGroups()->sync([$size->id => ['sort_order' => 0]]);
+
+        // Groups made by modifiers.spec.js runs that didn't get to delete them.
+        ModifierGroup::where('domain', self::DOMAIN)->where('name', 'like', 'E2E New %')->delete();
     }
 
     private function seedCustomers(): void
@@ -229,6 +255,16 @@ class E2ESalesSeeder extends Seeder
         PaymentCardType::updateOrCreate(
             ['domain' => self::DOMAIN, 'name' => 'E2E Inactive Card'],
             ['is_active' => false, 'location_id' => $location->id, 'sort_order' => 99]
+        );
+
+        // An e-wallet and a bank, for paying by E-wallet / Bank at checkout.
+        PaymentCardType::updateOrCreate(
+            ['domain' => self::DOMAIN, 'name' => 'E2E GCash'],
+            ['kind' => 'ewallet', 'is_active' => true, 'location_id' => $location->id, 'sort_order' => 0]
+        );
+        PaymentCardType::updateOrCreate(
+            ['domain' => self::DOMAIN, 'name' => 'E2E BDO'],
+            ['kind' => 'bank', 'is_active' => true, 'location_id' => $location->id, 'sort_order' => 0]
         );
 
         // Another organization's card type, for cross-organization checks.

@@ -16,6 +16,7 @@ personal_token.pub
 .env.backup
 .env.production
 .env.playwright
+.env.testing
 /tests/e2e/test-results/
 /tests/e2e/playwright-report/
 /tests/e2e/findings-report.md

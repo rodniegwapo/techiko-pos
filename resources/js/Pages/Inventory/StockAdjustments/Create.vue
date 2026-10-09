@@ -253,7 +253,8 @@ const handleSubmit = async () => {
     if (response.data.success) {
       notification.success({
         message: "Adjustment Created",
-        description: "Stock adjustment has been created successfully",
+        description:
+          "Saved as a draft. Submit it for approval — stock updates once it's approved.",
       });
       router.visit(route("inventory.adjustments.index"));
     } else {

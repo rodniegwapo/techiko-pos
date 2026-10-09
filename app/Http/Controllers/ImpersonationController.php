@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers;
 use App\Models\User;
 use App\Services\ImpersonationService;
 use Illuminate\Http\RedirectResponse;
@@ -37,7 +38,7 @@ class ImpersonationController extends Controller
             // This matches the logic in AuthenticatedSessionController
             if ($user->domain) {
                 // User has a domain - redirect to domain-specific dashboard
-                return redirect()->route('domains.sales.index', ['domain' => $user->domain])
+                return redirect()->route(Helpers::homeRouteFor($user), ['domain' => $user->domain])
                     ->with('success', "You are now impersonating {$user->name}");
             }
 

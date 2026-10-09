@@ -73,6 +73,16 @@ const props = defineProps({
     },
 });
 
+/** Words for this channel's kind: a card terminal, an e-wallet or a bank. */
+const kindWords = computed(
+    () =>
+        ({
+            card: { sales: "card", thing: "card type" },
+            ewallet: { sales: "e-wallet", thing: "e-wallet" },
+            bank: { sales: "bank", thing: "bank" },
+        })[props.moneyDetailsCardType?.kind || "card"],
+);
+
 /** @param {string} url */
 function queryObjectFromPageUrl(url) {
     if (!url || typeof url !== "string") {
@@ -290,7 +300,7 @@ onMounted(() => {
                         <a
                             class="text-teal-700 cursor-pointer"
                             @click.prevent="goToCardTerminalsIndex"
-                            >Card terminals</a
+                            >Payment channels</a
                         >
                     </a-breadcrumb-item>
                     <a-breadcrumb-item class="min-w-0 truncate">{{
@@ -330,7 +340,7 @@ onMounted(() => {
                         class="rounded-lg border border-gray-200 bg-white px-4 py-4 shadow-sm"
                     >
                         <div class="text-sm font-medium text-gray-700 mb-2">
-                            Transaction history (paid card sales)
+                            Transaction history (paid {{ kindWords.sales }} sales)
                         </div>
                         <div
                             class="mb-3 flex flex-col gap-3 md:flex-row md:flex-wrap"
@@ -401,7 +411,7 @@ onMounted(() => {
                             row-key="id"
                             :locale="{
                                 emptyText:
-                                    'No transactions for this card type yet.',
+                                    `No transactions for this ${kindWords.thing} yet.`,
                             }"
                             @change="onMoneyTableChange"
                         >
@@ -433,7 +443,7 @@ onMounted(() => {
                                 v-if="!historyRows.length"
                                 class="py-12 text-center text-sm text-gray-500"
                             >
-                                No transactions for this card type yet.
+                                No transactions for this {{ kindWords.thing }} yet.
                             </div>
                             <div v-else class="flex flex-col gap-3">
                                 <div

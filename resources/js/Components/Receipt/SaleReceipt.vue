@@ -25,10 +25,14 @@ const vatLabel = computed(() => {
 });
 
 const paymentLabel = computed(() => {
-    const method = (props.sale.payment_method || "").toUpperCase();
-    return props.sale.payment_card_type
-        ? `${method} · ${props.sale.payment_card_type}`
-        : method;
+    // e.g. "E-WALLET · GCash · Ref 1234"
+    return [
+        (props.sale.payment_method || "").toUpperCase(),
+        props.sale.payment_card_type,
+        props.sale.payment_reference ? `Ref ${props.sale.payment_reference}` : null,
+    ]
+        .filter(Boolean)
+        .join(" · ");
 });
 </script>
 
@@ -37,6 +41,11 @@ const paymentLabel = computed(() => {
         <div class="center bold big">{{ businessName }}</div>
         <div v-if="sale.location_name" class="center">{{ sale.location_name }}</div>
         <div class="center">OFFICIAL RECEIPT (REPRINT)</div>
+        <template v-if="sale.void">
+            <div class="center bold big">*** VOID ***</div>
+            <div class="center">Voided {{ sale.void.voided_at }}</div>
+            <div v-if="sale.void.reason" class="center">{{ sale.void.reason }}</div>
+        </template>
 
         <div class="rule" />
         <div class="row"><span>Invoice #</span><span>{{ sale.invoice_number || `#${sale.id}` }}</span></div>
@@ -47,6 +56,10 @@ const paymentLabel = computed(() => {
 
         <div v-for="item in items" :key="item.id" class="item">
             <div>{{ item.product_name }}</div>
+            <div v-for="(m, i) in item.modifiers || []" :key="i" class="muted">
+                  + {{ m.name }}<template v-if="m.price_delta"> ({{ formattedTotal(m.price_delta) }})</template>
+            </div>
+            <div v-if="item.notes" class="muted">  * {{ item.notes }}</div>
             <div class="row">
                 <span>{{ item.quantity }} x {{ formattedTotal(item.unit_price) }}</span>
                 <span>{{ formattedTotal(item.subtotal) }}</span>
@@ -65,12 +78,25 @@ const paymentLabel = computed(() => {
             <span>Loyalty ({{ sale.loyalty_points_redeemed }} pts)</span>
             <span>-{{ formattedTotal(sale.loyalty_discount_amount) }}</span>
         </div>
-        <div class="row"><span>{{ vatLabel }}</span><span>{{ formattedTotal(sale.tax_amount) }}</span></div>
+        <div v-if="Number(sale.tax_amount) > 0" class="row"><span>{{ vatLabel }}</span><span>{{ formattedTotal(sale.tax_amount) }}</span></div>
         <div class="row bold big"><span>TOTAL</span><span>{{ formattedTotal(sale.grand_total) }}</span></div>
-        <div class="row"><span>Paid by</span><span>{{ paymentLabel }}</span></div>
+        <template v-if="sale.payments?.length">
+            <div class="row"><span>Paid by</span><span>SPLIT</span></div>
+            <template v-for="(p, i) in sale.payments" :key="i">
+                <div class="row">
+                    <span>  {{ p.label }}<template v-if="p.reference"> · Ref {{ p.reference }}</template></span>
+                    <span>{{ formattedTotal(p.tendered ?? p.amount) }}</span>
+                </div>
+                <div v-if="p.tendered != null && p.tendered > p.amount" class="row muted">
+                    <span>  Change</span><span>{{ formattedTotal(p.tendered - p.amount) }}</span>
+                </div>
+            </template>
+        </template>
+        <div v-else class="row"><span>Paid by</span><span>{{ paymentLabel }}</span></div>
 
         <div class="rule" />
-        <div class="center">Thank you!</div>
+        <div v-if="sale.void" class="center bold">*** VOID - NOT A VALID SALE ***</div>
+        <div v-else class="center">Thank you!</div>
     </div>
 </template>
 

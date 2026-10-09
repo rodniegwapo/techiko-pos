@@ -66,8 +66,21 @@ const switchLocation = async (location) => {
         // Close popover
         visible.value = false;
 
-        // Full page reload with new location in URL
+        // Full page reload with new location in URL. A warehouse doesn't sell, so leaving a sales
+        // screen for one goes to its Inventory dashboard instead.
         const url = new URL(window.location);
+        const onSalesScreen = /\/sales(\/|$)/.test(url.pathname);
+        if (location.type === "warehouse" && onSalesScreen) {
+            const inventory = new URL(
+                window.route("domains.inventory.index", {
+                    domain: currentDomain.value.name_slug,
+                }),
+                window.location.origin,
+            );
+            inventory.searchParams.set("location_id", location.id);
+            window.location.href = inventory.toString();
+            return;
+        }
         url.searchParams.set("location_id", location.id);
         window.location.href = url.toString();
     } catch (error) {
@@ -76,7 +89,10 @@ const switchLocation = async (location) => {
         // Show error notification
         notification.error({
             message: "Location Update Failed",
-            description: "Failed to switch location. Please try again.",
+            // Show the server's reason (e.g. inactive store, no access) when it gives one.
+            description:
+                error.response?.data?.message ||
+                "Failed to switch location. Please try again.",
             duration: 5,
         });
     }
@@ -84,7 +100,7 @@ const switchLocation = async (location) => {
 </script>
 
 <template>
-    <div v-if="shouldShowBadge" class="fixed top-4 right-4 z-50">
+    <div v-if="shouldShowBadge" class="location-badge mb-3 flex justify-end">
         <a-popover
             v-model:open="visible"
             placement="bottomRight"

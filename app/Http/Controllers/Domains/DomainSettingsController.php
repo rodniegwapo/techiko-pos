@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Domains;
 
 use App\Http\Controllers\Controller;
 use App\Models\Domain;
+use App\Models\Sale;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -21,6 +22,7 @@ class DomainSettingsController extends Controller
                     ? data_get($settings, 'sales.vat_pricing_mode')
                     : 'exclusive',
                 'allow_overselling' => (bool) data_get($settings, 'sales.allow_overselling', false),
+                'hide_out_of_stock' => (bool) data_get($settings, 'sales.hide_out_of_stock', false),
             ],
         ]);
     }
@@ -32,8 +34,10 @@ class DomainSettingsController extends Controller
             'vat_rate_percent' => ['sometimes', 'numeric', 'min:0', 'max:100'],
             'vat_pricing_mode' => ['sometimes', 'string', 'in:exclusive,inclusive'],
             'allow_overselling' => ['sometimes', 'boolean'],
+            'hide_out_of_stock' => ['sometimes', 'boolean'],
         ]);
 
+        $vatBefore = $domain->salesVatSettings();
         $current = $domain->settings ?? [];
         $sales = $current['sales'] ?? [];
 
@@ -49,9 +53,17 @@ class DomainSettingsController extends Controller
         if (array_key_exists('allow_overselling', $validated)) {
             $sales['allow_overselling'] = (bool) $validated['allow_overselling'];
         }
+        if (array_key_exists('hide_out_of_stock', $validated)) {
+            $sales['hide_out_of_stock'] = (bool) $validated['hide_out_of_stock'];
+        }
 
         $current['sales'] = $sales;
         $domain->update(['settings' => $current]);
+
+        // Open carts store their VAT, so re-total them or they'd keep charging under the old setting.
+        if ($domain->salesVatSettings() != $vatBefore) {
+            Sale::query()->where('domain', $domain->name_slug)->pending()->get()->each->recalcTotals();
+        }
 
         return redirect()->route('domains.settings.index', ['domain' => $domain])
             ->with('success', 'Settings saved.');

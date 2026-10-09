@@ -46,6 +46,14 @@ const props = defineProps({
         type: Object,
         default: () => ({ today_total: 0, yesterday_total: 0 }),
     },
+    walletEwalletTotals: {
+        type: Object,
+        default: () => ({ today_total: 0, yesterday_total: 0 }),
+    },
+    walletBankTotals: {
+        type: Object,
+        default: () => ({ today_total: 0, yesterday_total: 0 }),
+    },
     ledger: {
         type: Object,
         default: null,
@@ -119,7 +127,38 @@ const activeBusinessDate = computed(() => {
     );
 });
 
-const rows = computed(() => props.cardTypes ?? []);
+/** A channel is a card terminal, an e-wallet (GCash, Maya…) or a bank account. */
+const KINDS = [
+    { value: "card", label: "Card", color: "blue" },
+    { value: "ewallet", label: "E-wallet", color: "cyan" },
+    { value: "bank", label: "Bank", color: "purple" },
+];
+const kindOf = (row) => KINDS.find((k) => k.value === (row?.kind || "card")) ?? KINDS[0];
+
+const kindFilter = ref("all");
+const rows = computed(() =>
+    (props.cardTypes ?? []).filter(
+        (row) => kindFilter.value === "all" || kindOf(row).value === kindFilter.value,
+    ),
+);
+
+/** Today / yesterday paid sales per way of paying, shown above the list. */
+const totalsBoxes = computed(() => [
+    { title: "Credit", hint: "Paid credit sales (charge to account)", totals: props.walletCreditTotals },
+    { title: "E-wallet", hint: "Paid e-wallet sales (GCash, Maya…)", totals: props.walletEwalletTotals },
+    { title: "Bank", hint: "Paid bank sales", totals: props.walletBankTotals },
+]);
+
+const RELOAD_PROPS = [
+    "cardTypes",
+    "walletCashTotals",
+    "walletCreditTotals",
+    "walletEwalletTotals",
+    "walletBankTotals",
+    "ledger",
+    "runningCashBalance",
+    "cashControl",
+];
 
 const isMdUp = useMediaQuery("(min-width: 768px)");
 
@@ -133,12 +172,15 @@ const cardTypeModalRootStyle = computed(() =>
 const modalOpen = ref(false);
 const editing = ref(null);
 const formName = ref("");
+const formKind = ref("card");
 const formActive = ref(true);
 const saving = ref(false);
 
 function openCreate() {
     editing.value = null;
     formName.value = "";
+    // Adding while the list shows one kind adds that kind.
+    formKind.value = kindFilter.value === "all" ? "card" : kindFilter.value;
     formActive.value = true;
     modalOpen.value = true;
 }
@@ -146,6 +188,7 @@ function openCreate() {
 function openEdit(row) {
     editing.value = row;
     formName.value = row.name;
+    formKind.value = kindOf(row).value;
     formActive.value = !!row.is_active;
     modalOpen.value = true;
 }
@@ -171,31 +214,24 @@ async function save() {
                 {
                     location_id: activeLocationId.value,
                     name,
+                    kind: formKind.value,
                     is_active: formActive.value,
                 },
             );
-            notification.success({ message: "Card type updated." });
+            notification.success({ message: "Payment channel updated." });
         } else {
             await axios.post(getRoute("payment-card-types.store"), {
                 location_id: activeLocationId.value,
                 name,
+                kind: formKind.value,
                 sort_order: 0,
             });
-            notification.success({ message: "Card type created." });
+            notification.success({ message: "Payment channel created." });
         }
         closeModal();
-        router.reload({
-            only: [
-                "cardTypes",
-                "walletCashTotals",
-                "walletCreditTotals",
-                "ledger",
-                "runningCashBalance",
-                "cashControl",
-            ],
-        });
+        router.reload({ only: RELOAD_PROPS });
     } catch (e) {
-        const msg = firstValidationMessage(e) || "Could not save card type.";
+        const msg = firstValidationMessage(e) || "Could not save the payment channel.";
         notification.error({ message: msg });
     } finally {
         saving.value = false;
@@ -208,7 +244,7 @@ function confirmRemove(row) {
     Modal.confirm({
         title: `Remove "${row.name}"?`,
         content:
-            "Card types used on past sales can't be deleted; they will be deactivated instead.",
+            "Channels used on past sales can't be deleted; they will be deactivated instead.",
         okText: "Remove",
         okType: "danger",
         cancelText: "Cancel",
@@ -230,19 +266,10 @@ async function remove(row) {
             },
         );
         // The server says whether it deleted the type or only deactivated it (used on past sales).
-        notification.success({ message: data?.message || "Card type removed." });
-        router.reload({
-            only: [
-                "cardTypes",
-                "walletCashTotals",
-                "walletCreditTotals",
-                "ledger",
-                "runningCashBalance",
-                "cashControl",
-            ],
-        });
+        notification.success({ message: data?.message || "Payment channel removed." });
+        router.reload({ only: RELOAD_PROPS });
     } catch (e) {
-        const msg = firstValidationMessage(e) || "Could not remove card type.";
+        const msg = firstValidationMessage(e) || "Could not remove the payment channel.";
         notification.error({ message: msg });
     } finally {
         deletingId.value = null;
@@ -251,6 +278,7 @@ async function remove(row) {
 
 const columns = [
     { title: "Name", dataIndex: "name", key: "name" },
+    { title: "Type", key: "kind", width: 120 },
     {
         title: "Status",
         key: "is_active",
@@ -287,57 +315,61 @@ const showMobileSecondaryActions = computed(
         <template #primary>
             <div class="mt-6 w-full min-w-0 max-w-7xl">
                 <div class="space-y-4">
-                    <div
-                        class="mb-4 max-w-full min-w-0 rounded-lg border border-gray-200 bg-white px-4 py-4 shadow-sm md:max-w-7xl"
-                    >
-                        <div class="text-base font-semibold text-gray-900">
-                            Credit
-                        </div>
-                        <div class="mb-3 text-xs text-gray-500">
-                            Paid credit sales (charge to account)
-                        </div>
+                    <div class="mb-4 grid min-w-0 max-w-full grid-cols-1 gap-3 md:max-w-7xl md:grid-cols-3">
                         <div
-                            class="grid min-w-0 max-w-full grid-cols-1 gap-3 md:max-w-md md:grid-cols-2"
+                            v-for="box in totalsBoxes"
+                            :key="box.title"
+                            class="min-w-0 rounded-lg border border-gray-200 bg-white px-4 py-4 shadow-sm"
                         >
-                            <div
-                                class="min-w-0 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2"
-                            >
-                                <div class="text-xs uppercase text-gray-500">
-                                    Today
-                                </div>
-                                <div class="text-lg font-semibold text-green-700">
-                                    {{
-                                        formattedTotal(
-                                            Number(
-                                                walletCreditTotals.today_total,
-                                            ) || 0,
-                                        )
-                                    }}
-                                </div>
+                            <div class="text-base font-semibold text-gray-900">
+                                {{ box.title }}
                             </div>
-                            <div
-                                class="min-w-0 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2"
-                            >
-                                <div class="text-xs uppercase text-gray-500">
-                                    Yesterday
+                            <div class="mb-3 text-xs text-gray-500">
+                                {{ box.hint }}
+                            </div>
+                            <div class="grid min-w-0 grid-cols-2 gap-3">
+                                <div
+                                    class="min-w-0 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2"
+                                >
+                                    <div class="text-xs uppercase text-gray-500">
+                                        Today
+                                    </div>
+                                    <div class="text-lg font-semibold text-green-700">
+                                        {{ formattedTotal(Number(box.totals?.today_total) || 0) }}
+                                    </div>
                                 </div>
-                                <div class="text-lg font-semibold text-gray-800">
-                                    {{
-                                        formattedTotal(
-                                            Number(
-                                                walletCreditTotals.yesterday_total,
-                                            ) || 0,
-                                        )
-                                    }}
+                                <div
+                                    class="min-w-0 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2"
+                                >
+                                    <div class="text-xs uppercase text-gray-500">
+                                        Yesterday
+                                    </div>
+                                    <div class="text-lg font-semibold text-gray-800">
+                                        {{ formattedTotal(Number(box.totals?.yesterday_total) || 0) }}
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                     <ContentLayout
-                        title="Payment card types"
+                        title="Payment channels"
                         filter-class="flex flex-wrap items-center justify-end gap-2 w-full min-w-0"
                     >
                         <template #filters>
+                            <a-radio-group
+                                v-model:value="kindFilter"
+                                button-style="solid"
+                                size="small"
+                                aria-label="Show channels of type"
+                            >
+                                <a-radio-button value="all">All</a-radio-button>
+                                <a-radio-button
+                                    v-for="k in KINDS"
+                                    :key="k.value"
+                                    :value="k.value"
+                                    >{{ k.label }}</a-radio-button
+                                >
+                            </a-radio-group>
                             <div
                                 v-if="hasPermission('payment-card-types.store')"
                                 class="w-full md:w-auto"
@@ -350,7 +382,7 @@ const showMobileSecondaryActions = computed(
                                     <template #icon>
                                         <IconPlus class="h-4 w-4" />
                                     </template>
-                                    Add card type
+                                    Add channel
                                 </a-button>
                             </div>
                         </template>
@@ -364,11 +396,16 @@ const showMobileSecondaryActions = computed(
                                 row-key="id"
                                 :locale="{
                                     emptyText:
-                                        'No card types yet. Add one to use Pay in Card on Sales.',
+                                        'No payment channels yet. Add a card terminal, e-wallet or bank to take those payments on Sales.',
                                 }"
                             >
                                 <template #bodyCell="{ column, record }">
-                                    <template v-if="column.key === 'is_active'">
+                                    <template v-if="column.key === 'kind'">
+                                        <a-tag :color="kindOf(record).color">{{
+                                            kindOf(record).label
+                                        }}</a-tag>
+                                    </template>
+                                    <template v-else-if="column.key === 'is_active'">
                                         <a-tag
                                             :color="
                                                 record.is_active
@@ -412,7 +449,7 @@ const showMobileSecondaryActions = computed(
                                                         'payment-card-types.update',
                                                     )
                                                 "
-                                                name="Edit card type"
+                                                name="Edit channel"
                                                 hover="hover:bg-blue-500"
                                                 @click="openEdit(record)"
                                             >
@@ -427,7 +464,7 @@ const showMobileSecondaryActions = computed(
                                                         'payment-card-types.destroy',
                                                     )
                                                 "
-                                                name="Remove card type"
+                                                name="Remove channel"
                                                 hover="hover:bg-red-600"
                                                 :loading="
                                                     deletingId === record.id
@@ -450,8 +487,9 @@ const showMobileSecondaryActions = computed(
                                         v-if="!rows.length"
                                         class="py-12 text-center text-sm text-gray-500"
                                     >
-                                        No card types yet. Add one to use Pay in
-                                        Card on Sales.
+                                        No payment channels yet. Add a card
+                                        terminal, e-wallet or bank to take those
+                                        payments on Sales.
                                     </div>
                                     <div v-else class="flex flex-col gap-3">
                                         <div
@@ -468,6 +506,11 @@ const showMobileSecondaryActions = computed(
                                                 <div
                                                     class="mt-2 flex flex-wrap items-center gap-2"
                                                 >
+                                                    <a-tag
+                                                        :color="kindOf(record).color"
+                                                        class="m-0 text-xs"
+                                                        >{{ kindOf(record).label }}</a-tag
+                                                    >
                                                     <a-tag
                                                         :color="
                                                             record.is_active
@@ -575,7 +618,7 @@ const showMobileSecondaryActions = computed(
         <template #after>
             <a-modal
                 v-model:visible="modalOpen"
-                :title="editing ? 'Edit card type' : 'Add card type'"
+                :title="editing ? 'Edit payment channel' : 'Add payment channel'"
                 :width="cardTypeModalWidth"
                 :style="cardTypeModalRootStyle"
                 centered
@@ -587,12 +630,27 @@ const showMobileSecondaryActions = computed(
             >
                 <div class="flex flex-col gap-4 pt-2">
                     <div>
+                        <div class="text-sm text-gray-600 mb-1">Type</div>
+                        <a-radio-group
+                            v-model:value="formKind"
+                            button-style="solid"
+                            aria-label="Channel type"
+                        >
+                            <a-radio-button
+                                v-for="k in KINDS"
+                                :key="k.value"
+                                :value="k.value"
+                                >{{ k.label }}</a-radio-button
+                            >
+                        </a-radio-group>
+                    </div>
+                    <div>
                         <div class="text-sm text-gray-600 mb-1">
                             Display name
                         </div>
                         <a-input
                             v-model:value="formName"
-                            placeholder="e.g. BDO POS, Visa terminal"
+                            placeholder="e.g. GCash, Maya, BDO, Visa terminal"
                             maxlength="255"
                         />
                     </div>

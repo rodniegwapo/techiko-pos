@@ -5,6 +5,12 @@ import { watchDebounced } from "@vueuse/core";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
 import ContentLayout from "@/Components/ContentLayout.vue";
+import ProductStockFields from "./components/ProductStockFields.vue";
+import ProductModifierGroupsField from "./components/ProductModifierGroupsField.vue";
+import {
+    generateInternalBarcode,
+    generateSku,
+} from "@/Composables/useProductCodes";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useSharedCatalogLookup } from "@/Composables/useSharedCatalogLookup";
 import {
@@ -20,6 +26,10 @@ const page = usePage();
 const { getRoute, hrefWithPreservedLocationId } = useDomainRoutes();
 
 const props = defineProps({
+    modifierGroups: {
+        type: Array,
+        default: () => [],
+    },
     categories: {
         type: Array,
         default: () => [],
@@ -50,6 +60,11 @@ const form = useForm({
     representation_type: "color",
     representation: "",
     representation_image: null,
+    track_inventory: true,
+    reorder_level: 0,
+    // The form always says it sent the modifier field, so clearing it clears them.
+    modifier_groups_present: true,
+    modifier_group_ids: [],
 });
 
 const imageFileList = ref([]);
@@ -481,7 +496,18 @@ const handleSave = () => {
                                             v-model:value="form.SKU"
                                             placeholder="Enter SKU"
                                             size="large"
-                                        />
+                                        >
+                                            <template #suffix>
+                                                <a-button
+                                                    type="link"
+                                                    size="small"
+                                                    class="h-auto p-0"
+                                                    aria-label="Generate SKU"
+                                                    @click="form.SKU = generateSku(form.name)"
+                                                    >Generate</a-button
+                                                >
+                                            </template>
+                                        </a-input>
                                     </a-form-item>
 
                                     <a-form-item
@@ -521,7 +547,18 @@ const handleSave = () => {
                                             v-model:value="form.barcode"
                                             placeholder="Enter barcode"
                                             size="large"
-                                        />
+                                        >
+                                            <template #suffix>
+                                                <a-button
+                                                    type="link"
+                                                    size="small"
+                                                    class="h-auto p-0"
+                                                    aria-label="Generate barcode"
+                                                    @click="form.barcode = generateInternalBarcode()"
+                                                    >Generate</a-button
+                                                >
+                                            </template>
+                                        </a-input>
                                     </a-form-item>
                                 </div>
 
@@ -549,6 +586,16 @@ const handleSave = () => {
                                         :message="`Suggested category (hint only): ${sharedCategoryHint}`"
                                     />
                                 </div>
+                            </section>
+
+                            <section
+                                class="space-y-4 rounded-lg bg-gray-50 p-4"
+                            >
+                                <h4 class="font-semibold text-gray-900">
+                                    Stock
+                                </h4>
+                                <ProductStockFields :form="form" />
+                                <ProductModifierGroupsField :form="form" :groups="modifierGroups" />
                             </section>
 
                             <section

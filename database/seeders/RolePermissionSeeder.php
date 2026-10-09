@@ -77,6 +77,7 @@ class RolePermissionSeeder extends Seeder
             'sales.payment.store',
             'sales-history.index',
             'sales-history.show',
+            'sales-history.void',
             'sales.loyalty-redemption',
             'sales.find-sale-item',
             'sales.sales.assignCustomer',
@@ -111,8 +112,12 @@ class RolePermissionSeeder extends Seeder
 
             // Products
             'products.index',
+            'products.modifier-groups.index',
             'products.store',
             'products.update',
+            'products.modifier-groups.store',
+            'products.modifier-groups.update',
+            'products.modifier-groups.destroy',
             'products.destroy',
             'products.create',
             'products.edit',
@@ -388,6 +393,7 @@ class RolePermissionSeeder extends Seeder
             'sales.payment.store',
             'sales-history.index',
             'sales-history.show',
+            'sales-history.void',
             'sales.loyalty-redemption',
             'sales.find-sale-item',
             'sales.sales.assignCustomer',
@@ -421,8 +427,12 @@ class RolePermissionSeeder extends Seeder
 
             // Products
             'products.index',
+            'products.modifier-groups.index',
             'products.store',
             'products.update',
+            'products.modifier-groups.store',
+            'products.modifier-groups.update',
+            'products.modifier-groups.destroy',
             'products.destroy',
             'products.create',
             'products.edit',
@@ -597,6 +607,7 @@ class RolePermissionSeeder extends Seeder
             'sales.payment.store',
             'sales-history.index',
             'sales-history.show',
+            'sales-history.void',
             'sales.loyalty-redemption',
             'sales.find-sale-item',
             'sales.sales.assignCustomer',
@@ -630,8 +641,12 @@ class RolePermissionSeeder extends Seeder
 
             // Products
             'products.index',
+            'products.modifier-groups.index',
             'products.store',
             'products.update',
+            'products.modifier-groups.store',
+            'products.modifier-groups.update',
+            'products.modifier-groups.destroy',
             'products.create',
             'products.edit',
             'products.assignable',
@@ -753,6 +768,7 @@ class RolePermissionSeeder extends Seeder
             'sales.payment.store',
             'sales-history.index',
             'sales-history.show',
+            'sales-history.void',
             'sales.loyalty-redemption',
             'sales.find-sale-item',
             'sales.sales.assignCustomer',
@@ -786,8 +802,12 @@ class RolePermissionSeeder extends Seeder
 
             // Products
             'products.index',
+            'products.modifier-groups.index',
             'products.store',
             'products.update',
+            'products.modifier-groups.store',
+            'products.modifier-groups.update',
+            'products.modifier-groups.destroy',
             'products.create',
             'products.edit',
             'products.assignable',
@@ -881,6 +901,7 @@ class RolePermissionSeeder extends Seeder
             'sales.payment.store',
             'sales-history.index',
             'sales-history.show',
+            'sales-history.void',
             'sales.loyalty-redemption',
             'sales.find-sale-item',
             'sales.sales.assignCustomer',
@@ -914,6 +935,7 @@ class RolePermissionSeeder extends Seeder
 
             // Products
             'products.index',
+            'products.modifier-groups.index',
 
             // Customers
             'customers.index',

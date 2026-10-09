@@ -10,7 +10,9 @@ use App\Models\Domain;
 use App\Services\CreditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class CreditController extends Controller
@@ -103,12 +105,7 @@ class CreditController extends Controller
         $paymentHistory = $customer->getCreditHistory(100);
 
         // Get outstanding invoices (unpaid credit transactions)
-        $outstandingInvoices = $customer->creditTransactions()
-            ->where('transaction_type', 'credit')
-            ->whereNull('paid_at')
-            ->with(['sale.saleItems.product'])
-            ->orderBy('due_date', 'asc')
-            ->get();
+        $outstandingInvoices = $this->outstandingCharges($customer);
 
         // Get overdue transactions
         $overdueTransactions = $customer->getOverdueTransactions();
@@ -133,12 +130,7 @@ class CreditController extends Controller
             abort(403, 'Customer does not belong to this domain');
         }
 
-        $outstandingInvoices = $customer->creditTransactions()
-            ->where('transaction_type', 'credit')
-            ->whereNull('paid_at')
-            ->with(['sale.saleItems.product'])
-            ->orderBy('due_date', 'asc')
-            ->get();
+        $outstandingInvoices = $this->outstandingCharges($customer);
 
         return response()->json([
             'success' => true,
@@ -157,10 +149,22 @@ class CreditController extends Controller
             abort(403, 'Customer does not belong to this domain');
         }
 
+        // Charging a customer by hand raises what they owe, so it is for whoever may set their credit.
+        if ($request->input('transaction_type') === 'credit'
+            && ! $request->user()->hasPermissionToRoute('credits.settings.update')) {
+            abort(403, 'You are not allowed to charge credit to a customer.');
+        }
+
         $validated = $request->validate([
-            'transaction_type' => 'required|in:payment,adjustment,refund',
-            'amount' => 'required|numeric|min:0.01',
-            'payment_method' => 'nullable|string|max:255',
+            'transaction_type' => 'required|in:credit,payment,adjustment,refund',
+            // An adjustment may lower the balance (a negative amount); everything else is above nothing.
+            'amount' => $request->input('transaction_type') === 'adjustment'
+                ? 'required|numeric|not_in:0'
+                : 'required|numeric|min:0.01',
+            'payment_method' => 'nullable|string|in:cash,card,e-wallet,bank',
+            'installments' => 'nullable|array|min:2|max:60',
+            'installments.*.due_date' => 'required|date|after_or_equal:today',
+            'installments.*.amount' => 'required|numeric|min:0.01',
             'reference_number' => 'nullable|string|max:255',
             'notes' => 'nullable|string',
             'transaction_ids' => 'nullable|array',
@@ -170,8 +174,11 @@ class CreditController extends Controller
                     ->where('transaction_type', 'credit')
                     ->whereNull('paid_at'),
             ],
-            'due_date' => 'nullable|date',
+            'due_date' => 'nullable|date|after_or_equal:today',
         ]);
+
+        $installments = $validated['transaction_type'] === 'credit' ? ($validated['installments'] ?? []) : [];
+        $this->validateInstallmentSchedule($installments, (float) $validated['amount']);
 
         $transactionIds = array_values(array_filter(
             $validated['transaction_ids'] ?? [],
@@ -183,7 +190,16 @@ class CreditController extends Controller
 
             $customer->refresh();
 
-            $transaction = $this->creditService->processPayment(
+            $transaction = $validated['transaction_type'] === 'credit'
+                ? $this->creditService->processManualCharge(
+                    customer: $customer,
+                    amount: (float) $validated['amount'],
+                    dueDate: $validated['due_date'] ?? null,
+                    installments: $installments,
+                    referenceNumber: $validated['reference_number'] ?? null,
+                    notes: $validated['notes'] ?? null,
+                )
+                : $this->creditService->processPayment(
                 customer: $customer,
                 amount: (float) $validated['amount'],
                 transactionIds: $transactionIds,
@@ -208,6 +224,48 @@ class CreditController extends Controller
                 'success' => false,
                 'message' => $e->getMessage(),
             ], 422);
+        }
+    }
+
+    /** A customer's unpaid charges, with their installment schedules and how late they are. */
+    private function outstandingCharges(Customer $customer)
+    {
+        return $customer->creditTransactions()
+            ->where('transaction_type', 'credit')
+            ->whereNull('paid_at')
+            ->with(['sale.saleItems.product', 'installments'])
+            ->orderBy('due_date', 'asc')
+            ->get()
+            ->each->append('days_overdue');
+    }
+
+    /**
+     * An installment schedule has to add up to the charge, with each payment due after the one before.
+     *
+     * @param  array<int, array{due_date: string, amount: mixed}>  $installments
+     */
+    private function validateInstallmentSchedule(array $installments, float $amount): void
+    {
+        if ($installments === []) {
+            return;
+        }
+
+        $totalCents = array_sum(array_map(fn ($i) => (int) round((float) $i['amount'] * 100), $installments));
+        if ($totalCents !== (int) round($amount * 100)) {
+            throw ValidationException::withMessages([
+                'installments' => 'The installments must add up to the amount charged ('.number_format($amount, 2).').',
+            ]);
+        }
+
+        $previous = null;
+        foreach ($installments as $installment) {
+            $due = Carbon::parse($installment['due_date'])->startOfDay();
+            if ($previous !== null && $due->lte($previous)) {
+                throw ValidationException::withMessages([
+                    'installments' => 'Each installment must be due after the one before it.',
+                ]);
+            }
+            $previous = $due;
         }
     }
 
@@ -254,6 +312,7 @@ class CreditController extends Controller
         }
 
         $query = $customer->creditTransactions()
+            ->with('installments')
             ->when($request->type, function ($q, $type) {
                 return $q->where('transaction_type', $type);
             })

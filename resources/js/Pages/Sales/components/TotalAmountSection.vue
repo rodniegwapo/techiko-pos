@@ -3,6 +3,12 @@ import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import ApplyOrderDiscountModal from "./ApplyOrderDiscountModal.vue";
 import CardPaymentTypeModal from "./CardPaymentTypeModal.vue";
 import LoyaltyRedemptionModal from "./LoyaltyRedemptionModal.vue";
+import SplitPaymentPanel from "./SplitPaymentPanel.vue";
+import {
+    newSplitRow,
+    splitPayload,
+    splitProblem,
+} from "@/Composables/useSplitPayment";
 import { IconDiscount, IconGift, IconArrowRightToArc } from "@tabler/icons-vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
@@ -11,6 +17,7 @@ import { useCredit } from "@/Composables/useCredit";
 import { useSaleTotals } from "@/Composables/useSaleTotals";
 import { ref, computed, createVNode, toRefs, watch, inject } from "vue";
 import { Modal, notification } from "ant-design-vue";
+import { DownOutlined } from "@ant-design/icons-vue";
 import { ExclamationCircleOutlined } from "@ant-design/icons-vue";
 import axios from "axios";
 import { usePage } from "@inertiajs/vue3";
@@ -42,6 +49,8 @@ const props = defineProps({
     /** Cached card types from parent (refreshed while online) for offline modal */
     cachedPaymentCardTypes: { type: Array, default: () => [] },
     offlinePaymentCardTypeId: { type: [Number, String], default: null },
+    /** E-wallet / bank reference no. kept with an offline sale */
+    offlinePaymentReference: { type: String, default: "" },
     salesSettings: {
         type: Object,
         default: () => ({
@@ -67,6 +76,11 @@ const props = defineProps({
         type: Boolean,
         default: false,
     },
+    // The parent renders its own pay button and calls the exposed proceed().
+    hideProceedButton: {
+        type: Boolean,
+        default: false,
+    },
 });
 
 const {
@@ -86,6 +100,8 @@ const emit = defineEmits([
     "payment-success",
     "update:offlinePaymentMethod",
     "update:offlinePaymentCardTypeId",
+    "update:offlinePaymentReference",
+    "update:offlinePayments",
 ]);
 
 const {
@@ -351,6 +367,84 @@ const cardTypeModalOpen = ref(false);
 const selectedPaymentCardTypeId = ref(null);
 const paymentMethod = ref("cash");
 
+/** Card, e-wallet and bank payments name the channel used: a terminal, GCash, BDO… */
+const CHANNEL_KIND = { card: "card", "e-wallet": "ewallet", bank: "bank" };
+const CHANNEL_LABEL = { card: "card type", ewallet: "e-wallet", bank: "bank" };
+const channelKind = computed(() => CHANNEL_KIND[paymentMethod.value] ?? null);
+/** Less common ways to pay, kept behind the "Other" button so the main choices stay short. */
+const OTHER_METHODS = [
+    { value: "e-wallet", label: "E-wallet" },
+    { value: "bank", label: "Bank" },
+    { value: "split", label: "Split payment" },
+];
+
+/** A sale paid in parts (cash + GCash, card + credit…). */
+const isSplit = computed(() => paymentMethod.value === "split");
+const splitRows = ref([]);
+const splitIssue = computed(() =>
+    isSplit.value
+        ? splitProblem(splitRows.value, grandTotalDisplay.value, {
+              allowCredit: salesCartIsOnline.value,
+          })
+        : null,
+);
+const splitCreditOverLimit = computed(() => {
+    const credit = splitRows.value.find((r) => r.method === "credit");
+    return (
+        isSplit.value &&
+        !!credit &&
+        Number(credit.amount || 0) > Number(creditInfo.value?.availableCredit ?? 0)
+    );
+});
+
+watch(isSplit, (split) => {
+    if (split && splitRows.value.length < 2) {
+        splitRows.value = [newSplitRow("cash"), newSplitRow("e-wallet")];
+    }
+});
+
+watch(
+    splitRows,
+    (rows) => {
+        if (!salesCartIsOnline.value) {
+            emit("update:offlinePayments", isSplit.value ? splitPayload(rows) : []);
+        }
+    },
+    { deep: true },
+);
+const otherMethodSelected = computed(() =>
+    OTHER_METHODS.some((m) => m.value === paymentMethod.value),
+);
+const otherMethodLabel = computed(
+    () =>
+        OTHER_METHODS.find((m) => m.value === paymentMethod.value)?.label ??
+        "Other",
+);
+const needsChannel = computed(() => channelKind.value !== null);
+const missingChannel = computed(
+    () => needsChannel.value && !selectedPaymentCardTypeId.value,
+);
+/** Optional reference no. for e-wallet and bank payments (e.g. the GCash ref). */
+const paymentReference = ref(props.offlinePaymentReference || "");
+const takesReference = computed(
+    () => channelKind.value === "ewallet" || channelKind.value === "bank",
+);
+/** The channel picked, as the picker returned it (it may be newer than the saved list). */
+const selectedChannel = ref(null);
+const channelById = (id) =>
+    (selectedChannel.value?.id === id ? selectedChannel.value : null) ??
+    (props.cachedPaymentCardTypes || []).find((t) => t.id === id) ??
+    null;
+const selectedChannelName = computed(
+    () => channelById(selectedPaymentCardTypeId.value)?.name ?? null,
+);
+
+watch(paymentReference, (ref) => {
+    if (!salesCartIsOnline.value) {
+        emit("update:offlinePaymentReference", ref);
+    }
+});
+
 watch(
     () => props.offlinePaymentCardTypeId,
     (v) => {
@@ -367,8 +461,9 @@ watch(selectedPaymentCardTypeId, (id) => {
     }
 });
 
-function onCardTypeModalConfirm(id) {
+function onCardTypeModalConfirm(id, channel = null) {
     selectedPaymentCardTypeId.value = id;
+    selectedChannel.value = channel;
 }
 
 function onCardTypeModalCancel() {
@@ -430,17 +525,28 @@ const handleProceedPayment = async () => {
             }
         }
 
-        if (
-            paymentMethod.value === "card" &&
-            !selectedPaymentCardTypeId.value
-        ) {
+        if (isSplit.value) {
+            if (splitIssue.value) {
+                notification.error({ message: "Split payment", description: splitIssue.value });
+                throw new Error(splitIssue.value);
+            }
+            if (splitRows.value.some((r) => r.method === "credit") && !props.selectedCustomer?.id) {
+                notification.error({
+                    message: "Error",
+                    description: "Customer is required for credit payments.",
+                });
+                throw new Error("Customer required for credit payment");
+            }
+        }
+
+        if (missingChannel.value) {
+            const label = CHANNEL_LABEL[channelKind.value];
             notification.error({
-                message: "Card type required",
-                description:
-                    "Choose a card payment type before completing checkout.",
+                message: `${label[0].toUpperCase()}${label.slice(1)} required`,
+                description: `Choose the ${label} used before completing checkout.`,
             });
             cardTypeModalOpen.value = true;
-            throw new Error("Card type required");
+            throw new Error("Payment channel required");
         }
 
         // Single API call to process payment and loyalty together
@@ -450,8 +556,14 @@ const handleProceedPayment = async () => {
             payment_method: paymentMethod.value,
             loyalty_points_to_redeem: Number(loyaltyPointsDraft.value ?? 0),
         };
-        if (paymentMethod.value === "card" && selectedPaymentCardTypeId.value) {
+        if (needsChannel.value && selectedPaymentCardTypeId.value) {
             body.payment_card_type_id = selectedPaymentCardTypeId.value;
+        }
+        if (takesReference.value && paymentReference.value.trim()) {
+            body.payment_reference = paymentReference.value.trim();
+        }
+        if (isSplit.value) {
+            body.payments = splitPayload(splitRows.value);
         }
         const response = await axios.post(
             getRoute("sales.payment.store", {
@@ -463,7 +575,9 @@ const handleProceedPayment = async () => {
         // Clean up and finalize
         amountReceived.value = 0;
         selectedPaymentCardTypeId.value = null;
+        paymentReference.value = "";
         paymentMethod.value = "cash";
+        splitRows.value = [];
 
         // Show success notification based on response
         const loyaltyResults = response.data.loyalty_results;
@@ -530,6 +644,11 @@ const disabledPaymentButtonColor = computed(() => {
         if (orders.value.length == 0) return "";
         return "bg-green-700 border-green-700 hover:bg-green-600";
     }
+    if (isSplit.value) {
+        if (splitIssue.value || splitCreditOverLimit.value) return "";
+        if (orders.value.length == 0) return "";
+        return "bg-green-700 border-green-700 hover:bg-green-600";
+    }
     if (amountReceived.value < grandTotalDisplay.value) return "";
     if (orders.value.length == 0) return "";
     return "bg-green-700 border-green-700 hover:bg-green-600";
@@ -552,10 +671,22 @@ watch(paymentMethod, (v) => {
     if (!salesCartIsOnline.value) {
         emit("update:offlinePaymentMethod", v);
     }
-    if (v === "card") {
-        cardTypeModalOpen.value = true;
-    } else {
+    const kind = CHANNEL_KIND[v];
+    if (!kind) {
         selectedPaymentCardTypeId.value = null;
+        paymentReference.value = "";
+        return;
+    }
+    // A channel picked for another method (say a card terminal, now paying by GCash) no longer fits.
+    const picked = channelById(selectedPaymentCardTypeId.value);
+    if (picked && (picked.kind || "card") !== kind) {
+        selectedPaymentCardTypeId.value = null;
+    }
+    if (kind === "card") {
+        paymentReference.value = "";
+    }
+    if (!selectedPaymentCardTypeId.value) {
+        cardTypeModalOpen.value = true;
     }
 });
 
@@ -624,6 +755,44 @@ const canUseCredit = computed(() => {
 const creditLimitSufficient = computed(() => {
     if (paymentMethod.value !== "credit" || !creditInfo.value) return true;
     return creditInfo.value.availableCredit >= grandTotalDisplay.value;
+});
+
+const proceedPaymentDisabled = computed(
+    () =>
+        proceedPaymentLoading.value ||
+        (paymentMethod.value !== "credit" &&
+            !isSplit.value &&
+            amountReceived.value < grandTotalDisplay.value) ||
+        (paymentMethod.value === "credit" && !creditLimitSufficient.value) ||
+        (isSplit.value && (!!splitIssue.value || splitCreditOverLimit.value)) ||
+        missingChannel.value ||
+        orders.value.length == 0,
+);
+
+const offlineSaveDisabled = computed(
+    () =>
+        orders.value.length == 0 ||
+        missingChannel.value ||
+        (isSplit.value && !!splitIssue.value),
+);
+
+// Lets a parent own the pay button (the Modern layout's footer "Charge" button).
+function proceed() {
+    if (!salesCartIsOnline.value) {
+        if (!offlineSaveDisabled.value) emit("save-offline-sale");
+        return;
+    }
+    if (!proceedPaymentDisabled.value) handleProceedPaymentConfirmation();
+}
+
+defineExpose({
+    proceed,
+    canProceed: computed(() =>
+        salesCartIsOnline.value
+            ? !proceedPaymentDisabled.value
+            : !offlineSaveDisabled.value,
+    ),
+    loading: proceedPaymentLoading,
 });
 </script>
 
@@ -781,24 +950,81 @@ const creditLimitSufficient = computed(() => {
                     <span class="text-gray-700 whitespace-nowrap"
                         >Payment method</span
                     >
-                    <a-radio-group
-                        v-model:value="paymentMethod"
-                        button-style="solid"
-                        :class="
-                            layout === 'compact'
-                                ? 'flex w-full [&>.ant-radio-button-wrapper]:flex-1 [&>.ant-radio-button-wrapper]:text-center'
-                                : ''
-                        "
+                    <!-- The usual ways to pay, plus "Other" for e-wallet and bank -->
+                    <!-- In the narrow checkout panel "Other" wraps under Cash / Card / Credit;
+                         side by side it covered Credit. -->
+                    <div
+                        class="flex items-stretch gap-2"
+                        :class="layout === 'compact' ? 'w-full flex-wrap' : ''"
                     >
-                        <a-radio-button value="cash">Cash</a-radio-button>
-                        <a-radio-button value="card">Card</a-radio-button>
-                        <a-radio-button
-                            value="credit"
-                            :disabled="!salesCartIsOnline || !canUseCredit"
+                        <a-radio-group
+                            v-model:value="paymentMethod"
+                            button-style="solid"
+                            :class="
+                                layout === 'compact'
+                                    ? 'flex min-w-0 flex-1 [&>.ant-radio-button-wrapper]:flex-1 [&>.ant-radio-button-wrapper]:text-center'
+                                    : ''
+                            "
                         >
-                            Credit
-                        </a-radio-button>
-                    </a-radio-group>
+                            <a-radio-button value="cash">Cash</a-radio-button>
+                            <a-radio-button value="card">Card</a-radio-button>
+                            <a-radio-button
+                                value="credit"
+                                :disabled="!salesCartIsOnline || !canUseCredit"
+                            >
+                                Credit
+                            </a-radio-button>
+                        </a-radio-group>
+                        <a-dropdown :trigger="['click']" placement="bottomRight">
+                            <a-button
+                                :type="otherMethodSelected ? 'primary' : 'default'"
+                                aria-label="Other payment methods"
+                                class="shrink-0"
+                                :class="layout === 'compact' ? 'w-full' : ''"
+                            >
+                                {{ otherMethodLabel }}
+                                <DownOutlined class="text-xs" />
+                            </a-button>
+                            <template #overlay>
+                                <a-menu
+                                    :selected-keys="otherMethodSelected ? [paymentMethod] : []"
+                                    @click="({ key }) => (paymentMethod = key)"
+                                >
+                                    <a-menu-item
+                                        v-for="m in OTHER_METHODS"
+                                        :key="m.value"
+                                        >{{ m.label }}</a-menu-item
+                                    >
+                                </a-menu>
+                            </template>
+                        </a-dropdown>
+                    </div>
+                    <!-- Channel picked for card / e-wallet / bank, and the e-wallet or bank reference no. -->
+                    <div
+                        v-if="needsChannel"
+                        class="mt-2 flex flex-col gap-2 text-sm"
+                    >
+                        <div class="flex items-center gap-2">
+                            <span class="text-gray-600">
+                                {{ selectedChannelName || "No " + CHANNEL_LABEL[channelKind] + " chosen" }}
+                            </span>
+                            <a-button
+                                type="link"
+                                size="small"
+                                class="h-auto p-0"
+                                @click="cardTypeModalOpen = true"
+                            >
+                                {{ selectedPaymentCardTypeId ? "Change" : "Choose" }}
+                            </a-button>
+                        </div>
+                        <a-input
+                            v-if="takesReference"
+                            v-model:value="paymentReference"
+                            :maxlength="100"
+                            placeholder="Reference no. (optional)"
+                            aria-label="Reference no."
+                        />
+                    </div>
                     <!-- Credit Information Display -->
                     <div
                         v-if="paymentMethod === 'credit' && creditInfo"
@@ -844,11 +1070,22 @@ const creditLimitSufficient = computed(() => {
                             </div>
                         </div>
                     </div>
+                    <!-- Split payment: each part with its own method and amount -->
+                    <split-payment-panel
+                        v-if="isSplit"
+                        v-model="splitRows"
+                        class="mt-2"
+                        :grand-total="Number(grandTotalDisplay) || 0"
+                        :allow-credit="salesCartIsOnline && !!canUseCredit"
+                        :available-credit="Number(creditInfo?.availableCredit ?? 0)"
+                        :use-network="salesCartIsOnline"
+                        :cached-payment-card-types="cachedPaymentCardTypes"
+                    />
                 </div>
 
                 <!-- Amount Received (only show for non-credit payments) -->
                 <div
-                    v-if="paymentMethod !== 'credit'"
+                    v-if="paymentMethod !== 'credit' && !isSplit"
                     class="flex items-start flex-col gap-2"
                 >
                     <span class="text-gray-700 whitespace-nowrap"
@@ -869,7 +1106,7 @@ const creditLimitSufficient = computed(() => {
 
                 <!-- Change (only show for non-credit payments) -->
                 <div
-                    v-if="paymentMethod !== 'credit'"
+                    v-if="paymentMethod !== 'credit' && !isSplit"
                     class="flex items-start flex-col gap-2"
                 >
                     <span class="text-gray-700 whitespace-nowrap">Change:</span>
@@ -877,7 +1114,7 @@ const creditLimitSufficient = computed(() => {
                 </div>
 
                 <!-- Proceed Payment / Offline save -->
-                <div class="flex flex-col gap-2">
+                <div v-if="!hideProceedButton" class="flex flex-col gap-2">
                     <div class="invisible">Proceed Payment</div>
                     <a-button
                         v-if="salesCartIsOnline"
@@ -887,16 +1124,7 @@ const creditLimitSufficient = computed(() => {
                             disabledPaymentButtonColor,
                         ]"
                         @click="handleProceedPaymentConfirmation"
-                        :disabled="
-                            proceedPaymentLoading ||
-                            (paymentMethod !== 'credit' &&
-                                amountReceived < grandTotalDisplay) ||
-                            (paymentMethod === 'credit' &&
-                                !creditLimitSufficient) ||
-                            (paymentMethod === 'card' &&
-                                !selectedPaymentCardTypeId) ||
-                            orders.length == 0
-                        "
+                        :disabled="proceedPaymentDisabled"
                         :loading="proceedPaymentLoading"
                     >
                         Proceed Payment
@@ -909,11 +1137,7 @@ const creditLimitSufficient = computed(() => {
                                 ? 'w-full bg-amber-700 border-amber-700 hover:bg-amber-600'
                                 : 'w-[300px] bg-amber-700 border-amber-700 hover:bg-amber-600'
                         "
-                        :disabled="
-                            orders.length == 0 ||
-                            (paymentMethod === 'card' &&
-                                !selectedPaymentCardTypeId)
-                        "
+                        :disabled="offlineSaveDisabled"
                         @click="emit('save-offline-sale')"
                     >
                         Save as offline sale
@@ -937,6 +1161,7 @@ const creditLimitSufficient = computed(() => {
                 :use-network="salesCartIsOnline"
                 :cached-types="cachedPaymentCardTypes"
                 :initial-selected-id="selectedPaymentCardTypeId"
+                :kind="channelKind || 'card'"
                 @confirm="onCardTypeModalConfirm"
                 @cancel="onCardTypeModalCancel"
             />

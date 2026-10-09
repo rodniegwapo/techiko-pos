@@ -3,12 +3,16 @@
 namespace App\Services;
 
 use App\Jobs\SyncSaleDraft;
+use App\Models\CreditTransaction;
+use App\Models\Customer;
 use App\Models\Domain;
 use App\Models\InventoryLocation;
+use App\Models\InventoryMovement;
 use App\Models\Product\Discount;
 use App\Models\ProductInventory;
 use App\Models\Sale;
 use App\Models\StockAdjustment;
+use App\Models\User;
 use App\Models\UserPin;
 use App\Models\VoidLog;
 use Illuminate\Support\Arr;
@@ -31,11 +35,10 @@ class SaleService
     {
         // Determine location based on user role and context
         $currentUser = auth()->user();
-        $userRole = $currentUser ? $currentUser->roles()->first() : null;
 
-        // Set location_id based on user role
-        if ($userRole && ($userRole->name === 'admin' || $userRole->name === 'super admin')) {
-            // Admin/Super Admin: Use provided location or current user's location
+        // Anyone not tied to one store (whatever their role is called) works in the store they picked
+        if ($currentUser && ! $currentUser->hasLocationRestriction()) {
+            // Use provided location or current user's location
             $finalLocationId = $locationId ?? $currentUser->location_id;
         } else {
             // Regular users: Use their assigned location only
@@ -136,8 +139,13 @@ class SaleService
 
     public function voidItem(Sale $sale, array $validated, $currentUser)
     {
+        // The line named, or (for callers that only know the product) the product's first line.
         $saleItem = $sale->saleItems()
-            ->where('product_id', $validated['product_id'])
+            ->when(
+                $validated['sale_item_id'] ?? null,
+                fn ($q, $id) => $q->whereKey((int) $id),
+                fn ($q) => $q->where('product_id', $validated['product_id'])->orderBy('id')
+            )
             ->firstOrFail();
 
         // Check PIN and get approver
@@ -161,6 +169,142 @@ class SaleService
         return $saleItem;
     }
 
+    /**
+     * Void a whole completed sale (from Sales History), approved with a manager PIN.
+     * The sale stays on record as "voided", so it drops out of sales totals, the cash drawer and
+     * reports, which all count paid sales only. Its stock goes back to the store it was sold from,
+     * loyalty points are reversed, and a credit charge on it is cancelled — unless the customer has
+     * already paid something on it, which has to be refunded by hand first.
+     */
+    public function voidSale(Sale $sale, User $currentUser, string $pinCode, string $reason): Sale
+    {
+        $approvedBy = $this->validatePin($currentUser, $pinCode);
+
+        return DB::transaction(function () use ($sale, $currentUser, $approvedBy, $reason) {
+            $sale = Sale::query()->whereKey($sale->id)->lockForUpdate()->firstOrFail();
+
+            if (! in_array($sale->payment_status, ['paid', 'partial'], true)) {
+                throw ValidationException::withMessages([
+                    'sale' => ['Only a completed sale can be voided.'],
+                ]);
+            }
+
+            $this->cancelCreditCharges($sale);
+            $this->returnSaleStock($sale, $currentUser);
+            $this->reverseSaleLoyalty($sale);
+
+            // One log line per item, so the Void Logs page lists what was on the receipt.
+            foreach ($sale->saleItems()->get() as $item) {
+                VoidLog::create([
+                    'sale_item_id' => $item->id,
+                    'user_id' => $currentUser->id,
+                    'approver_id' => $approvedBy,
+                    'reason' => 'Receipt voided: '.$reason,
+                    'amount' => max(0, (float) $item->unit_price * (float) $item->quantity - (float) $item->discount),
+                ]);
+            }
+
+            $sale->update([
+                'payment_status' => 'voided',
+                'voided_at' => now(),
+                'voided_by' => $currentUser->id,
+                'void_approved_by' => $approvedBy,
+                'void_reason' => $reason,
+            ]);
+
+            return $sale;
+        });
+    }
+
+    /** Cancel what the sale charged on credit. Refuses if a payment was already put against it. */
+    private function cancelCreditCharges(Sale $sale): void
+    {
+        $charges = CreditTransaction::query()
+            ->where('sale_id', $sale->id)
+            ->where('transaction_type', 'credit')
+            ->lockForUpdate()
+            ->get();
+
+        if ($charges->contains(fn (CreditTransaction $charge) => (float) $charge->paid_amount > 0)) {
+            throw ValidationException::withMessages([
+                'sale' => ['The customer has already paid part of this credit sale. Refund that payment in Credits before voiding the sale.'],
+            ]);
+        }
+
+        foreach ($charges->whereNull('paid_at') as $charge) {
+            $customer = Customer::query()->lockForUpdate()->find($charge->customer_id);
+            if ($customer) {
+                $customer->addCreditTransaction(
+                    type: 'adjustment',
+                    amount: -(float) $charge->amount,
+                    saleId: $sale->id,
+                    referenceNumber: $sale->invoice_number,
+                    notes: "Sale voided - Invoice: {$sale->invoice_number}",
+                );
+            }
+
+            // Closed, not paid: nothing is owed on it any more, and it no longer shows as due or overdue.
+            $charge->update(['paid_at' => now(), 'notes' => trim(($charge->notes ?? '').' (voided)')]);
+            $charge->installments()->whereNull('paid_at')->update(['paid_at' => now()]);
+        }
+    }
+
+    /** Put back the stock the sale took, at the store it took it from. */
+    private function returnSaleStock(Sale $sale, User $currentUser): void
+    {
+        $movements = InventoryMovement::query()
+            ->where('reference_type', 'Sale')
+            ->where('reference_id', $sale->id)
+            ->where('movement_type', 'sale')
+            ->get();
+
+        foreach ($movements as $movement) {
+            $this->inventoryService->recordMovement([
+                'product_id' => $movement->product_id,
+                'location_id' => $movement->location_id,
+                'movement_type' => 'return',
+                'quantity_change' => abs((float) $movement->quantity_change),
+                'unit_cost' => $movement->unit_cost,
+                'reference_type' => 'Sale',
+                'reference_id' => $sale->id,
+                'user_id' => $currentUser->id,
+                'notes' => "Sale voided - Invoice: {$sale->invoice_number}",
+            ]);
+        }
+    }
+
+    /**
+     * Take back the points the sale earned and give back the points spent on it, and undo its
+     * spending stats. Points earned are worked out again from the sale total (they aren't stored),
+     * and never take a customer below zero.
+     */
+    private function reverseSaleLoyalty(Sale $sale): void
+    {
+        if (! $sale->customer_id) {
+            return;
+        }
+
+        $customer = Customer::query()->lockForUpdate()->find($sale->customer_id);
+        if (! $customer) {
+            return;
+        }
+
+        $amount = (float) $sale->grand_total;
+        $changes = [
+            'lifetime_spent' => max(0, (float) $customer->lifetime_spent - $amount),
+            'total_purchases' => max(0, (int) $customer->total_purchases - 1),
+        ];
+
+        // A customer not enrolled in loyalty (no points balance) neither earned nor spent points.
+        if ($customer->loyalty_points !== null) {
+            $earned = $customer->calculatePointsForPurchase($amount);
+            $redeemed = (int) ($sale->loyalty_points_redeemed ?? 0);
+            $changes['loyalty_points'] = max(0, (int) $customer->loyalty_points - $earned) + $redeemed;
+        }
+
+        $customer->update($changes);
+    }
+
     private function validatePin($currentUser, string $pinCode): int
     {
         if ($currentUser->hasAnyRole(['manager', 'admin'])) {
@@ -168,7 +312,7 @@ class SaleService
         }
 
         if ($currentUser->hasRole('cashier')) {
-            return $this->validateCashierPin($pinCode);
+            return $this->validateCashierPin($pinCode, $currentUser->domain);
         }
 
         throw ValidationException::withMessages([
@@ -189,11 +333,13 @@ class SaleService
         return $userId;
     }
 
-    private function validateCashierPin(string $pinCode): int
+    private function validateCashierPin(string $pinCode, ?string $domain): int
     {
-        $managerPin = UserPin::whereHas('user.roles', function ($q) {
-            $q->whereIn('name', ['manager', 'admin']);
-        })->get()
+        // Only a manager or admin of the cashier's own organization can approve.
+        $managerPin = UserPin::whereHas('user', fn ($q) => $q->where('domain', $domain))
+            ->whereHas('user.roles', function ($q) {
+                $q->whereIn('name', ['manager', 'admin']);
+            })->get()
             ->first(fn ($pin) => Hash::check($pinCode, $pin->pin_code));
 
         if (! $managerPin) {

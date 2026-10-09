@@ -16,9 +16,10 @@ import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { useHelpers } from "@/Composables/useHelpers";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 import { router } from "@inertiajs/vue3";
+import { useStockAdjustmentActions } from "@/Composables/useStockAdjustmentActions";
 
-const { formatCurrency, formatDate, confirmDelete, showNotification } =
-  useHelpers();
+const { formatCurrency, formatDate, confirmDelete } = useHelpers();
+const adjustmentActions = useStockAdjustmentActions();
 const { hasPermission } = usePermissionsV2();
 const page = usePage();
 const isMdUp = useMediaQuery("(min-width: 768px)");
@@ -143,73 +144,14 @@ const editAdjustment = (adjustment) => {
   router.visit(route("inventory.adjustments.edit", adjustment.id));
 };
 
-const submitForApproval = async (adjustment) => {
-  try {
-    await router.post(
-      route("inventory.adjustments.submit", adjustment.id),
-      {},
-      {
-        onSuccess: () => {
-          showNotification(
-            "success",
-            "Success",
-            "Adjustment submitted for approval"
-          );
-          emit("refresh");
-        },
-        onError: () => {
-          showNotification("error", "Error", "Failed to submit adjustment");
-        },
-      }
-    );
-  } catch (error) {
-    console.error("Submit error:", error);
-  }
-};
+const submitForApproval = (adjustment) =>
+  adjustmentActions.submitAdjustment(adjustment, () => emit("refresh"));
 
-const approveAdjustment = async (adjustment) => {
-  try {
-    await router.post(
-      route("inventory.adjustments.approve", adjustment.id),
-      {},
-      {
-        onSuccess: () => {
-          showNotification(
-            "success",
-            "Success",
-            "Adjustment approved and processed"
-          );
-          emit("refresh");
-        },
-        onError: () => {
-          showNotification("error", "Error", "Failed to approve adjustment");
-        },
-      }
-    );
-  } catch (error) {
-    console.error("Approve error:", error);
-  }
-};
+const approveAdjustment = (adjustment) =>
+  adjustmentActions.approveAdjustment(adjustment, () => emit("refresh"));
 
-const rejectAdjustment = async (adjustment) => {
-  try {
-    await router.post(
-      route("inventory.adjustments.reject", adjustment.id),
-      {},
-      {
-        onSuccess: () => {
-          showNotification("success", "Success", "Adjustment rejected");
-          emit("refresh");
-        },
-        onError: () => {
-          showNotification("error", "Error", "Failed to reject adjustment");
-        },
-      }
-    );
-  } catch (error) {
-    console.error("Reject error:", error);
-  }
-};
+const rejectAdjustment = (adjustment) =>
+  adjustmentActions.rejectAdjustment(adjustment, () => emit("refresh"));
 
 const deleteAdjustment = (adjustment) => {
   // The route parameter is {adjustment}; anything else can't be built into a URL.

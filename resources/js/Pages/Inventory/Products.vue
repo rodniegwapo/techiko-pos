@@ -149,7 +149,9 @@ const showReceiveModal = () => {
     receiveModalVisible.value = true;
 };
 
+// The toolbar's Transfer starts with an empty list (not the product last opened in a dialog).
 const showTransferModal = () => {
+    selectedProduct.value = null;
     transferModalVisible.value = true;
 };
 

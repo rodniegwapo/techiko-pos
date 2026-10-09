@@ -8,8 +8,10 @@ use App\Http\Resources\ProductResource;
 use App\Models\Category;
 use App\Models\Domain;
 use App\Models\InventoryLocation;
+use App\Models\ModifierGroup;
 use App\Models\Product\Product;
 use App\Models\Product\ProductSoldType;
+use App\Models\ProductInventory;
 use App\Models\SharedProduct;
 use App\Models\SharedProductSuggestion;
 use App\Services\DomainSubscriptionService;
@@ -101,11 +103,17 @@ class ProductController extends Controller
                     ? Rule::exists('inventory_locations', 'id')->where('domain', $domainSlug)
                     : 'exists:inventory_locations,id',
             ],
+
+            'modifier_groups_present' => ['nullable', 'boolean'],
+            'modifier_group_ids' => ['nullable', 'array'],
+            'modifier_group_ids.*' => ['integer', Rule::exists('modifier_groups', 'id')->where('domain', $domainSlug ?? '')],
         ], [
+            'modifier_group_ids.*.exists' => 'The selected modifier group does not belong to this organization.',
             'category_id.exists' => 'The selected category does not belong to this organization.',
             'location_id.exists' => 'The selected store does not belong to this organization.',
         ], [
             'name' => 'product name',
+            'SKU' => 'SKU',
             'sold_type' => 'sold type',
             'category_id' => 'category',
             'location_id' => 'location',
@@ -124,8 +132,18 @@ class ProductController extends Controller
         $barcode = BarcodeNormalizer::normalize($validated['barcode'] ?? null);
         $validated['barcode'] = $barcode === '' ? null : $barcode;
 
+        // reorder_level is NOT NULL; a cleared "Low stock level" means no threshold.
+        if (array_key_exists('reorder_level', $validated) && $validated['reorder_level'] === null) {
+            $validated['reorder_level'] = 0;
+        }
+
         // Request-only fields — not columns on products
-        unset($validated['location_id'], $validated['representation_image']);
+        unset(
+            $validated['location_id'],
+            $validated['representation_image'],
+            $validated['modifier_groups_present'],
+            $validated['modifier_group_ids'],
+        );
 
         return $validated;
     }
@@ -138,6 +156,11 @@ class ProductController extends Controller
     {
         $norm = BarcodeNormalizer::normalize((string) $product->barcode);
         if ($norm === '') {
+            return;
+        }
+
+        // A shop's own code (GS1 in-store range, e.g. from "Generate") isn't a real product barcode.
+        if (preg_match('/^2\d{12}$/', $norm)) {
             return;
         }
 
@@ -218,7 +241,72 @@ class ProductController extends Controller
             ->when($request->sold_type, fn ($q, $soldType) => $q->where('sold_type', $soldType))
             // Price and cost filters (number inputs) match the exact amount.
             ->when(is_numeric($request->price), fn ($q) => $q->where('price', (float) $request->price))
-            ->when(is_numeric($request->cost), fn ($q) => $q->where('cost', (float) $request->cost));
+            ->when(is_numeric($request->cost), fn ($q) => $q->where('cost', (float) $request->cost))
+            ->when(is_numeric($request->price_min), fn ($q) => $q->where('price', '>=', (float) $request->price_min))
+            ->when(is_numeric($request->price_max), fn ($q) => $q->where('price', '<=', (float) $request->price_max))
+            ->when(in_array($request->track_stock, ['yes', 'no'], true), fn ($q) => $q->where('track_inventory', $request->track_stock === 'yes'));
+    }
+
+    /** The store's low stock level: its own override, else the product's. */
+    private const LOW_STOCK_LEVEL_SQL = 'COALESCE(product_inventory.location_reorder_level, products.reorder_level, 0)';
+
+    /**
+     * Narrow to tracked products that are in stock, low or out at the store. A product with no
+     * stock row at the store counts as out of stock.
+     */
+    private function applyStockStatus(Builder $query, string $status, InventoryLocation $location): void
+    {
+        $query->where('track_inventory', true);
+        $atStore = fn ($q) => $q->where('location_id', $location->id);
+
+        match ($status) {
+            'out' => $query->whereDoesntHave('inventories', fn ($q) => $atStore($q)->where('quantity_available', '>', 0)),
+            'low' => $query->whereHas('inventories', fn ($q) => $atStore($q)
+                ->where('quantity_available', '>', 0)
+                ->whereRaw(self::LOW_STOCK_LEVEL_SQL.' > 0')
+                ->whereRaw('quantity_available <= '.self::LOW_STOCK_LEVEL_SQL)),
+            'in' => $query->whereHas('inventories', fn ($q) => $atStore($q)
+                ->where('quantity_available', '>', 0)
+                ->whereRaw('quantity_available > '.self::LOW_STOCK_LEVEL_SQL)),
+            default => null,
+        };
+    }
+
+    /** @return array{low: int, out: int} how many of the store's products are low or out of stock */
+    private function stockCounts(Domain $domain, InventoryLocation $location): array
+    {
+        $atStore = fn () => Product::query()
+            ->where('domain', $domain->name_slug)
+            ->whereHas('activeLocations', fn ($q) => $q->where('inventory_locations.id', $location->id));
+
+        $counts = [];
+        foreach (['low', 'out'] as $status) {
+            $query = $atStore();
+            $this->applyStockStatus($query, $status, $location);
+            $counts[$status] = $query->count();
+        }
+
+        return $counts;
+    }
+
+    /** Sort options for the products list; newest first unless asked otherwise. */
+    private function applySort(Builder $query, ?string $sort, ?InventoryLocation $location): void
+    {
+        match ($sort) {
+            'name' => $query->orderBy('name')->orderBy('id'),
+            'price_asc' => $query->orderBy('price')->orderBy('id'),
+            'price_desc' => $query->orderByDesc('price')->orderBy('id'),
+            'qty_asc' => $location
+                ? $query->orderBy(
+                    ProductInventory::query()
+                        ->select('quantity_available')
+                        ->whereColumn('product_inventory.product_id', 'products.id')
+                        ->where('location_id', $location->id)
+                        ->limit(1)
+                )->orderBy('id')
+                : $query->latest(),
+            default => $query->latest(),
+        };
     }
 
     /**
@@ -332,10 +420,11 @@ class ProductController extends Controller
     /**
      * Standard response for products index.
      */
-    private function respondWithIndex($products, $categoriesQuery, $location, Domain $domain)
+    private function respondWithIndex($products, $categoriesQuery, $location, Domain $domain, array $stockCounts = ['low' => 0, 'out' => 0])
     {
         return Inertia::render('Products/Index', [
             'items' => ProductResource::collection($products),
+            'stockCounts' => $stockCounts,
             'categories' => $categoriesQuery->get(),
             'sold_by_types' => ProductSoldType::all(),
             'isGlobalView' => false,
@@ -358,18 +447,30 @@ class ProductController extends Controller
             })
                 ->with([
                     'inventories' => fn ($iq) => $iq->where('location_id', $location->id),
-                ]);
+                ])
+                // The delete dialog says how many stores carry the product.
+                ->withCount(['activeLocations as store_count']);
+
+            if (in_array($request->stock_status, ['in', 'low', 'out'], true)) {
+                $this->applyStockStatus($query, $request->stock_status, $location);
+            }
         } else {
             $query->whereRaw('0 = 1');
         }
 
-        $query->latest();
+        $this->applySort($query, $request->sort, $location);
 
         $products = $query->paginate(15);
 
         $categoriesQuery = $this->buildCategoriesQuery($domain, $location);
 
-        return $this->respondWithIndex($products, $categoriesQuery, $location, $domain);
+        return $this->respondWithIndex(
+            $products,
+            $categoriesQuery,
+            $location,
+            $domain,
+            $location ? $this->stockCounts($domain, $location) : ['low' => 0, 'out' => 0],
+        );
     }
 
     /**
@@ -396,6 +497,10 @@ class ProductController extends Controller
         }
 
         $product = Product::create($validated);
+
+        if ($domain) {
+            $this->syncModifierGroups($request, $domain, $product);
+        }
 
         $location = $this->resolveActiveLocation($request, $domain)
             ?: ($request->location_id ? InventoryLocation::find($request->location_id) : null);
@@ -432,6 +537,7 @@ class ProductController extends Controller
         );
         $product->update($validated);
         $product->refresh();
+        $this->syncModifierGroups($request, $domain, $product);
 
         if ($request->filled('location_id')) {
             $location = InventoryLocation::find($request->input('location_id'));
@@ -442,22 +548,80 @@ class ProductController extends Controller
 
         $this->queueSharedCatalogSuggestionIfNeeded($request, $domain, $product);
 
-        return redirect()->back()->with('success', 'Product updated successfully');
+        // Back to the items list (in the same store) once the edit is saved.
+        return redirect()
+            ->route('domains.products.index', array_filter([
+                'domain' => $domain->name_slug,
+                'location_id' => $request->input('location_id') ?: $request->query('location_id'),
+            ]))
+            ->with('success', 'Product updated successfully');
     }
 
     /**
      * Remove the specified product from the domain.
      */
-    public function destroy(Domain $domain, Product $product)
+    public function destroy(Request $request, Domain $domain, Product $product)
     {
         // Ensure product belongs to this domain
         if ($product->domain !== $domain->name_slug) {
             abort(403, 'Product does not belong to this domain');
         }
 
+        $validated = $request->validate([
+            'scope' => ['nullable', 'in:store,all'],
+            'location_id' => ['required_if:scope,store', 'nullable', 'integer'],
+        ]);
+
+        if (($validated['scope'] ?? 'all') === 'store') {
+            return $this->removeFromStore($product, (int) $validated['location_id'], $domain);
+        }
+
         $product->delete();
 
         return redirect()->back()->with('success', 'Product deleted successfully');
+    }
+
+    /**
+     * Take a product off one store's list, leaving it in the organization and at its other stores.
+     * Refused while the store still holds stock, so no stock drops out of the store's records.
+     */
+    private function removeFromStore(Product $product, int $locationId, Domain $domain)
+    {
+        $location = InventoryLocation::query()
+            ->whereKey($locationId)
+            ->where('domain', $domain->name_slug)
+            ->firstOrFail();
+
+        if (! $product->isAvailableAt($location)) {
+            return redirect()->back()->with('error', "{$product->name} isn't in {$location->name}.");
+        }
+
+        // A product in no store can't be offered back under "Add existing to store", so the last
+        // store can only be left by deleting the product everywhere.
+        if (! $product->activeLocations()->where('inventory_locations.id', '!=', $location->id)->exists()) {
+            return redirect()->back()->with(
+                'error',
+                "{$location->name} is the only store with {$product->name}. Delete it everywhere instead.",
+            );
+        }
+
+        $onHand = (float) ProductInventory::query()
+            ->where('product_id', $product->id)
+            ->where('location_id', $location->id)
+            ->value('quantity_on_hand');
+
+        if ($product->track_inventory && $onHand > 0) {
+            $quantity = rtrim(rtrim(number_format($onHand, 2, '.', ''), '0'), '.');
+
+            return redirect()->back()->with(
+                'error',
+                "{$location->name} still has {$quantity} of {$product->name} in stock. Transfer it or adjust it to 0 first.",
+            );
+        }
+
+        $product->removeFromLocation($location);
+
+        return redirect()->back()->with('success', "{$product->name} was removed from {$location->name}.");
     }
 
     /**
@@ -473,6 +637,7 @@ class ProductController extends Controller
 
         return Inertia::render('Products/Create', [
             'categories' => $categories,
+            'modifierGroups' => $this->modifierGroupOptions($domain),
             'sold_by_types' => ProductSoldType::all(),
             'isGlobalView' => false,
             'currentLocation' => $location,
@@ -503,11 +668,40 @@ class ProductController extends Controller
                     $product->representation,
                     $product->representation_type,
                 ),
+                'modifier_group_ids' => $product->modifierGroups()->pluck('modifier_groups.id'),
             ],
             'categories' => $categories,
+            'modifierGroups' => $this->modifierGroupOptions($domain),
             'sold_by_types' => ProductSoldType::all(),
             'isGlobalView' => false,
             'currentLocation' => $location,
         ]);
+    }
+
+    /** The organization's modifier groups, for the product form's "Modifiers" field. */
+    private function modifierGroupOptions(Domain $domain)
+    {
+        return ModifierGroup::forDomain($domain->name_slug)
+            ->withCount('modifiers')
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['id', 'name', 'selection', 'is_required']);
+    }
+
+    /**
+     * Attach the modifier groups picked on the product form. The form says it sent the field
+     * (modifier_groups_present), so an empty pick clears them while other callers leave them be.
+     */
+    private function syncModifierGroups(Request $request, Domain $domain, Product $product): void
+    {
+        if (! $request->boolean('modifier_groups_present')) {
+            return;
+        }
+
+        // Checked with the rest of the form in validatedData().
+        $ids = array_values(array_unique(array_map('intval', $request->input('modifier_group_ids', []))));
+        $product->modifierGroups()->sync(
+            collect($ids)->mapWithKeys(fn ($id, $i) => [$id => ['sort_order' => $i]])->all()
+        );
     }
 }

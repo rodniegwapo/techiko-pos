@@ -30,6 +30,28 @@ const sold_type = ref(null);
 const price = ref(null);
 const category = ref(null);
 const cost = ref(null);
+const price_min = ref(null);
+const price_max = ref(null);
+const stock_status = ref(null);
+const track_stock = ref(null);
+const sort = ref(null);
+
+const STOCK_STATUS_OPTIONS = [
+    { label: "In stock", value: "in" },
+    { label: "Low stock", value: "low" },
+    { label: "Out of stock", value: "out" },
+];
+const TRACK_STOCK_OPTIONS = [
+    { label: "Tracked", value: "yes" },
+    { label: "Not tracked", value: "no" },
+];
+const SORT_OPTIONS = [
+    { label: "Newest first", value: "newest" },
+    { label: "Name (A–Z)", value: "name" },
+    { label: "Price (low to high)", value: "price_asc" },
+    { label: "Price (high to low)", value: "price_desc" },
+    { label: "Quantity (low to high)", value: "qty_asc" },
+];
 
 const locationIdQuery = () => {
     if (typeof window === "undefined") {
@@ -43,7 +65,7 @@ const locationIdQuery = () => {
 // Fetch items
 const getItems = () => {
     router.reload({
-        only: ["items"],
+        only: ["items", "stockCounts"],
         preserveScroll: true,
         data: {
             ...locationIdQuery(),
@@ -52,6 +74,11 @@ const getItems = () => {
             price: price.value || undefined,
             category: category.value || undefined,
             cost: cost.value || undefined,
+            price_min: price_min.value || undefined,
+            price_max: price_max.value || undefined,
+            stock_status: stock_status.value || undefined,
+            track_stock: track_stock.value || undefined,
+            sort: sort.value || undefined,
             // page: pagination.value.current_page || 1,
         },
         onStart: () => (spinning.value = true),
@@ -94,6 +121,26 @@ const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
         },
         { key: "cost", ref: cost, label: "Cost" },
         { key: "price", ref: price, label: "Price" },
+        { key: "price_min", ref: price_min, label: "Min price" },
+        { key: "price_max", ref: price_max, label: "Max price" },
+        {
+            key: "stock_status",
+            ref: stock_status,
+            label: "Stock",
+            getLabel: toLabel(computed(() => STOCK_STATUS_OPTIONS)),
+        },
+        {
+            key: "track_stock",
+            ref: track_stock,
+            label: "Track stock",
+            getLabel: toLabel(computed(() => TRACK_STOCK_OPTIONS)),
+        },
+        {
+            key: "sort",
+            ref: sort,
+            label: "Sort",
+            getLabel: toLabel(computed(() => SORT_OPTIONS)),
+        },
     ],
 });
 
@@ -117,12 +164,34 @@ const filtersConfig = [
             value: item.name,
         })),
     },
+    { key: "stock_status", label: "Stock", type: "select", options: STOCK_STATUS_OPTIONS },
+    { key: "track_stock", label: "Track stock", type: "select", options: TRACK_STOCK_OPTIONS },
+    { key: "price_min", label: "Min price", type: "number" },
+    { key: "price_max", label: "Max price", type: "number" },
     { key: "cost", label: "Cost", type: "number" },
     { key: "price", label: "Price", type: "number" },
+    { key: "sort", label: "Sort by", type: "select", options: SORT_OPTIONS },
 ];
 
 // group all filters in one object
-const tableFilters = { search, sold_type, price, category, cost };
+const tableFilters = {
+    search,
+    sold_type,
+    price,
+    category,
+    cost,
+    price_min,
+    price_max,
+    stock_status,
+    track_stock,
+    sort,
+};
+
+/** Low / out of stock counts for the store; clicking one filters the list to it. */
+const stockCounts = computed(() => page.props.stockCounts ?? { low: 0, out: 0 });
+const showStockStatus = (status) => {
+    filters.value = { ...filters.value, stock_status: status };
+};
 const { pagination, handleTableChange } = useTable("items", tableFilters, {
     preserveQueryKeys: ["location_id"],
 });
@@ -171,6 +240,14 @@ const hasMultipleStores = computed(() => {
                     placeholder="Search products"
                     class="w-full min-w-0 md:max-w-[300px]"
                 />
+
+                <Link
+                    v-if="hasPermission('products.modifier-groups.index')"
+                    class="block w-full md:w-auto"
+                    :href="getRoute('products.modifier-groups.index')"
+                >
+                    <a-button class="w-full md:w-auto">Modifiers</a-button>
+                </Link>
 
                 <template v-if="canCreate">
                 <Link
@@ -243,6 +320,29 @@ const hasMultipleStores = computed(() => {
 
             <template #activeStore>
                 <LocationInfoAlert />
+                <div
+                    v-if="stockCounts.low > 0 || stockCounts.out > 0"
+                    class="mt-2 flex flex-wrap gap-2"
+                >
+                    <a-tag
+                        v-if="stockCounts.low > 0"
+                        color="orange"
+                        class="cursor-pointer"
+                        role="button"
+                        @click="showStockStatus('low')"
+                    >
+                        {{ stockCounts.low }} low stock
+                    </a-tag>
+                    <a-tag
+                        v-if="stockCounts.out > 0"
+                        color="red"
+                        class="cursor-pointer"
+                        role="button"
+                        @click="showStockStatus('out')"
+                    >
+                        {{ stockCounts.out }} out of stock
+                    </a-tag>
+                </div>
             </template>
 
             <!-- Table -->

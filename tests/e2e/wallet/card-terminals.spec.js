@@ -11,14 +11,14 @@ const cardRow = (page, name) => cardRows(page).filter({ has: page.getByText(name
 
 async function openCardTerminals(page, query = "") {
     await page.goto(`${cardTypesUrl()}${query}`);
-    await expect(page.getByRole("heading", { name: "Payment card types" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Payment channels" })).toBeVisible();
 }
 
 /** Opens Add/Edit, types the name (and active state when editing) and saves. Returns the request's response. */
 async function saveCardTypeDialog(page, { name, active } = {}) {
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
-    if (name !== undefined) await dialog.getByPlaceholder("e.g. BDO POS, Visa terminal").fill(name);
+    if (name !== undefined) await dialog.getByPlaceholder("e.g. GCash, Maya, BDO, Visa terminal").fill(name);
     if (active !== undefined) {
         const toggle = dialog.getByRole("switch");
         if ((await toggle.getAttribute("aria-checked")) !== String(active)) await toggle.click();
@@ -72,7 +72,7 @@ test.describe("Card terminals page", () => {
     test.describe("adding a card type", () => {
         test("a name is required", async ({ page }) => {
             await openCardTerminals(page);
-            await page.getByRole("button", { name: "Add card type" }).click();
+            await page.getByRole("button", { name: "Add channel" }).click();
 
             const res = await saveCardTypeDialog(page, { name: "   " });
 
@@ -81,16 +81,40 @@ test.describe("Card terminals page", () => {
             await expect(page.getByRole("dialog")).toBeVisible();
         });
 
-        test("creates an active card type in the manager's store", async ({ page, serverAs }, testInfo) => {
-            const name = uniqueName("Add");
+        test("adds an e-wallet, which shows under the E-wallet filter and is offered as an e-wallet", async ({ page, serverAs }) => {
+            const name = uniqueName("GCash");
             await openCardTerminals(page);
-            await page.getByRole("button", { name: "Add card type" }).click();
-            await expect(page.getByRole("dialog")).toContainText("Add card type");
+            await page.getByRole("button", { name: "Add channel" }).click();
+            await page.getByRole("dialog").getByRole("radio", { name: "E-wallet" }).check({ force: true });
 
             const res = await saveCardTypeDialog(page, { name });
 
             expect(res?.status()).toBe(201);
-            await expect(notice(page, "Card type created.")).toBeVisible();
+            expect((await res.json()).data.kind).toBe("ewallet");
+            await expect(cardRow(page, name)).toContainText("E-wallet");
+
+            await page.getByRole("radio", { name: "Card", exact: true }).check({ force: true });
+            await expect(cardRow(page, name)).toHaveCount(0);
+            await page.getByRole("radio", { name: "E-wallet", exact: true }).check({ force: true });
+            await expect(cardRow(page, name)).toHaveCount(1);
+
+            const api = await serverAs("wallet-manager");
+            const ewallets = await apiJson(api, "GET", cardTypesUrl("/list?kind=ewallet"));
+            expect(ewallets.body.data.map((c) => c.name)).toContain(name);
+            const cards = await apiJson(api, "GET", cardTypesUrl("/list?kind=card"));
+            expect(cards.body.data.map((c) => c.name)).not.toContain(name);
+        });
+
+        test("creates an active card type in the manager's store", async ({ page, serverAs }, testInfo) => {
+            const name = uniqueName("Add");
+            await openCardTerminals(page);
+            await page.getByRole("button", { name: "Add channel" }).click();
+            await expect(page.getByRole("dialog")).toContainText("Add payment channel");
+
+            const res = await saveCardTypeDialog(page, { name });
+
+            expect(res?.status()).toBe(201);
+            await expect(notice(page, "Payment channel created.")).toBeVisible();
             await expect(cardRow(page, name)).toContainText("Active");
 
             const api = await serverAs("wallet-manager");
@@ -102,19 +126,19 @@ test.describe("Card terminals page", () => {
 
         test("a name already used in the store is rejected with a message", async ({ page }) => {
             await openCardTerminals(page);
-            await page.getByRole("button", { name: "Add card type" }).click();
+            await page.getByRole("button", { name: "Add channel" }).click();
 
             const res = await saveCardTypeDialog(page, { name: "E2E Wallet Visa" });
 
             expect(res?.status()).toBe(422);
-            await expect(notice(page, "A card type with this name already exists at this store.")).toBeVisible();
+            await expect(notice(page, "A payment channel with this name already exists at this store.")).toBeVisible();
             await expect(cardRow(page, "E2E Wallet Visa")).toHaveCount(1);
         });
 
         test("the name is trimmed", async ({ page }) => {
             const name = uniqueName("Trim");
             await openCardTerminals(page);
-            await page.getByRole("button", { name: "Add card type" }).click();
+            await page.getByRole("button", { name: "Add channel" }).click();
 
             await saveCardTypeDialog(page, { name: `   ${name}   ` });
 
@@ -130,13 +154,13 @@ test.describe("Card terminals page", () => {
             const renamed = `${original} Renamed`;
             await openCardTerminals(page);
 
-            await cardRow(page, original).getByRole("button", { name: "Edit card type" }).click();
-            await expect(page.getByRole("dialog")).toContainText("Edit card type");
-            await expect(page.getByRole("dialog").getByPlaceholder("e.g. BDO POS, Visa terminal")).toHaveValue(original);
+            await cardRow(page, original).getByRole("button", { name: "Edit channel" }).click();
+            await expect(page.getByRole("dialog")).toContainText("Edit payment channel");
+            await expect(page.getByRole("dialog").getByPlaceholder("e.g. GCash, Maya, BDO, Visa terminal")).toHaveValue(original);
             const res = await saveCardTypeDialog(page, { name: renamed, active: false });
 
             expect(res?.status()).toBe(200);
-            await expect(notice(page, "Card type updated.")).toBeVisible();
+            await expect(notice(page, "Payment channel updated.")).toBeVisible();
             await expect(cardRow(page, renamed)).toContainText("Inactive");
             await expect(cardRow(page, original)).toHaveCount(0);
 
@@ -146,7 +170,7 @@ test.describe("Card terminals page", () => {
 
         test("the add dialog has no active switch", async ({ page }) => {
             await openCardTerminals(page);
-            await page.getByRole("button", { name: "Add card type" }).click();
+            await page.getByRole("button", { name: "Add channel" }).click();
 
             await expect(page.getByRole("dialog").getByRole("switch")).toHaveCount(0);
         });
@@ -163,7 +187,7 @@ test.describe("Card terminals page", () => {
                 if (r.method() === "DELETE") deleted = true;
             });
 
-            await cardRow(page, name).getByRole("button", { name: "Remove card type" }).click();
+            await cardRow(page, name).getByRole("button", { name: "Remove channel" }).click();
             const confirm = page.getByRole("dialog").filter({ hasText: `Remove "${name}"?` });
             await expect(confirm).toBeVisible();
             await confirm.getByRole("button", { name: "Cancel" }).click();
@@ -179,12 +203,12 @@ test.describe("Card terminals page", () => {
             const created = await apiJson(api, "POST", cardTypesUrl(), { name });
             await openCardTerminals(page);
 
-            await cardRow(page, name).getByRole("button", { name: "Remove card type" }).click();
+            await cardRow(page, name).getByRole("button", { name: "Remove channel" }).click();
             const removed = page.waitForResponse((r) => r.request().method() === "DELETE");
             await page.getByRole("dialog").filter({ hasText: `Remove "${name}"?` }).getByRole("button", { name: "Remove" }).click();
 
             expect((await removed).status()).toBe(200);
-            await expect(notice(page, "Card type deleted.")).toBeVisible();
+            await expect(notice(page, "Payment channel deleted.")).toBeVisible();
             await expect(cardRow(page, name)).toHaveCount(0);
             const update = await apiJson(api, "PUT", cardTypeUrl(created.body.data.id), { name: "gone" });
             expect(update.status).toBe(404);
@@ -195,7 +219,7 @@ test.describe("Card terminals page", () => {
             await openCardTerminals(page);
 
             try {
-                await cardRow(page, "E2E Wallet Mastercard").getByRole("button", { name: "Remove card type" }).click();
+                await cardRow(page, "E2E Wallet Mastercard").getByRole("button", { name: "Remove channel" }).click();
                 const removed = page.waitForResponse((r) => r.request().method() === "DELETE");
                 await page.getByRole("dialog").filter({ hasText: 'Remove "E2E Wallet Mastercard"?' }).getByRole("button", { name: "Remove" }).click();
 
@@ -317,9 +341,9 @@ test.describe("Card payment details page", () => {
     test("the breadcrumb returns to card terminals", async ({ page }, testInfo) => {
         await openDetails(page, testInfo);
 
-        await page.locator(".ant-breadcrumb").getByText("Card terminals").click();
+        await page.locator(".ant-breadcrumb").getByText("Payment channels").click();
 
         await expect(page).toHaveURL(new RegExp(`${cardTypesUrl()}(\\?|$)`));
-        await expect(page.getByRole("heading", { name: "Payment card types" })).toBeVisible();
+        await expect(page.getByRole("heading", { name: "Payment channels" })).toBeVisible();
     });
 });

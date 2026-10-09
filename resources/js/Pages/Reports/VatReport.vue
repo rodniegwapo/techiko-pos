@@ -4,6 +4,7 @@ import { Head, router, usePage } from "@inertiajs/vue3";
 import { useMediaQuery } from "@vueuse/core";
 import axios from "axios";
 import dayjs from "dayjs";
+import { dateRangePresets } from "@/Composables/useDateRangePresets";
 import { message } from "ant-design-vue";
 import { IconPrinter } from "@tabler/icons-vue";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
@@ -368,6 +369,7 @@ const columns = [
                     <span class="text-xs text-gray-600">Date range</span>
                     <a-range-picker
                         v-model:value="dateRangeLocal"
+                        :ranges="dateRangePresets()"
                         format="YYYY-MM-DD"
                         class="w-full min-w-0 md:min-w-[260px]"
                     />

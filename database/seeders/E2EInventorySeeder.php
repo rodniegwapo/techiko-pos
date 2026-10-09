@@ -81,6 +81,7 @@ class E2EInventorySeeder extends Seeder
                 ],
                 'mainLocation' => InventoryLocation::where('code', 'JB-MAIN')->first(['id', 'name', 'code'])->toArray(),
                 'branchLocation' => InventoryLocation::where('code', 'JB-BRANCH')->first(['id', 'name', 'code'])->toArray(),
+                'warehouseLocation' => InventoryLocation::where('code', 'JB-WH')->first(['id', 'name', 'code'])?->toArray(),
                 'otherOrgLocationId' => InventoryLocation::where('code', 'MC-MAIN')->value('id'),
             ];
         });

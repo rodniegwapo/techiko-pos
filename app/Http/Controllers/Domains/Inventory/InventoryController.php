@@ -15,6 +15,7 @@ use App\Models\InventoryMovement;
 use App\Models\Product\Product;
 use App\Models\ProductInventory;
 use App\Services\InventoryService;
+use App\Traits\HandlesStockTransfers;
 use App\Traits\LocationCategoryScoping;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -23,6 +24,7 @@ use Inertia\Inertia;
 
 class InventoryController extends Controller
 {
+    use HandlesStockTransfers;
     use LocationCategoryScoping;
 
     public function __construct(private InventoryService $inventoryService) {}
@@ -74,7 +76,8 @@ class InventoryController extends Controller
                     $query->where('quantity_available', '>', 0);
                     break;
                 case 'low_stock':
-                    $query->whereRaw('quantity_available <= (SELECT reorder_level FROM products WHERE products.id = product_inventory.product_id)');
+                    // The store's own low stock level, else the product's.
+                    $query->whereRaw('quantity_available <= COALESCE(product_inventory.location_reorder_level, (SELECT reorder_level FROM products WHERE products.id = product_inventory.product_id))');
                     break;
                 case 'out_of_stock':
                     $query->where('quantity_available', '<=', 0);
@@ -268,6 +271,8 @@ class InventoryController extends Controller
                 'location' => null,
                 'summary' => [
                     'total_value' => 0,
+                    'total_retail_value' => 0,
+                    'potential_profit' => 0,
                     'total_quantity' => 0,
                     'total_products' => 0,
                 ],
@@ -287,9 +292,12 @@ class InventoryController extends Controller
 
         $totalValue = $inventories->sum('total_value');
         $totalQuantity = $inventories->sum('quantity_on_hand');
+        // What the stock would sell for at today's prices, next to what it cost.
+        $retailValue = fn ($inventory) => round((float) $inventory->quantity_on_hand * (float) $inventory->product->price, 2);
+        $totalRetailValue = round($inventories->sum($retailValue), 2);
 
         // Every row is stock at $location, so its organization is known without loading it per row.
-        $valuationData = $inventories->map(function ($inventory) use ($location) {
+        $valuationData = $inventories->map(function ($inventory) use ($location, $retailValue) {
             return [
                 'product_id' => $inventory->product_id,
                 'product_name' => $inventory->product->name,
@@ -297,6 +305,8 @@ class InventoryController extends Controller
                 'quantity_on_hand' => $inventory->quantity_on_hand,
                 'average_cost' => $inventory->average_cost,
                 'total_value' => $inventory->total_value,
+                'price' => $inventory->product->price,
+                'retail_value' => $retailValue($inventory),
                 'last_movement_at' => $inventory->last_movement_at,
                 'domain' => $location->domain ?? 'N/A',
             ];
@@ -306,6 +316,8 @@ class InventoryController extends Controller
             'location' => $location,
             'summary' => [
                 'total_value' => $totalValue,
+                'total_retail_value' => $totalRetailValue,
+                'potential_profit' => round($totalRetailValue - (float) $totalValue, 2),
                 'total_quantity' => $totalQuantity,
                 'total_products' => $inventories->count(),
             ],
@@ -350,37 +362,25 @@ class InventoryController extends Controller
 
     public function transfer(Request $request, Domain $domain)
     {
-        $validated = $request->validate([
-            'product_id' => 'required|exists:products,id',
-            'from_location_id' => 'required|exists:inventory_locations,id',
-            'to_location_id' => 'required|exists:inventory_locations,id|different:from_location_id',
-            'quantity' => 'required|integer|min:1',
-            'notes' => 'nullable|string|max:500',
-        ]);
+        $transfer = $this->validatedTransfer($request);
 
-        $product = Product::where('domain', $domain->name_slug)->findOrFail($validated['product_id']);
-        $fromLocation = InventoryLocation::forDomain($domain->name_slug)->findOrFail($validated['from_location_id']);
-        $toLocation = InventoryLocation::forDomain($domain->name_slug)->findOrFail($validated['to_location_id']);
+        // Looked up within the organization, so another organization's product or store is not found.
+        $fromLocation = InventoryLocation::forDomain($domain->name_slug)->findOrFail($transfer['from_location_id']);
+        $toLocation = InventoryLocation::forDomain($domain->name_slug)->findOrFail($transfer['to_location_id']);
+        $products = Product::where('domain', $domain->name_slug)
+            ->whereIn('id', array_column($transfer['rows'], 'product_id'))
+            ->get()
+            ->keyBy('id');
+
+        $items = array_map(fn ($row) => [
+            'product' => $products[$row['product_id']] ?? abort(404),
+            'quantity' => $row['quantity'],
+        ], $transfer['rows']);
 
         try {
-            $this->inventoryService->transferInventory(
-                $product,
-                $fromLocation,
-                $toLocation,
-                $validated['quantity'],
-                auth()->user(),
-                $validated['notes'] ?? null
-            );
+            $this->inventoryService->transferMany($items, $fromLocation, $toLocation, auth()->user(), $transfer['notes']);
         } catch (InsufficientStockException $e) {
-            $item = $e->getUnavailableItems()[0] ?? null;
-            $available = $item['available_quantity'] ?? 0;
-            $message = "Only {$available} units available at source location";
-
-            return response()->json([
-                'success' => false,
-                'errors' => ['quantity' => [$message]],
-                'message' => $message,
-            ], 422);
+            return $this->transferShortageResponse($e, $transfer, $fromLocation);
         }
 
         return response()->noContent(200);

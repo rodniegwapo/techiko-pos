@@ -6,6 +6,8 @@ import { notifyInsufficientStock } from "@/Composables/useCartStockNotification"
 import { usePage } from "@inertiajs/vue3";
 import axios from "axios";
 import ProductMedia from "@/Components/ProductMedia.vue";
+import ModifierPickerModal from "./ModifierPickerModal.vue";
+import { hasModifiers } from "@/Composables/useProductModifiers";
 
 const props = defineProps({
     products: {
@@ -82,13 +84,24 @@ function isOutOfStock(product) {
 }
 
 const addingItem = ref(false);
-const addToCart = async (product) => {
+
+// A product with options (Size, Add-ons…) asks for them before it goes into the cart.
+const pickerProduct = ref(null);
+const pickerOpen = ref(false);
+
+const addToCart = async (product, line = null) => {
     if (isOutOfStock(product)) return;
+
+    if (!line && hasModifiers(product)) {
+        pickerProduct.value = product;
+        pickerOpen.value = true;
+        return;
+    }
 
     try {
         addingItem.value = true;
         if (!online.value) {
-            emit("offline-add-product", product);
+            emit("offline-add-product", product, line);
             return;
         }
 
@@ -98,6 +111,9 @@ const addToCart = async (product) => {
         await axios.post(route, {
             product_id: product.id,
             quantity: 1,
+            ...(line
+                ? { modifier_ids: line.modifier_ids, notes: line.notes }
+                : {}),
         });
 
         emit("cart-updated");
@@ -292,5 +308,11 @@ const formattedTotal = (price) => {
                 Load more
             </a-button>
         </div>
+
+        <ModifierPickerModal
+            v-model:open="pickerOpen"
+            :product="pickerProduct"
+            @confirm="(line) => addToCart(pickerProduct, line)"
+        />
     </div>
 </template>

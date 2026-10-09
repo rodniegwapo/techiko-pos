@@ -139,7 +139,7 @@
                     Role Permissions
                 </h4>
                 <div class="text-sm text-blue-700">
-                    <strong>{{ selectedRole.name }}</strong> -
+                    <strong>{{ humanize(selectedRole.name) }}</strong> -
                     {{ getRoleDescription(selectedRole.name) }}
                 </div>
             </div>
@@ -164,7 +164,7 @@
                     </div>
                     <div v-if="selectedRole" class="text-xs font-medium mt-1">
                         <a-tag :color="getRoleColor(selectedRole.name)">
-                            {{ selectedRole.name }}
+                            {{ humanize(selectedRole.name) }}
                         </a-tag>
                     </div>
                 </div>
@@ -199,6 +199,9 @@ import { SafetyCertificateOutlined } from "@ant-design/icons-vue";
 import { usePage } from "@inertiajs/vue3";
 import axios from "axios";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
+import { useHelpers } from "@/Composables/useHelpers";
+
+const { humanize } = useHelpers();
 
 const page = usePage();
 const { getRoute, isInDomainContext } = useDomainRoutes();
@@ -298,18 +301,18 @@ const isOwnRoleLocked = computed(
     () => isEditingSelf.value && !isSuperUser.value
 );
 
-const ownRoleName = computed(() => {
-    return (
+const ownRoleName = computed(() =>
+    humanize(
         editingUserData.value?.roles?.[0]?.name ||
-        selectedRole.value?.name ||
-        "—"
-    );
-});
+            selectedRole.value?.name ||
+            "—"
+    )
+);
 
 // Available roles (filter out super admin for regular admins)
 const availableRoles = computed(() => {
     let roles = props.roles.map((role) => ({
-        label: role.name,
+        label: humanize(role.name),
         value: role.id,
     }));
 
@@ -625,9 +628,10 @@ const getRoleColor = (roleName) => {
         "Super Admin": "red",
         Admin: "orange",
         Manager: "blue",
+        Supervisor: "purple",
         Cashier: "green",
     };
-    return roleColors[roleName] || "default";
+    return roleColors[humanize(roleName)] || "default";
 };
 
 const getRoleDescription = (roleName) => {
@@ -636,8 +640,9 @@ const getRoleDescription = (roleName) => {
             "Full system access including user management and system settings",
         Admin: "Administrative access with user management capabilities",
         Manager: "Operational management with reporting and staff oversight",
+        Supervisor: "Shift supervision with limited management capabilities",
         Cashier: "Basic sales operations and customer service",
     };
-    return descriptions[roleName] || "Standard user permissions";
+    return descriptions[humanize(roleName)] || "Standard user permissions";
 };
 </script>

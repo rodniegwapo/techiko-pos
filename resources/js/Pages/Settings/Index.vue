@@ -16,6 +16,7 @@ const props = defineProps({
             vat_rate_percent: 12,
             vat_pricing_mode: "exclusive",
             allow_overselling: false,
+            hide_out_of_stock: false,
         }),
     },
 });
@@ -29,6 +30,7 @@ const form = useForm({
             : "exclusive",
     allow_overselling:
         props.salesSettings?.allow_overselling !== false,
+    hide_out_of_stock: props.salesSettings?.hide_out_of_stock === true,
 });
 
 function submit() {
@@ -111,6 +113,19 @@ const domainName =
                                 available quantity at this location. Turn on to
                                 allow overselling and reconcile via automatic
                                 adjustments.
+                            </span>
+                        </a-form-item>
+                        <a-form-item
+                            label="Hide out-of-stock products at the POS"
+                        >
+                            <a-switch
+                                v-model:checked="form.hide_out_of_stock"
+                                aria-label="Hide out-of-stock products at the POS"
+                            />
+                            <span class="ml-2 text-sm text-gray-600">
+                                When on, products with nothing left at the
+                                store are left out of the sales screen.
+                                Scanning a barcode still finds them.
                             </span>
                         </a-form-item>
                         <a-form-item>

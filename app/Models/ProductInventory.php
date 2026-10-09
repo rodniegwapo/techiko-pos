@@ -160,7 +160,8 @@ class ProductInventory extends Model
      */
     public function scopeLowStock($query)
     {
-        return $query->whereRaw('quantity_available <= (SELECT reorder_level FROM products WHERE products.id = product_inventory.product_id)');
+        // The store's own low stock level, else the product's.
+        return $query->whereRaw('quantity_available <= COALESCE(product_inventory.location_reorder_level, (SELECT reorder_level FROM products WHERE products.id = product_inventory.product_id))');
     }
 
     /**

@@ -13,7 +13,7 @@ import {
 } from "@tabler/icons-vue";
 import { useHelpers } from "@/Composables/useHelpers";
 
-const { formatCurrency, formatDate, formatDateTime } = useHelpers();
+const { formatCurrency, formatDate, formatDateTime, humanize } = useHelpers();
 const isMdUp = useMediaQuery("(min-width: 768px)");
 const modalWidth = computed(() =>
   isMdUp.value ? 700 : "calc(100vw - 24px)",
@@ -258,7 +258,7 @@ const isDecrease = computed(() => {
           <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div v-if="movement.reference_type">
               <p class="text-sm text-gray-600">Reference Type</p>
-              <p class="font-semibold">{{ movement.reference_type }}</p>
+              <p class="font-semibold">{{ humanize(String(movement.reference_type).split("\\").pop()) }}</p>
             </div>
             <div v-if="movement.reference_id">
               <p class="text-sm text-gray-600">Reference ID</p>

@@ -59,7 +59,7 @@ test.describe("Card terminals API as a store manager", () => {
             const second = await apiJson(api, "POST", cardTypesUrl(), { name });
 
             expect422(second, "name");
-            expect(second.body.errors.name[0]).toBe("A card type with this name already exists at this store.");
+            expect(second.body.errors.name[0]).toBe("A payment channel with this name already exists at this store.");
         });
 
         test("the same name is allowed in a different store", async ({ serverAs }) => {
@@ -134,7 +134,7 @@ test.describe("Card terminals API as a store manager", () => {
             const res = await apiJson(api, "DELETE", cardTypeUrl(id));
 
             expect(res.status).toBe(200);
-            expect(res.body.message).toBe("Card type deleted.");
+            expect(res.body.message).toBe("Payment channel deleted.");
             expect((await apiJson(api, "GET", cardTypeUrl(id, "/money"))).status).toBe(404);
         });
 
