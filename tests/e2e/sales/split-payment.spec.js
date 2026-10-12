@@ -70,10 +70,34 @@ test.describe("Split payment (classic layout)", () => {
         await expect(panel).toContainText("Remaining: ₱30.00");
         await expect(sales.proceedButton).toBeDisabled();
 
-        // "Rest" puts what is left on that part.
-        await panel.getByRole("button", { name: "Rest" }).first().click();
+        // The fill button puts what is left on that part.
+        await panel.getByRole("button", { name: "Fill the remaining amount for payment 1" }).click();
         await expect(panel.getByLabel("Payment 1 amount")).toHaveValue("60.00");
         await expect(sales.proceedButton).toBeEnabled();
+    });
+
+    test("says why it can't be charged before the amounts are in", async ({ page }) => {
+        const sales = await openSplit(page);
+        const panel = page.getByTestId("split-payment");
+
+        await expect(panel.getByTestId("split-problem")).toHaveText("Enter an amount for each payment.");
+        await expect(sales.proceedButton).toBeDisabled();
+    });
+
+    test("a store without an e-wallet starts the split as cash and card", async ({ page }) => {
+        // Channels are set up per store; this store's list has a card only.
+        await page.route("**/payment-card-types/list**", (route) =>
+            route.fulfill({ json: { data: [{ id: 999001, name: "E2E Only Card", kind: "card", is_active: true }] } }),
+        );
+        await openSplit(page);
+        const panel = page.getByTestId("split-payment");
+
+        // Card is picked up as the second method, and the store's one card is chosen for it.
+        await expect(panel.getByRole("button", { name: "E2E Only Card" })).toBeVisible();
+        await panel.getByLabel("Payment 2 method").click();
+        const options = page.locator(".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option");
+        await expect(options).toHaveText(["Cash", "Card"]);
+        await page.keyboard.press("Escape");
     });
 
     test("the e-wallet can't come to more than the total", async ({ page }) => {

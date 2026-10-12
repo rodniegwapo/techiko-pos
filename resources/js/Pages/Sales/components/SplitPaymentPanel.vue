@@ -1,12 +1,14 @@
 <script setup>
 import { computed, ref, watch } from "vue";
 import { CloseOutlined, PlusOutlined } from "@ant-design/icons-vue";
+import { IconArrowBarToDown } from "@tabler/icons-vue";
 import CardPaymentTypeModal from "./CardPaymentTypeModal.vue";
 import {
     SPLIT_CHANNEL_KIND,
     SPLIT_METHODS,
     newSplitRow,
     splitTotals,
+    storeTakesMethod,
 } from "@/Composables/useSplitPayment";
 import { useHelpers } from "@/Composables/useHelpers";
 
@@ -27,9 +29,29 @@ const { formattedTotal } = useHelpers();
 
 const totals = computed(() => splitTotals(rows.value, props.grandTotal));
 
+// The footer already shows what is left and an over-paid card; give every other reason its own line.
+const shownProblem = computed(() => {
+    if (!props.problem) return null;
+    if (totals.value.nonCashOver || props.problem.endsWith("still to pay.")) return null;
+    return props.problem;
+});
+
+// Only methods this store can take: card / e-wallet / bank need a channel set up at the store.
 const methodOptions = computed(() =>
-    SPLIT_METHODS.filter((m) => m.value !== "credit" || props.allowCredit),
+    SPLIT_METHODS.filter((m) =>
+        m.value === "credit"
+            ? props.allowCredit
+            : storeTakesMethod(m.value, props.cachedPaymentCardTypes),
+    ),
 );
+
+/** What "fill the remaining" would put on this row. */
+function restFor(row) {
+    const others = rows.value
+        .filter((r) => r !== row)
+        .reduce((s, r) => s + Math.round(Number(r.amount || 0) * 100), 0);
+    return Math.max(0, Math.round(props.grandTotal * 100) - others) / 100;
+}
 
 const creditRow = computed(() => rows.value.find((r) => r.method === "credit"));
 const creditOverLimit = computed(
@@ -87,11 +109,7 @@ watch(
 
 /** Put what is still owed on this row. */
 function fillRest(row) {
-    const others = rows.value
-        .filter((r) => r !== row)
-        .reduce((s, r) => s + Math.round(Number(r.amount || 0) * 100), 0);
-    const rest = Math.max(0, Math.round(props.grandTotal * 100) - others);
-    row.amount = rest / 100;
+    row.amount = restFor(row);
 }
 
 function addRow() {
@@ -136,13 +154,18 @@ function removeRow(row) {
                 class="w-32"
                 :aria-label="`Payment ${i + 1} amount`"
             />
-            <a-button
-                size="small"
-                type="link"
-                class="px-1"
-                @click="fillRest(row)"
-                >Rest</a-button
-            >
+            <a-tooltip :title="`Fill the remaining ${formattedTotal(restFor(row))}`">
+                <a-button
+                    size="small"
+                    type="text"
+                    class="!px-1 text-blue-600"
+                    :disabled="Number(row.amount || 0) === restFor(row)"
+                    :aria-label="`Fill the remaining amount for payment ${i + 1}`"
+                    @click="fillRest(row)"
+                >
+                    <template #icon><IconArrowBarToDown :size="18" class="inline" /></template>
+                </a-button>
+            </a-tooltip>
             <template v-if="SPLIT_CHANNEL_KIND[row.method]">
                 <a-button
                     size="small"
@@ -187,13 +210,6 @@ function removeRow(row) {
             <span v-else-if="totals.remaining > 0" class="text-red-600 font-medium">
                 Remaining: {{ formattedTotal(totals.remaining) }}
             </span>
-            <span
-                v-else-if="problem"
-                class="text-red-600 font-medium"
-                data-testid="split-problem"
-            >
-                {{ problem }}
-            </span>
             <span v-else class="text-gray-700">
                 Change: <span class="font-medium">{{ formattedTotal(totals.change) }}</span>
             </span>
@@ -201,6 +217,14 @@ function removeRow(row) {
                 Credit is over the available {{ formattedTotal(availableCredit) }}
             </span>
         </div>
+        <!-- Why the sale can't be charged yet, so the button is never disabled without a reason. -->
+        <p
+            v-if="shownProblem"
+            class="mb-0 text-sm font-medium text-red-600"
+            data-testid="split-problem"
+        >
+            {{ shownProblem }}
+        </p>
 
         <card-payment-type-modal
             v-model:visible="pickerOpen"

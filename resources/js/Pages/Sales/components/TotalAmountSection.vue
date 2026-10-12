@@ -5,6 +5,7 @@ import CardPaymentTypeModal from "./CardPaymentTypeModal.vue";
 import LoyaltyRedemptionModal from "./LoyaltyRedemptionModal.vue";
 import SplitPaymentPanel from "./SplitPaymentPanel.vue";
 import {
+    firstSplitPartnerMethod,
     newSplitRow,
     splitPayload,
     splitProblem,
@@ -399,7 +400,12 @@ const splitCreditOverLimit = computed(() => {
 
 watch(isSplit, (split) => {
     if (split && splitRows.value.length < 2) {
-        splitRows.value = [newSplitRow("cash"), newSplitRow("e-wallet")];
+        // Pair cash with a method this store has a channel for (channels are set up per store).
+        const partner = firstSplitPartnerMethod(
+            props.cachedPaymentCardTypes,
+            salesCartIsOnline.value && !!canUseCredit.value,
+        );
+        splitRows.value = [newSplitRow("cash"), newSplitRow(partner)];
     }
 });
 
