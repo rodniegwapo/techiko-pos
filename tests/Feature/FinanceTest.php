@@ -41,6 +41,8 @@ class FinanceTest extends TestCase
     private function seedDomainContext(string $name = 'Finance Org'): array
     {
         $domain = Domain::query()->create([
+            // Finance and AI support are off until a super admin turns them on.
+            'settings' => ['features' => ['finance' => true, 'ai' => true]],
             'name' => $name,
             'name_slug' => 'finance-org-'.Str::lower(Str::random(8)),
         ]);

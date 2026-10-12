@@ -54,7 +54,9 @@ class FinancePhase3Test extends TestCase
     /** @return array{domain: Domain, location: InventoryLocation, user: User, product: Product, category: Category} */
     private function seedDomainContext(string $name = 'Phase3 Org'): array
     {
-        $domain = Domain::query()->create(['name' => $name, 'name_slug' => 'phase3-org-'.Str::lower(Str::random(8))]);
+        $domain = Domain::query()->create([
+            // Finance and AI support are off until a super admin turns them on.
+            'settings' => ['features' => ['finance' => true, 'ai' => true]], 'name' => $name, 'name_slug' => 'phase3-org-'.Str::lower(Str::random(8))]);
         $location = InventoryLocation::query()->create([
             'domain' => $domain->name_slug,
             'name' => 'Store A',

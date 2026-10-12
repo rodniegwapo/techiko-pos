@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Domain;
 use App\Models\InventoryLocation;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -28,6 +29,14 @@ class E2EUserSeeder extends Seeder
     {
         if (! app()->environment(['local', 'testing'])) {
             throw new RuntimeException('E2EUserSeeder may only run in local or testing environments.');
+        }
+
+        // The finance specs run against Jollibee, so it is given Finance and AI support
+        // (both are off for an organization until a super admin turns them on).
+        if ($jollibee = Domain::query()->where('name_slug', 'jollibee-corp')->first()) {
+            $settings = $jollibee->settings ?? [];
+            $settings['features'] = ['finance' => true, 'ai' => true];
+            $jollibee->update(['settings' => $settings]);
         }
 
         User::updateOrCreate(

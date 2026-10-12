@@ -21,6 +21,9 @@ class TakeFinancialSnapshots extends Command
     {
         $domains = Domain::query()
             ->when($this->option('domain'), fn ($q, $slug) => $q->where('name_slug', $slug))
+            ->get()
+            // Only organizations given Finance keep balance sheet snapshots.
+            ->filter(fn (Domain $domain) => $domain->hasFeature('finance'))
             ->pluck('name_slug');
 
         foreach ($domains as $slug) {

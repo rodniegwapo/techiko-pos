@@ -4,6 +4,7 @@ import axios from "axios";
 import { useMediaQuery } from "@vueuse/core";
 import { IconSparkles } from "@tabler/icons-vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
+import { usePage } from "@inertiajs/vue3";
 import { answerSections } from "../composables/answerSections";
 
 /**
@@ -23,6 +24,8 @@ const props = defineProps({
 });
 
 const { getRoute } = useDomainRoutes();
+const page = usePage();
+const aiFeatureOn = computed(() => !!page.props.domainFeatures?.ai);
 
 const open = ref(false);
 const loading = ref(false);
@@ -68,6 +71,8 @@ function switchLanguage() {
 </script>
 
 <template>
+    <!-- Only for organizations given AI support (a super admin turns it on). -->
+    <template v-if="aiFeatureOn">
     <a-tooltip :title="aiEnabled ? null : 'The AI assistant is not set up yet'">
         <a-button
             :type="link ? 'link' : type"
@@ -116,4 +121,5 @@ function switchLanguage() {
             <p class="border-t border-gray-100 pt-3 text-xs text-gray-500">{{ answer.disclaimer }}</p>
         </div>
     </a-drawer>
+    </template>
 </template>

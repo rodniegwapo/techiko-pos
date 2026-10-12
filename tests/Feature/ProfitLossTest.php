@@ -51,6 +51,8 @@ class ProfitLossTest extends TestCase
         Carbon::setTestNow('2026-10-15 12:00:00');
 
         $this->domain = Domain::query()->create([
+            // Finance and AI support are off until a super admin turns them on.
+            'settings' => ['features' => ['finance' => true, 'ai' => true]],
             'name' => 'PnL Org',
             'name_slug' => 'pnl-org-'.Str::lower(Str::random(8)),
         ]);

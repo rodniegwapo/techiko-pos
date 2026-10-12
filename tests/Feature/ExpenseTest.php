@@ -40,6 +40,8 @@ class ExpenseTest extends TestCase
         ]);
 
         $this->domain = Domain::query()->create([
+            // Finance and AI support are off until a super admin turns them on.
+            'settings' => ['features' => ['finance' => true, 'ai' => true]],
             'name' => 'Expense Org',
             'name_slug' => 'expense-org-'.Str::lower(Str::random(8)),
         ]);
@@ -234,7 +236,9 @@ class ExpenseTest extends TestCase
 
         $this->actingAs($admin)->get($this->route('expenses.receipt', ['expense' => $expense->id]))->assertOk();
 
-        $other = Domain::query()->create(['name' => 'Other', 'name_slug' => 'other-'.Str::lower(Str::random(8))]);
+        $other = Domain::query()->create([
+            // Finance and AI support are off until a super admin turns them on.
+            'settings' => ['features' => ['finance' => true, 'ai' => true]], 'name' => 'Other', 'name_slug' => 'other-'.Str::lower(Str::random(8))]);
         $this->actingAs($admin)
             ->get(route('domains.expenses.receipt', ['domain' => $other->name_slug, 'expense' => $expense->id]))
             ->assertNotFound();

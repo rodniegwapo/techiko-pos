@@ -32,6 +32,8 @@ class VatReportCsvExportTest extends TestCase
     private function seedDomainContext(): array
     {
         $domain = Domain::query()->create([
+            // Finance and AI support are off until a super admin turns them on.
+            'settings' => ['features' => ['finance' => true, 'ai' => true]],
             'name' => 'VAT Test Org',
             'name_slug' => 'vat-org-'.Str::lower(Str::random(8)),
         ]);

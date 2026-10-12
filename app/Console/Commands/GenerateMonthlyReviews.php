@@ -42,7 +42,9 @@ class GenerateMonthlyReviews extends Command
                 ->where('payment_status', 'paid')
                 ->whereBetween('transaction_date', [$start, date('Y-m-t 23:59:59', strtotime($start))])
                 ->select('domain'))
-            ->get();
+            ->get()
+            // Only organizations given Finance get monthly reviews.
+            ->filter(fn (Domain $domain) => $domain->hasFeature('finance'));
 
         foreach ($domains as $domain) {
             $exists = MonthlyReview::query()->forDomain($domain->name_slug)->where('month', $month)->exists();

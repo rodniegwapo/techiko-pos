@@ -175,6 +175,10 @@ Route::middleware(['auth', 'verified', 'user.permission'])->prefix('domains')->n
     Route::put('/{domain}', [DomainController::class, 'update'])->name('update');
     Route::delete('/{domain}', [DomainController::class, 'destroy'])->name('destroy');
     Route::post('/{domain}/toggle-status', [DomainController::class, 'toggleStatus'])->name('toggle-status');
+    // Which paid features (Finance, AI support) an organization has; super admins only.
+    Route::patch('/{domain}/features', [DomainController::class, 'updateFeatures'])
+        ->middleware('check.super.user')
+        ->name('features.update');
 });
 
 // Global routes (not domain-specific)

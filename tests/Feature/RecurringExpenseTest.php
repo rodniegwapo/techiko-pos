@@ -39,6 +39,8 @@ class RecurringExpenseTest extends TestCase
         ]);
 
         $this->domain = Domain::query()->create([
+            // Finance and AI support are off until a super admin turns them on.
+            'settings' => ['features' => ['finance' => true, 'ai' => true]],
             'name' => 'Recurring Org',
             'name_slug' => 'recurring-org-'.Str::lower(Str::random(8)),
         ]);

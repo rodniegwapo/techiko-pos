@@ -105,6 +105,28 @@ class DomainController extends Controller
     }
 
     /**
+     * Turn Finance / AI support on or off for an organization. AI support needs Finance,
+     * so it goes off with it. Other settings (e.g. sales) are kept.
+     */
+    public function updateFeatures(Request $request, Domain $domain)
+    {
+        $validated = $request->validate([
+            'finance' => ['required', 'boolean'],
+            'ai' => ['required', 'boolean'],
+        ]);
+
+        $finance = (bool) $validated['finance'];
+        $settings = $domain->settings ?? [];
+        $settings['features'] = [
+            'finance' => $finance,
+            'ai' => $finance && (bool) $validated['ai'],
+        ];
+        $domain->update(['settings' => $settings]);
+
+        return back()->with('success', 'Features updated.');
+    }
+
+    /**
      * Toggle domain active status
      */
     public function toggleStatus(Request $request, Domain $domain)

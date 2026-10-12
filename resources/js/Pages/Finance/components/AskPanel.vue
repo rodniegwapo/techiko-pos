@@ -1,8 +1,9 @@
 <script setup>
-import { nextTick, ref } from "vue";
+import { computed, nextTick, ref } from "vue";
 import axios from "axios";
 import { IconSparkles, IconSend } from "@tabler/icons-vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
+import { usePage } from "@inertiajs/vue3";
 import { answerSections } from "../composables/answerSections";
 
 /**
@@ -16,6 +17,8 @@ const props = defineProps({
 });
 
 const { getRoute } = useDomainRoutes();
+const page = usePage();
+const aiFeatureOn = computed(() => !!page.props.domainFeatures?.ai);
 
 const question = ref("");
 const turns = ref([]); // { question, answer, error }
@@ -55,6 +58,8 @@ async function ask(text = question.value) {
 </script>
 
 <template>
+    <!-- Only for organizations given AI support (a super admin turns it on). -->
+    <template v-if="aiFeatureOn">
     <section class="space-y-3 rounded-lg border border-blue-100 bg-white p-4" data-testid="ask-panel">
         <div class="flex flex-wrap items-center justify-between gap-2">
             <h2 class="flex items-center gap-2 text-base font-semibold text-gray-900">
@@ -108,4 +113,5 @@ async function ask(text = question.value) {
             </p>
         </template>
     </section>
+    </template>
 </template>

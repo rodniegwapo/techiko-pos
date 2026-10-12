@@ -91,7 +91,8 @@ class MonthlyReviewService
             ],
         );
 
-        if ($this->assistant->isConfigured()) {
+        // The AI summary only for organizations given AI support.
+        if ($domain->hasFeature('ai') && $this->assistant->isConfigured()) {
             try {
                 $review->update(['ai_summary' => $this->assistant->explain('review', [
                     'business' => $domain->name,

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Domain;
 use App\Models\Expense;
 use App\Models\RecurringExpense;
 use Illuminate\Support\Facades\Log;
@@ -26,6 +27,10 @@ class RecurringExpenseService
             ->where('is_active', true)
             ->whereDate('next_run_date', '<=', $today)
             ->when($domainSlug, fn ($q) => $q->forDomain($domainSlug))
+            // Only organizations given Finance (Expenses is part of it) get their recurring expenses.
+            ->whereIn('domain', Domain::query()->get()
+                ->filter(fn (Domain $domain) => $domain->hasFeature('finance'))
+                ->pluck('name_slug'))
             ->get();
 
         foreach ($due as $template) {

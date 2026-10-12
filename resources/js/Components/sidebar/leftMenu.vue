@@ -150,6 +150,8 @@ const menuItems = [
         title: "Finance",
         icon: IconReportAnalytics,
         domainOnly: true,
+        // Only for organizations given Finance (a super admin turns it on per organization).
+        feature: "finance",
         children: [
             {
                 key: "finance-dashboard",
@@ -500,6 +502,11 @@ const menus = computed(() => {
                     ["sales", "offline-sales"].includes(item.key) &&
                     page.props.currentLocation?.type === "warehouse"
                 ) {
+                    return false;
+                }
+
+                // A feature the organization hasn't been given (the server blocks it too).
+                if (item.feature && !page.props.domainFeatures?.[item.feature]) {
                     return false;
                 }
 

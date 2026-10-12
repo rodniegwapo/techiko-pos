@@ -23,7 +23,6 @@ use App\Notifications\MonthlyReviewReady;
 use App\Services\Ai\FinanceTools;
 use App\Services\Finance\FinancialInsightService;
 use App\Services\Finance\FinancialReportService;
-use Carbon\Carbon;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
@@ -52,7 +51,9 @@ class FinanceHistoryTest extends TestCase
     /** @return array{domain: Domain, location: InventoryLocation, user: User, product: Product} */
     private function seedDomainContext(): array
     {
-        $domain = Domain::query()->create(['name' => 'History Shop', 'name_slug' => 'history-shop-'.Str::lower(Str::random(8))]);
+        $domain = Domain::query()->create([
+            // Finance and AI support are off until a super admin turns them on.
+            'settings' => ['features' => ['finance' => true, 'ai' => true]], 'name' => 'History Shop', 'name_slug' => 'history-shop-'.Str::lower(Str::random(8))]);
         $location = InventoryLocation::query()->create([
             'domain' => $domain->name_slug, 'name' => 'Store A', 'code' => Str::upper(Str::random(8)),
             'type' => 'store', 'is_active' => true, 'is_default' => true,
