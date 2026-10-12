@@ -51,6 +51,21 @@ for (const layout of ["classic", "coffeeshop"]) {
                 expect(await stockOf(cashierApi, products.fries.name)).toBeLessThanOrEqual(stockBefore - 2);
             });
 
+            test("paying an order that was removed elsewhere explains it and reloads the cart", async ({ page }) => {
+                const sales = await SalesPage.open(page, { layout });
+                await sales.addProduct(products.burger.name);
+                await sales.goToCheckout();
+
+                // As if another device or user closed this order after the screen loaded it.
+                await page.route("**/sales/*/payments", (route) =>
+                    route.fulfill({ status: 404, json: { message: "No query results for model [App\\Models\\Sale]." } }),
+                );
+                await sales.pay({ amountReceived: 100 });
+
+                await expect(sales.notice("This order no longer exists")).toBeVisible();
+                await expect(page.getByText("No query results for model")).toHaveCount(0);
+            });
+
             test("the confirmation can be cancelled without charging", async ({ page }) => {
                 const sales = await SalesPage.open(page, { layout });
                 await sales.addProduct(products.burger.name);

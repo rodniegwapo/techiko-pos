@@ -631,6 +631,20 @@ const handleProceedPayment = async () => {
         orderDiscountAmount.value = 0;
         orderDiscountId.value = "";
     } catch (error) {
+        // The order was closed or removed elsewhere (another tab, device or user) while this
+        // screen still showed it: say so plainly and load the cart as it is now.
+        if (error.response?.status === 404) {
+            notification.warning({
+                message: "This order no longer exists",
+                description: "It was closed or removed elsewhere. The cart has been reloaded.",
+                duration: 6,
+            });
+            localStorage.setItem("order_discount_amount", 0);
+            localStorage.setItem("order_discount_ids", "");
+            emit("cart-updated");
+            return;
+        }
+
         const errorMessage =
             error.response?.data?.message ||
             error.message ||
