@@ -16,6 +16,7 @@ use Database\Seeders\ProductSoldTypeSeeder;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 /**
@@ -167,6 +168,45 @@ class StockAdjustmentReflectsStockTest extends TestCase
 
         $this->assertSame(7, $this->quantityAt($ctx['product'], $ctx['locA']));
         $this->assertSame(8, $this->quantityAt($ctx['other'], $ctx['locA']));
+    }
+
+    public function test_a_draft_opens_for_editing_inside_its_store(): void
+    {
+        $ctx = $this->seedContext();
+        $adjustment = $this->draft($ctx, 10);
+
+        $this->actingAs($ctx['user'])
+            ->get(route('domains.inventory.adjustments.edit', [
+                'domain' => $ctx['domain']->name_slug,
+                'adjustment' => $adjustment->id,
+            ]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Inventory/StockAdjustments/Edit')
+                ->where('adjustment.id', $adjustment->id));
+    }
+
+    public function test_the_store_list_only_shows_the_active_locations_adjustments(): void
+    {
+        $ctx = $this->seedContext();
+        $here = $this->draft($ctx, 10);
+        $elsewhere = app(InventoryService::class)->createStockAdjustment([
+            'location_id' => $ctx['locB']->id,
+            'domain' => $ctx['domain']->name_slug,
+            'type' => 'recount',
+            'reason' => 'physical_count',
+        ], [['product_id' => $ctx['product']->id, 'actual_quantity' => 1]], $ctx['user']);
+
+        $this->actingAs($ctx['user'])
+            ->get(route('domains.inventory.adjustments.index', [
+                'domain' => $ctx['domain']->name_slug,
+                'location_id' => $ctx['locA']->id,
+            ]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('adjustments.data', fn ($rows) => collect($rows)->pluck('id')->all() === [$here->id]));
+
+        $this->assertNotNull($elsewhere->id);
     }
 
     public function test_items_left_out_of_an_edit_are_removed(): void

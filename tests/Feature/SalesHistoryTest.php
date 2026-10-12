@@ -65,6 +65,7 @@ class SalesHistoryTest extends TestCase
         return Sale::query()->create(array_merge([
             'domain' => $domain->name_slug,
             'user_id' => $user->id,
+            'location_id' => $user->location_id,
             'invoice_number' => 'INV-'.Str::upper(Str::random(8)),
             'payment_method' => 'cash',
             'payment_status' => 'paid',
@@ -116,19 +117,28 @@ class SalesHistoryTest extends TestCase
 
     public function test_filters_narrow_the_list(): void
     {
-        ['domain' => $domain, 'user' => $user, 'location' => $location] = $this->seedDomainContext();
+        ['domain' => $domain, 'user' => $user] = $this->seedDomainContext();
         $customer = Customer::query()->create(['domain' => $domain->name_slug, 'name' => 'Juana Cruz']);
+        $storeB = InventoryLocation::query()->create([
+            'domain' => $domain->name_slug,
+            'name' => 'Store B',
+            'code' => Str::upper(Str::random(8)),
+            'type' => 'store',
+            'is_active' => true,
+            'is_default' => false,
+        ]);
 
         $this->makeSale($domain, $user, ['invoice_number' => 'INV-CASH']);
-        $card = $this->makeSale($domain, $user, ['invoice_number' => 'INV-CARD', 'payment_method' => 'card', 'location_id' => $location->id]);
+        $card = $this->makeSale($domain, $user, ['invoice_number' => 'INV-CARD', 'payment_method' => 'card', 'location_id' => $storeB->id]);
         $refunded = $this->makeSale($domain, $user, ['invoice_number' => 'INV-REF', 'payment_status' => 'refunded', 'customer_id' => $customer->id]);
 
-        $url = fn (array $q) => route('domains.sales-history.index', ['domain' => $domain->name_slug] + $q);
+        // Everything below asks for every store; the default (the store in the header) is tested separately.
+        $url = fn (array $q) => route('domains.sales-history.index', ['domain' => $domain->name_slug] + $q + ['location_id' => 'all']);
 
         $this->actingAs($user)->get($url(['payment_method' => 'card']))
             ->assertInertia(fn (Assert $page) => $page->has('items.data', 1)->where('items.data.0.id', $card->id));
 
-        $this->actingAs($user)->get($url(['location_id' => $location->id]))
+        $this->actingAs($user)->get($url(['location_id' => $storeB->id]))
             ->assertInertia(fn (Assert $page) => $page->has('items.data', 1)->where('items.data.0.id', $card->id));
 
         $this->actingAs($user)->get($url(['payment_status' => 'refunded']))
@@ -144,6 +154,34 @@ class SalesHistoryTest extends TestCase
             'start_date' => now()->subDays(1)->toDateString(),
             'end_date' => now()->subDays(1)->toDateString(),
         ]))->assertInertia(fn (Assert $page) => $page->has('items.data', 0));
+    }
+
+    public function test_location_defaults_to_the_store_picked_in_the_header(): void
+    {
+        ['domain' => $domain, 'user' => $user, 'location' => $location] = $this->seedDomainContext();
+        $storeB = InventoryLocation::query()->create([
+            'domain' => $domain->name_slug,
+            'name' => 'Store B',
+            'code' => Str::upper(Str::random(8)),
+            'type' => 'store',
+            'is_active' => true,
+            'is_default' => false,
+        ]);
+        $here = $this->makeSale($domain, $user);
+        $this->makeSale($domain, $user, ['location_id' => $storeB->id]);
+
+        $url = fn (array $q = []) => route('domains.sales-history.index', ['domain' => $domain->name_slug] + $q);
+
+        $this->actingAs($user)->get($url())
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('filters.location_id', $location->id)
+                ->has('items.data', 1)
+                ->where('items.data.0.id', $here->id));
+
+        $this->actingAs($user)->get($url(['location_id' => 'all']))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('filters.location_id', null)
+                ->has('items.data', 2));
     }
 
     public function test_cashier_only_sees_their_own_sales(): void

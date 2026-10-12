@@ -17,9 +17,11 @@ import { useHelpers } from "@/Composables/useHelpers";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 import { router } from "@inertiajs/vue3";
 import { useStockAdjustmentActions } from "@/Composables/useStockAdjustmentActions";
+import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 
 const { formatCurrency, formatDate, confirmDelete } = useHelpers();
 const adjustmentActions = useStockAdjustmentActions();
+const { getRoute, getLocationQueryFromPage } = useDomainRoutes();
 const { hasPermission } = usePermissionsV2();
 const page = usePage();
 const isMdUp = useMediaQuery("(min-width: 768px)");
@@ -141,7 +143,7 @@ const getTypeColor = (type) => {
 };
 
 const editAdjustment = (adjustment) => {
-  router.visit(route("inventory.adjustments.edit", adjustment.id));
+  router.visit(getRoute("inventory.adjustments.edit", { adjustment: adjustment.id, ...getLocationQueryFromPage() }));
 };
 
 const submitForApproval = (adjustment) =>

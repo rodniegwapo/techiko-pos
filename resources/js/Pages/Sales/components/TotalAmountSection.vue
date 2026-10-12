@@ -1080,6 +1080,7 @@ defineExpose({
                         :available-credit="Number(creditInfo?.availableCredit ?? 0)"
                         :use-network="salesCartIsOnline"
                         :cached-payment-card-types="cachedPaymentCardTypes"
+                        :problem="splitIssue"
                     />
                 </div>
 

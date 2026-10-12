@@ -433,12 +433,17 @@ class InventoryService
 
     /**
      * Update a draft stock adjustment, including its line items.
-     * Items sent with an id are updated, new ones are added and missing ones are removed.
+     * Items sent with an id are updated, new ones are added and missing ones are removed;
+     * with no items at all (null), only the type, reason and description change.
      */
-    public function updateStockAdjustment(StockAdjustment $adjustment, array $data, array $items): StockAdjustment
+    public function updateStockAdjustment(StockAdjustment $adjustment, array $data, ?array $items): StockAdjustment
     {
         return DB::transaction(function () use ($adjustment, $data, $items) {
             $adjustment->update($data);
+
+            if ($items === null) {
+                return $adjustment->fresh('items');
+            }
 
             $location = $adjustment->location;
             $existing = $adjustment->items()->get()->keyBy('id');
@@ -583,6 +588,33 @@ class InventoryService
     /**
      * Get inventory report data
      */
+    /**
+     * Stock on hand at a location at cost and at today's sale prices, counted the way the
+     * Valuation report counts it (only stock on hand, only the organization's products).
+     *
+     * @return array{total_value: float, total_retail_value: float, potential_profit: float}
+     */
+    public function valuationTotals(InventoryLocation $location, ?string $domain = null): array
+    {
+        $row = ProductInventory::query()
+            ->join('products', 'products.id', '=', 'product_inventory.product_id')
+            ->where('product_inventory.location_id', $location->id)
+            ->where('product_inventory.quantity_on_hand', '>', 0)
+            ->when($domain, fn ($q) => $q->where('products.domain', $domain))
+            ->selectRaw('COALESCE(SUM(product_inventory.total_value), 0) as cost')
+            ->selectRaw('COALESCE(SUM(product_inventory.quantity_on_hand * COALESCE(products.price, 0)), 0) as retail')
+            ->first();
+
+        $cost = round((float) $row->cost, 2);
+        $retail = round((float) $row->retail, 2);
+
+        return [
+            'total_value' => $cost,
+            'total_retail_value' => $retail,
+            'potential_profit' => round($retail - $cost, 2),
+        ];
+    }
+
     public function getInventoryReport(?InventoryLocation $location = null, ?string $domain = null): array
     {
         if (! $location) {
@@ -607,6 +639,7 @@ class InventoryService
         $lowStockProducts = $assignedStatuses['low_stock'];
         $outOfStockProducts = $assignedStatuses['out_of_stock'];
         $totalInventoryValue = $location->getTotalInventoryValue();
+        $valuation = $this->valuationTotals($location, $domain);
 
         // Get category stock data
         $categoryStockData = $this->getCategoryStockData($location, $domain);
@@ -619,6 +652,8 @@ class InventoryService
                 'low_stock_products' => $lowStockProducts,
                 'out_of_stock_products' => $outOfStockProducts,
                 'total_inventory_value' => $totalInventoryValue,
+                'total_retail_value' => $valuation['total_retail_value'],
+                'potential_profit' => $valuation['potential_profit'],
             ],
             'low_stock_products' => $this->getLowStockProducts($location, $domain),
             'category_stock_data' => $categoryStockData,

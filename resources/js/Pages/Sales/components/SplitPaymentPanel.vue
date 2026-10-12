@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { CloseOutlined, PlusOutlined } from "@ant-design/icons-vue";
 import CardPaymentTypeModal from "./CardPaymentTypeModal.vue";
 import {
@@ -19,6 +19,8 @@ const props = defineProps({
     availableCredit: { type: Number, default: 0 },
     useNetwork: { type: Boolean, default: true },
     cachedPaymentCardTypes: { type: Array, default: () => [] },
+    /** Why the sale can't be charged yet (from splitProblem), shown so the cashier knows what's missing. */
+    problem: { type: String, default: null },
 });
 
 const { formattedTotal } = useHelpers();
@@ -62,8 +64,26 @@ function onMethodChange(row, method) {
     row.payment_card_type_id = null;
     row.channel_name = null;
     if (method === "card" || !SPLIT_CHANNEL_KIND[method]) row.payment_reference = "";
-    if (SPLIT_CHANNEL_KIND[method]) pickChannel(row);
+    autoPickChannel(row);
+    if (SPLIT_CHANNEL_KIND[method] && !row.payment_card_type_id) pickChannel(row);
 }
+
+/** With only one channel of a kind there is nothing to choose, so pick it. */
+function autoPickChannel(row) {
+    const kind = SPLIT_CHANNEL_KIND[row.method];
+    if (!kind || row.payment_card_type_id) return;
+    const options = props.cachedPaymentCardTypes.filter((t) => (t.kind || "card") === kind);
+    if (options.length === 1) {
+        row.payment_card_type_id = options[0].id;
+        row.channel_name = options[0].name;
+    }
+}
+
+watch(
+    () => [rows.value.map((r) => r.method), props.cachedPaymentCardTypes],
+    () => rows.value.forEach(autoPickChannel),
+    { immediate: true, deep: true },
+);
 
 /** Put what is still owed on this row. */
 function fillRest(row) {
@@ -124,7 +144,11 @@ function removeRow(row) {
                 >Rest</a-button
             >
             <template v-if="SPLIT_CHANNEL_KIND[row.method]">
-                <a-button size="small" @click="pickChannel(row)">
+                <a-button
+                    size="small"
+                    :danger="!row.payment_card_type_id"
+                    @click="pickChannel(row)"
+                >
                     {{ row.channel_name || "Choose " + (row.method === "card" ? "card type" : row.method) }}
                 </a-button>
                 <a-input
@@ -162,6 +186,13 @@ function removeRow(row) {
             </span>
             <span v-else-if="totals.remaining > 0" class="text-red-600 font-medium">
                 Remaining: {{ formattedTotal(totals.remaining) }}
+            </span>
+            <span
+                v-else-if="problem"
+                class="text-red-600 font-medium"
+                data-testid="split-problem"
+            >
+                {{ problem }}
             </span>
             <span v-else class="text-gray-700">
                 Change: <span class="font-medium">{{ formattedTotal(totals.change) }}</span>

@@ -11,12 +11,14 @@ import {
 import { notification } from "ant-design-vue";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import axios from "axios";
+import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
 import ContentLayout from "@/Components/ContentLayout.vue";
 
 const { spinning } = useGlobalVariables();
+const { getRoute, getLocationQueryFromPage } = useDomainRoutes();
 
 const props = defineProps({
   adjustment: Object,
@@ -80,7 +82,7 @@ const searchProducts = async () => {
 
   searchLoading.value = true;
   try {
-    const response = await axios.get(route("inventory.adjustment-products"), {
+    const response = await axios.get(getRoute("inventory.adjustment-products"), {
       params: {
         search: productSearch.value,
         location_id: form.location_id,
@@ -205,7 +207,7 @@ const handleSubmit = async () => {
     };
 
     const response = await axios.put(
-      route("inventory.adjustments.update", props.adjustment.id),
+      getRoute("inventory.adjustments.update", { adjustment: props.adjustment.id }),
       cleanedForm
     );
 
@@ -214,7 +216,7 @@ const handleSubmit = async () => {
         message: "Adjustment Updated",
         description: "Stock adjustment has been updated successfully",
       });
-      router.visit(route("inventory.adjustments.index"));
+      router.visit(getRoute("inventory.adjustments.index", getLocationQueryFromPage()));
     } else {
       notification.error({
         message: "Update Failed",
@@ -237,7 +239,7 @@ const handleSubmit = async () => {
 
 // Cancel and go back
 const handleCancel = () => {
-  router.visit(route("inventory.adjustments.index"));
+  router.visit(getRoute("inventory.adjustments.index", getLocationQueryFromPage()));
 };
 </script>
 

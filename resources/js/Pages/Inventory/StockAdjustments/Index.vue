@@ -8,6 +8,7 @@ import { useHelpers } from "@/Composables/useHelpers";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useTable } from "@/Composables/useTable";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
+import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
@@ -21,6 +22,7 @@ import LocationInfoAlert from "@/Components/LocationInfoAlert.vue";
 
 const page = usePage();
 const { showModal } = useHelpers();
+const { getRoute, getLocationQueryFromPage } = useDomainRoutes();
 const { spinning } = useGlobalVariables();
 const { hasPermission } = usePermissionsV2();
 
@@ -121,7 +123,7 @@ const { pagination, handleTableChange } = useTable("adjustments", tableFilters);
 
 // Methods
 const createAdjustment = () => {
-  router.visit(route('inventory.adjustments.create'));
+  router.visit(getRoute('inventory.adjustments.create', getLocationQueryFromPage()));
 };
 
 const exportAdjustments = () => {

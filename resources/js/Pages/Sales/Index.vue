@@ -1339,10 +1339,17 @@ const getProducts = async ({ append = false } = {}) => {
                             .includes(q),
                 );
             }
-            // Same A–Z order as the online list.
-            filtered.sort((a, b) =>
-                String(a.name || "").localeCompare(String(b.name || "")),
-            );
+            // Same order as the online list: A–Z, category by category when grouped.
+            filtered.sort((a, b) => {
+                if (groupByCategory.value) {
+                    const ca = a?.category?.name;
+                    const cb = b?.category?.name;
+                    if (!ca !== !cb) return ca ? -1 : 1; // Uncategorized last
+                    const byCategory = String(ca || "").localeCompare(String(cb || ""));
+                    if (byCategory) return byCategory;
+                }
+                return String(a.name || "").localeCompare(String(b.name || ""));
+            });
             products.value = filtered.slice(0, 500);
         } finally {
             loading.value = false;
@@ -1367,6 +1374,7 @@ const getProducts = async ({ append = false } = {}) => {
                 search: search.value || undefined,
                 category: category.value || undefined,
                 hide_out_of_stock: hideOutOfStock.value ? 1 : 0,
+                group_by_category: groupByCategory.value ? 1 : 0,
                 ...(locationId != null && locationId !== ""
                     ? { location_id: locationId }
                     : {}),
@@ -1411,6 +1419,13 @@ const hideOutOfStock = computed({
     },
 });
 watch(hideOutOfStock, () => getProducts());
+
+// Lists the products category by category, with the category name where each starts.
+const groupByCategory = useStorage(
+    `sales_group_by_category_${domainSlug.value || "default"}`,
+    false,
+);
+watch(groupByCategory, () => getProducts());
 const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
     getItems: getProducts,
     configs: [
@@ -1588,6 +1603,21 @@ watch(
                         />
                         Hide out of stock
                     </label>
+                    <label
+                        class="flex shrink-0 cursor-pointer items-center gap-2 text-xs font-medium"
+                        :class="
+                            isCoffeeshopLayout
+                                ? 'text-[var(--cs-muted)]'
+                                : 'text-gray-700'
+                        "
+                    >
+                        <a-switch
+                            v-model:checked="groupByCategory"
+                            size="small"
+                            data-testid="group-by-category"
+                        />
+                        Group by category
+                    </label>
                 </template>
                 <template v-if="!isCoffeeshopLayout" #activeFilters>
                     <ActiveFilters
@@ -1615,6 +1645,7 @@ watch(
                         :orderId="orderId"
                         :layout="productTableLayout"
                         :variant="productTableVariant"
+                        :group-by-category="groupByCategory"
                         @cart-updated="loadCurrentPendingSale"
                         @offline-add-product="(p, line) => addToCart(p, { line })"
                         @load-more="loadMoreProducts"

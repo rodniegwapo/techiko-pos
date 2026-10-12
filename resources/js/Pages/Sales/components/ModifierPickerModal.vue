@@ -56,7 +56,8 @@ const line = computed(() =>
 
 function deltaLabel(m) {
     const n = Number(m.price_delta) || 0;
-    if (!n) return "";
+    // A free option says so, so it doesn't read like a heading.
+    if (!n) return "included";
     return n > 0 ? `+${formattedTotal(n)}` : `−${formattedTotal(-n)}`;
 }
 
@@ -109,6 +110,7 @@ function confirm() {
                         v-for="m in g.active_modifiers"
                         :key="m.id"
                         :value="m.id"
+                        class="!ml-0"
                         :disabled="maxReached(g) && !(picks[g.id] || []).includes(m.id)"
                     >
                         {{ m.name }} <span class="text-gray-500">{{ deltaLabel(m) }}</span>

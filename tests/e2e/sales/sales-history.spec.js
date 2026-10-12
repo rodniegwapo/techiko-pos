@@ -21,6 +21,9 @@ const rangeQuery = () => {
     return `?start_date=${day(yesterday)}&end_date=${day(today)}`;
 };
 
+// The seeded voided sales have no store, so look across every store (the list defaults to the one in the header).
+const allStores = "&location_id=all";
+
 const rows = (page) => page.locator("[data-testid=sales-history-table] .ant-table-tbody tr.ant-table-row");
 
 async function searchInvoice(page, invoice) {
@@ -44,7 +47,7 @@ test.describe("Sales history (admin)", () => {
 
     test("finds a sale by invoice and shows its voided line in the drawer", async ({ page }) => {
         const sale = voided();
-        await page.goto(historyPath + rangeQuery());
+        await page.goto(historyPath + rangeQuery() + allStores);
         await searchInvoice(page, sale.invoice_number);
 
         await expect(rows(page)).toHaveCount(1);
@@ -101,7 +104,7 @@ test.describe("Sales history (admin)", () => {
 
     test("exports the filtered sales as CSV", async ({ page }) => {
         const sale = voided();
-        await page.goto(historyPath + rangeQuery());
+        await page.goto(historyPath + rangeQuery() + allStores);
         await searchInvoice(page, sale.invoice_number);
 
         const download = page.waitForEvent("download");

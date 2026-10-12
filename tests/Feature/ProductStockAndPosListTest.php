@@ -145,6 +145,27 @@ class ProductStockAndPosListTest extends TestCase
             ->assertJsonPath('data.0.name', 'Sold Out Item');
     }
 
+    public function test_pos_list_can_be_grouped_by_category(): void
+    {
+        $ctx = $this->seedStore();
+        $drinks = Category::factory()->create(['domain' => $ctx['domain']->name_slug, 'name' => 'Drinks']);
+        $bakery = Category::factory()->create(['domain' => $ctx['domain']->name_slug, 'name' => 'Bakery']);
+
+        $this->productAt($ctx, 'Americano', 5, ['category_id' => $drinks->id]);
+        $this->productAt($ctx, 'Zesty Bun', 5, ['category_id' => $bakery->id]);
+        $this->productAt($ctx, 'Croissant', 5, ['category_id' => $bakery->id]);
+        $this->productAt($ctx, 'Loose Item', 5, ['category_id' => null]);
+
+        $this->posProducts($ctx, ['group_by_category' => 1])
+            ->assertOk()
+            ->assertJsonPath('data.*.name', ['Croissant', 'Zesty Bun', 'Americano', 'Loose Item']);
+
+        // Still works together with a search.
+        $this->posProducts($ctx, ['group_by_category' => 1, 'search' => 'Bun'])
+            ->assertOk()
+            ->assertJsonPath('data.*.name', ['Zesty Bun']);
+    }
+
     public function test_the_cashiers_switch_overrides_the_store_setting(): void
     {
         $ctx = $this->seedStore();

@@ -331,7 +331,7 @@ class StockAdjustmentController extends Controller
             'type' => 'required|in:increase,decrease,recount',
             'reason' => 'required|in:physical_count,damaged_goods,expired_goods,theft_loss,supplier_error,system_error,promotion,sample,other',
             'description' => 'nullable|string|max:1000',
-            'items' => 'required|array|min:1',
+            'items' => 'sometimes|array|min:1',
             'items.*.id' => 'nullable|integer',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.actual_quantity' => 'required|integer|min:0',
@@ -343,7 +343,7 @@ class StockAdjustmentController extends Controller
 
         $user = auth()->user();
         if (! $user->is_super_user && ! empty($user->domain)) {
-            $productIds = collect($validated['items'])->pluck('product_id')->unique()->all();
+            $productIds = collect($validated['items'] ?? [])->pluck('product_id')->unique()->all();
             $invalidCount = Product::query()
                 ->whereIn('id', $productIds)
                 ->where('domain', '!=', $user->domain)
@@ -357,7 +357,7 @@ class StockAdjustmentController extends Controller
             $this->inventoryService->updateStockAdjustment(
                 $adjustment,
                 Arr::only($validated, ['type', 'reason', 'description']),
-                $validated['items']
+                $validated['items'] ?? null
             );
 
             return response()->json([

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Domains;
 
+use App\Helpers;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\SalesHistoryResource;
 use App\Models\Domain;
@@ -342,7 +343,12 @@ class SalesHistoryController extends Controller
         $validated = $request->validate([
             'start_date' => ['nullable', 'date'],
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
-            'location_id' => ['nullable', 'integer'],
+            // A store id, or "all" for every store; left out, the store picked in the header is used.
+            'location_id' => ['nullable', function ($attribute, $value, $fail) {
+                if ($value !== 'all' && filter_var($value, FILTER_VALIDATE_INT) === false) {
+                    $fail('The location must be a store or "all".');
+                }
+            }],
             'user_id' => ['nullable', 'integer'],
             'payment_method' => ['nullable', Rule::in(self::PAYMENT_METHODS)],
             'payment_status' => ['nullable', Rule::in(self::STATUSES)],
@@ -354,7 +360,12 @@ class SalesHistoryController extends Controller
         $start = Carbon::parse($validated['start_date'] ?? now()->toDateString())->startOfDay();
         $end = Carbon::parse($validated['end_date'] ?? $start->toDateString())->endOfDay();
 
-        $locationId = isset($validated['location_id']) ? (int) $validated['location_id'] : null;
+        $locationId = isset($validated['location_id']) && $validated['location_id'] !== 'all'
+            ? (int) $validated['location_id']
+            : null;
+        if (! $request->filled('location_id') && $this->canSeeAllSales($request->user())) {
+            $locationId = Helpers::getActiveLocation($domain)?->id;
+        }
         if ($locationId && ! InventoryLocation::query()->forDomain($domain->name_slug)->whereKey($locationId)->exists()) {
             $locationId = null;
         }

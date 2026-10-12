@@ -103,6 +103,8 @@ class SaleController extends Controller
             'include_out_of_stock' => ['nullable', 'boolean'],
             // The cashier's own on/off switch; without it the store setting decides.
             'hide_out_of_stock' => ['nullable', 'boolean'],
+            // Category by category (A–Z, uncategorized last), then by name.
+            'group_by_category' => ['nullable', 'boolean'],
         ]);
 
         $perPage = min((int) ($validated['per_page'] ?? 30), 100);
@@ -156,7 +158,15 @@ class SaleController extends Controller
         $total = (clone $base)->count();
         $lastPage = max(1, (int) ceil($total / $perPage));
 
-        $products = (clone $base)
+        $listed = clone $base;
+        if ($request->boolean('group_by_category')) {
+            // A subquery rather than a join: the filters above use unqualified column names.
+            $categoryName = Category::query()->select('name')->whereColumn('categories.id', 'products.category_id')->limit(1);
+            $listed->orderByRaw('('.$categoryName->toSql().') IS NULL', $categoryName->getBindings())
+                ->orderBy($categoryName);
+        }
+
+        $products = $listed
             ->orderBy('name')->orderBy('id')
             ->forPage($page, $perPage)
             ->get();

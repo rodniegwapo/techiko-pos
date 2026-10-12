@@ -62,15 +62,15 @@ class DashboardController extends Controller
         // Return raw data - let frontend handle formatting
         $salesQuery = Sale::where('domain', $domain)
             ->where('payment_status', 'paid')
-            ->where('created_at', '>=', $this->getStartDate($timeRange));
+            ->where('transaction_date', '>=', $this->getStartDate($timeRange));
 
         // Add location filtering if location exists
         if ($location) {
             $salesQuery->where('location_id', $location->id);
         }
 
-        $sales = $salesQuery->select(['created_at', 'grand_total', 'payment_method'])
-            ->orderBy('created_at')
+        $sales = $salesQuery->select([DB::raw('transaction_date as created_at'), 'grand_total', 'payment_method'])
+            ->orderBy('transaction_date')
             ->get();
 
         return response()->json([
@@ -100,11 +100,11 @@ class DashboardController extends Controller
 
         // Today's Sales
         $todaySales = (clone $salesQuery)
-            ->whereDate('created_at', $today)
+            ->whereDate('transaction_date', $today)
             ->sum('grand_total') ?? 0;
 
         $yesterdaySales = (clone $salesQuery)
-            ->whereDate('created_at', $yesterday)
+            ->whereDate('transaction_date', $yesterday)
             ->sum('grand_total') ?? 0;
 
         $salesGrowth = $yesterdaySales > 0
@@ -113,12 +113,12 @@ class DashboardController extends Controller
 
         // Total Revenue (This Week)
         $thisWeekRevenue = (clone $salesQuery)
-            ->where('created_at', '>=', $thisWeek)
+            ->where('transaction_date', '>=', $thisWeek)
             ->sum('grand_total') ?? 0;
 
         $lastWeekRevenue = (clone $salesQuery)
-            ->where('created_at', '>=', $lastWeek)
-            ->where('created_at', '<', $thisWeek)
+            ->where('transaction_date', '>=', $lastWeek)
+            ->where('transaction_date', '<', $thisWeek)
             ->sum('grand_total') ?? 0;
 
         $revenueGrowth = $lastWeekRevenue > 0
@@ -186,7 +186,7 @@ class DashboardController extends Controller
             $transactionsQuery->where('location_id', $location->id);
         }
 
-        return $transactionsQuery->latest()
+        return $transactionsQuery->latest('transaction_date')
             ->limit(10)
             ->get()
             ->map(function ($sale) {
@@ -195,7 +195,7 @@ class DashboardController extends Controller
                     'customer_name' => $sale->customer->name ?? 'Walk-in Customer',
                     'total' => $sale->grand_total,
                     'items_count' => $sale->saleItems->count(),
-                    'date' => $sale->created_at->format('M d, Y H:i'),
+                    'date' => \Illuminate\Support\Carbon::parse($sale->transaction_date ?? $sale->created_at)->format('M d, Y H:i'),
                     'status' => $sale->payment_status
                 ];
             });
@@ -299,7 +299,7 @@ class DashboardController extends Controller
             ->with(['sales' => function ($query) use ($today, $domain) {
                 $query->where('payment_status', 'paid')
                     ->where('domain', $domain)
-                    ->whereDate('created_at', $today);
+                    ->whereDate('transaction_date', $today);
             }])
             ->get()
             ->map(function ($location) {
@@ -339,7 +339,7 @@ class DashboardController extends Controller
 
         $query = Sale::where('payment_status', 'paid')
             ->where('domain', $domain)
-            ->whereDate('created_at', $today)
+            ->whereDate('transaction_date', $today)
             ->select('user_id', DB::raw('SUM(grand_total) as total_sales'), DB::raw('COUNT(*) as transaction_count'))
             ->groupBy('user_id')
             ->with('user:id,name,role_level')

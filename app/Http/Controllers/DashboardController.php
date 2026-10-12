@@ -91,10 +91,10 @@ class DashboardController extends Controller
 
         // Global view: no domain or location filtering
         $salesQuery = Sale::where('payment_status', 'paid')
-            ->where('created_at', '>=', $this->getStartDate($timeRange));
+            ->where('transaction_date', '>=', $this->getStartDate($timeRange));
 
-        $sales = $salesQuery->select(['created_at', 'grand_total', 'payment_method'])
-            ->orderBy('created_at')
+        $sales = $salesQuery->select([DB::raw('transaction_date as created_at'), 'grand_total', 'payment_method'])
+            ->orderBy('transaction_date')
             ->get();
 
 
@@ -135,11 +135,11 @@ class DashboardController extends Controller
 
         // Today's Sales
         $todaySales = (clone $salesQuery)
-            ->whereDate('created_at', $today)
+            ->whereDate('transaction_date', $today)
             ->sum('grand_total') ?? 0;
 
         $yesterdaySales = (clone $salesQuery)
-            ->whereDate('created_at', $yesterday)
+            ->whereDate('transaction_date', $yesterday)
             ->sum('grand_total') ?? 0;
 
         $salesGrowth = $yesterdaySales > 0
@@ -148,12 +148,12 @@ class DashboardController extends Controller
 
         // Total Revenue (This Week)
         $thisWeekRevenue = (clone $salesQuery)
-            ->where('created_at', '>=', $thisWeek)
+            ->where('transaction_date', '>=', $thisWeek)
             ->sum('grand_total') ?? 0;
 
         $lastWeekRevenue = (clone $salesQuery)
-            ->where('created_at', '>=', $lastWeek)
-            ->where('created_at', '<', $thisWeek)
+            ->where('transaction_date', '>=', $lastWeek)
+            ->where('transaction_date', '<', $thisWeek)
             ->sum('grand_total') ?? 0;
 
         $revenueGrowth = $lastWeekRevenue > 0
@@ -230,7 +230,7 @@ class DashboardController extends Controller
             $date = now()->subDays($i)->startOfDay();
 
             $salesQuery = Sale::where('payment_status', 'paid')
-                ->whereDate('created_at', $date);
+                ->whereDate('transaction_date', $date);
             if ($domain) {
                 $salesQuery->where('domain', $domain);
             }
@@ -238,7 +238,7 @@ class DashboardController extends Controller
             $sales = $salesQuery->sum('grand_total') ?? 0;
 
             $transactionQuery = Sale::where('payment_status', 'paid')
-                ->whereDate('created_at', $date);
+                ->whereDate('transaction_date', $date);
             if ($domain) {
                 $transactionQuery->where('domain', $domain);
             }
@@ -252,7 +252,7 @@ class DashboardController extends Controller
 
         // Payment methods distribution
         $paymentMethodsQuery = Sale::where('payment_status', 'paid')
-            ->where('created_at', '>=', now()->subDays(7));
+            ->where('transaction_date', '>=', now()->subDays(7));
         if ($domain) {
             $paymentMethodsQuery->where('domain', $domain);
         }
@@ -479,7 +479,7 @@ class DashboardController extends Controller
         $locations = InventoryLocation::active()
             ->with(['sales' => function($query) use ($today) {
                 $query->where('payment_status', 'paid')
-                      ->whereDate('created_at', $today);
+                      ->whereDate('transaction_date', $today);
             }])
             ->get()
             ->map(function($location) {
@@ -515,7 +515,7 @@ class DashboardController extends Controller
         $today = now()->startOfDay();
         
         $query = Sale::where('payment_status', 'paid')
-            ->whereDate('created_at', $today)
+            ->whereDate('transaction_date', $today)
             ->select('user_id', DB::raw('SUM(grand_total) as total_sales'), DB::raw('COUNT(*) as transaction_count'))
             ->groupBy('user_id')
             ->with('user:id,name,role_level')

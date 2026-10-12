@@ -15,11 +15,13 @@ import {
 import { useHelpers } from "@/Composables/useHelpers";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 import { useStockAdjustmentActions } from "@/Composables/useStockAdjustmentActions";
+import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import axios from "axios";
 
 const { formatCurrency, formatDate, formatDateTime } = useHelpers();
 const { hasPermission } = usePermissionsV2();
 const { approveAdjustment, rejectAdjustment } = useStockAdjustmentActions();
+const { getRoute } = useDomainRoutes();
 const isMdUp = useMediaQuery("(min-width: 768px)");
 const modalWidth = computed(() =>
   isMdUp.value ? 900 : "calc(100vw - 24px)",
@@ -70,7 +72,7 @@ const fetchAdjustmentDetails = async (adjustmentId) => {
   
   loading.value = true;
   try {
-    const response = await axios.get(route('inventory.adjustments.show', adjustmentId), {
+    const response = await axios.get(getRoute('inventory.adjustments.show', { adjustment: adjustmentId }), {
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
