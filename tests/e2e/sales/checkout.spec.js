@@ -144,7 +144,7 @@ for (const layout of ["classic", "coffeeshop"]) {
                 await dialog.getByText("E2E GCash", { exact: true }).click();
                 await dialog.getByRole("button", { name: "Use selected e-wallet" }).click();
                 await expect(dialog).toBeHidden();
-                await page.getByRole("textbox", { name: "Reference no." }).fill("GC-12345");
+                await page.getByRole("textbox", { name: "Reference no." }).fill("12345");
 
                 const paid = page.waitForRequest((r) => r.method() === "POST" && r.url().includes("/payments"));
                 const res = await sales.pay({ amountReceived: 100 });
@@ -152,7 +152,7 @@ for (const layout of ["classic", "coffeeshop"]) {
 
                 expect(res?.status()).toBe(200);
                 expect(body.payment_method).toBe("e-wallet");
-                expect(body.payment_reference).toBe("GC-12345");
+                expect(body.payment_reference).toBe("12345");
             });
 
             test("Bank asks which bank, listing only banks", async ({ page }) => {

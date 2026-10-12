@@ -11,6 +11,7 @@ import {
     splitProblem,
 } from "@/Composables/useSplitPayment";
 import { IconDiscount, IconGift, IconArrowRightToArc } from "@tabler/icons-vue";
+import { digitsOnly, numberKeysOnly, numberPasteOnly } from "@/Composables/numericInput";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useHelpers } from "@/Composables/useHelpers";
@@ -1025,8 +1026,12 @@ defineExpose({
                         </div>
                         <a-input
                             v-if="takesReference"
-                            v-model:value="paymentReference"
+                            :value="paymentReference"
+                            inputmode="numeric"
                             :maxlength="100"
+                            @update:value="(v) => (paymentReference = digitsOnly(v))"
+                            @keydown="(e) => numberKeysOnly(e, { decimal: false })"
+                            @paste="(e) => numberPasteOnly(e, { decimal: false })"
                             placeholder="Reference no. (optional)"
                             aria-label="Reference no."
                         />
@@ -1101,7 +1106,10 @@ defineExpose({
                     <a-input
                         v-model:value="amountReceived"
                         type="number"
+                        inputmode="decimal"
                         placeholder="0"
+                        @keydown="numberKeysOnly"
+                        @paste="numberPasteOnly"
                         :class="{
                             'border-red-400':
                                 amountReceived < grandTotalDisplay &&

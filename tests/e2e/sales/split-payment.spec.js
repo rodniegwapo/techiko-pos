@@ -41,7 +41,7 @@ test.describe("Split payment (classic layout)", () => {
         await panel.getByLabel("Payment 1 amount").fill("70");
         await panel.getByLabel("Payment 2 amount").fill("40");
         await chooseGcash(page, 0);
-        await panel.getByLabel("Payment 2 reference no.").fill("GC-777");
+        await panel.getByLabel("Payment 2 reference no.").fill("777123");
 
         await expect(panel).toContainText("Change: ₱10.00");
         await expect(sales.proceedButton).toBeEnabled();
@@ -54,7 +54,7 @@ test.describe("Split payment (classic layout)", () => {
         expect(body.payment_method).toBe("split");
         expect(body.payments).toEqual([
             { method: "cash", amount: 70 },
-            expect.objectContaining({ method: "e-wallet", amount: 40, payment_reference: "GC-777" }),
+            expect.objectContaining({ method: "e-wallet", amount: 40, payment_reference: "777123" }),
         ]);
         await expect(sales.notice("Payment Successful!")).toBeVisible();
     });
@@ -70,10 +70,24 @@ test.describe("Split payment (classic layout)", () => {
         await expect(panel).toContainText("Remaining: ₱30.00");
         await expect(sales.proceedButton).toBeDisabled();
 
-        // The fill button puts what is left on that part.
-        await panel.getByRole("button", { name: "Fill the remaining amount for payment 1" }).click();
+        // Reset puts what is left on that part.
+        await panel.getByRole("button", { name: "Reset payment 1 to the remaining amount" }).click();
         await expect(panel.getByLabel("Payment 1 amount")).toHaveValue("60.00");
         await expect(sales.proceedButton).toBeEnabled();
+    });
+
+    test("amounts and the reference no. only take numbers", async ({ page }) => {
+        await openSplit(page);
+        const panel = page.getByTestId("split-payment");
+
+        const amount = panel.getByLabel("Payment 1 amount");
+        await amount.pressSequentially("1a2e-+3.5.0");
+        await amount.blur();
+        await expect(amount).toHaveValue("123.50");
+
+        const ref = panel.getByLabel("Payment 2 reference no.");
+        await ref.pressSequentially("GC-12 34");
+        await expect(ref).toHaveValue("1234");
     });
 
     test("says why it can't be charged before the amounts are in", async ({ page }) => {

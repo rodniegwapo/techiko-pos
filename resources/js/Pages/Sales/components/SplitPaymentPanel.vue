@@ -11,6 +11,7 @@ import {
     storeTakesMethod,
 } from "@/Composables/useSplitPayment";
 import { useHelpers } from "@/Composables/useHelpers";
+import { digitsOnly, numberKeysOnly, numberPasteOnly } from "@/Composables/numericInput";
 
 /** The parts of a sale paid in parts: a method, an amount and (for card / e-wallet / bank) the channel. */
 const rows = defineModel({ type: Array, required: true });
@@ -152,15 +153,18 @@ function removeRow(row) {
                 :precision="2"
                 placeholder="0.00"
                 class="w-32"
+                inputmode="decimal"
                 :aria-label="`Payment ${i + 1} amount`"
+                @keydown="numberKeysOnly"
+                @paste="numberPasteOnly"
             />
-            <a-tooltip :title="`Fill the remaining ${formattedTotal(restFor(row))}`">
+            <a-tooltip :title="`Reset to the remaining ${formattedTotal(restFor(row))}`">
                 <a-button
                     size="small"
                     type="text"
                     class="!px-1 text-blue-600"
                     :disabled="Number(row.amount || 0) === restFor(row)"
-                    :aria-label="`Fill the remaining amount for payment ${i + 1}`"
+                    :aria-label="`Reset payment ${i + 1} to the remaining amount`"
                     @click="fillRest(row)"
                 >
                     <template #icon><IconArrowBarToDown :size="18" class="inline" /></template>
@@ -176,8 +180,12 @@ function removeRow(row) {
                 </a-button>
                 <a-input
                     v-if="row.method !== 'card'"
-                    v-model:value="row.payment_reference"
+                    :value="row.payment_reference"
                     size="small"
+                    inputmode="numeric"
+                    @update:value="(v) => (row.payment_reference = digitsOnly(v))"
+                    @keydown="(e) => numberKeysOnly(e, { decimal: false })"
+                    @paste="(e) => numberPasteOnly(e, { decimal: false })"
                     :maxlength="100"
                     placeholder="Ref no."
                     class="w-28"
