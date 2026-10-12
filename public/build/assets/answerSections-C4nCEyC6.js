@@ -1,0 +1,2 @@
+function r(n){if(!n)return[];const e=[{heading:null,paragraphs:[],bullets:[]}];for(const s of n.split(`
+`)){const t=s.trim();if(!t)continue;if(/^(what to watch|suggested next steps)\s*:?$/i.test(t)){e.push({heading:t.replace(/:$/,""),paragraphs:[],bullets:[]});continue}const a=e[e.length-1];/^[-•*]\s+/.test(t)?a.bullets.push(t.replace(/^[-•*]\s+/,"")):a.paragraphs.push(t)}return e.filter(s=>s.paragraphs.length||s.bullets.length)}export{r as a};
