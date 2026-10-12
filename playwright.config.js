@@ -13,6 +13,7 @@ if (existsSync(".env.playwright")) {
 export default defineConfig({
     testDir: "tests/e2e",
     globalSetup: "./tests/e2e/global-setup.js",
+    globalTeardown: "./tests/e2e/global-teardown.js",
     outputDir: "tests/e2e/test-results",
     fullyParallel: true,
     forbidOnly: !!process.env.CI,

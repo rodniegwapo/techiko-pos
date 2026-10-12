@@ -31,10 +31,18 @@ class E2EUserSeeder extends Seeder
             throw new RuntimeException('E2EUserSeeder may only run in local or testing environments.');
         }
 
-        // The finance specs run against Jollibee, so it is given Finance and AI support
-        // (both are off for an organization until a super admin turns them on).
+        // The finance specs run against Jollibee, so it is given Finance and AI support for the run
+        // (both are off for an organization until a super admin turns them on). What it had before
+        // is kept and put back by E2ERestoreDomainFeaturesSeeder after the run (global-teardown.js).
         if ($jollibee = Domain::query()->where('name_slug', 'jollibee-corp')->first()) {
             $settings = $jollibee->settings ?? [];
+            $backup = E2ERestoreDomainFeaturesSeeder::backupPath();
+            // A backup left by a run that didn't finish still holds the real setting; keep that one.
+            if (! file_exists($backup)) {
+                file_put_contents($backup, json_encode([
+                    'jollibee-corp' => $settings['features'] ?? null,
+                ]));
+            }
             $settings['features'] = ['finance' => true, 'ai' => true];
             $jollibee->update(['settings' => $settings]);
         }
