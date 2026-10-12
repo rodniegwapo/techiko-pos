@@ -145,6 +145,24 @@ class ProductStockAndPosListTest extends TestCase
             ->assertJsonPath('data.0.name', 'Sold Out Item');
     }
 
+    public function test_the_cashiers_switch_overrides_the_store_setting(): void
+    {
+        $ctx = $this->seedStore();
+        $this->productAt($ctx, 'In Stock Item', 5);
+        $this->productAt($ctx, 'Sold Out Item', 0);
+
+        // Store shows everything; the cashier hides out-of-stock.
+        $this->posProducts($ctx, ['hide_out_of_stock' => 1])
+            ->assertOk()
+            ->assertJsonPath('data.*.name', ['In Stock Item']);
+
+        // Store hides; the cashier shows everything.
+        $this->hideOutOfStock($ctx['domain']);
+        $this->posProducts($ctx, ['hide_out_of_stock' => 0])
+            ->assertOk()
+            ->assertJsonPath('meta.total', 2);
+    }
+
     public function test_hide_out_of_stock_setting_is_saved(): void
     {
         $ctx = $this->seedStore();

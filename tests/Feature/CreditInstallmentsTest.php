@@ -111,6 +111,35 @@ class CreditInstallmentsTest extends TestCase
         $this->assertEquals(3000, (float) $ctx['customer']->fresh()->credit_balance);
     }
 
+    public function test_the_due_date_of_a_charge_in_installments_cannot_be_moved_on_its_own(): void
+    {
+        $ctx = $this->seedContext();
+        $this->send($ctx, [
+            'transaction_type' => 'credit',
+            'amount' => 3000,
+            'installments' => $this->threeMonthly(),
+        ])->assertOk();
+        $charge = CreditTransaction::where('customer_id', $ctx['customer']->id)->sole();
+
+        $update = fn (array $body) => $this->actingAs($ctx['user'])->putJson(
+            route('domains.credits.transactions.update', [
+                'domain' => $ctx['domain']->name_slug,
+                'transaction' => $charge->id,
+            ]),
+            $body
+        );
+
+        $update(['due_date' => today()->addMonths(6)->toDateString()])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('due_date');
+        $update(['due_date' => null])->assertStatus(422);
+        $this->assertSame(today()->addMonths(3)->toDateString(), $charge->fresh()->due_date->toDateString());
+
+        // Notes, and resending the same date, still go through.
+        $update(['notes' => 'Called the customer', 'due_date' => today()->addMonths(3)->toDateString()])->assertOk();
+        $this->assertSame('Called the customer', $charge->fresh()->notes);
+    }
+
     public function test_installments_must_add_up_and_run_in_order(): void
     {
         $ctx = $this->seedContext();

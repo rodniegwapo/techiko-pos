@@ -101,6 +101,8 @@ class SaleController extends Controller
             'category' => ['nullable', 'string'],
             // Barcode lookups must find an item even when the list hides out-of-stock products.
             'include_out_of_stock' => ['nullable', 'boolean'],
+            // The cashier's own on/off switch; without it the store setting decides.
+            'hide_out_of_stock' => ['nullable', 'boolean'],
         ]);
 
         $perPage = min((int) ($validated['per_page'] ?? 30), 100);
@@ -138,7 +140,11 @@ class SaleController extends Controller
             ]);
 
         // Filtered before counting so the page count matches what is shown.
-        if ($domain->salesHidesOutOfStock() && ! $request->boolean('include_out_of_stock')) {
+        $hideOutOfStock = $request->filled('hide_out_of_stock')
+            ? $request->boolean('hide_out_of_stock')
+            : $domain->salesHidesOutOfStock();
+
+        if ($hideOutOfStock && ! $request->boolean('include_out_of_stock')) {
             $base->where(function ($q) use ($location) {
                 $q->where('track_inventory', false)
                     ->orWhereHas('inventories', fn ($iq) => $iq

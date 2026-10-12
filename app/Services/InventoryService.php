@@ -432,6 +432,53 @@ class InventoryService
     }
 
     /**
+     * Update a draft stock adjustment, including its line items.
+     * Items sent with an id are updated, new ones are added and missing ones are removed.
+     */
+    public function updateStockAdjustment(StockAdjustment $adjustment, array $data, array $items): StockAdjustment
+    {
+        return DB::transaction(function () use ($adjustment, $data, $items) {
+            $adjustment->update($data);
+
+            $location = $adjustment->location;
+            $existing = $adjustment->items()->get()->keyBy('id');
+            $keptIds = [];
+
+            foreach ($items as $itemData) {
+                $product = Product::findOrFail($itemData['product_id']);
+                $item = isset($itemData['id']) ? $existing->get($itemData['id']) : null;
+
+                $fields = [
+                    'product_id' => $product->id,
+                    'actual_quantity' => $itemData['actual_quantity'],
+                    'unit_cost' => $itemData['unit_cost'] ?? $product->cost,
+                    'batch_number' => $itemData['batch_number'] ?? null,
+                    'expiry_date' => $itemData['expiry_date'] ?? null,
+                    'notes' => $itemData['notes'] ?? null,
+                ];
+
+                if (! $item || (int) $item->product_id !== (int) $product->id) {
+                    $fields['system_quantity'] = $this->getOrCreateInventory($product, $location)->quantity_on_hand;
+                }
+
+                if ($item) {
+                    $item->update($fields);
+                } else {
+                    $item = $adjustment->items()->create($fields);
+                }
+
+                $keptIds[] = $item->id;
+            }
+
+            $adjustment->items()->whereNotIn('id', $keptIds)->delete();
+
+            $adjustment->calculateTotalValueChange();
+
+            return $adjustment->fresh('items');
+        });
+    }
+
+    /**
      * Get low stock products
      */
     public function getLowStockProducts(?InventoryLocation $location = null, ?string $domain = null): Collection

@@ -13,6 +13,8 @@ use App\Models\StockAdjustment;
 use App\Services\InventoryService;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Arr;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class StockAdjustmentController extends Controller
@@ -165,9 +167,24 @@ class StockAdjustmentController extends Controller
             'type' => 'required|in:increase,decrease,recount',
             'reason' => 'required|in:physical_count,damaged_goods,expired_goods,theft_loss,supplier_error,system_error,promotion,sample,other',
             'description' => 'nullable|string|max:1000',
+            'items' => 'required|array|min:1',
+            'items.*.id' => 'nullable|integer',
+            'items.*.product_id' => [
+                'required',
+                Rule::exists('products', 'id')->where('domain', $domain->name_slug),
+            ],
+            'items.*.actual_quantity' => 'required|integer|min:0',
+            'items.*.unit_cost' => 'nullable|numeric|min:0',
+            'items.*.batch_number' => 'nullable|string|max:255',
+            'items.*.expiry_date' => 'nullable|date',
+            'items.*.notes' => 'nullable|string|max:500',
         ]);
 
-        $adjustment->update($validated);
+        $this->inventoryService->updateStockAdjustment(
+            $adjustment,
+            Arr::only($validated, ['type', 'reason', 'description']),
+            $validated['items']
+        );
 
         return response()->json(['success' => true, 'message' => 'Stock adjustment updated successfully']);
     }

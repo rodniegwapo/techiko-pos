@@ -285,6 +285,18 @@ class CreditController extends Controller
             'due_date' => 'nullable|date',
         ]);
 
+        // A charge paid in installments is due when its last installment is; moving it alone
+        // would leave the two disagreeing.
+        if (array_key_exists('due_date', $validated)
+            && $transaction->installments()->exists()
+            && ! ($validated['due_date'] && $transaction->due_date?->isSameDay($validated['due_date']))) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Due date follows the installment schedule and cannot be changed here.',
+                'errors' => ['due_date' => ['Due date follows the installment schedule and cannot be changed here.']],
+            ], 422);
+        }
+
         try {
             $transaction->update($validated);
 

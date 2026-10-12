@@ -33,7 +33,7 @@ import CustomerOrder from "./components/CustomerOrder.vue";
 import TotalAmountSection from "./components/TotalAmountSection.vue";
 import SalesMobileCheckoutBar from "./components/SalesMobileCheckoutBar.vue";
 import SalesCartDrawer from "./components/SalesCartDrawer.vue";
-import { useMediaQuery, watchDebounced } from "@vueuse/core";
+import { useMediaQuery, useStorage, watchDebounced } from "@vueuse/core";
 import { useSalesCartDrawer } from "@/Composables/useSalesCartDrawer";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useSaleTotals } from "@/Composables/useSaleTotals";
@@ -1320,7 +1320,7 @@ const getProducts = async ({ append = false } = {}) => {
             const q = String(search.value || "")
                 .trim()
                 .toLowerCase();
-            if (salesSettings.value?.hide_out_of_stock) {
+            if (hideOutOfStock.value) {
                 filtered = filtered.filter(
                     (p) =>
                         !p.track_inventory ||
@@ -1366,6 +1366,7 @@ const getProducts = async ({ append = false } = {}) => {
                 per_page: PRODUCTS_PER_PAGE,
                 search: search.value || undefined,
                 category: category.value || undefined,
+                hide_out_of_stock: hideOutOfStock.value ? 1 : 0,
                 ...(locationId != null && locationId !== ""
                     ? { location_id: locationId }
                     : {}),
@@ -1394,6 +1395,22 @@ const loadMoreProducts = () => {
     if (!hasMoreProducts.value || loadingMore.value || loading.value) return;
     return getProducts({ append: true });
 };
+
+// The cashier's own pick ("1"/"0") wins; until they pick, the store setting decides.
+const hideOutOfStockChoice = useStorage(
+    `sales_hide_out_of_stock_${domainSlug.value || "default"}`,
+    "",
+);
+const hideOutOfStock = computed({
+    get: () =>
+        hideOutOfStockChoice.value === ""
+            ? !!salesSettings.value?.hide_out_of_stock
+            : hideOutOfStockChoice.value === "1",
+    set: (checked) => {
+        hideOutOfStockChoice.value = checked ? "1" : "0";
+    },
+});
+watch(hideOutOfStock, () => getProducts());
 const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
     getItems: getProducts,
     configs: [
@@ -1556,6 +1573,21 @@ watch(
                         v-model="filters"
                         :filters="filtersConfig"
                     />
+                    <label
+                        class="flex shrink-0 cursor-pointer items-center gap-2 text-xs font-medium"
+                        :class="
+                            isCoffeeshopLayout
+                                ? 'text-[var(--cs-muted)]'
+                                : 'text-gray-700'
+                        "
+                    >
+                        <a-switch
+                            v-model:checked="hideOutOfStock"
+                            size="small"
+                            data-testid="hide-out-of-stock"
+                        />
+                        Hide out of stock
+                    </label>
                 </template>
                 <template v-if="!isCoffeeshopLayout" #activeFilters>
                     <ActiveFilters

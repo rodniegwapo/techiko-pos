@@ -331,10 +331,34 @@ class StockAdjustmentController extends Controller
             'type' => 'required|in:increase,decrease,recount',
             'reason' => 'required|in:physical_count,damaged_goods,expired_goods,theft_loss,supplier_error,system_error,promotion,sample,other',
             'description' => 'nullable|string|max:1000',
+            'items' => 'required|array|min:1',
+            'items.*.id' => 'nullable|integer',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.actual_quantity' => 'required|integer|min:0',
+            'items.*.unit_cost' => 'nullable|numeric|min:0',
+            'items.*.batch_number' => 'nullable|string|max:255',
+            'items.*.expiry_date' => 'nullable|date',
+            'items.*.notes' => 'nullable|string|max:500',
         ]);
 
+        $user = auth()->user();
+        if (! $user->is_super_user && ! empty($user->domain)) {
+            $productIds = collect($validated['items'])->pluck('product_id')->unique()->all();
+            $invalidCount = Product::query()
+                ->whereIn('id', $productIds)
+                ->where('domain', '!=', $user->domain)
+                ->count();
+            if ($invalidCount > 0) {
+                abort(403, 'One or more products are not in your organization.');
+            }
+        }
+
         try {
-            $adjustment->update($validated);
+            $this->inventoryService->updateStockAdjustment(
+                $adjustment,
+                Arr::only($validated, ['type', 'reason', 'description']),
+                $validated['items']
+            );
 
             return response()->json([
                 'success' => true,
