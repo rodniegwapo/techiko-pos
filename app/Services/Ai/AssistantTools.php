@@ -6,6 +6,8 @@ use App\Ai\Tools\AssistantTool;
 use App\Models\AssistantUnansweredQuestion;
 use App\Models\Category;
 use App\Models\Domain;
+use App\Models\ExpenseCategory;
+use App\Models\Finance\Supplier;
 use App\Models\InventoryLocation;
 use App\Models\Product\Product;
 use App\Models\User;
@@ -42,6 +44,14 @@ class AssistantTools
         'find_products' => ['products.index', 'products.update'],
         'list_stores' => ['inventory.locations.index', 'inventory.locations.update', 'inventory.locations.set-default', 'inventory.locations.toggle-status', 'sales-history.index', 'inventory.products', 'inventory.index'],
         'get_sales_settings' => ['settings.index', 'settings.update'],
+        'list_expense_categories' => ['expenses.index', 'expenses.store', 'finance.bills.store'],
+        'list_suppliers' => ['finance.payables.index', 'finance.bills.store'],
+    ];
+
+    /** Read tools that also need a feature of the business. */
+    private const READ_TOOL_FEATURES = [
+        'list_expense_categories' => 'finance',
+        'list_suppliers' => 'finance',
     ];
 
     /** @var array<string, array{title: string, url: string}> */
@@ -101,6 +111,8 @@ class AssistantTools
             ]],
             'list_stores' => ['The stores and warehouses of this business: id, name, code, type, address, active, default.', fn () => []],
             'get_sales_settings' => ['The current sales settings: VAT on/off, VAT rate, prices include VAT or not, selling when out of stock, hiding out-of-stock products.', fn () => []],
+            'list_expense_categories' => ['The expense categories of this business (rent, utilities…), with their ids.', fn () => []],
+            'list_suppliers' => ['The suppliers of this business with their ids and payment terms (days).', fn () => []],
         ];
         foreach ($read as $name => [$description, $schema]) {
             if ($this->mayRead($name)) {
@@ -112,7 +124,7 @@ class AssistantTools
             $tools[] = $tool($name, $description, $schema);
         }
 
-        foreach ($this->actions->allowedFor($this->user) as $action) {
+        foreach ($this->actions->allowedFor($this->user, $this->domain) as $action) {
             $tools[] = $tool(
                 'propose_'.$action->name(),
                 $action->description().' Nothing changes until the user presses Confirm on the card shown with your answer.',
@@ -158,6 +170,8 @@ class AssistantTools
                     'find_products' => $this->findProducts((string) ($input['query'] ?? '')),
                     'list_stores' => InventoryLocation::query()->forDomain($this->domain->name_slug)->orderBy('name')
                         ->get(['id', 'name', 'code', 'type', 'address', 'is_active', 'is_default'])->toArray(),
+                    'list_expense_categories' => ExpenseCategory::query()->forDomain($this->domain->name_slug)->where('is_active', true)->orderBy('name')->get(['id', 'name'])->toArray(),
+                    'list_suppliers' => Supplier::query()->where('domain', $this->domain->name_slug)->orderBy('name')->get(['id', 'name', 'payment_terms_days', 'is_active'])->toArray(),
                     'get_sales_settings' => [
                         ...$this->domain->salesVatSettings(),
                         'allow_overselling' => (bool) ($this->domain->settings['sales']['allow_overselling'] ?? false),
@@ -197,6 +211,9 @@ class AssistantTools
 
     private function mayRead(string $tool): bool
     {
+        if (isset(self::READ_TOOL_FEATURES[$tool]) && ! $this->domain->hasFeature(self::READ_TOOL_FEATURES[$tool])) {
+            return false;
+        }
         foreach (self::READ_TOOLS[$tool] as $permission) {
             if (RoutePermission::allows($this->user, $permission)) {
                 return true;
@@ -209,7 +226,7 @@ class AssistantTools
     private function propose(string $name, array $input): array
     {
         $action = $this->actions->find($name);
-        if (! $action instanceof AssistantAction || ! RoutePermission::allows($this->user, $action->permission())) {
+        if (! $action instanceof AssistantAction || ! $this->actions->allows($action, $this->user, $this->domain)) {
             return ['error' => 'not_allowed', 'message' => 'This user\'s role cannot do that. They should ask the business owner or an admin.'];
         }
 

@@ -42,14 +42,19 @@ class ControllerCall
             $request->setLaravelSession(app('session.store'));
         }
 
+        [$class, $action] = explode('@', $route->getActionName());
+
+        // Like implicit route binding: a parameter becomes the model only where the controller
+        // method asks for one; elsewhere $request->route('domain') stays the slug from the URL.
         $route = clone $route;
         $route->bind($request);
+        $typed = $this->typedParameterNames($class, $action);
         foreach ($parameters as $name => $value) {
-            $route->setParameter($name, $value);
+            if (in_array($name, $typed, true)) {
+                $route->setParameter($name, $value);
+            }
         }
         $request->setRouteResolver(fn () => $route);
-
-        [$class, $action] = explode('@', $route->getActionName());
 
         // Code that reads request() during the call must see this request, not the confirm click.
         $previous = app('request');
@@ -91,7 +96,8 @@ class ControllerCall
             } elseif ($typeName && is_a($typeName, Request::class, true)) {
                 $arguments[] = $request;
             } elseif (array_key_exists($parameter->getName(), $parameters)) {
-                $arguments[] = $parameters[$parameter->getName()];
+                // Typed: the model, as implicit binding gives it; untyped: the value from the URL.
+                $arguments[] = $typeName ? $parameters[$parameter->getName()] : $request->route($parameter->getName());
             } elseif ($typeName) {
                 $arguments[] = app($typeName);
             } else {
@@ -100,6 +106,20 @@ class ControllerCall
         }
 
         return $arguments;
+    }
+
+    /** @return list<string> Names of the method's parameters typed as a class (models, requests, services). */
+    private function typedParameterNames(string $class, string $action): array
+    {
+        $names = [];
+        foreach ((new ReflectionMethod($class, $action))->getParameters() as $parameter) {
+            $type = $parameter->getType();
+            if ($type instanceof ReflectionNamedType && ! $type->isBuiltin()) {
+                $names[] = $parameter->getName();
+            }
+        }
+
+        return $names;
     }
 
     /** @param  class-string<FormRequest>  $class */

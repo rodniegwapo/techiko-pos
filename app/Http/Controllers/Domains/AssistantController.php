@@ -10,7 +10,6 @@ use App\Services\Ai\Actions\ActionContext;
 use App\Services\Ai\Actions\ActionRegistry;
 use App\Services\Ai\Actions\PendingActions;
 use App\Services\Ai\AppAssistant;
-use App\Support\RoutePermission;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -90,7 +89,7 @@ class AssistantController extends Controller
         }
 
         $action = $this->actions->find($pending['action']);
-        if (! $action || ! RoutePermission::allows($user, $action->permission())) {
+        if (! $action || ! $this->actions->allows($action, $user, $domain)) {
             return response()->json(['message' => 'Your role is not allowed to make this change.'], 403);
         }
 

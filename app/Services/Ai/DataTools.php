@@ -38,11 +38,11 @@ class DataTools
         'stock_levels' => ['inventory.products', 'inventory.index'],
         'low_stock' => ['inventory.index', 'inventory.products'],
         'stock_movements' => ['inventory.movements'],
-        'find_customer' => ['customers.index', 'credits.index'],
+        'find_customer' => ['customers.index', 'credits.index', 'loyalty.index'],
         'overdue_credit' => ['credits.index'],
         'voids' => ['voids.index'],
         'expected_cash_today' => ['wallet.money-movement'],
-        'list_discounts' => ['products.discounts.index', 'sales.index'],
+        'list_discounts' => ['products.discounts.index', 'products.discounts.update', 'sales.index'],
     ];
 
     private const MAX_DAYS = 366;
@@ -79,13 +79,13 @@ class DataTools
                 'days' => $s->integer()->description('How many days back, 1 to 365 (default 30)'),
                 ...$store($s),
             ]],
-            'find_customer' => ['Customers matching a name, phone or email: loyalty points and tier, and their credit (limit, balance, available, overdue) when this user may see credit.', fn (JsonSchema $s) => [
+            'find_customer' => ['Customers matching a name, phone or email (with their id): loyalty points and tier, and their credit (limit, balance, available, overdue) when this user may see credit.', fn (JsonSchema $s) => [
                 'query' => $s->string()->description('Part of the name, phone or email')->required(),
             ]],
             'overdue_credit' => ['Customers with overdue credit (utang) and how much is overdue.', fn () => []],
             'voids' => ['Voided items in a period: product, amount, reason, who voided it and who approved it.', fn (JsonSchema $s) => $dates($s)],
             'expected_cash_today' => ['How much cash should be in the drawer today (stores with an opened shift today).', fn (JsonSchema $s) => $store($s)],
-            'list_discounts' => ['The active discounts and the mandatory discounts (PWD, Senior…) with their rates.', fn () => []],
+            'list_discounts' => ['The active discounts (with their ids) and the mandatory discounts (PWD, Senior…) with their rates.', fn () => []],
         ];
 
         return array_filter($all, fn ($tool, $name) => $this->allows($name), ARRAY_FILTER_USE_BOTH);
@@ -339,6 +339,7 @@ class DataTools
 
         return ['customers' => $customers->map(function (Customer $c) use ($seesCredit) {
             $row = [
+                'id' => $c->id,
                 'name' => $c->name,
                 'phone' => $c->phone,
                 'loyalty_points' => (int) $c->loyalty_points,
@@ -428,7 +429,7 @@ class DataTools
             'discounts' => Discount::query()->forDomain($this->domain->name_slug)->where('is_active', true)
                 ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', now()))
                 ->orderBy('name')->limit(30)
-                ->get(['name', 'type', 'scope', 'value', 'min_order_amount', 'start_date', 'end_date'])
+                ->get(['id', 'name', 'type', 'scope', 'value', 'min_order_amount', 'start_date', 'end_date'])
                 ->toArray(),
             'mandatory_discounts' => MandatoryDiscount::query()->forDomain($this->domain->name_slug)->where('is_active', true)
                 ->orderBy('name')
