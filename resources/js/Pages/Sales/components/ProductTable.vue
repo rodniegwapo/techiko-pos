@@ -148,16 +148,8 @@ const formattedTotal = (price) => {
 </script>
 
 <template>
-    <div
-        class="flex min-h-0 flex-col"
-        :class="
-            layout === 'mobile'
-                ? 'h-[calc(100dvh-12rem)]'
-                : isCoffeeshop
-                  ? 'h-full min-h-0 flex-1'
-                  : 'h-[calc(100vh-430px)]'
-        "
-    >
+    <!-- Fills the panel the sales layout gives it; the list scrolls inside. -->
+    <div class="flex h-full min-h-0 flex-1 flex-col">
         <div class="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
             <a-spin
                 v-if="props.loading"

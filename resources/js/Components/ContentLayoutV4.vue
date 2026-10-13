@@ -56,9 +56,9 @@ defineProps({
                 </div>
             </div>
 
-            <!-- Order rail (desktop) -->
+            <!-- Order rail (desktop); room at the top for the pinned store switcher -->
             <div
-                class="cs-order-rail hidden min-h-0 min-w-0 overflow-hidden md:flex md:h-full md:min-h-0 md:w-[32%] md:flex-col md:px-5 md:py-6"
+                class="cs-order-rail hidden min-h-0 min-w-0 overflow-hidden md:flex md:h-full md:min-h-0 md:w-[32%] md:flex-col md:px-5 md:pb-6 md:pt-14"
             >
                 <div class="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
                     <slot name="right-side-content" />

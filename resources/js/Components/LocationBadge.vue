@@ -6,6 +6,11 @@ import axios from "axios";
 import { notification } from "ant-design-vue";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 
+const props = defineProps({
+    // Placed by the parent (pinned in a corner or a header bar) instead of taking its own row.
+    pinned: { type: Boolean, default: false },
+});
+
 const page = usePage();
 const visible = ref(false);
 
@@ -100,7 +105,11 @@ const switchLocation = async (location) => {
 </script>
 
 <template>
-    <div v-if="shouldShowBadge" class="location-badge mb-3 flex justify-end">
+    <div
+        v-if="shouldShowBadge"
+        class="location-badge"
+        :class="props.pinned ? '' : 'mb-3 flex justify-end'"
+    >
         <a-popover
             v-model:open="visible"
             placement="bottomRight"

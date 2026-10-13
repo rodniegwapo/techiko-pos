@@ -1498,15 +1498,22 @@ watch(
 </script>
 
 <template>
-    <AuthenticatedLayout>
+    <AuthenticatedLayout fit-viewport>
         <Head title="Sales" />
+        <!-- Fills the screen; the product list and cart scroll inside their own panels. -->
         <div
+            class="flex min-h-0 flex-1 flex-col"
             :class="{
                 'sales-coffeeshop': isCoffeeshopLayout,
                 'sales-coffeeshop--viewport': isCoffeeshopLayout,
             }"
         >
-            <ContentHeader v-if="!isCoffeeshopLayout" title="Sales">
+            <!-- Room on the right for the pinned store switcher -->
+            <ContentHeader
+                v-if="!isCoffeeshopLayout"
+                title="Sales"
+                class="shrink-0 md:pr-44"
+            >
                 <template v-if="!isMdUp" #actions>
                     <div class="flex items-center gap-2">
                         <span class="text-xs font-medium text-gray-800">

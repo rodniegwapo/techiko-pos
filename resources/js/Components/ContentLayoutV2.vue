@@ -17,11 +17,14 @@ const props = defineProps({
 });
 </script>
 
+<!-- Fills the height it is given; the products and the cart scroll inside their own cards. -->
 <template>
-    <div>
-        <div class="rounded-lg w-full flex gap-4">
-            <div class="w-[70%] p-6 bg-white rounded-lg shadow">
-                <div :class="filterMainClass">
+    <div class="flex min-h-0 flex-1 flex-col">
+        <div class="rounded-lg w-full flex min-h-0 flex-1 gap-4">
+            <div
+                class="flex min-h-0 w-[70%] flex-col p-6 bg-white rounded-lg shadow"
+            >
+                <div class="shrink-0" :class="filterMainClass">
                     <h1 class="text-lg font-semibold text-nowrap">
                         {{ title }}
                     </h1>
@@ -30,16 +33,20 @@ const props = defineProps({
                         <slot name="filters" />
                     </div>
                 </div>
-                <div>
+                <div class="shrink-0">
                     <slot name="activeFilters" />
+                </div>
+                <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
                     <slot name="table" />
                 </div>
             </div>
-            <div class="w-[30%] bg-white p-6 rounded-lg shadow">
+            <div
+                class="flex min-h-0 w-[30%] flex-col overflow-hidden bg-white p-6 rounded-lg shadow"
+            >
                 <slot name="right-side-content" />
             </div>
         </div>
-        <div>
+        <div class="shrink-0">
             <slot name="footer" />
         </div>
     </div>
