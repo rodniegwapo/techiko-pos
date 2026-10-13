@@ -22,10 +22,15 @@ class AppAssistant
     private const PROMPT = <<<'PROMPT'
 You are the assistant inside Techiko POS, a point-of-sale system used by small businesses in the Philippines. You help the shop's staff use the system and can make changes for them: add and edit products and categories, update store details and store settings. Be friendly, patient and brief, like a helpful co-worker.
 
+Finding your way:
+- "Pages this user can open" below lists every page of the app this user can open, where it is in the sidebar and what it is for. Use it for "where do I…", "where can I see…" and "what is this page for" questions, naming the sidebar path (e.g. Inventory → Movements).
+- A page that is not in that list is one this user's role can't open (or their business doesn't have); say so and suggest asking the business owner or an admin. Never point them to pages outside the list.
+
 Teaching:
 - For any "how do I…" question, call search_guides, then get_guide, and teach the steps from the guide. Never invent menu names, buttons or steps that are not in a guide.
 - Only teach tasks the guides return for this user. If search_guides lists the task under not_allowed_for_this_role (or a tool says not_allowed), say their role can't do that and suggest asking the business owner or an admin.
-- If no guide covers the question, say you don't have a guide for it yet and suggest the "Chat with the team" tab to ask a person.
+- If no guide covers the task but a page in the list clearly does, name that page and say what it is for, without inventing button-by-button steps. Then call report_unanswered so a guide gets written.
+- If neither a guide, a page nor a tool covers the question, call report_unanswered, say you can't help with that yet, and suggest the "Chat with the team" tab to ask a person.
 - When get_guide says page_link_shown_to_user is true, a button to open that page appears under your answer; you may mention it ("tap the button below").
 - After teaching a task, if you have the matching propose_* tool, offer to do it for them ("Want me to add it for you?").
 
@@ -42,7 +47,10 @@ PROMPT;
 
     public const LANGUAGES = FinancialAssistant::LANGUAGES;
 
-    public function __construct(private readonly GuideLibrary $guides) {}
+    public function __construct(
+        private readonly GuideLibrary $guides,
+        private readonly AppMap $map,
+    ) {}
 
     /**
      * Answers one chat message.
@@ -56,7 +64,7 @@ PROMPT;
             throw new RuntimeException('The AI assistant is not set up yet. Ask your administrator to add an AI API key.');
         }
 
-        $tools = new AssistantTools($this->guides, $user, $domain, $location);
+        $tools = (new AssistantTools($this->guides, $user, $domain, $location))->forMessage($message, $currentPage);
         $agent = new AppAssistantAgent($this->instructions($user, $domain, $location, $currentPage), $history, $tools, $this->provider(), $this->model());
 
         $answer = $this->send(fn () => $agent->prompt($language === 'taglish'
@@ -70,11 +78,15 @@ PROMPT;
     {
         $role = $user->isSuperUser() ? 'super admin' : ($user->getRoleNames()->implode(', ') ?: 'staff');
 
+        $page = $this->map->pathOf($currentPage) ?? $currentPage;
+
         return self::PROMPT
             ."\n\nBusiness: ".$domain->name.'. The user is '.$user->name.' (role: '.$role.').'
             .($location ? ' They are working in the store "'.$location->name.'".' : '')
-            .($currentPage ? ' They are on the page "'.$currentPage.'".' : '')
-            .' Today is '.today()->format('l, F j, Y').'.';
+            .($page ? ' They are on the page "'.$page.'".' : '')
+            .' Today is '.today()->format('l, F j, Y').'.'
+            ."\n\nPages this user can open (sidebar path: what it is for):\n"
+            .($this->map->forUser($user, $domain) ?: '- (none)');
     }
 
     protected function emptyAnswerMessage(): string

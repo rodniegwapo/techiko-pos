@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AssistantUnansweredController;
 use App\Http\Controllers\Billing\AdminManualPaymentsController;
 use App\Http\Controllers\Catalog\SharedProductController;
 use App\Http\Controllers\Catalog\SharedProductSuggestionController;
@@ -44,7 +45,7 @@ Route::get('/', [MarketingController::class, 'home'])->name('home');
 Route::get('/services', [MarketingController::class, 'services'])->name('marketing.services');
 Route::get('/about', [MarketingController::class, 'about'])->name('marketing.about');
 Route::get('/contact', [MarketingController::class, 'contact'])->name('marketing.contact');
-//Route::get('/pricing', [MarketingController::class, 'pricing'])->name('marketing.pricing');
+// Route::get('/pricing', [MarketingController::class, 'pricing'])->name('marketing.pricing');
 
 Route::get('/sitemap.xml', [SeoController::class, 'sitemap'])->name('sitemap');
 // Source of truth is public/robots.txt (nginx often serves it before PHP). Route keeps tests / non-nginx stacks working.
@@ -163,7 +164,7 @@ Route::get('/thank-you', function () {
 })->name('registration.thankyou');
 
 // Organization-specific routes extracted to routes/domains.php
-require __DIR__ . '/domains.php';
+require __DIR__.'/domains.php';
 
 // Domain Management Routes (for super users)
 Route::middleware(['auth', 'verified', 'user.permission'])->prefix('domains')->name('domains.')->group(function () {
@@ -279,6 +280,10 @@ Route::middleware(['auth', 'verified', 'check.super.user'])->group(function () {
     Route::post('/messages/{conversation}/read', [ConversationController::class, 'markRead'])->name('messages.read');
     Route::post('/messages/{conversation}/messages', [ConversationController::class, 'storeStaff'])->name('messages.staff');
 
+    // Questions the AI assistant couldn't help with
+    Route::get('/assistant/unanswered', [AssistantUnansweredController::class, 'index'])->name('assistant-unanswered.index');
+    Route::post('/assistant/unanswered/{question}/resolve', [AssistantUnansweredController::class, 'resolve'])->name('assistant-unanswered.resolve');
+
     Route::get('/mail/test', [MailTestController::class, 'create'])->name('mail.test');
     Route::post('/mail/test', [MailTestController::class, 'store'])
         ->middleware('throttle:5,1')
@@ -287,4 +292,4 @@ Route::middleware(['auth', 'verified', 'check.super.user'])->group(function () {
 
 Route::get('/__deploy/{token}', [DeployController::class, 'run']);
 
-require __DIR__ . '/auth.php';
+require __DIR__.'/auth.php';

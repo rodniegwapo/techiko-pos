@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Ai\Agents\AppAssistantAgent;
 use App\Http\Middleware\RoleBasedAccessControl;
+use App\Models\AssistantUnansweredQuestion;
 use App\Models\Category;
 use App\Models\Domain;
 use App\Models\InventoryLocation;
@@ -12,6 +13,7 @@ use App\Models\Product\Product;
 use App\Models\User;
 use App\Services\Ai\Actions\PendingActions;
 use App\Services\Ai\AppAssistant;
+use App\Services\Ai\AppMap;
 use App\Services\Ai\AssistantTools;
 use App\Services\Ai\GuideLibrary;
 use Database\Seeders\ProductSoldTypeSeeder;
@@ -19,6 +21,7 @@ use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
+use Inertia\Testing\AssertableInertia as Assert;
 use Laravel\Ai\Prompts\AgentPrompt;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
@@ -353,6 +356,78 @@ class AppAssistantTest extends TestCase
         $token = $this->propose($ctx, 'set_store_active', ['location_id' => $main->id, 'active' => false]);
         $this->confirm($ctx, $token)->assertOk();
         $this->assertFalse((bool) $main->fresh()->is_active);
+    }
+
+    public function test_the_app_map_covers_every_page_of_the_sidebar(): void
+    {
+        preg_match_all('/routeName:\s*"([^"]+)"/', file_get_contents(resource_path('js/Components/sidebar/leftMenu.vue')), $matches);
+        $sidebarDomainPages = array_values(array_filter(array_unique($matches[1]), fn ($r) => Route::has('domains.'.$r)));
+        $mapped = array_column(config('assistant_map'), 'route');
+
+        $this->assertNotEmpty($sidebarDomainPages);
+        $this->assertSame([], array_values(array_diff($sidebarDomainPages, $mapped)), 'sidebar pages missing from config/assistant_map.php');
+        foreach ($mapped as $route) {
+            $this->assertTrue(Route::has('domains.'.$route), "config/assistant_map.php names the unknown route {$route}");
+        }
+    }
+
+    public function test_the_app_map_lists_only_pages_the_user_can_open(): void
+    {
+        $map = app(AppMap::class);
+
+        $cashier = $this->staff(['sales.index']);
+        $lines = $map->forUser($cashier['user'], $cashier['domain']);
+        $this->assertStringContainsString('- Sales: the POS screen', $lines);
+        $this->assertStringNotContainsString('Inventory', $lines);
+
+        // The owner can open Finance pages, but only once the business has Finance.
+        $owner = $this->staff(['inventory.movements', 'finance.balance-sheet']);
+        $this->assertStringContainsString('Inventory → Movements', $map->forUser($owner['user'], $owner['domain']));
+        $this->assertStringNotContainsString('Balance sheet', $map->forUser($owner['user'], $owner['domain']));
+
+        $owner['domain']->update(['settings' => ['features' => ['finance' => true, 'ai' => true]]]);
+        $this->assertStringContainsString('Finance → Balance sheet', $map->forUser($owner['user'], $owner['domain']->fresh()));
+
+        $this->assertSame('Inventory → Movements', $map->pathOf('domains.inventory.movements'));
+    }
+
+    public function test_questions_it_cannot_answer_are_logged_once_in_the_users_words(): void
+    {
+        $ctx = $this->staff(['sales.index']);
+        $tools = $this->tools($ctx)->forMessage('Paano mag-transfer ng stock sa ibang branch?', 'domains.sales.index');
+
+        $this->assertSame(['logged' => true], json_decode($tools->run('report_unanswered', ['topic' => 'Stock transfer']), true));
+        $tools->run('report_unanswered', ['topic' => 'again']);
+
+        $logged = AssistantUnansweredQuestion::query()->sole();
+        $this->assertSame('Paano mag-transfer ng stock sa ibang branch?', $logged->question);
+        $this->assertSame($ctx['domain']->name_slug, $logged->domain);
+        $this->assertSame($ctx['user']->id, $logged->user_id);
+        $this->assertSame('domains.sales.index', $logged->page);
+        $this->assertSame('Stock transfer', $logged->topic);
+        $this->assertNull($logged->resolved_at);
+    }
+
+    public function test_super_admins_review_and_resolve_unanswered_questions(): void
+    {
+        $ctx = $this->staff(['sales.index']);
+        $question = AssistantUnansweredQuestion::query()->create([
+            'domain' => $ctx['domain']->name_slug, 'user_id' => $ctx['user']->id, 'question' => 'How do I print a Z-reading?', 'topic' => 'z reading',
+        ]);
+        $super = User::factory()->create(['is_super_user' => true]);
+
+        $this->actingAs($super)->get(route('assistant-unanswered.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Messages/AssistantUnanswered')
+                ->where('openCount', 1)
+                ->where('questions.data.0.question', 'How do I print a Z-reading?')
+                ->where('topTopics.0.topic', 'z reading'));
+
+        $this->actingAs($super)->post(route('assistant-unanswered.resolve', $question))->assertRedirect();
+        $this->assertNotNull($question->fresh()->resolved_at);
+
+        $this->actingAs($ctx['user'])->getJson(route('assistant-unanswered.index'))->assertForbidden();
     }
 
     public function test_a_cancelled_change_is_not_saved(): void

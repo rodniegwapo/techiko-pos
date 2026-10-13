@@ -3,6 +3,7 @@
 namespace App\Services\Ai;
 
 use App\Ai\Tools\AssistantTool;
+use App\Models\AssistantUnansweredQuestion;
 use App\Models\Category;
 use App\Models\Domain;
 use App\Models\InventoryLocation;
@@ -49,6 +50,13 @@ class AssistantTools
 
     private readonly PendingActions $pending;
 
+    /** The user's message and page, saved as-is when the AI reports it couldn't help. */
+    private string $message = '';
+
+    private ?string $page = null;
+
+    private bool $reportedUnanswered = false;
+
     public function __construct(
         private readonly GuideLibrary $guides,
         private readonly User $user,
@@ -73,6 +81,9 @@ class AssistantTools
             ]),
             $tool('list_guides', 'Every task this user can get help with. Use for "what can you do" or "what can you help me with".', fn () => []),
             $tool('get_current_store', 'The store the user is working in now (new products are added there).', fn () => []),
+            $tool('report_unanswered', 'Record that you could not help with this message (no guide, page or tool covers it), so the Techiko team can add help for it. Call it once, before suggesting the team chat.', fn (JsonSchema $schema) => [
+                'topic' => $schema->string()->description('What it was about in 2 to 5 words, e.g. "transfer stock between stores"')->required(),
+            ]),
         ];
 
         $read = [
@@ -114,6 +125,7 @@ class AssistantTools
                     'search_guides' => $this->searchGuides((string) ($input['query'] ?? '')),
                     'get_guide' => $this->getGuide((string) ($input['key'] ?? '')),
                     'list_guides' => array_values(array_map(fn ($g) => ['key' => $g['key'], 'title' => $g['title']], $this->guides->allowedFor($this->user))),
+                    'report_unanswered' => $this->reportUnanswered((string) ($input['topic'] ?? '')),
                     'get_current_store' => $this->location
                         ? ['id' => $this->location->id, 'name' => $this->location->name, 'type' => $this->location->type]
                         : ['error' => 'No store is selected.'],
@@ -136,6 +148,15 @@ class AssistantTools
         }
 
         return json_encode($result, JSON_UNESCAPED_UNICODE);
+    }
+
+    /** The message being answered and the page it was asked on, for report_unanswered. */
+    public function forMessage(string $message, ?string $page): static
+    {
+        $this->message = $message;
+        $this->page = $page;
+
+        return $this;
     }
 
     /** @return list<array{title: string, url: string}> The pages the AI pointed to, for buttons under the answer. */
@@ -182,6 +203,24 @@ class AssistantTools
             'message' => 'A confirm card is shown with your answer. Nothing has changed yet; it is saved only when the user presses Confirm.',
             'summary' => $prepared->title.': '.collect($prepared->fields)->map(fn ($f) => $f['label'].' '.$f['value'])->implode('; '),
         ];
+    }
+
+    /** Saves the user's own words (not the AI's), once per message. */
+    private function reportUnanswered(string $topic): array
+    {
+        if (! $this->reportedUnanswered && trim($this->message) !== '') {
+            AssistantUnansweredQuestion::query()->create([
+                'domain' => $this->domain->name_slug,
+                'user_id' => $this->user->id,
+                'question' => mb_substr($this->message, 0, 1000),
+                'page' => $this->page ? mb_substr($this->page, 0, 255) : null,
+                'role' => mb_substr($this->user->isSuperUser() ? 'super admin' : ($this->user->getRoleNames()->implode(', ') ?: 'staff'), 0, 255),
+                'topic' => trim($topic) !== '' ? mb_substr(trim($topic), 0, 100) : null,
+            ]);
+            $this->reportedUnanswered = true;
+        }
+
+        return ['logged' => true];
     }
 
     private function findProducts(string $query): array
