@@ -38,6 +38,21 @@ function parts(line) {
 /** Starter questions that fit the page the user is on. */
 export function suggestionsFor(routeName) {
     const name = (routeName || "").replace(/^domains\./, "");
+    if (name.startsWith("expenses") || name.startsWith("finance.payables") || name.startsWith("finance.other-income")) {
+        return ["Record an expense for me", "How do I set up a monthly expense?", "How do I record a supplier bill?"];
+    }
+    if (name.startsWith("finance") || name.startsWith("profit-loss") || name.startsWith("vat-report")) {
+        return ["What was our profit this month?", "Why is my cash lower than my profit?", "How do I record a loan?"];
+    }
+    if (name.startsWith("wallet") || name.startsWith("payment-card-types")) {
+        return ["How do I end the shift?", "How much cash should be in the drawer?", "Add GCash as a payment option"];
+    }
+    if (name.startsWith("products.discounts") || name.startsWith("mandatory-discounts")) {
+        return ["Create a 10% payday promo for me", "How do I set the senior discount rate?"];
+    }
+    if (name.startsWith("products.modifier")) {
+        return ["How do I add sizes like small, medium, large?", "How do I add add-ons with extra price?"];
+    }
     if (name.startsWith("products") || name.startsWith("categories")) {
         return ["Add a product for me", "Change a product's price", "How do I add a category?"];
     }

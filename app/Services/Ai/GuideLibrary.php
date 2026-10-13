@@ -2,7 +2,9 @@
 
 namespace App\Services\Ai;
 
+use App\Models\Domain;
 use App\Models\User;
+use App\Support\RouteFeature;
 use App\Support\RoutePermission;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
@@ -43,15 +45,22 @@ class GuideLibrary
     }
 
     /** @return array<string, array{key: string, title: string, page: ?string, requires: list<string>, keywords: list<string>, steps: string}> */
-    public function allowedFor(User $user): array
+    public function allowedFor(User $user, ?Domain $domain = null): array
     {
-        return array_filter($this->all(), fn (array $guide) => $this->allows($user, $guide));
+        return array_filter($this->all(), fn (array $guide) => $this->allows($user, $guide, $domain));
     }
 
-    public function allows(User $user, array $guide): bool
+    /**
+     * The user's role has every permission the task needs, and (given the business) the business
+     * has the features its pages need, e.g. Finance for the expense guides.
+     */
+    public function allows(User $user, array $guide, ?Domain $domain = null): bool
     {
         foreach ($guide['requires'] as $routeName) {
             if (! RoutePermission::allows($user, $routeName)) {
+                return false;
+            }
+            if ($domain && ! RouteFeature::allows($domain, $routeName)) {
                 return false;
             }
         }
@@ -69,10 +78,10 @@ class GuideLibrary
      *
      * @return list<array{key: string, title: string}>
      */
-    public function search(User $user, string $query, int $limit = 5): array
+    public function search(User $user, string $query, int $limit = 5, ?Domain $domain = null): array
     {
         $scored = [];
-        foreach ($this->allowedFor($user) as $guide) {
+        foreach ($this->allowedFor($user, $domain) as $guide) {
             $score = $this->score($guide, $query);
             if ($score > 0) {
                 $scored[] = ['score' => $score, 'key' => $guide['key'], 'title' => $guide['title']];

@@ -160,7 +160,7 @@ class AssistantTools
                 $result = match ($name) {
                     'search_guides' => $this->searchGuides((string) ($input['query'] ?? '')),
                     'get_guide' => $this->getGuide((string) ($input['key'] ?? '')),
-                    'list_guides' => array_values(array_map(fn ($g) => ['key' => $g['key'], 'title' => $g['title']], $this->guides->allowedFor($this->user))),
+                    'list_guides' => array_values(array_map(fn ($g) => ['key' => $g['key'], 'title' => $g['title']], $this->guides->allowedFor($this->user, $this->domain))),
                     'report_unanswered' => $this->reportUnanswered((string) ($input['topic'] ?? '')),
                     'get_current_store' => $this->location
                         ? ['id' => $this->location->id, 'name' => $this->location->name, 'type' => $this->location->type]
@@ -292,11 +292,11 @@ class AssistantTools
 
     private function searchGuides(string $query): array
     {
-        $allowed = $this->guides->search($this->user, $query);
+        $allowed = $this->guides->search($this->user, $query, 5, $this->domain);
 
         $notAllowed = [];
         foreach ($this->guides->all() as $guide) {
-            if (! $this->guides->allows($this->user, $guide) && $this->guides->score($guide, $query) > 0) {
+            if (! $this->guides->allows($this->user, $guide, $this->domain) && $this->guides->score($guide, $query) > 0) {
                 $notAllowed[] = $guide['title'];
             }
         }
@@ -315,6 +315,9 @@ class AssistantTools
         }
         if (! $this->guides->allows($this->user, $guide)) {
             return ['error' => 'not_allowed', 'message' => 'This user\'s role is not allowed to do "'.$guide['title'].'". They should ask the business owner or an admin.'];
+        }
+        if (! $this->guides->allows($this->user, $guide, $this->domain)) {
+            return ['error' => 'not_available', 'message' => 'This business does not have the feature for "'.$guide['title'].'" turned on (e.g. Finance). The Techiko team can turn it on.'];
         }
 
         $url = $this->guides->pageUrl($guide, $this->domain->name_slug);

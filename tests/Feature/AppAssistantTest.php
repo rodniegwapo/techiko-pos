@@ -173,6 +173,26 @@ class AppAssistantTest extends TestCase
             ['ilan pa stock', 'check-stock'],
             ['export sales to excel', 'export-sales'],
             ['add new customer', 'add-customer'],
+            ['record electricity expense', 'record-expense'],
+            ['bayad sa kuryente meralco', 'record-expense'],
+            ['rent every month automatic', 'recurring-expense'],
+            ['record supplier bill', 'supplier-bill'],
+            ['pay supplier', 'pay-supplier-bill'],
+            ['bank balance gcash balance', 'bank-ewallet-balance'],
+            ['loan from bank repayment', 'record-loan'],
+            ['new freezer equipment', 'record-asset'],
+            ['owner added capital puhunan', 'owner-investment'],
+            ['how much profit kita this month', 'finance-reports'],
+            ['vat report for bir', 'vat-report'],
+            ['opening cash float', 'opening-cash'],
+            ['count cash end shift', 'end-shift'],
+            ['owner took cash out', 'cash-in-out'],
+            ['add gcash payment option', 'payment-channels'],
+            ['create payday promo', 'create-discount'],
+            ['add sizes small medium large', 'modifier-groups'],
+            ['add-ons sugar level', 'modifier-groups'],
+            ['set senior discount rate', 'mandatory-discounts'],
+            ['upgrade plan product limit', 'servicing-payment'],
         ];
     }
 
@@ -184,6 +204,26 @@ class AppAssistantTest extends TestCase
         $found = array_column(app(GuideLibrary::class)->search($owner, $question, 3), 'key');
 
         $this->assertContains($guide, $found, "\"{$question}\" found: ".implode(', ', $found));
+    }
+
+    public function test_finance_guides_need_the_finance_feature(): void
+    {
+        $ctx = $this->staff(['expenses.index', 'expenses.store', 'finance.dashboard']);
+        $library = app(GuideLibrary::class);
+
+        // The role allows it, but the business has no Finance: no Finance guides, and a clear reason.
+        $this->assertArrayHasKey('record-expense', $library->allowedFor($ctx['user']));
+        $this->assertArrayNotHasKey('record-expense', $library->allowedFor($ctx['user'], $ctx['domain']));
+        $this->assertSame([], array_values(array_filter(
+            array_column($library->search($ctx['user'], 'record electricity expense', 5, $ctx['domain']), 'key'),
+            fn ($key) => $key === 'record-expense',
+        )));
+        $refused = json_decode($this->tools($ctx)->run('get_guide', ['key' => 'record-expense']), true);
+        $this->assertSame('not_available', $refused['error']);
+
+        $ctx['domain']->update(['settings' => ['features' => ['ai' => true, 'finance' => true]]]);
+        $this->assertArrayHasKey('record-expense', $library->allowedFor($ctx['user'], $ctx['domain']->fresh()));
+        $this->assertArrayHasKey('steps', json_decode($this->tools(['domain' => $ctx['domain']->fresh()] + $ctx)->run('get_guide', ['key' => 'record-expense']), true));
     }
 
     public function test_guides_for_sales_inventory_customers_and_users_follow_permissions(): void
