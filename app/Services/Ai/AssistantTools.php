@@ -15,15 +15,19 @@ use App\Services\Ai\Actions\ActionRegistry;
 use App\Services\Ai\Actions\AssistantAction;
 use App\Services\Ai\Actions\Catalog\SoldTypes;
 use App\Services\Ai\Actions\PendingActions;
+use App\Services\Finance\FinancialInsightService;
+use App\Services\Finance\FinancialReportService;
 use App\Support\RoutePermission;
 use Closure;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Laravel\Ai\Contracts\Tool;
 use Throwable;
 
 /**
  * The tools the AI assistant may call for one user. Only what the user's role allows is offered:
- * guides are filtered by GuideLibrary, and each read tool and each propose_* tool is added only
- * when the user holds its permission. A propose_* tool never changes anything; it leaves a pending
+ * guides are filtered by GuideLibrary, and each read tool, data tool (DataTools), Finance tool and
+ * propose_* tool is added only when the user holds its permission (and the business has the
+ * feature). A propose_* tool never changes anything; it leaves a pending
  * change for the user to confirm (pendingActions()). The pages the AI pointed to are kept in
  * links() so the chat can show them as buttons.
  */
@@ -36,7 +40,7 @@ class AssistantTools
         'list_categories' => ['categories.index', 'products.store', 'products.update'],
         'list_sold_types' => ['products.store', 'products.update'],
         'find_products' => ['products.index', 'products.update'],
-        'list_stores' => ['inventory.locations.index', 'inventory.locations.update', 'inventory.locations.set-default', 'inventory.locations.toggle-status'],
+        'list_stores' => ['inventory.locations.index', 'inventory.locations.update', 'inventory.locations.set-default', 'inventory.locations.toggle-status', 'sales-history.index', 'inventory.products', 'inventory.index'],
         'get_sales_settings' => ['settings.index', 'settings.update'],
     ];
 
@@ -49,6 +53,8 @@ class AssistantTools
     private readonly ActionRegistry $actions;
 
     private readonly PendingActions $pending;
+
+    private readonly DataTools $data;
 
     /** The user's message and page, saved as-is when the AI reports it couldn't help. */
     private string $message = '';
@@ -65,9 +71,10 @@ class AssistantTools
     ) {
         $this->actions = app(ActionRegistry::class);
         $this->pending = app(PendingActions::class);
+        $this->data = new DataTools($user, $domain, $location);
     }
 
-    /** @return list<AssistantTool> */
+    /** @return list<Tool> */
     public function tools(): array
     {
         $tool = fn (string $name, string $description, Closure $schema) => new AssistantTool($this, $name, $description, $schema);
@@ -101,12 +108,27 @@ class AssistantTools
             }
         }
 
+        foreach ($this->data->definitions() as $name => [$description, $schema]) {
+            $tools[] = $tool($name, $description, $schema);
+        }
+
         foreach ($this->actions->allowedFor($this->user) as $action) {
             $tools[] = $tool(
                 'propose_'.$action->name(),
                 $action->description().' Nothing changes until the user presses Confirm on the card shown with your answer.',
                 fn (JsonSchema $schema) => $action->schema($schema),
             );
+        }
+
+        // The Finance AI's own tools (income statement, cash flow, balance sheet…), unchanged,
+        // for users who may ask Finance questions in a business that has Finance.
+        if ($this->domain->hasFeature('finance') && RoutePermission::allows($this->user, 'finance.ask')) {
+            array_push($tools, ...(new FinanceTools(
+                app(FinancialReportService::class),
+                app(FinancialInsightService::class),
+                $this->domain->name_slug,
+                $this->location?->id,
+            ))->tools());
         }
 
         return $tools;
@@ -118,6 +140,8 @@ class AssistantTools
         try {
             if (str_starts_with($name, 'propose_')) {
                 $result = $this->propose(substr($name, strlen('propose_')), $input);
+            } elseif ($this->data->handles($name)) {
+                $result = $this->data->run($name, $input);
             } elseif (array_key_exists($name, self::READ_TOOLS) && ! $this->mayRead($name)) {
                 $result = ['error' => 'not_allowed', 'message' => 'This user\'s role cannot see that.'];
             } else {

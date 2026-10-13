@@ -2,16 +2,17 @@
 
 namespace App\Http\Controllers\Domains;
 
-use App\Http\Controllers\Controller;
 use App\Helpers;
+use App\Http\Controllers\Controller;
 use App\Models\Domain;
 use App\Models\InventoryLocation;
-use App\Models\Sale;
-use App\Models\ProductInventory;
 use App\Models\InventoryMovement;
 use App\Models\Product\Product;
-use Illuminate\Http\Request;
+use App\Models\ProductInventory;
+use App\Models\Sale;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
@@ -23,7 +24,6 @@ class DashboardController extends Controller
     public function index(Request $request, Domain $domain)
     {
         $location = Helpers::getActiveLocation($domain, $request->input('location_id'));
-
 
         // Only essential KPIs - let frontend handle complex analytics
         $stats = [
@@ -49,7 +49,7 @@ class DashboardController extends Controller
     {
         $request->validate([
             'time_range' => 'required|in:daily,weekly,monthly',
-            'location_id' => 'nullable'
+            'location_id' => 'nullable',
         ]);
 
         $domainParam = $request->route('domain');
@@ -75,7 +75,7 @@ class DashboardController extends Controller
 
         return response()->json([
             'raw_data' => $sales,
-            'time_range' => $timeRange
+            'time_range' => $timeRange,
         ]);
     }
 
@@ -145,29 +145,29 @@ class DashboardController extends Controller
                 'growth' => $salesGrowth,
                 'label' => 'Today\'s Sales',
                 'icon' => 'dollar',
-                'color' => 'green'
+                'color' => 'green',
             ],
             'total_revenue' => [
                 'value' => $thisWeekRevenue,
                 'growth' => $revenueGrowth,
                 'label' => 'This Week Revenue',
                 'icon' => 'trending-up',
-                'color' => 'blue'
+                'color' => 'blue',
             ],
             'active_orders' => [
                 'value' => $activeOrders,
                 'growth' => 0,
                 'label' => 'Pending Orders',
                 'icon' => 'shopping-cart',
-                'color' => 'orange'
+                'color' => 'orange',
             ],
             'inventory_value' => [
                 'value' => $inventoryValue,
                 'growth' => 0,
                 'label' => 'Inventory Value',
                 'icon' => 'package',
-                'color' => 'purple'
-            ]
+                'color' => 'purple',
+            ],
         ];
     }
 
@@ -195,8 +195,8 @@ class DashboardController extends Controller
                     'customer_name' => $sale->customer->name ?? 'Walk-in Customer',
                     'total' => $sale->grand_total,
                     'items_count' => $sale->saleItems->count(),
-                    'date' => \Illuminate\Support\Carbon::parse($sale->transaction_date ?? $sale->created_at)->format('M d, Y H:i'),
-                    'status' => $sale->payment_status
+                    'date' => Carbon::parse($sale->transaction_date ?? $sale->created_at)->format('M d, Y H:i'),
+                    'status' => $sale->payment_status,
                 ];
             });
     }
@@ -206,23 +206,18 @@ class DashboardController extends Controller
      */
     private function getInventoryAlerts($location, $domain)
     {
-        // Use Product model to filter by domain, then get inventory data
+        // Use Product model to filter by domain, then get inventory data. Low stock: at or under
+        // the store's own low stock level, else the product's (the same rule the AI assistant uses).
         $lowStockQuery = ProductInventory::whereHas('product', function ($query) use ($domain) {
             $query->where('domain', $domain);
         })
-            ->where(function ($query) {
-                $query->whereColumn('quantity_available', '<=', 'location_reorder_level')
-                    ->orWhere(function ($subQuery) {
-                        $subQuery->whereNull('location_reorder_level')
-                            ->whereColumn('quantity_available', '<=', DB::raw('(SELECT reorder_level FROM products WHERE products.id = product_inventory.product_id)'));
-                    });
-            })
-            ->where('quantity_available', '>', 0);
+            ->lowStock()
+            ->inStock();
 
         $outOfStockQuery = ProductInventory::whereHas('product', function ($query) use ($domain) {
             $query->where('domain', $domain);
         })
-            ->where('quantity_available', '<=', 0);
+            ->outOfStock();
 
         if ($location) {
             $lowStockQuery->where('location_id', $location->id);
@@ -235,6 +230,7 @@ class DashboardController extends Controller
                 ->get()
                 ->map(function ($inventory) {
                     $minLevel = $inventory->location_reorder_level ?? $inventory->product->reorder_level ?? 0;
+
                     return [
                         'id' => $inventory->product_id,
                         'name' => $inventory->product->name ?? 'Unknown Product',
@@ -248,6 +244,7 @@ class DashboardController extends Controller
                 ->get()
                 ->map(function ($inventory) {
                     $minLevel = $inventory->location_reorder_level ?? $inventory->product->reorder_level ?? 0;
+
                     return [
                         'id' => $inventory->product_id,
                         'name' => $inventory->product->name ?? 'Unknown Product',
@@ -282,7 +279,7 @@ class DashboardController extends Controller
             ->map(function ($movement) {
                 return [
                     'product' => $movement->product,
-                    'quantity_sold' => $movement->total_sold
+                    'quantity_sold' => $movement->total_sold,
                 ];
             });
     }
