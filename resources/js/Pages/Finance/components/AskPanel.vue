@@ -18,7 +18,7 @@ const props = defineProps({
 
 const { getRoute } = useDomainRoutes();
 const page = usePage();
-const aiFeatureOn = computed(() => !!page.props.domainFeatures?.ai);
+const aiFeatureOn = computed(() => !!page.props.domainFeatures?.finance);
 
 const question = ref("");
 const turns = ref([]); // { question, answer, error }
@@ -58,7 +58,7 @@ async function ask(text = question.value) {
 </script>
 
 <template>
-    <!-- Only for organizations given AI support (a super admin turns it on). -->
+    <!-- Comes with Finance. -->
     <template v-if="aiFeatureOn">
     <section class="space-y-3 rounded-lg border border-blue-100 bg-white p-4" data-testid="ask-panel">
         <div class="flex flex-wrap items-center justify-between gap-2">

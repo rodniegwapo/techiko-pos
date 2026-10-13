@@ -44,4 +44,12 @@ return [
         'daily_question_limit' => (int) env('FINANCE_AI_DAILY_QUESTIONS', 30),
     ],
 
+    // The AI assistant in the chat drawer: teaches how to use the POS within each user's permissions.
+    'app_assistant' => [
+        'provider' => env('ASSISTANT_AI_PROVIDER', 'gemini'),
+        'model' => env('ASSISTANT_AI_MODEL', 'gemini-3.8-flash'),
+        // Messages one user may send per day, to keep API costs predictable.
+        'daily_limit' => (int) env('ASSISTANT_AI_DAILY_MESSAGES', 50),
+    ],
+
 ];

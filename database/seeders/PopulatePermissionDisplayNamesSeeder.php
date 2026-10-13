@@ -162,6 +162,11 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
 
             'vat-report.index' => 'View VAT Report',
 
+            // AI assistant
+            'assistant.ask' => 'Ask the AI assistant',
+            'assistant.actions.confirm' => 'Confirm changes prepared by the AI assistant',
+            'assistant.actions.cancel' => 'Cancel changes prepared by the AI assistant',
+
             // Finance
             'finance.dashboard' => 'View finance dashboard',
             'finance.income-statement' => 'View income statement',

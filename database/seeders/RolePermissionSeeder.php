@@ -24,6 +24,11 @@ class RolePermissionSeeder extends Seeder
             'dashboard',
             'dashboard.sales-chart',
 
+            // AI assistant (chat drawer)
+            'assistant.ask',
+            'assistant.actions.confirm',
+            'assistant.actions.cancel',
+
             // User Management
             'users.index',
             'users.hierarchy',
@@ -392,6 +397,11 @@ class RolePermissionSeeder extends Seeder
             'dashboard',
             'dashboard.sales-chart',
 
+            // AI assistant (chat drawer)
+            'assistant.ask',
+            'assistant.actions.confirm',
+            'assistant.actions.cancel',
+
             // User Management
             'users.index',
             'users.hierarchy',
@@ -683,6 +693,11 @@ class RolePermissionSeeder extends Seeder
             'dashboard',
             'dashboard.sales-chart',
 
+            // AI assistant (chat drawer)
+            'assistant.ask',
+            'assistant.actions.confirm',
+            'assistant.actions.cancel',
+
             // Sales
             'sales.index',
             'sales.offline-transactions',
@@ -913,6 +928,11 @@ class RolePermissionSeeder extends Seeder
             'dashboard',
             'dashboard.sales-chart',
 
+            // AI assistant (chat drawer)
+            'assistant.ask',
+            'assistant.actions.confirm',
+            'assistant.actions.cancel',
+
             // User Management (view only)
             'users.index',
             'users.show',
@@ -1049,6 +1069,11 @@ class RolePermissionSeeder extends Seeder
             // Dashboard
             'dashboard',
             'dashboard.sales-chart',
+
+            // AI assistant (chat drawer)
+            'assistant.ask',
+            'assistant.actions.confirm',
+            'assistant.actions.cancel',
 
             // Sales
             'sales.index',

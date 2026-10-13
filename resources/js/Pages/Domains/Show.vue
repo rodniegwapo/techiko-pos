@@ -1,5 +1,5 @@
 <script setup>
-import { computed, reactive, watch } from "vue";
+import { computed, reactive } from "vue";
 import { router, Head, usePage } from "@inertiajs/vue3";
 import { notification } from "ant-design-vue";
 import {
@@ -49,20 +49,10 @@ const regional = computed(() => [
 /*** === FEATURES (super admins turn paid features on per organization) === ***/
 const savedFeatures = () => ({
     finance: domain.value.settings?.features?.finance === true,
-    ai:
-        domain.value.settings?.features?.finance === true &&
-        domain.value.settings?.features?.ai === true,
+    ai: domain.value.settings?.features?.ai === true,
 });
 
 const features = reactive({ ...savedFeatures(), saving: false });
-
-// AI support lives inside Finance, so it goes off with it.
-watch(
-    () => features.finance,
-    (on) => {
-        if (!on) features.ai = false;
-    },
-);
 
 const featuresChanged = computed(() => {
     const saved = savedFeatures();
@@ -213,25 +203,22 @@ const handleBack = () => {
                                 </span>
                                 <span class="block text-xs text-gray-500">
                                     Finance dashboard, statements, expenses, payables, VAT report
-                                    and monthly reviews.
+                                    and monthly reviews, with AI explanations ("Explain this",
+                                    "Ask about your business").
                                 </span>
                             </a-checkbox>
 
                             <a-checkbox
                                 v-model:checked="features.ai"
-                                :disabled="!features.finance"
                                 class="!ml-0 flex items-start"
                                 data-testid="feature-ai"
                             >
                                 <span class="flex items-center gap-1 font-medium">
-                                    <IconSparkles :size="16" /> AI support
+                                    <IconSparkles :size="16" /> AI assistant
                                 </span>
                                 <span class="block text-xs text-gray-500">
-                                    {{
-                                        features.finance
-                                            ? "\"Explain this\", \"Ask about your business\" and AI summaries in monthly reviews."
-                                            : "Turn on Finance first."
-                                    }}
+                                    Help assistant in the chat drawer: teaches staff step by step
+                                    and can do tasks for them after they confirm.
                                 </span>
                             </a-checkbox>
                         </div>

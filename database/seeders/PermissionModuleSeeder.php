@@ -205,6 +205,14 @@ class PermissionModuleSeeder extends Seeder
                 'sort_order' => 20,
                 'is_active' => true,
             ],
+            [
+                'name' => 'assistant',
+                'display_name' => 'AI Assistant',
+                'icon' => 'robot',
+                'description' => 'The AI assistant in the chat drawer: how-to help and actions done for you',
+                'sort_order' => 21,
+                'is_active' => true,
+            ],
         ];
 
         foreach ($modules as $module) {

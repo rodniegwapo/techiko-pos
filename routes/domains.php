@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Domains\AssistantController;
 use App\Http\Controllers\Domains\CategoryController;
 use App\Http\Controllers\Domains\CreditController;
 use App\Http\Controllers\Domains\CustomerController;
@@ -46,6 +47,14 @@ Route::prefix('domains/{domain:name_slug}')
         // Organization settings (Sales VAT, etc.)
         Route::get('/settings', [DomainSettingsController::class, 'index'])->name('settings.index');
         Route::patch('/settings', [DomainSettingsController::class, 'update'])->name('settings.update');
+
+        // AI assistant in the chat drawer (how-to help within the user's permissions)
+        // Changes it prepared run only when the user confirms them; each also needs that change's own permission.
+        Route::middleware('domain.feature:ai')->prefix('assistant')->name('assistant.')->group(function () {
+            Route::post('/ask', [AssistantController::class, 'ask'])->name('ask');
+            Route::post('/actions/{token}/confirm', [AssistantController::class, 'confirm'])->where('token', '[A-Za-z0-9]{40}')->name('actions.confirm');
+            Route::post('/actions/{token}/cancel', [AssistantController::class, 'cancel'])->where('token', '[A-Za-z0-9]{40}')->name('actions.cancel');
+        });
 
         Route::get('/billing/gcash', function (Request $request) {
             $domain = $request->route('domain');
@@ -225,7 +234,7 @@ Route::prefix('domains/{domain:name_slug}')
             Route::get('/finance/receivables', [FinanceController::class, 'receivables'])->name('finance.receivables');
             Route::get('/finance/cash-flow', [FinanceController::class, 'cashFlow'])->name('finance.cash-flow');
             Route::get('/finance/balance-sheet', [FinanceController::class, 'balanceSheet'])->name('finance.balance-sheet');
-            Route::post('/finance/explain', [FinanceController::class, 'explain'])->middleware('domain.feature:ai')->name('finance.explain');
+            Route::post('/finance/explain', [FinanceController::class, 'explain'])->name('finance.explain');
 
             // Finance records next to Expenses: other income, suppliers and their bills
             Route::prefix('finance')->name('finance.')->group(function () {
@@ -265,7 +274,7 @@ Route::prefix('domains/{domain:name_slug}')
                 Route::delete('/other-liabilities/{liability}', [BalanceItemsController::class, 'destroyLiability'])->name('other-liabilities.destroy');
 
                 // "Ask about your business" and the monthly business reviews
-                Route::post('/ask', [FinanceController::class, 'ask'])->middleware('domain.feature:ai')->name('ask');
+                Route::post('/ask', [FinanceController::class, 'ask'])->name('ask');
                 Route::get('/reviews', [MonthlyReviewController::class, 'index'])->name('reviews.index');
                 Route::post('/reviews', [MonthlyReviewController::class, 'generate'])->name('reviews.generate');
             });

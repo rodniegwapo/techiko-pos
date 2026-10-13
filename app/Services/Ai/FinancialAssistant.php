@@ -4,15 +4,9 @@ namespace App\Services\Ai;
 
 use App\Ai\Agents\FinanceExplainer;
 use App\Ai\Agents\FinanceQuestionAgent;
-use Closure;
+use App\Services\Ai\Concerns\HandlesAiErrors;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Log;
-use Laravel\Ai\Exceptions\InsufficientCreditsException;
-use Laravel\Ai\Exceptions\ProviderConnectionException;
-use Laravel\Ai\Exceptions\ProviderOverloadedException;
-use Laravel\Ai\Exceptions\RateLimitedException;
 use RuntimeException;
-use Throwable;
 
 /**
  * Explains a business's figures in plain language through laravel/ai (Gemini by default; see
@@ -22,6 +16,8 @@ use Throwable;
  */
 class FinancialAssistant
 {
+    use HandlesAiErrors;
+
     public const TOPICS = ['overview', 'health', 'income_statement', 'receivables', 'payables', 'cash_flow', 'balance_sheet', 'expenses', 'review', 'metric'];
 
     private const QUESTION_PROMPT = <<<'PROMPT'
@@ -71,11 +67,6 @@ PROMPT;
         'expenses' => 'Explain my expenses: where is my money going, which costs grew, and am I spending too much compared with my sales?',
         'review' => 'This is my monthly business review. Summarize how the month went compared with the month before, and what matters most for next month.',
     ];
-
-    public function isConfigured(): bool
-    {
-        return (string) config('ai.providers.'.$this->provider().'.key') !== '';
-    }
 
     /**
      * @param  array<string, mixed>  $facts
@@ -130,35 +121,9 @@ PROMPT;
             : $question)->text);
     }
 
-    /**
-     * Runs one prompt (tool calls included) and returns its text, turning API failures into
-     * messages an owner can act on.
-     *
-     * @param  Closure(): ?string  $call
-     */
-    private function send(Closure $call): string
+    protected function emptyAnswerMessage(): string
     {
-        try {
-            $text = trim((string) $call());
-        } catch (RateLimitedException|ProviderOverloadedException $e) {
-            throw new RuntimeException('The AI assistant is busy right now. Please try again in a minute.', 0, $e);
-        } catch (ProviderConnectionException $e) {
-            Log::warning('Financial assistant could not reach the API', ['message' => $e->getMessage()]);
-            throw new RuntimeException('Could not reach the AI assistant. Check the internet connection and try again.', 0, $e);
-        } catch (InsufficientCreditsException $e) {
-            Log::warning('Financial assistant has no API credit left', ['message' => $e->getMessage()]);
-            throw new RuntimeException('The AI assistant could not answer right now. Please try again later.', 0, $e);
-        } catch (Throwable $e) {
-            Log::warning('Financial assistant request failed', ['exception' => $e::class, 'message' => $e->getMessage()]);
-            throw new RuntimeException('The AI assistant could not answer right now. Please try again later.', 0, $e);
-        }
-
-        // An empty answer also covers one the provider blocked, or a question that ran out of steps.
-        if ($text === '') {
-            throw new RuntimeException('The AI assistant could not answer this one. Try asking something more specific; the figures on the page are still accurate.');
-        }
-
-        return $text;
+        return 'The AI assistant could not answer this one. Try asking something more specific; the figures on the page are still accurate.';
     }
 
     private function provider(): string

@@ -216,14 +216,14 @@ class Domain extends Model
     /** Features an organization has to be given (by a super admin); all are off until turned on. */
     public const FEATURES = ['finance', 'ai'];
 
-    /** AI support lives inside Finance, so it is only on while Finance is. */
+    /** Finance includes its AI explanations; "ai" is the AI assistant in the chat drawer, a separate add-on. */
     public function hasFeature(string $key): bool
     {
         $on = fn (string $k) => data_get($this->settings, "features.{$k}") === true;
 
         return match ($key) {
             'finance' => $on('finance'),
-            'ai' => $on('finance') && $on('ai'),
+            'ai' => $on('ai'),
             default => false,
         };
     }

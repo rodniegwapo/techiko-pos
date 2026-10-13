@@ -16,7 +16,7 @@ class EnsureDomainFeature
 {
     public const MESSAGES = [
         'finance' => "Finance isn't turned on for this organization.",
-        'ai' => "AI support isn't turned on for this organization.",
+        'ai' => "The AI assistant isn't turned on for this organization.",
     ];
 
     public function handle(Request $request, Closure $next, string $feature): Response

@@ -25,7 +25,7 @@ const props = defineProps({
 
 const { getRoute } = useDomainRoutes();
 const page = usePage();
-const aiFeatureOn = computed(() => !!page.props.domainFeatures?.ai);
+const aiFeatureOn = computed(() => !!page.props.domainFeatures?.finance);
 
 const open = ref(false);
 const loading = ref(false);
