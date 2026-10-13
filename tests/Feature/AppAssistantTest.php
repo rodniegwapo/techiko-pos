@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Laravel\Ai\Prompts\AgentPrompt;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
@@ -140,6 +141,68 @@ class AppAssistantTest extends TestCase
 
         $this->assertSame('add-product', $library->search($owner, 'how do I add a product?')[0]['key']);
         $this->assertSame([], $library->search($cashier, 'add product'));
+    }
+
+    /** How staff actually ask, in English and Taglish, and the guide that should come up (top 3). */
+    public static function commonQuestions(): array
+    {
+        return [
+            ['paano mag void ng benta', 'void-sale'],
+            ['how do I void a sale', 'void-sale'],
+            ['how to add stock from supplier delivery', 'receive-stock'],
+            ['lipat stock sa ibang branch', 'transfer-stock'],
+            ['transfer stock to another store', 'transfer-stock'],
+            ['record utang payment', 'credit-payment'],
+            ['bayad sa utang ng customer', 'credit-payment'],
+            ['add new cashier', 'add-user'],
+            ['senior discount', 'pwd-senior-discount'],
+            ['pwd discount', 'pwd-senior-discount'],
+            ['split payment cash and gcash', 'split-payment'],
+            ['customer pays with gcash', 'card-ewallet-payment'],
+            ['damaged items stock', 'stock-adjustment'],
+            ['expired na products', 'stock-adjustment'],
+            ['approve stock adjustment', 'approve-adjustment'],
+            ['reprint receipt', 'find-receipt'],
+            ['walang internet paano magbenta', 'offline-sales'],
+            ['set credit limit for customer', 'credit-limit'],
+            ['who is overdue', 'overdue-credit'],
+            ['add loyalty points to customer', 'adjust-loyalty-points'],
+            ['set pin for manager', 'user-pin'],
+            ['low stock items', 'low-stock-reorder'],
+            ['stock value', 'inventory-valuation'],
+            ['ilan pa stock', 'check-stock'],
+            ['export sales to excel', 'export-sales'],
+            ['add new customer', 'add-customer'],
+        ];
+    }
+
+    #[DataProvider('commonQuestions')]
+    public function test_common_questions_find_the_right_guide(string $question, string $guide): void
+    {
+        $owner = User::factory()->create(['is_super_user' => true]);
+
+        $found = array_column(app(GuideLibrary::class)->search($owner, $question, 3), 'key');
+
+        $this->assertContains($guide, $found, "\"{$question}\" found: ".implode(', ', $found));
+    }
+
+    public function test_guides_for_sales_inventory_customers_and_users_follow_permissions(): void
+    {
+        $library = app(GuideLibrary::class);
+
+        $cashier = array_keys($library->allowedFor($this->staff(['sales.index'])['user']));
+        foreach (['make-a-sale', 'sale-discount', 'pwd-senior-discount', 'split-payment', 'redeem-loyalty', 'void-item-in-cart'] as $key) {
+            $this->assertContains($key, $cashier);
+        }
+        foreach (['void-sale', 'receive-stock', 'add-user', 'credit-payment', 'approve-adjustment'] as $key) {
+            $this->assertNotContains($key, $cashier);
+        }
+
+        $stockClerk = array_keys($library->allowedFor($this->staff(['inventory.products', 'inventory.receive', 'inventory.transfer', 'inventory.movements'])['user']));
+        foreach (['check-stock', 'receive-stock', 'transfer-stock', 'stock-movements'] as $key) {
+            $this->assertContains($key, $stockClerk);
+        }
+        $this->assertNotContains('approve-adjustment', $stockClerk);
     }
 
     public function test_tools_teach_allowed_tasks_and_refuse_the_rest(): void
