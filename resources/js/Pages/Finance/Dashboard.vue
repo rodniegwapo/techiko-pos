@@ -261,7 +261,7 @@ const productColumns = [
                         </section>
                     </div>
 
-                    <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">
+                    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
                         <section class="space-y-3">
                             <h2 class="text-base font-semibold text-gray-900">Slow-moving stock</h2>
                             <a-table :columns="slowColumns" :data-source="overview.products.slow_movers" :pagination="false"
