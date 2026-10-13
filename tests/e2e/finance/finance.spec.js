@@ -52,32 +52,30 @@ for (const role of ["admin", "manager"]) {
             expect(props.filters.start_date).toMatch(/-01-01$/);
         });
 
-        test("tabs open every Finance page", async ({ page }) => {
+        // The pages are reached from the sidebar, so they carry no tab bar of their own.
+        test("every Finance page opens without a tab bar", async ({ page }) => {
             await page.goto(url("/finance?period=month"));
-            const nav = page.getByTestId("finance-nav");
+            await expect(page.getByTestId("finance-nav")).toHaveCount(0);
 
-            await nav.getByRole("link", { name: "Income statement" }).click();
-            await expect(page).toHaveURL(/\/profit-loss\?(.*&)?preset=this_month/);
+            await page.goto(url("/profit-loss?preset=this_month"));
             await expect(page.getByTestId("pnl-statement")).toBeVisible();
+            await expect(page.getByTestId("finance-nav")).toHaveCount(0);
 
-            await page.getByTestId("finance-nav").getByRole("link", { name: "Cash flow" }).click();
+            await page.goto(url("/finance/cash-flow?period=month"));
             await expect(page.getByTestId("cash-flow-statement")).toBeVisible();
             await expect(page.getByTestId("profit-vs-cash")).toBeVisible();
 
-            await page.getByTestId("finance-nav").getByRole("link", { name: "Balance sheet" }).click();
+            await page.goto(url("/finance/balance-sheet"));
             await expect(page.getByTestId("net-worth")).toBeVisible();
 
-            await page.getByTestId("finance-nav").getByRole("link", { name: "Customer credit" }).click();
+            await page.goto(url("/finance/receivables"));
             await expect(page.getByRole("heading", { name: /How much do my customers owe me/ })).toBeVisible();
 
-            await page.getByTestId("finance-nav").getByRole("link", { name: "Supplier bills" }).click();
+            await page.goto(url("/finance/payables"));
             await expect(page.getByTestId("payables-summary")).toBeVisible();
 
-            await page.getByTestId("finance-nav").getByRole("link", { name: "Other income" }).click();
+            await page.goto(url("/finance/other-income"));
             await expect(page.getByTestId("income-table")).toBeVisible();
-
-            await page.getByTestId("finance-nav").getByRole("link", { name: "Expenses" }).click();
-            await expect(page).toHaveURL(/\/expenses\?/);
         });
 
         test("explain buttons follow whether the AI assistant is set up", async ({ page }) => {

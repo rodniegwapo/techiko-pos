@@ -10,7 +10,6 @@ import FilterDropdown from "@/Components/filters/FilterDropdown.vue";
 import ActiveFilters from "@/Components/filters/ActiveFilters.vue";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useFinanceFilters } from "./composables/useFinanceFilters";
-import FinanceNav from "./components/FinanceNav.vue";
 import FinancePeriod from "./components/FinancePeriod.vue";
 import ExplainButton from "./components/ExplainButton.vue";
 import MetricCard from "./components/MetricCard.vue";
@@ -79,7 +78,6 @@ const accounts = computed(() => props.current.account_balances ?? { accounts: []
 
             <template #table>
                 <div class="space-y-6 px-4 pb-8 md:px-6">
-                    <FinanceNav active="finance.cash-flow" :filters="props.filters" />
                     <FinancePeriod :label="periodLabel" :previous="previousLabel" note="Drawer, e-wallets, card terminals and bank channels together" />
 
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-3" data-testid="cash-flow-summary">

@@ -11,7 +11,6 @@ import { useHelpers } from "@/Composables/useHelpers";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
-import FinanceNav from "./components/FinanceNav.vue";
 import MetricCard from "./components/MetricCard.vue";
 import { answerSections } from "./composables/answerSections";
 
@@ -61,8 +60,6 @@ const summary = computed(() => answerSections(props.selected?.ai_summary));
 
             <template #table>
                 <div class="space-y-6 px-4 pb-8 md:px-6">
-                    <FinanceNav active="finance.reviews.index" :filters="{ key: 'month' }" />
-
                     <div v-if="!reviews.length" class="rounded-lg border border-gray-200 bg-white p-6 text-center text-sm text-gray-500" data-testid="no-reviews">
                         No reviews yet. A review of each month is written on the 1st of the next month.
                         <template v-if="lastMonthMissing && hasPermission('finance.reviews.generate')"> You can also write last month's now.</template>

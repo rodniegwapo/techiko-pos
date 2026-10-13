@@ -11,7 +11,6 @@ import RefreshButton from "@/Components/buttons/Refresh.vue";
 import FilterDropdown from "@/Components/filters/FilterDropdown.vue";
 import ActiveFilters from "@/Components/filters/ActiveFilters.vue";
 import SimplePrintTable from "@/Components/Reports/SimplePrintTable.vue";
-import FinanceNav from "@/Pages/Finance/components/FinanceNav.vue";
 import ExplainButton from "@/Pages/Finance/components/ExplainButton.vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useFilters, toLabel } from "@/Composables/useFilters";
@@ -221,7 +220,6 @@ const printColumns = [
             <template #table>
                 <a-spin :spinning="spinning">
                     <div class="space-y-4 px-4 pb-6 md:px-6">
-                        <FinanceNav active="profit-loss.index" :filters="financeFilters" />
                         <div class="text-sm text-gray-600">
                             <strong>{{ periods.current }}</strong> compared with {{ periods.previous }} · {{ storeLabel }}
                         </div>

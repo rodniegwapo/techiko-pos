@@ -13,7 +13,6 @@ import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 import { paymentMethodLabel } from "@/Pages/Expenses/paymentMethods";
-import FinanceNav from "./components/FinanceNav.vue";
 import MetricCard from "./components/MetricCard.vue";
 import PaymentMethodFields from "./components/PaymentMethodFields.vue";
 
@@ -254,7 +253,6 @@ const investmentColumns = [
 
             <template #table>
                 <div class="space-y-6 px-4 pb-8 md:px-6">
-                    <FinanceNav active="finance.balance-items.index" :filters="{ key: 'month' }" />
 
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                         <MetricCard label="Bank & e-wallets" :value="totals.accounts" hint="Latest balances you entered" />

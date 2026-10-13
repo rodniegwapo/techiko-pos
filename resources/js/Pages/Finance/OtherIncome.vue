@@ -15,7 +15,6 @@ import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 import { paymentMethodLabel } from "@/Pages/Expenses/paymentMethods";
 import { useFinanceFilters } from "./composables/useFinanceFilters";
-import FinanceNav from "./components/FinanceNav.vue";
 import FinancePeriod from "./components/FinancePeriod.vue";
 import MetricCard from "./components/MetricCard.vue";
 import PaymentMethodFields from "./components/PaymentMethodFields.vue";
@@ -125,7 +124,6 @@ const columns = [
 
             <template #table>
                 <div class="space-y-6 px-4 pb-8 md:px-6">
-                    <FinanceNav active="finance.other-income.index" :filters="props.filters" />
                     <FinancePeriod :label="periodLabel" />
 
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-3">

@@ -9,7 +9,6 @@ import { useHelpers } from "@/Composables/useHelpers";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 import { useFinanceFilters } from "./composables/useFinanceFilters";
-import FinanceNav from "./components/FinanceNav.vue";
 import FinancePeriod from "./components/FinancePeriod.vue";
 import ExplainButton from "./components/ExplainButton.vue";
 
@@ -69,7 +68,6 @@ const sections = computed(() => [
 
             <template #table>
                 <div class="space-y-6 px-4 pb-8 md:px-6">
-                    <FinanceNav active="finance.balance-sheet" :filters="props.filters" />
                     <FinancePeriod :label="`As of ${asOf}`" note="Whole business" />
 
                     <div class="rounded-lg border border-blue-100 bg-blue-50 p-4 text-gray-800" data-testid="net-worth">

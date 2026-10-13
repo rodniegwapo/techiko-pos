@@ -10,7 +10,6 @@ import ActiveFilters from "@/Components/filters/ActiveFilters.vue";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useFinanceFilters } from "./composables/useFinanceFilters";
-import FinanceNav from "./components/FinanceNav.vue";
 import FinancePeriod from "./components/FinancePeriod.vue";
 import ExplainButton from "./components/ExplainButton.vue";
 import MetricCard from "./components/MetricCard.vue";
@@ -80,7 +79,6 @@ const overdueColumns = [
 
             <template #table>
                 <div class="space-y-6 px-4 pb-8 md:px-6">
-                    <FinanceNav active="finance.receivables" :filters="props.filters" />
                     <FinancePeriod :label="periodLabel" :previous="previousLabel" note="Balances are as of today" />
 
                     <p class="text-gray-800">
