@@ -35,6 +35,7 @@ const asking = ref(false);
 const language = ref("en");
 const remaining = ref(null);
 const list = ref(null);
+const input = ref(null);
 
 onMounted(() => {
     try {
@@ -99,6 +100,8 @@ async function ask(text = message.value) {
         asking.value = false;
         turns.value = [...turns.value];
         scrollDown();
+        // Ready for the next message without clicking back into the box.
+        input.value?.focus();
     }
 }
 
@@ -129,7 +132,8 @@ function clearChat() {
 }
 
 function onKeydown(e) {
-    if (e.key === "Enter" && !e.shiftKey) {
+    // Leave Enter alone while an IME (e.g. Japanese input) is composing a word.
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
         e.preventDefault();
         ask();
     }
@@ -208,18 +212,33 @@ function onKeydown(e) {
         </div>
 
         <div class="shrink-0 border-t border-gray-200 bg-white px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]">
-            <div class="flex gap-2">
+            <!-- Enter sends, Shift+Enter adds a line. The box stays usable while waiting so focus isn't lost. -->
+            <div
+                class="relative rounded-lg border border-gray-300 bg-white transition-colors focus-within:border-blue-500"
+            >
                 <a-textarea
+                    ref="input"
                     v-model:value="message"
-                    :auto-size="{ minRows: 1, maxRows: 4 }"
+                    :auto-size="{ minRows: 3, maxRows: 8 }"
                     :maxlength="1000"
-                    :disabled="asking"
-                    placeholder="e.g. How do I add a product?"
+                    :bordered="false"
+                    class="!resize-none !pr-14 !shadow-none"
+                    placeholder="e.g. How do I add a product? (Enter to send, Shift+Enter for a new line)"
                     data-testid="assistant-input"
                     @keydown="onKeydown"
                 />
-                <a-button type="primary" :loading="asking" :disabled="message.trim().length < 2" aria-label="Send" @click="ask()">
-                    <template #icon><IconSend :size="16" /></template>
+                <a-button
+                    type="primary"
+                    shape="circle"
+                    size="large"
+                    class="!absolute bottom-2 right-2 !flex items-center justify-center !p-0"
+                    :loading="asking"
+                    :disabled="message.trim().length < 2"
+                    aria-label="Send"
+                    data-testid="assistant-send"
+                    @click="ask()"
+                >
+                    <IconSend v-if="!asking" :size="18" class="block" />
                 </a-button>
             </div>
             <p class="mt-2 text-xs text-gray-500">
