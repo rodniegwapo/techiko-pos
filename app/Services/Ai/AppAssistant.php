@@ -75,11 +75,25 @@ PROMPT;
         $tools = (new AssistantTools($this->guides, $user, $domain, $location))->forMessage($message, $currentPage);
         $agent = new AppAssistantAgent($this->instructions($user, $domain, $location, $currentPage), $history, $tools, $this->provider(), $this->model());
 
-        $answer = $this->send(fn () => $agent->prompt($language === 'taglish'
-            ? $message."\n\n(Answer in Taglish, a natural mix of Tagalog and English, keeping button and field names in English.)"
-            : $message)->text);
+        $response = null;
+        $answer = $this->send(function () use ($agent, $message, $language, &$response) {
+            $response = $agent->prompt($language === 'taglish'
+                ? $message."\n\n(Answer in Taglish, a natural mix of Tagalog and English, keeping button and field names in English.)"
+                : $message);
 
-        return ['answer' => $answer, 'links' => $tools->links(), 'pending_actions' => $tools->pendingActions()];
+            return $response->text;
+        });
+
+        return [
+            'answer' => $answer,
+            'links' => $tools->links(),
+            'pending_actions' => $tools->pendingActions(),
+            // Which tools the AI used and with what, for assistant:eval (not sent to the chat).
+            'tools_called' => collect($response?->toolCalls ?? [])
+                ->map(fn ($call) => ['name' => $call->name, 'arguments' => $call->arguments])
+                ->values()
+                ->all(),
+        ];
     }
 
     private function instructions(User $user, Domain $domain, ?InventoryLocation $location, ?string $currentPage): string

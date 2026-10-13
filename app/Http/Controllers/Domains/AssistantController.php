@@ -12,6 +12,7 @@ use App\Services\Ai\Actions\PendingActions;
 use App\Services\Ai\AppAssistant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
@@ -70,7 +71,7 @@ class AssistantController extends Controller
         }
 
         return response()->json([
-            ...$reply,
+            ...Arr::except($reply, ['tools_called']),
             'remaining' => max(0, $limit - $sent - 1),
         ]);
     }

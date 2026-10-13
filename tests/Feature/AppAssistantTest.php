@@ -233,7 +233,7 @@ class AppAssistantTest extends TestCase
 
         $reply = app(AppAssistant::class)->reply('How do I add a product?', [], $ctx['user'], $ctx['domain'], $ctx['location'], 'domains.products.index', 'taglish');
 
-        $this->assertSame(['answer' => '1. Open **Products → Items**.', 'links' => [], 'pending_actions' => []], $reply);
+        $this->assertSame(['answer' => '1. Open **Products → Items**.', 'links' => [], 'pending_actions' => [], 'tools_called' => []], $reply);
         AppAssistantAgent::assertPrompted(fn (AgentPrompt $prompt) => $prompt->contains('How do I add a product?') && $prompt->contains('Taglish'));
     }
 
@@ -245,7 +245,7 @@ class AppAssistantTest extends TestCase
 
         $ask = fn () => $this->actingAs($ctx['user'])->postJson($this->askUrl($ctx['domain']), ['message' => 'How do I add a product?']);
 
-        $ask()->assertOk()->assertJsonPath('answer', 'Here are the steps.')->assertJsonPath('remaining', 1);
+        $ask()->assertOk()->assertJsonPath('answer', 'Here are the steps.')->assertJsonPath('remaining', 1)->assertJsonMissingPath('tools_called');
         $ask()->assertOk()->assertJsonPath('remaining', 0);
         $ask()->assertStatus(429);
     }
