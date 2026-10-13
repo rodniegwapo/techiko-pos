@@ -269,7 +269,7 @@ class FinanceTest extends TestCase
 
     public function test_explain_reports_when_the_assistant_is_not_set_up(): void
     {
-        config(['services.anthropic.key' => '']);
+        config(['services.finance_ai.provider' => 'gemini', 'ai.providers.gemini.key' => '']);
         $ctx = $this->seedDomainContext();
 
         $this->actingAs($ctx['user'])

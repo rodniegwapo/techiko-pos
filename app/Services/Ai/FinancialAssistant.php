@@ -2,25 +2,27 @@
 
 namespace App\Services\Ai;
 
-use Anthropic\Client;
-use Anthropic\Core\Exceptions\APIConnectionException;
-use Anthropic\Core\Exceptions\APIStatusException;
-use Anthropic\Core\Exceptions\RateLimitException;
+use App\Ai\Agents\FinanceExplainer;
+use App\Ai\Agents\FinanceQuestionAgent;
+use Closure;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Laravel\Ai\Exceptions\InsufficientCreditsException;
+use Laravel\Ai\Exceptions\ProviderConnectionException;
+use Laravel\Ai\Exceptions\ProviderOverloadedException;
+use Laravel\Ai\Exceptions\RateLimitedException;
 use RuntimeException;
+use Throwable;
 
 /**
- * Explains a business's figures in plain language with Claude. It is handed numbers that were
- * already worked out (FinancialReportService) and told to use only those, so it explains the
- * books rather than doing the sums.
+ * Explains a business's figures in plain language through laravel/ai (Gemini by default; see
+ * services.finance_ai). It is handed numbers that were already worked out
+ * (FinancialReportService) and told to use only those, so it explains the books rather than
+ * doing the sums.
  */
 class FinancialAssistant
 {
     public const TOPICS = ['overview', 'health', 'income_statement', 'receivables', 'payables', 'cash_flow', 'balance_sheet', 'expenses', 'review', 'metric'];
-
-    /** Steps (tool calls and the answer) a question may take before giving up. */
-    private const MAX_QUESTION_STEPS = 8;
 
     private const QUESTION_PROMPT = <<<'PROMPT'
 You are the financial assistant inside Techiko POS, a point-of-sale system used by small businesses in the Philippines. The owner is asking about their own business. Answer the way a trusted, plain-spoken bookkeeper friend would.
@@ -72,7 +74,7 @@ PROMPT;
 
     public function isConfigured(): bool
     {
-        return (string) config('services.anthropic.key') !== '';
+        return (string) config('ai.providers.'.$this->provider().'.key') !== '';
     }
 
     /**
@@ -82,7 +84,7 @@ PROMPT;
     public function explain(string $topic, array $facts, string $language = 'en', ?string $metricLabel = null): array
     {
         if (! $this->isConfigured()) {
-            throw new RuntimeException('The AI assistant is not set up yet. Add ANTHROPIC_API_KEY to the server settings.');
+            throw new RuntimeException('The AI assistant is not set up yet. Add an AI API key (GEMINI_API_KEY) to the server settings.');
         }
 
         $question = $topic === 'metric'
@@ -99,25 +101,17 @@ PROMPT;
             return ['text' => $cached, 'cached' => true];
         }
 
-        $message = $this->send(fn (Client $client) => $client->messages->create(
-            model: $this->model(),
-            maxTokens: 4000,
-            system: self::SYSTEM_PROMPT,
-            outputConfig: ['effort' => 'low'],
-            messages: [[
-                'role' => 'user',
-                'content' => "<fact_sheet>\n".json_encode($facts, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
-                    ."\n</fact_sheet>\n\n".$question,
-            ]],
-        ));
-        $text = $this->textOf($message);
+        $agent = new FinanceExplainer(self::SYSTEM_PROMPT, $this->provider(), $this->model());
+        $text = $this->send(fn () => $agent->prompt(
+            "<fact_sheet>\n".json_encode($facts, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)."\n</fact_sheet>\n\n".$question,
+        )->text);
         Cache::put($cacheKey, $text, now()->addHours(6));
 
         return ['text' => $text, 'cached' => false];
     }
 
     /**
-     * Answers an owner's own question about the business. Claude calls the finance tools for the
+     * Answers an owner's own question about the business. The AI calls the finance tools for the
      * figures it needs (as many rounds as it takes, within a limit), then answers in plain words.
      *
      * @param  list<array{question: string, answer: string}>  $history  The last few questions and answers, for follow-ups.
@@ -125,100 +119,61 @@ PROMPT;
     public function answer(string $question, array $history, FinanceTools $tools, string $businessName, string $language = 'en'): string
     {
         if (! $this->isConfigured()) {
-            throw new RuntimeException('The AI assistant is not set up yet. Add ANTHROPIC_API_KEY to the server settings.');
+            throw new RuntimeException('The AI assistant is not set up yet. Add an AI API key (GEMINI_API_KEY) to the server settings.');
         }
-
-        $messages = [];
-        foreach (array_slice($history, -4) as $turn) {
-            $messages[] = ['role' => 'user', 'content' => (string) $turn['question']];
-            $messages[] = ['role' => 'assistant', 'content' => (string) $turn['answer']];
-        }
-        $messages[] = ['role' => 'user', 'content' => $language === 'taglish'
-            ? $question."\n\n(Answer in Taglish, a natural mix of Tagalog and English.)"
-            : $question];
 
         $system = self::QUESTION_PROMPT."\n\nBusiness: ".$businessName.'. Today is '.today()->format('l, F j, Y').' ('.today()->toDateString().').';
+        $agent = new FinanceQuestionAgent($system, $history, $tools, $this->provider(), $this->questionModel());
 
-        for ($step = 0; $step < self::MAX_QUESTION_STEPS; $step++) {
-            $response = $this->send(fn (Client $client) => $client->messages->create(
-                model: $this->questionModel(),
-                maxTokens: 8000,
-                system: $system,
-                tools: $tools->definitions(),
-                outputConfig: ['effort' => 'low'],
-                messages: $messages,
-            ));
-
-            if ($response->stopReason !== 'tool_use') {
-                return $this->textOf($response);
-            }
-
-            $results = [];
-            foreach ($response->content as $block) {
-                if ($block->type === 'tool_use') {
-                    $results[] = [
-                        'type' => 'tool_result',
-                        'toolUseID' => $block->id,
-                        'content' => $tools->run($block->name, (array) $block->input),
-                    ];
-                }
-            }
-            // The assistant turn goes back unchanged (thinking blocks included), then the results.
-            $messages[] = ['role' => 'assistant', 'content' => $response->content];
-            $messages[] = ['role' => 'user', 'content' => $results];
-        }
-
-        throw new RuntimeException('That question needed too many steps to answer. Try asking something more specific.');
+        return $this->send(fn () => $agent->prompt($language === 'taglish'
+            ? $question."\n\n(Answer in Taglish, a natural mix of Tagalog and English.)"
+            : $question)->text);
     }
 
-    /** Runs one API call, turning API failures into messages an owner can act on. */
-    private function send(callable $call): object
+    /**
+     * Runs one prompt (tool calls included) and returns its text, turning API failures into
+     * messages an owner can act on.
+     *
+     * @param  Closure(): ?string  $call
+     */
+    private function send(Closure $call): string
     {
-        $client = new Client(apiKey: (string) config('services.anthropic.key'));
-
         try {
-            $message = $call($client);
-        } catch (RateLimitException $e) {
+            $text = trim((string) $call());
+        } catch (RateLimitedException|ProviderOverloadedException $e) {
             throw new RuntimeException('The AI assistant is busy right now. Please try again in a minute.', 0, $e);
-        } catch (APIStatusException $e) {
-            Log::warning('Financial assistant request failed', ['type' => $e->type?->value, 'message' => $e->getMessage()]);
-            throw new RuntimeException('The AI assistant could not answer right now. Please try again later.', 0, $e);
-        } catch (APIConnectionException $e) {
+        } catch (ProviderConnectionException $e) {
             Log::warning('Financial assistant could not reach the API', ['message' => $e->getMessage()]);
             throw new RuntimeException('Could not reach the AI assistant. Check the internet connection and try again.', 0, $e);
+        } catch (InsufficientCreditsException $e) {
+            Log::warning('Financial assistant has no API credit left', ['message' => $e->getMessage()]);
+            throw new RuntimeException('The AI assistant could not answer right now. Please try again later.', 0, $e);
+        } catch (Throwable $e) {
+            Log::warning('Financial assistant request failed', ['exception' => $e::class, 'message' => $e->getMessage()]);
+            throw new RuntimeException('The AI assistant could not answer right now. Please try again later.', 0, $e);
         }
 
-        if ($message->stopReason === 'refusal') {
-            throw new RuntimeException('The AI assistant could not answer this one. The figures on the page are still accurate.');
+        // An empty answer also covers one the provider blocked, or a question that ran out of steps.
+        if ($text === '') {
+            throw new RuntimeException('The AI assistant could not answer this one. Try asking something more specific; the figures on the page are still accurate.');
         }
 
-        return $message;
+        return $text;
     }
 
-    private function textOf(object $message): string
+    private function provider(): string
     {
-        $text = '';
-        foreach ($message->content as $block) {
-            if ($block->type === 'text') {
-                $text .= $block->text;
-            }
-        }
-
-        if (trim($text) === '') {
-            throw new RuntimeException('The AI assistant returned an empty answer. Please try again.');
-        }
-
-        return trim($text);
+        return (string) config('services.finance_ai.provider', 'gemini');
     }
 
     private function model(): string
     {
-        return (string) config('services.anthropic.model', 'claude-haiku-5-5');
+        return (string) config('services.finance_ai.model', 'gemini-3.8-flash');
     }
 
-    /** Questions need judgment about which figures to fetch, so they use a stronger model. */
+    /** Questions need judgment about which figures to fetch, so they may use a stronger model. */
     private function questionModel(): string
     {
-        return (string) config('services.anthropic.question_model', 'claude-sonnet-5-5');
+        return (string) config('services.finance_ai.question_model', 'gemini-3.8-flash');
     }
 }

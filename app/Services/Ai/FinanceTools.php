@@ -2,16 +2,19 @@
 
 namespace App\Services\Ai;
 
+use App\Ai\Tools\FinanceTool;
 use App\Services\Finance\FinancialInsightService;
 use App\Services\Finance\FinancialReportService;
 use App\Services\Finance\FinancialSnapshotService;
 use Carbon\Carbon;
+use Closure;
+use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Support\Arr;
 use Throwable;
 
 /**
- * The tools Claude can call to answer an owner's question. Every figure comes from
- * FinancialReportService, always for this business (and store, when one is chosen); Claude only
+ * The tools the AI can call to answer an owner's question. Every figure comes from
+ * FinancialReportService, always for this business (and store, when one is chosen); the AI only
  * picks which figures it needs and words the answer. Customer names are left out.
  */
 class FinanceTools
@@ -23,50 +26,29 @@ class FinanceTools
         private readonly ?int $locationId,
     ) {}
 
-    /** @return list<array<string, mixed>> Tool definitions in the SDK's shape. */
-    public function definitions(): array
+    /** @return list<FinanceTool> The tools in laravel/ai's shape, each answered by run(). */
+    public function tools(): array
     {
-        $range = [
-            'start_date' => ['type' => 'string', 'description' => 'First day, YYYY-MM-DD'],
-            'end_date' => ['type' => 'string', 'description' => 'Last day, YYYY-MM-DD'],
-        ];
-        $rangeTool = fn (string $name, string $description) => [
-            'name' => $name,
-            'description' => $description,
-            'inputSchema' => ['type' => 'object', 'properties' => $range, 'required' => ['start_date', 'end_date']],
-        ];
-        $noInput = fn (string $name, string $description) => [
-            'name' => $name,
-            'description' => $description,
-            'inputSchema' => ['type' => 'object', 'properties' => new \stdClass],
-        ];
+        $tool = fn (string $name, string $description, Closure $schema) => new FinanceTool($this, $name, $description, $schema);
+        $rangeTool = fn (string $name, string $description) => $tool($name, $description, fn (JsonSchema $schema) => [
+            'start_date' => $schema->string()->description('First day, YYYY-MM-DD')->required(),
+            'end_date' => $schema->string()->description('Last day, YYYY-MM-DD')->required(),
+        ]);
+        $noInput = fn (string $name, string $description) => $tool($name, $description, fn () => []);
+        $monthsTool = fn (string $name, string $description) => $tool($name, $description, fn (JsonSchema $schema) => [
+            'months' => $schema->integer()->description('How many months back, 1 to 24')->required(),
+        ]);
 
         return [
             $rangeTool('get_income_statement', 'Sales, cost of goods sold, gross profit, operating expenses, other income and expenses and net profit for a date range, with the same figures for the equally long period just before it and how each changed.'),
-            [
-                'name' => 'get_monthly_trend',
-                'description' => 'Revenue, gross profit, operating expenses and net profit for each of the last N months, oldest first. Use for "which month was best", trends and comparisons across months.',
-                'inputSchema' => [
-                    'type' => 'object',
-                    'properties' => ['months' => ['type' => 'integer', 'description' => 'How many months back, 1 to 24']],
-                    'required' => ['months'],
-                ],
-            ],
+            $monthsTool('get_monthly_trend', 'Revenue, gross profit, operating expenses and net profit for each of the last N months, oldest first. Use for "which month was best", trends and comparisons across months.'),
             $rangeTool('get_expenses', 'Expenses by category for a date range and for the equally long period before it.'),
             $rangeTool('get_cash_flow', 'Money in and out for a date range: customer payments, collections, other income, loans, owner investments, stock bought, expenses paid, loan repayments, equipment bought, owner withdrawals, the net change, and why it differs from net profit.'),
             $rangeTool('get_products', 'Best-selling products with their profit margins, the lowest-margin products for a date range, and slow-moving stock (as of today).'),
             $noInput('get_customer_credit', 'What customers owe today: total, overdue, how late, due soon, the largest balances (customers are anonymised as Customer A, B…), and credit given and collected this month.'),
             $noInput('get_supplier_bills', 'What the business owes suppliers today: total, overdue, due within 7 days, upcoming and overdue bills, largest supplier balances, recent payments.'),
             $noInput('get_balance_sheet', 'What the business owns and owes today (cash, bank, e-wallets, inventory, customer credit, equipment; supplier bills, loans, other amounts owed) and the owner\'s share, including accumulated profit.'),
-            [
-                'name' => 'get_balance_history',
-                'description' => 'How balances stood at the end of each of the last N months (the last daily snapshot of each month): cash in drawers, bank and e-wallet balances, inventory value, what customers owed (and how much was overdue), supplier bills, loans, net worth. Use for "why is my inventory value increasing", "why do customers owe me more", "why is my cash low". History only exists from when snapshots started.',
-                'inputSchema' => [
-                    'type' => 'object',
-                    'properties' => ['months' => ['type' => 'integer', 'description' => 'How many months back, 1 to 24']],
-                    'required' => ['months'],
-                ],
-            ],
+            $monthsTool('get_balance_history', 'How balances stood at the end of each of the last N months (the last daily snapshot of each month): cash in drawers, bank and e-wallet balances, inventory value, what customers owed (and how much was overdue), supplier bills, loans, net worth. Use for "why is my inventory value increasing", "why do customers owe me more", "why is my cash low". History only exists from when snapshots started.'),
             $rangeTool('get_business_health', 'The business health check (sales, profit, money received, inventory, customer credit, supplier bills, expenses) and suggested actions for a date range compared with the period before it.'),
         ];
     }

@@ -10,6 +10,7 @@ use App\Models\Finance\Supplier;
 use App\Models\Finance\SupplierBill;
 use App\Models\Finance\SupplierPayment;
 use App\Models\InventoryLocation;
+use App\Services\Ai\FinancialAssistant;
 use App\Services\Finance\CashRegisterPosting;
 use App\Services\Finance\FinancialReportService;
 use Carbon\Carbon;
@@ -91,7 +92,7 @@ class PayablesController extends Controller
             'locations' => InventoryLocation::query()->forDomain($slug)->active()->orderBy('name')->get(['id', 'name']),
             'paymentMethods' => Expense::PAYMENT_METHODS,
             'defaultLocationId' => $request->user()->location_id,
-            'aiEnabled' => (string) config('services.anthropic.key') !== '',
+            'aiEnabled' => app(FinancialAssistant::class)->isConfigured(),
             'domainName' => $domain->name,
         ]);
     }

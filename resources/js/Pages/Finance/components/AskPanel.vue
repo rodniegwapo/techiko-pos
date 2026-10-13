@@ -72,7 +72,7 @@ async function ask(text = question.value) {
         </div>
 
         <a-alert v-if="!aiEnabled" type="info" show-icon
-            message="The AI assistant is not set up yet. Ask your administrator to add an Anthropic API key." />
+            message="The AI assistant is not set up yet. Ask your administrator to add an AI API key." />
 
         <template v-else>
             <div v-if="turns.length" ref="list" class="max-h-96 space-y-4 overflow-y-auto pr-1" data-testid="ask-turns">

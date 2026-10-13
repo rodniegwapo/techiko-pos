@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Ai\Agents\FinanceExplainer;
+use App\Ai\Agents\FinanceQuestionAgent;
 use App\Http\Middleware\RoleBasedAccessControl;
 use App\Http\Middleware\UserPermissionCheckMiddleware;
 use App\Models\Category;
@@ -31,6 +33,7 @@ use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
+use Laravel\Ai\Prompts\AgentPrompt;
 use Tests\TestCase;
 
 /**
@@ -311,7 +314,10 @@ class FinancePhase3Test extends TestCase
         ]);
 
         $tools = new FinanceTools(app(FinancialReportService::class), app(FinancialInsightService::class), $ctx['domain']->name_slug, null);
-        $this->assertCount(10, $tools->definitions());
+        $this->assertSame(
+            ['get_income_statement', 'get_monthly_trend', 'get_expenses', 'get_cash_flow', 'get_products', 'get_customer_credit', 'get_supplier_bills', 'get_balance_sheet', 'get_balance_history', 'get_business_health'],
+            array_map(fn ($tool) => $tool->name(), $tools->tools()),
+        );
 
         $statement = json_decode($tools->run('get_income_statement', ['start_date' => today()->toDateString(), 'end_date' => today()->toDateString()]), true);
         $this->assertEquals(400, $statement['current']['revenue']);
@@ -329,7 +335,7 @@ class FinancePhase3Test extends TestCase
 
     public function test_questions_go_to_the_assistant_within_the_daily_limit(): void
     {
-        config(['services.anthropic.daily_question_limit' => 2]);
+        config(['services.finance_ai.daily_question_limit' => 2]);
         $ctx = $this->seedDomainContext();
 
         $this->mock(FinancialAssistant::class, function ($mock) {
@@ -345,6 +351,44 @@ class FinancePhase3Test extends TestCase
         $ask()->assertOk()->assertJsonPath('answer', 'You made ₱100 gross profit today.')->assertJsonPath('remaining', 1);
         $ask()->assertOk()->assertJsonPath('remaining', 0);
         $ask()->assertStatus(429);
+    }
+
+    public function test_assistant_explains_through_the_configured_provider_and_caches_the_answer(): void
+    {
+        config(['services.finance_ai.provider' => 'gemini', 'ai.providers.gemini.key' => 'test-key']);
+        FinanceExplainer::fake(['Your sales went up.'])->preventStrayPrompts();
+
+        $assistant = app(FinancialAssistant::class);
+        $facts = ['current' => ['revenue' => 12345]];
+
+        $this->assertSame(['text' => 'Your sales went up.', 'cached' => false], $assistant->explain('overview', $facts, 'taglish'));
+        $this->assertSame(['text' => 'Your sales went up.', 'cached' => true], $assistant->explain('overview', $facts, 'taglish'));
+
+        FinanceExplainer::assertPrompted(fn (AgentPrompt $prompt) => $prompt->contains('"revenue": 12345') && $prompt->contains('Taglish'));
+    }
+
+    public function test_assistant_answers_questions_with_the_finance_tools(): void
+    {
+        config(['services.finance_ai.provider' => 'gemini', 'ai.providers.gemini.key' => 'test-key']);
+        FinanceQuestionAgent::fake(['You made ₱100 gross profit today.'])->preventStrayPrompts();
+        $ctx = $this->seedDomainContext();
+        $tools = new FinanceTools(app(FinancialReportService::class), app(FinancialInsightService::class), $ctx['domain']->name_slug, null);
+
+        $answer = app(FinancialAssistant::class)->answer('How much profit did I make?', [], $tools, 'Test Shop');
+
+        $this->assertSame('You made ₱100 gross profit today.', $answer);
+        FinanceQuestionAgent::assertPrompted('How much profit did I make?');
+    }
+
+    public function test_assistant_reports_an_empty_answer_plainly(): void
+    {
+        config(['services.finance_ai.provider' => 'gemini', 'ai.providers.gemini.key' => 'test-key']);
+        FinanceExplainer::fake(['']);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('could not answer this one');
+
+        app(FinancialAssistant::class)->explain('overview', ['current' => ['revenue' => 1]]);
     }
 
     public function test_monthly_review_compares_the_month_with_the_one_before(): void

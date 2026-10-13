@@ -64,7 +64,7 @@ class FinanceController extends Controller
     }
 
     /**
-     * "Ask about your business": Claude answers from the business's own figures, fetched through
+     * "Ask about your business": the AI answers from the business's own figures, fetched through
      * FinanceTools. Limited per business per day to keep API costs predictable.
      */
     public function ask(Request $request, Domain $domain): JsonResponse
@@ -79,10 +79,10 @@ class FinanceController extends Controller
         ]);
 
         if (! $this->assistant->isConfigured()) {
-            return response()->json(['message' => 'The AI assistant is not set up yet. Ask your administrator to add an Anthropic API key.'], 503);
+            return response()->json(['message' => 'The AI assistant is not set up yet. Ask your administrator to add an AI API key.'], 503);
         }
 
-        $limit = (int) config('services.anthropic.daily_question_limit', 30);
+        $limit = (int) config('services.finance_ai.daily_question_limit', 30);
         $counter = 'finance-ai-questions:'.$domain->name_slug.':'.today()->toDateString();
         $asked = (int) Cache::get($counter, 0);
         if ($asked >= $limit) {
@@ -198,7 +198,7 @@ class FinanceController extends Controller
         ]);
 
         if (! $this->assistant->isConfigured()) {
-            return response()->json(['message' => 'The AI assistant is not set up yet. Ask your administrator to add an Anthropic API key.'], 503);
+            return response()->json(['message' => 'The AI assistant is not set up yet. Ask your administrator to add an AI API key.'], 503);
         }
 
         [$period, $locationId] = $this->resolveFilters($request, $domain);
