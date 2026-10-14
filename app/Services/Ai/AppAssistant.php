@@ -79,9 +79,9 @@ PROMPT;
 
         $response = null;
         $answer = $this->send(function () use ($agent, $message, $language, &$response) {
-            $response = $agent->prompt($language === 'taglish'
+            $response = $this->remember($agent->prompt($language === 'taglish'
                 ? $message."\n\n(Answer in Taglish, a natural mix of Tagalog and English, keeping button and field names in English.)"
-                : $message);
+                : $message));
 
             return $response->text;
         });

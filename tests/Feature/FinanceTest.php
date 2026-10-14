@@ -245,6 +245,7 @@ class FinanceTest extends TestCase
                     return true;
                 })
                 ->andReturn(['text' => 'Your sales went up.', 'cached' => false]);
+            $mock->shouldReceive('lastResponse')->andReturn(null);
         });
 
         $this->actingAs($ctx['user'])

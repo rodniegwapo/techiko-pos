@@ -18,6 +18,11 @@ const props = defineProps({
         type: Object,
         required: true,
     },
+    /** Plan & AI credits (super admins only, otherwise null). */
+    billing: {
+        type: Object,
+        default: null,
+    },
 });
 
 const page = usePage();
@@ -72,6 +77,55 @@ const saveFeatures = () => {
             },
             onError: () => notification.error({ message: "Couldn't save the features" }),
             onFinish: () => (features.saving = false),
+        },
+    );
+};
+
+/*** === PLAN & AI CREDITS (super admins; the cost is never shown to the organization) === ***/
+const savedPlan = () => ({
+    service_tier_id: props.billing?.service_tier_id ?? null,
+    ai_monthly_credits_override: props.billing?.ai_monthly_credits_override ?? null,
+});
+
+const plan = reactive({ ...savedPlan(), saving: false });
+
+const planChanged = computed(() => {
+    const saved = savedPlan();
+    return saved.service_tier_id !== plan.service_tier_id || saved.ai_monthly_credits_override !== plan.ai_monthly_credits_override;
+});
+
+const planOptions = computed(() => [
+    { value: null, label: `Free starter · ${props.billing?.free_credits ?? 0} AI credits` },
+    ...(props.billing?.tiers ?? []).map((tier) => ({
+        value: tier.id,
+        label: `${tier.name} · ₱${Number(tier.amount).toLocaleString("en-PH", { minimumFractionDigits: 2 })} · ${
+            tier.ai_monthly_credits == null ? "unlimited" : tier.ai_monthly_credits.toLocaleString()
+        } AI credits`,
+    })),
+]);
+
+/** What the chosen plan includes, shown as the override's placeholder. */
+const planCreditsPlaceholder = computed(() => {
+    if (plan.service_tier_id === null) return `Plan default: ${props.billing?.free_credits ?? 0}`;
+    const tier = (props.billing?.tiers ?? []).find((t) => t.id === plan.service_tier_id);
+    return tier?.ai_monthly_credits == null ? "Plan default: unlimited" : `Plan default: ${tier.ai_monthly_credits.toLocaleString()}`;
+});
+
+const aiCost = computed(() => `$${Number(props.billing?.ai_cost_this_month_usd ?? 0).toFixed(2)}`);
+
+const savePlan = () => {
+    plan.saving = true;
+    router.patch(
+        route("domains.subscription.update", { domain: domain.value.name_slug }),
+        { service_tier_id: plan.service_tier_id, ai_monthly_credits_override: plan.ai_monthly_credits_override },
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                Object.assign(plan, savedPlan());
+                notification.success({ message: "Plan updated" });
+            },
+            onError: () => notification.error({ message: "Couldn't save the plan" }),
+            onFinish: () => (plan.saving = false),
         },
     );
 };
@@ -232,6 +286,86 @@ const handleBack = () => {
                             @click="saveFeatures"
                         >
                             Save features
+                        </a-button>
+                    </section>
+
+                    <!-- Plan & AI credits (super admins; the AI cost stays here, never shown to the organization) -->
+                    <section
+                        v-if="isSuperUser && billing"
+                        class="rounded-lg bg-white p-6"
+                        data-testid="domain-plan"
+                    >
+                        <h2 class="mb-1 text-lg font-semibold text-gray-900">Plan &amp; AI credits</h2>
+                        <p class="mb-4 text-sm text-gray-500">
+                            The plan sets the monthly AI credits. Custom credits replace the plan's for this organization.
+                        </p>
+
+                        <label class="mb-1 block text-sm font-medium text-gray-700">Plan</label>
+                        <a-select
+                            v-model:value="plan.service_tier_id"
+                            :options="planOptions"
+                            class="w-full"
+                            data-testid="plan-select"
+                        />
+                        <p v-if="billing.subscription_started_at" class="mt-1 text-xs text-gray-500">
+                            On this plan since {{ billing.subscription_started_at }}
+                        </p>
+
+                        <label class="mb-1 mt-4 block text-sm font-medium text-gray-700">Custom monthly AI credits</label>
+                        <a-input-number
+                            v-model:value="plan.ai_monthly_credits_override"
+                            :min="0"
+                            :max="1000000"
+                            :precision="0"
+                            class="!w-full"
+                            :placeholder="planCreditsPlaceholder"
+                            data-testid="plan-credits-override"
+                        />
+                        <p class="mt-1 text-xs text-gray-500">Leave blank to follow the plan.</p>
+
+                        <div class="mt-4 rounded-md bg-gray-50 p-3 text-sm">
+                            <p>
+                                This month:
+                                <strong class="tabular-nums">{{ billing.ai_credits.used.toLocaleString() }}</strong>
+                                <template v-if="!billing.ai_credits.unlimited">
+                                    / {{ billing.ai_credits.allowance.toLocaleString() }}
+                                </template>
+                                credits used
+                                <a-tag v-if="billing.ai_credits.source === 'override'" color="blue" class="ml-1">Custom</a-tag>
+                            </p>
+                            <a-progress
+                                v-if="!billing.ai_credits.unlimited"
+                                :percent="billing.ai_credits.percent"
+                                :status="billing.ai_credits.remaining === 0 ? 'exception' : 'normal'"
+                                :show-info="false"
+                                class="!mb-0"
+                            />
+                            <p class="mt-1 text-gray-600">
+                                Estimated AI cost: <strong class="tabular-nums">{{ aiCost }}</strong>
+                                <span class="text-xs text-gray-400">(only super admins see this)</span>
+                            </p>
+                            <a v-if="features.ai" :href="billing.ai_usage_url" class="mt-1 inline-block text-xs font-medium text-blue-600 hover:underline">
+                                View AI usage →
+                            </a>
+                        </div>
+
+                        <a-alert
+                            v-if="!features.ai && !features.finance"
+                            class="mt-3"
+                            type="info"
+                            show-icon
+                            message="AI is off for this organization (neither Finance nor the AI assistant is on), so no credits will be used."
+                        />
+
+                        <a-button
+                            type="primary"
+                            class="mt-5 w-full"
+                            :loading="plan.saving"
+                            :disabled="!planChanged"
+                            data-testid="save-plan"
+                            @click="savePlan"
+                        >
+                            Save plan
                         </a-button>
                     </section>
 

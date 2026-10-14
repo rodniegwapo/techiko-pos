@@ -123,4 +123,13 @@ class DomainSubscriptionService
             'subscription_started_at' => now(),
         ]);
     }
+
+    /** Puts an organization back on the free plan. */
+    public function clearServicingTier(Domain $domain): void
+    {
+        $domain->update([
+            'current_service_tier_id' => null,
+            'subscription_started_at' => null,
+        ]);
+    }
 }

@@ -28,6 +28,7 @@ class Domain extends Model
         'settings' => 'array',
         'is_active' => 'boolean',
         'subscription_started_at' => 'datetime',
+        'ai_monthly_credits_override' => 'integer',
     ];
 
     protected $attributes = [

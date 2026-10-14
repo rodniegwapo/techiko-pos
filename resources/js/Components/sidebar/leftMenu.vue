@@ -21,6 +21,7 @@ import {
     IconSettings,
     IconMessages,
     IconMail,
+    IconSparkles,
 } from "@tabler/icons-vue";
 import { router, usePage } from "@inertiajs/vue3";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
@@ -400,6 +401,15 @@ const menuItems = [
         routeName: "billing.servicing.index",
         path: "/billing/servicing",
         domainOnly: true,
+    },
+    {
+        key: "ai-usage",
+        title: "AI usage",
+        icon: IconSparkles,
+        routeName: "ai-usage.index",
+        path: "/ai-usage",
+        domainOnly: true,
+        feature: "ai",
     },
     {
         key: "roles",

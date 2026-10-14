@@ -180,6 +180,10 @@ Route::middleware(['auth', 'verified', 'user.permission'])->prefix('domains')->n
     Route::patch('/{domain}/features', [DomainController::class, 'updateFeatures'])
         ->middleware('check.super.user')
         ->name('features.update');
+    // Its plan and monthly AI credits; super admins only.
+    Route::patch('/{domain}/subscription', [DomainController::class, 'updateSubscription'])
+        ->middleware('check.super.user')
+        ->name('subscription.update');
 });
 
 // Global routes (not domain-specific)

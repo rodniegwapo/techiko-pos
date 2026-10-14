@@ -55,4 +55,5 @@ return [
     ['route' => 'users.index', 'path' => 'Users', 'about' => 'staff accounts: add users, roles, assigned store, supervisors and PINs'],
     ['route' => 'settings.index', 'path' => 'Settings', 'about' => 'sales settings: VAT on/off, VAT rate and pricing mode, selling when out of stock, hiding out-of-stock products'],
     ['route' => 'billing.servicing.index', 'path' => 'Servicing payment', 'about' => 'the Techiko plan and paying for it (GCash / QR Ph); the free plan allows a limited number of products'],
+    ['route' => 'ai-usage.index', 'path' => 'AI usage', 'about' => "this month's AI credits: the plan's allowance, credits used and left, when they reset, and usage by day, feature and user"],
 ];

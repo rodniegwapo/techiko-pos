@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Domains\AiUsageController;
 use App\Http\Controllers\Domains\AssistantController;
 use App\Http\Controllers\Domains\CategoryController;
 use App\Http\Controllers\Domains\CreditController;
@@ -55,6 +56,9 @@ Route::prefix('domains/{domain:name_slug}')
             Route::post('/actions/{token}/confirm', [AssistantController::class, 'confirm'])->where('token', '[A-Za-z0-9]{40}')->name('actions.confirm');
             Route::post('/actions/{token}/cancel', [AssistantController::class, 'cancel'])->where('token', '[A-Za-z0-9]{40}')->name('actions.cancel');
         });
+
+        // The organization's plan and this month's AI credits (credits only, no costs).
+        Route::get('/ai-usage', [AiUsageController::class, 'index'])->middleware('domain.feature:ai')->name('ai-usage.index');
 
         Route::get('/billing/gcash', function (Request $request) {
             $domain = $request->route('domain');

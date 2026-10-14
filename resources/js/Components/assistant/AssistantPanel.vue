@@ -35,6 +35,7 @@ const turns = ref([]); // { question, answer, links, actions, forms, error }
 const asking = ref(false);
 const language = ref("en");
 const remaining = ref(null);
+const creditsLeft = ref(null); // the organization's AI credits left this month (null = unlimited or not known yet)
 const list = ref(null);
 const input = ref(null);
 
@@ -80,7 +81,7 @@ async function ask(text = message.value) {
         .filter((t) => t.answer)
         .slice(-6)
         .map((t) => ({ question: t.question, answer: withOutcomes(t) }));
-    const turn = { question: q, answer: null, links: [], actions: [], forms: [], error: null };
+    const turn = { question: q, answer: null, links: [], actions: [], forms: [], error: null, billingUrl: null };
     turns.value.push(turn);
     scrollDown();
     try {
@@ -96,8 +97,14 @@ async function ask(text = message.value) {
         turn.actions = data.pending_actions || [];
         turn.forms = data.forms || [];
         remaining.value = data.remaining;
+        creditsLeft.value = data.credits_remaining ?? null;
     } catch (e) {
         turn.error = e?.response?.data?.message || "Could not get an answer right now. Please try again.";
+        // Out of the organization's monthly AI credits: offer the Billing page.
+        if (e?.response?.status === 402 && e.response.data?.billing_url) {
+            turn.billingUrl = e.response.data.billing_url;
+            creditsLeft.value = 0;
+        }
     } finally {
         asking.value = false;
         turns.value = [...turns.value];
@@ -187,7 +194,12 @@ function onKeydown(e) {
                 <div class="ml-auto w-fit max-w-[85%] whitespace-pre-wrap break-words rounded-lg bg-green-100 px-3 py-2 text-sm text-gray-800">{{ turn.question }}</div>
                 <div class="w-fit max-w-[95%] rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-800" data-testid="assistant-answer">
                     <a-skeleton v-if="!turn.answer && !turn.error" active :paragraph="{ rows: 2 }" :title="false" />
-                    <p v-else-if="turn.error" class="text-red-600">{{ turn.error }}</p>
+                    <template v-else-if="turn.error">
+                        <p class="text-red-600">{{ turn.error }}</p>
+                        <a-button v-if="turn.billingUrl" class="mt-2" size="small" type="primary" ghost @click="openLink({ url: turn.billingUrl })">
+                            <span class="inline-flex items-center gap-1">Go to Billing <IconExternalLink :size="14" /></span>
+                        </a-button>
+                    </template>
                     <template v-else>
                         <template v-for="(block, j) in answerBlocks(turn.answer)" :key="j">
                             <component
@@ -259,6 +271,7 @@ function onKeydown(e) {
                 AI answers can be wrong.
                 <a-button type="link" size="small" class="!h-auto !p-0 !text-xs" @click="emit('ask-human')">Ask a person instead</a-button>
                 <span v-if="remaining !== null"> · {{ remaining }} messages left today</span>
+                <span v-if="creditsLeft !== null"> · {{ creditsLeft.toLocaleString() }} AI credits left this month</span>
             </p>
         </div>
     </div>

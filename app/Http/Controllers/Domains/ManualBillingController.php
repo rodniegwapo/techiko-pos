@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Domain;
 use App\Models\ManualPaymentRequest;
 use App\Models\ServiceTier;
+use App\Services\Ai\AiCreditService;
 use App\Services\DomainSubscriptionService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -14,7 +15,8 @@ use Inertia\Inertia;
 class ManualBillingController extends Controller
 {
     public function __construct(
-        private DomainSubscriptionService $subscriptionService
+        private DomainSubscriptionService $subscriptionService,
+        private AiCreditService $aiCredits,
     ) {}
 
     public function index(Request $request, Domain $domain)
@@ -43,6 +45,10 @@ class ManualBillingController extends Controller
             'currencySymbol' => config('manual_billing.currency_symbol'),
             'currentDomain' => $domain->only(['id', 'name', 'name_slug']),
             'subscription' => $this->subscriptionService->subscriptionPropsForFrontend($domain),
+            'aiCredits' => $domain->hasFeature('ai') ? $this->aiCredits->propsForFrontend($domain) : null,
+            'aiUsageUrl' => $domain->hasFeature('ai') && $request->user()?->hasPermissionToRoute('ai-usage.index')
+                ? route('domains.ai-usage.index', ['domain' => $domain->name_slug])
+                : null,
             'showManualGcash' => (bool) config('manual_billing.show_manual_gcash_section'),
             'freeTier' => [
                 'marketing_features' => config('manual_billing.free_tier_marketing_bullets', []),

@@ -124,7 +124,11 @@ class FeaturePermissionSeedersTest extends TestCase
         $this->seed(AssistantPermissionSeeder::class);
 
         foreach ($roles as $role) {
-            $this->assertSame($this->sorted(AssistantPermissionSeeder::ROUTES), $this->routesOf($role), $role->name);
+            // The AI usage page only for the roles that see billing.
+            $expected = in_array($role->name, AssistantPermissionSeeder::USAGE_ROLES, true)
+                ? AssistantPermissionSeeder::ROUTES
+                : array_diff(AssistantPermissionSeeder::ROUTES, AssistantPermissionSeeder::USAGE_ROUTES);
+            $this->assertSame($this->sorted(array_values($expected)), $this->routesOf($role), $role->name);
         }
         $this->assertSame(
             DB::table('permission_modules')->where('name', 'assistant')->value('id'),

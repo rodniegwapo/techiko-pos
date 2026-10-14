@@ -1,11 +1,12 @@
 <script setup>
 import { computed, watch } from "vue";
-import { Head, useForm, usePage } from "@inertiajs/vue3";
+import { Head, Link, useForm, usePage } from "@inertiajs/vue3";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
 import ContentLayout from "@/Components/ContentLayout.vue";
 import ManualGcashDesktopQrAside from "@/Pages/Billing/ManualGcashDesktopQrAside.vue";
 import ManualGcashPayment from "@/Pages/Billing/ManualGcashPayment.vue";
+import AiCreditsMeter from "@/Components/ai/AiCreditsMeter.vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { message } from "ant-design-vue";
 import { IconCheck } from "@tabler/icons-vue";
@@ -27,7 +28,23 @@ const props = defineProps({
         type: Object,
         default: null,
     },
+    /** This month's AI credits (null when the organization doesn't have the AI feature). */
+    aiCredits: {
+        type: Object,
+        default: null,
+    },
+    /** The AI usage page, when this user may open it. */
+    aiUsageUrl: {
+        type: String,
+        default: null,
+    },
 });
+
+function aiCreditsLabel(credits) {
+    return credits == null
+        ? "Unlimited AI credits"
+        : `${Number(credits).toLocaleString()} AI credits / month`;
+}
 
 const page = usePage();
 const { getRoute } = useDomainRoutes();
@@ -46,6 +63,7 @@ const selectedTier = computed(() =>
 );
 
 const qrSrc = computed(() => {
+    const p = props.gcashQrUrl || "";
     if (p.startsWith("http")) {
         return p;
     }
@@ -203,6 +221,9 @@ function tierLimitsLabel(tier) {
     } else {
         parts.push("Unlimited users");
     }
+    if (props.aiCredits) {
+        parts.push(aiCreditsLabel(tier.ai_monthly_credits));
+    }
     return parts.join(" · ");
 }
 
@@ -346,6 +367,24 @@ const referenceHelp = computed(() => {
                     </div>
 
                     <div
+                        v-if="aiCredits"
+                        class="rounded-lg border border-gray-200 bg-white px-5 py-4 shadow-sm text-sm text-gray-800"
+                    >
+                        <AiCreditsMeter
+                            :credits="aiCredits"
+                            upgrade-hint="Upgrade your plan below, or wait for the reset."
+                        >
+                            <Link
+                                v-if="aiUsageUrl"
+                                :href="aiUsageUrl"
+                                class="mt-2 inline-block text-xs font-medium text-blue-600 hover:underline"
+                            >
+                                See AI usage details →
+                            </Link>
+                        </AiCreditsMeter>
+                    </div>
+
+                    <div
                         class="grid grid-cols-1 items-start gap-10"
                         :class="{ 'lg:grid-cols-2 lg:gap-10': showManualGcash }"
                     >
@@ -432,6 +471,14 @@ const referenceHelp = computed(() => {
                                                     products
                                                 </template>
                                                 · utang/wallet basics
+                                                <template v-if="aiCredits">
+                                                    ·
+                                                    {{
+                                                        aiCreditsLabel(
+                                                            aiCredits.free_allowance,
+                                                        )
+                                                    }}
+                                                </template>
                                             </p>
                                         </div>
                                         <ul

@@ -9,6 +9,7 @@ use App\Models\InventoryLocation;
 use App\Services\Ai\Actions\ActionContext;
 use App\Services\Ai\Actions\ActionRegistry;
 use App\Services\Ai\Actions\PendingActions;
+use App\Services\Ai\AiCreditService;
 use App\Services\Ai\AppAssistant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -29,6 +30,7 @@ class AssistantController extends Controller
         private readonly AppAssistant $assistant,
         private readonly PendingActions $pending,
         private readonly ActionRegistry $actions,
+        private readonly AiCreditService $credits,
     ) {}
 
     public function ask(Request $request, Domain $domain): JsonResponse
@@ -46,6 +48,9 @@ class AssistantController extends Controller
         if (! $this->assistant->isConfigured()) {
             return response()->json(['message' => 'The AI assistant is not set up yet. Ask your administrator to add an AI API key.'], 503);
         }
+
+        // The organization's monthly AI credits (answers 402 when used up), then each user's daily limit.
+        $this->credits->assertHasCredits($domain, 'assistant');
 
         $user = $request->user();
         $limit = (int) config('services.app_assistant.daily_limit', 50);
@@ -70,9 +75,12 @@ class AssistantController extends Controller
             return response()->json(['message' => $e->getMessage()], 502);
         }
 
+        $this->credits->record($domain, $user, 'assistant', $this->assistant->lastResponse());
+
         return response()->json([
             ...Arr::except($reply, ['tools_called']),
             'remaining' => max(0, $limit - $sent - 1),
+            'credits_remaining' => $this->credits->remaining($domain),
         ]);
     }
 

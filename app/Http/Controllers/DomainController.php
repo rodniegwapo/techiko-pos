@@ -4,14 +4,20 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\DomainResource;
 use App\Models\Domain;
+use App\Models\ServiceTier;
+use App\Services\Ai\AiCreditService;
 use App\Services\DomainService;
+use App\Services\DomainSubscriptionService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class DomainController extends Controller
 {
     public function __construct(
-        private DomainService $domainService
+        private DomainService $domainService,
+        private DomainSubscriptionService $subscriptions,
+        private AiCreditService $aiCredits,
     ) {}
 
     /**
@@ -61,11 +67,46 @@ class DomainController extends Controller
      */
     public function show(Domain $domain)
     {
-        $domain->load(['users']);
+        $domain->load(['users', 'currentServiceTier']);
 
         return Inertia::render('Domains/Show', [
             'domain' => new DomainResource($domain),
+            // Plan & AI credits, for super admins (the section is hidden from others).
+            'billing' => fn () => request()->user()?->isSuperUser() ? [
+                'tiers' => ServiceTier::query()->active()->get(['id', 'name', 'amount', 'ai_monthly_credits']),
+                'service_tier_id' => $domain->current_service_tier_id,
+                'subscription_started_at' => $domain->subscription_started_at?->toDateString(),
+                'ai_monthly_credits_override' => $domain->ai_monthly_credits_override,
+                'free_credits' => (int) config('ai_billing.free_monthly_credits', 30),
+                'ai_credits' => $this->aiCredits->propsForFrontend($domain),
+                'ai_cost_this_month_usd' => $this->aiCredits->costThisMonth($domain),
+                'ai_usage_url' => route('domains.ai-usage.index', ['domain' => $domain->name_slug]),
+            ] : null,
         ]);
+    }
+
+    /**
+     * Set an organization's plan (null = free) and, optionally, its own monthly AI credits instead
+     * of the plan's. Super admins only.
+     */
+    public function updateSubscription(Request $request, Domain $domain)
+    {
+        $validated = $request->validate([
+            'service_tier_id' => ['nullable', 'integer', Rule::exists('service_tiers', 'id')->where('is_active', true)],
+            'ai_monthly_credits_override' => ['nullable', 'integer', 'min:0', 'max:1000000'],
+        ]);
+
+        $tierId = $validated['service_tier_id'] ?? null;
+        if ($tierId === null) {
+            $this->subscriptions->clearServicingTier($domain);
+        } elseif ((int) $tierId !== (int) $domain->current_service_tier_id) {
+            // Only a change of plan restarts the subscription date.
+            $this->subscriptions->grantServicingTier($domain->name_slug, (int) $tierId);
+        }
+
+        $domain->refresh()->update(['ai_monthly_credits_override' => $validated['ai_monthly_credits_override'] ?? null]);
+
+        return back()->with('success', 'Plan updated.');
     }
 
     /**

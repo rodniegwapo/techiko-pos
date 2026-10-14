@@ -344,6 +344,7 @@ class FinancePhase3Test extends TestCase
                 ->twice()
                 ->withArgs(fn ($question, $history, $tools) => $question === 'How much profit did I make?' && $tools instanceof FinanceTools)
                 ->andReturn('You made ₱100 gross profit today.');
+            $mock->shouldReceive('lastResponse')->andReturn(null);
         });
 
         $ask = fn () => $this->actingAs($ctx['user'])->postJson($this->url($ctx, 'finance.ask'), ['question' => 'How much profit did I make?']);
