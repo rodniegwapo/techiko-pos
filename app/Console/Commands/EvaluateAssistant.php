@@ -41,7 +41,7 @@ class EvaluateAssistant extends Command
             return self::FAILURE;
         }
         if (! $assistant->isConfigured()) {
-            $this->error('The AI is not set up: add the provider\'s API key (e.g. GEMINI_API_KEY).');
+            $this->error('The AI is not set up: add '.$assistant->keyEnvName().' to .env.');
 
             return self::FAILURE;
         }

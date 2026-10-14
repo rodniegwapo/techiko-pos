@@ -12,7 +12,7 @@ use RuntimeException;
 /**
  * The AI assistant in the chat drawer: teaches staff how to use Techiko POS from the how-to
  * guides (GuideLibrary) and prepares changes for them to confirm (AssistantTools' propose_*
- * tools), only for what their role allows, through laravel/ai (Gemini by default; see
+ * tools), only for what their role allows, through laravel/ai (the provider set in .env; see
  * services.app_assistant).
  */
 class AppAssistant

@@ -3,7 +3,10 @@
 namespace App\Services\Ai\Concerns;
 
 use Closure;
+use Illuminate\Http\Client\RequestException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Laravel\Ai\Exceptions\InsufficientCreditsException;
 use Laravel\Ai\Exceptions\ProviderConnectionException;
 use Laravel\Ai\Exceptions\ProviderOverloadedException;
@@ -16,6 +19,8 @@ use Throwable;
  */
 trait HandlesAiErrors
 {
+    private const OUT_OF_CREDITS = 'The AI assistant is unavailable: the AI account has run out of credits. Ask your administrator to add credits.';
+
     /**
      * Runs one prompt (tool calls included) and returns its text.
      *
@@ -28,13 +33,21 @@ trait HandlesAiErrors
         try {
             $text = trim((string) $call());
         } catch (RateLimitedException|ProviderOverloadedException $e) {
-            throw new RuntimeException('The AI assistant is busy right now. Please try again in a minute.', 0, $e);
+            // The provider's own reason (per-minute limit, daily quota, model overloaded) is only in its response.
+            $response = $e->getPrevious() instanceof RequestException ? $e->getPrevious()->response : null;
+            Log::warning($who.' was turned away by the API', [
+                'exception' => class_basename($e),
+                'status' => $response?->status(),
+                'retry_after' => $response?->header('Retry-After'),
+                'error' => $response?->json('error.message') ?? Str::limit((string) $response?->body(), 500),
+            ]);
+            throw new RuntimeException($this->turnedAwayMessage($response), 0, $e);
         } catch (ProviderConnectionException $e) {
             Log::warning($who.' could not reach the API', ['message' => $e->getMessage()]);
             throw new RuntimeException('Could not reach the AI assistant. Check the internet connection and try again.', 0, $e);
         } catch (InsufficientCreditsException $e) {
             Log::warning($who.' has no API credit left', ['message' => $e->getMessage()]);
-            throw new RuntimeException('The AI assistant could not answer right now. Please try again later.', 0, $e);
+            throw new RuntimeException(self::OUT_OF_CREDITS, 0, $e);
         } catch (Throwable $e) {
             Log::warning($who.' request failed', ['exception' => $e::class, 'message' => $e->getMessage()]);
             throw new RuntimeException('The AI assistant could not answer right now. Please try again later.', 0, $e);
@@ -48,6 +61,28 @@ trait HandlesAiErrors
         return $text;
     }
 
+    /**
+     * What to tell the user when the provider turns a request away: a used-up plan (no credits, or a
+     * daily limit that only resets hours later) is not "busy", and retrying in a minute won't help.
+     */
+    private function turnedAwayMessage(?Response $response): string
+    {
+        $error = strtolower((string) ($response?->json('error.message') ?? '').' '.(string) ($response?->json('error.code') ?? ''));
+        if (Str::contains($error, ['credit', 'insufficient_quota', 'billing'])) {
+            return self::OUT_OF_CREDITS;
+        }
+
+        $wait = (string) $response?->header('Retry-After');
+        $hours = ctype_digit($wait) ? (int) ceil((int) $wait / 3600) : null;
+        if (($hours !== null && (int) $wait > 300) || Str::contains($error, 'per day')) {
+            return 'The AI assistant has reached its usage limit for today'
+                .($hours ? ' and opens again in about '.$hours.' '.Str::plural('hour', $hours) : '')
+                .'. Ask your administrator to raise the AI plan\'s limit.';
+        }
+
+        return 'The AI assistant is busy right now. Please try again in a minute.';
+    }
+
     protected function emptyAnswerMessage(): string
     {
         return 'The AI assistant could not answer this one. Try asking something more specific.';
@@ -56,5 +91,11 @@ trait HandlesAiErrors
     public function isConfigured(): bool
     {
         return (string) config('ai.providers.'.$this->provider().'.key') !== '';
+    }
+
+    /** The .env setting that holds the active provider's key (OPENAI_API_KEY, GEMINI_API_KEY…), for setup messages. */
+    public function keyEnvName(): string
+    {
+        return strtoupper($this->provider()).'_API_KEY';
     }
 }
