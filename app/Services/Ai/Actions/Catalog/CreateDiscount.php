@@ -8,16 +8,40 @@ use App\Services\Ai\Actions\ActionResult;
 use App\Services\Ai\Actions\AssistantAction;
 use App\Services\Ai\Actions\ControllerCall;
 use App\Services\Ai\Actions\DescribesValues;
+use App\Services\Ai\Actions\HasInputTemplate;
 use App\Services\Ai\Actions\PreparedAction;
 use Carbon\Carbon;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 
 /** Adds a discount for the POS, like Products → Discounts → add. */
-class CreateDiscount implements AssistantAction
+class CreateDiscount implements AssistantAction, HasInputTemplate
 {
     use DescribesValues;
 
     public function __construct(private readonly ControllerCall $call) {}
+
+    public function templateTitle(): string
+    {
+        return 'Add discount';
+    }
+
+    public function templateGuide(): ?string
+    {
+        return 'create-discount';
+    }
+
+    public function template(ActionContext $context): array
+    {
+        return [
+            ['label' => 'Name', 'required' => true, 'hint' => null],
+            ['label' => 'Type', 'required' => true, 'hint' => 'percentage or amount'],
+            ['label' => 'Value', 'required' => true, 'hint' => '% or ₱'],
+            ['label' => 'Applies to', 'required' => true, 'hint' => 'order or product'],
+            ['label' => 'Minimum order', 'required' => false, 'hint' => '₱'],
+            ['label' => 'Start date', 'required' => false, 'hint' => 'YYYY-MM-DD'],
+            ['label' => 'End date', 'required' => false, 'hint' => 'YYYY-MM-DD'],
+        ];
+    }
 
     public function name(): string
     {

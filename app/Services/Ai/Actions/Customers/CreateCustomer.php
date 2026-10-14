@@ -7,15 +7,37 @@ use App\Services\Ai\Actions\ActionInputException;
 use App\Services\Ai\Actions\ActionResult;
 use App\Services\Ai\Actions\AssistantAction;
 use App\Services\Ai\Actions\ControllerCall;
+use App\Services\Ai\Actions\HasInputTemplate;
 use App\Services\Ai\Actions\PreparedAction;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 
 /** Adds a customer, like Customers → Add Customer. */
-class CreateCustomer implements AssistantAction
+class CreateCustomer implements AssistantAction, HasInputTemplate
 {
     public const FIELDS = ['name' => 'Name', 'phone' => 'Phone', 'email' => 'Email', 'address' => 'Address', 'date_of_birth' => 'Date of birth'];
 
     public function __construct(private readonly ControllerCall $call) {}
+
+    public function templateTitle(): string
+    {
+        return 'Add customer';
+    }
+
+    public function templateGuide(): ?string
+    {
+        return 'add-customer';
+    }
+
+    public function template(ActionContext $context): array
+    {
+        return [
+            ['label' => 'Name', 'required' => true, 'hint' => null],
+            ['label' => 'Phone', 'required' => false, 'hint' => null],
+            ['label' => 'Email', 'required' => false, 'hint' => null],
+            ['label' => 'Address', 'required' => false, 'hint' => null],
+            ['label' => 'Birthday', 'required' => false, 'hint' => 'YYYY-MM-DD'],
+        ];
+    }
 
     public function name(): string
     {

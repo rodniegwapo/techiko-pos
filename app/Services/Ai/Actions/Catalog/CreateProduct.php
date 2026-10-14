@@ -19,9 +19,6 @@ class CreateProduct implements AssistantAction, HasInputTemplate
 {
     use DescribesValues;
 
-    /** Category names listed in the form; past this many it shows examples instead of all of them. */
-    private const TEMPLATE_CATEGORIES = 8;
-
     public function __construct(private readonly ControllerCall $call) {}
 
     public function templateTitle(): string
@@ -36,17 +33,12 @@ class CreateProduct implements AssistantAction, HasInputTemplate
 
     public function template(ActionContext $context): array
     {
-        $categories = $this->categories($context)->pluck('name');
-        $categoryHint = $categories->isEmpty() ? null
-            : ($categories->count() > self::TEMPLATE_CATEGORIES ? 'e.g. ' : 'one of: ')
-                .$categories->take(self::TEMPLATE_CATEGORIES)->implode(', ');
-
         return [
             ['label' => 'Name', 'required' => true, 'hint' => null],
             ['label' => 'Price', 'required' => true, 'hint' => '₱'],
-            ['label' => 'Category', 'required' => false, 'hint' => $categoryHint],
+            ['label' => 'Category', 'required' => false, 'hint' => $this->namesHint($this->categories($context)->pluck('name'))],
             ['label' => 'Cost', 'required' => false, 'hint' => '₱'],
-            ['label' => 'Sold per', 'required' => false, 'hint' => 'one of: '.implode(', ', SoldTypes::all())],
+            ['label' => 'Sold per', 'required' => false, 'hint' => $this->namesHint(SoldTypes::all())],
             ['label' => 'SKU', 'required' => false, 'hint' => null],
             ['label' => 'Barcode', 'required' => false, 'hint' => null],
         ];

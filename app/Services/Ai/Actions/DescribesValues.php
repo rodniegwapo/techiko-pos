@@ -21,6 +21,17 @@ trait DescribesValues
         return $old === null || $old === '' || $old === $new ? $new : $old.' → '.$new;
     }
 
+    /** A fill-in form hint for a choice: "one of: A, B", or "e.g. A, B…" when there are more than $max. */
+    protected function namesHint(iterable $names, int $max = 8): ?string
+    {
+        $names = collect($names)->values();
+        if ($names->isEmpty()) {
+            return null;
+        }
+
+        return ($names->count() > $max ? 'e.g. ' : 'one of: ').$names->take($max)->implode(', ');
+    }
+
     /** The given keys of the input that have a value (0 and false count). */
     protected function filled(array $input, array $keys): array
     {

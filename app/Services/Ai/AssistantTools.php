@@ -244,11 +244,17 @@ class AssistantTools
             return ['error' => 'not_allowed', 'message' => 'There is no form for that, or this user\'s role cannot make that change.'];
         }
 
+        try {
+            $template = $action->template(new ActionContext($this->user, $this->domain, $this->location));
+        } catch (ActionInputException $e) {
+            return ['error' => $e->getMessage()];
+        }
+
         $lines = array_map(function (array $field) {
             $notes = array_filter([$field['hint'], $field['required'] ? null : 'optional']);
 
             return $field['label'].($notes ? ' ('.implode('; ', $notes).')' : '').': ';
-        }, $action->template(new ActionContext($this->user, $this->domain, $this->location)));
+        }, $template);
 
         $this->forms[$action->name()] = ['action' => $action->name(), 'title' => $action->templateTitle(), 'text' => implode("\n", $lines)];
 

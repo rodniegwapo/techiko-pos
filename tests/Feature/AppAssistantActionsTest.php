@@ -237,5 +237,64 @@ class AppAssistantActionsTest extends TestCase
         $refused = json_decode($this->tools($cashier->fresh())->run('propose_record_expense', ['expense_category_id' => $utilities->id, 'amount' => 50, 'description' => 'Ice', 'payment_method' => 'cash_register']), true);
 
         $this->assertStringContainsString('managers', $refused['error']);
+
+        // Nor is a cashier handed an expense form they couldn't send.
+        $tools = $this->tools($cashier->fresh());
+        $form = json_decode($tools->run('show_fill_in_form', ['action' => 'record_expense']), true);
+        $this->assertStringContainsString('managers', $form['error']);
+        $this->assertSame([], $tools->forms());
+    }
+
+    public function test_customer_expense_and_discount_have_fill_in_forms(): void
+    {
+        $user = $this->user([
+            'customers.index', 'customers.store', 'expenses.index', 'expenses.store',
+            'products.discounts.index', 'products.discounts.store',
+        ]);
+        ExpenseCategory::query()->create(['domain' => $this->domain->name_slug, 'name' => 'Utilities', 'is_active' => true]);
+        ExpenseCategory::query()->create(['domain' => $this->domain->name_slug, 'name' => 'Old', 'is_active' => false]);
+        ExpenseCategory::query()->create(['domain' => 'another-business', 'name' => 'Not Ours', 'is_active' => true]);
+
+        $tools = $this->tools($user);
+        foreach (['create_customer', 'record_expense', 'create_discount'] as $action) {
+            $shown = json_decode($tools->run('show_fill_in_form', ['action' => $action]), true);
+            $this->assertSame('form_shown', $shown['status'] ?? null, $action.': '.json_encode($shown));
+            $this->assertTrue($shown['page_link_shown_to_user'], $action);
+        }
+
+        $forms = collect($tools->forms())->keyBy('action');
+        $this->assertSame(
+            "Name: \nPhone (optional): \nEmail (optional): \nAddress (optional): \nBirthday (YYYY-MM-DD; optional): ",
+            $forms['create_customer']['text'],
+        );
+        $this->assertSame(
+            "Category (one of: Utilities): \nAmount (₱): \nWhat it was for: \n"
+            ."Paid with (one of: Cash from the register, Bank, E-wallet, Card, Other): \n"
+            ."Date (YYYY-MM-DD; optional): \nPaid to (optional): \nReference no. (optional): ",
+            $forms['record_expense']['text'],
+        );
+        $this->assertSame(
+            "Name: \nType (percentage or amount): \nValue (% or ₱): \nApplies to (order or product): \n"
+            ."Minimum order (₱; optional): \nStart date (YYYY-MM-DD; optional): \nEnd date (YYYY-MM-DD; optional): ",
+            $forms['create_discount']['text'],
+        );
+        $this->assertSame(
+            ['Add or edit a customer', 'Record an expense', 'Create a discount or promo'],
+            array_column($tools->links(), 'title'),
+        );
+    }
+
+    public function test_an_expense_may_name_its_category(): void
+    {
+        $user = $this->user(['expenses.store']);
+        $utilities = ExpenseCategory::query()->create(['domain' => $this->domain->name_slug, 'name' => 'Utilities', 'is_active' => true]);
+        ExpenseCategory::query()->create(['domain' => 'another-business', 'name' => 'Rent', 'is_active' => true]);
+
+        $card = $this->propose($user, 'record_expense', ['expense_category' => ' utilities ', 'amount' => 750, 'description' => 'Water bill', 'payment_method' => 'bank']);
+        $this->confirm($user, $card)->assertOk();
+        $this->assertSame($utilities->id, (int) Expense::query()->where('domain', $this->domain->name_slug)->sole()->expense_category_id);
+
+        $refused = json_decode($this->tools($user)->run('propose_record_expense', ['expense_category' => 'Rent', 'amount' => 9000, 'description' => 'October rent', 'payment_method' => 'bank']), true);
+        $this->assertSame('There is no expense category "Rent". The categories are: Utilities.', $refused['error']);
     }
 }
