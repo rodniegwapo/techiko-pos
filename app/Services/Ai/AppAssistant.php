@@ -75,7 +75,7 @@ PROMPT;
         }
 
         $tools = (new AssistantTools($this->guides, $user, $domain, $location))->forMessage($message, $currentPage);
-        $agent = new AppAssistantAgent($this->instructions($user, $domain, $location, $currentPage), $history, $tools, $this->provider(), $this->model());
+        $agent = new AppAssistantAgent($this->instructions($user, $domain, $location, $currentPage), $history, $tools, $this->providers($this->model()), $this->timeout());
 
         $response = null;
         $answer = $this->send(function () use ($agent, $message, $language, &$response) {
@@ -117,6 +117,11 @@ PROMPT;
     protected function emptyAnswerMessage(): string
     {
         return 'The AI assistant could not answer this one. Try asking it another way, or ask the team in the "Chat with the team" tab.';
+    }
+
+    protected function aiConfig(): string
+    {
+        return 'services.app_assistant';
     }
 
     private function provider(): string

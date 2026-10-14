@@ -88,9 +88,38 @@ trait HandlesAiErrors
         return 'The AI assistant could not answer this one. Try asking something more specific.';
     }
 
+    /** Where this feature's AI settings live, e.g. "services.app_assistant". */
+    abstract protected function aiConfig(): string;
+
     public function isConfigured(): bool
     {
-        return (string) config('ai.providers.'.$this->provider().'.key') !== '';
+        return $this->providers($this->model()) !== [];
+    }
+
+    /**
+     * The providers to try in order, each with its model: the configured one, then the fallback
+     * (when set). One without an API key is left out. laravel/ai moves to the next when a provider
+     * is rate limited, overloaded, out of credits or can't be reached in time.
+     *
+     * @return array<string, string>
+     */
+    protected function providers(string $model): array
+    {
+        $providers = [$this->provider() => $model];
+
+        $fallback = (string) config($this->aiConfig().'.fallback_provider');
+        $fallbackModel = (string) config($this->aiConfig().'.fallback_model');
+        if ($fallback !== '' && $fallbackModel !== '' && ! isset($providers[$fallback])) {
+            $providers[$fallback] = $fallbackModel;
+        }
+
+        return array_filter($providers, fn (string $model, string $provider) => (string) config('ai.providers.'.$provider.'.key') !== '', ARRAY_FILTER_USE_BOTH);
+    }
+
+    /** Seconds to wait for one AI call before giving up (or trying the fallback). */
+    protected function timeout(): int
+    {
+        return max(5, (int) config($this->aiConfig().'.timeout', 30));
     }
 
     /** The .env setting that holds the active provider's key (OPENAI_API_KEY, GEMINI_API_KEY…), for setup messages. */

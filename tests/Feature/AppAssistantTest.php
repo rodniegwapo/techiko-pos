@@ -22,6 +22,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
+use Laravel\Ai\Exceptions\RateLimitedException;
 use Laravel\Ai\Prompts\AgentPrompt;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Spatie\Permission\PermissionRegistrar;
@@ -276,6 +277,62 @@ class AppAssistantTest extends TestCase
 
         $this->assertSame(['answer' => '1. Open **Products → Items**.', 'links' => [], 'pending_actions' => [], 'forms' => [], 'tools_called' => []], $reply);
         AppAssistantAgent::assertPrompted(fn (AgentPrompt $prompt) => $prompt->contains('How do I add a product?') && $prompt->contains('Taglish'));
+    }
+
+    public function test_the_fallback_provider_answers_when_the_first_is_turned_away(): void
+    {
+        config([
+            'services.app_assistant.provider' => 'openai', 'services.app_assistant.model' => 'gpt-6-luna',
+            'services.app_assistant.fallback_provider' => 'gemini', 'services.app_assistant.fallback_model' => 'gemini-3.8-flash',
+            'services.app_assistant.timeout' => 20,
+            'ai.providers.openai.key' => 'test-key', 'ai.providers.gemini.key' => 'test-key',
+        ]);
+        $tried = [];
+        AppAssistantAgent::fake(function (string $prompt, $attachments, $provider, string $model) use (&$tried) {
+            $tried[] = [$provider->name(), $model];
+            if ($provider->name() === 'openai') {
+                throw RateLimitedException::forProvider('openai');
+            }
+
+            return 'Answered by the backup.';
+        });
+        $ctx = $this->staff(['assistant.ask']);
+
+        $reply = app(AppAssistant::class)->reply('Where are my sales?', [], $ctx['user'], $ctx['domain'], $ctx['location']);
+
+        $this->assertSame('Answered by the backup.', $reply['answer']);
+        $this->assertSame([['openai', 'gpt-6-luna'], ['gemini', 'gemini-3.8-flash']], $tried);
+        AppAssistantAgent::assertPrompted(fn (AgentPrompt $prompt) => $prompt->timeout === 20);
+    }
+
+    public function test_a_fallback_without_its_key_is_left_out(): void
+    {
+        config([
+            'services.app_assistant.provider' => 'openai', 'services.app_assistant.model' => 'gpt-6-luna',
+            'services.app_assistant.fallback_provider' => 'gemini', 'services.app_assistant.fallback_model' => 'gemini-3.8-flash',
+            'ai.providers.openai.key' => 'test-key', 'ai.providers.gemini.key' => '',
+        ]);
+        $tried = [];
+        AppAssistantAgent::fake(function (string $prompt, $attachments, $provider) use (&$tried) {
+            $tried[] = $provider->name();
+
+            throw RateLimitedException::forProvider('openai');
+        });
+        $ctx = $this->staff(['assistant.ask']);
+
+        try {
+            app(AppAssistant::class)->reply('Where are my sales?', [], $ctx['user'], $ctx['domain'], $ctx['location']);
+            $this->fail('expected the rate limit to reach the user');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('The AI assistant is busy right now. Please try again in a minute.', $e->getMessage());
+        }
+        $this->assertSame(['openai'], $tried);
+
+        // With only the fallback's key, the fallback alone is used, so the assistant still counts as set up.
+        config(['ai.providers.openai.key' => '', 'ai.providers.gemini.key' => 'test-key']);
+        $this->assertTrue(app(AppAssistant::class)->isConfigured());
+        config(['ai.providers.gemini.key' => '']);
+        $this->assertFalse(app(AppAssistant::class)->isConfigured());
     }
 
     public function test_ask_endpoint_answers_within_the_daily_limit(): void

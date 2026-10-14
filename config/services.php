@@ -42,6 +42,11 @@ return [
         'question_model' => env('FINANCE_AI_QUESTION_MODEL', 'gemini-3.8-flash'),
         // Questions one business may ask per day, to keep API costs predictable.
         'daily_question_limit' => (int) env('FINANCE_AI_DAILY_QUESTIONS', 30),
+        // Seconds to wait for one AI call before giving up (or trying the fallback).
+        'timeout' => (int) env('FINANCE_AI_TIMEOUT', 30),
+        // Tried when the provider above is down, rate limited, out of credits or too slow (needs its key).
+        'fallback_provider' => env('FINANCE_AI_FALLBACK_PROVIDER'),
+        'fallback_model' => env('FINANCE_AI_FALLBACK_MODEL'),
     ],
 
     // The AI assistant in the chat drawer: teaches how to use the POS within each user's permissions.
@@ -50,6 +55,11 @@ return [
         'model' => env('ASSISTANT_AI_MODEL', 'gemini-3.8-flash'),
         // Messages one user may send per day, to keep API costs predictable.
         'daily_limit' => (int) env('ASSISTANT_AI_DAILY_MESSAGES', 50),
+        // Seconds to wait for one AI call before giving up (or trying the fallback).
+        'timeout' => (int) env('ASSISTANT_AI_TIMEOUT', 30),
+        // Tried when the provider above is down, rate limited, out of credits or too slow (needs its key).
+        'fallback_provider' => env('ASSISTANT_AI_FALLBACK_PROVIDER'),
+        'fallback_model' => env('ASSISTANT_AI_FALLBACK_MODEL'),
     ],
 
 ];

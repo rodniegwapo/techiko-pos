@@ -92,7 +92,7 @@ PROMPT;
             return ['text' => $cached, 'cached' => true];
         }
 
-        $agent = new FinanceExplainer(self::SYSTEM_PROMPT, $this->provider(), $this->model());
+        $agent = new FinanceExplainer(self::SYSTEM_PROMPT, $this->providers($this->model()), $this->timeout());
         $text = $this->send(fn () => $agent->prompt(
             "<fact_sheet>\n".json_encode($facts, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)."\n</fact_sheet>\n\n".$question,
         )->text);
@@ -114,7 +114,7 @@ PROMPT;
         }
 
         $system = self::QUESTION_PROMPT."\n\nBusiness: ".$businessName.'. Today is '.today()->format('l, F j, Y').' ('.today()->toDateString().').';
-        $agent = new FinanceQuestionAgent($system, $history, $tools, $this->provider(), $this->questionModel());
+        $agent = new FinanceQuestionAgent($system, $history, $tools, $this->providers($this->questionModel()), $this->timeout());
 
         return $this->send(fn () => $agent->prompt($language === 'taglish'
             ? $question."\n\n(Answer in Taglish, a natural mix of Tagalog and English.)"
@@ -124,6 +124,11 @@ PROMPT;
     protected function emptyAnswerMessage(): string
     {
         return 'The AI assistant could not answer this one. Try asking something more specific; the figures on the page are still accurate.';
+    }
+
+    protected function aiConfig(): string
+    {
+        return 'services.finance_ai';
     }
 
     private function provider(): string
