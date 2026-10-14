@@ -1607,33 +1607,50 @@ watch(
                     </span>
                 </template>
                 <template #filters>
+                    <!-- Search, then the list display switches stacked beside it. -->
                     <template v-if="isCoffeeshopLayout">
                         <a-input
+                            ref="productSearchInput"
                             v-model:value="search"
                             placeholder="Search menu..."
                             allow-clear
-                            class="cs-menu-search min-w-[140px] max-w-[320px]"
-                        />
-                        <label
-                            class="flex shrink-0 cursor-pointer items-center gap-2 text-xs font-medium text-[var(--cs-muted)]"
+                            class="cs-menu-search w-full min-w-[180px] sm:w-[320px]"
+                            data-testid="product-search"
                         >
-                            <a-switch
-                                v-model:checked="hideOutOfStock"
-                                size="small"
-                                data-testid="hide-out-of-stock"
-                            />
-                            Hide out of stock
-                        </label>
-                        <label
-                            class="flex shrink-0 cursor-pointer items-center gap-2 text-xs font-medium text-[var(--cs-muted)]"
-                        >
-                            <a-switch
-                                v-model:checked="groupByCategory"
-                                size="small"
-                                data-testid="group-by-category"
-                            />
-                            Group by category
-                        </label>
+                            <template #prefix>
+                                <SearchOutlined class="text-[var(--cs-muted)]" />
+                            </template>
+                            <template #suffix>
+                                <kbd
+                                    v-if="!search"
+                                    class="hidden rounded border border-[var(--cs-border)] px-1.5 text-[10px] leading-4 text-[var(--cs-muted)] sm:inline"
+                                    title="Press / to search"
+                                    >/</kbd
+                                >
+                            </template>
+                        </a-input>
+                        <div class="flex shrink-0 flex-col gap-1.5">
+                            <label
+                                class="flex cursor-pointer items-center gap-2 text-xs font-medium text-[var(--cs-muted)]"
+                            >
+                                <a-switch
+                                    v-model:checked="hideOutOfStock"
+                                    size="small"
+                                    data-testid="hide-out-of-stock"
+                                />
+                                Hide out of stock
+                            </label>
+                            <label
+                                class="flex cursor-pointer items-center gap-2 text-xs font-medium text-[var(--cs-muted)]"
+                            >
+                                <a-switch
+                                    v-model:checked="groupByCategory"
+                                    size="small"
+                                    data-testid="group-by-category"
+                                />
+                                Group by category
+                            </label>
+                        </div>
                     </template>
                     <!-- Search and actions on one row; list display switches underneath. -->
                     <div v-else class="flex w-full min-w-0 flex-col gap-2">
