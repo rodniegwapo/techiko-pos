@@ -108,7 +108,7 @@ export class SalesPage {
     }
 
     get searchBox() {
-        return this.page.getByPlaceholder(this.isModern ? "Search menu..." : "Search Product");
+        return this.page.getByPlaceholder(this.isModern ? "Search menu..." : "Search products, SKU, or category");
     }
 
     waitForProducts() {
