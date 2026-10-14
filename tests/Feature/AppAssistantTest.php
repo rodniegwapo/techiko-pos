@@ -273,7 +273,7 @@ class AppAssistantTest extends TestCase
 
         $reply = app(AppAssistant::class)->reply('How do I add a product?', [], $ctx['user'], $ctx['domain'], $ctx['location'], 'domains.products.index', 'taglish');
 
-        $this->assertSame(['answer' => '1. Open **Products → Items**.', 'links' => [], 'pending_actions' => [], 'tools_called' => []], $reply);
+        $this->assertSame(['answer' => '1. Open **Products → Items**.', 'links' => [], 'pending_actions' => [], 'forms' => [], 'tools_called' => []], $reply);
         AppAssistantAgent::assertPrompted(fn (AgentPrompt $prompt) => $prompt->contains('How do I add a product?') && $prompt->contains('Taglish'));
     }
 
@@ -333,6 +333,50 @@ class AppAssistantTest extends TestCase
         $cashierCtx = $this->staff(['sales.index']);
         $refused = json_decode($this->tools($cashierCtx)->run('propose_create_product', ['name' => 'Fries', 'price' => 50]), true);
         $this->assertSame('not_allowed', $refused['error']);
+    }
+
+    public function test_the_add_product_form_is_built_by_the_server_for_allowed_users(): void
+    {
+        $this->seed(ProductSoldTypeSeeder::class);
+        $ctx = $this->admin();
+        Category::factory()->create(['domain' => $ctx['domain']->name_slug, 'name' => 'Drinks']);
+        Category::factory()->create(['domain' => $ctx['domain']->name_slug, 'name' => 'Burgers']);
+        Category::factory()->create(['domain' => $this->staff([])['domain']->name_slug, 'name' => 'Not Ours']);
+
+        $tools = $this->tools($ctx);
+        $this->assertContains('show_fill_in_form', array_map(fn ($tool) => $tool->name(), $tools->tools()));
+        $this->assertSame('form_shown', json_decode($tools->run('show_fill_in_form', ['action' => 'create_product']), true)['status']);
+
+        [$form] = $tools->forms();
+        $this->assertSame('create_product', $form['action']);
+        $this->assertSame('Add product', $form['title']);
+        $lines = explode("\n", $form['text']);
+        $this->assertSame('Name: ', $lines[0]);
+        $this->assertSame('Price (₱): ', $lines[1]);
+        $this->assertSame('Category (one of: Burgers, Drinks; optional): ', $lines[2]);
+        $this->assertStringNotContainsString('Not Ours', $form['text']);
+
+        // A role that can't add products gets no form tool, and no form even if the AI asks for one.
+        $cashier = $this->tools($this->staff(['sales.index']));
+        $this->assertNotContains('show_fill_in_form', array_map(fn ($tool) => $tool->name(), $cashier->tools()));
+        $this->assertSame('not_allowed', json_decode($cashier->run('show_fill_in_form', ['action' => 'create_product']), true)['error']);
+        $this->assertSame([], $cashier->forms());
+    }
+
+    public function test_a_filled_in_product_form_may_name_the_category(): void
+    {
+        $this->seed(ProductSoldTypeSeeder::class);
+        $ctx = $this->admin();
+        $drinks = Category::factory()->create(['domain' => $ctx['domain']->name_slug, 'name' => 'Drinks']);
+        Category::factory()->create(['domain' => $this->staff([])['domain']->name_slug, 'name' => 'Snacks']);
+
+        $token = $this->propose($ctx, 'create_product', ['name' => 'Coke 1L', 'price' => 65, 'category' => ' drinks ']);
+        $this->confirm($ctx, $token)->assertOk();
+        $this->assertSame($drinks->id, Product::query()->where('name', 'Coke 1L')->value('category_id'));
+
+        // Another business's category is not found, and the AI is told this business's names.
+        $refused = json_decode($this->tools($ctx)->run('propose_create_product', ['name' => 'Chippy', 'price' => 15, 'category' => 'Snacks']), true);
+        $this->assertSame('There is no category "Snacks" in this business. The categories are: Drinks.', $refused['error']);
     }
 
     public function test_a_product_is_added_only_after_the_user_confirms(): void

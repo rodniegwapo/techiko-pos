@@ -5,6 +5,7 @@ import { router, usePage } from "@inertiajs/vue3";
 import { IconSparkles, IconSend, IconExternalLink, IconTrash } from "@tabler/icons-vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import ActionConfirmCard from "./ActionConfirmCard.vue";
+import FillInFormCard from "./FillInFormCard.vue";
 import { answerBlocks, suggestionsFor } from "./assistantAnswer";
 
 /**
@@ -30,7 +31,7 @@ const currentRoute = computed(() => {
 const suggestions = computed(() => suggestionsFor(currentRoute.value));
 
 const message = ref("");
-const turns = ref([]); // { question, answer, links, actions, error }
+const turns = ref([]); // { question, answer, links, actions, forms, error }
 const asking = ref(false);
 const language = ref("en");
 const remaining = ref(null);
@@ -79,7 +80,7 @@ async function ask(text = message.value) {
         .filter((t) => t.answer)
         .slice(-6)
         .map((t) => ({ question: t.question, answer: withOutcomes(t) }));
-    const turn = { question: q, answer: null, links: [], actions: [], error: null };
+    const turn = { question: q, answer: null, links: [], actions: [], forms: [], error: null };
     turns.value.push(turn);
     scrollDown();
     try {
@@ -93,6 +94,7 @@ async function ask(text = message.value) {
         turn.answer = data.answer;
         turn.links = data.links || [];
         turn.actions = data.pending_actions || [];
+        turn.forms = data.forms || [];
         remaining.value = data.remaining;
     } catch (e) {
         turn.error = e?.response?.data?.message || "Could not get an answer right now. Please try again.";
@@ -120,6 +122,17 @@ function onSettled(turn, action, result) {
     if (result.state === "done") {
         router.reload({ preserveScroll: true });
     }
+}
+
+/** Puts a fill-in form in the message box, with the cursor after the first label ("Name: "). */
+async function fillIn(text) {
+    message.value = text;
+    await nextTick();
+    const root = input.value?.$el;
+    const box = root?.tagName === "TEXTAREA" ? root : root?.querySelector?.("textarea");
+    box?.focus();
+    const firstLineEnd = text.indexOf("\n");
+    box?.setSelectionRange?.(firstLineEnd, firstLineEnd);
 }
 
 function openLink(link) {
@@ -201,6 +214,7 @@ function onKeydown(e) {
                             :action="action"
                             @settled="(result) => onSettled(turn, action, result)"
                         />
+                        <FillInFormCard v-for="form in turn.forms || []" :key="form.action" :form="form" @fill="fillIn" />
                         <div v-if="turn.links?.length" class="mt-2 flex flex-wrap gap-2">
                             <a-button v-for="link in turn.links" :key="link.url" size="small" type="primary" ghost @click="openLink(link)">
                                 <span class="inline-flex items-center gap-1">Open: {{ link.title }} <IconExternalLink :size="14" /></span>
