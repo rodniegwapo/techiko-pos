@@ -284,6 +284,74 @@ class AppAssistantActionsTest extends TestCase
         );
     }
 
+    public function test_supplier_and_store_changes_have_fill_in_forms(): void
+    {
+        $user = $this->user([
+            'finance.payables.index', 'finance.bills.store', 'finance.suppliers.store',
+            'inventory.locations.create', 'inventory.locations.store',
+        ]);
+
+        // No suppliers yet: no bill form, but the supplier form is there to add one.
+        $tools = $this->tools($user);
+        $refused = json_decode($tools->run('show_fill_in_form', ['action' => 'record_supplier_bill']), true);
+        $this->assertSame('There are no suppliers yet. Add the supplier first.', $refused['error']);
+        $this->assertSame([], $tools->forms());
+
+        Supplier::query()->create(['domain' => $this->domain->name_slug, 'name' => 'Magnolia', 'payment_terms_days' => 15, 'is_active' => true]);
+        Supplier::query()->create(['domain' => $this->domain->name_slug, 'name' => 'Gone Supplier', 'payment_terms_days' => 30, 'is_active' => false]);
+        Supplier::query()->create(['domain' => 'another-business', 'name' => 'Not Ours', 'payment_terms_days' => 30, 'is_active' => true]);
+        ExpenseCategory::query()->create(['domain' => $this->domain->name_slug, 'name' => 'Utilities', 'is_active' => true]);
+
+        $tools = $this->tools($user);
+        foreach (['record_supplier_bill', 'create_supplier', 'create_store'] as $action) {
+            $shown = json_decode($tools->run('show_fill_in_form', ['action' => $action]), true);
+            $this->assertSame('form_shown', $shown['status'] ?? null, $action.': '.json_encode($shown));
+            $this->assertTrue($shown['page_link_shown_to_user'], $action);
+        }
+
+        $forms = collect($tools->forms())->keyBy('action');
+        $this->assertSame(
+            "Supplier (one of: Magnolia): \nAmount (₱): \nBill type (inventory or expense): \n"
+            ."Expense category (one of: Utilities; only for expense bills; optional): \n"
+            ."Bill date (YYYY-MM-DD; optional): \nDue date (YYYY-MM-DD; optional): \nBill no. (optional): ",
+            $forms['record_supplier_bill']['text'],
+        );
+        $this->assertSame(
+            "Name: \nPays bills within (days; optional): \nContact person (optional): \nPhone (optional): \nEmail (optional): ",
+            $forms['create_supplier']['text'],
+        );
+        $this->assertSame(
+            "Name: \nCode (up to 10 characters, e.g. BR2): \nType (store or warehouse; optional): \nAddress (optional): \n"
+            ."Contact person (optional): \nPhone (optional): \nEmail (optional): ",
+            $forms['create_store']['text'],
+        );
+        $this->assertSame(
+            ['Record a supplier bill (what you owe a supplier)', 'Add a supplier', 'Add a store, branch or warehouse'],
+            array_column($tools->links(), 'title'),
+        );
+    }
+
+    public function test_a_supplier_bill_may_name_its_supplier_and_category(): void
+    {
+        $user = $this->user(['finance.bills.store']);
+        $magnolia = Supplier::query()->create(['domain' => $this->domain->name_slug, 'name' => 'Magnolia', 'payment_terms_days' => 15, 'is_active' => true]);
+        Supplier::query()->create(['domain' => 'another-business', 'name' => 'San Miguel', 'payment_terms_days' => 30, 'is_active' => true]);
+        $utilities = ExpenseCategory::query()->create(['domain' => $this->domain->name_slug, 'name' => 'Utilities', 'is_active' => true]);
+
+        $card = $this->propose($user, 'record_supplier_bill', [
+            'supplier' => ' magnolia ', 'amount' => 1200, 'bill_type' => 'expense', 'expense_category' => 'UTILITIES',
+        ]);
+        $this->confirm($user, $card)->assertOk();
+        $bill = SupplierBill::query()->where('supplier_id', $magnolia->id)->sole();
+        $this->assertSame($utilities->id, (int) $bill->expense_category_id);
+
+        $refused = json_decode($this->tools($user)->run('propose_record_supplier_bill', ['supplier' => 'San Miguel', 'amount' => 500, 'bill_type' => 'inventory']), true);
+        $this->assertSame('There is no supplier "San Miguel". The suppliers are: Magnolia.', $refused['error']);
+
+        $refused = json_decode($this->tools($user)->run('propose_record_supplier_bill', ['supplier' => 'Magnolia', 'amount' => 500, 'bill_type' => 'expense', 'expense_category' => 'Rent']), true);
+        $this->assertSame('There is no expense category "Rent". The categories are: Utilities.', $refused['error']);
+    }
+
     public function test_an_expense_may_name_its_category(): void
     {
         $user = $this->user(['expenses.store']);

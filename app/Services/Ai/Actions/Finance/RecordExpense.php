@@ -43,7 +43,7 @@ class RecordExpense implements AssistantAction, HasInputTemplate
         }
 
         return [
-            ['label' => 'Category', 'required' => true, 'hint' => $this->namesHint($this->categories($context)->pluck('name'))],
+            ['label' => 'Category', 'required' => true, 'hint' => $this->namesHint(ExpenseCategories::active($context)->pluck('name'))],
             ['label' => 'Amount', 'required' => true, 'hint' => '₱'],
             ['label' => 'What it was for', 'required' => true, 'hint' => null],
             ['label' => 'Paid with', 'required' => true, 'hint' => $this->namesHint(self::METHODS)],
@@ -51,12 +51,6 @@ class RecordExpense implements AssistantAction, HasInputTemplate
             ['label' => 'Paid to', 'required' => false, 'hint' => null],
             ['label' => 'Reference no.', 'required' => false, 'hint' => null],
         ];
-    }
-
-    /** @return Collection<int, ExpenseCategory> This business's active expense categories, A–Z. */
-    private function categories(ActionContext $context): Collection
-    {
-        return ExpenseCategory::query()->forDomain($context->domain->name_slug)->where('is_active', true)->orderBy('name')->get(['id', 'name']);
     }
 
     public function name(): string
@@ -94,19 +88,7 @@ class RecordExpense implements AssistantAction, HasInputTemplate
         if (! FinanceAccess::canManage($context->user)) {
             throw new ActionInputException('Only managers and above can record expenses.');
         }
-        $categories = $this->categories($context);
-        $wanted = trim((string) ($input['expense_category'] ?? ''));
-        if (! empty($input['expense_category_id'])) {
-            $category = $categories->firstWhere('id', (int) $input['expense_category_id']);
-        } elseif ($wanted !== '') {
-            $category = $categories->first(fn (ExpenseCategory $c) => strcasecmp($c->name, $wanted) === 0);
-            if (! $category) {
-                throw new ActionInputException('There is no expense category "'.$wanted.'". The categories are: '
-                    .($categories->pluck('name')->implode(', ') ?: 'none yet').'.');
-            }
-        } else {
-            $category = null;
-        }
+        $category = ExpenseCategories::resolve($input, $context);
         if (! $category) {
             throw new ActionInputException('Choose an expense category from list_expense_categories.');
         }

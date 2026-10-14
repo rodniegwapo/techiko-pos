@@ -2,7 +2,6 @@
 
 namespace App\Services\Ai\Actions\Finance;
 
-use App\Models\ExpenseCategory;
 use App\Models\Finance\Supplier;
 use App\Services\Ai\Actions\ActionContext;
 use App\Services\Ai\Actions\ActionInputException;
@@ -10,16 +9,53 @@ use App\Services\Ai\Actions\ActionResult;
 use App\Services\Ai\Actions\AssistantAction;
 use App\Services\Ai\Actions\ControllerCall;
 use App\Services\Ai\Actions\DescribesValues;
+use App\Services\Ai\Actions\HasInputTemplate;
 use App\Services\Ai\Actions\PreparedAction;
 use Carbon\Carbon;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Database\Eloquent\Collection;
 
 /** Records a bill from a supplier (money owed to them), like Finance → Supplier bills → add bill. */
-class RecordSupplierBill implements AssistantAction
+class RecordSupplierBill implements AssistantAction, HasInputTemplate
 {
     use DescribesValues;
 
     public function __construct(private readonly ControllerCall $call) {}
+
+    public function templateTitle(): string
+    {
+        return 'Record supplier bill';
+    }
+
+    public function templateGuide(): ?string
+    {
+        return 'supplier-bill';
+    }
+
+    public function template(ActionContext $context): array
+    {
+        $suppliers = $this->suppliers($context)->where('is_active', true)->pluck('name');
+        if ($suppliers->isEmpty()) {
+            throw new ActionInputException('There are no suppliers yet. Add the supplier first.');
+        }
+        $categories = $this->namesHint(ExpenseCategories::active($context)->pluck('name'));
+
+        return [
+            ['label' => 'Supplier', 'required' => true, 'hint' => $this->namesHint($suppliers)],
+            ['label' => 'Amount', 'required' => true, 'hint' => '₱'],
+            ['label' => 'Bill type', 'required' => true, 'hint' => 'inventory or expense'],
+            ['label' => 'Expense category', 'required' => false, 'hint' => ($categories ? $categories.'; ' : '').'only for expense bills'],
+            ['label' => 'Bill date', 'required' => false, 'hint' => 'YYYY-MM-DD'],
+            ['label' => 'Due date', 'required' => false, 'hint' => 'YYYY-MM-DD'],
+            ['label' => 'Bill no.', 'required' => false, 'hint' => null],
+        ];
+    }
+
+    /** @return Collection<int, Supplier> This business's suppliers, A–Z. */
+    private function suppliers(ActionContext $context): Collection
+    {
+        return Supplier::query()->where('domain', $context->domain->name_slug)->orderBy('name')->get(['id', 'name', 'is_active', 'payment_terms_days']);
+    }
 
     public function name(): string
     {
@@ -33,16 +69,18 @@ class RecordSupplierBill implements AssistantAction
 
     public function description(): string
     {
-        return 'Propose recording a supplier bill (money the business owes a supplier). supplier_id from list_suppliers. bill_type "inventory" is for stock bought; "expense" is for a service or cost and needs an expense category.';
+        return 'Propose recording a supplier bill (money the business owes a supplier). Give the supplier by name (supplier) or id (supplier_id from list_suppliers). bill_type "inventory" is for stock bought; "expense" is for a service or cost and needs an expense category, by name (expense_category) or id (expense_category_id).';
     }
 
     public function schema(JsonSchema $schema): array
     {
         return [
-            'supplier_id' => $schema->integer()->description('Supplier id from list_suppliers')->required(),
+            'supplier_id' => $schema->integer()->description('Supplier id from list_suppliers (or give supplier)'),
+            'supplier' => $schema->string()->description('Supplier name, as the user wrote it (used when there is no supplier_id)'),
             'amount' => $schema->number()->description('Bill amount in pesos')->required(),
             'bill_type' => $schema->string()->enum(['inventory', 'expense'])->description('inventory (stock bought) or expense')->required(),
-            'expense_category_id' => $schema->integer()->description('Needed for an expense bill: id from list_expense_categories'),
+            'expense_category_id' => $schema->integer()->description('Needed for an expense bill: id from list_expense_categories (or give expense_category)'),
+            'expense_category' => $schema->string()->description('Expense category name, as the user wrote it (used when there is no expense_category_id)'),
             'bill_date' => $schema->string()->description('Bill date, YYYY-MM-DD (default today)'),
             'due_date' => $schema->string()->description('Due date, YYYY-MM-DD (default: the supplier\'s payment terms)'),
             'bill_number' => $schema->string()->description('The supplier\'s bill or invoice number (optional)'),
@@ -51,7 +89,15 @@ class RecordSupplierBill implements AssistantAction
 
     public function prepare(array $input, ActionContext $context): PreparedAction
     {
-        $supplier = Supplier::query()->where('domain', $context->domain->name_slug)->find($input['supplier_id'] ?? null);
+        $suppliers = $this->suppliers($context);
+        $wanted = trim((string) ($input['supplier'] ?? ''));
+        if (empty($input['supplier_id']) && $wanted !== '') {
+            $supplier = $suppliers->first(fn (Supplier $s) => strcasecmp($s->name, $wanted) === 0)
+                ?? throw new ActionInputException('There is no supplier "'.$wanted.'". The suppliers are: '
+                    .($suppliers->pluck('name')->implode(', ') ?: 'none yet; add the supplier first').'.');
+        } else {
+            $supplier = $suppliers->firstWhere('id', (int) ($input['supplier_id'] ?? 0));
+        }
         if (! $supplier) {
             throw new ActionInputException('No such supplier in this business. Use list_suppliers, or add the supplier first.');
         }
@@ -65,7 +111,7 @@ class RecordSupplierBill implements AssistantAction
         }
         $category = null;
         if ($type === 'expense') {
-            $category = ExpenseCategory::query()->forDomain($context->domain->name_slug)->find($input['expense_category_id'] ?? null);
+            $category = ExpenseCategories::resolve($input, $context);
             if (! $category) {
                 throw new ActionInputException('An expense bill needs an expense category from list_expense_categories.');
             }

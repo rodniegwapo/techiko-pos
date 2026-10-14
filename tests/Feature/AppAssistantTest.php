@@ -177,6 +177,7 @@ class AppAssistantTest extends TestCase
             ['bayad sa kuryente meralco', 'record-expense'],
             ['rent every month automatic', 'recurring-expense'],
             ['record supplier bill', 'supplier-bill'],
+            ['add a new supplier', 'add-supplier'],
             ['pay supplier', 'pay-supplier-bill'],
             ['bank balance gcash balance', 'bank-ewallet-balance'],
             ['loan from bank repayment', 'record-loan'],
