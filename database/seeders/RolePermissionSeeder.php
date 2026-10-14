@@ -1179,7 +1179,7 @@ class RolePermissionSeeder extends Seeder
     /**
      * Get display name for action
      */
-    private function getActionDisplayName(string $action): string
+    public function getActionDisplayName(string $action): string
     {
         $actionLabels = [
             'index' => 'View',
