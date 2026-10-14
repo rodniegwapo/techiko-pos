@@ -29,6 +29,11 @@ class CreateProduct implements AssistantAction, HasInputTemplate
         return 'Add product';
     }
 
+    public function templateGuide(): ?string
+    {
+        return 'add-product';
+    }
+
     public function template(ActionContext $context): array
     {
         $categories = $this->categories($context)->pluck('name');

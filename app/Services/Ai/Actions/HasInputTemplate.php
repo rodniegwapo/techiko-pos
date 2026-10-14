@@ -14,4 +14,7 @@ interface HasInputTemplate
 
     /** @return list<array{label: string, required: bool, hint: ?string}> */
     public function template(ActionContext $context): array;
+
+    /** The how-to guide for making the same change on its page (e.g. "add-product"); its page is offered as a button with the form. */
+    public function templateGuide(): ?string;
 }

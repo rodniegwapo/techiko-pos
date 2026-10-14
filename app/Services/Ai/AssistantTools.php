@@ -252,9 +252,17 @@ class AssistantTools
 
         $this->forms[$action->name()] = ['action' => $action->name(), 'title' => $action->templateTitle(), 'text' => implode("\n", $lines)];
 
+        // The page for doing it by hand comes with the form, when this user may open it.
+        $guide = $action->templateGuide() ? $this->guides->find($action->templateGuide()) : null;
+        $linked = $guide !== null && $this->guides->allows($this->user, $guide, $this->domain) && $this->addGuideLink($guide);
+
         return [
             'status' => 'form_shown',
-            'message' => 'A fill-in form with a Fill in button is shown under your answer. Tell the user in one short sentence to fill it in and send it; do not repeat the fields.',
+            'page_link_shown_to_user' => $linked,
+            'message' => 'A fill-in form with a Fill in button is shown under your answer'.($linked ? ', with a button to the page' : '').'. '
+                .'In one short sentence, tell the user to fill in the form and send it'
+                .($linked ? ', or tap the button to do it themselves on the page' : '')
+                .'. Do not repeat the fields.',
         ];
     }
 
@@ -369,15 +377,21 @@ class AssistantTools
             return ['error' => 'not_available', 'message' => 'This business does not have the feature for "'.$guide['title'].'" turned on (e.g. Finance). The Techiko team can turn it on.'];
         }
 
+        return [
+            'title' => $guide['title'],
+            'steps' => $guide['steps'],
+            'page_link_shown_to_user' => $this->addGuideLink($guide),
+        ];
+    }
+
+    /** Adds a button to the guide's page under the answer, when it has one. Callers check the user may follow it. */
+    private function addGuideLink(array $guide): bool
+    {
         $url = $this->guides->pageUrl($guide, $this->domain->name_slug);
         if ($url !== null) {
             $this->links[$guide['key']] = ['title' => $guide['title'], 'url' => $url];
         }
 
-        return [
-            'title' => $guide['title'],
-            'steps' => $guide['steps'],
-            'page_link_shown_to_user' => $url !== null,
-        ];
+        return $url !== null;
     }
 }

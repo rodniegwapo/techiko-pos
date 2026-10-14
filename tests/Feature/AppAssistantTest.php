@@ -345,7 +345,9 @@ class AppAssistantTest extends TestCase
 
         $tools = $this->tools($ctx);
         $this->assertContains('show_fill_in_form', array_map(fn ($tool) => $tool->name(), $tools->tools()));
-        $this->assertSame('form_shown', json_decode($tools->run('show_fill_in_form', ['action' => 'create_product']), true)['status']);
+        $shown = json_decode($tools->run('show_fill_in_form', ['action' => 'create_product']), true);
+        $this->assertSame('form_shown', $shown['status']);
+        $this->assertFalse($shown['page_link_shown_to_user']);
 
         [$form] = $tools->forms();
         $this->assertSame('create_product', $form['action']);
@@ -355,6 +357,17 @@ class AppAssistantTest extends TestCase
         $this->assertSame('Price (₱): ', $lines[1]);
         $this->assertSame('Category (one of: Burgers, Drinks; optional): ', $lines[2]);
         $this->assertStringNotContainsString('Not Ours', $form['text']);
+        // This admin may save products but not open the Create Product page, so no page button.
+        $this->assertSame([], $tools->links());
+
+        // With the page allowed too, its button comes with the form.
+        $withPage = $this->tools(['user' => $this->grant($ctx['user'], ['products.create'])] + $ctx);
+        $shown = json_decode($withPage->run('show_fill_in_form', ['action' => 'create_product']), true);
+        $this->assertTrue($shown['page_link_shown_to_user']);
+        $this->assertSame(
+            [['title' => 'Add a product', 'url' => route('domains.products.create', ['domain' => $ctx['domain']->name_slug])]],
+            $withPage->links(),
+        );
 
         // A role that can't add products gets no form tool, and no form even if the AI asks for one.
         $cashier = $this->tools($this->staff(['sales.index']));
