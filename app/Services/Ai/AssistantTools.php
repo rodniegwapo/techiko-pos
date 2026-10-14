@@ -15,6 +15,7 @@ use App\Services\Ai\Actions\ActionContext;
 use App\Services\Ai\Actions\ActionInputException;
 use App\Services\Ai\Actions\ActionRegistry;
 use App\Services\Ai\Actions\AssistantAction;
+use App\Services\Ai\Actions\Finance\PaySupplierBill;
 use App\Services\Ai\Actions\HasInputTemplate;
 use App\Services\Ai\Actions\Catalog\SoldTypes;
 use App\Services\Ai\Actions\PendingActions;
@@ -47,12 +48,14 @@ class AssistantTools
         'get_sales_settings' => ['settings.index', 'settings.update'],
         'list_expense_categories' => ['expenses.index', 'expenses.store', 'finance.bills.store'],
         'list_suppliers' => ['finance.payables.index', 'finance.bills.store'],
+        'list_open_bills' => ['finance.payables.index', 'finance.bill-payments.store'],
     ];
 
     /** Read tools that also need a feature of the business. */
     private const READ_TOOL_FEATURES = [
         'list_expense_categories' => 'finance',
         'list_suppliers' => 'finance',
+        'list_open_bills' => 'finance',
     ];
 
     /** @var array<string, array{title: string, url: string}> */
@@ -117,6 +120,7 @@ class AssistantTools
             'get_sales_settings' => ['The current sales settings: VAT on/off, VAT rate, prices include VAT or not, selling when out of stock, hiding out-of-stock products.', fn () => []],
             'list_expense_categories' => ['The expense categories of this business (rent, utilities…), with their ids.', fn () => []],
             'list_suppliers' => ['The suppliers of this business with their ids and payment terms (days).', fn () => []],
+            'list_open_bills' => ['The unpaid supplier bills, oldest due first: bill_id, supplier, bill no., bill and due dates, amount left to pay, overdue.', fn () => []],
         ];
         foreach ($read as $name => [$description, $schema]) {
             if ($this->mayRead($name)) {
@@ -184,6 +188,16 @@ class AssistantTools
                         ->get(['id', 'name', 'code', 'type', 'address', 'is_active', 'is_default'])->toArray(),
                     'list_expense_categories' => ExpenseCategory::query()->forDomain($this->domain->name_slug)->where('is_active', true)->orderBy('name')->get(['id', 'name'])->toArray(),
                     'list_suppliers' => Supplier::query()->where('domain', $this->domain->name_slug)->orderBy('name')->get(['id', 'name', 'payment_terms_days', 'is_active'])->toArray(),
+                    'list_open_bills' => PaySupplierBill::openBills(new ActionContext($this->user, $this->domain, $this->location))->take(30)
+                        ->map(fn ($bill) => [
+                            'bill_id' => $bill->id,
+                            'supplier' => $bill->supplier?->name,
+                            'bill_number' => $bill->bill_number,
+                            'bill_date' => $bill->bill_date?->toDateString(),
+                            'due_date' => $bill->due_date?->toDateString(),
+                            'left_to_pay' => $bill->remaining,
+                            'overdue' => $bill->due_date !== null && $bill->due_date->isPast() && ! $bill->due_date->isToday(),
+                        ])->values()->all(),
                     'get_sales_settings' => [
                         ...$this->domain->salesVatSettings(),
                         'allow_overselling' => (bool) ($this->domain->settings['sales']['allow_overselling'] ?? false),

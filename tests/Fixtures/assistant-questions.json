@@ -65,6 +65,8 @@
         { "id": "act-category", "question": "Create a category called Desserts", "expect": { "any_tool": ["propose_create_category"] } },
         { "id": "act-vat", "question": "Turn on VAT at 12%, prices already include VAT", "expect": { "any_tool": ["propose_update_sales_settings"] } },
         { "id": "act-customer", "question": "Add customer Maria Santos, phone 09181112222", "expect": { "any_tool": ["propose_create_customer", "find_customer"] } },
+        { "id": "act-receive-stock", "question": "We just received 24 bottles of Coke 1L at ₱45 each", "expect": { "any_tool": ["propose_receive_stock", "find_products"] } },
+        { "id": "act-pay-bill", "question": "I paid our supplier bill to Magnolia today in cash", "expect": { "any_tool": ["list_open_bills", "propose_pay_supplier_bill"] } },
         { "id": "form-add-customer", "question": "Add a customer for me", "expect": { "any_tool": ["show_fill_in_form"], "no_tool": ["propose_create_customer"] } },
         { "id": "form-record-expense", "question": "I want to record an expense", "expect": { "any_tool": ["show_fill_in_form"], "no_tool": ["propose_record_expense"] } },
         { "id": "form-add-supplier", "question": "Pakidagdag ng bagong supplier", "language": "taglish", "expect": { "any_tool": ["show_fill_in_form"] } },

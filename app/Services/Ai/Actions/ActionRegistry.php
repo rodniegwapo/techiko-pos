@@ -14,9 +14,11 @@ use App\Services\Ai\Actions\Customers\CreateCustomer;
 use App\Services\Ai\Actions\Customers\RecordCreditPayment;
 use App\Services\Ai\Actions\Customers\UpdateCustomer;
 use App\Services\Ai\Actions\Finance\CreateSupplier;
+use App\Services\Ai\Actions\Finance\PaySupplierBill;
 use App\Services\Ai\Actions\Finance\RecordExpense;
 use App\Services\Ai\Actions\Finance\RecordSupplierBill;
 use App\Services\Ai\Actions\Inventory\CreateStockAdjustment;
+use App\Services\Ai\Actions\Inventory\ReceiveStock;
 use App\Services\Ai\Actions\Store\CreatePaymentChannel;
 use App\Services\Ai\Actions\Store\CreateStore;
 use App\Services\Ai\Actions\Store\SetDefaultStore;
@@ -46,9 +48,11 @@ class ActionRegistry
         AdjustLoyaltyPoints::class,
         RecordCreditPayment::class,
         CreateStockAdjustment::class,
+        ReceiveStock::class,
         RecordExpense::class,
         CreateSupplier::class,
         RecordSupplierBill::class,
+        PaySupplierBill::class,
     ];
 
     /** @return list<AssistantAction> */

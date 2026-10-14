@@ -184,6 +184,79 @@ class AppAssistantActionsTest extends TestCase
         $this->assertEquals(10, ProductInventory::query()->where('product_id', $burger->id)->value('quantity_on_hand'), 'stock changes only after approval');
     }
 
+    public function test_received_stock_goes_up_in_the_users_store_on_confirm(): void
+    {
+        $user = $this->user(['inventory.receive']);
+        $category = Category::factory()->create(['domain' => $this->domain->name_slug]);
+        $coke = Product::factory()->create(['domain' => $this->domain->name_slug, 'category_id' => $category->id, 'name' => 'Coke 1L', 'cost' => 45]);
+        $ice = Product::factory()->create(['domain' => $this->domain->name_slug, 'category_id' => $category->id, 'name' => 'Ice', 'cost' => null]);
+        ProductInventory::query()->create(['product_id' => $coke->id, 'location_id' => $this->store->id, 'quantity_on_hand' => 10, 'quantity_reserved' => 0, 'quantity_available' => 10]);
+
+        // By name (any letter case) and at the product's own cost, until confirmed.
+        $card = $this->propose($user, 'receive_stock', ['items' => [['product' => 'coke 1l', 'quantity' => 24]]]);
+        $this->assertContains(['label' => 'Coke 1L', 'value' => '24 × ₱45.00 = ₱1,080.00'], $card['fields']);
+        $this->assertEquals(10, ProductInventory::query()->where('product_id', $coke->id)->value('quantity_on_hand'), 'nothing changes before Confirm');
+
+        $this->confirm($user, $card)->assertOk()->assertJsonPath('message', 'Received 24 items into Main.');
+        $this->assertEquals(34, ProductInventory::query()->where('product_id', $coke->id)->where('location_id', $this->store->id)->value('quantity_on_hand'));
+
+        // A product with no cost needs one; another business's product is not found.
+        $other = Product::factory()->create(['domain' => 'another-business', 'category_id' => $category->id, 'name' => 'Sprite']);
+        $tools = $this->tools($user);
+        $this->assertSame('What did each Ice cost? It has no cost saved.', json_decode($tools->run('propose_receive_stock', ['items' => [['product_id' => $ice->id, 'quantity' => 5]]]), true)['error']);
+        $this->assertStringContainsString('not in this business', json_decode($tools->run('propose_receive_stock', ['items' => [['product_id' => $other->id, 'quantity' => 5, 'unit_cost' => 20]]]), true)['error']);
+        $this->assertSame('There is no product "Sprite". Use find_products to look it up.', json_decode($tools->run('propose_receive_stock', ['items' => [['product' => 'Sprite', 'quantity' => 5, 'unit_cost' => 20]]]), true)['error']);
+    }
+
+    public function test_a_supplier_bill_payment_lowers_what_is_owed_on_confirm(): void
+    {
+        $user = $this->user(['finance.payables.index', 'finance.bill-payments.store']);
+        $magnolia = Supplier::query()->create(['domain' => $this->domain->name_slug, 'name' => 'Magnolia', 'payment_terms_days' => 15, 'is_active' => true]);
+        $bill = fn (array $attributes) => SupplierBill::query()->create([
+            'domain' => $this->domain->name_slug, 'supplier_id' => $magnolia->id, 'bill_type' => 'inventory', 'user_id' => $user->id,
+            'bill_date' => today()->subDays(20)->toDateString(), 'due_date' => today()->subDays(5)->toDateString(), ...$attributes,
+        ]);
+        $first = $bill(['amount' => 3000, 'bill_number' => 'MG-1']);
+
+        $names = array_map(fn ($tool) => $tool->name(), $this->tools($user)->tools());
+        $this->assertContains('list_open_bills', $names);
+        $this->assertContains('propose_pay_supplier_bill', $names);
+        $open = json_decode($this->tools($user)->run('list_open_bills', []), true);
+        $this->assertSame([['bill_id' => $first->id, 'supplier' => 'Magnolia', 'bill_number' => 'MG-1', 'bill_date' => today()->subDays(20)->toDateString(),
+            'due_date' => today()->subDays(5)->toDateString(), 'left_to_pay' => 3000, 'overdue' => true]], $open);
+
+        // The supplier's only unpaid bill, part of it, in cash from the user's store.
+        $card = $this->propose($user, 'pay_supplier_bill', ['supplier' => 'magnolia', 'amount' => 1000, 'payment_method' => 'cash_register']);
+        $this->assertContains(['label' => 'Amount', 'value' => '₱1,000.00 of ₱3,000.00 left'], $card['fields']);
+        $this->confirm($user, $card)->assertOk()->assertJsonPath('message', 'Recorded ₱1,000.00 paid to Magnolia.');
+        $this->assertSame(2000.0, $first->fresh()->remaining);
+
+        // More than is left is refused; with two unpaid bills the AI must ask which.
+        $tools = $this->tools($user);
+        $this->assertSame('Only ₱2,000.00 is left to pay on this bill.', json_decode($tools->run('propose_pay_supplier_bill', ['bill_id' => $first->id, 'amount' => 2500, 'payment_method' => 'bank']), true)['error']);
+        $second = $bill(['amount' => 500, 'bill_number' => 'MG-2']);
+        $refused = json_decode($this->tools($user)->run('propose_pay_supplier_bill', ['supplier' => 'Magnolia', 'payment_method' => 'bank']), true);
+        $this->assertStringStartsWith('Magnolia has 2 unpaid bills: bill_id '.$first->id, $refused['error']);
+        $this->assertStringContainsString('bill_id '.$second->id, $refused['error']);
+
+        // Paying the rest by bill id clears the bill.
+        $this->confirm($user, $this->propose($user, 'pay_supplier_bill', ['bill_id' => $first->id, 'payment_method' => 'bank']))->assertOk();
+        $this->assertSame(0.0, $first->fresh()->remaining);
+    }
+
+    public function test_bill_payments_need_the_finance_feature_and_permission(): void
+    {
+        $noPermission = $this->user(['finance.payables.index']);
+        $names = array_map(fn ($tool) => $tool->name(), $this->tools($noPermission)->tools());
+        $this->assertNotContains('propose_pay_supplier_bill', $names);
+
+        $user = $this->user(['finance.payables.index', 'finance.bill-payments.store']);
+        $this->domain->update(['settings' => ['features' => ['ai' => true, 'finance' => false]]]);
+        $names = array_map(fn ($tool) => $tool->name(), $this->tools($user)->tools());
+        $this->assertNotContains('propose_pay_supplier_bill', $names);
+        $this->assertNotContains('list_open_bills', $names);
+    }
+
     public function test_a_payment_channel_is_added_to_the_users_store(): void
     {
         $user = $this->user(['payment-card-types.store']);
