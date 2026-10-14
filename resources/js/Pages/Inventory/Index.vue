@@ -389,7 +389,7 @@ onMounted(() => setTimeout(() => (chartLoaded.value = true), 400));
                         </div>
 
                         <div class="mt-8">
-                            <p>Total Inventory Value</p>
+                            <p>Total Inventory Value (at cost)</p>
                             <p
                                 class="text-3xl font-bold text-green-700 md:text-4xl"
                             >
@@ -399,6 +399,49 @@ onMounted(() => setTimeout(() => (chartLoaded.value = true), 400));
                                     )
                                 }}
                             </p>
+                        </div>
+
+                        <!-- Same figures as the Valuation report; they reveal margins, so the same permission. -->
+                        <div
+                            v-if="canViewValuation"
+                            class="mt-4 grid grid-cols-2 gap-3"
+                            data-testid="inventory-retail-summary"
+                        >
+                            <div class="rounded-lg border p-3">
+                                <p class="text-xs uppercase text-gray-500">
+                                    At sale price
+                                </p>
+                                <p class="mt-1 text-lg font-semibold text-gray-800">
+                                    {{ formattedTotal(summary.total_retail_value ?? 0) }}
+                                </p>
+                            </div>
+                            <div class="rounded-lg border p-3">
+                                <p class="text-xs uppercase text-gray-500">
+                                    Potential profit
+                                </p>
+                                <p
+                                    class="mt-1 text-lg font-semibold"
+                                    :class="
+                                        Number(summary.potential_profit ?? 0) < 0
+                                            ? 'text-red-600'
+                                            : 'text-green-700'
+                                    "
+                                >
+                                    {{ formattedTotal(summary.potential_profit ?? 0) }}
+                                </p>
+                                <p
+                                    v-if="Number(summary.total_retail_value) > 0"
+                                    class="text-xs text-gray-500"
+                                >
+                                    {{
+                                        (
+                                            (Number(summary.potential_profit) /
+                                                Number(summary.total_retail_value)) *
+                                            100
+                                        ).toFixed(1)
+                                    }}% margin
+                                </p>
+                            </div>
                         </div>
 
                         <div class="border rounded-lg p-6 mt-6">

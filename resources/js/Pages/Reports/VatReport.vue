@@ -4,13 +4,16 @@ import { Head, router, usePage } from "@inertiajs/vue3";
 import { useMediaQuery } from "@vueuse/core";
 import axios from "axios";
 import dayjs from "dayjs";
-import { dateRangePresets } from "@/Composables/useDateRangePresets";
 import { message } from "ant-design-vue";
 import { IconPrinter } from "@tabler/icons-vue";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
 import ContentLayout from "@/Components/ContentLayout.vue";
 import SimplePrintTable from "@/Components/Reports/SimplePrintTable.vue";
+import RefreshButton from "@/Components/buttons/Refresh.vue";
+import FilterDropdown from "@/Components/filters/FilterDropdown.vue";
+import ActiveFilters from "@/Components/filters/ActiveFilters.vue";
+import { useFilters, toLabel } from "@/Composables/useFilters";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useHelpers } from "@/Composables/useHelpers";
 
@@ -55,20 +58,48 @@ const props = defineProps({
 const domainName =
     page.props.currentDomain?.name ?? page.props.domain?.name ?? "Organization";
 
-const dateRangeLocal = ref([
-    props.filters?.start_date ? dayjs(props.filters.start_date) : null,
-    props.filters?.end_date ? dayjs(props.filters.end_date) : null,
-]);
-const locationIdLocal = ref(props.filters?.location_id ?? null);
+// Filters work like the other report pages: a Filter dropdown (date range, location) and
+// Active Filters tags under the title; changing one reloads the report.
+const dateRange = ref(
+    props.filters?.start_date && props.filters?.end_date
+        ? [dayjs(props.filters.start_date), dayjs(props.filters.end_date)]
+        : null,
+);
+const locationId = ref(props.filters?.location_id ?? null);
+const loading = ref(false);
 
+const locationOptions = computed(() =>
+    (props.locations || []).map((l) => ({ value: l.id, label: l.name })),
+);
+
+const filtersConfig = computed(() => [
+    { key: "date", label: "Date", type: "range" },
+    { key: "location", label: "Location", type: "select", options: locationOptions.value },
+]);
+
+const dateLabel = (v) =>
+    Array.isArray(v) && v[0] && v[1]
+        ? `${dayjs(v[0]).format("MMM D, YYYY")} – ${dayjs(v[1]).format("MMM D, YYYY")}`
+        : null;
+
+const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
+    getItems: () => applyFilters(),
+    configs: [
+        { label: "Date", key: "date", ref: dateRange, getLabel: dateLabel },
+        { label: "Location", key: "location", ref: locationId, getLabel: toLabel(locationOptions) },
+    ],
+});
+
+const clearAllFilters = () =>
+    Object.keys(filters.value).forEach((k) => (filters.value[k] = null));
+
+// The server fills in a default period when none is picked; show it as the Date tag.
 watch(
     () => props.filters,
     (f) => {
-        dateRangeLocal.value = [
-            f?.start_date ? dayjs(f.start_date) : null,
-            f?.end_date ? dayjs(f.end_date) : null,
-        ];
-        locationIdLocal.value = f?.location_id ?? null;
+        dateRange.value =
+            f?.start_date && f?.end_date ? [dayjs(f.start_date), dayjs(f.end_date)] : null;
+        locationId.value = f?.location_id ?? null;
     },
     { deep: true },
 );
@@ -108,17 +139,21 @@ const pageSubtotals = computed(() => {
 });
 
 function applyFilters() {
-    const start = dateRangeLocal.value?.[0]?.format?.("YYYY-MM-DD");
-    const end = dateRangeLocal.value?.[1]?.format?.("YYYY-MM-DD");
+    const [start, end] = Array.isArray(dateRange.value) ? dateRange.value : [];
     router.get(
         getRoute("vat-report.index"),
         {
-            start_date: start,
-            end_date: end,
-            location_id: locationIdLocal.value || undefined,
+            start_date: start ? dayjs(start).format("YYYY-MM-DD") : undefined,
+            end_date: end ? dayjs(end).format("YYYY-MM-DD") : undefined,
+            location_id: locationId.value || undefined,
             page: 1,
         },
-        { preserveState: true, replace: true },
+        {
+            preserveState: true,
+            replace: true,
+            onStart: () => (loading.value = true),
+            onFinish: () => (loading.value = false),
+        },
     );
 }
 
@@ -365,56 +400,33 @@ const columns = [
             filter-class="flex flex-wrap items-center justify-end gap-2 w-full min-w-0"
         >
             <template #filters>
-                <div class="flex w-full min-w-0 flex-col gap-1 md:w-auto">
-                    <span class="text-xs text-gray-600">Date range</span>
-                    <a-range-picker
-                        v-model:value="dateRangeLocal"
-                        :ranges="dateRangePresets()"
-                        format="YYYY-MM-DD"
-                        class="w-full min-w-0 md:min-w-[260px]"
-                    />
-                </div>
-                <div class="flex w-full min-w-0 flex-col gap-1 md:w-auto">
-                    <span class="text-xs text-gray-600">Location</span>
-                    <a-select
-                        v-model:value="locationIdLocal"
-                        allow-clear
-                        placeholder="All locations"
-                        class="w-full min-w-0 md:min-w-[200px]"
-                        :options="
-                            (locations || []).map((l) => ({
-                                value: l.id,
-                                label: l.name,
-                            }))
-                        "
-                    />
-                </div>
-                <a-button
-                    type="primary"
-                    class="w-full md:w-auto"
-                    @click="applyFilters"
-                >
-                    Apply
-                </a-button>
+                <RefreshButton :loading="loading" @click="applyFilters" />
                 <a-button
                     type="default"
-                    class="w-full md:w-auto"
                     :loading="exportingExcel"
                     @click="exportExcel"
                 >
                     Export Excel
                 </a-button>
-                <span v-print="vatPrintOptions" class="block w-full md:w-auto">
-                    <a-button
-                        type="default"
-                        class="flex w-full items-center justify-center gap-2 md:inline-flex md:w-auto"
-                    >
+                <span v-print="vatPrintOptions" class="inline-block">
+                    <a-button type="default" class="inline-flex items-center gap-2">
                         <template #icon>
                             <IconPrinter :size="20" />
                         </template>
                         Print
                     </a-button>
                 </span>
+                <FilterDropdown v-model="filters" :filters="filtersConfig" />
+            </template>
+
+            <template #activeFilters>
+                <div class="no-print">
+                    <ActiveFilters
+                        :filters="activeFilters"
+                        @remove-filter="handleClearSelectedFilter"
+                        @clear-all="clearAllFilters"
+                    />
+                </div>
             </template>
 
             <template #table>

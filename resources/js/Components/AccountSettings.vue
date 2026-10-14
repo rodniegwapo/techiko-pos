@@ -19,7 +19,7 @@ const props = defineProps({
             <a-dropdown :trigger="['click']">
                 <a-avatar
                     size="large"
-                    :src="`https://ui-avatars.com/api/?name=${user.name}&background=287e47&color=ffff`"
+                    :src="`https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=287e47&color=ffffff`"
                     class="cursor-pointer"
                 >
                 </a-avatar>

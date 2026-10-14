@@ -19,6 +19,24 @@ class WalletCashMovement extends Model
         'adjustment',
     ];
 
+    /** Written only by the Expenses module; staff can't pick it in the ledger form. */
+    public const KIND_EXPENSE = 'expense';
+
+    /**
+     * Lines other modules post on their own (an expense paid from the register, a supplier paid
+     * in cash, other income put in the drawer). They can't be added or picked by hand in the
+     * ledger; the record they belong to points at them through wallet_cash_movement_id.
+     */
+    public const SYSTEM_KINDS = [
+        self::KIND_EXPENSE,
+        'supplier_payment',
+        'other_income',
+        'loan_received',
+        'loan_payment',
+        'asset_purchase',
+        'owner_investment',
+    ];
+
     protected $casts = [
         'movement_date' => 'date',
         'amount' => 'float',

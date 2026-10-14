@@ -35,7 +35,7 @@ import LocationInfoAlert from "@/Components/LocationInfoAlert.vue";
 
 const page = usePage();
 const isMdUp = useMediaQuery("(min-width: 768px)");
-const { showModal, confirmDelete, showNotification } = useHelpers();
+const { showModal, confirmDelete, confirmAction, showNotification } = useHelpers();
 const { spinning } = useGlobalVariables();
 const { getRoute } = useDomainRoutes();
 const { hasPermission } = usePermissionsV2();
@@ -206,7 +206,14 @@ const reportResult = (reloaded, fallback) => {
     showNotification("success", "Success", reloaded?.props?.flash?.success || fallback);
 };
 
-const setAsDefault = (location) => {
+const setAsDefault = async (location) => {
+    const confirmed = await confirmAction({
+        title: `Make "${location.name}" the default location?`,
+        content: "It will be used whenever no other location is picked.",
+        okText: "Make default",
+    });
+    if (!confirmed) return;
+
     router.post(
         getRoute("inventory.locations.set-default", { location: location.id }),
         {},
@@ -220,7 +227,17 @@ const setAsDefault = (location) => {
     );
 };
 
-const toggleStatus = (location) => {
+const toggleStatus = async (location) => {
+    const action = location.is_active ? "Deactivate" : "Activate";
+    const confirmed = await confirmAction({
+        title: `${action} "${location.name}"?`,
+        content: location.is_active
+            ? "It can't be used for sales or stock until it is activated again."
+            : "It can be used for sales and stock again.",
+        okText: action,
+    });
+    if (!confirmed) return;
+
     router.post(
         getRoute("inventory.locations.toggle-status", { location: location.id }),
         {},

@@ -17,7 +17,8 @@ const GATED_PAGES = [
     { title: "Customers", path: "customers", allowed: ["admin", "manager", "cashier"] },
     { title: "Credit Management", path: "credits", allowed: ["admin", "manager", "cashier"] },
     { title: "Loyalty Program", path: "loyalty", allowed: ["admin", "manager", "cashier"] },
-    { title: "VAT report", path: "vat-report", allowed: ["admin", "manager"] },
+    // VAT report now sits in the Finance group, so the sidebar shows the group.
+    { title: "VAT report", menu: "Finance", path: "vat-report", allowed: ["admin", "manager"] },
     { title: "Settings", path: "settings", allowed: ["admin", "manager"] },
     { title: "Void Logs", path: "void-logs", allowed: ["admin", "manager"] },
     { title: "Users", path: "users", allowed: ["admin"] },
@@ -98,8 +99,12 @@ for (const role of ["admin", "manager", "cashier"]) {
             await page.goto(orgDashboard(user.domain));
             await expect(sidebarItem(page, "Dashboard")).toBeVisible();
 
-            for (const { title, allowed } of GATED_PAGES) {
-                const item = sidebarItem(page, title);
+            for (const { title: pageTitle, menu, allowed } of GATED_PAGES) {
+                const title = menu ?? pageTitle;
+                // A group's title is plain text in the sidebar, not a menu item of its own.
+                const item = menu
+                    ? page.getByRole("complementary").getByText(menu, { exact: true })
+                    : sidebarItem(page, title);
                 if (allowed.includes(role)) {
                     await expect(item, `${role} should see "${title}"`).toBeVisible();
                 } else {

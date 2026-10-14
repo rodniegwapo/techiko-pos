@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Domains;
 
+use App\Helpers;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\SalesHistoryResource;
 use App\Models\Domain;
@@ -10,12 +11,12 @@ use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\User;
 use App\Models\VoidLog;
+use App\Services\Sales\SalesHistoryQuery;
 use App\Services\SaleService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -27,40 +28,17 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class SalesHistoryController extends Controller
 {
     /** Statuses a sale can have once it has left the cart. */
-    private const STATUSES = ['paid', 'partial', 'refunded', 'voided'];
+    private const STATUSES = SalesHistoryQuery::STATUSES;
 
-    private const PAYMENT_METHODS = ['cash', 'card', 'e-wallet', 'bank', 'credit', 'split'];
+    private const PAYMENT_METHODS = SalesHistoryQuery::PAYMENT_METHODS;
 
     public function index(Request $request, Domain $domain)
     {
         $filters = $this->resolveFilters($request, $domain);
         $query = $this->baseQuery($domain, $filters);
 
-        // Voided sales stay in the list but count for nothing in the totals.
-        $counted = (clone $query)->where('payment_status', '!=', 'voided');
-
-        $summary = (clone $counted)
-            ->selectRaw('COUNT(*) as sales_count')
-            ->selectRaw('COALESCE(SUM(total_amount), 0) as gross')
-            ->selectRaw('COALESCE(SUM(discount_amount), 0) as discounts')
-            ->selectRaw('COALESCE(SUM(tax_amount), 0) as vat')
-            ->selectRaw('COALESCE(SUM(grand_total), 0) as net')
-            ->first();
-        $salesWithVoids = (clone $counted)->whereHas('saleItems', fn ($q) => $q->onlyTrashed())->count();
-        $voidedSales = (clone $query)->where('payment_status', 'voided')->count();
-
         // Profit reveals product costs, so only staff who see all sales get it.
-        $profitSummary = [];
-        if ($this->canSeeAllSales($request->user())) {
-            // Voided lines are soft-deleted, so they drop out of cost of goods sold on their own.
-            $soldItems = SaleItem::query()->whereIn('sale_id', (clone $counted)->select('sales.id'));
-            $cogs = (float) (clone $soldItems)->whereNotNull('unit_cost')->sum(DB::raw('unit_cost * quantity'));
-            $profitSummary = [
-                'cogs' => round($cogs, 2),
-                'profit' => round((float) $summary->net - (float) $summary->vat - $cogs, 2),
-                'items_missing_cost' => (clone $soldItems)->whereNull('unit_cost')->count(),
-            ];
-        }
+        $summary = SalesHistoryQuery::summary($query, $this->canSeeAllSales($request->user()));
 
         $perPage = min(max((int) $request->input('per_page', 20), 1), 100);
 
@@ -81,16 +59,7 @@ class SalesHistoryController extends Controller
                 'payment_status' => $filters['payment_status'],
                 'search' => $filters['search'],
             ],
-            'summary' => [
-                'sales_count' => (int) $summary->sales_count,
-                'gross' => round((float) $summary->gross, 2),
-                'discounts' => round((float) $summary->discounts, 2),
-                'vat' => round((float) $summary->vat, 2),
-                'net' => round((float) $summary->net, 2),
-                'sales_with_voids' => $salesWithVoids,
-                'voided_sales' => $voidedSales,
-                ...$profitSummary,
-            ],
+            'summary' => $summary,
             'options' => [
                 'locations' => $this->canSeeAllSales($request->user())
                     ? InventoryLocation::query()->forDomain($domain->name_slug)->active()->orderBy('name')->get(['id', 'name'])
@@ -343,7 +312,12 @@ class SalesHistoryController extends Controller
         $validated = $request->validate([
             'start_date' => ['nullable', 'date'],
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
-            'location_id' => ['nullable', 'integer'],
+            // A store id, or "all" for every store; left out, the store picked in the header is used.
+            'location_id' => ['nullable', function ($attribute, $value, $fail) {
+                if ($value !== 'all' && filter_var($value, FILTER_VALIDATE_INT) === false) {
+                    $fail('The location must be a store or "all".');
+                }
+            }],
             'user_id' => ['nullable', 'integer'],
             'payment_method' => ['nullable', Rule::in(self::PAYMENT_METHODS)],
             'payment_status' => ['nullable', Rule::in(self::STATUSES)],
@@ -355,7 +329,12 @@ class SalesHistoryController extends Controller
         $start = Carbon::parse($validated['start_date'] ?? now()->toDateString())->startOfDay();
         $end = Carbon::parse($validated['end_date'] ?? $start->toDateString())->endOfDay();
 
-        $locationId = isset($validated['location_id']) ? (int) $validated['location_id'] : null;
+        $locationId = isset($validated['location_id']) && $validated['location_id'] !== 'all'
+            ? (int) $validated['location_id']
+            : null;
+        if (! $request->filled('location_id') && $this->canSeeAllSales($request->user())) {
+            $locationId = Helpers::getActiveLocation($domain)?->id;
+        }
         if ($locationId && ! InventoryLocation::query()->forDomain($domain->name_slug)->whereKey($locationId)->exists()) {
             $locationId = null;
         }
@@ -378,24 +357,7 @@ class SalesHistoryController extends Controller
 
     private function baseQuery(Domain $domain, array $filters): Builder
     {
-        return Sale::query()
-            ->where('domain', $domain->name_slug)
-            ->whereBetween('transaction_date', [$filters['start'], $filters['end']])
-            ->whereIn('payment_status', $filters['payment_status'] ? [$filters['payment_status']] : self::STATUSES)
-            ->when($filters['location_id'], fn ($q, $id) => $q->where('location_id', $id))
-            ->when($filters['user_id'], fn ($q, $id) => $q->where('user_id', $id))
-            // A method also finds the sales paid partly that way ("split" finds every sale paid in parts).
-            ->when($filters['payment_method'], fn ($q, $method) => $q->where(function ($q) use ($method) {
-                $q->where('payment_method', $method)
-                    ->orWhere(fn ($split) => $split->where('payment_method', 'split')
-                        ->whereHas('payments', fn ($p) => $p->where('method', $method)));
-            }))
-            ->when($filters['search'], function ($q, $search) {
-                $q->where(function ($q) use ($search) {
-                    $q->where('invoice_number', 'like', "%{$search}%")
-                        ->orWhereHas('customer', fn ($c) => $c->where('name', 'like', "%{$search}%"));
-                });
-            });
+        return SalesHistoryQuery::baseQuery($domain->name_slug, $filters);
     }
 
     private function withListRelations(Builder $query): Builder
@@ -408,22 +370,9 @@ class SalesHistoryController extends Controller
             ]);
     }
 
-    /**
-     * Managers and above see everyone's sales; supervisors and cashiers see only their own.
-     * Goes by the assigned role's level: the users.role_level column defaults to 3 (manager)
-     * for staff created in the app, so it can't tell a cashier apart.
-     */
+    /** Managers and above see everyone's sales; supervisors and cashiers see only their own. */
     private function canSeeAllSales(?User $user): bool
     {
-        if ($user === null) {
-            return false;
-        }
-        if ($user->is_super_user) {
-            return true;
-        }
-
-        $roleLevel = $user->roles->min('level');
-
-        return $roleLevel !== null ? (int) $roleLevel <= 3 : $user->isManagerOrAbove();
+        return SalesHistoryQuery::canSeeAllSales($user);
     }
 }

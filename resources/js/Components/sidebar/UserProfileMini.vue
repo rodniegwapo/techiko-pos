@@ -13,7 +13,7 @@ const props = defineProps({
 
 const fallbackAvatar = (name) => {
   const q = encodeURIComponent(name || "User");
-  return `https://ui-avatars.com/api/?name=${q}&background=287e47&color=ffff`;
+  return `https://ui-avatars.com/api/?name=${q}&background=287e47&color=ffffff`;
 };
 
 const avatarSrc = computed(

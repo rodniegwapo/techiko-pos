@@ -139,6 +139,21 @@ class StockReachesDestinationStoreTest extends TestCase
         $this->assertSame(3, $this->quantityAt($ctx['product'], $ctx['locB']));
     }
 
+    public function test_inventory_dashboard_shows_stock_at_sale_price_and_potential_profit(): void
+    {
+        $ctx = $this->seedContext(); // 10 at Store A, cost 100, price 150
+
+        $this->actingAs($ctx['user'])
+            ->get(route('domains.inventory.index', [
+                'domain' => $ctx['domain']->name_slug,
+                'location_id' => $ctx['locA']->id,
+            ]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('report.summary.total_retail_value', fn ($v) => (float) $v === 1500.0)
+                ->where('report.summary.potential_profit', fn ($v) => (float) $v === 500.0));
+    }
+
     public function test_duplicate_sku_message_names_the_field_properly(): void
     {
         $ctx = $this->seedContext();

@@ -12,7 +12,23 @@ class PermissionModuleSeeder extends Seeder
      */
     public function run(): void
     {
-        $modules = [
+        foreach (self::modules() as $module) {
+            DB::table('permission_modules')->updateOrInsert(
+                ['name' => $module['name']],
+                $module
+            );
+        }
+    }
+
+    /**
+     * The permission modules (section headers of the role permissions page). Also used by the
+     * feature permission seeders, which add only their own modules.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function modules(): array
+    {
+        return [
             [
                 'name' => 'dashboard',
                 'display_name' => 'Dashboard',
@@ -166,6 +182,30 @@ class PermissionModuleSeeder extends Seeder
                 'is_active' => true,
             ],
             [
+                'name' => 'expenses',
+                'display_name' => 'Expenses',
+                'icon' => 'receipt-2',
+                'description' => 'Record business expenses such as rent, salaries and utilities',
+                'sort_order' => 18,
+                'is_active' => true,
+            ],
+            [
+                'name' => 'profit-loss',
+                'display_name' => 'Profit & Loss',
+                'icon' => 'report-analytics',
+                'description' => 'Profit and loss statement: sales, cost of goods, losses and expenses',
+                'sort_order' => 18,
+                'is_active' => true,
+            ],
+            [
+                'name' => 'finance',
+                'display_name' => 'Finance',
+                'icon' => 'report-analytics',
+                'description' => 'Financial dashboard, income statement, customer credit and AI explanations',
+                'sort_order' => 18,
+                'is_active' => true,
+            ],
+            [
                 'name' => 'domains',
                 'display_name' => 'Domains',
                 'icon' => 'world',
@@ -181,13 +221,14 @@ class PermissionModuleSeeder extends Seeder
                 'sort_order' => 20,
                 'is_active' => true,
             ],
+            [
+                'name' => 'assistant',
+                'display_name' => 'AI Assistant',
+                'icon' => 'robot',
+                'description' => 'The AI assistant in the chat drawer: how-to help and actions done for you',
+                'sort_order' => 21,
+                'is_active' => true,
+            ],
         ];
-
-        foreach ($modules as $module) {
-            DB::table('permission_modules')->updateOrInsert(
-                ['name' => $module['name']],
-                $module
-            );
-        }
     }
 }

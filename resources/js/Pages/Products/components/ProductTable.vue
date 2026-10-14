@@ -1,4 +1,5 @@
 <script setup>
+import { avatarStyle, initials } from "@/Composables/avatarColors";
 import { computed, ref } from "vue";
 import { useMediaQuery } from "@vueuse/core";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
@@ -117,11 +118,18 @@ const columns = computed(() => {
     return baseColumns;
 });
 
-function avatarSrc(record) {
-    if (record.representation_type === "color") {
-        return `https://ui-avatars.com/api/?name=${record.name}&background=${record.representation}&color=ffff`;
-    }
-    return `https://ui-avatars.com/api/?name=${record.name}&background=blue&color=ffff`;
+/** Image products show their picture; the rest show initials on their saved colour. */
+function avatarImage(record) {
+    return record?.representation_type === "image" && record.representation
+        ? String(record.representation)
+        : undefined;
+}
+
+function productAvatarStyle(record) {
+    return avatarStyle(
+        record?.name,
+        record?.representation_type === "color" ? record.representation : null,
+    );
 }
 
 function categoryName(record) {
@@ -204,8 +212,11 @@ function onMobilePaginationChange(pageNum) {
                 <a-avatar
                     shape="circle"
                     size="large"
-                    :src="avatarSrc(record)"
-                />
+                    :src="avatarImage(record)"
+                    :style="avatarImage(record) ? undefined : productAvatarStyle(record)"
+                >
+                    {{ initials(record.name) }}
+                </a-avatar>
             </template>
 
             <template v-if="column.key == 'domain'">
@@ -301,8 +312,11 @@ function onMobilePaginationChange(pageNum) {
                         <a-avatar
                             shape="circle"
                             size="large"
-                            :src="avatarSrc(record)"
-                        />
+                            :src="avatarImage(record)"
+                            :style="avatarImage(record) ? undefined : productAvatarStyle(record)"
+                        >
+                            {{ initials(record.name) }}
+                        </a-avatar>
                         <div class="min-w-0 flex-1">
                             <div
                                 class="truncate text-base font-semibold text-gray-900"
@@ -463,8 +477,11 @@ function onMobilePaginationChange(pageNum) {
                 <a-avatar
                     shape="circle"
                     size="large"
-                    :src="avatarSrc(selectedProduct)"
-                />
+                    :src="avatarImage(selectedProduct)"
+                    :style="avatarImage(selectedProduct) ? undefined : productAvatarStyle(selectedProduct)"
+                >
+                    {{ initials(selectedProduct.name) }}
+                </a-avatar>
                 <div class="min-w-0 flex-1">
                     <h3 class="text-xl font-semibold text-gray-900">
                         {{ selectedProduct.name }}

@@ -129,6 +129,10 @@ class StockAdjustment extends Model
         }
 
         DB::transaction(function () use ($approver) {
+            // Stock may have moved (sales, transfers) since the draft was made; measure the
+            // difference against today's stock so the counted quantity is what ends up on hand.
+            $this->refreshSystemQuantities();
+
             $this->update([
                 'status' => 'approved',
                 'approved_at' => now(),
@@ -194,6 +198,22 @@ class StockAdjustment extends Model
     /**
      * Process adjustment items and update inventory
      */
+    protected function refreshSystemQuantities(): void
+    {
+        foreach ($this->items as $item) {
+            $onHand = ProductInventory::query()
+                ->where('product_id', $item->product_id)
+                ->where('location_id', $this->location_id)
+                ->lockForUpdate()
+                ->value('quantity_on_hand');
+
+            $item->system_quantity = (int) ($onHand ?? 0);
+            $item->save();
+        }
+
+        $this->calculateTotalValueChange();
+    }
+
     protected function processAdjustmentItems()
     {
         foreach ($this->items as $item) {

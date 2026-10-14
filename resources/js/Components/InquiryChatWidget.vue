@@ -4,9 +4,24 @@ import { router, usePage } from "@inertiajs/vue3";
 import { IconMessageCircle } from "@tabler/icons-vue";
 import { message as antMessage } from "ant-design-vue";
 import { useConversationChannel } from "@/Composables/useConversationChannel";
+import { usePermissionsV2 } from "@/Composables/usePermissionV2";
+import AssistantPanel from "@/Components/assistant/AssistantPanel.vue";
 
 const page = usePage();
+const { hasPermission } = usePermissionsV2();
 const open = ref(false);
+
+// The AI assistant tab: for organizations given AI support, and roles allowed to ask it.
+const assistantAvailable = computed(
+    () => !!page.props.domainFeatures?.ai && !!page.props.currentDomain && hasPermission("assistant.ask"),
+);
+const tab = ref(assistantAvailable.value ? "assistant" : "team");
+watch(assistantAvailable, (available) => {
+    if (!available) tab.value = "team";
+});
+const drawerTitle = computed(() =>
+    assistantAvailable.value ? "Help & chat" : "Chat with the team",
+);
 const body = ref("");
 const submitting = ref(false);
 const localMessages = ref([]);
@@ -184,9 +199,9 @@ function onComposerKeydown(e) {
     <div>
         <a-drawer
             v-model:visible="open"
-            title="Chat with the team"
+            :title="drawerTitle"
             placement="right"
-            :width="400"
+            width="min(100vw, max(420px, 50vw))"
             :content-wrapper-style="{ height: '100dvh', maxHeight: '100dvh' }"
             :drawer-style="{
                 height: '100%',
@@ -205,7 +220,30 @@ function onComposerKeydown(e) {
             }"
             :style="{ overflow: 'hidden' }"
         >
-            <div class="flex h-full min-h-0 min-w-0 flex-1 flex-col">
+            <div
+                v-if="assistantAvailable"
+                class="shrink-0 px-4 pb-2 pt-3"
+            >
+                <a-radio-group
+                    v-model:value="tab"
+                    button-style="solid"
+                    class="flex w-full"
+                    data-testid="chat-tabs"
+                >
+                    <a-radio-button value="assistant" class="flex-1 text-center">
+                        AI Assistant
+                    </a-radio-button>
+                    <a-radio-button value="team" class="flex-1 text-center">
+                        Chat with the team
+                    </a-radio-button>
+                </a-radio-group>
+            </div>
+            <AssistantPanel
+                v-if="assistantAvailable && tab === 'assistant'"
+                @ask-human="tab = 'team'"
+                @navigate="open = false"
+            />
+            <div v-else class="flex h-full min-h-0 min-w-0 flex-1 flex-col">
                 <p class="shrink-0 px-4 pb-2 pt-1 text-sm text-gray-600">
                     Messages are delivered in real time when online. We may also
                     reply during business hours. Enable browser notifications in

@@ -82,26 +82,14 @@
     border-radius: 0 !important;
 }
 
-/* Viewport lock: stage fits one screen; only product grid scrolls */
+/* Viewport lock: stage fits one screen; only product grid scrolls. The layout (fitViewport)
+   gives the page exactly the screen's remaining height, so it just fills that. */
 .sales-coffeeshop.sales-coffeeshop--viewport {
-    /* Layout padding: p-3 (0.75rem*2) mobile, md:p-6 (1.5rem*2) desktop */
-    /* Mobile sticky header ~3rem when visible */
-    --cs-viewport-pad: 1.5rem;
-    --cs-mobile-header: 3.25rem;
     display: flex;
+    flex: 1 1 auto;
     flex-direction: column;
     min-height: 0;
     overflow: hidden;
-    height: calc(100dvh - var(--cs-mobile-header) - var(--cs-viewport-pad));
-    max-height: calc(100dvh - var(--cs-mobile-header) - var(--cs-viewport-pad));
-}
-
-@media (min-width: 768px) {
-    .sales-coffeeshop.sales-coffeeshop--viewport {
-        --cs-viewport-pad: 3rem;
-        height: calc(100dvh - var(--cs-viewport-pad));
-        max-height: calc(100dvh - var(--cs-viewport-pad));
-    }
 }
 
 .sales-coffeeshop.sales-coffeeshop--viewport .cs-stage {

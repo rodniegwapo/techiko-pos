@@ -17,6 +17,12 @@ import { useMediaQuery } from "@vueuse/core";
 import { useAuth } from "@/Composables/useAuth";
 import { useSidebar } from "@/Composables/useSidebar";
 
+const props = defineProps({
+    // The page fills the screen exactly and scrolls inside its own panels (e.g. the Sales screen);
+    // the store switcher is pinned in the corner so it takes no room.
+    fitViewport: { type: Boolean, default: false },
+});
+
 const { user } = useAuth();
 const page = usePage();
 const { toggleMobileDrawer, closeMobileDrawer } = useSidebar();
@@ -120,16 +126,29 @@ onMounted(() => {
 </script>
 
 <template>
+    <div
+        :class="
+            props.fitViewport ? 'flex h-[100dvh] flex-col overflow-hidden' : ''
+        "
+    >
     <!-- Impersonation Banner (shown at the very top) -->
-    <ImpersonationBanner />
+    <ImpersonationBanner :class="{ 'shrink-0': props.fitViewport }" />
 
     <a-layout
         class="relative bg-dots-darker bg-center bg-gray-200 dark:bg-dots-lighter dark:bg-gray-900 selection:bg-red-500 selection:text-white"
+        :class="{ 'min-h-0 flex-1 overflow-hidden': props.fitViewport }"
     >
         <!-- <terminal /> -->
         <left-sidebar-wrapper :user="user" />
 
-        <a-layout-content class="flex min-h-screen flex-1 flex-col">
+        <a-layout-content
+            class="flex flex-1 flex-col"
+            :class="
+                props.fitViewport
+                    ? 'h-full min-h-0 overflow-hidden'
+                    : 'min-h-screen'
+            "
+        >
             <div
                 class="sticky top-0 z-[60] flex shrink-0 items-center gap-3 border-b border-gray-300 bg-white px-3 py-2.5 shadow-sm md:hidden"
             >
@@ -144,12 +163,28 @@ onMounted(() => {
                 <span class="text-sm font-semibold text-gray-900">{{
                     currentMobileTitle
                 }}</span>
+                <LocationBadge
+                    v-if="props.fitViewport"
+                    pinned
+                    class="ml-auto"
+                />
             </div>
             <div
-                class="max-w-7xl mx-auto w-full min-w-0 flex-1 p-3 sm:p-4 md:p-6 lg:overflow-auto md:overflow-auto sm:overflow-scroll bg-gray-200 dark:bg-dots-lighter dark:bg-gray-900 selection:bg-red-500 selection:text-white"
+                class="max-w-7xl mx-auto w-full min-w-0 flex-1 p-3 sm:p-4 md:p-6 bg-gray-200 dark:bg-dots-lighter dark:bg-gray-900 selection:bg-red-500 selection:text-white"
+                :class="
+                    props.fitViewport
+                        ? 'relative flex min-h-0 flex-col overflow-hidden'
+                        : 'lg:overflow-auto md:overflow-auto sm:overflow-scroll'
+                "
             >
+                <!-- Fitted pages: the store switcher is pinned in the corner (beside the page title) so it takes no room. -->
+                <LocationBadge
+                    v-if="props.fitViewport"
+                    pinned
+                    class="absolute right-3 top-3 z-50 hidden sm:right-4 sm:top-4 md:right-6 md:top-6 md:block"
+                />
                 <!-- Store switcher sits above the page so it never covers header actions -->
-                <LocationBadge />
+                <LocationBadge v-else />
                 <!-- Why the user was sent here, e.g. away from a warehouse's sales screen -->
                 <a-alert
                     v-if="page.props.flash?.notice"
@@ -158,16 +193,24 @@ onMounted(() => {
                     show-icon
                     closable
                     class="mb-3"
+                    :class="{ 'shrink-0': props.fitViewport }"
                 />
-                <slot />
+                <div
+                    v-if="props.fitViewport"
+                    class="flex min-h-0 flex-1 flex-col"
+                >
+                    <slot />
+                </div>
+                <slot v-else />
             </div>
-            <div>
+            <div :class="{ 'shrink-0': props.fitViewport }">
                 <slot name="content-footer" />
             </div>
         </a-layout-content>
 
         <InquiryChatWidget v-if="user" />
     </a-layout>
+    </div>
 </template>
 
 <style>

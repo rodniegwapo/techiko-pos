@@ -1,5 +1,6 @@
 import { router } from "@inertiajs/vue3";
 import { useHelpers } from "@/Composables/useHelpers";
+import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 
 /**
  * Submit / approve / reject a stock adjustment. The controller answers a failed action with a
@@ -7,10 +8,11 @@ import { useHelpers } from "@/Composables/useHelpers";
  */
 export function useStockAdjustmentActions() {
   const { showNotification } = useHelpers();
+  const { getRoute } = useDomainRoutes();
 
   const post = (routeName, adjustment, successMessage, failureMessage, onDone) =>
     router.post(
-      route(routeName, adjustment.id),
+      getRoute(routeName, { adjustment: adjustment.id }),
       {},
       {
         preserveScroll: true,

@@ -13,6 +13,7 @@ class DomainController extends Controller
     public function __construct(
         private DomainService $domainService
     ) {}
+
     /**
      * Display a listing of the resource.
      */
@@ -105,13 +106,35 @@ class DomainController extends Controller
     }
 
     /**
+     * Turn Finance (with its AI explanations) and the AI assistant on or off for an organization.
+     * The two are independent. Other settings (e.g. sales) are kept.
+     */
+    public function updateFeatures(Request $request, Domain $domain)
+    {
+        $validated = $request->validate([
+            'finance' => ['required', 'boolean'],
+            'ai' => ['required', 'boolean'],
+        ]);
+
+        $finance = (bool) $validated['finance'];
+        $settings = $domain->settings ?? [];
+        $settings['features'] = [
+            'finance' => $finance,
+            'ai' => (bool) $validated['ai'],
+        ];
+        $domain->update(['settings' => $settings]);
+
+        return back()->with('success', 'Features updated.');
+    }
+
+    /**
      * Toggle domain active status
      */
     public function toggleStatus(Request $request, Domain $domain)
     {
         // Toggle the is_active field
         $domain->update([
-            'is_active' => !$domain->is_active,
+            'is_active' => ! $domain->is_active,
         ]);
 
         // Prepare the success message based on the new state

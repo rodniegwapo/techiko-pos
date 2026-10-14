@@ -15,7 +15,7 @@ import {
     IconKey,
     IconCreditCard,
     IconWallet,
-    IconReportMoney,
+    IconReportAnalytics,
     IconReceipt,
     IconAccessPointOff,
     IconSettings,
@@ -144,6 +144,83 @@ const menuItems = [
         routeName: "sales-history.index",
         path: "/sales-history",
         domainOnly: true,
+    },
+    {
+        key: "finance-group",
+        title: "Finance",
+        icon: IconReportAnalytics,
+        domainOnly: true,
+        // Only for organizations given Finance (a super admin turns it on per organization).
+        feature: "finance",
+        children: [
+            {
+                key: "finance-dashboard",
+                title: "Overview",
+                routeName: "finance.dashboard",
+                path: "/finance",
+            },
+            {
+                // The income statement is the Profit & Loss report.
+                key: "profit-loss",
+                title: "Income statement",
+                routeName: "profit-loss.index",
+                path: "/profit-loss",
+            },
+            {
+                key: "finance-cash-flow",
+                title: "Cash flow",
+                routeName: "finance.cash-flow",
+                path: "/finance/cash-flow",
+            },
+            {
+                key: "finance-balance-sheet",
+                title: "Balance sheet",
+                routeName: "finance.balance-sheet",
+                path: "/finance/balance-sheet",
+            },
+            {
+                key: "finance-receivables",
+                title: "Customer credit",
+                routeName: "finance.receivables",
+                path: "/finance/receivables",
+            },
+            {
+                key: "finance-payables",
+                title: "Supplier bills",
+                routeName: "finance.payables.index",
+                path: "/finance/payables",
+            },
+            {
+                key: "expenses",
+                title: "Expenses",
+                routeName: "expenses.index",
+                path: "/expenses",
+            },
+            {
+                key: "finance-other-income",
+                title: "Other income",
+                routeName: "finance.other-income.index",
+                path: "/finance/other-income",
+            },
+            {
+                key: "finance-balance-items",
+                title: "Accounts, loans & assets",
+                routeName: "finance.balance-items.index",
+                path: "/finance/assets-and-loans",
+            },
+            {
+                key: "finance-reviews",
+                title: "Monthly reviews",
+                routeName: "finance.reviews.index",
+                path: "/finance/reviews",
+            },
+            {
+                key: "vat-report",
+                title: "VAT report",
+                routeName: "vat-report.index",
+                path: "/vat-report",
+            },
+        ],
     },
     {
         key: "wallet-group",
@@ -309,14 +386,6 @@ const menuItems = [
         path: "/users",
     },
     {
-        key: "vat-report",
-        title: "VAT report",
-        icon: IconReportMoney,
-        routeName: "vat-report.index",
-        path: "/vat-report",
-        domainOnly: true,
-    },
-    {
         key: "organization-settings",
         title: "Settings",
         icon: IconSettings,
@@ -433,6 +502,11 @@ const menus = computed(() => {
                     ["sales", "offline-sales"].includes(item.key) &&
                     page.props.currentLocation?.type === "warehouse"
                 ) {
+                    return false;
+                }
+
+                // A feature the organization hasn't been given (the server blocks it too).
+                if (item.feature && !page.props.domainFeatures?.[item.feature]) {
                     return false;
                 }
 

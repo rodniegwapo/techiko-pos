@@ -51,6 +51,21 @@ for (const layout of ["classic", "coffeeshop"]) {
                 expect(await stockOf(cashierApi, products.fries.name)).toBeLessThanOrEqual(stockBefore - 2);
             });
 
+            test("paying an order that was removed elsewhere explains it and reloads the cart", async ({ page }) => {
+                const sales = await SalesPage.open(page, { layout });
+                await sales.addProduct(products.burger.name);
+                await sales.goToCheckout();
+
+                // As if another device or user closed this order after the screen loaded it.
+                await page.route("**/sales/*/payments", (route) =>
+                    route.fulfill({ status: 404, json: { message: "No query results for model [App\\Models\\Sale]." } }),
+                );
+                await sales.pay({ amountReceived: 100 });
+
+                await expect(sales.notice("This order no longer exists")).toBeVisible();
+                await expect(page.getByText("No query results for model")).toHaveCount(0);
+            });
+
             test("the confirmation can be cancelled without charging", async ({ page }) => {
                 const sales = await SalesPage.open(page, { layout });
                 await sales.addProduct(products.burger.name);
@@ -144,7 +159,7 @@ for (const layout of ["classic", "coffeeshop"]) {
                 await dialog.getByText("E2E GCash", { exact: true }).click();
                 await dialog.getByRole("button", { name: "Use selected e-wallet" }).click();
                 await expect(dialog).toBeHidden();
-                await page.getByRole("textbox", { name: "Reference no." }).fill("GC-12345");
+                await page.getByRole("textbox", { name: "Reference no." }).fill("12345");
 
                 const paid = page.waitForRequest((r) => r.method() === "POST" && r.url().includes("/payments"));
                 const res = await sales.pay({ amountReceived: 100 });
@@ -152,7 +167,7 @@ for (const layout of ["classic", "coffeeshop"]) {
 
                 expect(res?.status()).toBe(200);
                 expect(body.payment_method).toBe("e-wallet");
-                expect(body.payment_reference).toBe("GC-12345");
+                expect(body.payment_reference).toBe("12345");
             });
 
             test("Bank asks which bank, listing only banks", async ({ page }) => {

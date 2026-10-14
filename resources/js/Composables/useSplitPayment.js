@@ -14,6 +14,37 @@ export const SPLIT_METHODS = [
 /** Which kind of channel each method is paid through. */
 export const SPLIT_CHANNEL_KIND = { card: "card", "e-wallet": "ewallet", bank: "bank" };
 
+/** How many channels of each kind this store has (from the Sales channel list). */
+export function channelsByKind(cachedTypes = []) {
+    const counts = { card: 0, ewallet: 0, bank: 0 };
+    for (const t of cachedTypes || []) {
+        const kind = t.kind || "card";
+        if (kind in counts) counts[kind] += 1;
+    }
+    return counts;
+}
+
+/**
+ * Whether this store can take a method in a split. Channels are set up per store, so a store
+ * without an e-wallet can't take an e-wallet part. With no channel list at all (not loaded yet,
+ * or offline without a cache) nothing is ruled out.
+ */
+export function storeTakesMethod(method, cachedTypes = []) {
+    const kind = SPLIT_CHANNEL_KIND[method];
+    if (!kind || !(cachedTypes || []).length) return true;
+    return channelsByKind(cachedTypes)[kind] > 0;
+}
+
+/** The method to pair with cash when a split starts: one this store can actually take. */
+export function firstSplitPartnerMethod(cachedTypes = [], allowCredit = false) {
+    const usable = ["e-wallet", "card", "bank"].find(
+        (m) => (cachedTypes || []).length && storeTakesMethod(m, cachedTypes),
+    );
+    if (usable) return usable;
+    if (allowCredit && (cachedTypes || []).length) return "credit";
+    return "e-wallet";
+}
+
 let nextKey = 1;
 
 export function newSplitRow(method = "cash", amount = null) {

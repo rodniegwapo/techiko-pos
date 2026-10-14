@@ -1,14 +1,17 @@
 <script setup>
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { CloseOutlined, PlusOutlined } from "@ant-design/icons-vue";
+import { IconArrowBarToDown } from "@tabler/icons-vue";
 import CardPaymentTypeModal from "./CardPaymentTypeModal.vue";
 import {
     SPLIT_CHANNEL_KIND,
     SPLIT_METHODS,
     newSplitRow,
     splitTotals,
+    storeTakesMethod,
 } from "@/Composables/useSplitPayment";
 import { useHelpers } from "@/Composables/useHelpers";
+import { digitsOnly, numberKeysOnly, numberPasteOnly } from "@/Composables/numericInput";
 
 /** The parts of a sale paid in parts: a method, an amount and (for card / e-wallet / bank) the channel. */
 const rows = defineModel({ type: Array, required: true });
@@ -19,15 +22,37 @@ const props = defineProps({
     availableCredit: { type: Number, default: 0 },
     useNetwork: { type: Boolean, default: true },
     cachedPaymentCardTypes: { type: Array, default: () => [] },
+    /** Why the sale can't be charged yet (from splitProblem), shown so the cashier knows what's missing. */
+    problem: { type: String, default: null },
 });
 
 const { formattedTotal } = useHelpers();
 
 const totals = computed(() => splitTotals(rows.value, props.grandTotal));
 
+// The footer already shows what is left and an over-paid card; give every other reason its own line.
+const shownProblem = computed(() => {
+    if (!props.problem) return null;
+    if (totals.value.nonCashOver || props.problem.endsWith("still to pay.")) return null;
+    return props.problem;
+});
+
+// Only methods this store can take: card / e-wallet / bank need a channel set up at the store.
 const methodOptions = computed(() =>
-    SPLIT_METHODS.filter((m) => m.value !== "credit" || props.allowCredit),
+    SPLIT_METHODS.filter((m) =>
+        m.value === "credit"
+            ? props.allowCredit
+            : storeTakesMethod(m.value, props.cachedPaymentCardTypes),
+    ),
 );
+
+/** What "fill the remaining" would put on this row. */
+function restFor(row) {
+    const others = rows.value
+        .filter((r) => r !== row)
+        .reduce((s, r) => s + Math.round(Number(r.amount || 0) * 100), 0);
+    return Math.max(0, Math.round(props.grandTotal * 100) - others) / 100;
+}
 
 const creditRow = computed(() => rows.value.find((r) => r.method === "credit"));
 const creditOverLimit = computed(
@@ -62,16 +87,30 @@ function onMethodChange(row, method) {
     row.payment_card_type_id = null;
     row.channel_name = null;
     if (method === "card" || !SPLIT_CHANNEL_KIND[method]) row.payment_reference = "";
-    if (SPLIT_CHANNEL_KIND[method]) pickChannel(row);
+    autoPickChannel(row);
+    if (SPLIT_CHANNEL_KIND[method] && !row.payment_card_type_id) pickChannel(row);
 }
+
+/** With only one channel of a kind there is nothing to choose, so pick it. */
+function autoPickChannel(row) {
+    const kind = SPLIT_CHANNEL_KIND[row.method];
+    if (!kind || row.payment_card_type_id) return;
+    const options = props.cachedPaymentCardTypes.filter((t) => (t.kind || "card") === kind);
+    if (options.length === 1) {
+        row.payment_card_type_id = options[0].id;
+        row.channel_name = options[0].name;
+    }
+}
+
+watch(
+    () => [rows.value.map((r) => r.method), props.cachedPaymentCardTypes],
+    () => rows.value.forEach(autoPickChannel),
+    { immediate: true, deep: true },
+);
 
 /** Put what is still owed on this row. */
 function fillRest(row) {
-    const others = rows.value
-        .filter((r) => r !== row)
-        .reduce((s, r) => s + Math.round(Number(r.amount || 0) * 100), 0);
-    const rest = Math.max(0, Math.round(props.grandTotal * 100) - others);
-    row.amount = rest / 100;
+    row.amount = restFor(row);
 }
 
 function addRow() {
@@ -114,23 +153,39 @@ function removeRow(row) {
                 :precision="2"
                 placeholder="0.00"
                 class="w-32"
+                inputmode="decimal"
                 :aria-label="`Payment ${i + 1} amount`"
+                @keydown="numberKeysOnly"
+                @paste="numberPasteOnly"
             />
-            <a-button
-                size="small"
-                type="link"
-                class="px-1"
-                @click="fillRest(row)"
-                >Rest</a-button
-            >
+            <a-tooltip :title="`Reset to the remaining ${formattedTotal(restFor(row))}`">
+                <a-button
+                    size="small"
+                    type="text"
+                    class="!px-1 text-blue-600"
+                    :disabled="Number(row.amount || 0) === restFor(row)"
+                    :aria-label="`Reset payment ${i + 1} to the remaining amount`"
+                    @click="fillRest(row)"
+                >
+                    <template #icon><IconArrowBarToDown :size="18" class="inline" /></template>
+                </a-button>
+            </a-tooltip>
             <template v-if="SPLIT_CHANNEL_KIND[row.method]">
-                <a-button size="small" @click="pickChannel(row)">
+                <a-button
+                    size="small"
+                    :danger="!row.payment_card_type_id"
+                    @click="pickChannel(row)"
+                >
                     {{ row.channel_name || "Choose " + (row.method === "card" ? "card type" : row.method) }}
                 </a-button>
                 <a-input
                     v-if="row.method !== 'card'"
-                    v-model:value="row.payment_reference"
+                    :value="row.payment_reference"
                     size="small"
+                    inputmode="numeric"
+                    @update:value="(v) => (row.payment_reference = digitsOnly(v))"
+                    @keydown="(e) => numberKeysOnly(e, { decimal: false })"
+                    @paste="(e) => numberPasteOnly(e, { decimal: false })"
                     :maxlength="100"
                     placeholder="Ref no."
                     class="w-28"
@@ -170,6 +225,14 @@ function removeRow(row) {
                 Credit is over the available {{ formattedTotal(availableCredit) }}
             </span>
         </div>
+        <!-- Why the sale can't be charged yet, so the button is never disabled without a reason. -->
+        <p
+            v-if="shownProblem"
+            class="mb-0 text-sm font-medium text-red-600"
+            data-testid="split-problem"
+        >
+            {{ shownProblem }}
+        </p>
 
         <card-payment-type-modal
             v-model:visible="pickerOpen"

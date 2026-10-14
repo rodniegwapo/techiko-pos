@@ -5,11 +5,13 @@ import CardPaymentTypeModal from "./CardPaymentTypeModal.vue";
 import LoyaltyRedemptionModal from "./LoyaltyRedemptionModal.vue";
 import SplitPaymentPanel from "./SplitPaymentPanel.vue";
 import {
+    firstSplitPartnerMethod,
     newSplitRow,
     splitPayload,
     splitProblem,
 } from "@/Composables/useSplitPayment";
 import { IconDiscount, IconGift, IconArrowRightToArc } from "@tabler/icons-vue";
+import { digitsOnly, numberKeysOnly, numberPasteOnly } from "@/Composables/numericInput";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useHelpers } from "@/Composables/useHelpers";
@@ -399,7 +401,12 @@ const splitCreditOverLimit = computed(() => {
 
 watch(isSplit, (split) => {
     if (split && splitRows.value.length < 2) {
-        splitRows.value = [newSplitRow("cash"), newSplitRow("e-wallet")];
+        // Pair cash with a method this store has a channel for (channels are set up per store).
+        const partner = firstSplitPartnerMethod(
+            props.cachedPaymentCardTypes,
+            salesCartIsOnline.value && !!canUseCredit.value,
+        );
+        splitRows.value = [newSplitRow("cash"), newSplitRow(partner)];
     }
 });
 
@@ -624,6 +631,20 @@ const handleProceedPayment = async () => {
         orderDiscountAmount.value = 0;
         orderDiscountId.value = "";
     } catch (error) {
+        // The order was closed or removed elsewhere (another tab, device or user) while this
+        // screen still showed it: say so plainly and load the cart as it is now.
+        if (error.response?.status === 404) {
+            notification.warning({
+                message: "This order no longer exists",
+                description: "It was closed or removed elsewhere. The cart has been reloaded.",
+                duration: 6,
+            });
+            localStorage.setItem("order_discount_amount", 0);
+            localStorage.setItem("order_discount_ids", "");
+            emit("cart-updated");
+            return;
+        }
+
         const errorMessage =
             error.response?.data?.message ||
             error.message ||
@@ -1019,8 +1040,12 @@ defineExpose({
                         </div>
                         <a-input
                             v-if="takesReference"
-                            v-model:value="paymentReference"
+                            :value="paymentReference"
+                            inputmode="numeric"
                             :maxlength="100"
+                            @update:value="(v) => (paymentReference = digitsOnly(v))"
+                            @keydown="(e) => numberKeysOnly(e, { decimal: false })"
+                            @paste="(e) => numberPasteOnly(e, { decimal: false })"
                             placeholder="Reference no. (optional)"
                             aria-label="Reference no."
                         />
@@ -1080,6 +1105,7 @@ defineExpose({
                         :available-credit="Number(creditInfo?.availableCredit ?? 0)"
                         :use-network="salesCartIsOnline"
                         :cached-payment-card-types="cachedPaymentCardTypes"
+                        :problem="splitIssue"
                     />
                 </div>
 
@@ -1094,7 +1120,10 @@ defineExpose({
                     <a-input
                         v-model:value="amountReceived"
                         type="number"
+                        inputmode="decimal"
                         placeholder="0"
+                        @keydown="numberKeysOnly"
+                        @paste="numberPasteOnly"
                         :class="{
                             'border-red-400':
                                 amountReceived < grandTotalDisplay &&

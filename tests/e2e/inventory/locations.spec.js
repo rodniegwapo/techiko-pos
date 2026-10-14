@@ -207,13 +207,26 @@ test.describe("Location actions (admin)", () => {
         const location = await createLocation(page);
         await openLocations(page, listUrl(`?search=${location.code}`));
 
+        // Cancelling the confirmation leaves the store as it was.
         await menuItem(await openRowMenu(page, rows(page).first()), "Deactivate").click();
+        const askOff = page.locator(".ant-modal-confirm").filter({ hasText: `Deactivate "${location.name}"?` });
+        await askOff.getByRole("button", { name: "Cancel" }).click();
+        await expect(askOff).toHaveCount(0);
+        await expect(cell(rows(page).first(), "status").locator(".ant-tag")).toHaveText("Active");
+
+        await menuItem(await openRowMenu(page, rows(page).first()), "Deactivate").click();
+        await askOff.getByRole("button", { name: "Deactivate" }).click();
 
         await expect(notice(page, "Location status updated")).toBeVisible();
         await expect(cell(rows(page).first(), "status").locator(".ant-tag")).toHaveText("Inactive");
 
         // And back on again, which was impossible while the list only showed active stores.
         await menuItem(await openRowMenu(page, rows(page).first()), "Activate").click();
+        await page
+            .locator(".ant-modal-confirm")
+            .filter({ hasText: `Activate "${location.name}"?` })
+            .getByRole("button", { name: "Activate" })
+            .click();
 
         await expect(cell(rows(page).first(), "status").locator(".ant-tag")).toHaveText("Active");
     });

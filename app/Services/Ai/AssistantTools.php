@@ -1,0 +1,417 @@
+<?php
+
+namespace App\Services\Ai;
+
+use App\Ai\Tools\AssistantTool;
+use App\Models\AssistantUnansweredQuestion;
+use App\Models\Category;
+use App\Models\Domain;
+use App\Models\ExpenseCategory;
+use App\Models\Finance\Supplier;
+use App\Models\InventoryLocation;
+use App\Models\Product\Product;
+use App\Models\User;
+use App\Services\Ai\Actions\ActionContext;
+use App\Services\Ai\Actions\ActionInputException;
+use App\Services\Ai\Actions\ActionRegistry;
+use App\Services\Ai\Actions\AssistantAction;
+use App\Services\Ai\Actions\Finance\PaySupplierBill;
+use App\Services\Ai\Actions\HasInputTemplate;
+use App\Services\Ai\Actions\Catalog\SoldTypes;
+use App\Services\Ai\Actions\PendingActions;
+use App\Services\Finance\FinancialInsightService;
+use App\Services\Finance\FinancialReportService;
+use App\Support\RoutePermission;
+use Closure;
+use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Laravel\Ai\Contracts\Tool;
+use Throwable;
+
+/**
+ * The tools the AI assistant may call for one user. Only what the user's role allows is offered:
+ * guides are filtered by GuideLibrary, and each read tool, data tool (DataTools), Finance tool and
+ * propose_* tool is added only when the user holds its permission (and the business has the
+ * feature). A propose_* tool never changes anything; it leaves a pending
+ * change for the user to confirm (pendingActions()). The pages the AI pointed to are kept in
+ * links() so the chat can show them as buttons.
+ */
+class AssistantTools
+{
+    /**
+     * Read tools and the permissions that allow each (any one of them).
+     */
+    private const READ_TOOLS = [
+        'list_categories' => ['categories.index', 'products.store', 'products.update'],
+        'list_sold_types' => ['products.store', 'products.update'],
+        'find_products' => ['products.index', 'products.update'],
+        'list_stores' => ['inventory.locations.index', 'inventory.locations.update', 'inventory.locations.set-default', 'inventory.locations.toggle-status', 'sales-history.index', 'inventory.products', 'inventory.index'],
+        'get_sales_settings' => ['settings.index', 'settings.update'],
+        'list_expense_categories' => ['expenses.index', 'expenses.store', 'finance.bills.store'],
+        'list_suppliers' => ['finance.payables.index', 'finance.bills.store'],
+        'list_open_bills' => ['finance.payables.index', 'finance.bill-payments.store'],
+    ];
+
+    /** Read tools that also need a feature of the business. */
+    private const READ_TOOL_FEATURES = [
+        'list_expense_categories' => 'finance',
+        'list_suppliers' => 'finance',
+        'list_open_bills' => 'finance',
+    ];
+
+    /** @var array<string, array{title: string, url: string}> */
+    private array $links = [];
+
+    /** @var list<array{token: string, title: string, fields: list<array{label: string, value: string}>, confirm_label: string, expires_at: string}> */
+    private array $pendingActions = [];
+
+    /** @var array<string, array{action: string, title: string, text: string}> Fill-in forms shown under the answer, by action. */
+    private array $forms = [];
+
+    private readonly ActionRegistry $actions;
+
+    private readonly PendingActions $pending;
+
+    private readonly DataTools $data;
+
+    /** The user's message and page, saved as-is when the AI reports it couldn't help. */
+    private string $message = '';
+
+    private ?string $page = null;
+
+    private bool $reportedUnanswered = false;
+
+    public function __construct(
+        private readonly GuideLibrary $guides,
+        private readonly User $user,
+        private readonly Domain $domain,
+        private readonly ?InventoryLocation $location = null,
+    ) {
+        $this->actions = app(ActionRegistry::class);
+        $this->pending = app(PendingActions::class);
+        $this->data = new DataTools($user, $domain, $location);
+    }
+
+    /** @return list<Tool> */
+    public function tools(): array
+    {
+        $tool = fn (string $name, string $description, Closure $schema) => new AssistantTool($this, $name, $description, $schema);
+
+        $tools = [
+            $tool('search_guides', 'Find the how-to guides for a task, best match first. Returns the guides this user may follow, and the titles of matching tasks their role does not allow. Use it before explaining how to do anything in Techiko POS.', fn (JsonSchema $schema) => [
+                'query' => $schema->string()->description('The task in a few words, e.g. "add product" or "change VAT"')->required(),
+            ]),
+            $tool('get_guide', 'The step-by-step guide for one task (by key from search_guides or list_guides), with the page it happens on.', fn (JsonSchema $schema) => [
+                'key' => $schema->string()->description('The guide key, e.g. "add-product"')->required(),
+            ]),
+            $tool('list_guides', 'Every task this user can get help with. Use for "what can you do" or "what can you help me with".', fn () => []),
+            $tool('get_current_store', 'The store the user is working in now (new products are added there).', fn () => []),
+            $tool('report_unanswered', 'Record that you could not help with this message (no guide, page or tool covers it), so the Techiko team can add help for it. Call it once, before suggesting the team chat.', fn (JsonSchema $schema) => [
+                'topic' => $schema->string()->description('What it was about in 2 to 5 words, e.g. "transfer stock between stores"')->required(),
+            ]),
+        ];
+
+        $read = [
+            'list_categories' => ['The product categories of this business, with their ids.', fn () => []],
+            'list_sold_types' => ['The ways a product can be sold (Piece, Box…).', fn () => []],
+            'find_products' => ['Find products by name, SKU or barcode: id, name, price, cost, category, SKU, barcode (up to 10).', fn (JsonSchema $schema) => [
+                'query' => $schema->string()->description('Part of the name, SKU or barcode')->required(),
+            ]],
+            'list_stores' => ['The stores and warehouses of this business: id, name, code, type, address, active, default.', fn () => []],
+            'get_sales_settings' => ['The current sales settings: VAT on/off, VAT rate, prices include VAT or not, selling when out of stock, hiding out-of-stock products.', fn () => []],
+            'list_expense_categories' => ['The expense categories of this business (rent, utilities…), with their ids.', fn () => []],
+            'list_suppliers' => ['The suppliers of this business with their ids and payment terms (days).', fn () => []],
+            'list_open_bills' => ['The unpaid supplier bills, oldest due first: bill_id, supplier, bill no., bill and due dates, amount left to pay, overdue.', fn () => []],
+        ];
+        foreach ($read as $name => [$description, $schema]) {
+            if ($this->mayRead($name)) {
+                $tools[] = $tool($name, $description, $schema);
+            }
+        }
+
+        foreach ($this->data->definitions() as $name => [$description, $schema]) {
+            $tools[] = $tool($name, $description, $schema);
+        }
+
+        $withForms = array_map(fn (AssistantAction $a) => $a->name(), $this->actionsWithForms());
+        if ($withForms) {
+            $tools[] = $tool('show_fill_in_form', 'Show the user a fill-in form ("Name:", "Price (₱):"…) with a Fill in button under your answer, for a change they asked for without giving the details. They send it back filled in; read the "Label: value" lines and call the matching propose_* tool.', fn (JsonSchema $schema) => [
+                'action' => $schema->string()->enum($withForms)->description('The change, e.g. "create_product"')->required(),
+            ]);
+        }
+
+        foreach ($this->actions->allowedFor($this->user, $this->domain) as $action) {
+            $tools[] = $tool(
+                'propose_'.$action->name(),
+                $action->description().' Nothing changes until the user presses Confirm on the card shown with your answer.',
+                fn (JsonSchema $schema) => $action->schema($schema),
+            );
+        }
+
+        // The Finance AI's own tools (income statement, cash flow, balance sheet…), unchanged,
+        // for users who may ask Finance questions in a business that has Finance.
+        if ($this->domain->hasFeature('finance') && RoutePermission::allows($this->user, 'finance.ask')) {
+            array_push($tools, ...(new FinanceTools(
+                app(FinancialReportService::class),
+                app(FinancialInsightService::class),
+                $this->domain->name_slug,
+                $this->location?->id,
+            ))->tools());
+        }
+
+        return $tools;
+    }
+
+    /** Runs a tool and returns its result as JSON text. */
+    public function run(string $name, array $input): string
+    {
+        try {
+            if (str_starts_with($name, 'propose_')) {
+                $result = $this->propose(substr($name, strlen('propose_')), $input);
+            } elseif ($this->data->handles($name)) {
+                $result = $this->data->run($name, $input);
+            } elseif (array_key_exists($name, self::READ_TOOLS) && ! $this->mayRead($name)) {
+                $result = ['error' => 'not_allowed', 'message' => 'This user\'s role cannot see that.'];
+            } else {
+                $result = match ($name) {
+                    'search_guides' => $this->searchGuides((string) ($input['query'] ?? '')),
+                    'get_guide' => $this->getGuide((string) ($input['key'] ?? '')),
+                    'list_guides' => array_values(array_map(fn ($g) => ['key' => $g['key'], 'title' => $g['title']], $this->guides->allowedFor($this->user, $this->domain))),
+                    'report_unanswered' => $this->reportUnanswered((string) ($input['topic'] ?? '')),
+                    'show_fill_in_form' => $this->showFillInForm((string) ($input['action'] ?? '')),
+                    'get_current_store' => $this->location
+                        ? ['id' => $this->location->id, 'name' => $this->location->name, 'type' => $this->location->type]
+                        : ['error' => 'No store is selected.'],
+                    'list_categories' => Category::query()->forDomain($this->domain->name_slug)->orderBy('name')->get(['id', 'name'])->toArray(),
+                    'list_sold_types' => SoldTypes::all(),
+                    'find_products' => $this->findProducts((string) ($input['query'] ?? '')),
+                    'list_stores' => InventoryLocation::query()->forDomain($this->domain->name_slug)->orderBy('name')
+                        ->get(['id', 'name', 'code', 'type', 'address', 'is_active', 'is_default'])->toArray(),
+                    'list_expense_categories' => ExpenseCategory::query()->forDomain($this->domain->name_slug)->where('is_active', true)->orderBy('name')->get(['id', 'name'])->toArray(),
+                    'list_suppliers' => Supplier::query()->where('domain', $this->domain->name_slug)->orderBy('name')->get(['id', 'name', 'payment_terms_days', 'is_active'])->toArray(),
+                    'list_open_bills' => PaySupplierBill::openBills(new ActionContext($this->user, $this->domain, $this->location))->take(30)
+                        ->map(fn ($bill) => [
+                            'bill_id' => $bill->id,
+                            'supplier' => $bill->supplier?->name,
+                            'bill_number' => $bill->bill_number,
+                            'bill_date' => $bill->bill_date?->toDateString(),
+                            'due_date' => $bill->due_date?->toDateString(),
+                            'left_to_pay' => $bill->remaining,
+                            'overdue' => $bill->due_date !== null && $bill->due_date->isPast() && ! $bill->due_date->isToday(),
+                        ])->values()->all(),
+                    'get_sales_settings' => [
+                        ...$this->domain->salesVatSettings(),
+                        'allow_overselling' => (bool) ($this->domain->settings['sales']['allow_overselling'] ?? false),
+                        'hide_out_of_stock' => (bool) ($this->domain->settings['sales']['hide_out_of_stock'] ?? false),
+                    ],
+                    default => ['error' => 'Unknown tool '.$name],
+                };
+            }
+        } catch (Throwable $e) {
+            report($e);
+            $result = ['error' => 'That information could not be loaded.'];
+        }
+
+        return json_encode($result, JSON_UNESCAPED_UNICODE);
+    }
+
+    /** The message being answered and the page it was asked on, for report_unanswered. */
+    public function forMessage(string $message, ?string $page): static
+    {
+        $this->message = $message;
+        $this->page = $page;
+
+        return $this;
+    }
+
+    /** @return list<array{title: string, url: string}> The pages the AI pointed to, for buttons under the answer. */
+    public function links(): array
+    {
+        return array_values($this->links);
+    }
+
+    /** @return list<array{token: string, title: string, fields: list<array{label: string, value: string}>, confirm_label: string, expires_at: string}> Changes waiting for the user's Confirm. */
+    public function pendingActions(): array
+    {
+        return $this->pendingActions;
+    }
+
+    /** @return list<array{action: string, title: string, text: string}> Fill-in forms for the chat to show under the answer. */
+    public function forms(): array
+    {
+        return array_values($this->forms);
+    }
+
+    /** @return list<AssistantAction&HasInputTemplate> The changes this user may make that have a fill-in form. */
+    private function actionsWithForms(): array
+    {
+        return array_values(array_filter(
+            $this->actions->allowedFor($this->user, $this->domain),
+            fn (AssistantAction $action) => $action instanceof HasInputTemplate,
+        ));
+    }
+
+    /** Builds the form on the server ("Label (hint; optional): " per line), so it is the same every time. */
+    private function showFillInForm(string $name): array
+    {
+        $action = collect($this->actionsWithForms())->first(fn (AssistantAction $a) => $a->name() === $name);
+        if (! $action) {
+            return ['error' => 'not_allowed', 'message' => 'There is no form for that, or this user\'s role cannot make that change.'];
+        }
+
+        try {
+            $template = $action->template(new ActionContext($this->user, $this->domain, $this->location));
+        } catch (ActionInputException $e) {
+            return ['error' => $e->getMessage()];
+        }
+
+        $lines = array_map(function (array $field) {
+            $notes = array_filter([$field['hint'], $field['required'] ? null : 'optional']);
+
+            return $field['label'].($notes ? ' ('.implode('; ', $notes).')' : '').': ';
+        }, $template);
+
+        $this->forms[$action->name()] = ['action' => $action->name(), 'title' => $action->templateTitle(), 'text' => implode("\n", $lines)];
+
+        // The page for doing it by hand comes with the form, when this user may open it.
+        $guide = $action->templateGuide() ? $this->guides->find($action->templateGuide()) : null;
+        $linked = $guide !== null && $this->guides->allows($this->user, $guide, $this->domain) && $this->addGuideLink($guide);
+
+        return [
+            'status' => 'form_shown',
+            'page_link_shown_to_user' => $linked,
+            'message' => 'A fill-in form with a Fill in button is shown under your answer'.($linked ? ', with a button to the page' : '').'. '
+                .'In one short sentence, tell the user to fill in the form and send it'
+                .($linked ? ', or tap the button to do it themselves on the page' : '')
+                .'. Do not repeat the fields.',
+        ];
+    }
+
+    private function mayRead(string $tool): bool
+    {
+        if (isset(self::READ_TOOL_FEATURES[$tool]) && ! $this->domain->hasFeature(self::READ_TOOL_FEATURES[$tool])) {
+            return false;
+        }
+        foreach (self::READ_TOOLS[$tool] as $permission) {
+            if (RoutePermission::allows($this->user, $permission)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function propose(string $name, array $input): array
+    {
+        $action = $this->actions->find($name);
+        if (! $action instanceof AssistantAction || ! $this->actions->allows($action, $this->user, $this->domain)) {
+            return ['error' => 'not_allowed', 'message' => 'This user\'s role cannot do that. They should ask the business owner or an admin.'];
+        }
+
+        $context = new ActionContext($this->user, $this->domain, $this->location);
+        try {
+            $prepared = $action->prepare($input, $context);
+        } catch (ActionInputException $e) {
+            return ['error' => $e->getMessage()];
+        }
+
+        $this->pendingActions[] = $this->pending->put($action, $prepared, $context);
+
+        return [
+            'status' => 'awaiting_confirmation',
+            'message' => 'A confirm card is shown with your answer. Nothing has changed yet; it is saved only when the user presses Confirm.',
+            'summary' => $prepared->title.': '.collect($prepared->fields)->map(fn ($f) => $f['label'].' '.$f['value'])->implode('; '),
+        ];
+    }
+
+    /** Saves the user's own words (not the AI's), once per message. */
+    private function reportUnanswered(string $topic): array
+    {
+        if (! $this->reportedUnanswered && trim($this->message) !== '') {
+            AssistantUnansweredQuestion::query()->create([
+                'domain' => $this->domain->name_slug,
+                'user_id' => $this->user->id,
+                'question' => mb_substr($this->message, 0, 1000),
+                'page' => $this->page ? mb_substr($this->page, 0, 255) : null,
+                'role' => mb_substr($this->user->isSuperUser() ? 'super admin' : ($this->user->getRoleNames()->implode(', ') ?: 'staff'), 0, 255),
+                'topic' => trim($topic) !== '' ? mb_substr(trim($topic), 0, 100) : null,
+            ]);
+            $this->reportedUnanswered = true;
+        }
+
+        return ['logged' => true];
+    }
+
+    private function findProducts(string $query): array
+    {
+        $query = trim($query);
+        if ($query === '') {
+            return ['error' => 'Give part of the product name, SKU or barcode.'];
+        }
+
+        return Product::query()->forDomain($this->domain->name_slug)
+            ->where(fn ($q) => $q->where('name', 'like', '%'.$query.'%')->orWhere('SKU', $query)->orWhere('barcode', $query))
+            ->with('category:id,name')
+            ->orderBy('name')
+            ->limit(10)
+            ->get()
+            ->map(fn (Product $p) => [
+                'id' => $p->id,
+                'name' => $p->name,
+                'price' => (float) $p->price,
+                'cost' => $p->cost !== null ? (float) $p->cost : null,
+                'category' => $p->category?->name,
+                'sold_type' => $p->sold_type,
+                'sku' => $p->SKU,
+                'barcode' => $p->barcode,
+            ])
+            ->all();
+    }
+
+    private function searchGuides(string $query): array
+    {
+        $allowed = $this->guides->search($this->user, $query, 5, $this->domain);
+
+        $notAllowed = [];
+        foreach ($this->guides->all() as $guide) {
+            if (! $this->guides->allows($this->user, $guide, $this->domain) && $this->guides->score($guide, $query) > 0) {
+                $notAllowed[] = $guide['title'];
+            }
+        }
+
+        return [
+            'guides' => $allowed,
+            'not_allowed_for_this_role' => $notAllowed,
+        ];
+    }
+
+    private function getGuide(string $key): array
+    {
+        $guide = $this->guides->find($key);
+        if ($guide === null) {
+            return ['error' => 'No guide with that key. Use search_guides to find one.'];
+        }
+        if (! $this->guides->allows($this->user, $guide)) {
+            return ['error' => 'not_allowed', 'message' => 'This user\'s role is not allowed to do "'.$guide['title'].'". They should ask the business owner or an admin.'];
+        }
+        if (! $this->guides->allows($this->user, $guide, $this->domain)) {
+            return ['error' => 'not_available', 'message' => 'This business does not have the feature for "'.$guide['title'].'" turned on (e.g. Finance). The Techiko team can turn it on.'];
+        }
+
+        return [
+            'title' => $guide['title'],
+            'steps' => $guide['steps'],
+            'page_link_shown_to_user' => $this->addGuideLink($guide),
+        ];
+    }
+
+    /** Adds a button to the guide's page under the answer, when it has one. Callers check the user may follow it. */
+    private function addGuideLink(array $guide): bool
+    {
+        $url = $this->guides->pageUrl($guide, $this->domain->name_slug);
+        if ($url !== null) {
+            $this->links[$guide['key']] = ['title' => $guide['title'], 'url' => $url];
+        }
+
+        return $url !== null;
+    }
+}

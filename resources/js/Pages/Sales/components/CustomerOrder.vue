@@ -15,7 +15,7 @@ import {
     toRefs,
     nextTick,
 } from "vue";
-import { IconArmchair, IconUsers } from "@tabler/icons-vue";
+import { IconArmchair, IconDiscount, IconUsers } from "@tabler/icons-vue";
 import {
     CloseOutlined,
     PlusSquareOutlined,
@@ -490,6 +490,19 @@ const handleSubmitVoid = async ({ pin_code, reason }) => {
 
 const currentProduct = ref({});
 const openApplyDiscountModal = ref(false);
+
+// The small discount icon on each line: shown when a product discount is available, or the line
+// already has one (so it can be changed or cleared).
+const lineHasDiscount = (order) => parseFloat(order.discount) > 0 || !!order.discounts?.length;
+const hasProductDiscounts = computed(() =>
+    (props.discountOptions?.product_discount_options || []).some((d) => d.scope == "product" && d.is_active),
+);
+const canDiscountLine = (order) => hasProductDiscounts.value || lineHasDiscount(order);
+// Green outline so the % stands out; solid green once a discount is on the line.
+const lineDiscountClass = (order) =>
+    lineHasDiscount(order)
+        ? "bg-green-600 text-white hover:bg-green-700"
+        : "bg-green-50 text-green-700 hover:bg-green-600 hover:text-white";
 const handleShowProductDiscountModal = (product) => {
     if (!salesCartIsOnline.value) {
         notification.warning({
@@ -1482,24 +1495,41 @@ defineExpose({
                                                 v-if="isCoffeeshopLayout"
                                                 class="flex shrink-0 flex-col items-end gap-1"
                                             >
-                                                <a-tooltip
+                                                <div
                                                     v-if="salesCartIsOnline"
-                                                    title="Remove item from order"
+                                                    class="flex items-center gap-0.5"
                                                 >
-                                                    <a-button
-                                                        type="text"
-                                                        size="small"
-                                                        @click.stop="
-                                                            showVoidItem(order)
-                                                        "
-                                                        :aria-label="`Remove ${order.name}`"
-                                                        class="h-auto border-0 p-1 text-[var(--cs-muted)] hover:text-red-600"
+                                                    <a-tooltip
+                                                        v-if="canDiscountLine(order)"
+                                                        :title="lineHasDiscount(order) ? 'Change or clear discount' : 'Apply discount'"
                                                     >
-                                                        <template #icon>
-                                                            <CloseOutlined />
-                                                        </template>
-                                                    </a-button>
-                                                </a-tooltip>
+                                                        <button
+                                                            type="button"
+                                                            class="flex h-7 w-7 items-center justify-center rounded-full transition"
+                                                            :class="lineDiscountClass(order)"
+                                                            :aria-label="`Apply discount to ${order.name}`"
+                                                            data-testid="cart-line-discount"
+                                                            @click.stop="handleShowProductDiscountModal(order)"
+                                                        >
+                                                            <IconDiscount :size="18" :stroke-width="2.25" />
+                                                        </button>
+                                                    </a-tooltip>
+                                                    <a-tooltip title="Remove item from order">
+                                                        <a-button
+                                                            type="text"
+                                                            size="small"
+                                                            @click.stop="
+                                                                showVoidItem(order)
+                                                            "
+                                                            :aria-label="`Remove ${order.name}`"
+                                                            class="h-auto border-0 p-1 text-[var(--cs-muted)] hover:text-red-600"
+                                                        >
+                                                            <template #icon>
+                                                                <CloseOutlined />
+                                                            </template>
+                                                        </a-button>
+                                                    </a-tooltip>
+                                                </div>
                                                 <div
                                                     class="cs-display text-sm font-semibold text-[var(--cs-ink)]"
                                                 >
@@ -1524,9 +1554,25 @@ defineExpose({
                                                         : ''
                                                 "
                                             >
-                                                <template
+                                                <div
                                                     v-if="salesCartIsOnline"
+                                                    class="flex items-center gap-0.5"
                                                 >
+                                                    <a-tooltip
+                                                        v-if="canDiscountLine(order)"
+                                                        :title="lineHasDiscount(order) ? 'Change or clear discount' : 'Apply discount'"
+                                                    >
+                                                        <button
+                                                            type="button"
+                                                            class="flex h-7 w-7 items-center justify-center rounded-full transition"
+                                                            :class="lineDiscountClass(order)"
+                                                            :aria-label="`Apply discount to ${order.name}`"
+                                                            data-testid="cart-line-discount"
+                                                            @click.stop="handleShowProductDiscountModal(order)"
+                                                        >
+                                                            <IconDiscount :size="18" :stroke-width="2.25" />
+                                                        </button>
+                                                    </a-tooltip>
                                                     <a-tooltip
                                                         title="Remove item from order"
                                                     >
@@ -1546,7 +1592,7 @@ defineExpose({
                                                             </template>
                                                         </a-button>
                                                     </a-tooltip>
-                                                </template>
+                                                </div>
 
                                                 <div
                                                     class="text-xs"

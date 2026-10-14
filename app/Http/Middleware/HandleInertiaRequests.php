@@ -40,6 +40,7 @@ class HandleInertiaRequests extends Middleware
         $impersonationService = app(ImpersonationService::class);
 
         $user = $request->user();
+        $currentDomain = $this->getCurrentDomain($request);
 
         return [
             ...parent::share($request),
@@ -57,7 +58,9 @@ class HandleInertiaRequests extends Middleware
             'inquiryUnreadCount' => $user?->isSuperUser()
                 ? Conversation::unreadInboxConversationsForStaffCount()
                 : 0,
-            'currentDomain' => $this->getCurrentDomain($request),
+            'currentDomain' => $currentDomain,
+            // Paid features this organization has (Finance, AI support); the menu and pages hide what's off.
+            'domainFeatures' => $currentDomain?->features() ?? ['finance' => false, 'ai' => false],
             'currentLocation' => $this->getCurrentLocation($request),
             'availableLocations' => $this->getAvailableLocations($request),
             'default_store' => $request->user() ? $this->getDefaultStore($request) : null,

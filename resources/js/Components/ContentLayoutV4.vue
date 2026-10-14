@@ -37,12 +37,17 @@ defineProps({
 
                 <div
                     v-if="$slots.hero"
-                    class="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-2"
+                    class="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2"
                 >
-                    <div class="text-sm font-semibold text-[var(--cs-ink)]">
-                        All items
+                    <div class="min-w-0">
+                        <div class="text-sm font-semibold text-[var(--cs-ink)]">
+                            All items
+                        </div>
+                        <div class="text-xs text-[var(--cs-muted)]">
+                            Browse the full menu
+                        </div>
                     </div>
-                    <div class="flex flex-wrap items-center justify-end gap-2">
+                    <div class="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
                         <slot name="filters" />
                     </div>
                 </div>
@@ -56,9 +61,9 @@ defineProps({
                 </div>
             </div>
 
-            <!-- Order rail (desktop) -->
+            <!-- Order rail (desktop); room at the top for the pinned store switcher -->
             <div
-                class="cs-order-rail hidden min-h-0 min-w-0 overflow-hidden md:flex md:h-full md:min-h-0 md:w-[32%] md:flex-col md:px-5 md:py-6"
+                class="cs-order-rail hidden min-h-0 min-w-0 overflow-hidden md:flex md:h-full md:min-h-0 md:w-[32%] md:flex-col md:px-5 md:pb-6 md:pt-14"
             >
                 <div class="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
                     <slot name="right-side-content" />

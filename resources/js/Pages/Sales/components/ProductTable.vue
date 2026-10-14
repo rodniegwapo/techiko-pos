@@ -52,7 +52,21 @@ const props = defineProps({
         default: "classic",
         validator: (value) => ["classic", "coffeeshop"].includes(value),
     },
+    /** Products arrive sorted by category; show the category name where each one starts. */
+    groupByCategory: {
+        type: Boolean,
+        default: false,
+    },
 });
+
+const categoryOf = (product) => product?.category?.name ?? "Uncategorized";
+
+// Compared with the previous product only, so a category that continues on the next page
+// isn't headed twice.
+function startsCategory(index) {
+    if (!props.groupByCategory) return false;
+    return index === 0 || categoryOf(props.products[index - 1]) !== categoryOf(props.products[index]);
+}
 
 const { getRoute } = useDomainRoutes();
 const page = usePage();
@@ -134,16 +148,8 @@ const formattedTotal = (price) => {
 </script>
 
 <template>
-    <div
-        class="flex min-h-0 flex-col"
-        :class="
-            layout === 'mobile'
-                ? 'h-[calc(100dvh-12rem)]'
-                : isCoffeeshop
-                  ? 'h-full min-h-0 flex-1'
-                  : 'h-[calc(100vh-430px)]'
-        "
-    >
+    <!-- Fills the panel the sales layout gives it; the list scrolls inside. -->
+    <div class="flex h-full min-h-0 flex-1 flex-col">
         <div class="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
             <a-spin
                 v-if="props.loading"
@@ -156,9 +162,15 @@ const formattedTotal = (price) => {
                 v-else-if="products.length && isCoffeeshop"
                 class="mt-1 grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))] md:[grid-template-columns:repeat(auto-fill,minmax(180px,1fr))]"
             >
+                <template v-for="(product, index) in products" :key="product.id">
+                <div
+                    v-if="startsCategory(index)"
+                    class="col-span-full mt-2 border-b pb-1 text-sm font-semibold uppercase tracking-wide text-gray-500"
+                    data-testid="category-heading"
+                >
+                    {{ categoryOf(product) }}
+                </div>
                 <button
-                    v-for="product in products"
-                    :key="product.id"
                     type="button"
                     class="group relative flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white text-left shadow-sm transition hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#287e47] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:shadow-sm"
                     :class="isOutOfStock(product) ? 'opacity-60' : ''"
@@ -214,6 +226,7 @@ const formattedTotal = (price) => {
                         </div>
                     </div>
                 </button>
+                </template>
             </div>
 
             <!-- Classic text cards -->
@@ -221,9 +234,15 @@ const formattedTotal = (price) => {
                 v-else-if="products.length"
                 class="grid [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))] gap-4 mt-2"
             >
+                <template v-for="(product, index) in products" :key="product.id">
                 <div
-                    v-for="product in products"
-                    :key="product.id"
+                    v-if="startsCategory(index)"
+                    class="col-span-full mt-2 border-b pb-1 text-sm font-semibold uppercase tracking-wide text-gray-500"
+                    data-testid="category-heading"
+                >
+                    {{ categoryOf(product) }}
+                </div>
+                <div
                     class="flex justify-between items-start border px-4 py-3 rounded-lg bg-white"
                     :class="
                         isOutOfStock(product)
@@ -272,6 +291,7 @@ const formattedTotal = (price) => {
                         </a-button>
                     </div>
                 </div>
+                </template>
             </div>
             <div
                 v-else-if="!online"

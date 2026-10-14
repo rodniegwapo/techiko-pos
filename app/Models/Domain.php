@@ -72,9 +72,10 @@ class Domain extends Model
     /**
      * Get the users for this domain.
      */
+    /** Users belong to an organization by its slug (users.domain); users.domain_id is unused. */
     public function users()
     {
-        return $this->hasMany(User::class);
+        return $this->hasMany(User::class, 'domain', 'name_slug');
     }
 
     /**
@@ -210,6 +211,27 @@ class Domain extends Model
         $s = $this->settings['sales'] ?? [];
 
         return (bool) ($s['allow_overselling'] ?? false);
+    }
+
+    /** Features an organization has to be given (by a super admin); all are off until turned on. */
+    public const FEATURES = ['finance', 'ai'];
+
+    /** Finance includes its AI explanations; "ai" is the AI assistant in the chat drawer, a separate add-on. */
+    public function hasFeature(string $key): bool
+    {
+        $on = fn (string $k) => data_get($this->settings, "features.{$k}") === true;
+
+        return match ($key) {
+            'finance' => $on('finance'),
+            'ai' => $on('ai'),
+            default => false,
+        };
+    }
+
+    /** @return array{finance: bool, ai: bool} */
+    public function features(): array
+    {
+        return collect(self::FEATURES)->mapWithKeys(fn ($k) => [$k => $this->hasFeature($k)])->all();
     }
 
     /** When true, the POS product list leaves out tracked products with nothing available at the store. */

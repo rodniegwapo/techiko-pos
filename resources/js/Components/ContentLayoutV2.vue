@@ -7,39 +7,48 @@ const props = defineProps({
     filterMainClass: {
         type: String,
         default:
-            "flex justify-between lg:flex-row xl:flex-row flex-col lg:items-center xl:items-center items-start mb-3 w-full",
+            "flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between mb-3 w-full",
     },
     filterClass: {
         type: String,
-        default:
-            "flex justify-end lg:space-x-3 xl:lg:space-x-3 space-x-1 lg:w-5/6 xl:w-5/6 w-full",
+        default: "flex min-w-0 w-full xl:flex-1 justify-end",
     },
 });
 </script>
 
+<!-- Fills the height it is given; the products and the cart scroll inside their own cards. -->
 <template>
-    <div>
-        <div class="rounded-lg w-full flex gap-4">
-            <div class="w-[70%] p-6 bg-white rounded-lg shadow">
-                <div :class="filterMainClass">
-                    <h1 class="text-lg font-semibold text-nowrap">
-                        {{ title }}
-                    </h1>
+    <div class="flex min-h-0 flex-1 flex-col">
+        <div class="rounded-lg w-full flex min-h-0 flex-1 gap-4">
+            <div
+                class="flex min-h-0 w-[70%] flex-col p-6 bg-white rounded-lg shadow"
+            >
+                <div class="shrink-0" :class="filterMainClass">
+                    <div class="flex shrink-0 items-center gap-2 xl:min-h-[32px]">
+                        <h1 class="m-0 text-lg font-semibold text-nowrap">
+                            {{ title }}
+                        </h1>
+                        <slot name="titleMeta" />
+                    </div>
 
                     <div :class="filterClass">
                         <slot name="filters" />
                     </div>
                 </div>
-                <div>
+                <div class="shrink-0">
                     <slot name="activeFilters" />
+                </div>
+                <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
                     <slot name="table" />
                 </div>
             </div>
-            <div class="w-[30%] bg-white p-6 rounded-lg shadow">
+            <div
+                class="flex min-h-0 w-[30%] flex-col overflow-hidden bg-white p-6 rounded-lg shadow"
+            >
                 <slot name="right-side-content" />
             </div>
         </div>
-        <div>
+        <div class="shrink-0">
             <slot name="footer" />
         </div>
     </div>

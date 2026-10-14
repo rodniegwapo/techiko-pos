@@ -1,10 +1,18 @@
 <?php
 
+use App\Http\Controllers\Domains\AssistantController;
 use App\Http\Controllers\Domains\CategoryController;
 use App\Http\Controllers\Domains\CreditController;
 use App\Http\Controllers\Domains\CustomerController;
 use App\Http\Controllers\Domains\DashboardController;
 use App\Http\Controllers\Domains\DomainSettingsController;
+use App\Http\Controllers\Domains\ExpenseCategoryController;
+use App\Http\Controllers\Domains\ExpenseController;
+use App\Http\Controllers\Domains\Finance\BalanceItemsController;
+use App\Http\Controllers\Domains\Finance\MonthlyReviewController;
+use App\Http\Controllers\Domains\Finance\OtherIncomeController;
+use App\Http\Controllers\Domains\Finance\PayablesController;
+use App\Http\Controllers\Domains\FinanceController;
 use App\Http\Controllers\Domains\Inventory\InventoryController;
 use App\Http\Controllers\Domains\Inventory\InventoryLocationController;
 use App\Http\Controllers\Domains\Inventory\StockAdjustmentController;
@@ -15,6 +23,8 @@ use App\Http\Controllers\Domains\ModifierGroupController;
 use App\Http\Controllers\Domains\PaymentCardTypeController;
 use App\Http\Controllers\Domains\PayMongoQrPhController;
 use App\Http\Controllers\Domains\ProductController;
+use App\Http\Controllers\Domains\ProfitLossController;
+use App\Http\Controllers\Domains\RecurringExpenseController;
 use App\Http\Controllers\Domains\SaleController;
 use App\Http\Controllers\Domains\SaleDiscountController;
 use App\Http\Controllers\Domains\SalesHistoryController;
@@ -37,6 +47,14 @@ Route::prefix('domains/{domain:name_slug}')
         // Organization settings (Sales VAT, etc.)
         Route::get('/settings', [DomainSettingsController::class, 'index'])->name('settings.index');
         Route::patch('/settings', [DomainSettingsController::class, 'update'])->name('settings.update');
+
+        // AI assistant in the chat drawer (how-to help within the user's permissions)
+        // Changes it prepared run only when the user confirms them; each also needs that change's own permission.
+        Route::middleware('domain.feature:ai')->prefix('assistant')->name('assistant.')->group(function () {
+            Route::post('/ask', [AssistantController::class, 'ask'])->name('ask');
+            Route::post('/actions/{token}/confirm', [AssistantController::class, 'confirm'])->where('token', '[A-Za-z0-9]{40}')->name('actions.confirm');
+            Route::post('/actions/{token}/cancel', [AssistantController::class, 'cancel'])->where('token', '[A-Za-z0-9]{40}')->name('actions.cancel');
+        });
 
         Route::get('/billing/gcash', function (Request $request) {
             $domain = $request->route('domain');
@@ -177,16 +195,90 @@ Route::prefix('domains/{domain:name_slug}')
             ->only(['index', 'store', 'update', 'destroy'])
             ->names('customers');
 
-        // VAT summary (output VAT from paid sales)
-        Route::get('/vat-report/export-json', [VatReportController::class, 'exportJson'])->name('vat-report.export-json');
-        Route::get('/vat-report/export', [VatReportController::class, 'export'])->name('vat-report.export');
-        Route::get('/vat-report', [VatReportController::class, 'index'])->name('vat-report.index');
+        // Finance pages are only open to organizations given Finance (Domain::hasFeature).
+        Route::middleware('domain.feature:finance')->group(function () {
+            // VAT summary (output VAT from paid sales)
+            Route::get('/vat-report/export-json', [VatReportController::class, 'exportJson'])->name('vat-report.export-json');
+            Route::get('/vat-report/export', [VatReportController::class, 'export'])->name('vat-report.export');
+            Route::get('/vat-report', [VatReportController::class, 'index'])->name('vat-report.index');
+
+            // Profit & Loss (sales, cost of goods, stock losses and expenses → net profit)
+            Route::get('/profit-loss', [ProfitLossController::class, 'index'])->name('profit-loss.index');
+            Route::get('/profit-loss/export', [ProfitLossController::class, 'export'])->name('profit-loss.export');
+        });
 
         // Sales history (read-only list of completed sales, receipt reprint, CSV)
         Route::get('/sales-history', [SalesHistoryController::class, 'index'])->name('sales-history.index');
         Route::get('/sales-history/export', [SalesHistoryController::class, 'export'])->name('sales-history.export');
         Route::get('/sales-history/{sale}', [SalesHistoryController::class, 'show'])->whereNumber('sale')->name('sales-history.show');
         Route::post('/sales-history/{sale}/void', [SalesHistoryController::class, 'void'])->whereNumber('sale')->name('sales-history.void');
+
+        Route::middleware('domain.feature:finance')->group(function () {
+            // Expenses (feed the Profit & Loss report; cash-register expenses also post to the wallet ledger)
+            Route::get('/expenses/export', [ExpenseController::class, 'export'])->name('expenses.export');
+            Route::get('/expenses/{expense}/receipt', [ExpenseController::class, 'receipt'])->whereNumber('expense')->name('expenses.receipt');
+            Route::post('/expenses/categories', [ExpenseCategoryController::class, 'store'])->name('expenses.categories.store');
+            Route::put('/expenses/categories/{category}', [ExpenseCategoryController::class, 'update'])->name('expenses.categories.update');
+            Route::delete('/expenses/categories/{category}', [ExpenseCategoryController::class, 'destroy'])->name('expenses.categories.destroy');
+            Route::post('/expenses/recurring', [RecurringExpenseController::class, 'store'])->name('expenses.recurring.store');
+            Route::put('/expenses/recurring/{recurring}', [RecurringExpenseController::class, 'update'])->name('expenses.recurring.update');
+            Route::delete('/expenses/recurring/{recurring}', [RecurringExpenseController::class, 'destroy'])->name('expenses.recurring.destroy');
+            Route::resource('expenses', ExpenseController::class)
+                ->only(['index', 'store', 'update', 'destroy'])
+                ->names('expenses');
+
+            // Finance (owner's money view: dashboard, statements, customer credit, AI explanations).
+            // The income statement is the Profit & Loss report; this address forwards to it.
+            Route::get('/finance', [FinanceController::class, 'dashboard'])->name('finance.dashboard');
+            Route::get('/finance/income-statement', [FinanceController::class, 'incomeStatement'])->name('finance.income-statement');
+            Route::get('/finance/receivables', [FinanceController::class, 'receivables'])->name('finance.receivables');
+            Route::get('/finance/cash-flow', [FinanceController::class, 'cashFlow'])->name('finance.cash-flow');
+            Route::get('/finance/balance-sheet', [FinanceController::class, 'balanceSheet'])->name('finance.balance-sheet');
+            Route::post('/finance/explain', [FinanceController::class, 'explain'])->name('finance.explain');
+
+            // Finance records next to Expenses: other income, suppliers and their bills
+            Route::prefix('finance')->name('finance.')->group(function () {
+                Route::get('/other-income', [OtherIncomeController::class, 'index'])->name('other-income.index');
+                Route::post('/other-income', [OtherIncomeController::class, 'store'])->name('other-income.store');
+                Route::put('/other-income/{otherIncome}', [OtherIncomeController::class, 'update'])->name('other-income.update');
+                Route::delete('/other-income/{otherIncome}', [OtherIncomeController::class, 'destroy'])->name('other-income.destroy');
+
+                Route::get('/payables', [PayablesController::class, 'index'])->name('payables.index');
+                Route::post('/suppliers', [PayablesController::class, 'storeSupplier'])->name('suppliers.store');
+                Route::put('/suppliers/{supplier}', [PayablesController::class, 'updateSupplier'])->name('suppliers.update');
+                Route::post('/bills', [PayablesController::class, 'storeBill'])->name('bills.store');
+                Route::put('/bills/{bill}', [PayablesController::class, 'updateBill'])->name('bills.update');
+                Route::delete('/bills/{bill}', [PayablesController::class, 'destroyBill'])->name('bills.destroy');
+                Route::post('/bills/{bill}/payments', [PayablesController::class, 'storePayment'])->name('bill-payments.store');
+                Route::delete('/bill-payments/{payment}', [PayablesController::class, 'destroyPayment'])->name('bill-payments.destroy');
+
+                // Bank and e-wallet balances, loans, equipment and owner investments (balance sheet / cash flow)
+                Route::get('/assets-and-loans', [BalanceItemsController::class, 'index'])->name('balance-items.index');
+                Route::post('/accounts', [BalanceItemsController::class, 'storeAccount'])->name('accounts.store');
+                Route::put('/accounts/{account}', [BalanceItemsController::class, 'updateAccount'])->name('accounts.update');
+                Route::post('/accounts/{account}/balances', [BalanceItemsController::class, 'storeAccountBalance'])->name('account-balances.store');
+                Route::delete('/account-balances/{balance}', [BalanceItemsController::class, 'destroyAccountBalance'])->name('account-balances.destroy');
+                Route::post('/loans', [BalanceItemsController::class, 'storeLoan'])->name('loans.store');
+                Route::put('/loans/{loan}', [BalanceItemsController::class, 'updateLoan'])->name('loans.update');
+                Route::delete('/loans/{loan}', [BalanceItemsController::class, 'destroyLoan'])->name('loans.destroy');
+                Route::post('/loans/{loan}/payments', [BalanceItemsController::class, 'storeLoanPayment'])->name('loan-payments.store');
+                Route::delete('/loan-payments/{payment}', [BalanceItemsController::class, 'destroyLoanPayment'])->name('loan-payments.destroy');
+                Route::post('/assets', [BalanceItemsController::class, 'storeAsset'])->name('assets.store');
+                Route::put('/assets/{asset}', [BalanceItemsController::class, 'updateAsset'])->name('assets.update');
+                Route::delete('/assets/{asset}', [BalanceItemsController::class, 'destroyAsset'])->name('assets.destroy');
+                Route::post('/owner-investments', [BalanceItemsController::class, 'storeInvestment'])->name('owner-investments.store');
+                Route::put('/owner-investments/{investment}', [BalanceItemsController::class, 'updateInvestment'])->name('owner-investments.update');
+                Route::delete('/owner-investments/{investment}', [BalanceItemsController::class, 'destroyInvestment'])->name('owner-investments.destroy');
+                Route::post('/other-liabilities', [BalanceItemsController::class, 'storeLiability'])->name('other-liabilities.store');
+                Route::put('/other-liabilities/{liability}', [BalanceItemsController::class, 'updateLiability'])->name('other-liabilities.update');
+                Route::delete('/other-liabilities/{liability}', [BalanceItemsController::class, 'destroyLiability'])->name('other-liabilities.destroy');
+
+                // "Ask about your business" and the monthly business reviews
+                Route::post('/ask', [FinanceController::class, 'ask'])->name('ask');
+                Route::get('/reviews', [MonthlyReviewController::class, 'index'])->name('reviews.index');
+                Route::post('/reviews', [MonthlyReviewController::class, 'generate'])->name('reviews.generate');
+            });
+        });
 
         // Wallet — money movement (cash control + ledger); distinct URL from card-type setup
         Route::get('/wallet/money-movement', [PaymentCardTypeController::class, 'moneyMovement'])->name('wallet.money-movement');

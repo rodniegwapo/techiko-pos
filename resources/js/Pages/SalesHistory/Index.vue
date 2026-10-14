@@ -72,7 +72,8 @@ const statusOptions = computed(() =>
 const queryParams = (extra = {}) => ({
     start_date: dateRange.value?.[0] ? dayjs(dateRange.value[0]).format("YYYY-MM-DD") : undefined,
     end_date: dateRange.value?.[1] ? dayjs(dateRange.value[1]).format("YYYY-MM-DD") : undefined,
-    location_id: location.value || undefined,
+    // "all" keeps every store; left out, the server falls back to the store picked in the header.
+    location_id: location.value || "all",
     user_id: cashier.value || undefined,
     payment_method: payment.value || undefined,
     payment_status: status.value || undefined,

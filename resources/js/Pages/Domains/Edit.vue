@@ -24,20 +24,25 @@ const props = defineProps({
     },
 });
 
-// Form handling
+// The domain arrives as a resource ({ data: … }).
+const domain = computed(() => props.domain?.data ?? props.domain);
+
+// Form handling: the fields the server validates (DomainService::getUpdateValidationRules).
 const form = useForm({
-    name: props.domain.name || '',
-    name_slug: props.domain.name_slug || '',
-    description: props.domain.description || '',
-    country: props.domain.country || '',
-    currency: props.domain.currency || '',
-    timezone: props.domain.timezone || '',
-    is_active: props.domain.is_active ?? true,
+    name: domain.value.name || '',
+    name_slug: domain.value.name_slug || '',
+    country_code: domain.value.country_code || '',
+    currency_code: domain.value.currency_code || '',
+    timezone: domain.value.timezone || '',
+    date_format: domain.value.date_format || 'Y-m-d',
+    time_format: domain.value.time_format || '12h',
+    language_code: domain.value.language_code || 'en',
+    is_active: domain.value.is_active ?? true,
 });
 
 // Methods
 const handleSubmit = () => {
-    form.put(route('domains.update', { domain: props.domain.name_slug }), {
+    form.put(route('domains.update', { domain: domain.value.name_slug }), {
         onSuccess: () => {
             notification.success({
                 message: 'Success',
@@ -54,7 +59,7 @@ const handleSubmit = () => {
 };
 
 const handleCancel = () => {
-    router.visit(route('domains.show', { domain: props.domain.name_slug }));
+    router.visit(route('domains.show', { domain: domain.value.name_slug }));
 };
 </script>
 
@@ -62,8 +67,8 @@ const handleCancel = () => {
     <Head :title="`Edit Domain: ${domain.name}`" />
 
     <AuthenticatedLayout>
-        <div class="py-6">
-            <div class="max-w-2xl mx-auto sm:px-6 lg:px-8">
+        <div class="w-full min-w-0">
+            <div class="w-full">
                 <!-- Header Section -->
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">
                     <div class="p-6 border-b border-gray-200">
@@ -133,23 +138,6 @@ const handleCancel = () => {
                                 </p>
                             </div>
 
-                            <!-- Description -->
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">
-                                    Description
-                                </label>
-                                <textarea
-                                    v-model="form.description"
-                                    rows="3"
-                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    placeholder="Brief description of this domain..."
-                                    :class="{ 'border-red-500': form.errors.description }"
-                                ></textarea>
-                                <p v-if="form.errors.description" class="mt-1 text-sm text-red-600">
-                                    {{ form.errors.description }}
-                                </p>
-                            </div>
-
                             <!-- Country and Currency Row -->
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <!-- Country -->
@@ -159,17 +147,17 @@ const handleCancel = () => {
                                         Country
                                     </label>
                                     <select
-                                        v-model="form.country"
+                                        v-model="form.country_code"
                                         class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        :class="{ 'border-red-500': form.errors.country }"
+                                        :class="{ 'border-red-500': form.errors.country_code }"
                                     >
                                         <option value="">Select Country</option>
-                                        <option v-for="country in countries" :key="country" :value="country">
-                                            {{ country }}
+                                        <option v-for="(label, code) in countries" :key="code" :value="code">
+                                            {{ label }}
                                         </option>
                                     </select>
-                                    <p v-if="form.errors.country" class="mt-1 text-sm text-red-600">
-                                        {{ form.errors.country }}
+                                    <p v-if="form.errors.country_code" class="mt-1 text-sm text-red-600">
+                                        {{ form.errors.country_code }}
                                     </p>
                                 </div>
 
@@ -180,17 +168,17 @@ const handleCancel = () => {
                                         Currency
                                     </label>
                                     <select
-                                        v-model="form.currency"
+                                        v-model="form.currency_code"
                                         class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        :class="{ 'border-red-500': form.errors.currency }"
+                                        :class="{ 'border-red-500': form.errors.currency_code }"
                                     >
                                         <option value="">Select Currency</option>
-                                        <option v-for="currency in currencies" :key="currency" :value="currency">
-                                            {{ currency }}
+                                        <option v-for="(label, code) in currencies" :key="code" :value="code">
+                                            {{ label }}
                                         </option>
                                     </select>
-                                    <p v-if="form.errors.currency" class="mt-1 text-sm text-red-600">
-                                        {{ form.errors.currency }}
+                                    <p v-if="form.errors.currency_code" class="mt-1 text-sm text-red-600">
+                                        {{ form.errors.currency_code }}
                                     </p>
                                 </div>
                             </div>
@@ -207,8 +195,8 @@ const handleCancel = () => {
                                     :class="{ 'border-red-500': form.errors.timezone }"
                                 >
                                     <option value="">Select Timezone</option>
-                                    <option v-for="timezone in timezones" :key="timezone" :value="timezone">
-                                        {{ timezone }}
+                                    <option v-for="(label, tz) in timezones" :key="tz" :value="tz">
+                                        {{ label }}
                                     </option>
                                 </select>
                                 <p v-if="form.errors.timezone" class="mt-1 text-sm text-red-600">

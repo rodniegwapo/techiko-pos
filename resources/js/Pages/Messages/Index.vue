@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch } from "vue";
-import { Head, router } from "@inertiajs/vue3";
+import { Head, Link, router } from "@inertiajs/vue3";
 import { message as antMessage } from "ant-design-vue";
 import { useTable } from "@/Composables/useTable";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
@@ -156,7 +156,13 @@ function sendStaff() {
 <template>
     <AuthenticatedLayout>
         <Head title="Messages" />
-        <ContentHeader class="mb-8" title="Inquiries" />
+        <ContentHeader class="mb-8" title="Inquiries">
+            <template #actions>
+                <Link :href="route('assistant-unanswered.index')">
+                    <a-button>Unanswered by AI</a-button>
+                </Link>
+            </template>
+        </ContentHeader>
 
         <div class="flex flex-col gap-4 lg:flex-row">
             <div class="min-w-0 flex-1">

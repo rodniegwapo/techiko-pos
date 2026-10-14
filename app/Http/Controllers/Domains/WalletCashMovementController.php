@@ -14,6 +14,7 @@ use App\Support\Wallet\WalletCashBridgeExpected;
 use App\Support\Wallet\WalletCashDailyExpected;
 use App\Support\Wallet\WalletLedgerViewData;
 use App\Support\Wallet\WalletLocationResolver;
+use App\Support\Wallet\WalletShiftGuard;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -53,17 +54,7 @@ class WalletCashMovementController extends Controller
 
     private function ensureDateNotClosed(string $domainSlug, int $locationId, string $dateYmd): void
     {
-        $closed = WalletCashReconciliation::query()
-            ->forWalletContext($domainSlug, $locationId)
-            ->whereDate('business_date', $dateYmd)
-            ->where('is_closed', true)
-            ->exists();
-
-        if ($closed) {
-            throw ValidationException::withMessages([
-                'business_date' => 'Shift is closed for this date/location. Reopen to edit.',
-            ]);
-        }
+        WalletShiftGuard::ensureDateNotClosed($domainSlug, $locationId, $dateYmd);
     }
 
     public function index(Request $request, Domain $domain)
