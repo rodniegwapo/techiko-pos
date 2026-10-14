@@ -110,15 +110,18 @@ const overdueColumns = [
                         </div>
                     </section>
 
+                    <!-- Same heading row on both sides, so the two tables start level. -->
                     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
                         <section class="space-y-3">
-                            <h2 class="text-base font-semibold text-gray-900">Overdue customers</h2>
+                            <div class="flex min-h-6 items-center justify-between gap-2">
+                                <h2 class="m-0 text-base font-semibold text-gray-900">Overdue customers</h2>
+                            </div>
                             <a-table :columns="overdueColumns" :data-source="ar.overdue_customers" :pagination="false"
-                                row-key="customer_id" size="small" bordered class="bg-white" />
+                                row-key="customer_id" size="small" bordered class="bg-white" :scroll="{ x: 440 }" />
                         </section>
                         <section class="space-y-3">
-                            <div class="flex items-baseline justify-between gap-2">
-                                <h2 class="text-base font-semibold text-gray-900">Largest balances</h2>
+                            <div class="flex min-h-6 items-center justify-between gap-2">
+                                <h2 class="m-0 text-base font-semibold text-gray-900">Largest balances</h2>
                                 <span v-if="ar.outstanding > 0" class="text-xs text-gray-500">Top 3 hold {{ ar.top_three_share_pct }}% of the total</span>
                             </div>
                             <a-table :columns="largestColumns" :data-source="ar.largest_balances" :pagination="false"
