@@ -23,13 +23,14 @@ class PayMongoQrPhCheckoutService
      *     payment_intent_status: string,
      * }
      */
-    public function startCheckout(Domain $domain, ServiceTier $tier, User $user): array
+    public function startCheckout(Domain $domain, ServiceTier $tier, User $user, int $months = 1): array
     {
         if (! $tier->is_active) {
             throw ValidationException::withMessages(['service_tier_id' => [__('This plan is not available.')]]);
         }
 
-        $amountCentavos = (int) round((float) $tier->amount * 100);
+        // Paying ahead: the plan's monthly price times the months.
+        $amountCentavos = (int) round((float) $tier->amount * 100) * $months;
         if ($amountCentavos < 1) {
             throw ValidationException::withMessages(['service_tier_id' => [__('Invalid plan amount.')]]);
         }
@@ -41,7 +42,7 @@ class PayMongoQrPhCheckoutService
                     'currency' => 'PHP',
                     'payment_method_allowed' => ['qrph'],
                     'capture_type' => 'automatic',
-                    'description' => 'Servicing: '.$tier->name.' ('.$domain->name_slug.')',
+                    'description' => 'Servicing: '.$tier->name.($months > 1 ? " × {$months} months" : '').' ('.$domain->name_slug.')',
                     'metadata' => [
                         'domain_slug' => $domain->name_slug,
                         'service_tier_id' => (string) $tier->id,
@@ -133,6 +134,7 @@ class PayMongoQrPhCheckoutService
             'domain' => $domain->name_slug,
             'service_tier_id' => $tier->id,
             'amount_centavos' => $amountCentavos,
+            'months' => $months,
             'status' => PaymongoCheckout::STATUS_PENDING,
             'billing_email' => $user->email,
             'initiated_by' => $user->id,

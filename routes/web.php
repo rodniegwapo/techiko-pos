@@ -196,6 +196,9 @@ Route::middleware(['auth', 'verified', 'user.permission'])->prefix('domains')->n
     Route::post('/{domain}/payments/{payment}/void', [DomainPaymentController::class, 'void'])
         ->middleware('check.super.user')
         ->name('payments.void');
+    Route::post('/{domain}/payments/{payment}/confirm', [DomainPaymentController::class, 'confirm'])
+        ->middleware('check.super.user')
+        ->name('payments.confirm');
 });
 
 // Global routes (not domain-specific)

@@ -182,6 +182,27 @@ const savePayment = () => {
 };
 
 const payments = computed(() => props.billing?.payments ?? []);
+const toConfirm = computed(() => payments.value.filter((p) => p.awaiting_confirmation).length);
+/** "Premium servicing · Active · since Oct 15, 2026" */
+const currentSubscription = computed(() => {
+    const tier = paidTiers.value.find((t) => t.id === props.billing?.service_tier_id);
+    return {
+        plan: tier?.name ?? "Free starter",
+        locked: !!props.billing?.locked_at,
+        since: props.billing?.subscription_started_at ? shortDate(props.billing.subscription_started_at) : null,
+    };
+});
+const confirmPayment = (row) => {
+    router.post(
+        route("domains.payments.confirm", { domain: domain.value.name_slug, payment: row.id }),
+        {},
+        {
+            preserveScroll: true,
+            onSuccess: () => notification.success({ message: "Payment confirmed" }),
+            onError: () => notification.error({ message: "Couldn't confirm the payment" }),
+        },
+    );
+};
 const latestActivePaymentId = computed(() => payments.value.find((p) => !p.voided)?.id ?? null);
 const voidPayment = (row) => {
     router.post(
@@ -525,12 +546,25 @@ const handleBack = () => {
                     <!-- Payments: next payment due, record a bank transfer, history (super admins) -->
                     <section v-if="isSuperUser && billing" class="rounded-lg bg-white p-6" data-testid="domain-payments">
                         <div class="mb-3 flex items-center justify-between gap-2">
-                            <h2 class="text-lg font-semibold text-gray-900">Payments</h2>
+                            <h2 class="flex items-center gap-2 text-lg font-semibold text-gray-900">
+                                Payments
+                                <a-tag v-if="toConfirm" color="orange" class="!m-0 !text-xs !font-normal" data-testid="payments-to-confirm">
+                                    {{ toConfirm }} to confirm
+                                </a-tag>
+                            </h2>
                             <a-button type="primary" size="small" :disabled="!paidTiers.length" data-testid="record-payment" @click="openPayment">
                                 Record payment
                             </a-button>
                         </div>
 
+                        <p class="mb-2 text-sm text-gray-700" data-testid="current-subscription">
+                            <strong>{{ currentSubscription.plan }}</strong>
+                            ·
+                            <span :class="currentSubscription.locked ? 'font-medium text-red-600' : 'text-green-700'">
+                                {{ currentSubscription.locked ? "Locked" : "Active" }}
+                            </span>
+                            <template v-if="currentSubscription.since"> · since {{ currentSubscription.since }}</template>
+                        </p>
                         <p v-if="nextPaymentLabel" class="rounded-md px-3 py-2 text-sm" :class="nextPaymentClass" data-testid="next-payment">
                             Next payment
                             <strong v-if="nextPaymentLabel.amount">{{ nextPaymentLabel.amount }}</strong>
@@ -556,6 +590,17 @@ const handleBack = () => {
                                             <template v-if="row.reference_number"> · Ref {{ row.reference_number }}</template>
                                         </p>
                                         <p v-if="row.recorded_by" class="text-xs text-gray-400">Recorded by {{ row.recorded_by }}</p>
+                                        <p v-if="row.awaiting_confirmation" class="mt-1 flex items-center gap-2">
+                                            <a-tag color="orange" class="!m-0">Awaiting confirmation</a-tag>
+                                            <a-popconfirm
+                                                :title="`Confirm you received ${peso(row.amount)}?`"
+                                                ok-text="Confirm"
+                                                cancel-text="Not yet"
+                                                @confirm="confirmPayment(row)"
+                                            >
+                                                <a-button type="link" size="small" class="!p-0" data-testid="confirm-payment">Confirm</a-button>
+                                            </a-popconfirm>
+                                        </p>
                                     </div>
                                     <a-tag v-if="row.voided" class="!m-0 shrink-0">Voided</a-tag>
                                     <a-popconfirm

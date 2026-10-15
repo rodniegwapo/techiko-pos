@@ -32,6 +32,7 @@ use App\Http\Controllers\Domains\SaleDiscountController;
 use App\Http\Controllers\Domains\SalesHistoryController;
 use App\Http\Controllers\Domains\SharedCatalogLookupController;
 use App\Http\Controllers\Domains\SubscriptionOnHoldController;
+use App\Http\Controllers\Domains\SubscriptionRenewalController;
 use App\Http\Controllers\Domains\UserController;
 use App\Http\Controllers\Domains\UserPinController;
 use App\Http\Controllers\Domains\VatReportController;
@@ -49,6 +50,9 @@ Route::prefix('domains/{domain:name_slug}')
     ->name('domains.')
     ->group(function () {
         Route::get('/subscription-on-hold', SubscriptionOnHoldController::class)->name('subscription-on-hold');
+        // "Pay now" from that page (PayMongo QR Ph); the controller checks who may pay.
+        Route::post('/renew', [SubscriptionRenewalController::class, 'start'])->middleware('throttle:10,1')->name('renew.start');
+        Route::get('/renew/status', [SubscriptionRenewalController::class, 'status'])->name('renew.status');
     });
 
 Route::prefix('domains/{domain:name_slug}')

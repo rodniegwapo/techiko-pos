@@ -63,6 +63,9 @@ class SubscriptionPaymentService
                 'recorded_by' => $by?->id,
                 'manual_payment_request_id' => $data['manual_payment_request_id'] ?? null,
                 'paymongo_checkout_id' => $data['paymongo_checkout_id'] ?? null,
+                // A super admin recorded or approved it; a PayMongo payment waits for their confirmation.
+                'confirmed_at' => $data['method'] === 'paymongo' ? null : now(),
+                'confirmed_by' => $data['method'] === 'paymongo' ? null : $by?->id,
             ]);
 
             $changes = ['subscription_ends_at' => $end];
@@ -95,6 +98,14 @@ class SubscriptionPaymentService
             $payment->update(['voided_at' => now(), 'voided_by' => $by->id]);
             Domain::query()->where('name_slug', $payment->domain)->update(['subscription_ends_at' => $payment->previous_ends_at]);
         });
+    }
+
+    /** The super admin checked a PayMongo payment arrived. Dates don't change (it already counted). */
+    public function confirm(SubscriptionPayment $payment, User $by): void
+    {
+        if ($payment->needsConfirmation()) {
+            $payment->update(['confirmed_at' => now(), 'confirmed_by' => $by->id]);
+        }
     }
 
     /** @return array{due_on: string, amount: ?float, days_left: int}|null When the next payment is due, and how much the current plan costs. */

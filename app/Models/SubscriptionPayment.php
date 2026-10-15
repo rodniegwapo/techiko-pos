@@ -25,7 +25,19 @@ class SubscriptionPayment extends Model
         'period_end' => 'date:Y-m-d',
         'previous_ends_at' => 'date:Y-m-d',
         'voided_at' => 'datetime',
+        'confirmed_at' => 'datetime',
     ];
+
+    /** A PayMongo payment unlocks right away; a super admin still confirms the money arrived. */
+    public function needsConfirmation(): bool
+    {
+        return $this->method === 'paymongo' && $this->confirmed_at === null && $this->voided_at === null;
+    }
+
+    public function scopeAwaitingConfirmation(Builder $query): Builder
+    {
+        return $query->where('method', 'paymongo')->whereNull('confirmed_at')->whereNull('voided_at');
+    }
 
     public function serviceTier(): BelongsTo
     {
@@ -70,6 +82,7 @@ class SubscriptionPayment extends Model
             'note' => $this->note,
             'recorded_by' => $this->recordedByUser?->name,
             'voided' => $this->voided_at !== null,
+            'awaiting_confirmation' => $this->needsConfirmation(),
         ];
     }
 }

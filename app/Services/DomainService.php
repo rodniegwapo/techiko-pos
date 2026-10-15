@@ -12,7 +12,9 @@ class DomainService
      */
     public function getFilteredDomains(Request $request, $currentUser = null)
     {
-        $query = Domain::with(['users']);
+        // PayMongo payments a super admin hasn't confirmed yet, shown as "To confirm" in the list.
+        $query = Domain::with(['users'])
+            ->withCount(['subscriptionPayments as payments_to_confirm' => fn ($q) => $q->awaitingConfirmation()]);
 
         // Super users can see all domains, others see only their domain
         if ($currentUser && !$currentUser->isSuperUser() && $currentUser->domain_id) {

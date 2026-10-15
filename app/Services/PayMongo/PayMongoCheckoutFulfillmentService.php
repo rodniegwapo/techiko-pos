@@ -61,17 +61,19 @@ class PayMongoCheckoutFulfillmentService
                 return false;
             }
 
-            // Logged as a payment, which sets the plan and moves the next payment date a month on.
+            // Logged as a payment, which sets the plan, moves the next payment date the months paid for,
+            // and unlocks a locked organization right away (a super admin confirms it arrived later).
             $domain = Domain::query()->where('name_slug', $checkout->domain)->first();
             if ($domain) {
                 $this->payments->record($domain, [
                     'service_tier_id' => (int) $checkout->service_tier_id,
                     'amount' => $checkout->amount_centavos / 100,
-                    'months' => 1,
+                    'months' => max(1, (int) $checkout->months),
                     'method' => 'paymongo',
                     'reference_number' => $paymentIntentId,
                     'paid_on' => today()->toDateString(),
                     'paymongo_checkout_id' => $checkout->id,
+                    'unlock' => true,
                 ], null);
             }
 

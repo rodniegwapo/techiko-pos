@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Domains;
 
 use App\Http\Controllers\Controller;
 use App\Models\Domain;
+use App\Models\ServiceTier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -26,6 +27,15 @@ class SubscriptionOnHoldController extends Controller
             'organization' => $domain->name,
             'endedOn' => $domain->subscription_ends_at?->toDateString(),
             'contactUrl' => route('marketing.contact'),
+            // "Pay now" (PayMongo QR Ph) for the people who handle the plan; others ask their admin.
+            'canPay' => SubscriptionRenewalController::canPay($user, $domain),
+            'paymentsReady' => SubscriptionRenewalController::paymentsReady(),
+            'tiers' => ServiceTier::query()->active()->get(['id', 'slug', 'name', 'amount'])
+                ->reject(fn (ServiceTier $tier) => ServiceTier::isHiddenFromBilling($tier))
+                ->map(fn (ServiceTier $tier) => ['id' => $tier->id, 'name' => $tier->name, 'amount' => (float) $tier->amount])
+                ->values(),
+            'currentTierId' => $domain->current_service_tier_id,
+            'currencySymbol' => config('manual_billing.currency_symbol', '₱'),
         ]);
     }
 }

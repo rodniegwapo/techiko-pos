@@ -216,8 +216,9 @@ const getStatusText = (isActive) => {
                     class="min-w-[80px]"
                 />
                 <!-- Locked for not paying / when the subscription ends (set on the details page) -->
-                <div v-if="record.locked_at || record.subscription_ends_at" class="mt-1 flex flex-wrap items-center gap-1 text-xs">
+                <div v-if="record.locked_at || record.subscription_ends_at || record.payments_to_confirm" class="mt-1 flex flex-wrap items-center gap-1 text-xs">
                     <a-tag v-if="record.locked_at" color="red" class="!m-0">Locked</a-tag>
+                    <a-tag v-if="record.payments_to_confirm" color="orange" class="!m-0">To confirm</a-tag>
                     <span v-if="record.subscription_ends_at" :class="dayjs(record.subscription_ends_at).isBefore(dayjs(), 'day') ? 'text-red-600' : 'text-gray-500'">
                         {{ dayjs(record.subscription_ends_at).isBefore(dayjs(), "day") ? "Ended" : "Ends" }}
                         {{ dayjs(record.subscription_ends_at).format("MMM D, YYYY") }}

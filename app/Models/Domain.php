@@ -119,6 +119,12 @@ class Domain extends Model
         return $this->hasMany(Sale::class);
     }
 
+    /** Its subscription payments (see SubscriptionPaymentService). */
+    public function subscriptionPayments()
+    {
+        return $this->hasMany(SubscriptionPayment::class, 'domain', 'name_slug');
+    }
+
     public function currentServiceTier()
     {
         return $this->belongsTo(ServiceTier::class, 'current_service_tier_id');

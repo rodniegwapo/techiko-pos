@@ -42,4 +42,14 @@ class DomainPaymentController extends Controller
 
         return back()->with('success', 'Payment voided. The next payment date went back.');
     }
+
+    /** The super admin checked a PayMongo payment arrived. */
+    public function confirm(Request $request, Domain $domain, SubscriptionPayment $payment): RedirectResponse
+    {
+        abort_unless($payment->domain === $domain->name_slug, 404);
+
+        $this->payments->confirm($payment, $request->user());
+
+        return back()->with('success', 'Payment confirmed.');
+    }
 }
