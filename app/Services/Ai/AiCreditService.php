@@ -64,8 +64,7 @@ class AiCreditService
 
             throw new OutOfAiCreditsException(
                 "Your organization has used all {$allowance} AI credits for ".now()->format('F').'. '
-                .'They reset on '.now()->addMonthNoOverflow()->startOfMonth()->format('F j').', or upgrade your plan on the Billing page.',
-                route('domains.billing.servicing.index', ['domain' => $domain->name_slug]),
+                .'They reset on '.now()->addMonthNoOverflow()->startOfMonth()->format('F j').', or contact us to change your plan.',
             );
         }
     }

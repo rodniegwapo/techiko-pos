@@ -11,17 +11,11 @@ use Illuminate\Http\JsonResponse;
  */
 class OutOfAiCreditsException extends Exception
 {
-    public function __construct(string $message, public readonly ?string $billingUrl = null)
-    {
-        parent::__construct($message);
-    }
-
     public function render(): JsonResponse
     {
         return response()->json([
             'message' => $this->getMessage(),
             'out_of_credits' => true,
-            'billing_url' => $this->billingUrl,
         ], 402);
     }
 }

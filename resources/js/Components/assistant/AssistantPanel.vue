@@ -81,7 +81,7 @@ async function ask(text = message.value) {
         .filter((t) => t.answer)
         .slice(-6)
         .map((t) => ({ question: t.question, answer: withOutcomes(t) }));
-    const turn = { question: q, answer: null, links: [], actions: [], forms: [], error: null, billingUrl: null };
+    const turn = { question: q, answer: null, links: [], actions: [], forms: [], error: null };
     turns.value.push(turn);
     scrollDown();
     try {
@@ -100,9 +100,8 @@ async function ask(text = message.value) {
         creditsLeft.value = data.credits_remaining ?? null;
     } catch (e) {
         turn.error = e?.response?.data?.message || "Could not get an answer right now. Please try again.";
-        // Out of the organization's monthly AI credits: offer the Billing page.
-        if (e?.response?.status === 402 && e.response.data?.billing_url) {
-            turn.billingUrl = e.response.data.billing_url;
+        // Out of the organization's monthly AI credits.
+        if (e?.response?.status === 402) {
             creditsLeft.value = 0;
         }
     } finally {
@@ -194,12 +193,7 @@ function onKeydown(e) {
                 <div class="ml-auto w-fit max-w-[85%] whitespace-pre-wrap break-words rounded-lg bg-green-100 px-3 py-2 text-sm text-gray-800">{{ turn.question }}</div>
                 <div class="w-fit max-w-[95%] rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-800" data-testid="assistant-answer">
                     <a-skeleton v-if="!turn.answer && !turn.error" active :paragraph="{ rows: 2 }" :title="false" />
-                    <template v-else-if="turn.error">
-                        <p class="text-red-600">{{ turn.error }}</p>
-                        <a-button v-if="turn.billingUrl" class="mt-2" size="small" type="primary" ghost @click="openLink({ url: turn.billingUrl })">
-                            <span class="inline-flex items-center gap-1">Go to Billing <IconExternalLink :size="14" /></span>
-                        </a-button>
-                    </template>
+                    <p v-else-if="turn.error" class="text-red-600">{{ turn.error }}</p>
                     <template v-else>
                         <template v-for="(block, j) in answerBlocks(turn.answer)" :key="j">
                             <component

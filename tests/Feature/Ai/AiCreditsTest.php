@@ -138,7 +138,7 @@ class AiCreditsTest extends TestCase
         $this->ask($ctx)
             ->assertStatus(402)
             ->assertJsonPath('out_of_credits', true)
-            ->assertJsonPath('billing_url', route('domains.billing.servicing.index', ['domain' => $ctx['domain']->name_slug]));
+            ->assertJsonMissingPath('billing_url');
 
         $this->assertSame(3, AiUsage::query()->where('domain', $ctx['domain']->name_slug)->count());
         AppAssistantAgent::assertPrompted(fn () => true);
