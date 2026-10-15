@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Ai\Agents\AppAssistantAgent;
 use App\Http\Middleware\RoleBasedAccessControl;
+use App\Models\AssistantConversation;
 use App\Models\AssistantUnansweredQuestion;
 use App\Models\Category;
 use App\Models\Domain;
@@ -458,8 +459,13 @@ class AppAssistantTest extends TestCase
 
         $token = $this->propose($ctx, 'create_product', ['name' => 'Chickenjoy 2pc', 'price' => 120, 'category_id' => $category->id]);
         $this->assertFalse(Product::query()->where('name', 'Chickenjoy 2pc')->exists(), 'nothing is saved before Confirm');
+        $saved = AssistantConversation::query()
+            ->create(['domain' => $ctx['domain']->name_slug, 'user_id' => $ctx['user']->id, 'title' => 'Add', 'last_message_at' => now()])
+            ->messages()->create(['question' => 'Add it', 'answer' => 'Confirm below.', 'pending_actions' => [['token' => $token, 'title' => 'Add product']]]);
+        app(PendingActions::class)->attachMessage($token, $saved->id);
 
         $this->confirm($ctx, $token)->assertOk()->assertJsonPath('message', 'Added "Chickenjoy 2pc" to Main.');
+        $this->assertSame('done', $saved->fresh()->pending_actions[0]['state'], 'the saved chat shows it was done');
 
         $product = Product::query()->where('domain', $ctx['domain']->name_slug)->where('name', 'Chickenjoy 2pc')->sole();
         $this->assertEquals(120, $product->price);

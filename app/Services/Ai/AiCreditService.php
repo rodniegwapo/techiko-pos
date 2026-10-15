@@ -71,10 +71,10 @@ class AiCreditService
     }
 
     /** Charges one successful AI answer. A call that never reached the AI (no response) is free. */
-    public function record(Domain $domain, ?User $user, string $feature, ?TextResponse $response): void
+    public function record(Domain $domain, ?User $user, string $feature, ?TextResponse $response): ?AiUsage
     {
         if ($response === null) {
-            return;
+            return null;
         }
 
         $usage = $response->usage;
@@ -84,7 +84,7 @@ class AiCreditService
             ? ($usage->inputTokens * (float) $price['input'] + $usage->outputTokens * (float) $price['output']) / 1_000_000
             : 0;
 
-        AiUsage::query()->create([
+        return AiUsage::query()->create([
             'domain' => $domain->name_slug,
             'user_id' => $user?->id,
             'feature' => $feature,

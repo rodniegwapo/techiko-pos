@@ -21,6 +21,9 @@ class AssistantPermissionSeeder extends Seeder
         'assistant.ask',
         'assistant.actions.confirm',
         'assistant.actions.cancel',
+        'assistant.conversations.index',
+        'assistant.conversations.show',
+        'assistant.conversations.destroy',
         ...self::USAGE_ROUTES,
     ];
 

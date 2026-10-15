@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Domains\AiUsageController;
 use App\Http\Controllers\Domains\AssistantController;
+use App\Http\Controllers\Domains\AssistantConversationController;
 use App\Http\Controllers\Domains\CategoryController;
 use App\Http\Controllers\Domains\CreditController;
 use App\Http\Controllers\Domains\CustomerController;
@@ -55,6 +56,11 @@ Route::prefix('domains/{domain:name_slug}')
             Route::post('/ask', [AssistantController::class, 'ask'])->name('ask');
             Route::post('/actions/{token}/confirm', [AssistantController::class, 'confirm'])->where('token', '[A-Za-z0-9]{40}')->name('actions.confirm');
             Route::post('/actions/{token}/cancel', [AssistantController::class, 'cancel'])->where('token', '[A-Za-z0-9]{40}')->name('actions.cancel');
+
+            // The user's own saved chats (kept 90 days)
+            Route::get('/conversations', [AssistantConversationController::class, 'index'])->name('conversations.index');
+            Route::get('/conversations/{conversation}', [AssistantConversationController::class, 'show'])->whereNumber('conversation')->name('conversations.show');
+            Route::delete('/conversations/{conversation}', [AssistantConversationController::class, 'destroy'])->whereNumber('conversation')->name('conversations.destroy');
         });
 
         // The organization's plan and this month's AI credits (credits only, no costs).
