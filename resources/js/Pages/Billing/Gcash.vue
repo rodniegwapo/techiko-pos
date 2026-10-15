@@ -10,6 +10,7 @@ import AiCreditsMeter from "@/Components/ai/AiCreditsMeter.vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { message } from "ant-design-vue";
 import { IconCheck } from "@tabler/icons-vue";
+import dayjs from "dayjs";
 
 const props = defineProps({
     tiers: { type: Array, default: () => [] },
@@ -38,7 +39,35 @@ const props = defineProps({
         type: String,
         default: null,
     },
+    /** When the next payment is due ({ due_on, amount, days_left }), or null without a due date. */
+    nextPayment: { type: Object, default: null },
+    /** Past payments, newest first (read-only). */
+    payments: { type: Array, default: () => [] },
 });
+
+const longDate = (date) => (date ? dayjs(date).format("MMM D, YYYY") : "");
+const money = (amount) => `${props.currencySymbol}${Number(amount).toLocaleString("en-PH", { minimumFractionDigits: 2 })}`;
+const dueLabel = (days) => {
+    if (days > 1) return `due in ${days} days`;
+    if (days === 1) return "due tomorrow";
+    if (days === 0) return "due today";
+    return days === -1 ? "overdue by 1 day" : `overdue by ${-days} days`;
+};
+const nextPaymentClass = computed(() => {
+    const days = props.nextPayment?.days_left;
+    return days < 0 ? "text-red-700" : days <= 7 ? "text-amber-700" : "";
+});
+const paymentColumns = [
+    { title: "Paid on", dataIndex: "paid_on", key: "paid_on", customRender: ({ text }) => longDate(text) },
+    { title: "Amount", dataIndex: "amount", key: "amount", align: "right", customRender: ({ text }) => money(text) },
+    {
+        title: "Covers",
+        key: "covers",
+        customRender: ({ record }) => `${longDate(record.period_start)} → ${longDate(record.period_end)}`,
+    },
+    { title: "Method", dataIndex: "method", key: "method" },
+    { title: "Reference", dataIndex: "reference_number", key: "reference_number", ellipsis: true },
+];
 
 function aiCreditsLabel(credits) {
     return credits == null
@@ -297,6 +326,32 @@ const referenceHelp = computed(() => {
                             page—it does not expire.
                         </template>
                     </div>
+
+                    <!-- Read-only: when the next payment is due and what was paid (recorded by Techiko) -->
+                    <section
+                        v-if="nextPayment || payments.length"
+                        class="rounded-lg border border-gray-200 bg-white px-5 py-4 shadow-sm text-sm text-gray-800"
+                        data-testid="your-subscription"
+                    >
+                        <p class="font-semibold text-gray-900 mb-1">Your subscription</p>
+                        <p v-if="nextPayment" :class="nextPaymentClass">
+                            Paid through <strong>{{ longDate(nextPayment.due_on) }}</strong>
+                            <template v-if="nextPayment.amount != null">
+                                · Next payment <strong>{{ money(nextPayment.amount) }}</strong>
+                            </template>
+                            ({{ dueLabel(nextPayment.days_left) }})
+                        </p>
+                        <a-table
+                            v-if="payments.length"
+                            class="mt-3"
+                            size="small"
+                            :columns="paymentColumns"
+                            :data-source="payments"
+                            :pagination="false"
+                            row-key="id"
+                            :scroll="{ x: 640 }"
+                        />
+                    </section>
 
                     <a-steps
                         v-if="showManualGcash"

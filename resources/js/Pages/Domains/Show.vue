@@ -1,5 +1,5 @@
 <script setup>
-import { computed, reactive } from "vue";
+import { computed, reactive, watch } from "vue";
 import { router, Head, usePage } from "@inertiajs/vue3";
 import { notification } from "ant-design-vue";
 import dayjs from "dayjs";
@@ -115,6 +115,88 @@ const endHintClass = computed(() => {
 });
 const endBeforeStart = (current) =>
     !!plan.subscription_started_at && current && current.isBefore(dayjs(plan.subscription_started_at), "day");
+
+/*** === PAYMENTS (super admins record a bank transfer; it moves the next payment date) === ***/
+const peso = (amount) => `₱${Number(amount ?? 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}`;
+const shortDate = (date) => (date ? dayjs(date).format("MMM D, YYYY") : "");
+const paidTiers = computed(() => props.billing?.tiers ?? []);
+const tierPrice = (id) => Number(paidTiers.value.find((t) => t.id === id)?.amount ?? 0);
+
+const nextPayment = computed(() => props.billing?.next_payment ?? null);
+const nextPaymentLabel = computed(() => {
+    const next = nextPayment.value;
+    if (!next) return null;
+    const days = next.days_left;
+    const when = days > 1 ? `in ${days} days` : days === 1 ? "tomorrow" : days === 0 ? "today" : `overdue by ${-days} ${days === -1 ? "day" : "days"}`;
+    return { amount: next.amount != null ? peso(next.amount) : null, due: shortDate(next.due_on), when, days };
+});
+const nextPaymentClass = computed(() => {
+    const days = nextPaymentLabel.value?.days;
+    return days == null ? "" : days < 0 ? "bg-red-50 text-red-700" : days <= 7 ? "bg-amber-50 text-amber-800" : "bg-gray-50 text-gray-800";
+});
+
+const newPayment = () => {
+    const tierId = props.billing?.service_tier_id ?? paidTiers.value[0]?.id ?? null;
+    return {
+        service_tier_id: tierId,
+        months: 1,
+        amount: tierPrice(tierId),
+        paid_on: dayjs().format("YYYY-MM-DD"),
+        bank_name: "",
+        reference_number: "",
+        note: "",
+        unlock: !!props.billing?.locked_at,
+    };
+};
+const payment = reactive({ open: false, saving: false, errors: {}, form: newPayment() });
+const paymentTierOptions = computed(() =>
+    paidTiers.value.map((t) => ({ value: t.id, label: `${t.name} · ${peso(t.amount)} / month` })),
+);
+const paymentOkProps = computed(() => ({ disabled: !payment.form.reference_number.trim() }));
+const afterToday = (d) => !!d && d.isAfter(dayjs(), "day");
+const openPayment = () => Object.assign(payment, { open: true, errors: {}, form: newPayment() });
+// The amount follows the plan's price × months until changed by hand.
+watch(
+    () => [payment.form.service_tier_id, payment.form.months],
+    ([tierId, months]) => (payment.form.amount = tierPrice(tierId) * months),
+);
+/** What this payment will cover: from the current due date (or the day paid), the chosen months on. */
+const coversPreview = computed(() => {
+    const start = props.billing?.subscription_ends_at || payment.form.paid_on;
+    if (!start) return "";
+    const from = dayjs(start);
+    return `${shortDate(from)} → ${shortDate(from.add(payment.form.months, "month"))}`;
+});
+const savePayment = () => {
+    payment.saving = true;
+    router.post(route("domains.payments.store", { domain: domain.value.name_slug }), payment.form, {
+        preserveScroll: true,
+        onSuccess: () => {
+            payment.open = false;
+            Object.assign(plan, savedPlan());
+            notification.success({ message: "Payment recorded" });
+        },
+        onError: (errors) => (payment.errors = errors),
+        onFinish: () => (payment.saving = false),
+    });
+};
+
+const payments = computed(() => props.billing?.payments ?? []);
+const latestActivePaymentId = computed(() => payments.value.find((p) => !p.voided)?.id ?? null);
+const voidPayment = (row) => {
+    router.post(
+        route("domains.payments.void", { domain: domain.value.name_slug, payment: row.id }),
+        {},
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                Object.assign(plan, savedPlan());
+                notification.success({ message: "Payment voided" });
+            },
+            onError: (errors) => notification.error({ message: errors.payment ?? "Couldn't void the payment" }),
+        },
+    );
+};
 
 /*** === LOCK (an organization that hasn't paid: its users only see the "on hold" page) === ***/
 const locking = reactive({ saving: false });
@@ -366,7 +448,7 @@ const handleBack = () => {
                                 />
                             </div>
                             <div>
-                                <label class="mb-1 block text-sm font-medium text-gray-700">End</label>
+                                <label class="mb-1 block text-sm font-medium text-gray-700">Paid through</label>
                                 <a-date-picker
                                     v-model:value="plan.subscription_ends_at"
                                     value-format="YYYY-MM-DD"
@@ -439,6 +521,123 @@ const handleBack = () => {
                             Save plan
                         </a-button>
                     </section>
+
+                    <!-- Payments: next payment due, record a bank transfer, history (super admins) -->
+                    <section v-if="isSuperUser && billing" class="rounded-lg bg-white p-6" data-testid="domain-payments">
+                        <div class="mb-3 flex items-center justify-between gap-2">
+                            <h2 class="text-lg font-semibold text-gray-900">Payments</h2>
+                            <a-button type="primary" size="small" :disabled="!paidTiers.length" data-testid="record-payment" @click="openPayment">
+                                Record payment
+                            </a-button>
+                        </div>
+
+                        <p v-if="nextPaymentLabel" class="rounded-md px-3 py-2 text-sm" :class="nextPaymentClass" data-testid="next-payment">
+                            Next payment
+                            <strong v-if="nextPaymentLabel.amount">{{ nextPaymentLabel.amount }}</strong>
+                            due <strong>{{ nextPaymentLabel.due }}</strong> ({{ nextPaymentLabel.when }})
+                        </p>
+                        <p v-else class="rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-500">
+                            {{ payments.length ? "No next payment date yet." : "No payments recorded yet." }}
+                        </p>
+
+                        <!-- History: a stacked list fits this narrow column better than a table -->
+                        <ul v-if="payments.length" class="mt-3 divide-y divide-gray-100 text-sm" data-testid="payment-history">
+                            <li v-for="row in payments" :key="row.id" class="py-2">
+                                <div class="flex items-start justify-between gap-2">
+                                    <div :class="{ 'text-gray-400 line-through': row.voided }">
+                                        <p class="text-gray-900">
+                                            <strong class="tabular-nums">{{ peso(row.amount) }}</strong> · {{ shortDate(row.paid_on) }}
+                                        </p>
+                                        <p class="text-xs text-gray-600">
+                                            Covers {{ shortDate(row.period_start) }} → {{ shortDate(row.period_end) }} ({{ row.months }} mo)
+                                        </p>
+                                        <p class="text-xs text-gray-500">
+                                            {{ row.method }}<template v-if="row.bank_name"> · {{ row.bank_name }}</template>
+                                            <template v-if="row.reference_number"> · Ref {{ row.reference_number }}</template>
+                                        </p>
+                                        <p v-if="row.recorded_by" class="text-xs text-gray-400">Recorded by {{ row.recorded_by }}</p>
+                                    </div>
+                                    <a-tag v-if="row.voided" class="!m-0 shrink-0">Voided</a-tag>
+                                    <a-popconfirm
+                                        v-else-if="row.id === latestActivePaymentId"
+                                        title="Void this payment? The next payment date goes back."
+                                        ok-text="Void"
+                                        cancel-text="Keep"
+                                        @confirm="voidPayment(row)"
+                                    >
+                                        <a-button type="link" size="small" danger class="!p-0 shrink-0">Void</a-button>
+                                    </a-popconfirm>
+                                </div>
+                            </li>
+                        </ul>
+                    </section>
+
+                    <a-modal
+                        v-model:visible="payment.open"
+                        title="Record payment"
+                        ok-text="Record payment"
+                        :confirm-loading="payment.saving"
+                        :ok-button-props="paymentOkProps"
+                        @ok="savePayment"
+                    >
+                        <div class="space-y-3" data-testid="payment-form">
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-gray-700">Plan</label>
+                                <a-select v-model:value="payment.form.service_tier_id" class="w-full" :options="paymentTierOptions" />
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="mb-1 block text-sm font-medium text-gray-700">Months</label>
+                                    <a-radio-group v-model:value="payment.form.months" button-style="solid" size="small">
+                                        <a-radio-button v-for="m in [1, 3, 6, 12]" :key="m" :value="m">{{ m }}</a-radio-button>
+                                    </a-radio-group>
+                                </div>
+                                <div>
+                                    <label class="mb-1 block text-sm font-medium text-gray-700">Amount (₱)</label>
+                                    <!-- No `prefix` here: it freezes the page in this Ant Design version. -->
+                                    <a-input-number v-model:value="payment.form.amount" :min="0.01" :precision="2" class="!w-full" />
+                                    <p v-if="payment.errors.amount" class="mt-1 text-xs text-red-600">{{ payment.errors.amount }}</p>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="mb-1 block text-sm font-medium text-gray-700">Paid on</label>
+                                    <a-date-picker
+                                        v-model:value="payment.form.paid_on"
+                                        value-format="YYYY-MM-DD"
+                                        format="MMM D, YYYY"
+                                        class="!w-full"
+                                        :allow-clear="false"
+                                        :disabled-date="afterToday"
+                                    />
+                                    <p v-if="payment.errors.paid_on" class="mt-1 text-xs text-red-600">{{ payment.errors.paid_on }}</p>
+                                </div>
+                                <div>
+                                    <label class="mb-1 block text-sm font-medium text-gray-700">Method</label>
+                                    <a-input value="Bank transfer" disabled />
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="mb-1 block text-sm font-medium text-gray-700">Reference number</label>
+                                    <a-input v-model:value="payment.form.reference_number" :maxlength="100" placeholder="From the bank receipt" data-testid="payment-reference" />
+                                    <p v-if="payment.errors.reference_number" class="mt-1 text-xs text-red-600">{{ payment.errors.reference_number }}</p>
+                                </div>
+                                <div>
+                                    <label class="mb-1 block text-sm font-medium text-gray-700">Bank <span class="font-normal text-gray-400">(optional)</span></label>
+                                    <a-input v-model:value="payment.form.bank_name" :maxlength="100" placeholder="e.g. BDO, BPI" />
+                                </div>
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-gray-700">Note <span class="font-normal text-gray-400">(optional)</span></label>
+                                <a-input v-model:value="payment.form.note" :maxlength="1000" />
+                            </div>
+                            <a-checkbox v-if="billing?.locked_at" v-model:checked="payment.form.unlock">Unlock this organization</a-checkbox>
+                            <p class="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-800" data-testid="payment-covers">
+                                Covers {{ coversPreview }}.
+                            </p>
+                        </div>
+                    </a-modal>
 
                     <!-- Access: lock an organization that hasn't paid (super admins) -->
                     <section v-if="isSuperUser && billing" class="rounded-lg bg-white p-6" data-testid="domain-lock">

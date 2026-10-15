@@ -10,6 +10,7 @@ use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeployController;
 use App\Http\Controllers\DomainController;
+use App\Http\Controllers\DomainPaymentController;
 use App\Http\Controllers\ImpersonationController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryLocationController;
@@ -188,6 +189,13 @@ Route::middleware(['auth', 'verified', 'user.permission'])->prefix('domains')->n
     Route::patch('/{domain}/lock', [DomainController::class, 'updateLock'])
         ->middleware('check.super.user')
         ->name('lock.update');
+    // Subscription payments (e.g. a bank transfer with its reference number); super admins only.
+    Route::post('/{domain}/payments', [DomainPaymentController::class, 'store'])
+        ->middleware('check.super.user')
+        ->name('payments.store');
+    Route::post('/{domain}/payments/{payment}/void', [DomainPaymentController::class, 'void'])
+        ->middleware('check.super.user')
+        ->name('payments.void');
 });
 
 // Global routes (not domain-specific)

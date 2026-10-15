@@ -8,6 +8,7 @@ use App\Models\ManualPaymentRequest;
 use App\Models\ServiceTier;
 use App\Services\Ai\AiCreditService;
 use App\Services\DomainSubscriptionService;
+use App\Services\SubscriptionPaymentService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -17,6 +18,7 @@ class ManualBillingController extends Controller
     public function __construct(
         private DomainSubscriptionService $subscriptionService,
         private AiCreditService $aiCredits,
+        private SubscriptionPaymentService $payments,
     ) {}
 
     public function index(Request $request, Domain $domain)
@@ -45,6 +47,11 @@ class ManualBillingController extends Controller
             'currencySymbol' => config('manual_billing.currency_symbol'),
             'currentDomain' => $domain->only(['id', 'name', 'name_slug']),
             'subscription' => $this->subscriptionService->subscriptionPropsForFrontend($domain),
+            // Read-only: when the next payment is due and what was paid (recorded by Techiko).
+            'nextPayment' => $this->payments->nextPayment($domain),
+            'payments' => collect($this->payments->history($domain, 12, withVoided: false))
+                ->map(fn (array $row) => collect($row)->except(['note', 'recorded_by', 'voided'])->all())
+                ->all(),
             'aiCredits' => $domain->hasFeature('ai') ? $this->aiCredits->propsForFrontend($domain) : null,
             'aiUsageUrl' => $domain->hasFeature('ai') && $request->user()?->hasPermissionToRoute('ai-usage.index')
                 ? route('domains.ai-usage.index', ['domain' => $domain->name_slug])

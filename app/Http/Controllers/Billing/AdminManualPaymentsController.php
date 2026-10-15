@@ -3,15 +3,17 @@
 namespace App\Http\Controllers\Billing;
 
 use App\Http\Controllers\Controller;
+use App\Models\Domain;
 use App\Models\ManualPaymentRequest;
-use App\Services\DomainSubscriptionService;
+use App\Services\SubscriptionPaymentService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class AdminManualPaymentsController extends Controller
 {
     public function __construct(
-        private DomainSubscriptionService $subscriptionService,
+        private SubscriptionPaymentService $payments,
     ) {}
 
     private function authorizeSuper(Request $request): void
@@ -66,17 +68,29 @@ class AdminManualPaymentsController extends Controller
             'reviewer_note' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $manual_payment_request->update([
-            'status' => ManualPaymentRequest::STATUS_APPROVED,
-            'reviewed_by' => $request->user()->id,
-            'reviewed_at' => now(),
-            'reviewer_note' => $data['reviewer_note'] ?? null,
-        ]);
+        DB::transaction(function () use ($request, $manual_payment_request, $data) {
+            $manual_payment_request->update([
+                'status' => ManualPaymentRequest::STATUS_APPROVED,
+                'reviewed_by' => $request->user()->id,
+                'reviewed_at' => now(),
+                'reviewer_note' => $data['reviewer_note'] ?? null,
+            ]);
 
-        $this->subscriptionService->grantServicingTier(
-            $manual_payment_request->domain,
-            (int) $manual_payment_request->service_tier_id,
-        );
+            // Logged as a payment, which sets the plan and moves the next payment date a month on.
+            $domain = Domain::query()->where('name_slug', $manual_payment_request->domain)->first();
+            if ($domain) {
+                $this->payments->record($domain, [
+                    'service_tier_id' => (int) $manual_payment_request->service_tier_id,
+                    'amount' => $manual_payment_request->amount,
+                    'months' => 1,
+                    'method' => 'gcash',
+                    'reference_number' => $manual_payment_request->gcash_reference,
+                    'paid_on' => $manual_payment_request->created_at->toDateString(),
+                    'note' => $data['reviewer_note'] ?? null,
+                    'manual_payment_request_id' => $manual_payment_request->id,
+                ], $request->user());
+            }
+        });
 
         return redirect()->back()->with('success', 'Payment approved.');
     }

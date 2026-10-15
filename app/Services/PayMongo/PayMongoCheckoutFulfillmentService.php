@@ -2,9 +2,10 @@
 
 namespace App\Services\PayMongo;
 
+use App\Models\Domain;
 use App\Models\PaymongoCheckout;
 use App\Models\PaymongoWebhookEventLog;
-use App\Services\DomainSubscriptionService;
+use App\Services\SubscriptionPaymentService;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -12,7 +13,7 @@ use Illuminate\Support\Facades\Log;
 class PayMongoCheckoutFulfillmentService
 {
     public function __construct(
-        private DomainSubscriptionService $subscriptionService,
+        private SubscriptionPaymentService $payments,
         private PayMongoHttpClient $client,
     ) {}
 
@@ -60,10 +61,19 @@ class PayMongoCheckoutFulfillmentService
                 return false;
             }
 
-            $this->subscriptionService->grantServicingTier(
-                $checkout->domain,
-                (int) $checkout->service_tier_id,
-            );
+            // Logged as a payment, which sets the plan and moves the next payment date a month on.
+            $domain = Domain::query()->where('name_slug', $checkout->domain)->first();
+            if ($domain) {
+                $this->payments->record($domain, [
+                    'service_tier_id' => (int) $checkout->service_tier_id,
+                    'amount' => $checkout->amount_centavos / 100,
+                    'months' => 1,
+                    'method' => 'paymongo',
+                    'reference_number' => $paymentIntentId,
+                    'paid_on' => today()->toDateString(),
+                    'paymongo_checkout_id' => $checkout->id,
+                ], null);
+            }
 
             $checkout->update([
                 'status' => PaymongoCheckout::STATUS_PAID,

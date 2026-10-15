@@ -8,6 +8,7 @@ use App\Models\ServiceTier;
 use App\Services\Ai\AiCreditService;
 use App\Services\DomainService;
 use App\Services\DomainSubscriptionService;
+use App\Services\SubscriptionPaymentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
@@ -20,6 +21,7 @@ class DomainController extends Controller
         private DomainService $domainService,
         private DomainSubscriptionService $subscriptions,
         private AiCreditService $aiCredits,
+        private SubscriptionPaymentService $payments,
     ) {}
 
     /**
@@ -80,6 +82,8 @@ class DomainController extends Controller
                 'subscription_started_at' => $domain->subscription_started_at?->toDateString(),
                 'subscription_ends_at' => $domain->subscription_ends_at?->toDateString(),
                 'locked_at' => $domain->locked_at?->toIso8601String(),
+                'next_payment' => $this->payments->nextPayment($domain),
+                'payments' => $this->payments->history($domain),
                 'ai_monthly_credits_override' => $domain->ai_monthly_credits_override,
                 'free_credits' => (int) config('ai_billing.free_monthly_credits', 30),
                 'ai_credits' => $this->aiCredits->propsForFrontend($domain),
