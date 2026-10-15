@@ -38,13 +38,20 @@ const periodLabel = (date) => {
     return period.value === "weekly" ? `Week of ${day}` : day;
 };
 
+const maxCredits = computed(() => Math.max(1, ...usageRows.value.map((d) => d.credits)));
+
 const chartOptions = computed(() => ({
     chart: { type: "bar", toolbar: { show: false }, fontFamily: "inherit" },
     plotOptions: { bar: { columnWidth: "60%", borderRadius: 3 } },
     dataLabels: { enabled: false },
     colors: ["#2563eb"],
     xaxis: { categories: usageRows.value.map((d) => periodLabel(d.date)), labels: { rotate: -45, hideOverlappingLabels: true } },
-    yaxis: { labels: { formatter: (v) => Math.round(v).toLocaleString() } },
+    // Whole-number ticks: small totals get one tick per credit instead of rounded duplicates.
+    yaxis: {
+        min: 0,
+        ...(maxCredits.value <= 5 ? { max: maxCredits.value, tickAmount: maxCredits.value } : { tickAmount: 5, forceNiceScale: true }),
+        labels: { formatter: (v) => Math.round(v).toLocaleString() },
+    },
     tooltip: { y: { formatter: (v) => `${v.toLocaleString()} credits` } },
     grid: { borderColor: "#f1f5f9" },
 }));
