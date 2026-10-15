@@ -11,6 +11,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeployController;
 use App\Http\Controllers\DomainController;
 use App\Http\Controllers\DomainPaymentController;
+use App\Http\Controllers\ServiceTierController;
 use App\Http\Controllers\ImpersonationController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryLocationController;
@@ -302,6 +303,11 @@ Route::middleware(['auth', 'verified', 'check.super.user'])->group(function () {
     // Questions the AI assistant couldn't help with
     Route::get('/assistant/unanswered', [AssistantUnansweredController::class, 'index'])->name('assistant-unanswered.index');
     Route::post('/assistant/unanswered/{question}/resolve', [AssistantUnansweredController::class, 'resolve'])->name('assistant-unanswered.resolve');
+
+    // Plans organizations subscribe to: prices, AI credits and limits
+    Route::get('/plans', [ServiceTierController::class, 'index'])->name('service-tiers.index');
+    Route::post('/plans', [ServiceTierController::class, 'store'])->name('service-tiers.store');
+    Route::put('/plans/{serviceTier}', [ServiceTierController::class, 'update'])->name('service-tiers.update');
 
     Route::get('/mail/test', [MailTestController::class, 'create'])->name('mail.test');
     Route::post('/mail/test', [MailTestController::class, 'store'])

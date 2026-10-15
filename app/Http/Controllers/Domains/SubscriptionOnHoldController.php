@@ -30,8 +30,9 @@ class SubscriptionOnHoldController extends Controller
             // "Pay now" (PayMongo QR Ph) for the people who handle the plan; others ask their admin.
             'canPay' => SubscriptionRenewalController::canPay($user, $domain),
             'paymentsReady' => SubscriptionRenewalController::paymentsReady(),
-            'tiers' => ServiceTier::query()->active()->get(['id', 'slug', 'name', 'amount'])
-                ->reject(fn (ServiceTier $tier) => ServiceTier::isHiddenFromBilling($tier))
+            'tiers' => ServiceTier::query()->active()
+                ->where(fn ($query) => ServiceTier::constrainVisibleOnBillingTierPicker($query))
+                ->get(['id', 'name', 'amount'])
                 ->map(fn (ServiceTier $tier) => ['id' => $tier->id, 'name' => $tier->name, 'amount' => (float) $tier->amount])
                 ->values(),
             'currentTierId' => $domain->current_service_tier_id,

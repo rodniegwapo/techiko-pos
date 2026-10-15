@@ -41,6 +41,8 @@ return [
     |--------------------------------------------------------------------------
     |
     | Still active elsewhere; omit from servicing payment UI until you are ready.
+    | Only read once, by the migration that added service_tiers.shown_on_billing; after that,
+    | super admins show or hide plans on the Plans page.
     |
     */
     'billing_hidden_tier_slugs' => [

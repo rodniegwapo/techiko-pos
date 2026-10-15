@@ -441,6 +441,15 @@ const menuItems = [
         globalOnly: true,
     },
     {
+        key: "plans",
+        title: "Plans",
+        icon: IconCreditCard,
+        routeName: "service-tiers.index",
+        path: "/plans",
+        superUserOnly: true,
+        globalOnly: true,
+    },
+    {
         key: "messages",
         title: "Messages",
         icon: IconMessages,
