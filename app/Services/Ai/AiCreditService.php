@@ -7,6 +7,7 @@ use App\Models\AiUsage;
 use App\Models\Domain;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Carbon;
 use Laravel\Ai\Responses\TextResponse;
 
 /**
@@ -108,27 +109,43 @@ class AiCreditService
     }
 
     /**
-     * Credits per day for the last `$days` days, today included, with days without use as 0.
+     * Credits per day (last 30 days), per week (last 12, starting Monday) and per month (last 12),
+     * the current one included and periods without use as 0. Each `date` is the period's first day.
      *
-     * @return list<array{date: string, credits: int}>
+     * @return array{daily: list<array{date: string, credits: int}>, weekly: list<array{date: string, credits: int}>, monthly: list<array{date: string, credits: int}>}
      */
-    public function dailyUsage(Domain $domain, int $days = 30): array
+    public function usageOverTime(Domain $domain): array
     {
-        $from = today()->subDays($days - 1);
-        $used = AiUsage::query()
+        $days = today()->subDays(29);
+        $weeks = today()->startOfWeek()->subWeeks(11);
+        $months = today()->startOfMonth()->subMonths(11);
+
+        $perDay = AiUsage::query()
             ->where('domain', $domain->name_slug)
-            ->where('created_at', '>=', $from)
+            ->where('created_at', '>=', $days->min($weeks)->min($months))
             ->selectRaw('DATE(created_at) as day, SUM(credits) as credits')
             ->groupBy('day')
             ->pluck('credits', 'day');
 
-        return collect(range(0, $days - 1))
-            ->map(function (int $i) use ($from, $used) {
-                $date = $from->copy()->addDays($i)->toDateString();
+        $series = function (Carbon $from, int $count, string $unit, string $startOf) use ($perDay): array {
+            $totals = $perDay
+                ->groupBy(fn ($credits, string $day) => Carbon::parse($day)->{$startOf}()->toDateString(), preserveKeys: true)
+                ->map(fn ($days) => (int) $days->sum());
 
-                return ['date' => $date, 'credits' => (int) ($used[$date] ?? 0)];
-            })
-            ->all();
+            return collect(range(0, $count - 1))
+                ->map(function (int $i) use ($from, $unit, $totals) {
+                    $date = $from->copy()->add($unit, $i)->toDateString();
+
+                    return ['date' => $date, 'credits' => $totals[$date] ?? 0];
+                })
+                ->all();
+        };
+
+        return [
+            'daily' => $series($days, 30, 'day', 'startOfDay'),
+            'weekly' => $series($weeks, 12, 'week', 'startOfWeek'),
+            'monthly' => $series($months, 12, 'month', 'startOfMonth'),
+        ];
     }
 
     /**

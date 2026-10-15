@@ -79,8 +79,12 @@ class AiUsagePageTest extends TestCase
             ->where('plan.name', 'Basic servicing')
             ->where('aiCredits.allowance', 500)
             ->where('aiCredits.used', 3)
-            ->has('daily', 30)
-            ->where('daily.29.credits', 3)
+            ->has('usage.daily', 30)
+            ->where('usage.daily.29.credits', 3)
+            ->has('usage.weekly', 12)
+            ->where('usage.weekly.11.credits', 3)
+            ->has('usage.monthly', 12)
+            ->where('usage.monthly.11.credits', 3)
             ->where('byUser.0.name', 'System')
             ->where('byUser.0.credits', 2)
             ->where('byUser.1.name', $user->name)
@@ -89,6 +93,36 @@ class AiUsagePageTest extends TestCase
             ->etc());
 
         $this->assertStringNotContainsString('cost', json_encode($response->viewData('page')['props']));
+    }
+
+    public function test_usage_is_grouped_by_day_week_and_month(): void
+    {
+        $this->travelTo('2026-10-15 10:00:00'); // a Thursday
+        $domain = $this->domain();
+        $use = function (string $at, int $credits) use ($domain) {
+            AiUsage::query()->create(['domain' => $domain->name_slug, 'feature' => 'assistant', 'credits' => $credits])
+                ->forceFill(['created_at' => $at])->save();
+        };
+        $use('2026-10-15 09:00:00', 1); // today
+        $use('2026-10-12 09:00:00', 2); // Monday this week
+        $use('2026-10-11 09:00:00', 4); // Sunday last week
+        $use('2026-08-20 09:00:00', 8); // before the 30 days, within the 12 weeks
+        $use('2025-10-31 09:00:00', 16); // 12 months ago: dropped
+
+        $usage = app(AiCreditService::class)->usageOverTime($domain);
+
+        $this->assertSame(['date' => '2026-10-15', 'credits' => 1], $usage['daily'][29]);
+        $this->assertSame(['date' => '2026-10-12', 'credits' => 2], $usage['daily'][26]);
+        $this->assertSame(7, array_sum(array_column($usage['daily'], 'credits')));
+
+        $this->assertSame(['date' => '2026-10-12', 'credits' => 3], $usage['weekly'][11]);
+        $this->assertSame(['date' => '2026-10-05', 'credits' => 4], $usage['weekly'][10]);
+        $this->assertSame(15, array_sum(array_column($usage['weekly'], 'credits')));
+
+        $this->assertSame(['date' => '2026-10-01', 'credits' => 7], $usage['monthly'][11]);
+        $this->assertSame(['date' => '2026-08-01', 'credits' => 8], $usage['monthly'][9]);
+        $this->assertSame('2025-11-01', $usage['monthly'][0]['date']);
+        $this->assertSame(15, array_sum(array_column($usage['monthly'], 'credits')));
     }
 
     public function test_the_page_needs_the_ai_feature(): void

@@ -31,7 +31,7 @@ class AiUsageController extends Controller
                 'plan_unlimited' => $tier !== null && $tier->ai_monthly_credits === null,
             ],
             'aiCredits' => $this->credits->propsForFrontend($domain),
-            'daily' => $this->credits->dailyUsage($domain),
+            'usage' => $this->credits->usageOverTime($domain),
             'byUser' => $this->credits->byUser($domain),
             'recent' => $this->credits->recent($domain),
         ]);

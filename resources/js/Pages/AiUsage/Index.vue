@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { Head, router } from "@inertiajs/vue3";
 import VueApexCharts from "vue3-apexcharts";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
@@ -12,7 +12,7 @@ import { aiFeatureLabel } from "@/Components/ai/aiFeatures";
 const props = defineProps({
     plan: { type: Object, required: true },
     aiCredits: { type: Object, required: true },
-    daily: { type: Array, default: () => [] },
+    usage: { type: Object, default: () => ({ daily: [], weekly: [], monthly: [] }) },
     byUser: { type: Array, default: () => [] },
     recent: { type: Object, required: true },
 });
@@ -21,20 +21,35 @@ const allowanceLabel = computed(() =>
     props.aiCredits.unlimited ? "Unlimited AI credits" : `${props.aiCredits.allowance.toLocaleString()} AI credits / month`,
 );
 
-const shortDate = (date) => new Date(`${date}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+const periods = [
+    { value: "daily", label: "Daily", title: "Credits per day (last 30 days)", empty: "No AI used in the last 30 days" },
+    { value: "weekly", label: "Weekly", title: "Credits per week (last 12 weeks)", empty: "No AI used in the last 12 weeks" },
+    { value: "monthly", label: "Monthly", title: "Credits per month (last 12 months)", empty: "No AI used in the last 12 months" },
+];
+const period = ref("daily");
+const currentPeriod = computed(() => periods.find((p) => p.value === period.value));
+const usageRows = computed(() => props.usage[period.value] ?? []);
+
+/** Each row's date is the first day of its day, week or month. */
+const periodLabel = (date) => {
+    const d = new Date(`${date}T00:00:00`);
+    if (period.value === "monthly") return d.toLocaleDateString(undefined, { month: "short", year: "numeric" });
+    const day = d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    return period.value === "weekly" ? `Week of ${day}` : day;
+};
 
 const chartOptions = computed(() => ({
     chart: { type: "bar", toolbar: { show: false }, fontFamily: "inherit" },
     plotOptions: { bar: { columnWidth: "60%", borderRadius: 3 } },
     dataLabels: { enabled: false },
     colors: ["#2563eb"],
-    xaxis: { categories: props.daily.map((d) => shortDate(d.date)), labels: { rotate: -45, hideOverlappingLabels: true } },
+    xaxis: { categories: usageRows.value.map((d) => periodLabel(d.date)), labels: { rotate: -45, hideOverlappingLabels: true } },
     yaxis: { labels: { formatter: (v) => Math.round(v).toLocaleString() } },
     tooltip: { y: { formatter: (v) => `${v.toLocaleString()} credits` } },
     grid: { borderColor: "#f1f5f9" },
 }));
-const chartSeries = computed(() => [{ name: "Credits", data: props.daily.map((d) => d.credits) }]);
-const hasDailyUse = computed(() => props.daily.some((d) => d.credits > 0));
+const chartSeries = computed(() => [{ name: "Credits", data: usageRows.value.map((d) => d.credits) }]);
+const hasUsage = computed(() => usageRows.value.some((d) => d.credits > 0));
 
 const userColumns = [
     { title: "User", dataIndex: "name", key: "name", ellipsis: true },
@@ -98,9 +113,14 @@ const changePage = (pager) => {
                     </div>
 
                     <section class="rounded-lg border border-gray-200 bg-white px-5 py-4 shadow-sm">
-                        <h2 class="mb-2 font-semibold text-gray-900">Credits per day (last 30 days)</h2>
-                        <VueApexCharts v-if="hasDailyUse" type="bar" height="260" :options="chartOptions" :series="chartSeries" />
-                        <a-empty v-else description="No AI used in the last 30 days" />
+                        <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+                            <h2 class="font-semibold text-gray-900">{{ currentPeriod.title }}</h2>
+                            <a-radio-group v-model:value="period" button-style="solid" size="small" data-testid="ai-usage-period">
+                                <a-radio-button v-for="p in periods" :key="p.value" :value="p.value">{{ p.label }}</a-radio-button>
+                            </a-radio-group>
+                        </div>
+                        <VueApexCharts v-if="hasUsage" type="bar" height="260" :options="chartOptions" :series="chartSeries" />
+                        <a-empty v-else :description="currentPeriod.empty" />
                     </section>
 
                     <section class="rounded-lg border border-gray-200 bg-white px-5 py-4 shadow-sm">
