@@ -34,7 +34,6 @@ class AiUsageController extends Controller
             'daily' => $this->credits->dailyUsage($domain),
             'byUser' => $this->credits->byUser($domain),
             'recent' => $this->credits->recent($domain),
-            'billingUrl' => route('domains.billing.servicing.index', ['domain' => $domain->name_slug]),
         ]);
     }
 }

@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from "vue";
-import { Head, Link, router } from "@inertiajs/vue3";
+import { Head, router } from "@inertiajs/vue3";
 import VueApexCharts from "vue3-apexcharts";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
@@ -15,7 +15,6 @@ const props = defineProps({
     daily: { type: Array, default: () => [] },
     byUser: { type: Array, default: () => [] },
     recent: { type: Object, required: true },
-    billingUrl: { type: String, required: true },
 });
 
 const allowanceLabel = computed(() =>
@@ -91,13 +90,10 @@ const changePage = (pager) => {
                                 Set specially for your organization. The plan normally includes
                                 {{ plan.plan_unlimited ? "unlimited" : plan.plan_credits.toLocaleString() }}.
                             </p>
-                            <Link :href="billingUrl">
-                                <a-button type="primary" class="mt-4">{{ plan.is_paid ? "Change plan" : "Upgrade plan" }}</a-button>
-                            </Link>
                         </section>
 
                         <section class="rounded-lg border border-gray-200 bg-white px-5 py-4 shadow-sm lg:col-span-2">
-                            <AiCreditsMeter :credits="aiCredits" upgrade-hint="Upgrade your plan for more, or wait for the reset." />
+                            <AiCreditsMeter :credits="aiCredits" upgrade-hint="Contact us to change your plan, or wait for the reset." />
                         </section>
                     </div>
 
