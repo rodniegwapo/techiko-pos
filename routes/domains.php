@@ -31,6 +31,7 @@ use App\Http\Controllers\Domains\SaleController;
 use App\Http\Controllers\Domains\SaleDiscountController;
 use App\Http\Controllers\Domains\SalesHistoryController;
 use App\Http\Controllers\Domains\SharedCatalogLookupController;
+use App\Http\Controllers\Domains\SubscriptionOnHoldController;
 use App\Http\Controllers\Domains\UserController;
 use App\Http\Controllers\Domains\UserPinController;
 use App\Http\Controllers\Domains\VatReportController;
@@ -42,8 +43,16 @@ use App\Http\Controllers\VoidLogController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
+// What a locked organization's users see (needs no page permission; the controller checks they belong to it).
 Route::prefix('domains/{domain:name_slug}')
-    ->middleware(['auth', 'verified', 'user.permission', 'role.access'])
+    ->middleware(['auth', 'verified'])
+    ->name('domains.')
+    ->group(function () {
+        Route::get('/subscription-on-hold', SubscriptionOnHoldController::class)->name('subscription-on-hold');
+    });
+
+Route::prefix('domains/{domain:name_slug}')
+    ->middleware(['auth', 'verified', 'domain.unlocked', 'user.permission', 'role.access'])
     ->name('domains.')
     ->group(function () {
         // Organization settings (Sales VAT, etc.)

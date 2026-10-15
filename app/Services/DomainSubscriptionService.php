@@ -129,6 +129,7 @@ class DomainSubscriptionService
         $domain->update([
             'current_service_tier_id' => null,
             'subscription_started_at' => null,
+            'subscription_ends_at' => null,
         ]);
     }
 }

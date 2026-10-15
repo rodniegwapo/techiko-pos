@@ -9,7 +9,9 @@ use App\Services\Ai\AiCreditService;
 use App\Services\DomainService;
 use App\Services\DomainSubscriptionService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class DomainController extends Controller
@@ -76,6 +78,8 @@ class DomainController extends Controller
                 'tiers' => ServiceTier::query()->active()->get(['id', 'name', 'amount', 'ai_monthly_credits']),
                 'service_tier_id' => $domain->current_service_tier_id,
                 'subscription_started_at' => $domain->subscription_started_at?->toDateString(),
+                'subscription_ends_at' => $domain->subscription_ends_at?->toDateString(),
+                'locked_at' => $domain->locked_at?->toIso8601String(),
                 'ai_monthly_credits_override' => $domain->ai_monthly_credits_override,
                 'free_credits' => (int) config('ai_billing.free_monthly_credits', 30),
                 'ai_credits' => $this->aiCredits->propsForFrontend($domain),
@@ -86,27 +90,57 @@ class DomainController extends Controller
     }
 
     /**
-     * Set an organization's plan (null = free) and, optionally, its own monthly AI credits instead
-     * of the plan's. Super admins only.
+     * Set an organization's plan (null = free), when its subscription started and ends, and,
+     * optionally, its own monthly AI credits instead of the plan's. Super admins only.
      */
     public function updateSubscription(Request $request, Domain $domain)
     {
         $validated = $request->validate([
             'service_tier_id' => ['nullable', 'integer', Rule::exists('service_tiers', 'id')->where('is_active', true)],
             'ai_monthly_credits_override' => ['nullable', 'integer', 'min:0', 'max:1000000'],
+            'subscription_started_at' => ['nullable', 'date'],
+            'subscription_ends_at' => ['nullable', 'date'],
         ]);
 
         $tierId = $validated['service_tier_id'] ?? null;
         if ($tierId === null) {
+            // The free plan has no subscription dates.
             $this->subscriptions->clearServicingTier($domain);
         } elseif ((int) $tierId !== (int) $domain->current_service_tier_id) {
             // Only a change of plan restarts the subscription date.
             $this->subscriptions->grantServicingTier($domain->name_slug, (int) $tierId);
         }
 
-        $domain->refresh()->update(['ai_monthly_credits_override' => $validated['ai_monthly_credits_override'] ?? null]);
+        $domain->refresh();
+        $changes = ['ai_monthly_credits_override' => $validated['ai_monthly_credits_override'] ?? null];
+        if ($tierId !== null) {
+            // Dates the super admin typed win over "started today" from a plan change.
+            if (! empty($validated['subscription_started_at'])) {
+                $changes['subscription_started_at'] = Carbon::parse($validated['subscription_started_at'])->startOfDay();
+            }
+            if (array_key_exists('subscription_ends_at', $validated)) {
+                $changes['subscription_ends_at'] = $validated['subscription_ends_at'];
+            }
+
+            $start = $changes['subscription_started_at'] ?? $domain->subscription_started_at;
+            $end = array_key_exists('subscription_ends_at', $changes) ? $changes['subscription_ends_at'] : $domain->subscription_ends_at;
+            if ($start && $end && Carbon::parse($end)->lt(Carbon::parse($start)->startOfDay())) {
+                throw ValidationException::withMessages(['subscription_ends_at' => 'The end date must be on or after the start date.']);
+            }
+        }
+        $domain->update($changes);
 
         return back()->with('success', 'Plan updated.');
+    }
+
+    /** Locks an organization that hasn't paid (its users only see the "on hold" page), or unlocks it. Super admins only. */
+    public function updateLock(Request $request, Domain $domain)
+    {
+        $locked = $request->validate(['locked' => ['required', 'boolean']])['locked'];
+
+        $domain->update(['locked_at' => $locked ? ($domain->locked_at ?? now()) : null]);
+
+        return back()->with('success', $locked ? "{$domain->name} is locked. Its users now see the on-hold page." : "{$domain->name} is unlocked.");
     }
 
     /**

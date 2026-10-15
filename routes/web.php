@@ -184,6 +184,10 @@ Route::middleware(['auth', 'verified', 'user.permission'])->prefix('domains')->n
     Route::patch('/{domain}/subscription', [DomainController::class, 'updateSubscription'])
         ->middleware('check.super.user')
         ->name('subscription.update');
+    // Lock an organization that hasn't paid (its users only see the "on hold" page); super admins only.
+    Route::patch('/{domain}/lock', [DomainController::class, 'updateLock'])
+        ->middleware('check.super.user')
+        ->name('lock.update');
 });
 
 // Global routes (not domain-specific)

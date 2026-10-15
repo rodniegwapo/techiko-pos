@@ -2,6 +2,7 @@
 import { computed, reactive } from "vue";
 import { router, Head, usePage } from "@inertiajs/vue3";
 import { notification } from "ant-design-vue";
+import dayjs from "dayjs";
 import {
     IconEdit,
     IconArrowLeft,
@@ -85,14 +86,52 @@ const saveFeatures = () => {
 const savedPlan = () => ({
     service_tier_id: props.billing?.service_tier_id ?? null,
     ai_monthly_credits_override: props.billing?.ai_monthly_credits_override ?? null,
+    subscription_started_at: props.billing?.subscription_started_at ?? null,
+    subscription_ends_at: props.billing?.subscription_ends_at ?? null,
 });
 
 const plan = reactive({ ...savedPlan(), saving: false });
 
 const planChanged = computed(() => {
     const saved = savedPlan();
-    return saved.service_tier_id !== plan.service_tier_id || saved.ai_monthly_credits_override !== plan.ai_monthly_credits_override;
+    return ["service_tier_id", "ai_monthly_credits_override", "subscription_started_at", "subscription_ends_at"].some(
+        (key) => saved[key] !== plan[key],
+    );
 });
+
+/** "Ends in 5 days", "Ends today", "Ended 3 days ago" for the end date picked. */
+const endHint = computed(() => {
+    if (!plan.subscription_ends_at) return "No end date";
+    const days = dayjs(plan.subscription_ends_at).startOf("day").diff(dayjs().startOf("day"), "day");
+    if (days > 1) return `Ends in ${days} days`;
+    if (days === 1) return "Ends tomorrow";
+    if (days === 0) return "Ends today";
+    return days === -1 ? "Ended yesterday" : `Ended ${-days} days ago`;
+});
+const endHintClass = computed(() => {
+    if (!plan.subscription_ends_at) return "text-gray-500";
+    const days = dayjs(plan.subscription_ends_at).startOf("day").diff(dayjs().startOf("day"), "day");
+    return days < 0 ? "text-red-600" : days <= 7 ? "text-amber-600" : "text-gray-500";
+});
+const endBeforeStart = (current) =>
+    !!plan.subscription_started_at && current && current.isBefore(dayjs(plan.subscription_started_at), "day");
+
+/*** === LOCK (an organization that hasn't paid: its users only see the "on hold" page) === ***/
+const locking = reactive({ saving: false });
+const setLocked = (locked) => {
+    locking.saving = true;
+    router.patch(
+        route("domains.lock.update", { domain: domain.value.name_slug }),
+        { locked },
+        {
+            preserveScroll: true,
+            onSuccess: () => notification.success({ message: locked ? "Organization locked" : "Organization unlocked" }),
+            onError: () => notification.error({ message: "Couldn't change the lock" }),
+            onFinish: () => (locking.saving = false),
+        },
+    );
+};
+const lockedSince = computed(() => (props.billing?.locked_at ? dayjs(props.billing.locked_at).format("MMM D, YYYY") : null));
 
 const planOptions = computed(() => [
     { value: null, label: `Free starter · ${props.billing?.free_credits ?? 0} AI credits` },
@@ -117,14 +156,19 @@ const savePlan = () => {
     plan.saving = true;
     router.patch(
         route("domains.subscription.update", { domain: domain.value.name_slug }),
-        { service_tier_id: plan.service_tier_id, ai_monthly_credits_override: plan.ai_monthly_credits_override },
+        {
+            service_tier_id: plan.service_tier_id,
+            ai_monthly_credits_override: plan.ai_monthly_credits_override,
+            subscription_started_at: plan.subscription_started_at,
+            subscription_ends_at: plan.subscription_ends_at,
+        },
         {
             preserveScroll: true,
             onSuccess: () => {
                 Object.assign(plan, savedPlan());
                 notification.success({ message: "Plan updated" });
             },
-            onError: () => notification.error({ message: "Couldn't save the plan" }),
+            onError: (errors) => notification.error({ message: errors.subscription_ends_at ?? "Couldn't save the plan" }),
             onFinish: () => (plan.saving = false),
         },
     );
@@ -307,9 +351,36 @@ const handleBack = () => {
                             class="w-full"
                             data-testid="plan-select"
                         />
-                        <p v-if="billing.subscription_started_at" class="mt-1 text-xs text-gray-500">
-                            On this plan since {{ billing.subscription_started_at }}
-                        </p>
+
+                        <!-- Subscription dates (paid plans; the end date only warns, it never locks by itself) -->
+                        <div v-if="plan.service_tier_id !== null" class="mt-4 grid grid-cols-2 gap-3" data-testid="plan-dates">
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-gray-700">Start</label>
+                                <a-date-picker
+                                    v-model:value="plan.subscription_started_at"
+                                    value-format="YYYY-MM-DD"
+                                    format="MMM D, YYYY"
+                                    class="!w-full"
+                                    placeholder="Today"
+                                    data-testid="plan-start"
+                                />
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-gray-700">End</label>
+                                <a-date-picker
+                                    v-model:value="plan.subscription_ends_at"
+                                    value-format="YYYY-MM-DD"
+                                    format="MMM D, YYYY"
+                                    class="!w-full"
+                                    placeholder="No end date"
+                                    :disabled-date="endBeforeStart"
+                                    data-testid="plan-end"
+                                />
+                            </div>
+                            <p class="col-span-2 -mt-1 text-xs" :class="endHintClass" data-testid="plan-end-hint">
+                                {{ endHint }}. Admins are reminded 7 days before; nothing locks by itself.
+                            </p>
+                        </div>
 
                         <label class="mb-1 mt-4 block text-sm font-medium text-gray-700">Custom monthly AI credits</label>
                         <a-input-number
@@ -367,6 +438,32 @@ const handleBack = () => {
                         >
                             Save plan
                         </a-button>
+                    </section>
+
+                    <!-- Access: lock an organization that hasn't paid (super admins) -->
+                    <section v-if="isSuperUser && billing" class="rounded-lg bg-white p-6" data-testid="domain-lock">
+                        <h2 class="mb-1 text-lg font-semibold text-gray-900">Access</h2>
+                        <div class="flex items-center justify-between gap-3">
+                            <div>
+                                <p class="text-sm font-medium text-gray-800">Lock: subscription not paid</p>
+                                <p class="text-xs text-gray-500">Users can still log in but only see an "on hold" page.</p>
+                            </div>
+                            <a-popconfirm
+                                :title="billing.locked_at ? `Unlock ${domain.name}? Its users get their pages back.` : `Lock ${domain.name}? Its users will only see the on-hold page.`"
+                                :ok-text="billing.locked_at ? 'Unlock' : 'Lock'"
+                                cancel-text="Cancel"
+                                @confirm="setLocked(!billing.locked_at)"
+                            >
+                                <a-switch :checked="!!billing.locked_at" :loading="locking.saving" data-testid="lock-switch" />
+                            </a-popconfirm>
+                        </div>
+                        <a-alert
+                            v-if="billing.locked_at"
+                            class="mt-3"
+                            type="error"
+                            show-icon
+                            :message="`Locked since ${lockedSince}. Users only see the on-hold page.`"
+                        />
                     </section>
 
                     <!-- Dates -->

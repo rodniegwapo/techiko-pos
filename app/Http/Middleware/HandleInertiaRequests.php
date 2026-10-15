@@ -61,6 +61,12 @@ class HandleInertiaRequests extends Middleware
             'currentDomain' => $currentDomain,
             // The sidebar and route helpers switch into an organization only on its own pages.
             'inOrganization' => $this->inOrganization($request),
+            // For the "subscription ends soon" banner and the locked (greyed-out) sidebar, on the organization's pages.
+            'subscriptionStatus' => $currentDomain && $this->inOrganization($request) ? [
+                'locked' => $currentDomain->isLocked(),
+                'ends_at' => $currentDomain->subscription_ends_at?->toDateString(),
+                'ends_in_days' => $currentDomain->subscriptionEndsInDays(),
+            ] : null,
             // Paid features this organization has (Finance, AI support); the menu and pages hide what's off.
             'domainFeatures' => $currentDomain?->features() ?? ['finance' => false, 'ai' => false],
             'currentLocation' => $this->getCurrentLocation($request),

@@ -22,6 +22,7 @@ import {
     IconMessages,
     IconMail,
     IconSparkles,
+    IconLock,
 } from "@tabler/icons-vue";
 import { router, usePage } from "@inertiajs/vue3";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
@@ -578,6 +579,7 @@ function walletMenuQuery() {
 // MENU CLICK HANDLER
 // ===================
 const handleClick = (menu) => {
+    if (menuLocked.value) return;
     if (!menu.routeName) {
         console.warn("No routeName for menu:", menu);
         return;
@@ -695,6 +697,9 @@ const isMenuReady = computed(() => {
     return Array.isArray(menuData) && menuData.length >= 0;
 });
 
+// A locked organization (subscription on hold): the menu shows but nothing opens (the server blocks the pages too).
+const menuLocked = computed(() => !!page.props.subscriptionStatus?.locked && !isSuperUser.value);
+
 // Ensure menus is always an array
 const safeMenus = computed(() => {
     const menuData = menus.value;
@@ -708,6 +713,13 @@ const safeMenus = computed(() => {
 
 <template>
     <div class="overflow-auto">
+        <p
+            v-if="menuLocked"
+            class="mx-3 mb-2 flex items-center gap-1.5 rounded-md bg-red-50 px-2 py-1.5 text-xs text-red-700"
+            data-testid="menu-locked"
+        >
+            <IconLock :size="14" class="shrink-0" /> Subscription on hold
+        </p>
         <a-menu
             v-if="isMenuReady"
             v-model:openKeys="openKeys"
@@ -722,6 +734,7 @@ const safeMenus = computed(() => {
                 <a-menu-item
                     v-if="!menu.children"
                     :key="`item-${menu.key}`"
+                    :disabled="menuLocked"
                     @click="handleClick(menu)"
                     class="font-semibold text-gray-800"
                 >
@@ -760,6 +773,7 @@ const safeMenus = computed(() => {
                 <a-sub-menu
                     v-else
                     :key="`submenu-${menu.key}`"
+                    :disabled="menuLocked"
                     class="font-semibold text-gray-800"
                 >
                     <template #icon>

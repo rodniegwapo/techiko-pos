@@ -28,8 +28,24 @@ class Domain extends Model
         'settings' => 'array',
         'is_active' => 'boolean',
         'subscription_started_at' => 'datetime',
+        'subscription_ends_at' => 'date:Y-m-d',
+        'locked_at' => 'datetime',
         'ai_monthly_credits_override' => 'integer',
     ];
+
+    /** Locked by a super admin for not paying: its users only see the "on hold" page. */
+    public function isLocked(): bool
+    {
+        return $this->locked_at !== null;
+    }
+
+    /** Days until the subscription ends (0 on the last day, negative once it has ended), or null without an end date. */
+    public function subscriptionEndsInDays(): ?int
+    {
+        return $this->subscription_ends_at
+            ? (int) today()->diffInDays($this->subscription_ends_at->copy()->startOfDay(), false)
+            : null;
+    }
 
     protected $attributes = [
         'timezone' => 'Asia/Manila',
