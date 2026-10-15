@@ -80,6 +80,8 @@ const currentDomain = computed(() => page.props.currentDomain);
 
 // Helper function to detect domain from current URL
 const getCurrentDomainFromUrl = () => {
+    // The Domains admin pages (/domains/{slug}, /domains/{slug}/edit) only look at an organization.
+    if (page.props.inOrganization === false) return null;
     const currentPath = window.location.pathname;
     const domainMatch = currentPath.match(/\/domains\/([^\/]+)/);
     return domainMatch ? domainMatch[1] : null;

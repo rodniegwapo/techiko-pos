@@ -59,6 +59,8 @@ class HandleInertiaRequests extends Middleware
                 ? Conversation::unreadInboxConversationsForStaffCount()
                 : 0,
             'currentDomain' => $currentDomain,
+            // The sidebar and route helpers switch into an organization only on its own pages.
+            'inOrganization' => $this->inOrganization($request),
             // Paid features this organization has (Finance, AI support); the menu and pages hide what's off.
             'domainFeatures' => $currentDomain?->features() ?? ['finance' => false, 'ai' => false],
             'currentLocation' => $this->getCurrentLocation($request),
@@ -74,8 +76,9 @@ class HandleInertiaRequests extends Middleware
      */
     private function getCurrentDomain(Request $request)
     {
-        // Get domain from route parameter
-        $domain = $request->route('domain');
+        // Get domain from route parameter, only on the organization's own pages (routes/domains.php).
+        // Super admins' Domains pages (/domains/{domain}, /domains/{domain}/edit) only look at an organization.
+        $domain = $this->inOrganization($request) ? $request->route('domain') : null;
         $domainSlug = data_get($domain, 'name_slug') ?? $domain;
 
         if ($domainSlug) {
@@ -89,6 +92,12 @@ class HandleInertiaRequests extends Middleware
         }
 
         return null;
+    }
+
+    /** Whether this is one of an organization's own pages (/domains/{domain}/...), not the Domains admin. */
+    private function inOrganization(Request $request): bool
+    {
+        return str_starts_with(ltrim((string) $request->route()?->getPrefix(), '/'), 'domains/{domain');
     }
 
     /**
