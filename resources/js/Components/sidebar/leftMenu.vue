@@ -1,42 +1,28 @@
 <script setup>
-import { ref, computed, watch, onMounted, inject } from "vue";
-import {
-    IconDashboard,
-    IconCategory,
-    IconUsers,
-    IconHeartHandshake,
-    IconHistory,
-    IconGift,
-    IconUserCog,
-    IconPackage,
-    IconShield,
-    IconUserCheck,
-    IconWorld,
-    IconKey,
-    IconCreditCard,
-    IconWallet,
-    IconReportAnalytics,
-    IconReceipt,
-    IconAccessPointOff,
-    IconSettings,
-    IconMessages,
-    IconMail,
-    IconSparkles,
-    IconLock,
-} from "@tabler/icons-vue";
-import { router, usePage } from "@inertiajs/vue3";
+import { computed, watch, onMounted, inject } from "vue";
+import { IconLock, IconSearch } from "@tabler/icons-vue";
+import { usePage } from "@inertiajs/vue3";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
-import { usePermissionsV2 } from "@/Composables/usePermissionV2";
-import { useDomainRoutes } from "@/Composables/useDomainRoutes";
-import { useSidebar } from "@/Composables/useSidebar";
-import { useSalesLayoutMode } from "@/Composables/useSalesLayoutMode";
+import { useNavMenu } from "@/Composables/useNavMenu";
+import { openNavSearch } from "@/Composables/useNavSearch";
+
+const props = defineProps({
+    // The desktop sidebar's icon-only rail: icons with tooltips, submenus open as flyouts.
+    collapsed: { type: Boolean, default: false },
+});
 
 const page = usePage();
-const { hasPermission } = usePermissionsV2();
 const { selectedKeys, openKeys } = useGlobalVariables();
-const { getRoute, getLocationQueryFromPage } = useDomainRoutes();
-const { closeMobileDrawer } = useSidebar();
-const { isCoffeeshopLayout } = useSalesLayoutMode();
+const {
+    menus,
+    topItems,
+    sections,
+    navigate,
+    menuLocked,
+    isSuperUser,
+    getCurrentDomainFromUrl,
+    getRoute,
+} = useNavMenu();
 
 // Ensure selectedKeys and openKeys are arrays
 if (!Array.isArray(selectedKeys.value)) {
@@ -46,23 +32,7 @@ if (!Array.isArray(openKeys.value)) {
     openKeys.value = [];
 }
 
-// Initialize menu state on component mount
-onMounted(() => {
-    // Ensure menu state is properly initialized
-    if (!Array.isArray(selectedKeys.value)) {
-        selectedKeys.value = [];
-    }
-    if (!Array.isArray(openKeys.value)) {
-        openKeys.value = [];
-    }
-
-    // Initialize menu state
-    initializeMenuState();
-});
-
-const isSuperUser = computed(
-    () => !!page.props.auth?.user?.data?.is_super_user,
-);
+onMounted(() => initializeMenuState());
 
 const inquiryUnreadCountInjected = inject("inquiryUnreadCount", null);
 const inquiryUnreadCount = computed(() => {
@@ -76,21 +46,6 @@ const inquiryUnreadCount = computed(() => {
     return Number(page.props.inquiryUnreadCount) || 0;
 });
 
-// Get current domain from page props
-const currentDomain = computed(() => page.props.currentDomain);
-
-// Helper function to detect domain from current URL
-const getCurrentDomainFromUrl = () => {
-    // The Domains admin pages (/domains/{slug}, /domains/{slug}/edit) only look at an organization.
-    if (page.props.inOrganization === false) return null;
-    const currentPath = window.location.pathname;
-    const domainMatch = currentPath.match(/\/domains\/([^\/]+)/);
-    return domainMatch ? domainMatch[1] : null;
-};
-
-// Whether current URL is inside a domain context
-const isInDomainContext = computed(() => !!getCurrentDomainFromUrl());
-
 // Helper function to get dashboard tag text
 const getDashboardTagText = () => {
     const currentDomainSlug = getCurrentDomainFromUrl();
@@ -101,572 +56,21 @@ const getDashboardTagText = () => {
             return currentDomainSlug
                 .replace(/-/g, " ")
                 .replace(/\b\w/g, (l) => l.toUpperCase());
-        } else {
-            // Super user in global context
-            return "Global Admin";
         }
-    } else {
-        // Regular user
-        return currentDomain?.name || "Organization";
+        // Super user in global context
+        return "Global Admin";
     }
+    // Regular user
+    return page.props.currentDomain?.name || "Organization";
 };
 
-// Using getRoute from useDomainRoutes composable
+const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform || "");
+const searchShortcut = isMac ? "⌘K" : "Ctrl K";
 
-// ===================================
-// MENU ITEMS DEFINITION
-// ===================================
-const menuItems = [
-    {
-        key: "dashboard",
-        title: "Dashboard",
-        icon: IconDashboard,
-        routeName: "dashboard",
-        path: "/dashboard",
-        // Dashboard should be available in both global and domain contexts
-    },
-    {
-        key: "sales",
-        title: "Sales",
-        icon: IconHeartHandshake,
-        routeName: "sales.index",
-        path: "/sales",
-        domainOnly: true, // Sales are now domain-only
-    },
-    {
-        key: "offline-sales",
-        title: "Offline sales",
-        icon: IconAccessPointOff,
-        routeName: "sales.offline-transactions",
-        path: "/sales/offline-transactions",
-        domainOnly: true,
-    },
-    {
-        key: "sales-history",
-        title: "Sales History",
-        icon: IconReceipt,
-        routeName: "sales-history.index",
-        path: "/sales-history",
-        domainOnly: true,
-    },
-    {
-        key: "finance-group",
-        title: "Finance",
-        icon: IconReportAnalytics,
-        domainOnly: true,
-        children: [
-            {
-                key: "finance-dashboard",
-                title: "Overview",
-                routeName: "finance.dashboard",
-                path: "/finance",
-                feature: "finance",
-            },
-            {
-                // The income statement is the Profit & Loss report.
-                key: "profit-loss",
-                title: "Income statement",
-                routeName: "profit-loss.index",
-                path: "/profit-loss",
-                feature: "finance",
-            },
-            {
-                key: "finance-cash-flow",
-                title: "Cash flow",
-                routeName: "finance.cash-flow",
-                path: "/finance/cash-flow",
-                feature: "finance",
-            },
-            {
-                key: "finance-balance-sheet",
-                title: "Balance sheet",
-                routeName: "finance.balance-sheet",
-                path: "/finance/balance-sheet",
-                feature: "finance",
-            },
-            {
-                key: "finance-receivables",
-                title: "Customer credit",
-                routeName: "finance.receivables",
-                path: "/finance/receivables",
-                feature: "finance",
-            },
-            {
-                key: "finance-payables",
-                title: "Supplier bills",
-                routeName: "finance.payables.index",
-                path: "/finance/payables",
-                feature: "finance",
-            },
-            {
-                key: "expenses",
-                title: "Expenses",
-                routeName: "expenses.index",
-                path: "/expenses",
-                feature: "expenses",
-            },
-            {
-                key: "finance-other-income",
-                title: "Other income",
-                routeName: "finance.other-income.index",
-                path: "/finance/other-income",
-                feature: "finance",
-            },
-            {
-                key: "finance-balance-items",
-                title: "Accounts, loans & assets",
-                routeName: "finance.balance-items.index",
-                path: "/finance/assets-and-loans",
-                feature: "finance",
-            },
-            {
-                key: "finance-reviews",
-                title: "Monthly reviews",
-                routeName: "finance.reviews.index",
-                path: "/finance/reviews",
-                feature: "finance",
-            },
-            {
-                key: "vat-report",
-                title: "VAT report",
-                routeName: "vat-report.index",
-                path: "/vat-report",
-                feature: "finance",
-            },
-        ],
-    },
-    {
-        key: "wallet-group",
-        title: "Cash & wallet",
-        icon: IconWallet,
-        domainOnly: true,
-        children: [
-            {
-                key: "wallet-money-movement",
-                title: "Money movement",
-                routeName: "wallet.money-movement",
-                path: "/wallet/money-movement",
-            },
-            {
-                key: "wallet-card-terminals",
-                title: "Payment channels",
-                routeName: "payment-card-types.index",
-                path: "/payment-card-types",
-            },
-        ],
-    },
-    {
-        key: "domains",
-        title: "Domains",
-        icon: IconWorld,
-        routeName: "domains.index",
-        path: "/domains",
-        superUserOnly: true,
-        globalOnly: true,
-    },
-    {
-        key: "products",
-        title: "Products",
-        icon: IconCategory,
-        children: [
-            {
-                key: "products-items",
-                title: "Items",
-                routeName: "products.index",
-                path: "/products",
-                hideForSuperOutsideDomain: true,
-            },
-            {
-                key: "products-categories",
-                title: "Categories",
-                routeName: "categories.index",
-                path: "/categories",
-                hideForSuperOutsideDomain: true,
-            },
-            {
-                key: "products-discounts",
-                title: "Discounts",
-                routeName: "products.discounts.index",
-                path: "/products/discounts",
-                hideForSuperOutsideDomain: true,
-            },
-            {
-                key: "catalog-shared-products",
-                title: "Shared catalog",
-                routeName: "catalog.shared-products.index",
-                path: "/catalog/shared-products",
-                superUserOnly: true,
-                globalOnly: true,
-            },
-            {
-                key: "catalog-suggestions",
-                title: "Catalog suggestions",
-                routeName: "catalog.shared-product-suggestions.index",
-                path: "/catalog/shared-product-suggestions",
-                superUserOnly: true,
-                globalOnly: true,
-            },
-            {
-                key: "mandatory-discounts",
-                title: "Mandatory Discounts",
-                routeName: "mandatory-discounts.index",
-                path: "/mandatory-discounts",
-                hideForSuperOutsideDomain: true,
-            },
-        ],
-    },
-    {
-        key: "inventory",
-        title: "Inventory",
-        icon: IconPackage,
-        hideForSuperOutsideDomain: true,
-        children: [
-            {
-                key: "inventory-dashboard",
-                title: "Dashboard",
-                routeName: "inventory.index",
-                path: "/inventory",
-            },
-            {
-                key: "inventory-products",
-                title: "Products",
-                routeName: "inventory.products",
-                path: "/inventory/products",
-            },
-            {
-                key: "inventory-movements",
-                title: "Movements",
-                routeName: "inventory.movements",
-                path: "/inventory/movements",
-                feature: "advanced_inventory",
-            },
-            {
-                key: "inventory-adjustments",
-                title: "Stock Adjustments",
-                routeName: "inventory.adjustments.index",
-                path: "/inventory/adjustments",
-            },
-            {
-                key: "inventory-locations",
-                title: "Locations",
-                routeName: "inventory.locations.index",
-                path: "/inventory/locations",
-            },
-            {
-                key: "inventory-valuation",
-                title: "Valuation Report",
-                routeName: "inventory.valuation",
-                path: "/inventory/valuation",
-                feature: "advanced_inventory",
-            },
-        ],
-    },
-    {
-        key: "loyalty",
-        title: "Loyalty Program",
-        icon: IconGift,
-        routeName: "loyalty.index",
-        path: "/loyalty",
-        hideForSuperOutsideDomain: true,
-    },
-    {
-        key: "voids",
-        title: "Void Logs",
-        icon: IconHistory,
-        routeName: "voids.index",
-        path: "/void-logs",
-        hideForSuperOutsideDomain: true,
-    },
-    {
-        key: "customers",
-        title: "Customers",
-        icon: IconUsers,
-        routeName: "customers.index",
-        path: "/customers",
-        hideForSuperOutsideDomain: true,
-    },
-    {
-        key: "credits",
-        title: "Credit Management",
-        icon: IconCreditCard,
-        routeName: "credits.index",
-        path: "/credits",
-        domainOnly: true,
-    },
-    {
-        key: "users",
-        title: "Users",
-        icon: IconUserCog,
-        routeName: "users.index",
-        path: "/users",
-    },
-    {
-        key: "organization-settings",
-        title: "Settings",
-        icon: IconSettings,
-        routeName: "settings.index",
-        path: "/settings",
-        domainOnly: true,
-    },
-    {
-        key: "billing-servicing",
-        title: "Billing",
-        icon: IconWallet,
-        routeName: "billing.servicing.index",
-        path: "/billing/servicing",
-        domainOnly: true,
-    },
-    {
-        key: "ai-usage",
-        title: "AI usage",
-        icon: IconSparkles,
-        routeName: "ai-usage.index",
-        path: "/ai-usage",
-        domainOnly: true,
-        feature: "ai",
-    },
-    {
-        key: "roles",
-        title: "Roles",
-        icon: IconUserCheck,
-        routeName: "roles.index",
-        path: "/roles",
-        globalOnly: true, // Roles are now global-only
-    },
-    {
-        key: "permissions",
-        title: "Permissions",
-        icon: IconKey,
-        routeName: "permissions.index",
-        path: "/permissions",
-        superUserOnly: true,
-        globalOnly: true,
-    },
-    {
-        key: "manual-gcash-payments",
-        title: "Manual GCash payments",
-        icon: IconWallet,
-        routeName: "billing.manual-payments.index",
-        path: "/billing/manual-payments",
-        superUserOnly: true,
-        globalOnly: true,
-    },
-    {
-        key: "plans",
-        title: "Plans",
-        icon: IconCreditCard,
-        routeName: "service-tiers.index",
-        path: "/plans",
-        superUserOnly: true,
-        globalOnly: true,
-    },
-    {
-        key: "messages",
-        title: "Messages",
-        icon: IconMessages,
-        routeName: "messages.index",
-        path: "/messages",
-        superUserOnly: true,
-        globalOnly: true,
-    },
-    {
-        key: "mail-test",
-        title: "Test email",
-        icon: IconMail,
-        routeName: "mail.test",
-        path: "/mail/test",
-        superUserOnly: true,
-        globalOnly: true,
-    },
-];
-
-// ===================================
-// FILTER MENUS BASED ON PERMISSIONS
-// ===================================
-const menus = computed(() => {
-    const filterMenuItems = (items) => {
-        if (!Array.isArray(items)) {
-            console.warn("Menu items is not an array:", items);
-            return [];
-        }
-
-        return items
-            .filter((item) => {
-                if (!item || typeof item !== "object") {
-                    return false;
-                }
-
-                // Hide global-only menus when browsing inside a domain
-                if (isInDomainContext.value && item.globalOnly) {
-                    return false;
-                }
-
-                // Hide domain-only menus when browsing in global context
-                if (!isInDomainContext.value && item.domainOnly) {
-                    return false;
-                }
-
-                // Check if item is super user only
-                if (item.superUserOnly && !isSuperUser.value) {
-                    return false;
-                }
-
-                // Tenant ops: hide from super when browsing global URLs (show again under /domains/{slug}/)
-                if (
-                    isSuperUser.value &&
-                    !isInDomainContext.value &&
-                    item.hideForSuperOutsideDomain
-                ) {
-                    return false;
-                }
-
-                // Hide Sales for super users (Sales page not relevant for super user role)
-                if (item.key === "sales" && isSuperUser.value) {
-                    return false;
-                }
-
-                // Coffeeshop layout: Offline sales page is hidden
-                if (item.key === "offline-sales" && isCoffeeshopLayout.value) {
-                    return false;
-                }
-
-                // A warehouse doesn't sell, so there's no Sales screen there (Sales History stays).
-                if (
-                    ["sales", "offline-sales"].includes(item.key) &&
-                    page.props.currentLocation?.type === "warehouse"
-                ) {
-                    return false;
-                }
-
-                // A feature the organization doesn't have (the server blocks it too): shown locked to
-                // whoever can upgrade the plan, hidden from everyone else.
-                if (item.feature && !page.props.domainFeatures?.[item.feature] && !canUpgrade.value) {
-                    return false;
-                }
-
-                if (
-                    item.key === "billing-servicing" &&
-                    !page.props.features?.domain_servicing_sidebar_visible
-                ) {
-                    return false;
-                }
-
-                // Check permission for items with routeName (the server denies these routes too)
-                if (item.routeName && !hasPermission(item.routeName)) {
-                    return false;
-                }
-
-                return true;
-            })
-            .map((item) => {
-                const filteredItem = {
-                    ...item,
-                    upgrade: !!item.feature && !page.props.domainFeatures?.[item.feature],
-                };
-
-                // Filter children if they exist
-                if (item.children && Array.isArray(item.children)) {
-                    const filteredChildren = filterMenuItems(item.children);
-                    if (filteredChildren.length === 0) {
-                        // A group with no permitted pages leads nowhere, so hide it
-                        return null;
-                    }
-                    filteredItem.children = filteredChildren;
-                    filteredItem.upgrade = filteredChildren.every((child) => child.upgrade);
-                }
-
-                return filteredItem;
-            })
-            .filter(Boolean);
-    };
-
-    return filterMenuItems(menuItems);
-});
-
-// ===================
-// WALLET MENU QUERY (optional business_date from current URL only)
-// ===================
-function walletMenuQuery() {
-    const url = page.url || "";
-    const idx = url.indexOf("?");
-    if (idx === -1) {
-        return {};
-    }
-    const params = new URLSearchParams(url.slice(idx + 1));
-    const bd = params.get("business_date");
-    if (bd) {
-        return { business_date: bd };
-    }
-    return {};
-}
-
-// ===================
-// MENU CLICK HANDLER
-// ===================
 const handleClick = (menu) => {
-    if (menuLocked.value) return;
-    // Not part of the plan: open the plans instead.
-    if (menu.upgrade) {
-        router.get(getRoute("billing.servicing.index"));
-        closeMobileDrawer();
-        return;
-    }
-    if (!menu.routeName) {
-        console.warn("No routeName for menu:", menu);
-        return;
-    }
-
-    localStorage.setItem("selectedMenuForMobile", menu.title);
-    try {
-        if (menu.key === "wallet-money-movement") {
-            const routePath = getRoute("wallet.money-movement");
-            if (routePath && routePath !== "#") {
-                selectedKeys.value = [menu.key];
-                router.get(routePath, {
-                    ...getLocationQueryFromPage(),
-                    ...walletMenuQuery(),
-                });
-                closeMobileDrawer();
-            }
-            return;
-        }
-
-        if (menu.key === "wallet-card-terminals") {
-            const routePath = getRoute("payment-card-types.index");
-            if (routePath && routePath !== "#") {
-                selectedKeys.value = [menu.key];
-                router.get(routePath, {
-                    ...getLocationQueryFromPage(),
-                    ...walletMenuQuery(),
-                });
-                closeMobileDrawer();
-            }
-            return;
-        }
-
-        const routePath = getRoute(menu.routeName);
-
-        if (routePath && routePath !== "#") {
-            selectedKeys.value = [menu.key];
-            const slug = getCurrentDomainFromUrl();
-            if (slug) {
-                router.get(routePath, getLocationQueryFromPage());
-            } else {
-                router.visit(routePath);
-            }
-            closeMobileDrawer();
-        } else {
-            console.error(
-                "Invalid route generated for menu:",
-                menu.title,
-                "routeName:",
-                menu.routeName,
-                "generated:",
-                routePath,
-            );
-        }
-    } catch (error) {
-        console.error("Navigation error:", error, "for menu:", menu);
+    const key = navigate(menu);
+    if (key) {
+        selectedKeys.value = [key];
     }
 };
 
@@ -701,15 +105,12 @@ const initializeMenuState = () => {
         return null;
     };
 
-    const match = findMatchingMenu(safeMenus.value);
+    const match = findMatchingMenu(menus.value);
     if (match) {
         selectedKeys.value = [match.item.key];
-        if (match.parentKey) {
-            openKeys.value = [match.parentKey];
+        if (match.parentKey && !props.collapsed) {
+            openKeys.value = [`submenu-${match.parentKey}`];
         }
-    } else if (currentPath.includes("/dashboard")) {
-        selectedKeys.value = ["dashboard"];
-        openKeys.value = [];
     }
 };
 
@@ -721,33 +122,6 @@ watch(
 const handleOpenChange = (keys) => {
     openKeys.value = keys;
 };
-
-// Add a loading state to prevent rendering issues
-const isMenuReady = computed(() => {
-    const menuData = menus.value;
-    return Array.isArray(menuData) && menuData.length >= 0;
-});
-
-// Plans are enforced and this user can pay for the organization, so paid pages show locked with "Upgrade".
-const canUpgrade = computed(
-    () =>
-        !!page.props.features?.plan_gating &&
-        !!page.props.inOrganization &&
-        hasPermission("billing.servicing.index"),
-);
-
-// A locked organization (subscription on hold): the menu shows but nothing opens (the server blocks the pages too).
-const menuLocked = computed(() => !!page.props.subscriptionStatus?.locked && !isSuperUser.value);
-
-// Ensure menus is always an array
-const safeMenus = computed(() => {
-    const menuData = menus.value;
-    if (!Array.isArray(menuData)) {
-        console.warn("Menus is not an array, returning empty array:", menuData);
-        return [];
-    }
-    return menuData;
-});
 </script>
 
 <template>
@@ -757,115 +131,184 @@ const safeMenus = computed(() => {
             class="mx-3 mb-2 flex items-center gap-1.5 rounded-md bg-red-50 px-2 py-1.5 text-xs text-red-700"
             data-testid="menu-locked"
         >
-            <IconLock :size="14" class="shrink-0" /> Subscription on hold
+            <IconLock :size="14" class="shrink-0" />
+            <span v-if="!collapsed">Subscription on hold</span>
         </p>
+
+        <!-- Quick page search (Ctrl+K anywhere) -->
+        <div v-else class="mb-1" :class="collapsed ? 'flex justify-center' : 'px-3'">
+            <a-tooltip v-if="collapsed" :title="`Search pages (${searchShortcut})`" placement="right">
+                <button
+                    type="button"
+                    class="flex h-9 w-9 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+                    aria-label="Search pages"
+                    data-testid="nav-search-open"
+                    @click="openNavSearch"
+                >
+                    <IconSearch :size="18" />
+                </button>
+            </a-tooltip>
+            <button
+                v-else
+                type="button"
+                class="flex w-full items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-sm text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                aria-label="Search pages"
+                data-testid="nav-search-open"
+                @click="openNavSearch"
+            >
+                <IconSearch :size="16" class="shrink-0" />
+                <span class="flex-1 text-left">Search pages…</span>
+                <kbd class="rounded border border-gray-200 bg-white px-1.5 text-[10px] font-medium text-gray-400">
+                    {{ searchShortcut }}
+                </kbd>
+            </button>
+        </div>
+
         <a-menu
-            v-if="isMenuReady"
             v-model:openKeys="openKeys"
             v-model:selectedKeys="selectedKeys"
             mode="inline"
             theme="light"
-            :inlineCollapsed="false"
+            :inlineCollapsed="collapsed"
+            class="nav-menu"
             @openChange="handleOpenChange"
         >
-            <template v-for="menu in safeMenus" :key="menu.key">
-                <!-- Menu Item without children -->
-                <a-menu-item
-                    v-if="!menu.children"
-                    :key="`item-${menu.key}`"
-                    :disabled="menuLocked"
-                    @click="handleClick(menu)"
-                    class="font-semibold text-gray-800"
-                >
-                    <template #icon>
-                        <component
-                            v-if="menu.icon"
-                            :is="menu.icon"
-                            class="flex-shrink-0"
-                        />
-                    </template>
-                    <div class="flex items-center gap-2">
-                        {{ menu.title }}
-                        <span
-                            v-if="menu.upgrade"
-                            class="flex items-center gap-0.5 text-[10px] font-normal text-amber-600"
-                            data-testid="menu-upgrade"
+            <!-- Dashboard, above the sections -->
+            <a-menu-item
+                v-for="menu in topItems"
+                :key="menu.key"
+                :disabled="menuLocked"
+                @click="handleClick(menu)"
+                class="font-semibold text-gray-800"
+            >
+                <template #icon>
+                    <component :is="menu.icon" class="flex-shrink-0" />
+                </template>
+                <div class="flex items-center gap-2">
+                    {{ menu.title }}
+                    <span v-if="menu.key === 'dashboard' && !collapsed" class="text-xs">
+                        <a-tag
+                            :color="getCurrentDomainFromUrl() ? 'green' : 'blue'"
+                            class="text-[10px]"
                         >
-                            <IconLock :size="12" /> Upgrade
-                        </span>
-                        <span v-else-if="menu.title === 'Dashboard'" class="text-xs">
-                            <a-tag
-                                :color="
-                                    getCurrentDomainFromUrl() ? 'green' : 'blue'
-                                "
-                                class="text-[10px]"
-                            >
-                                {{ getDashboardTagText() }}
-                            </a-tag>
-                        </span>
-                        <span
-                            v-else-if="
-                                menu.key === 'messages' &&
-                                inquiryUnreadCount > 0
-                            "
-                            class="ml-1 min-w-[1.1rem] rounded-full bg-red-500 px-1.5 text-center text-[10px] leading-tight text-white"
-                        >
-                            {{ inquiryUnreadCount }}
-                        </span>
-                    </div>
-                </a-menu-item>
+                            {{ getDashboardTagText() }}
+                        </a-tag>
+                    </span>
+                </div>
+            </a-menu-item>
 
-                <!-- Sub Menu with children -->
-                <a-sub-menu
-                    v-else
-                    :key="`submenu-${menu.key}`"
-                    :disabled="menuLocked"
-                    class="font-semibold text-gray-800"
-                >
-                    <template #icon>
-                        <component
-                            v-if="menu.icon"
-                            :is="menu.icon"
-                            class="flex-shrink-0"
-                        />
-                    </template>
-                    <template #title>
-                        <span class="inline-flex items-center gap-2">
-                            {{ menu.title }}
-                            <IconLock v-if="menu.upgrade" :size="12" class="text-amber-600" />
-                        </span>
-                    </template>
+            <a-menu-item-group
+                v-for="section in sections"
+                :key="`section-${section.key}`"
+            >
+                <template #title>
+                    <span
+                        v-if="collapsed"
+                        class="nav-section-divider block"
+                        :data-testid="`nav-section-${section.key}`"
+                    />
+                    <span
+                        v-else
+                        class="text-[11px] font-semibold uppercase tracking-wide text-gray-400"
+                        :data-testid="`nav-section-${section.key}`"
+                    >
+                        {{ section.title }}
+                    </span>
+                </template>
 
+                <template v-for="menu in section.items" :key="menu.key">
+                    <!-- Menu Item without children -->
                     <a-menu-item
-                        v-for="child in menu.children"
-                        :key="child.key"
-                        @click="handleClick(child)"
+                        v-if="!menu.children"
+                        :key="menu.key"
+                        :disabled="menuLocked"
+                        @click="handleClick(menu)"
+                        class="font-semibold text-gray-800"
                     >
                         <template #icon>
-                            <component
-                                v-if="child.icon"
-                                :is="child.icon"
-                                class="flex-shrink-0"
-                            />
+                            <span class="nav-icon relative inline-flex">
+                                <component :is="menu.icon" class="flex-shrink-0" />
+                                <span
+                                    v-if="collapsed && (menu.upgrade || (menu.key === 'messages' && inquiryUnreadCount > 0))"
+                                    class="absolute -right-1 -top-1 h-2 w-2 rounded-full"
+                                    :class="menu.upgrade ? 'bg-amber-500' : 'bg-red-500'"
+                                />
+                            </span>
                         </template>
-                        <span class="inline-flex items-center gap-2">
-                            {{ child.title }}
+                        <div class="flex items-center gap-2">
+                            {{ menu.title }}
                             <span
-                                v-if="child.upgrade"
-                                class="flex items-center gap-0.5 text-[10px] text-amber-600"
+                                v-if="menu.upgrade"
+                                class="flex items-center gap-0.5 text-[10px] font-normal text-amber-600"
                                 data-testid="menu-upgrade"
                             >
                                 <IconLock :size="12" /> Upgrade
                             </span>
-                        </span>
+                            <span
+                                v-else-if="menu.key === 'messages' && inquiryUnreadCount > 0"
+                                class="ml-1 min-w-[1.1rem] rounded-full bg-red-500 px-1.5 text-center text-[10px] leading-tight text-white"
+                            >
+                                {{ inquiryUnreadCount }}
+                            </span>
+                        </div>
                     </a-menu-item>
-                </a-sub-menu>
-            </template>
-        </a-menu>
 
-        <!-- Loading state -->
-        <div v-else class="flex items-center justify-center p-4">
-            <div class="text-gray-500">Loading menu...</div>
-        </div>
+                    <!-- Sub Menu with children (a flyout in the rail) -->
+                    <a-sub-menu
+                        v-else
+                        :key="`submenu-${menu.key}`"
+                        :disabled="menuLocked"
+                        class="font-semibold text-gray-800"
+                    >
+                        <template #icon>
+                            <span class="nav-icon relative inline-flex">
+                                <component :is="menu.icon" class="flex-shrink-0" />
+                                <span
+                                    v-if="collapsed && menu.upgrade"
+                                    class="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-amber-500"
+                                />
+                            </span>
+                        </template>
+                        <template #title>
+                            <span class="inline-flex items-center gap-2">
+                                {{ menu.title }}
+                                <IconLock v-if="menu.upgrade" :size="12" class="text-amber-600" />
+                            </span>
+                        </template>
+
+                        <a-menu-item
+                            v-for="child in menu.children"
+                            :key="child.key"
+                            @click="handleClick(child)"
+                        >
+                            <span class="inline-flex items-center gap-2">
+                                {{ child.title }}
+                                <span
+                                    v-if="child.upgrade"
+                                    class="flex items-center gap-0.5 text-[10px] text-amber-600"
+                                    data-testid="menu-upgrade"
+                                >
+                                    <IconLock :size="12" /> Upgrade
+                                </span>
+                            </span>
+                        </a-menu-item>
+                    </a-sub-menu>
+                </template>
+            </a-menu-item-group>
+        </a-menu>
     </div>
 </template>
+
+<style scoped>
+/* Section headings sit tight above their items. */
+.nav-menu :deep(.ant-menu-item-group-title) {
+    padding: 12px 16px 4px 24px;
+}
+.nav-menu.ant-menu-inline-collapsed :deep(.ant-menu-item-group-title) {
+    padding: 6px 16px;
+}
+.nav-section-divider {
+    height: 1px;
+    background: #e5e7eb;
+}
+</style>

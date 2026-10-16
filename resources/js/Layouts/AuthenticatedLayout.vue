@@ -2,6 +2,7 @@
 import LeftSidebarWrapper from "@/Components/sidebar/leftWrapper.vue";
 import LocationBadge from "@/Components/LocationBadge.vue";
 import InquiryChatWidget from "@/Components/InquiryChatWidget.vue";
+import NavSearch from "@/Components/sidebar/NavSearch.vue";
 import Terminal from "@/Components/Terminal.vue";
 import ImpersonationBanner from "@/Components/ImpersonationBanner.vue";
 import SubscriptionEndBanner from "@/Components/SubscriptionEndBanner.vue";
@@ -211,6 +212,7 @@ onMounted(() => {
         </a-layout-content>
 
         <InquiryChatWidget v-if="user" />
+        <NavSearch v-if="user" />
     </a-layout>
     </div>
 </template>
