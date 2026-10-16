@@ -71,6 +71,11 @@ class SalesHistoryController extends Controller
                 'statuses' => self::STATUSES,
             ],
             'restrictedToOwnSales' => ! $this->canSeeAllSales($request->user()),
+            // Set when the plan only keeps recent history: the date picker stops there and the CSV export is off.
+            'historyLimit' => ($earliest = $this->earliestAllowedDate($domain)) ? [
+                'days' => Domain::FREE_SALES_HISTORY_DAYS,
+                'earliest_date' => $earliest->toDateString(),
+            ] : null,
             'domainName' => $domain->name,
         ]);
     }
@@ -329,6 +334,12 @@ class SalesHistoryController extends Controller
         $start = Carbon::parse($validated['start_date'] ?? now()->toDateString())->startOfDay();
         $end = Carbon::parse($validated['end_date'] ?? $start->toDateString())->endOfDay();
 
+        // Without unlimited history, the plan only looks back Domain::FREE_SALES_HISTORY_DAYS days (today included).
+        if ($earliest = $this->earliestAllowedDate($domain)) {
+            $start = $start->max($earliest);
+            $end = $end->max($earliest->copy()->endOfDay());
+        }
+
         $locationId = isset($validated['location_id']) && $validated['location_id'] !== 'all'
             ? (int) $validated['location_id']
             : null;
@@ -353,6 +364,13 @@ class SalesHistoryController extends Controller
             'payment_status' => $validated['payment_status'] ?? null,
             'search' => isset($validated['search']) ? trim($validated['search']) : null,
         ];
+    }
+
+    private function earliestAllowedDate(Domain $domain): ?Carbon
+    {
+        return $domain->hasFeature('sales_history_unlimited')
+            ? null
+            : now()->subDays(Domain::FREE_SALES_HISTORY_DAYS - 1)->startOfDay();
     }
 
     private function baseQuery(Domain $domain, array $filters): Builder

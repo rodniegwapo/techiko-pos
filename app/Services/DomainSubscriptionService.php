@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Domain;
+use App\Models\InventoryLocation;
 use App\Models\Product\Product;
 use App\Models\ServiceTier;
 use App\Models\User;
@@ -11,6 +12,9 @@ use Illuminate\Validation\ValidationException;
 class DomainSubscriptionService
 {
     public const FREE_TIER_MAX_PRODUCTS = 10;
+
+    /** Users on the free plan (only while plans are enforced, see config features.plan_gating). */
+    public const FREE_TIER_MAX_USERS = 2;
 
     public function effectiveMaxProducts(Domain $domain): ?int
     {
@@ -34,10 +38,21 @@ class DomainSubscriptionService
         $tier = $domain->currentServiceTier;
 
         if (! $domain->current_service_tier_id || ! $tier) {
-            return null;
+            return config('features.plan_gating', false) ? self::FREE_TIER_MAX_USERS : null;
         }
 
         return $tier->max_users;
+    }
+
+    /** One location unless the plan includes more stores (multi_location). */
+    public function effectiveMaxLocations(Domain $domain): ?int
+    {
+        return $domain->hasFeature('multi_location') ? null : 1;
+    }
+
+    public function locationCount(string $domainSlug): int
+    {
+        return InventoryLocation::query()->forDomain($domainSlug)->count();
     }
 
     public function productCount(string $domainSlug): int
@@ -79,6 +94,21 @@ class DomainSubscriptionService
         if ($this->tenantUserCount($domain->name_slug) >= $max) {
             throw ValidationException::withMessages([
                 'plan' => [__('Your plan allows :max users (including admins). Upgrade your servicing plan or remove a user.', ['max' => $max])],
+            ]);
+        }
+    }
+
+    public function assertCanCreateLocation(Domain $domain): void
+    {
+        $max = $this->effectiveMaxLocations($domain);
+
+        if ($max === null) {
+            return;
+        }
+
+        if ($this->locationCount($domain->name_slug) >= $max) {
+            throw ValidationException::withMessages([
+                'plan' => [__('Your plan includes :max location. Upgrade to Standard to add more stores or warehouses.', ['max' => $max])],
             ]);
         }
     }

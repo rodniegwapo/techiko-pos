@@ -136,7 +136,31 @@ function isPopularTier(tier) {
     return popularTierId.value != null && tier.id === popularTierId.value;
 }
 
-const servicingPriceFootnote = computed(() => "One-time servicing · PHP");
+const servicingPriceFootnote = computed(() => "Per month · PHP");
+
+// The free plan's limits, e.g. "Unlimited products · 2 users · 1 location · Last 31 days of sales history".
+const freeTierLimitsLabel = computed(() => {
+    const free = props.freeTier ?? {};
+    const parts = [];
+    if (props.subscription?.products_unlimited || free.product_limit == null) {
+        parts.push("Unlimited products");
+    } else {
+        parts.push(`${free.product_limit ?? props.subscription?.free_product_limit} products`);
+    }
+    if (free.user_limit != null) {
+        parts.push(`${free.user_limit} users`);
+    }
+    if (free.location_limit != null) {
+        parts.push(`${free.location_limit} location`);
+    }
+    if (free.history_days != null) {
+        parts.push(`Last ${free.history_days} days of sales history`);
+    }
+    if (props.aiCredits) {
+        parts.push(aiCreditsLabel(props.aiCredits.free_allowance));
+    }
+    return parts.join(" · ");
+});
 
 const planCardSlots = computed(() => {
     let n = props.tiers.length;
@@ -203,9 +227,9 @@ const freeTierSubLabel = computed(() => {
         return "Included when you join an organization.";
     }
     if (props.subscription.is_paid) {
-        return "Starter baseline—not selectable. Use paid tiers below for servicing checkout.";
+        return "Included with every plan. Your paid plan adds the features listed on its card.";
     }
-    return "Your current tier. Upgrade anytime using a paid plan.";
+    return "Your current plan. Upgrade anytime.";
 });
 
 function tierCardClasses(tier) {
@@ -246,7 +270,7 @@ function tierLimitsLabel(tier) {
         parts.push("Unlimited products");
     }
     if (tier.max_users != null) {
-        parts.push(`Max ${tier.max_users} domain users`);
+        parts.push(`Up to ${tier.max_users} users`);
     } else {
         parts.push("Unlimited users");
     }
@@ -278,12 +302,12 @@ const freeTierBadge = computed(() => {
     }
     if (props.subscription.is_paid) {
         return {
-            label: "Starter baseline",
+            label: "Included",
             pillClass: "bg-slate-200 text-slate-600",
         };
     }
     return {
-        label: "Current tier",
+        label: "Current plan",
         pillClass: "bg-emerald-100 text-emerald-900",
     };
 });
@@ -301,11 +325,10 @@ const referenceHelp = computed(() => {
         <Head title="Servicing plans & payment" />
         <ContentHeader class="mb-2" title="Servicing plans & payment" />
         <p class="mb-6 text-sm text-gray-600 max-w-2xl -mt-2">
-            Upgrade your servicing subscription for higher limits and features.
-            Techiko POS includes basic inventory, utang (basic), and wallet,
-            with a
-            <strong>30-day full-feature trial</strong> for qualifying
-            organizations.
+            Every organization starts free: selling, products, discounts,
+            customers, loyalty, utang, the cash drawer and stock tracking.
+            Paid plans add full sales history, more users and stores, advanced
+            inventory, expenses, finance reports and the AI assistant.
         </p>
         <ContentLayout :title="currentDomain?.name || 'Organization'">
             <template #table>
@@ -321,8 +344,8 @@ const referenceHelp = computed(() => {
                             the plan you selected.
                         </template>
                         <template v-else>
-                            Paid tiers unlock limits after verified payment.
-                            Basic can use the static merchant QR shown on this
+                            A paid plan's features turn on once its payment is
+                            confirmed. Basic can use the static merchant QR shown on this
                             page—it does not expire.
                         </template>
                     </div>
@@ -396,9 +419,8 @@ const referenceHelp = computed(() => {
                                 >.
                             </span>
                             <span v-else-if="subscription.products_unlimited">
-                                Product catalog is currently unlimited for this
-                                organization. You can still upgrade to a paid
-                                servicing tier for other benefits below.
+                                You're on the free plan. Upgrade below for
+                                the features each plan lists.
                             </span>
                             <span v-else>
                                 Free tier: up to
@@ -457,10 +479,9 @@ const referenceHelp = computed(() => {
                                 <p
                                     class="mt-3 max-w-2xl text-sm text-gray-600 md:text-base"
                                 >
-                                    Free starter is included; paid servicing
-                                    tiers unlock higher limits below. Select a
-                                    tier to continue (merchant QR and/or manual
-                                    reference, depending on setup).
+                                    The free plan is always included. Each paid
+                                    plan includes everything in the plans before
+                                    it. Pick one to continue to payment.
                                 </p>
 
                                 <div :class="['mt-8 md:mt-10', plansGridClass]">
@@ -476,7 +497,7 @@ const referenceHelp = computed(() => {
                                             <h3
                                                 class="text-lg font-bold text-gray-800"
                                             >
-                                                Free starter
+                                                Free
                                             </h3>
                                             <span
                                                 class="rounded-full px-3 py-1 text-xs font-semibold shrink-0"
@@ -508,32 +529,7 @@ const referenceHelp = computed(() => {
                                             <p
                                                 class="text-xs text-gray-500 pt-1"
                                             >
-                                                Cap:
-                                                <template
-                                                    v-if="
-                                                        subscription?.products_unlimited ||
-                                                        freeTier?.product_limit ==
-                                                            null
-                                                    "
-                                                >
-                                                    Unlimited products
-                                                </template>
-                                                <template v-else>
-                                                    {{
-                                                        freeTier.product_limit ??
-                                                        subscription?.free_product_limit
-                                                    }}
-                                                    products
-                                                </template>
-                                                · utang/wallet basics
-                                                <template v-if="aiCredits">
-                                                    ·
-                                                    {{
-                                                        aiCreditsLabel(
-                                                            aiCredits.free_allowance,
-                                                        )
-                                                    }}
-                                                </template>
+                                                {{ freeTierLimitsLabel }}
                                             </p>
                                         </div>
                                         <ul

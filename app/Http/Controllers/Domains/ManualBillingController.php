@@ -31,6 +31,7 @@ class ManualBillingController extends Controller
             ->values();
 
         $basicSlug = strtolower((string) config('manual_billing.servicing_basic_tier_slug'));
+        $planGating = (bool) config('features.plan_gating', false);
 
         $tierRows = $tiers->map(function (ServiceTier $tier) use ($basicSlug): array {
             $slug = strtolower((string) $tier->slug);
@@ -62,6 +63,10 @@ class ManualBillingController extends Controller
                 'product_limit' => config('features.unlimited_products', true)
                     ? null
                     : DomainSubscriptionService::FREE_TIER_MAX_PRODUCTS,
+                // The free plan's other limits, only while plans are enforced (config features.plan_gating).
+                'user_limit' => $planGating ? DomainSubscriptionService::FREE_TIER_MAX_USERS : null,
+                'location_limit' => $planGating ? 1 : null,
+                'history_days' => $planGating ? Domain::FREE_SALES_HISTORY_DAYS : null,
             ],
         ]);
     }

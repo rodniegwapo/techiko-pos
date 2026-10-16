@@ -14,10 +14,15 @@ const props = defineProps({
     tiers: { type: Array, default: () => [] },
     /** The plan whose static QR (on the Servicing page) has its amount built in. */
     basicSlug: { type: String, default: "basic" },
+    /** What a plan can include: [{ value, label }]. */
+    featureOptions: { type: Array, default: () => [] },
+    /** When false, organizations still get every feature except Finance and AI, whatever their plan. */
+    planGating: { type: Boolean, default: false },
 });
 
 const peso = (amount) => `₱${Number(amount ?? 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}`;
 const limit = (value) => (value == null ? "Unlimited" : Number(value).toLocaleString());
+const featureLabel = (key) => props.featureOptions.find((o) => o.value === key)?.label ?? key;
 
 const columns = [
     { title: "Plan", key: "name" },
@@ -25,6 +30,7 @@ const columns = [
     { title: "AI credits / month", key: "ai_monthly_credits", align: "right", width: 150 },
     { title: "Products", key: "max_products", align: "right", width: 110 },
     { title: "Users", key: "max_users", align: "right", width: 100 },
+    { title: "Includes", key: "features", width: 260 },
     { title: "Organizations", key: "organizations", align: "right", width: 120 },
     { title: "", key: "actions", width: 80, align: "right" },
 ];
@@ -33,6 +39,7 @@ const blank = () => ({
     name: "",
     amount: 0,
     ai_monthly_credits: null,
+    features: [],
     max_products: null,
     max_users: null,
     is_active: true,
@@ -52,6 +59,7 @@ const openEdit = (tier) =>
             name: tier.name,
             amount: tier.amount,
             ai_monthly_credits: tier.ai_monthly_credits,
+            features: [...(tier.features ?? [])],
             max_products: tier.max_products,
             max_users: tier.max_users,
             is_active: tier.is_active,
@@ -98,7 +106,7 @@ const save = () => {
         </ContentHeader>
 
         <section class="rounded-lg bg-white p-4 shadow">
-            <a-table :columns="columns" :data-source="tiers" :pagination="false" row-key="id" size="middle" :scroll="{ x: 860 }" data-testid="plans-table">
+            <a-table :columns="columns" :data-source="tiers" :pagination="false" row-key="id" size="middle" :scroll="{ x: 1120 }" data-testid="plans-table">
                 <template #bodyCell="{ column, record }">
                     <template v-if="column.key === 'name'">
                         <span class="font-medium text-gray-900">{{ record.name }}</span>
@@ -113,6 +121,12 @@ const save = () => {
                     </template>
                     <template v-else-if="['ai_monthly_credits', 'max_products', 'max_users'].includes(column.key)">
                         <span class="tabular-nums">{{ limit(record[column.key]) }}</span>
+                    </template>
+                    <template v-else-if="column.key === 'features'">
+                        <div class="flex flex-wrap gap-1" data-testid="plan-features">
+                            <a-tag v-for="key in record.features" :key="key" color="blue" class="!m-0">{{ featureLabel(key) }}</a-tag>
+                            <span v-if="!record.features.length" class="text-xs text-gray-400">Free-plan features only</span>
+                        </div>
                     </template>
                     <template v-else-if="column.key === 'organizations'">
                         <span class="tabular-nums">{{ record.organizations }}</span>
@@ -163,6 +177,18 @@ const save = () => {
                     </div>
                 </div>
                 <p class="-mt-1 text-xs text-gray-500">Leave a limit blank for unlimited.</p>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700">Includes</label>
+                    <a-checkbox-group v-model:value="form.data.features" class="!grid grid-cols-1 gap-1" data-testid="plan-feature-options">
+                        <a-checkbox v-for="option in featureOptions" :key="option.value" :value="option.value">
+                            {{ option.label }}
+                        </a-checkbox>
+                    </a-checkbox-group>
+                    <p class="mt-1 text-xs text-gray-500">
+                        Everything else (selling, products, discounts, customers, loyalty, credit, cash and basic stock) is free.
+                        <template v-if="!planGating">Plans aren't enforced yet (FEATURE_PLAN_GATING is off): every organization keeps everything, and Finance and AI are still turned on per organization.</template>
+                    </p>
+                </div>
                 <div class="grid grid-cols-2 gap-3">
                     <label class="flex items-center gap-2 text-sm text-gray-700">
                         <a-switch v-model:checked="form.data.is_active" size="small" /> Active

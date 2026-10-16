@@ -7,6 +7,7 @@ use App\Models\ServiceTier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -17,6 +18,16 @@ use Inertia\Response;
  */
 class ServiceTierController extends Controller
 {
+    /** What a plan can include (Domain::FEATURES), as super admins see it. */
+    private const FEATURE_LABELS = [
+        'sales_history_unlimited' => 'Full sales history and CSV export',
+        'multi_location' => 'More than one location',
+        'advanced_inventory' => 'Stock movements, valuation and transfers',
+        'expenses' => 'Expenses',
+        'finance' => 'Finance (statements, P&L, VAT report)',
+        'ai' => 'AI assistant',
+    ];
+
     public function index(): Response
     {
         $organizations = Domain::query()
@@ -32,6 +43,7 @@ class ServiceTierController extends Controller
                 'name' => $tier->name,
                 'amount' => (float) $tier->amount,
                 'ai_monthly_credits' => $tier->ai_monthly_credits,
+                'features' => $tier->features ?? [],
                 'max_products' => $tier->max_products,
                 'max_users' => $tier->max_users,
                 'is_active' => $tier->is_active,
@@ -40,6 +52,8 @@ class ServiceTierController extends Controller
                 'organizations' => (int) ($organizations[$tier->id] ?? 0),
             ]),
             'basicSlug' => strtolower((string) config('manual_billing.servicing_basic_tier_slug')),
+            'featureOptions' => collect(self::FEATURE_LABELS)->map(fn ($label, $key) => ['value' => $key, 'label' => $label])->values(),
+            'planGating' => (bool) config('features.plan_gating', false),
         ]);
     }
 
@@ -53,7 +67,7 @@ class ServiceTierController extends Controller
             $slug = "{$base}-{$i}";
         }
 
-        ServiceTier::query()->create([...$data, 'slug' => $slug]);
+        ServiceTier::query()->create(['features' => [], ...$data, 'slug' => $slug]);
 
         return back()->with('success', "Plan \"{$data['name']}\" added.");
     }
@@ -69,7 +83,10 @@ class ServiceTierController extends Controller
     /** @return array<string, mixed> */
     private function validated(Request $request): array
     {
-        return $request->validate([
+        $data = $request->validate([
+            // Left out, a plan keeps what it includes.
+            'features' => ['sometimes', 'array'],
+            'features.*' => ['string', 'distinct', Rule::in(Domain::FEATURES)],
             'name' => ['required', 'string', 'max:60'],
             'amount' => ['required', 'numeric', 'min:0', 'max:1000000', 'decimal:0,2'],
             'ai_monthly_credits' => ['nullable', 'integer', 'min:0', 'max:1000000'],
@@ -79,5 +96,11 @@ class ServiceTierController extends Controller
             'shown_on_billing' => ['required', 'boolean'],
             'sort_order' => ['required', 'integer', 'min:0', 'max:1000'],
         ]);
+
+        if (isset($data['features'])) {
+            $data['features'] = array_values($data['features']);
+        }
+
+        return $data;
     }
 }

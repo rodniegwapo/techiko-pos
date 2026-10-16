@@ -53,7 +53,7 @@ class AssistantTools
 
     /** Read tools that also need a feature of the business. */
     private const READ_TOOL_FEATURES = [
-        'list_expense_categories' => 'finance',
+        'list_expense_categories' => 'expenses',
         'list_suppliers' => 'finance',
         'list_open_bills' => 'finance',
     ];

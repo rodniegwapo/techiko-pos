@@ -49,6 +49,12 @@ export const USERS = {
     },
 };
 
+/** Admins of the one-organization-per-plan fixtures (database/seeders/E2EPlanSeeder.php). */
+for (const plan of ["free", "basic", "standard", "premium"]) {
+    const domain = `e2e-plan-${plan}`;
+    USERS[`plan-${plan}`] = { email: `${domain}-admin@techiko.test`, password: "e2e-password", domain, role: "admin" };
+}
+
 export const OTHER_DOMAIN = "mcdonalds-corp";
 
 /** Seeded worker cashiers (E2ESalesSeeder::WORKER_CASHIERS). */

@@ -58,6 +58,12 @@ class DomainFeaturesTest extends TestCase
         return compact('domain', 'user');
     }
 
+    /** The two features a super admin turns on (the rest come with plans, see PlanFeaturesTest). */
+    private function financeAndAi(Domain $domain): array
+    {
+        return array_intersect_key($domain->features(), ['finance' => 0, 'ai' => 0]);
+    }
+
     private function url(string $name, Domain $domain): string
     {
         return route($name, ['domain' => $domain->name_slug]);
@@ -67,7 +73,7 @@ class DomainFeaturesTest extends TestCase
     {
         ['domain' => $domain] = $this->seedOrg();
 
-        $this->assertSame(['finance' => false, 'ai' => false], $domain->features());
+        $this->assertSame(['finance' => false, 'ai' => false], $this->financeAndAi($domain));
     }
 
     public function test_finance_pages_are_closed_while_finance_is_off(): void
@@ -125,12 +131,12 @@ class DomainFeaturesTest extends TestCase
             ->assertSessionHas('success');
 
         $domain->refresh();
-        $this->assertSame(['finance' => true, 'ai' => true], $domain->features());
+        $this->assertSame(['finance' => true, 'ai' => true], $this->financeAndAi($domain));
         $this->assertTrue($domain->salesHidesOutOfStock(), 'sales settings are kept');
 
         // The two are independent: Finance off leaves the AI assistant as chosen.
         $this->actingAs($user)->patch(route('domains.features.update', $domain), ['finance' => false, 'ai' => true]);
-        $this->assertSame(['finance' => false, 'ai' => true], $domain->fresh()->features());
+        $this->assertSame(['finance' => false, 'ai' => true], $this->financeAndAi($domain->fresh()));
     }
 
     public function test_only_a_super_admin_can_change_features(): void
@@ -154,7 +160,8 @@ class DomainFeaturesTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Domains/Show')
                 ->where('domain.data.name', 'Feature Org')
-                ->where('domainFeatures', ['finance' => true, 'ai' => false]));
+                ->where('domainFeatures.finance', true)
+                ->where('domainFeatures.ai', false));
     }
 
     public function test_snapshots_skip_organizations_without_finance(): void

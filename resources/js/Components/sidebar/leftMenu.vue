@@ -154,14 +154,13 @@ const menuItems = [
         title: "Finance",
         icon: IconReportAnalytics,
         domainOnly: true,
-        // Only for organizations given Finance (a super admin turns it on per organization).
-        feature: "finance",
         children: [
             {
                 key: "finance-dashboard",
                 title: "Overview",
                 routeName: "finance.dashboard",
                 path: "/finance",
+                feature: "finance",
             },
             {
                 // The income statement is the Profit & Loss report.
@@ -169,60 +168,70 @@ const menuItems = [
                 title: "Income statement",
                 routeName: "profit-loss.index",
                 path: "/profit-loss",
+                feature: "finance",
             },
             {
                 key: "finance-cash-flow",
                 title: "Cash flow",
                 routeName: "finance.cash-flow",
                 path: "/finance/cash-flow",
+                feature: "finance",
             },
             {
                 key: "finance-balance-sheet",
                 title: "Balance sheet",
                 routeName: "finance.balance-sheet",
                 path: "/finance/balance-sheet",
+                feature: "finance",
             },
             {
                 key: "finance-receivables",
                 title: "Customer credit",
                 routeName: "finance.receivables",
                 path: "/finance/receivables",
+                feature: "finance",
             },
             {
                 key: "finance-payables",
                 title: "Supplier bills",
                 routeName: "finance.payables.index",
                 path: "/finance/payables",
+                feature: "finance",
             },
             {
                 key: "expenses",
                 title: "Expenses",
                 routeName: "expenses.index",
                 path: "/expenses",
+                feature: "expenses",
             },
             {
                 key: "finance-other-income",
                 title: "Other income",
                 routeName: "finance.other-income.index",
                 path: "/finance/other-income",
+                feature: "finance",
             },
             {
                 key: "finance-balance-items",
                 title: "Accounts, loans & assets",
                 routeName: "finance.balance-items.index",
                 path: "/finance/assets-and-loans",
+                feature: "finance",
             },
             {
                 key: "finance-reviews",
                 title: "Monthly reviews",
                 routeName: "finance.reviews.index",
                 path: "/finance/reviews",
+                feature: "finance",
             },
             {
                 key: "vat-report",
                 title: "VAT report",
                 routeName: "vat-report.index",
                 path: "/vat-report",
+                feature: "finance",
             },
         ],
     },
@@ -329,6 +338,7 @@ const menuItems = [
                 title: "Movements",
                 routeName: "inventory.movements",
                 path: "/inventory/movements",
+                feature: "advanced_inventory",
             },
             {
                 key: "inventory-adjustments",
@@ -347,6 +357,7 @@ const menuItems = [
                 title: "Valuation Report",
                 routeName: "inventory.valuation",
                 path: "/inventory/valuation",
+                feature: "advanced_inventory",
             },
         ],
     },
@@ -527,8 +538,9 @@ const menus = computed(() => {
                     return false;
                 }
 
-                // A feature the organization hasn't been given (the server blocks it too).
-                if (item.feature && !page.props.domainFeatures?.[item.feature]) {
+                // A feature the organization doesn't have (the server blocks it too): shown locked to
+                // whoever can upgrade the plan, hidden from everyone else.
+                if (item.feature && !page.props.domainFeatures?.[item.feature] && !canUpgrade.value) {
                     return false;
                 }
 
@@ -547,7 +559,10 @@ const menus = computed(() => {
                 return true;
             })
             .map((item) => {
-                const filteredItem = { ...item };
+                const filteredItem = {
+                    ...item,
+                    upgrade: !!item.feature && !page.props.domainFeatures?.[item.feature],
+                };
 
                 // Filter children if they exist
                 if (item.children && Array.isArray(item.children)) {
@@ -557,6 +572,7 @@ const menus = computed(() => {
                         return null;
                     }
                     filteredItem.children = filteredChildren;
+                    filteredItem.upgrade = filteredChildren.every((child) => child.upgrade);
                 }
 
                 return filteredItem;
@@ -589,6 +605,12 @@ function walletMenuQuery() {
 // ===================
 const handleClick = (menu) => {
     if (menuLocked.value) return;
+    // Not part of the plan: open the plans instead.
+    if (menu.upgrade) {
+        router.get(getRoute("billing.servicing.index"));
+        closeMobileDrawer();
+        return;
+    }
     if (!menu.routeName) {
         console.warn("No routeName for menu:", menu);
         return;
@@ -706,6 +728,14 @@ const isMenuReady = computed(() => {
     return Array.isArray(menuData) && menuData.length >= 0;
 });
 
+// Plans are enforced and this user can pay for the organization, so paid pages show locked with "Upgrade".
+const canUpgrade = computed(
+    () =>
+        !!page.props.features?.plan_gating &&
+        !!page.props.inOrganization &&
+        hasPermission("billing.servicing.index"),
+);
+
 // A locked organization (subscription on hold): the menu shows but nothing opens (the server blocks the pages too).
 const menuLocked = computed(() => !!page.props.subscriptionStatus?.locked && !isSuperUser.value);
 
@@ -756,7 +786,14 @@ const safeMenus = computed(() => {
                     </template>
                     <div class="flex items-center gap-2">
                         {{ menu.title }}
-                        <span v-if="menu.title === 'Dashboard'" class="text-xs">
+                        <span
+                            v-if="menu.upgrade"
+                            class="flex items-center gap-0.5 text-[10px] font-normal text-amber-600"
+                            data-testid="menu-upgrade"
+                        >
+                            <IconLock :size="12" /> Upgrade
+                        </span>
+                        <span v-else-if="menu.title === 'Dashboard'" class="text-xs">
                             <a-tag
                                 :color="
                                     getCurrentDomainFromUrl() ? 'green' : 'blue'
@@ -792,7 +829,12 @@ const safeMenus = computed(() => {
                             class="flex-shrink-0"
                         />
                     </template>
-                    <template #title>{{ menu.title }}</template>
+                    <template #title>
+                        <span class="inline-flex items-center gap-2">
+                            {{ menu.title }}
+                            <IconLock v-if="menu.upgrade" :size="12" class="text-amber-600" />
+                        </span>
+                    </template>
 
                     <a-menu-item
                         v-for="child in menu.children"
@@ -806,7 +848,16 @@ const safeMenus = computed(() => {
                                 class="flex-shrink-0"
                             />
                         </template>
-                        {{ child.title }}
+                        <span class="inline-flex items-center gap-2">
+                            {{ child.title }}
+                            <span
+                                v-if="child.upgrade"
+                                class="flex items-center gap-0.5 text-[10px] text-amber-600"
+                                data-testid="menu-upgrade"
+                            >
+                                <IconLock :size="12" /> Upgrade
+                            </span>
+                        </span>
                     </a-menu-item>
                 </a-sub-menu>
             </template>

@@ -232,12 +232,12 @@ Route::prefix('domains/{domain:name_slug}')
 
         // Sales history (read-only list of completed sales, receipt reprint, CSV)
         Route::get('/sales-history', [SalesHistoryController::class, 'index'])->name('sales-history.index');
-        Route::get('/sales-history/export', [SalesHistoryController::class, 'export'])->name('sales-history.export');
+        Route::get('/sales-history/export', [SalesHistoryController::class, 'export'])->middleware('domain.feature:sales_history_unlimited')->name('sales-history.export');
         Route::get('/sales-history/{sale}', [SalesHistoryController::class, 'show'])->whereNumber('sale')->name('sales-history.show');
         Route::post('/sales-history/{sale}/void', [SalesHistoryController::class, 'void'])->whereNumber('sale')->name('sales-history.void');
 
-        Route::middleware('domain.feature:finance')->group(function () {
-            // Expenses (feed the Profit & Loss report; cash-register expenses also post to the wallet ledger)
+        // Expenses (feed the Profit & Loss report; cash-register expenses also post to the wallet ledger)
+        Route::middleware('domain.feature:expenses')->group(function () {
             Route::get('/expenses/export', [ExpenseController::class, 'export'])->name('expenses.export');
             Route::get('/expenses/{expense}/receipt', [ExpenseController::class, 'receipt'])->whereNumber('expense')->name('expenses.receipt');
             Route::post('/expenses/categories', [ExpenseCategoryController::class, 'store'])->name('expenses.categories.store');
@@ -249,7 +249,9 @@ Route::prefix('domains/{domain:name_slug}')
             Route::resource('expenses', ExpenseController::class)
                 ->only(['index', 'store', 'update', 'destroy'])
                 ->names('expenses');
+        });
 
+        Route::middleware('domain.feature:finance')->group(function () {
             // Finance (owner's money view: dashboard, statements, customer credit, AI explanations).
             // The income statement is the Profit & Loss report; this address forwards to it.
             Route::get('/finance', [FinanceController::class, 'dashboard'])->name('finance.dashboard');
@@ -367,12 +369,15 @@ Route::prefix('domains/{domain:name_slug}')
         Route::prefix('inventory')->name('inventory.')->group(function () {
             Route::get('/', [InventoryController::class, 'index'])->name('index');
             Route::get('/products', [InventoryController::class, 'products'])->name('products');
-            Route::get('/movements', [InventoryController::class, 'movements'])->name('movements');
             Route::get('/low-stock', [InventoryController::class, 'lowStock'])->name('low-stock');
-            Route::get('/valuation', [InventoryController::class, 'valuation'])->name('valuation');
-
             Route::post('/receive', [InventoryController::class, 'receive'])->name('receive');
-            Route::post('/transfer', [InventoryController::class, 'transfer'])->name('transfer');
+
+            // Advanced inventory: stock history, valuation and moving stock between locations (paid plans).
+            Route::middleware('domain.feature:advanced_inventory')->group(function () {
+                Route::get('/movements', [InventoryController::class, 'movements'])->name('movements');
+                Route::get('/valuation', [InventoryController::class, 'valuation'])->name('valuation');
+                Route::post('/transfer', [InventoryController::class, 'transfer'])->name('transfer');
+            });
 
             // Search routes
             Route::get('/search/products', [InventoryController::class, 'searchProducts'])->name('search.products');

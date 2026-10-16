@@ -22,6 +22,7 @@ class ServiceTier extends Model
         'max_products' => 'integer',
         'max_users' => 'integer',
         'ai_monthly_credits' => 'integer',
+        'features' => 'array',
     ];
 
     public function manualPaymentRequests(): HasMany

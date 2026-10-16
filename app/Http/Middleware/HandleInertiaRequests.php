@@ -67,8 +67,8 @@ class HandleInertiaRequests extends Middleware
                 'ends_at' => $currentDomain->subscription_ends_at?->toDateString(),
                 'ends_in_days' => $currentDomain->subscriptionEndsInDays(),
             ] : null,
-            // Paid features this organization has (Finance, AI support); the menu and pages hide what's off.
-            'domainFeatures' => $currentDomain?->features() ?? ['finance' => false, 'ai' => false],
+            // Paid features this organization has (its plan, or given by a super admin); the menu locks what's off.
+            'domainFeatures' => $currentDomain?->features() ?? array_fill_keys(Domain::FEATURES, false),
             'currentLocation' => $this->getCurrentLocation($request),
             'availableLocations' => $this->getAvailableLocations($request),
             'default_store' => $request->user() ? $this->getDefaultStore($request) : null,
