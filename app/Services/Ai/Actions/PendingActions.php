@@ -2,6 +2,7 @@
 
 namespace App\Services\Ai\Actions;
 
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
@@ -28,6 +29,7 @@ class PendingActions
             'user_id' => $context->user->id,
             'domain' => $context->domain->name_slug,
             'location_id' => $context->location?->id,
+            'expires_at' => $expiresAt->toIso8601String(),
         ], $expiresAt);
 
         return [
@@ -42,7 +44,7 @@ class PendingActions
     /**
      * Takes a pending change out (so it can only run once), or null when it expired or was used.
      *
-     * @return array{action: string, input: array, title: string, user_id: int, domain: string, location_id: ?int}|null
+     * @return array{action: string, input: array, title: string, user_id: int, domain: string, location_id: ?int, expires_at: string, message_id?: int}|null
      */
     public function pull(string $token): ?array
     {
@@ -52,6 +54,15 @@ class PendingActions
     public function get(string $token): ?array
     {
         return Cache::get($this->key($token));
+    }
+
+    /** Remembers which saved chat message showed this change, so confirming it can record the outcome there. */
+    public function attachMessage(string $token, int $messageId): void
+    {
+        $pending = $this->get($token);
+        if ($pending) {
+            Cache::put($this->key($token), [...$pending, 'message_id' => $messageId], Carbon::parse($pending['expires_at']));
+        }
     }
 
     private function key(string $token): string

@@ -54,5 +54,6 @@ return [
     ['route' => 'credits.index', 'path' => 'Credit Management', 'about' => 'customer credit accounts: credit limits and terms, balances, overdue accounts and recording payments'],
     ['route' => 'users.index', 'path' => 'Users', 'about' => 'staff accounts: add users, roles, assigned store, supervisors and PINs'],
     ['route' => 'settings.index', 'path' => 'Settings', 'about' => 'sales settings: VAT on/off, VAT rate and pricing mode, selling when out of stock, hiding out-of-stock products'],
-    ['route' => 'billing.servicing.index', 'path' => 'Servicing payment', 'about' => 'the Techiko plan and paying for it (GCash / QR Ph); the free plan allows a limited number of products'],
+    ['route' => 'billing.servicing.index', 'path' => 'Billing', 'about' => 'the Techiko plan: the current plan and what it uses, upgrading (pay with a QR Ph code; the plan starts once paid), renewing and past payments'],
+    ['route' => 'ai-usage.index', 'path' => 'AI usage', 'about' => "this month's AI credits: the plan's allowance, credits used and left, when they reset, and usage by day, feature and user"],
 ];

@@ -283,16 +283,20 @@ const smallBillColumns = [
                             :hint="`${formattedTotal(ap.period.billed)} newly billed`" />
                     </div>
 
-                    <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                        <section class="space-y-3">
+                    <!-- Two columns: bills due soon and overdue, then who is owed most and recent payments; all bills below. -->
+                    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                        <section class="min-w-0 space-y-3">
                             <h2 class="text-base font-semibold text-gray-900">Coming up (30 days)</h2>
                             <a-table :columns="smallBillColumns" :data-source="ap.upcoming" :pagination="false" row-key="id" size="small" bordered class="bg-white" />
                         </section>
-                        <section class="space-y-3">
+                        <section class="min-w-0 space-y-3">
                             <h2 class="text-base font-semibold text-gray-900">Overdue bills</h2>
                             <a-table :columns="smallBillColumns" :data-source="ap.overdue_bills" :pagination="false" row-key="id" size="small" bordered class="bg-white" />
                         </section>
-                        <section class="space-y-3">
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                        <section class="min-w-0 space-y-3">
                             <h2 class="text-base font-semibold text-gray-900">Largest balances</h2>
                             <div class="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white text-sm">
                                 <div v-if="!ap.largest.length" class="p-3 text-gray-500">Nothing owed.</div>
@@ -302,6 +306,16 @@ const smallBillColumns = [
                                         <span class="font-medium text-gray-900">{{ formattedTotal(row.balance) }}</span>
                                         <span v-if="row.overdue > 0" class="block text-xs text-red-600">{{ formattedTotal(row.overdue) }} overdue</span>
                                     </span>
+                                </div>
+                            </div>
+                        </section>
+                        <section class="min-w-0 space-y-3">
+                            <h2 class="text-base font-semibold text-gray-900">Recently paid</h2>
+                            <div class="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white text-sm">
+                                <div v-if="!ap.recently_paid.length" class="p-3 text-gray-500">No supplier payments yet.</div>
+                                <div v-for="p in ap.recently_paid" :key="p.id" class="flex justify-between gap-2 px-3 py-2">
+                                    <span class="text-gray-700">{{ p.supplier }}<span v-if="p.bill_number" class="text-gray-400"> · {{ p.bill_number }}</span></span>
+                                    <span class="text-gray-900">{{ formattedTotal(p.amount) }} <span class="text-gray-400">· {{ fmtDate(p.payment_date) }}</span></span>
                                 </div>
                             </div>
                         </section>
@@ -361,17 +375,6 @@ const smallBillColumns = [
                                 <p v-if="record.notes" class="mt-1 text-xs text-gray-500">{{ record.notes }}</p>
                             </template>
                         </a-table>
-                    </section>
-
-                    <section class="space-y-3">
-                        <h2 class="text-base font-semibold text-gray-900">Recently paid</h2>
-                        <div class="divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white text-sm">
-                            <div v-if="!ap.recently_paid.length" class="p-3 text-gray-500">No supplier payments yet.</div>
-                            <div v-for="p in ap.recently_paid" :key="p.id" class="flex justify-between gap-2 px-3 py-2">
-                                <span class="text-gray-700">{{ p.supplier }}<span v-if="p.bill_number" class="text-gray-400"> · {{ p.bill_number }}</span></span>
-                                <span class="text-gray-900">{{ formattedTotal(p.amount) }} <span class="text-gray-400">· {{ fmtDate(p.payment_date) }}</span></span>
-                            </div>
-                        </div>
                     </section>
                 </div>
             </template>

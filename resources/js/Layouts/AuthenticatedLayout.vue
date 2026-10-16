@@ -2,8 +2,10 @@
 import LeftSidebarWrapper from "@/Components/sidebar/leftWrapper.vue";
 import LocationBadge from "@/Components/LocationBadge.vue";
 import InquiryChatWidget from "@/Components/InquiryChatWidget.vue";
+import NavSearch from "@/Components/sidebar/NavSearch.vue";
 import Terminal from "@/Components/Terminal.vue";
 import ImpersonationBanner from "@/Components/ImpersonationBanner.vue";
+import SubscriptionEndBanner from "@/Components/SubscriptionEndBanner.vue";
 
 import { onMounted, onUnmounted, ref, watch, provide } from "vue";
 import { usePage, router } from "@inertiajs/vue3";
@@ -185,6 +187,7 @@ onMounted(() => {
                 />
                 <!-- Store switcher sits above the page so it never covers header actions -->
                 <LocationBadge v-else />
+                <SubscriptionEndBanner :class="{ 'shrink-0': props.fitViewport }" />
                 <!-- Why the user was sent here, e.g. away from a warehouse's sales screen -->
                 <a-alert
                     v-if="page.props.flash?.notice"
@@ -209,6 +212,7 @@ onMounted(() => {
         </a-layout-content>
 
         <InquiryChatWidget v-if="user" />
+        <NavSearch v-if="user" />
     </a-layout>
     </div>
 </template>

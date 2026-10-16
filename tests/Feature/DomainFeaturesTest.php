@@ -58,16 +58,22 @@ class DomainFeaturesTest extends TestCase
         return compact('domain', 'user');
     }
 
+    /** Finance, which a super admin can turn on, and the AI assistant, which every plan has (the rest come with plans, see PlanFeaturesTest). */
+    private function financeAndAi(Domain $domain): array
+    {
+        return array_intersect_key($domain->features(), ['finance' => 0, 'ai' => 0]);
+    }
+
     private function url(string $name, Domain $domain): string
     {
         return route($name, ['domain' => $domain->name_slug]);
     }
 
-    public function test_features_are_off_until_turned_on(): void
+    public function test_finance_is_off_until_turned_on_and_ai_is_always_on(): void
     {
         ['domain' => $domain] = $this->seedOrg();
 
-        $this->assertSame(['finance' => false, 'ai' => false], $domain->features());
+        $this->assertSame(['finance' => false, 'ai' => true], $this->financeAndAi($domain), 'the AI assistant comes with every plan');
     }
 
     public function test_finance_pages_are_closed_while_finance_is_off(): void
@@ -94,43 +100,49 @@ class DomainFeaturesTest extends TestCase
 
     public function test_finance_ai_comes_with_finance(): void
     {
-        ['domain' => $domain, 'user' => $user] = $this->seedOrg(['finance' => false, 'ai' => true]);
+        ['domain' => $domain, 'user' => $user] = $this->seedOrg(['finance' => false]);
 
         $this->actingAs($user)->postJson($this->url('domains.finance.explain', $domain), [])
             ->assertForbidden()
             ->assertJsonPath('message', EnsureDomainFeature::MESSAGES['finance']);
         $this->actingAs($user)->postJson($this->url('domains.finance.ask', $domain), [])->assertForbidden();
 
-        // With Finance on (and the AI assistant off), the request reaches the controller (which then checks its own input).
-        $domain->update(['settings' => ['features' => ['finance' => true, 'ai' => false]]]);
+        // With Finance on, the request reaches the controller (which then checks its own input).
+        $domain->update(['settings' => ['features' => ['finance' => true]]]);
         $this->assertNotSame(403, $this->actingAs($user)->postJson($this->url('domains.finance.explain', $domain), [])->status());
         $this->assertNotSame(403, $this->actingAs($user)->postJson($this->url('domains.finance.ask', $domain), [])->status());
     }
 
     public function test_ai_assistant_does_not_need_finance(): void
     {
-        ['domain' => $domain] = $this->seedOrg(['finance' => false, 'ai' => true]);
+        ['domain' => $domain] = $this->seedOrg(['finance' => false]);
 
         $this->assertTrue($domain->hasFeature('ai'));
         $this->assertFalse($domain->hasFeature('finance'));
     }
 
-    public function test_a_super_admin_turns_features_on_and_other_settings_stay(): void
+    public function test_a_super_admin_turns_finance_on_and_other_settings_stay(): void
     {
         ['domain' => $domain, 'user' => $user] = $this->seedOrg();
 
         $this->actingAs($user)
-            ->patch(route('domains.features.update', $domain), ['finance' => true, 'ai' => true])
+            ->patch(route('domains.features.update', $domain), ['finance' => true])
             ->assertRedirect()
             ->assertSessionHas('success');
 
         $domain->refresh();
-        $this->assertSame(['finance' => true, 'ai' => true], $domain->features());
+        $this->assertSame(['finance' => true, 'ai' => true], $this->financeAndAi($domain));
         $this->assertTrue($domain->salesHidesOutOfStock(), 'sales settings are kept');
 
-        // The two are independent: Finance off leaves the AI assistant as chosen.
-        $this->actingAs($user)->patch(route('domains.features.update', $domain), ['finance' => false, 'ai' => true]);
-        $this->assertSame(['finance' => false, 'ai' => true], $domain->fresh()->features());
+        $this->actingAs($user)->patch(route('domains.features.update', $domain), ['finance' => false]);
+        $this->assertSame(['finance' => false, 'ai' => true], $this->financeAndAi($domain->fresh()));
+    }
+
+    public function test_an_old_ai_switch_left_off_does_not_turn_the_assistant_off(): void
+    {
+        ['domain' => $domain] = $this->seedOrg(['finance' => true, 'ai' => false]);
+
+        $this->assertTrue($domain->hasFeature('ai'));
     }
 
     public function test_only_a_super_admin_can_change_features(): void
@@ -139,7 +151,7 @@ class DomainFeaturesTest extends TestCase
         $owner = User::factory()->create(['domain' => $domain->name_slug, 'is_super_user' => false]);
 
         $this->actingAs($owner)
-            ->patchJson(route('domains.features.update', $domain), ['finance' => true, 'ai' => true])
+            ->patchJson(route('domains.features.update', $domain), ['finance' => true])
             ->assertForbidden();
 
         $this->assertFalse($domain->fresh()->hasFeature('finance'));
@@ -154,7 +166,8 @@ class DomainFeaturesTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Domains/Show')
                 ->where('domain.data.name', 'Feature Org')
-                ->where('domainFeatures', ['finance' => true, 'ai' => false]));
+                ->where('domainFeatures.finance', true)
+                ->where('domainFeatures.ai', true));
     }
 
     public function test_snapshots_skip_organizations_without_finance(): void

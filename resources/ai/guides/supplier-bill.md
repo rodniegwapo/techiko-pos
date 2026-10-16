@@ -3,7 +3,7 @@ key: supplier-bill
 title: Record a supplier bill (what you owe a supplier)
 page: finance.payables.index
 requires: finance.payables.index, finance.bills.store
-keywords: supplier bill, payable, utang sa supplier, invoice from supplier, bill, delivery bill, owe supplier, add supplier, terms
+keywords: supplier bill, payable, utang sa supplier, invoice from supplier, bill, delivery bill, owe supplier, terms
 ---
 1. In the sidebar, open **Finance → Supplier bills**.
 2. Click **Record bill**.

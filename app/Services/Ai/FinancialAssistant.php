@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Cache;
 use RuntimeException;
 
 /**
- * Explains a business's figures in plain language through laravel/ai (Gemini by default; see
+ * Explains a business's figures in plain language through laravel/ai (the provider set in .env; see
  * services.finance_ai). It is handed numbers that were already worked out
  * (FinancialReportService) and told to use only those, so it explains the books rather than
  * doing the sums.
@@ -70,12 +70,13 @@ PROMPT;
 
     /**
      * @param  array<string, mixed>  $facts
+     * @param  (\Closure(): void)|null  $beforeAiCall  Runs only when the answer isn't cached, e.g. to check AI credits.
      * @return array{text: string, cached: bool}
      */
-    public function explain(string $topic, array $facts, string $language = 'en', ?string $metricLabel = null): array
+    public function explain(string $topic, array $facts, string $language = 'en', ?string $metricLabel = null, ?\Closure $beforeAiCall = null): array
     {
         if (! $this->isConfigured()) {
-            throw new RuntimeException('The AI assistant is not set up yet. Add an AI API key (GEMINI_API_KEY) to the server settings.');
+            throw new RuntimeException('The AI assistant is not set up yet. Add an AI API key ('.$this->keyEnvName().') to the server settings.');
         }
 
         $question = $topic === 'metric'
@@ -92,10 +93,14 @@ PROMPT;
             return ['text' => $cached, 'cached' => true];
         }
 
-        $agent = new FinanceExplainer(self::SYSTEM_PROMPT, $this->provider(), $this->model());
-        $text = $this->send(fn () => $agent->prompt(
+        if ($beforeAiCall) {
+            $beforeAiCall();
+        }
+
+        $agent = new FinanceExplainer(self::SYSTEM_PROMPT, $this->providers($this->model()), $this->timeout());
+        $text = $this->send(fn () => $this->remember($agent->prompt(
             "<fact_sheet>\n".json_encode($facts, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)."\n</fact_sheet>\n\n".$question,
-        )->text);
+        ))->text);
         Cache::put($cacheKey, $text, now()->addHours(6));
 
         return ['text' => $text, 'cached' => false];
@@ -110,20 +115,25 @@ PROMPT;
     public function answer(string $question, array $history, FinanceTools $tools, string $businessName, string $language = 'en'): string
     {
         if (! $this->isConfigured()) {
-            throw new RuntimeException('The AI assistant is not set up yet. Add an AI API key (GEMINI_API_KEY) to the server settings.');
+            throw new RuntimeException('The AI assistant is not set up yet. Add an AI API key ('.$this->keyEnvName().') to the server settings.');
         }
 
         $system = self::QUESTION_PROMPT."\n\nBusiness: ".$businessName.'. Today is '.today()->format('l, F j, Y').' ('.today()->toDateString().').';
-        $agent = new FinanceQuestionAgent($system, $history, $tools, $this->provider(), $this->questionModel());
+        $agent = new FinanceQuestionAgent($system, $history, $tools, $this->providers($this->questionModel()), $this->timeout());
 
-        return $this->send(fn () => $agent->prompt($language === 'taglish'
+        return $this->send(fn () => $this->remember($agent->prompt($language === 'taglish'
             ? $question."\n\n(Answer in Taglish, a natural mix of Tagalog and English.)"
-            : $question)->text);
+            : $question))->text);
     }
 
     protected function emptyAnswerMessage(): string
     {
         return 'The AI assistant could not answer this one. Try asking something more specific; the figures on the page are still accurate.';
+    }
+
+    protected function aiConfig(): string
+    {
+        return 'services.finance_ai';
     }
 
     private function provider(): string

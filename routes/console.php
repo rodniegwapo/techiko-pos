@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\AssistantConversation;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -30,3 +31,6 @@ Schedule::command('finance:monthly-review')->monthlyOn(1, '06:00');
 // Each business's balance sheet figures at the end of the day, so inventory, customer credit and
 // cash can be compared over time. Opening the Finance pages also takes today's if it is missing.
 Schedule::command('finance:snapshot')->dailyAt('23:55');
+
+// AI assistant chats are kept 90 days after their last message.
+Schedule::command('model:prune', ['--model' => [AssistantConversation::class]])->dailyAt('03:00');

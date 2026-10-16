@@ -7,11 +7,11 @@ defineProps({
     filterMainClass: {
         type: String,
         default:
-            "flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-3 w-full",
+            "flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between mb-3 w-full",
     },
     filterClass: {
         type: String,
-        default: "flex flex-wrap justify-end gap-2 w-full sm:w-auto",
+        default: "flex min-w-0 w-full sm:flex-1 justify-end",
     },
 });
 </script>
@@ -23,7 +23,10 @@ defineProps({
             class="flex w-full min-h-0 flex-1 flex-col rounded-lg bg-white p-3 pb-0 shadow sm:p-4 sm:pb-0 min-w-0"
         >
             <div class="shrink-0" :class="filterMainClass">
-                <h1 class="text-lg font-semibold">{{ title }}</h1>
+                <div class="flex shrink-0 items-center gap-2">
+                    <h1 class="m-0 text-lg font-semibold">{{ title }}</h1>
+                    <slot name="titleMeta" />
+                </div>
                 <div :class="filterClass">
                     <slot name="filters" />
                 </div>

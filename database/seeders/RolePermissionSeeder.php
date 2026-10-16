@@ -341,6 +341,7 @@ class RolePermissionSeeder extends Seeder
             // Domain servicing billing (tenant UI)
             'billing.servicing.index',
             'billing.servicing.manual_gcash',
+            'ai-usage.index',
 
             // Global manual payment review (super)
             'billing.manual-payments.index',
@@ -435,6 +436,7 @@ class RolePermissionSeeder extends Seeder
             'settings.update',
             'billing.servicing.index',
             'billing.servicing.manual_gcash',
+            'ai-usage.index',
             'payment-card-types.index',
             'payment-card-types.list',
             'payment-card-types.store',
@@ -708,6 +710,7 @@ class RolePermissionSeeder extends Seeder
             'settings.update',
             'billing.servicing.index',
             'billing.servicing.manual_gcash',
+            'ai-usage.index',
             'payment-card-types.index',
             'payment-card-types.list',
             'payment-card-types.store',
@@ -1179,7 +1182,7 @@ class RolePermissionSeeder extends Seeder
     /**
      * Get display name for action
      */
-    private function getActionDisplayName(string $action): string
+    public function getActionDisplayName(string $action): string
     {
         $actionLabels = [
             'index' => 'View',

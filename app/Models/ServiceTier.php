@@ -5,18 +5,24 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Query\Builder;
-use Illuminate\Support\Facades\DB;
 
 class ServiceTier extends Model
 {
     protected $guarded = ['id'];
 
+    protected $attributes = [
+        'shown_on_billing' => true,
+    ];
+
     protected $casts = [
         'amount' => 'decimal:2',
         'is_active' => 'boolean',
+        'shown_on_billing' => 'boolean',
         'sort_order' => 'integer',
         'max_products' => 'integer',
         'max_users' => 'integer',
+        'ai_monthly_credits' => 'integer',
+        'features' => 'array',
     ];
 
     public function manualPaymentRequests(): HasMany
@@ -24,30 +30,18 @@ class ServiceTier extends Model
         return $this->hasMany(ManualPaymentRequest::class);
     }
 
-    /** @return list<string> */
-    public static function billingHiddenSlugs(): array
-    {
-        return array_values(array_unique(array_filter(array_map(
-            static fn (mixed $slug): string => strtolower((string) $slug),
-            config('manual_billing.billing_hidden_tier_slugs', [])
-        ))));
-    }
-
+    /** Organizations can't pick it on the billing page (super admins set this on the Plans page). */
     public static function isHiddenFromBilling(self|string $tier): bool
     {
-        $slug = $tier instanceof self ? (string) $tier->slug : (string) $tier;
+        $tier = $tier instanceof self ? $tier : self::query()->whereRaw('LOWER(slug) = ?', [strtolower($tier)])->first();
 
-        return in_array(strtolower($slug), self::billingHiddenSlugs(), true);
+        return $tier !== null && ! $tier->shown_on_billing;
     }
 
     /** @param Builder|\Illuminate\Database\Eloquent\Builder $query */
     public static function constrainVisibleOnBillingTierPicker($query): void
     {
-        $hidden = self::billingHiddenSlugs();
-
-        if ($hidden !== []) {
-            $query->whereNotIn(DB::raw('LOWER(slug)'), $hidden);
-        }
+        $query->where('shown_on_billing', true);
     }
 
     public function scopeActive($query)

@@ -13,10 +13,13 @@ class FinanceExplainer implements Agent
 {
     use Promptable;
 
+    /**
+     * @param  array<string, string>  $providers  Providers to try in order, each with its model.
+     */
     public function __construct(
         private readonly string $instructions,
-        private readonly string $provider,
-        private readonly string $model,
+        private readonly array $providers,
+        private readonly int $timeout,
     ) {}
 
     public function instructions(): string
@@ -24,14 +27,20 @@ class FinanceExplainer implements Agent
         return $this->instructions;
     }
 
-    public function provider(): string
+    /** @return array<string, string> */
+    public function provider(): array
     {
-        return $this->provider;
+        return $this->providers;
     }
 
     public function model(): string
     {
-        return $this->model;
+        return (string) reset($this->providers);
+    }
+
+    public function timeout(): int
+    {
+        return $this->timeout;
     }
 
     public function maxTokens(): int

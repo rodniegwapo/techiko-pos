@@ -8,6 +8,7 @@ use App\Http\Resources\InventoryLocationResource;
 use App\Http\Requests\InventoryLocationRequest;
 use App\Models\Domain;
 use App\Models\InventoryLocation;
+use App\Services\DomainSubscriptionService;
 use App\Traits\LocationTypes;
 use Illuminate\Http\Request;
 
@@ -71,8 +72,10 @@ class InventoryLocationController extends Controller
         ]);
     }
 
-    public function store(InventoryLocationRequest $request, Domain $domain)
+    public function store(InventoryLocationRequest $request, Domain $domain, DomainSubscriptionService $subscriptions)
     {
+        $subscriptions->assertCanCreateLocation($domain);
+
         $validated = $request->validated();
         $validated['domain'] = $domain->name_slug;
         $makeDefault = (bool) ($validated['is_default'] ?? false);

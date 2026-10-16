@@ -15,6 +15,8 @@ use App\Services\Ai\Actions\ActionContext;
 use App\Services\Ai\Actions\ActionInputException;
 use App\Services\Ai\Actions\ActionRegistry;
 use App\Services\Ai\Actions\AssistantAction;
+use App\Services\Ai\Actions\Finance\PaySupplierBill;
+use App\Services\Ai\Actions\HasInputTemplate;
 use App\Services\Ai\Actions\Catalog\SoldTypes;
 use App\Services\Ai\Actions\PendingActions;
 use App\Services\Finance\FinancialInsightService;
@@ -46,12 +48,14 @@ class AssistantTools
         'get_sales_settings' => ['settings.index', 'settings.update'],
         'list_expense_categories' => ['expenses.index', 'expenses.store', 'finance.bills.store'],
         'list_suppliers' => ['finance.payables.index', 'finance.bills.store'],
+        'list_open_bills' => ['finance.payables.index', 'finance.bill-payments.store'],
     ];
 
     /** Read tools that also need a feature of the business. */
     private const READ_TOOL_FEATURES = [
-        'list_expense_categories' => 'finance',
+        'list_expense_categories' => 'expenses',
         'list_suppliers' => 'finance',
+        'list_open_bills' => 'finance',
     ];
 
     /** @var array<string, array{title: string, url: string}> */
@@ -59,6 +63,9 @@ class AssistantTools
 
     /** @var list<array{token: string, title: string, fields: list<array{label: string, value: string}>, confirm_label: string, expires_at: string}> */
     private array $pendingActions = [];
+
+    /** @var array<string, array{action: string, title: string, text: string}> Fill-in forms shown under the answer, by action. */
+    private array $forms = [];
 
     private readonly ActionRegistry $actions;
 
@@ -113,6 +120,7 @@ class AssistantTools
             'get_sales_settings' => ['The current sales settings: VAT on/off, VAT rate, prices include VAT or not, selling when out of stock, hiding out-of-stock products.', fn () => []],
             'list_expense_categories' => ['The expense categories of this business (rent, utilities…), with their ids.', fn () => []],
             'list_suppliers' => ['The suppliers of this business with their ids and payment terms (days).', fn () => []],
+            'list_open_bills' => ['The unpaid supplier bills, oldest due first: bill_id, supplier, bill no., bill and due dates, amount left to pay, overdue.', fn () => []],
         ];
         foreach ($read as $name => [$description, $schema]) {
             if ($this->mayRead($name)) {
@@ -122,6 +130,13 @@ class AssistantTools
 
         foreach ($this->data->definitions() as $name => [$description, $schema]) {
             $tools[] = $tool($name, $description, $schema);
+        }
+
+        $withForms = array_map(fn (AssistantAction $a) => $a->name(), $this->actionsWithForms());
+        if ($withForms) {
+            $tools[] = $tool('show_fill_in_form', 'Show the user a fill-in form ("Name:", "Price (₱):"…) with a Fill in button under your answer, for a change they asked for without giving the details. They send it back filled in; read the "Label: value" lines and call the matching propose_* tool.', fn (JsonSchema $schema) => [
+                'action' => $schema->string()->enum($withForms)->description('The change, e.g. "create_product"')->required(),
+            ]);
         }
 
         foreach ($this->actions->allowedFor($this->user, $this->domain) as $action) {
@@ -162,6 +177,7 @@ class AssistantTools
                     'get_guide' => $this->getGuide((string) ($input['key'] ?? '')),
                     'list_guides' => array_values(array_map(fn ($g) => ['key' => $g['key'], 'title' => $g['title']], $this->guides->allowedFor($this->user, $this->domain))),
                     'report_unanswered' => $this->reportUnanswered((string) ($input['topic'] ?? '')),
+                    'show_fill_in_form' => $this->showFillInForm((string) ($input['action'] ?? '')),
                     'get_current_store' => $this->location
                         ? ['id' => $this->location->id, 'name' => $this->location->name, 'type' => $this->location->type]
                         : ['error' => 'No store is selected.'],
@@ -172,6 +188,16 @@ class AssistantTools
                         ->get(['id', 'name', 'code', 'type', 'address', 'is_active', 'is_default'])->toArray(),
                     'list_expense_categories' => ExpenseCategory::query()->forDomain($this->domain->name_slug)->where('is_active', true)->orderBy('name')->get(['id', 'name'])->toArray(),
                     'list_suppliers' => Supplier::query()->where('domain', $this->domain->name_slug)->orderBy('name')->get(['id', 'name', 'payment_terms_days', 'is_active'])->toArray(),
+                    'list_open_bills' => PaySupplierBill::openBills(new ActionContext($this->user, $this->domain, $this->location))->take(30)
+                        ->map(fn ($bill) => [
+                            'bill_id' => $bill->id,
+                            'supplier' => $bill->supplier?->name,
+                            'bill_number' => $bill->bill_number,
+                            'bill_date' => $bill->bill_date?->toDateString(),
+                            'due_date' => $bill->due_date?->toDateString(),
+                            'left_to_pay' => $bill->remaining,
+                            'overdue' => $bill->due_date !== null && $bill->due_date->isPast() && ! $bill->due_date->isToday(),
+                        ])->values()->all(),
                     'get_sales_settings' => [
                         ...$this->domain->salesVatSettings(),
                         'allow_overselling' => (bool) ($this->domain->settings['sales']['allow_overselling'] ?? false),
@@ -207,6 +233,57 @@ class AssistantTools
     public function pendingActions(): array
     {
         return $this->pendingActions;
+    }
+
+    /** @return list<array{action: string, title: string, text: string}> Fill-in forms for the chat to show under the answer. */
+    public function forms(): array
+    {
+        return array_values($this->forms);
+    }
+
+    /** @return list<AssistantAction&HasInputTemplate> The changes this user may make that have a fill-in form. */
+    private function actionsWithForms(): array
+    {
+        return array_values(array_filter(
+            $this->actions->allowedFor($this->user, $this->domain),
+            fn (AssistantAction $action) => $action instanceof HasInputTemplate,
+        ));
+    }
+
+    /** Builds the form on the server ("Label (hint; optional): " per line), so it is the same every time. */
+    private function showFillInForm(string $name): array
+    {
+        $action = collect($this->actionsWithForms())->first(fn (AssistantAction $a) => $a->name() === $name);
+        if (! $action) {
+            return ['error' => 'not_allowed', 'message' => 'There is no form for that, or this user\'s role cannot make that change.'];
+        }
+
+        try {
+            $template = $action->template(new ActionContext($this->user, $this->domain, $this->location));
+        } catch (ActionInputException $e) {
+            return ['error' => $e->getMessage()];
+        }
+
+        $lines = array_map(function (array $field) {
+            $notes = array_filter([$field['hint'], $field['required'] ? null : 'optional']);
+
+            return $field['label'].($notes ? ' ('.implode('; ', $notes).')' : '').': ';
+        }, $template);
+
+        $this->forms[$action->name()] = ['action' => $action->name(), 'title' => $action->templateTitle(), 'text' => implode("\n", $lines)];
+
+        // The page for doing it by hand comes with the form, when this user may open it.
+        $guide = $action->templateGuide() ? $this->guides->find($action->templateGuide()) : null;
+        $linked = $guide !== null && $this->guides->allows($this->user, $guide, $this->domain) && $this->addGuideLink($guide);
+
+        return [
+            'status' => 'form_shown',
+            'page_link_shown_to_user' => $linked,
+            'message' => 'A fill-in form with a Fill in button is shown under your answer'.($linked ? ', with a button to the page' : '').'. '
+                .'In one short sentence, tell the user to fill in the form and send it'
+                .($linked ? ', or tap the button to do it themselves on the page' : '')
+                .'. Do not repeat the fields.',
+        ];
     }
 
     private function mayRead(string $tool): bool
@@ -320,15 +397,21 @@ class AssistantTools
             return ['error' => 'not_available', 'message' => 'This business does not have the feature for "'.$guide['title'].'" turned on (e.g. Finance). The Techiko team can turn it on.'];
         }
 
+        return [
+            'title' => $guide['title'],
+            'steps' => $guide['steps'],
+            'page_link_shown_to_user' => $this->addGuideLink($guide),
+        ];
+    }
+
+    /** Adds a button to the guide's page under the answer, when it has one. Callers check the user may follow it. */
+    private function addGuideLink(array $guide): bool
+    {
         $url = $this->guides->pageUrl($guide, $this->domain->name_slug);
         if ($url !== null) {
             $this->links[$guide['key']] = ['title' => $guide['title'], 'url' => $url];
         }
 
-        return [
-            'title' => $guide['title'],
-            'steps' => $guide['steps'],
-            'page_link_shown_to_user' => $url !== null,
-        ];
+        return $url !== null;
     }
 }

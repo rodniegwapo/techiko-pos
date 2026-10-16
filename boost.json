@@ -1,0 +1,15 @@
+{
+    "agents": [
+        "claude_code"
+    ],
+    "cloud": true,
+    "skills": [
+        "infer-conventions",
+        "deploying-to-cloud",
+        "ai-sdk-development",
+        "laravel-best-practices",
+        "testing-best-practices",
+        "inertia-vue-development",
+        "tailwindcss-development"
+    ]
+}

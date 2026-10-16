@@ -37,12 +37,17 @@ defineProps({
 
                 <div
                     v-if="$slots.hero"
-                    class="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-2"
+                    class="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2"
                 >
-                    <div class="text-sm font-semibold text-[var(--cs-ink)]">
-                        All items
+                    <div class="min-w-0">
+                        <div class="text-sm font-semibold text-[var(--cs-ink)]">
+                            All items
+                        </div>
+                        <div class="text-xs text-[var(--cs-muted)]">
+                            Browse the full menu
+                        </div>
                     </div>
-                    <div class="flex flex-wrap items-center justify-end gap-2">
+                    <div class="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
                         <slot name="filters" />
                     </div>
                 </div>

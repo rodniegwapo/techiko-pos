@@ -9,9 +9,12 @@ use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Session\SessionManager;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Ai\Events\AgentFailedOver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -61,6 +64,14 @@ class AppServiceProvider extends ServiceProvider
 
             return Limit::perMinute($max)->by($request->ip());
         });
+
+        // An AI provider failed and the next one (services.*.fallback_provider) was tried.
+        Event::listen(AgentFailedOver::class, fn (AgentFailedOver $e) => Log::warning('AI failed over to the next provider', [
+            'agent' => class_basename($e->agent),
+            'from' => $e->provider->name(),
+            'model' => $e->model,
+            'reason' => class_basename($e->exception).': '.$e->exception->getMessage(),
+        ]));
 
         Route::bind('sale', function ($value, $route) {
             $domain = $route->parameter('domain');

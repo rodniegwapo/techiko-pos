@@ -12,6 +12,8 @@ export function useDomainRoutes() {
 
     /*** === HELPERS === ***/
     const getCurrentDomainFromUrl = () => {
+        // The Domains admin pages (/domains/{slug}, /domains/{slug}/edit) only look at an organization.
+        if (page.props.inOrganization === false) return null;
         const match = window.location.pathname.match(/\/domains\/([^\/]+)/);
         return match ? match[1] : null;
     };

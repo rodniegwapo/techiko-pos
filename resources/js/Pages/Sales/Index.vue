@@ -33,7 +33,12 @@ import CustomerOrder from "./components/CustomerOrder.vue";
 import TotalAmountSection from "./components/TotalAmountSection.vue";
 import SalesMobileCheckoutBar from "./components/SalesMobileCheckoutBar.vue";
 import SalesCartDrawer from "./components/SalesCartDrawer.vue";
-import { useMediaQuery, useStorage, watchDebounced } from "@vueuse/core";
+import {
+    useEventListener,
+    useMediaQuery,
+    useStorage,
+    watchDebounced,
+} from "@vueuse/core";
 import { useSalesCartDrawer } from "@/Composables/useSalesCartDrawer";
 import { useHelpers } from "@/Composables/useHelpers";
 import { useSaleTotals } from "@/Composables/useSaleTotals";
@@ -45,6 +50,7 @@ import {
     MinusSquareOutlined,
     CloudDownloadOutlined,
     LeftOutlined,
+    SearchOutlined,
 } from "@ant-design/icons-vue";
 import { message } from "ant-design-vue";
 
@@ -1236,6 +1242,40 @@ const hasMoreProducts = computed(
         salesCartIsOnline.value && productsPage.value < productsLastPage.value,
 );
 
+// Offline lists come from the local catalog, which has no server total.
+const productCountLabel = computed(() => {
+    const count = salesCartIsOnline.value
+        ? productsTotal.value
+        : products.value.length;
+    return `${count} ${count === 1 ? "product" : "products"}`;
+});
+
+// "/" jumps to the product search. Keys arriving in quick succession are a barcode
+// scan (which may contain "/"), so only a key typed on its own counts. Runs in the
+// capture phase so the scanner's buffer never sees the "/" (it would prefix the next scan).
+const productSearchInput = ref(null);
+let lastKeydownAt = 0;
+function focusSearchOnSlash(e) {
+    const now = Date.now();
+    const isLoneKey = now - lastKeydownAt > 50;
+    lastKeydownAt = now;
+    if (e.key !== "/" || !isLoneKey) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const target = e.target;
+    if (
+        target?.isContentEditable ||
+        ["INPUT", "TEXTAREA", "SELECT"].includes(target?.tagName) ||
+        target?.closest?.(".ant-modal, .ant-drawer, [role='dialog']")
+    ) {
+        return;
+    }
+    if (!productSearchInput.value) return;
+    e.preventDefault();
+    e.stopPropagation();
+    productSearchInput.value.focus();
+}
+useEventListener(window, "keydown", focusSearchOnSlash, { capture: true });
+
 function matchesScanCode(p, code) {
     const q = String(code ?? "").trim();
     if (!q || !p) {
@@ -1558,73 +1598,136 @@ watch(
                         </p>
                     </div>
                 </template>
+                <template v-if="!isCoffeeshopLayout" #titleMeta>
+                    <span
+                        class="whitespace-nowrap rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500"
+                        data-testid="products-count"
+                    >
+                        {{ productCountLabel }}
+                    </span>
+                </template>
                 <template #filters>
-                    <a-input
-                        v-if="isCoffeeshopLayout"
-                        v-model:value="search"
-                        placeholder="Search menu..."
-                        allow-clear
-                        class="cs-menu-search min-w-[140px] max-w-[320px]"
-                    />
-                    <a-input-search
-                        v-else
-                        v-model:value="search"
-                        placeholder="Search Product"
-                        class="min-w-[100px] max-w-[300px]"
-                    />
-                    <RefreshButton
-                        v-if="!isCoffeeshopLayout"
-                        :loading="loading"
-                        @click="getProducts"
-                    />
-                    <a-button
-                        v-if="!isCoffeeshopLayout"
-                        type="default"
-                        :loading="syncingOffline"
-                        :disabled="!salesCartIsOnline || !activeLocationId"
-                        @click="syncOfflineDataForSales"
-                    >
-                        <template #icon>
-                            <CloudDownloadOutlined />
-                        </template>
-                        Sync for offline
-                    </a-button>
-
-                    <FilterDropdown
-                        v-if="!isCoffeeshopLayout"
-                        v-model="filters"
-                        :filters="filtersConfig"
-                    />
-                    <label
-                        class="flex shrink-0 cursor-pointer items-center gap-2 text-xs font-medium"
-                        :class="
-                            isCoffeeshopLayout
-                                ? 'text-[var(--cs-muted)]'
-                                : 'text-gray-700'
-                        "
-                    >
-                        <a-switch
-                            v-model:checked="hideOutOfStock"
-                            size="small"
-                            data-testid="hide-out-of-stock"
-                        />
-                        Hide out of stock
-                    </label>
-                    <label
-                        class="flex shrink-0 cursor-pointer items-center gap-2 text-xs font-medium"
-                        :class="
-                            isCoffeeshopLayout
-                                ? 'text-[var(--cs-muted)]'
-                                : 'text-gray-700'
-                        "
-                    >
-                        <a-switch
-                            v-model:checked="groupByCategory"
-                            size="small"
-                            data-testid="group-by-category"
-                        />
-                        Group by category
-                    </label>
+                    <!-- Search, then the list display switches stacked beside it. -->
+                    <template v-if="isCoffeeshopLayout">
+                        <a-input
+                            ref="productSearchInput"
+                            v-model:value="search"
+                            placeholder="Search menu..."
+                            allow-clear
+                            class="cs-menu-search w-full min-w-[180px] sm:w-[320px]"
+                            data-testid="product-search"
+                        >
+                            <template #prefix>
+                                <SearchOutlined class="text-[var(--cs-muted)]" />
+                            </template>
+                            <template #suffix>
+                                <kbd
+                                    v-if="!search"
+                                    class="hidden rounded border border-[var(--cs-border)] px-1.5 text-[10px] leading-4 text-[var(--cs-muted)] sm:inline"
+                                    title="Press / to search"
+                                    >/</kbd
+                                >
+                            </template>
+                        </a-input>
+                        <div class="flex shrink-0 flex-col gap-1.5">
+                            <label
+                                class="flex cursor-pointer items-center gap-2 text-xs font-medium text-[var(--cs-muted)]"
+                            >
+                                <a-switch
+                                    v-model:checked="hideOutOfStock"
+                                    size="small"
+                                    data-testid="hide-out-of-stock"
+                                />
+                                Hide out of stock
+                            </label>
+                            <label
+                                class="flex cursor-pointer items-center gap-2 text-xs font-medium text-[var(--cs-muted)]"
+                            >
+                                <a-switch
+                                    v-model:checked="groupByCategory"
+                                    size="small"
+                                    data-testid="group-by-category"
+                                />
+                                Group by category
+                            </label>
+                        </div>
+                    </template>
+                    <!-- Search and actions on one row; list display switches underneath. -->
+                    <div v-else class="flex w-full min-w-0 flex-col gap-2">
+                        <div class="flex w-full min-w-0 items-center gap-2">
+                            <a-input
+                                ref="productSearchInput"
+                                v-model:value="search"
+                                placeholder="Search products, SKU, or category"
+                                allow-clear
+                                class="min-w-0 flex-1"
+                                data-testid="product-search"
+                            >
+                                <template #prefix>
+                                    <SearchOutlined class="text-gray-400" />
+                                </template>
+                                <template #suffix>
+                                    <kbd
+                                        v-if="!search"
+                                        class="hidden rounded border border-gray-200 bg-gray-50 px-1.5 text-[10px] leading-4 text-gray-400 sm:inline"
+                                        title="Press / to search"
+                                        >/</kbd
+                                    >
+                                </template>
+                            </a-input>
+                            <a-tooltip title="Refresh products">
+                                <RefreshButton
+                                    :loading="loading"
+                                    @click="getProducts"
+                                />
+                            </a-tooltip>
+                            <a-tooltip
+                                title="Download products so sales work without internet"
+                            >
+                                <a-button
+                                    type="default"
+                                    :loading="syncingOffline"
+                                    :disabled="
+                                        !salesCartIsOnline || !activeLocationId
+                                    "
+                                    @click="syncOfflineDataForSales"
+                                >
+                                    <template #icon>
+                                        <CloudDownloadOutlined />
+                                    </template>
+                                    <span class="hidden sm:inline">
+                                        Sync for offline
+                                    </span>
+                                </a-button>
+                            </a-tooltip>
+                            <FilterDropdown
+                                v-model="filters"
+                                :filters="filtersConfig"
+                            />
+                        </div>
+                        <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
+                            <label
+                                class="flex shrink-0 cursor-pointer items-center gap-2 text-xs font-medium text-gray-700"
+                            >
+                                <a-switch
+                                    v-model:checked="hideOutOfStock"
+                                    size="small"
+                                    data-testid="hide-out-of-stock"
+                                />
+                                Hide out of stock
+                            </label>
+                            <label
+                                class="flex shrink-0 cursor-pointer items-center gap-2 text-xs font-medium text-gray-700"
+                            >
+                                <a-switch
+                                    v-model:checked="groupByCategory"
+                                    size="small"
+                                    data-testid="group-by-category"
+                                />
+                                Group by category
+                            </label>
+                        </div>
+                    </div>
                 </template>
                 <template v-if="!isCoffeeshopLayout" #activeFilters>
                     <ActiveFilters
@@ -1636,7 +1739,6 @@ watch(
                                     (k) => (filters[k] = null),
                                 )
                         "
-                        :always-show="true"
                     />
                 </template>
 

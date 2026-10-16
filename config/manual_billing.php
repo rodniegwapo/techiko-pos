@@ -41,6 +41,8 @@ return [
     |--------------------------------------------------------------------------
     |
     | Still active elsewhere; omit from servicing payment UI until you are ready.
+    | Only read once, by the migration that added service_tiers.shown_on_billing; after that,
+    | super admins show or hide plans on the Plans page.
     |
     */
     'billing_hidden_tier_slugs' => [
@@ -57,19 +59,22 @@ return [
     */
     'tier_marketing_bullets' => [
         'basic' => [
-            '👥 Multi-user (cashier accounts)',
-            '💰 Cash control: cash in/out; expected vs actual',
-            '📊 Simple analytics: top products; daily trends',
-            '📒 Advanced utang: due dates; payment history',
+            '✅ Everything in Free',
+            '🧾 Full sales history with CSV export',
+            '👥 More users (see the limit above)',
         ],
         'standard' => [
-            '🏪 Multi-store',
-            '🔄 Stock transfers',
-            '📦 Supplier tracking',
-            '📈 Advanced reports',
-            '🔔 Smart alerts (utang reminders, low stock)',
+            '✅ Everything in Basic',
+            '🏪 Multi-store: more stores and warehouses',
+            '🔄 Stock transfers, movements and valuation',
+            '🧾 Expenses (recurring too)',
         ],
-        'premium' => [],
+        'premium' => [
+            '✅ Everything in Standard',
+            '📊 Finance: P&L, cash flow, balance sheet, VAT report',
+            '📒 Supplier bills, receivables, loans and assets',
+            '✨ AI explanations and monthly business reviews',
+        ],
     ],
 
     /*
@@ -78,10 +83,12 @@ return [
     |--------------------------------------------------------------------------
     */
     'free_tier_marketing_bullets' => [
-        'Point-of-sale essentials for day-to-day selling',
-        'Basic inventory and product catalog',
-        'Utang (basic) and wallet (trial-period access)',
-        'Upgrade below for unlimited products and full servicing tiers',
+        'Point of sale, offline selling and receipts',
+        'Unlimited products, discounts, customers and loyalty',
+        'Stock tracking, adjustments and low-stock alerts',
+        'Utang and cash drawer',
+        '1 location, 2 users, last 31 days of sales history',
+        'AI assistant for your staff',
     ],
 
 ];

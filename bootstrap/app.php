@@ -58,6 +58,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role.access' => \App\Http\Middleware\RoleBasedAccessControl::class,
             'location.sellable' => \App\Http\Middleware\EnsureSellableLocation::class,
             'domain.feature' => \App\Http\Middleware\EnsureDomainFeature::class,
+            'domain.unlocked' => \App\Http\Middleware\EnsureDomainNotLocked::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

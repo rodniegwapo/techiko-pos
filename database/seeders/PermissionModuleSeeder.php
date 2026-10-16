@@ -12,7 +12,23 @@ class PermissionModuleSeeder extends Seeder
      */
     public function run(): void
     {
-        $modules = [
+        foreach (self::modules() as $module) {
+            DB::table('permission_modules')->updateOrInsert(
+                ['name' => $module['name']],
+                $module
+            );
+        }
+    }
+
+    /**
+     * The permission modules (section headers of the role permissions page). Also used by the
+     * feature permission seeders, which add only their own modules.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function modules(): array
+    {
+        return [
             [
                 'name' => 'dashboard',
                 'display_name' => 'Dashboard',
@@ -214,12 +230,5 @@ class PermissionModuleSeeder extends Seeder
                 'is_active' => true,
             ],
         ];
-
-        foreach ($modules as $module) {
-            DB::table('permission_modules')->updateOrInsert(
-                ['name' => $module['name']],
-                $module
-            );
-        }
     }
 }

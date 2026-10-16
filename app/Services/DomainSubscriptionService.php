@@ -3,14 +3,20 @@
 namespace App\Services;
 
 use App\Models\Domain;
+use App\Models\InventoryLocation;
 use App\Models\Product\Product;
 use App\Models\ServiceTier;
 use App\Models\User;
+use App\Support\FreePlan;
 use Illuminate\Validation\ValidationException;
 
 class DomainSubscriptionService
 {
+    /** Defaults for the Free plan, until super admins change it on the Plans page (App\Support\FreePlan). */
     public const FREE_TIER_MAX_PRODUCTS = 10;
+
+    /** Users on the free plan (only while plans are enforced, see config features.plan_gating). */
+    public const FREE_TIER_MAX_USERS = 2;
 
     public function effectiveMaxProducts(Domain $domain): ?int
     {
@@ -22,7 +28,7 @@ class DomainSubscriptionService
         $tier = $domain->currentServiceTier;
 
         if (! $domain->current_service_tier_id || ! $tier) {
-            return self::FREE_TIER_MAX_PRODUCTS;
+            return FreePlan::maxProducts();
         }
 
         return $tier->max_products;
@@ -34,10 +40,21 @@ class DomainSubscriptionService
         $tier = $domain->currentServiceTier;
 
         if (! $domain->current_service_tier_id || ! $tier) {
-            return null;
+            return config('features.plan_gating', false) ? FreePlan::maxUsers() : null;
         }
 
         return $tier->max_users;
+    }
+
+    /** One location unless the plan includes more stores (multi_location). */
+    public function effectiveMaxLocations(Domain $domain): ?int
+    {
+        return $domain->hasFeature('multi_location') ? null : 1;
+    }
+
+    public function locationCount(string $domainSlug): int
+    {
+        return InventoryLocation::query()->forDomain($domainSlug)->count();
     }
 
     public function productCount(string $domainSlug): int
@@ -83,6 +100,21 @@ class DomainSubscriptionService
         }
     }
 
+    public function assertCanCreateLocation(Domain $domain): void
+    {
+        $max = $this->effectiveMaxLocations($domain);
+
+        if ($max === null) {
+            return;
+        }
+
+        if ($this->locationCount($domain->name_slug) >= $max) {
+            throw ValidationException::withMessages([
+                'plan' => [__('Your plan includes :max location. Upgrade to Standard to add more stores or warehouses.', ['max' => $max])],
+            ]);
+        }
+    }
+
     /** @return array<string, mixed> */
     public function subscriptionPropsForFrontend(Domain $domain): array
     {
@@ -104,8 +136,11 @@ class DomainSubscriptionService
             'user_count' => $userCount,
             'max_users' => $maxUsers,
             'users_at_capacity' => $maxUsers !== null && $userCount >= $maxUsers,
-            'free_product_limit' => self::FREE_TIER_MAX_PRODUCTS,
-            'billing_url' => route('domains.billing.servicing.index', ['domain' => $domain->name_slug]),
+            'location_count' => $this->locationCount($domain->name_slug),
+            'max_locations' => $this->effectiveMaxLocations($domain),
+            // Days of sales history the plan shows (null: all of it), as on the Sales history page.
+            'history_days' => $domain->hasFeature('sales_history_unlimited') ? null : FreePlan::historyDays(),
+            'free_product_limit' => FreePlan::maxProducts(),
         ];
     }
 
@@ -121,6 +156,16 @@ class DomainSubscriptionService
         $domain->update([
             'current_service_tier_id' => $serviceTierId,
             'subscription_started_at' => now(),
+        ]);
+    }
+
+    /** Puts an organization back on the free plan. */
+    public function clearServicingTier(Domain $domain): void
+    {
+        $domain->update([
+            'current_service_tier_id' => null,
+            'subscription_started_at' => null,
+            'subscription_ends_at' => null,
         ]);
     }
 }

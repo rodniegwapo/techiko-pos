@@ -7,13 +7,35 @@ use App\Services\Ai\Actions\ActionInputException;
 use App\Services\Ai\Actions\ActionResult;
 use App\Services\Ai\Actions\AssistantAction;
 use App\Services\Ai\Actions\ControllerCall;
+use App\Services\Ai\Actions\HasInputTemplate;
 use App\Services\Ai\Actions\PreparedAction;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 
 /** Adds a supplier, like Finance → Supplier bills → add supplier. */
-class CreateSupplier implements AssistantAction
+class CreateSupplier implements AssistantAction, HasInputTemplate
 {
     public function __construct(private readonly ControllerCall $call) {}
+
+    public function templateTitle(): string
+    {
+        return 'Add supplier';
+    }
+
+    public function templateGuide(): ?string
+    {
+        return 'add-supplier';
+    }
+
+    public function template(ActionContext $context): array
+    {
+        return [
+            ['label' => 'Name', 'required' => true, 'hint' => null],
+            ['label' => 'Pays bills within', 'required' => false, 'hint' => 'days'],
+            ['label' => 'Contact person', 'required' => false, 'hint' => null],
+            ['label' => 'Phone', 'required' => false, 'hint' => null],
+            ['label' => 'Email', 'required' => false, 'hint' => null],
+        ];
+    }
 
     public function name(): string
     {

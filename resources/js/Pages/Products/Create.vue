@@ -286,21 +286,12 @@ const handleSave = () => {
                     class="mx-auto w-full min-w-0 max-w-2xl space-y-4 px-4 pb-6 md:px-6 md:pb-8"
                 >
                     <a-alert
-                        v-if="productsAtCapacity && subscription?.billing_url"
+                        v-if="productsAtCapacity"
                         type="warning"
                         show-icon
                         message="Product limit reached"
-                    >
-                        <template #description>
-                            <span class="mr-1"
-                                >Subscribe for unlimited products on this
-                                domain.</span
-                            >
-                            <a :href="subscription.billing_url"
-                                >Open servicing payment</a
-                            >
-                        </template>
-                    </a-alert>
+                        description="Contact us to change your plan for unlimited products on this domain."
+                    />
 
                     <div ref="formContainerRef">
                         <a-form

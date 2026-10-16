@@ -10,19 +10,48 @@ use App\Services\Ai\Actions\ActionResult;
 use App\Services\Ai\Actions\AssistantAction;
 use App\Services\Ai\Actions\ControllerCall;
 use App\Services\Ai\Actions\DescribesValues;
+use App\Services\Ai\Actions\HasInputTemplate;
 use App\Services\Ai\Actions\PreparedAction;
 use App\Support\FinanceAccess;
 use Carbon\Carbon;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Database\Eloquent\Collection;
 
 /** Records an expense (rent, electricity, salaries…), like Finance → Expenses → add. */
-class RecordExpense implements AssistantAction
+class RecordExpense implements AssistantAction, HasInputTemplate
 {
     use DescribesValues;
 
     public const METHODS = ['cash_register' => 'Cash from the register', 'bank' => 'Bank', 'ewallet' => 'E-wallet', 'card' => 'Card', 'other' => 'Other'];
 
     public function __construct(private readonly ControllerCall $call) {}
+
+    public function templateTitle(): string
+    {
+        return 'Record expense';
+    }
+
+    public function templateGuide(): ?string
+    {
+        return 'record-expense';
+    }
+
+    public function template(ActionContext $context): array
+    {
+        if (! FinanceAccess::canManage($context->user)) {
+            throw new ActionInputException('Only managers and above can record expenses.');
+        }
+
+        return [
+            ['label' => 'Category', 'required' => true, 'hint' => $this->namesHint(ExpenseCategories::active($context)->pluck('name'))],
+            ['label' => 'Amount', 'required' => true, 'hint' => '₱'],
+            ['label' => 'What it was for', 'required' => true, 'hint' => null],
+            ['label' => 'Paid with', 'required' => true, 'hint' => $this->namesHint(self::METHODS)],
+            ['label' => 'Date', 'required' => false, 'hint' => 'YYYY-MM-DD'],
+            ['label' => 'Paid to', 'required' => false, 'hint' => null],
+            ['label' => 'Reference no.', 'required' => false, 'hint' => null],
+        ];
+    }
 
     public function name(): string
     {
@@ -36,13 +65,15 @@ class RecordExpense implements AssistantAction
 
     public function description(): string
     {
-        return 'Propose recording an expense for the store the user works in. Use list_expense_categories for the category. "cash_register" means it was paid with cash from the store\'s register.';
+        return 'Propose recording an expense for the store the user works in. Give the category by name (expense_category) or id (expense_category_id from list_expense_categories). Payment methods: '
+            .collect(self::METHODS)->map(fn ($label, $key) => $key.' = '.$label)->implode(', ').'.';
     }
 
     public function schema(JsonSchema $schema): array
     {
         return [
-            'expense_category_id' => $schema->integer()->description('Category id from list_expense_categories')->required(),
+            'expense_category_id' => $schema->integer()->description('Category id from list_expense_categories (or give expense_category)'),
+            'expense_category' => $schema->string()->description('Category name, as the user wrote it (used when there is no expense_category_id)'),
             'amount' => $schema->number()->description('Amount in pesos')->required(),
             'description' => $schema->string()->description('What it was for, e.g. "October electricity"')->required(),
             'payment_method' => $schema->string()->enum(array_keys(self::METHODS))->description('How it was paid')->required(),
@@ -57,7 +88,7 @@ class RecordExpense implements AssistantAction
         if (! FinanceAccess::canManage($context->user)) {
             throw new ActionInputException('Only managers and above can record expenses.');
         }
-        $category = ExpenseCategory::query()->forDomain($context->domain->name_slug)->where('is_active', true)->find($input['expense_category_id'] ?? null);
+        $category = ExpenseCategories::resolve($input, $context);
         if (! $category) {
             throw new ActionInputException('Choose an expense category from list_expense_categories.');
         }

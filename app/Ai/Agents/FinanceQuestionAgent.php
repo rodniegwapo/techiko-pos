@@ -22,13 +22,14 @@ class FinanceQuestionAgent implements Agent, Conversational, HasTools
 
     /**
      * @param  list<array{question: string, answer: string}>  $history  The last few questions and answers, for follow-ups.
+     * @param  array<string, string>  $providers  Providers to try in order, each with its model.
      */
     public function __construct(
         private readonly string $instructions,
         private readonly array $history,
         private readonly FinanceTools $financeTools,
-        private readonly string $provider,
-        private readonly string $model,
+        private readonly array $providers,
+        private readonly int $timeout,
     ) {}
 
     public function instructions(): string
@@ -52,14 +53,20 @@ class FinanceQuestionAgent implements Agent, Conversational, HasTools
         return $this->financeTools->tools();
     }
 
-    public function provider(): string
+    /** @return array<string, string> Providers to try in order, each with its model. */
+    public function provider(): array
     {
-        return $this->provider;
+        return $this->providers;
     }
 
     public function model(): string
     {
-        return $this->model;
+        return (string) reset($this->providers);
+    }
+
+    public function timeout(): int
+    {
+        return $this->timeout;
     }
 
     public function maxSteps(): int

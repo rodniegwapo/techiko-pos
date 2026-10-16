@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Ai\Agents\AppAssistantAgent;
 use App\Http\Middleware\RoleBasedAccessControl;
+use App\Models\AssistantConversation;
 use App\Models\AssistantUnansweredQuestion;
 use App\Models\Category;
 use App\Models\Domain;
@@ -22,6 +23,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
+use Laravel\Ai\Exceptions\RateLimitedException;
 use Laravel\Ai\Prompts\AgentPrompt;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Spatie\Permission\PermissionRegistrar;
@@ -177,6 +179,7 @@ class AppAssistantTest extends TestCase
             ['bayad sa kuryente meralco', 'record-expense'],
             ['rent every month automatic', 'recurring-expense'],
             ['record supplier bill', 'supplier-bill'],
+            ['add a new supplier', 'add-supplier'],
             ['pay supplier', 'pay-supplier-bill'],
             ['bank balance gcash balance', 'bank-ewallet-balance'],
             ['loan from bank repayment', 'record-loan'],
@@ -273,8 +276,64 @@ class AppAssistantTest extends TestCase
 
         $reply = app(AppAssistant::class)->reply('How do I add a product?', [], $ctx['user'], $ctx['domain'], $ctx['location'], 'domains.products.index', 'taglish');
 
-        $this->assertSame(['answer' => '1. Open **Products → Items**.', 'links' => [], 'pending_actions' => [], 'tools_called' => []], $reply);
+        $this->assertSame(['answer' => '1. Open **Products → Items**.', 'links' => [], 'pending_actions' => [], 'forms' => [], 'tools_called' => []], $reply);
         AppAssistantAgent::assertPrompted(fn (AgentPrompt $prompt) => $prompt->contains('How do I add a product?') && $prompt->contains('Taglish'));
+    }
+
+    public function test_the_fallback_provider_answers_when_the_first_is_turned_away(): void
+    {
+        config([
+            'services.app_assistant.provider' => 'openai', 'services.app_assistant.model' => 'gpt-6-luna',
+            'services.app_assistant.fallback_provider' => 'gemini', 'services.app_assistant.fallback_model' => 'gemini-3.8-flash',
+            'services.app_assistant.timeout' => 20,
+            'ai.providers.openai.key' => 'test-key', 'ai.providers.gemini.key' => 'test-key',
+        ]);
+        $tried = [];
+        AppAssistantAgent::fake(function (string $prompt, $attachments, $provider, string $model) use (&$tried) {
+            $tried[] = [$provider->name(), $model];
+            if ($provider->name() === 'openai') {
+                throw RateLimitedException::forProvider('openai');
+            }
+
+            return 'Answered by the backup.';
+        });
+        $ctx = $this->staff(['assistant.ask']);
+
+        $reply = app(AppAssistant::class)->reply('Where are my sales?', [], $ctx['user'], $ctx['domain'], $ctx['location']);
+
+        $this->assertSame('Answered by the backup.', $reply['answer']);
+        $this->assertSame([['openai', 'gpt-6-luna'], ['gemini', 'gemini-3.8-flash']], $tried);
+        AppAssistantAgent::assertPrompted(fn (AgentPrompt $prompt) => $prompt->timeout === 20);
+    }
+
+    public function test_a_fallback_without_its_key_is_left_out(): void
+    {
+        config([
+            'services.app_assistant.provider' => 'openai', 'services.app_assistant.model' => 'gpt-6-luna',
+            'services.app_assistant.fallback_provider' => 'gemini', 'services.app_assistant.fallback_model' => 'gemini-3.8-flash',
+            'ai.providers.openai.key' => 'test-key', 'ai.providers.gemini.key' => '',
+        ]);
+        $tried = [];
+        AppAssistantAgent::fake(function (string $prompt, $attachments, $provider) use (&$tried) {
+            $tried[] = $provider->name();
+
+            throw RateLimitedException::forProvider('openai');
+        });
+        $ctx = $this->staff(['assistant.ask']);
+
+        try {
+            app(AppAssistant::class)->reply('Where are my sales?', [], $ctx['user'], $ctx['domain'], $ctx['location']);
+            $this->fail('expected the rate limit to reach the user');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('The AI assistant is busy right now. Please try again in a minute.', $e->getMessage());
+        }
+        $this->assertSame(['openai'], $tried);
+
+        // With only the fallback's key, the fallback alone is used, so the assistant still counts as set up.
+        config(['ai.providers.openai.key' => '', 'ai.providers.gemini.key' => 'test-key']);
+        $this->assertTrue(app(AppAssistant::class)->isConfigured());
+        config(['ai.providers.gemini.key' => '']);
+        $this->assertFalse(app(AppAssistant::class)->isConfigured());
     }
 
     public function test_ask_endpoint_answers_within_the_daily_limit(): void
@@ -290,7 +349,7 @@ class AppAssistantTest extends TestCase
         $ask()->assertStatus(429);
     }
 
-    public function test_ask_needs_the_assistant_permission_and_ai_feature(): void
+    public function test_ask_needs_the_assistant_permission_and_ai_credits(): void
     {
         AppAssistantAgent::fake()->preventStrayPrompts();
 
@@ -299,10 +358,12 @@ class AppAssistantTest extends TestCase
             ->postJson($this->askUrl($noPermission['domain']), ['message' => 'How do I add a product?'])
             ->assertForbidden();
 
-        $noFeature = $this->staff(['assistant.ask'], ai: false);
-        $this->actingAs($noFeature['user'])
-            ->postJson($this->askUrl($noFeature['domain']), ['message' => 'How do I add a product?'])
-            ->assertStatus(403);
+        // Every plan has the assistant; a super admin turns it off with 0 credits.
+        $noCredits = $this->staff(['assistant.ask'], ai: false);
+        $noCredits['domain']->update(['ai_monthly_credits_override' => 0]);
+        $this->actingAs($noCredits['user'])
+            ->postJson($this->askUrl($noCredits['domain']), ['message' => 'How do I add a product?'])
+            ->assertStatus(402);
     }
 
     public function test_ask_reports_when_the_ai_is_not_set_up(): void
@@ -335,6 +396,63 @@ class AppAssistantTest extends TestCase
         $this->assertSame('not_allowed', $refused['error']);
     }
 
+    public function test_the_add_product_form_is_built_by_the_server_for_allowed_users(): void
+    {
+        $this->seed(ProductSoldTypeSeeder::class);
+        $ctx = $this->admin();
+        Category::factory()->create(['domain' => $ctx['domain']->name_slug, 'name' => 'Drinks']);
+        Category::factory()->create(['domain' => $ctx['domain']->name_slug, 'name' => 'Burgers']);
+        Category::factory()->create(['domain' => $this->staff([])['domain']->name_slug, 'name' => 'Not Ours']);
+
+        $tools = $this->tools($ctx);
+        $this->assertContains('show_fill_in_form', array_map(fn ($tool) => $tool->name(), $tools->tools()));
+        $shown = json_decode($tools->run('show_fill_in_form', ['action' => 'create_product']), true);
+        $this->assertSame('form_shown', $shown['status']);
+        $this->assertFalse($shown['page_link_shown_to_user']);
+
+        [$form] = $tools->forms();
+        $this->assertSame('create_product', $form['action']);
+        $this->assertSame('Add product', $form['title']);
+        $lines = explode("\n", $form['text']);
+        $this->assertSame('Name: ', $lines[0]);
+        $this->assertSame('Price (₱): ', $lines[1]);
+        $this->assertSame('Category (one of: Burgers, Drinks; optional): ', $lines[2]);
+        $this->assertStringNotContainsString('Not Ours', $form['text']);
+        // This admin may save products but not open the Create Product page, so no page button.
+        $this->assertSame([], $tools->links());
+
+        // With the page allowed too, its button comes with the form.
+        $withPage = $this->tools(['user' => $this->grant($ctx['user'], ['products.create'])] + $ctx);
+        $shown = json_decode($withPage->run('show_fill_in_form', ['action' => 'create_product']), true);
+        $this->assertTrue($shown['page_link_shown_to_user']);
+        $this->assertSame(
+            [['title' => 'Add a product', 'url' => route('domains.products.create', ['domain' => $ctx['domain']->name_slug])]],
+            $withPage->links(),
+        );
+
+        // A role that can't add products gets no form tool, and no form even if the AI asks for one.
+        $cashier = $this->tools($this->staff(['sales.index']));
+        $this->assertNotContains('show_fill_in_form', array_map(fn ($tool) => $tool->name(), $cashier->tools()));
+        $this->assertSame('not_allowed', json_decode($cashier->run('show_fill_in_form', ['action' => 'create_product']), true)['error']);
+        $this->assertSame([], $cashier->forms());
+    }
+
+    public function test_a_filled_in_product_form_may_name_the_category(): void
+    {
+        $this->seed(ProductSoldTypeSeeder::class);
+        $ctx = $this->admin();
+        $drinks = Category::factory()->create(['domain' => $ctx['domain']->name_slug, 'name' => 'Drinks']);
+        Category::factory()->create(['domain' => $this->staff([])['domain']->name_slug, 'name' => 'Snacks']);
+
+        $token = $this->propose($ctx, 'create_product', ['name' => 'Coke 1L', 'price' => 65, 'category' => ' drinks ']);
+        $this->confirm($ctx, $token)->assertOk();
+        $this->assertSame($drinks->id, Product::query()->where('name', 'Coke 1L')->value('category_id'));
+
+        // Another business's category is not found, and the AI is told this business's names.
+        $refused = json_decode($this->tools($ctx)->run('propose_create_product', ['name' => 'Chippy', 'price' => 15, 'category' => 'Snacks']), true);
+        $this->assertSame('There is no category "Snacks" in this business. The categories are: Drinks.', $refused['error']);
+    }
+
     public function test_a_product_is_added_only_after_the_user_confirms(): void
     {
         $this->seed(ProductSoldTypeSeeder::class);
@@ -343,8 +461,13 @@ class AppAssistantTest extends TestCase
 
         $token = $this->propose($ctx, 'create_product', ['name' => 'Chickenjoy 2pc', 'price' => 120, 'category_id' => $category->id]);
         $this->assertFalse(Product::query()->where('name', 'Chickenjoy 2pc')->exists(), 'nothing is saved before Confirm');
+        $saved = AssistantConversation::query()
+            ->create(['domain' => $ctx['domain']->name_slug, 'user_id' => $ctx['user']->id, 'title' => 'Add', 'last_message_at' => now()])
+            ->messages()->create(['question' => 'Add it', 'answer' => 'Confirm below.', 'pending_actions' => [['token' => $token, 'title' => 'Add product']]]);
+        app(PendingActions::class)->attachMessage($token, $saved->id);
 
         $this->confirm($ctx, $token)->assertOk()->assertJsonPath('message', 'Added "Chickenjoy 2pc" to Main.');
+        $this->assertSame('done', $saved->fresh()->pending_actions[0]['state'], 'the saved chat shows it was done');
 
         $product = Product::query()->where('domain', $ctx['domain']->name_slug)->where('name', 'Chickenjoy 2pc')->sole();
         $this->assertEquals(120, $product->price);

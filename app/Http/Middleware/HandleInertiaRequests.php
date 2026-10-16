@@ -59,8 +59,16 @@ class HandleInertiaRequests extends Middleware
                 ? Conversation::unreadInboxConversationsForStaffCount()
                 : 0,
             'currentDomain' => $currentDomain,
-            // Paid features this organization has (Finance, AI support); the menu and pages hide what's off.
-            'domainFeatures' => $currentDomain?->features() ?? ['finance' => false, 'ai' => false],
+            // The sidebar and route helpers switch into an organization only on its own pages.
+            'inOrganization' => $this->inOrganization($request),
+            // For the "subscription ends soon" banner and the locked (greyed-out) sidebar, on the organization's pages.
+            'subscriptionStatus' => $currentDomain && $this->inOrganization($request) ? [
+                'locked' => $currentDomain->isLocked(),
+                'ends_at' => $currentDomain->subscription_ends_at?->toDateString(),
+                'ends_in_days' => $currentDomain->subscriptionEndsInDays(),
+            ] : null,
+            // Paid features this organization has (its plan, or given by a super admin); the menu locks what's off.
+            'domainFeatures' => $currentDomain?->features() ?? array_fill_keys(Domain::FEATURES, false),
             'currentLocation' => $this->getCurrentLocation($request),
             'availableLocations' => $this->getAvailableLocations($request),
             'default_store' => $request->user() ? $this->getDefaultStore($request) : null,
@@ -74,8 +82,9 @@ class HandleInertiaRequests extends Middleware
      */
     private function getCurrentDomain(Request $request)
     {
-        // Get domain from route parameter
-        $domain = $request->route('domain');
+        // Get domain from route parameter, only on the organization's own pages (routes/domains.php).
+        // Super admins' Domains pages (/domains/{domain}, /domains/{domain}/edit) only look at an organization.
+        $domain = $this->inOrganization($request) ? $request->route('domain') : null;
         $domainSlug = data_get($domain, 'name_slug') ?? $domain;
 
         if ($domainSlug) {
@@ -89,6 +98,12 @@ class HandleInertiaRequests extends Middleware
         }
 
         return null;
+    }
+
+    /** Whether this is one of an organization's own pages (/domains/{domain}/...), not the Domains admin. */
+    private function inOrganization(Request $request): bool
+    {
+        return str_starts_with(ltrim((string) $request->route()?->getPrefix(), '/'), 'domains/{domain');
     }
 
     /**
