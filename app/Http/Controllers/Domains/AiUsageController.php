@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Domains;
 use App\Http\Controllers\Controller;
 use App\Models\Domain;
 use App\Services\Ai\AiCreditService;
+use App\Support\FreePlan;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -27,7 +28,7 @@ class AiUsageController extends Controller
             'plan' => [
                 'name' => $tier?->name ?? 'Free starter',
                 'is_paid' => (bool) $domain->current_service_tier_id,
-                'plan_credits' => $tier ? $tier->ai_monthly_credits : (int) config('ai_billing.free_monthly_credits', 30),
+                'plan_credits' => $tier ? $tier->ai_monthly_credits : FreePlan::aiCredits(),
                 'plan_unlimited' => $tier !== null && $tier->ai_monthly_credits === null,
             ],
             'aiCredits' => $this->credits->propsForFrontend($domain),

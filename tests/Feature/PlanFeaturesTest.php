@@ -11,6 +11,8 @@ use App\Models\InventoryLocation;
 use App\Models\ServiceTier;
 use App\Models\User;
 use App\Services\Ai\AiCreditService;
+use App\Services\DomainSubscriptionService;
+use App\Support\FreePlan;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -166,6 +168,31 @@ class PlanFeaturesTest extends TestCase
                 ->where('historyLimit', ['days' => 31, 'earliest_date' => '2026-09-16']));
 
         $this->actingAs($user)->getJson($this->url('domains.sales-history.export', $domain))->assertForbidden();
+    }
+
+    public function test_super_admins_change_the_free_plans_limits(): void
+    {
+        $this->travelTo('2026-10-16 10:00:00');
+        ['domain' => $domain, 'user' => $user] = $this->seedOrg();
+        FreePlan::update(['ai_monthly_credits' => 75, 'max_users' => 4, 'history_days' => 60]);
+        $subscriptions = app(DomainSubscriptionService::class);
+
+        $this->assertSame(4, $subscriptions->effectiveMaxUsers($domain));
+        $this->assertSame(75, app(AiCreditService::class)->monthlyAllowance($domain));
+        $this->actingAs($user)
+            ->get($this->url('domains.sales-history.index', $domain).'?start_date=2026-01-01&end_date=2026-10-16')
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('filters.start_date', '2026-08-18')
+                ->where('historyLimit', ['days' => 60, 'earliest_date' => '2026-08-18']));
+
+        // Blank limits are unlimited.
+        FreePlan::update(['max_users' => null, 'history_days' => null]);
+        $this->assertNull($subscriptions->effectiveMaxUsers($domain));
+        $this->actingAs($user)
+            ->get($this->url('domains.sales-history.index', $domain).'?start_date=2026-01-01&end_date=2026-10-16')
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('filters.start_date', '2026-01-01')
+                ->where('historyLimit', null));
     }
 
     public function test_a_plan_with_full_history_is_not_cut_off(): void

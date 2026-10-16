@@ -278,7 +278,7 @@ const summaryCards = computed(() => {
                 />
                 <FilterDropdown v-model="filters" :filters="filtersConfig" />
                 <a
-                    v-if="!historyLimit && hasPermission('sales-history.export')"
+                    v-if="!historyLimit && $page.props.domainFeatures?.sales_history_unlimited && hasPermission('sales-history.export')"
                     :href="exportUrl"
                     data-testid="sales-history-export"
                 >

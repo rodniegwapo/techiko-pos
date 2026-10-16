@@ -185,7 +185,11 @@ test.describe("plans", () => {
                 expect(subscription.is_paid).toBe(plan !== "free");
                 if (plan === "free") {
                     await expect(page.getByText("Current plan").first()).toBeVisible();
-                    await expect(page.getByText("2 users · 1 location")).toBeVisible();
+                    // The Free plan's limits are set on the Plans page (seeded orgs: 2 users, 1 location).
+                    const users = (await pageProps(page)).freeTier?.user_limit;
+                    if (users != null) {
+                        await expect(page.getByText(`${users} users · 1 location`)).toBeVisible();
+                    }
                 } else {
                     expect(subscription.tier_name.toLowerCase()).toContain(plan);
                 }
@@ -225,11 +229,17 @@ test.describe("plans", () => {
             return res;
         };
 
-        test("the free plan stops at 2 users", async ({ serverAs }) => {
+        test("the free plan stops at its user limit", async ({ serverAs }) => {
             const api = await serverAs("plan-free");
+            // Set on the Plans page (2 unless a super admin changed it); the seeded org has 2 users.
+            const limit = (await responseProps(await api.get(`${base("free")}/billing/servicing`))).freeTier?.user_limit;
+            test.skip(limit == null, "The Free plan has no user limit");
+            for (let n = 3; n <= limit; n++) {
+                expect((await addCashier(api, "free")).status, `user ${n}`).toBe(201);
+            }
             const res = await addCashier(api, "free");
             expect(res.status).toBe(422);
-            expect(res.body.errors.plan[0]).toContain("2 users");
+            expect(res.body.errors.plan[0]).toContain(`${limit} users`);
         });
 
         test("basic allows up to 5 users", async ({ serverAs }) => {
@@ -251,5 +261,37 @@ test.describe("plans", () => {
                 expect(res.status, `user ${n}`).toBe(201);
             }
         });
+    });
+});
+
+/** The super admins' Plans page: the Free plan first, then the plans, with search and filters. */
+test.describe("plans page", () => {
+    test.use({ account: "super" });
+
+    const rowNames = (page) => page.locator('[data-testid="plans-table"] tbody tr.ant-table-row td:first-child .font-medium');
+
+    test("lists the Free plan first and filters the plans", async ({ page }) => {
+        await page.goto("/plans");
+        await expect(rowNames(page).first()).toHaveText("Free");
+        await expect(page.getByTestId("free-plan-row")).toBeVisible();
+
+        await page.getByPlaceholder("Search plans by name").fill("prem");
+        await expect(rowNames(page)).toHaveCount(1);
+        await expect(rowNames(page).first()).toContainText("Premium");
+
+        // Free is never off, so the Off filter leaves it out.
+        await page.goto("/plans?status=off");
+        await expect(page.getByTestId("free-plan-row")).toHaveCount(0);
+        const rows = await rowNames(page).count();
+        await expect(page.locator('[data-testid="plans-table"] .ant-tag', { hasText: /^Off$/ })).toHaveCount(rows);
+    });
+
+    test("the Free plan opens its own form", async ({ page }) => {
+        await page.goto("/plans");
+        await page.getByRole("button", { name: "Edit Free plan" }).click();
+        const form = page.getByTestId("free-plan-form");
+        await expect(form).toBeVisible();
+        await expect(form.getByPlaceholder("Unlimited").last()).toHaveValue(/\d+/);
+        await expect(form.getByText("Includes", { exact: true })).toHaveCount(0);
     });
 });

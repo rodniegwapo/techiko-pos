@@ -307,6 +307,8 @@ Route::middleware(['auth', 'verified', 'check.super.user'])->group(function () {
     // Plans organizations subscribe to: prices, AI credits and limits
     Route::get('/plans', [ServiceTierController::class, 'index'])->name('service-tiers.index');
     Route::post('/plans', [ServiceTierController::class, 'store'])->name('service-tiers.store');
+    // The Free plan isn't a service tier (free organizations have none); its limits are an app setting.
+    Route::put('/plans/free', [ServiceTierController::class, 'updateFree'])->name('service-tiers.free.update');
     Route::put('/plans/{serviceTier}', [ServiceTierController::class, 'update'])->name('service-tiers.update');
 
     Route::get('/mail/test', [MailTestController::class, 'create'])->name('mail.test');

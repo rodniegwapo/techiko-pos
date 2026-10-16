@@ -9,6 +9,7 @@ use App\Models\ServiceTier;
 use App\Models\SubscriptionPayment;
 use App\Models\User;
 use App\Services\SubscriptionPaymentService;
+use App\Support\FreePlan;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -126,7 +127,62 @@ class ServiceTierAdminTest extends TestCase
         $this->actingAs($staff)->get(route('service-tiers.index'))->assertRedirect();
         $this->actingAs($staff)->post(route('service-tiers.store'), $this->plan())->assertRedirect();
         $this->actingAs($staff)->put(route('service-tiers.update', $tier), $this->plan())->assertRedirect();
+        $this->actingAs($staff)->put(route('service-tiers.free.update'), ['ai_monthly_credits' => 999])->assertRedirect();
         $this->assertEquals(999, $tier->fresh()->amount);
         $this->assertSame(1, ServiceTier::query()->count());
+        $this->assertSame(FreePlan::defaults(), FreePlan::all());
+    }
+
+    public function test_plans_are_filtered_by_name_status_and_billing(): void
+    {
+        $standard = $this->tier(['name' => 'Standard servicing']);
+        $premium = $this->tier(['name' => 'Premium servicing', 'slug' => 'premium-x', 'shown_on_billing' => false, 'sort_order' => 3]);
+        $old = $this->tier(['name' => 'Old servicing', 'slug' => 'old-x', 'is_active' => false, 'sort_order' => 4]);
+        $admin = $this->superAdmin();
+        $ids = fn (array $query) => collect($this->actingAs($admin)->get(route('service-tiers.index', $query))
+            ->viewData('page')['props']['tiers'])->pluck('id')->all();
+        $freeShown = fn (array $query) => $this->actingAs($admin)->get(route('service-tiers.index', $query))
+            ->viewData('page')['props']['freePlan']['matches_filters'];
+
+        $this->assertSame([$standard->id, $premium->id, $old->id], $ids([]));
+        $this->assertSame([$premium->id], $ids(['search' => 'prem']));
+        $this->assertSame([$old->id], $ids(['status' => 'off']));
+        $this->assertSame([$standard->id, $premium->id], $ids(['status' => 'active']));
+        $this->assertSame([$premium->id], $ids(['billing' => 'hidden']));
+        $this->assertSame([], $ids(['search' => 'free']));
+
+        // Free is always on and on the billing page, and found by its name.
+        $this->assertTrue($freeShown([]));
+        $this->assertTrue($freeShown(['search' => 'fre', 'status' => 'active', 'billing' => 'shown']));
+        $this->assertFalse($freeShown(['status' => 'off']));
+        $this->assertFalse($freeShown(['billing' => 'hidden']));
+        $this->assertFalse($freeShown(['search' => 'prem']));
+
+        $this->actingAs($admin)->get(route('service-tiers.index', ['status' => 'maybe']))->assertSessionHasErrors('status');
+    }
+
+    public function test_the_free_plan_is_listed_with_its_organizations_and_saved(): void
+    {
+        $tier = $this->tier();
+        Domain::query()->create(['name' => 'On Plan', 'name_slug' => 'on-plan-'.Str::lower(Str::random(6)), 'current_service_tier_id' => $tier->id]);
+        Domain::query()->create(['name' => 'No Plan', 'name_slug' => 'no-plan-'.Str::lower(Str::random(6))]);
+        $admin = $this->superAdmin();
+
+        $this->actingAs($admin)->get(route('service-tiers.index'))->assertInertia(fn (Assert $page) => $page
+            ->where('freePlan.organizations', 1)
+            ->where('freePlan.max_users', 2)
+            ->where('freePlan.history_days', 31)
+            ->where('tiers.0.history_days', 31)
+            ->etc());
+
+        $this->actingAs($admin)
+            ->put(route('service-tiers.free.update'), ['ai_monthly_credits' => 50, 'max_users' => 3, 'max_products' => null, 'history_days' => null])
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('success');
+        $this->assertSame(['ai_monthly_credits' => 50, 'max_users' => 3, 'max_products' => null, 'history_days' => null], FreePlan::all());
+
+        $this->actingAs($admin)->put(route('service-tiers.free.update'), ['ai_monthly_credits' => null, 'max_users' => 0, 'history_days' => 4000])
+            ->assertSessionHasErrors(['ai_monthly_credits', 'max_users', 'history_days']);
+        $this->assertSame(50, FreePlan::aiCredits(), 'a rejected save changes nothing');
     }
 }

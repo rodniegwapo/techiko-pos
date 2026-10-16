@@ -7,13 +7,14 @@ use App\Models\AiUsage;
 use App\Models\Domain;
 use App\Models\ServiceTier;
 use App\Models\User;
+use App\Support\FreePlan;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Laravel\Ai\Responses\TextResponse;
 
 /**
  * Monthly AI credits per organization: the pool comes from its service tier (free organizations get
- * ai_billing.free_monthly_credits), every user draws from it, and it resets on the 1st. What was
+ * App\Support\FreePlan::aiCredits()), every user draws from it, and it resets on the 1st. What was
  * used is the sum of ai_usages this month, so there is no counter to drift.
  */
 class AiCreditService
@@ -29,7 +30,7 @@ class AiCreditService
         $tier = $domain->currentServiceTier;
 
         if (! $domain->current_service_tier_id || ! $tier) {
-            return (int) config('ai_billing.free_monthly_credits', 30);
+            return FreePlan::aiCredits();
         }
 
         return $tier->ai_monthly_credits;
@@ -260,7 +261,7 @@ class AiCreditService
             'resets_on' => now()->addMonthNoOverflow()->startOfMonth()->toDateString(),
             'by_feature' => $byFeature,
             'credits_per_feature' => config('ai_billing.credits', []),
-            'free_allowance' => (int) config('ai_billing.free_monthly_credits', 30),
+            'free_allowance' => FreePlan::aiCredits(),
             'source' => $this->allowanceSource($domain),
         ];
     }

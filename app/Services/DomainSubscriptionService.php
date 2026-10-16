@@ -7,10 +7,12 @@ use App\Models\InventoryLocation;
 use App\Models\Product\Product;
 use App\Models\ServiceTier;
 use App\Models\User;
+use App\Support\FreePlan;
 use Illuminate\Validation\ValidationException;
 
 class DomainSubscriptionService
 {
+    /** Defaults for the Free plan, until super admins change it on the Plans page (App\Support\FreePlan). */
     public const FREE_TIER_MAX_PRODUCTS = 10;
 
     /** Users on the free plan (only while plans are enforced, see config features.plan_gating). */
@@ -26,7 +28,7 @@ class DomainSubscriptionService
         $tier = $domain->currentServiceTier;
 
         if (! $domain->current_service_tier_id || ! $tier) {
-            return self::FREE_TIER_MAX_PRODUCTS;
+            return FreePlan::maxProducts();
         }
 
         return $tier->max_products;
@@ -38,7 +40,7 @@ class DomainSubscriptionService
         $tier = $domain->currentServiceTier;
 
         if (! $domain->current_service_tier_id || ! $tier) {
-            return config('features.plan_gating', false) ? self::FREE_TIER_MAX_USERS : null;
+            return config('features.plan_gating', false) ? FreePlan::maxUsers() : null;
         }
 
         return $tier->max_users;
@@ -134,7 +136,7 @@ class DomainSubscriptionService
             'user_count' => $userCount,
             'max_users' => $maxUsers,
             'users_at_capacity' => $maxUsers !== null && $userCount >= $maxUsers,
-            'free_product_limit' => self::FREE_TIER_MAX_PRODUCTS,
+            'free_product_limit' => FreePlan::maxProducts(),
         ];
     }
 

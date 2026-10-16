@@ -7,7 +7,7 @@
 */
 
 return [
-    // Organizations without a paid tier.
+    // Organizations without a paid tier, until super admins change it on the Plans page (App\Support\FreePlan).
     'free_monthly_credits' => (int) env('AI_FREE_MONTHLY_CREDITS', 30),
 
     // Credits charged per successful AI answer, by feature.

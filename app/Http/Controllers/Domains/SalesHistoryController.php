@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Models\VoidLog;
 use App\Services\Sales\SalesHistoryQuery;
 use App\Services\SaleService;
+use App\Support\FreePlan;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -73,7 +74,7 @@ class SalesHistoryController extends Controller
             'restrictedToOwnSales' => ! $this->canSeeAllSales($request->user()),
             // Set when the plan only keeps recent history: the date picker stops there and the CSV export is off.
             'historyLimit' => ($earliest = $this->earliestAllowedDate($domain)) ? [
-                'days' => Domain::FREE_SALES_HISTORY_DAYS,
+                'days' => FreePlan::historyDays(),
                 'earliest_date' => $earliest->toDateString(),
             ] : null,
             'domainName' => $domain->name,
@@ -334,7 +335,7 @@ class SalesHistoryController extends Controller
         $start = Carbon::parse($validated['start_date'] ?? now()->toDateString())->startOfDay();
         $end = Carbon::parse($validated['end_date'] ?? $start->toDateString())->endOfDay();
 
-        // Without unlimited history, the plan only looks back Domain::FREE_SALES_HISTORY_DAYS days (today included).
+        // Without unlimited history, the plan only looks back FreePlan::historyDays() days (today included).
         if ($earliest = $this->earliestAllowedDate($domain)) {
             $start = $start->max($earliest);
             $end = $end->max($earliest->copy()->endOfDay());
@@ -368,9 +369,11 @@ class SalesHistoryController extends Controller
 
     private function earliestAllowedDate(Domain $domain): ?Carbon
     {
-        return $domain->hasFeature('sales_history_unlimited')
+        $days = FreePlan::historyDays();
+
+        return $days === null || $domain->hasFeature('sales_history_unlimited')
             ? null
-            : now()->subDays(Domain::FREE_SALES_HISTORY_DAYS - 1)->startOfDay();
+            : now()->subDays($days - 1)->startOfDay();
     }
 
     private function baseQuery(Domain $domain, array $filters): Builder

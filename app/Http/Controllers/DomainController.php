@@ -9,6 +9,7 @@ use App\Services\Ai\AiCreditService;
 use App\Services\DomainService;
 use App\Services\DomainSubscriptionService;
 use App\Services\SubscriptionPaymentService;
+use App\Support\FreePlan;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
@@ -85,7 +86,7 @@ class DomainController extends Controller
                 'next_payment' => $this->payments->nextPayment($domain),
                 'payments' => $this->payments->history($domain),
                 'ai_monthly_credits_override' => $domain->ai_monthly_credits_override,
-                'free_credits' => (int) config('ai_billing.free_monthly_credits', 30),
+                'free_credits' => FreePlan::aiCredits(),
                 'ai_credits' => $this->aiCredits->propsForFrontend($domain),
                 'ai_cost_this_month_usd' => $this->aiCredits->costThisMonth($domain),
                 'ai_usage_url' => route('domains.ai-usage.index', ['domain' => $domain->name_slug]),

@@ -9,6 +9,7 @@ use App\Models\ServiceTier;
 use App\Services\Ai\AiCreditService;
 use App\Services\DomainSubscriptionService;
 use App\Services\SubscriptionPaymentService;
+use App\Support\FreePlan;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -62,11 +63,11 @@ class ManualBillingController extends Controller
                 'marketing_features' => config('manual_billing.free_tier_marketing_bullets', []),
                 'product_limit' => config('features.unlimited_products', true)
                     ? null
-                    : DomainSubscriptionService::FREE_TIER_MAX_PRODUCTS,
+                    : FreePlan::maxProducts(),
                 // The free plan's other limits, only while plans are enforced (config features.plan_gating).
-                'user_limit' => $planGating ? DomainSubscriptionService::FREE_TIER_MAX_USERS : null,
+                'user_limit' => $planGating ? FreePlan::maxUsers() : null,
                 'location_limit' => $planGating ? 1 : null,
-                'history_days' => $planGating ? Domain::FREE_SALES_HISTORY_DAYS : null,
+                'history_days' => $planGating ? FreePlan::historyDays() : null,
             ],
         ]);
     }
