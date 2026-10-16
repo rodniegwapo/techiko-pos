@@ -410,7 +410,7 @@ const menuItems = [
     },
     {
         key: "billing-servicing",
-        title: "Servicing payment",
+        title: "Billing",
         icon: IconWallet,
         routeName: "billing.servicing.index",
         path: "/billing/servicing",

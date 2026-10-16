@@ -5,7 +5,7 @@ import dayjs from "dayjs";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 
 /**
- * Reminds the people who handle the plan (those who can open Servicing payment) that the
+ * Reminds the people who handle the plan (those who can open Billing) that the
  * subscription ends within 7 days or has ended. Nothing locks by itself; a super admin does that.
  */
 const page = usePage();

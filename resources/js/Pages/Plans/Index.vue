@@ -23,8 +23,6 @@ const props = defineProps({
     /** The Free plan's limits, its organizations and whether the filters keep it. */
     freePlan: { type: Object, default: null },
     filters: { type: Object, default: () => ({}) },
-    /** The plan whose static QR (on the Servicing page) has its amount built in. */
-    basicSlug: { type: String, default: "basic" },
     /** What a plan can include: [{ value, label }]. */
     featureOptions: { type: Array, default: () => [] },
     /** When false, organizations still get every feature except Finance, whatever their plan. */
@@ -156,7 +154,6 @@ const openEdit = (tier) =>
     });
 
 const priceChanged = computed(() => form.editing && Number(form.editing.amount) !== Number(form.data.amount));
-const isBasic = computed(() => form.editing?.slug === props.basicSlug);
 const okProps = computed(() => ({ disabled: !form.data.name.trim() }));
 
 const save = () => {
@@ -370,12 +367,6 @@ const saveFree = () => {
                     type="info"
                     show-icon
                     :message="`Organizations on this plan (${form.editing.organizations}) pay ${peso(form.data.amount)} from their next payment. Payments already recorded keep their amounts.`"
-                />
-                <a-alert
-                    v-if="isBasic && priceChanged"
-                    type="warning"
-                    show-icon
-                    message="Basic's static QR on the Servicing page has its amount built in. Replace that QR image if you change this price."
                 />
             </div>
         </a-modal>

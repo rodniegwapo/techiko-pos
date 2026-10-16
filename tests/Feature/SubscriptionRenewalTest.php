@@ -112,6 +112,66 @@ class SubscriptionRenewalTest extends TestCase
         $this->assertTrue($payment->needsConfirmation());
     }
 
+    private function plan(string $slug, string $amount, int $order): ServiceTier
+    {
+        return ServiceTier::query()->create([
+            'slug' => $slug.'-'.Str::lower(Str::random(4)), 'name' => Str::title($slug).' servicing', 'amount' => $amount,
+            'sort_order' => $order, 'is_active' => true, 'shown_on_billing' => true,
+        ]);
+    }
+
+    public function test_the_billing_page_shows_the_current_plan_and_which_plans_are_upgrades(): void
+    {
+        $basic = $this->plan('basic', '499.00', 1);
+        $standard = $this->plan('standard', '999.00', 2);
+        $domain = $this->domain(['current_service_tier_id' => $basic->id, 'subscription_ends_at' => '2026-11-15']);
+        $admin = $this->member($domain);
+        $relation = fn ($page, ServiceTier $tier) => collect($page->toArray()['props']['tiers'])->firstWhere('id', $tier->id)['relation'];
+
+        $this->actingAs($admin)->get(route('domains.billing.servicing.index', $domain))
+            ->assertOk()
+            ->assertInertia(function (Assert $page) use ($basic, $standard, $relation) {
+                $page->component('Billing/Gcash')
+                    ->where('currentTier.id', $basic->id)
+                    ->where('canPay', true)
+                    ->where('paymentsReady', true)
+                    ->where('subscription.location_count', 0)
+                    ->has('subscription.max_locations')
+                    ->etc();
+                $this->assertSame('current', $relation($page, $basic));
+                $this->assertSame('upgrade', $relation($page, $standard));
+            });
+
+        // On Free, every paid plan is an upgrade; without a PayMongo key, online payment isn't offered.
+        config(['paymongo.secret_key' => '']);
+        $free = $this->domain();
+        $this->actingAs($this->member($free))->get(route('domains.billing.servicing.index', $free))
+            ->assertInertia(function (Assert $page) use ($basic, $relation) {
+                $page->where('currentTier', null)->where('paymentsReady', false)->etc();
+                $this->assertSame('upgrade', $relation($page, $basic));
+            });
+    }
+
+    public function test_upgrading_pays_with_a_qr_and_switches_the_plan_once_paid(): void
+    {
+        $basic = $this->plan('basic', '499.00', 1);
+        $standard = $this->plan('standard', '999.00', 2);
+        $domain = $this->domain(['current_service_tier_id' => $basic->id, 'subscription_ends_at' => '2026-11-15']);
+        $admin = $this->member($domain);
+        $this->paymongoMakesAQr('pi_upgrade_1');
+
+        $this->start($admin, $domain, $standard, 1)->assertOk()->assertJsonPath('amount', 999)->assertJsonPath('tier_name', 'Standard servicing');
+        $this->assertSame($basic->id, $domain->fresh()->current_service_tier_id, 'nothing changes until it is paid');
+
+        $this->paymongo->shouldReceive('get')->with('payment_intents/pi_upgrade_1')->once()->andReturn(['data' => ['attributes' => ['status' => 'succeeded', 'amount' => 99900]]]);
+        $this->actingAs($admin)->getJson(route('domains.renew.status', [$domain, 'payment_intent_id' => 'pi_upgrade_1']))
+            ->assertOk()
+            ->assertJsonPath('paid', true)
+            ->assertJsonPath('next_due_on', '2026-12-15');
+
+        $this->assertSame($standard->id, $domain->fresh()->current_service_tier_id);
+    }
+
     public function test_the_webhook_also_unlocks(): void
     {
         $domain = $this->domain(['locked_at' => now()]);

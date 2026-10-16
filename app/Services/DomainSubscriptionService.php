@@ -136,6 +136,10 @@ class DomainSubscriptionService
             'user_count' => $userCount,
             'max_users' => $maxUsers,
             'users_at_capacity' => $maxUsers !== null && $userCount >= $maxUsers,
+            'location_count' => $this->locationCount($domain->name_slug),
+            'max_locations' => $this->effectiveMaxLocations($domain),
+            // Days of sales history the plan shows (null: all of it), as on the Sales history page.
+            'history_days' => $domain->hasFeature('sales_history_unlimited') ? null : FreePlan::historyDays(),
             'free_product_limit' => FreePlan::maxProducts(),
         ];
     }

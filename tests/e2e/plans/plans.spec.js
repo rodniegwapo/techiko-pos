@@ -193,9 +193,52 @@ test.describe("plans", () => {
                 } else {
                     expect(subscription.tier_name.toLowerCase()).toContain(plan);
                 }
+
+                // Billing: the current plan up top, and Upgrade only on plans above it.
+                await expect(page).toHaveTitle(/Billing/);
+                await expect(page.getByTestId("current-plan-name")).toContainText(plan === "free" ? "Free" : plan, { ignoreCase: true });
+                await expect(page.getByTestId("plan-usage")).toContainText("Users");
+                const props = await pageProps(page);
+                for (const tier of props.tiers) {
+                    const upgrade = page.getByTestId(`upgrade-${tier.slug}`);
+                    await expect(upgrade, `${tier.slug} on ${plan}`).toHaveCount(tier.relation === "upgrade" ? 1 : 0);
+                }
+                if (plan === "premium") {
+                    await expect(page.locator('[data-testid^="upgrade-"]')).toHaveCount(0);
+                }
+                // The static QR Ph image is gone.
+                await expect(page.getByAltText("QR Ph merchant code")).toHaveCount(0);
             });
         });
     }
+
+    test.describe("upgrading", () => {
+        test.use({ account: "plan-free" });
+
+        test("Upgrade opens the payment with that plan chosen", async ({ page }) => {
+            await page.goto(`${base("free")}/billing/servicing`);
+            const props = await pageProps(page);
+            const target = props.tiers.find((tier) => tier.relation === "upgrade");
+            test.skip(!target || !props.paymentsReady, "No plan to upgrade to, or online payment isn't set up");
+
+            await page.getByTestId(`upgrade-${target.slug}`).click();
+            const choose = page.getByTestId("pay-choose");
+            await expect(choose).toBeVisible();
+            await expect(page.locator(".ant-modal-title")).toHaveText(`Upgrade to ${target.name}`);
+            await expect(page.getByTestId(`pay-tier-${target.id}`)).toHaveClass(/border-blue-500/);
+            await expect(page.getByTestId("pay-total")).toContainText(Number(target.amount).toLocaleString("en-PH", { minimumFractionDigits: 2 }));
+            await expect(page.getByTestId("pay-note")).toContainText("starts right away");
+            // Not asking PayMongo for a real QR code here.
+        });
+
+        test("Contact us opens the chat with the team, with a message ready", async ({ page }) => {
+            await page.goto(`${base("free")}/billing/servicing`);
+            await page.getByTestId("contact-team").click();
+            const drawer = page.locator(".ant-drawer-content");
+            await expect(drawer).toBeVisible();
+            await expect(drawer.locator("textarea")).toHaveValue("I have a question about my plan (Free).");
+        });
+    });
 
     test.describe("free plan clicks", () => {
         test.use({ account: "plan-free" });

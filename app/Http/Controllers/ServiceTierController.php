@@ -81,7 +81,6 @@ class ServiceTierController extends Controller
                 'sort_order' => $tier->sort_order,
                 'organizations' => (int) ($organizations[$tier->id] ?? 0),
             ]),
-            'basicSlug' => strtolower((string) config('manual_billing.servicing_basic_tier_slug')),
             'featureOptions' => collect(self::FEATURE_LABELS)->map(fn ($label, $key) => ['value' => $key, 'label' => $label])->values(),
             'planGating' => (bool) config('features.plan_gating', false),
             // Product limits only count while config features.unlimited_products is off.

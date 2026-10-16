@@ -16,7 +16,7 @@ use Illuminate\Validation\Rule;
 /**
  * "Pay now" on the subscription on hold page: a PayMongo QR Ph code for the chosen plan and months.
  * Once PayMongo says it's paid, the organization unlocks (a super admin confirms the money later).
- * Open while locked, so only the organization's admins and managers (who can see Servicing payment) may use it.
+ * Open while locked, so only the organization's admins and managers (who can see Billing) may use it.
  */
 class SubscriptionRenewalController extends Controller
 {

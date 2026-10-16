@@ -3,7 +3,7 @@
 return [
     /*
     |--------------------------------------------------------------------------
-    | Domain sidebar: Servicing payment (/domains/{slug}/billing/servicing)
+    | Domain sidebar: Billing (/domains/{slug}/billing/servicing)
     |--------------------------------------------------------------------------
     | When false, the menu entry is hidden; routes and pages stay registered.
     */
