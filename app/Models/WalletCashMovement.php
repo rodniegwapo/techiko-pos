@@ -27,6 +27,12 @@ class WalletCashMovement extends Model
      * in cash, other income put in the drawer). They can't be added or picked by hand in the
      * ledger; the record they belong to points at them through wallet_cash_movement_id.
      */
+    /** Written only when a sale is completed with a cash/e-wallet payment. */
+    public const KIND_SALE_PAYMENT = 'sale_payment';
+
+    /** Written only when a sale with a posted sale_payment movement is voided. */
+    public const KIND_SALE_VOID = 'sale_void';
+
     public const SYSTEM_KINDS = [
         self::KIND_EXPENSE,
         'supplier_payment',
@@ -35,6 +41,8 @@ class WalletCashMovement extends Model
         'loan_payment',
         'asset_purchase',
         'owner_investment',
+        self::KIND_SALE_PAYMENT,
+        self::KIND_SALE_VOID,
     ];
 
     protected $casts = [

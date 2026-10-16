@@ -4,6 +4,7 @@ import ApplyOrderDiscountModal from "./ApplyOrderDiscountModal.vue";
 import CardPaymentTypeModal from "./CardPaymentTypeModal.vue";
 import LoyaltyRedemptionModal from "./LoyaltyRedemptionModal.vue";
 import SplitPaymentPanel from "./SplitPaymentPanel.vue";
+import StartShiftModal from "./StartShiftModal.vue";
 import {
     firstSplitPartnerMethod,
     newSplitRow,
@@ -22,7 +23,7 @@ import { Modal, notification } from "ant-design-vue";
 import { DownOutlined } from "@ant-design/icons-vue";
 import { ExclamationCircleOutlined } from "@ant-design/icons-vue";
 import axios from "axios";
-import { usePage } from "@inertiajs/vue3";
+import { usePage, router } from "@inertiajs/vue3";
 
 const { formData, errors } = useGlobalVariables();
 const { getRoute } = useDomainRoutes();
@@ -364,6 +365,7 @@ const customerChange = computed(() => {
 });
 
 const proceedPaymentLoading = ref(false);
+const shiftModalOpen = ref(false);
 
 const cardTypeModalOpen = ref(false);
 const selectedPaymentCardTypeId = ref(null);
@@ -645,6 +647,18 @@ const handleProceedPayment = async () => {
             return;
         }
 
+        const shiftMessage = error.response?.data?.errors?.shift;
+        if (shiftMessage) {
+            notification.warning({
+                message: "Shift required",
+                description: Array.isArray(shiftMessage)
+                    ? shiftMessage[0]
+                    : shiftMessage,
+            });
+            shiftModalOpen.value = true;
+            return;
+        }
+
         const errorMessage =
             error.response?.data?.message ||
             error.message ||
@@ -658,6 +672,12 @@ const handleProceedPayment = async () => {
         proceedPaymentLoading.value = false;
     }
 };
+
+/** The shift was opened from the "no shift open" modal raised by a failed payment: resubmit it. */
+async function onShiftStarted() {
+    router.reload({ only: ["shiftStatus"] });
+    await handleProceedPayment();
+}
 
 const disabledPaymentButtonColor = computed(() => {
     if (paymentMethod.value === "credit") {
@@ -1205,6 +1225,11 @@ defineExpose({
                 :patching="loyaltyPatching"
                 @close="loyaltyRedemptionModalOpen = false"
                 @apply="onLoyaltyModalApply"
+            />
+
+            <StartShiftModal
+                v-model:visible="shiftModalOpen"
+                @started="onShiftStarted"
             />
         </div>
     </div>

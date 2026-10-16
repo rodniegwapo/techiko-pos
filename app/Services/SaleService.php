@@ -15,6 +15,7 @@ use App\Models\StockAdjustment;
 use App\Models\User;
 use App\Models\UserPin;
 use App\Models\VoidLog;
+use App\Services\Wallet\SalePaymentWalletPosting;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -211,6 +212,8 @@ class SaleService
                 'void_approved_by' => $approvedBy,
                 'void_reason' => $reason,
             ]);
+
+            app(SalePaymentWalletPosting::class)->reverseForVoidedSale($sale, $currentUser);
 
             return $sale;
         });

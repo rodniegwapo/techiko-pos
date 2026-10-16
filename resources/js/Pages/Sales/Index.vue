@@ -54,12 +54,13 @@ import {
 } from "@ant-design/icons-vue";
 import { message } from "ant-design-vue";
 
-import { usePage, Head, Link } from "@inertiajs/vue3";
+import { usePage, Head, Link, router } from "@inertiajs/vue3";
 import { useFilters, toLabel } from "@/Composables/useFilters";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { notifyInsufficientStock } from "@/Composables/useCartStockNotification";
 import { hasModifiers } from "@/Composables/useProductModifiers";
 import ModifierPickerModal from "./components/ModifierPickerModal.vue";
+import StartShiftModal from "./components/StartShiftModal.vue";
 
 const page = usePage();
 const { getRoute, getLocationQueryFromPage } = useDomainRoutes();
@@ -167,6 +168,9 @@ const loyaltyRedemptionSettings = computed(
 );
 const activeLocationId = computed(() => page.props.currentLocation?.id);
 const cashierUserId = computed(() => page.props.auth?.user?.data?.id);
+
+const shiftIsOpen = computed(() => page.props.shiftStatus?.is_open ?? true);
+const shiftBannerModalOpen = ref(false);
 
 const offlinePaymentMethod = ref("cash");
 const offlinePaymentCardTypeId = ref(null);
@@ -1548,6 +1552,30 @@ watch(
                 'sales-coffeeshop--viewport': isCoffeeshopLayout,
             }"
         >
+            <a-alert
+                v-if="salesCartIsOnline && !shiftIsOpen"
+                type="warning"
+                show-icon
+                banner
+                class="shrink-0"
+            >
+                <template #message>
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <span>
+                            No shift is open for this location today. Start
+                            the shift before taking payments.
+                        </span>
+                        <a-button
+                            type="primary"
+                            size="small"
+                            @click="shiftBannerModalOpen = true"
+                        >
+                            Start shift
+                        </a-button>
+                    </div>
+                </template>
+            </a-alert>
+
             <!-- Room on the right for the pinned store switcher -->
             <ContentHeader
                 v-if="!isCoffeeshopLayout"
@@ -2165,6 +2193,11 @@ watch(
             v-model:open="pickerOpen"
             :product="pickerProduct"
             @confirm="(line) => addToCart(pickerProduct, { line })"
+        />
+
+        <StartShiftModal
+            v-model:visible="shiftBannerModalOpen"
+            @started="() => router.reload({ only: ['shiftStatus'] })"
         />
     </AuthenticatedLayout>
 </template>

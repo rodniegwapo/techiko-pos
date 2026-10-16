@@ -34,9 +34,12 @@ final class WalletCashDailyExpected
             ->whereDate('transaction_date', $businessDate);
 
         // Mirror physical ledger: exclude book-only AUTO_CC_* except end-shift cashout (cash leaves drawer).
+        // Sale payment/void movements are excluded too: paid_cash_sales already counts them straight
+        // from Sale/SalePayment, and e-wallet sale movements aren't physical cash in the drawer at all.
         $movementBase = WalletCashMovement::query()
             ->forWalletContext($domainSlug, $locationId)
             ->whereDate('movement_date', $businessDate)
+            ->whereNotIn('kind', [WalletCashMovement::KIND_SALE_PAYMENT, WalletCashMovement::KIND_SALE_VOID])
             ->where(function ($q) {
                 $q->whereNull('notes')
                     ->orWhere('notes', WalletCashBridgeExpected::NOTE_ENDSHIFT_CASHOUT)

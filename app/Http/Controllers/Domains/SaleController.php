@@ -26,6 +26,8 @@ use App\Services\InventoryService;
 use App\Services\LoyaltyRedemptionService;
 use App\Services\ProductModifierService;
 use App\Services\SaleService;
+use App\Services\Wallet\SalePaymentWalletPosting;
+use App\Support\Wallet\WalletShiftGuard;
 use App\Traits\LocationCategoryScoping;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
@@ -71,12 +73,17 @@ class SaleController extends Controller
     {
         $location = Helpers::getActiveLocation($domain);
         $vat = $domain->salesVatSettings();
+        $businessDate = now()->toDateString();
 
         return Inertia::render('Sales/Index', [
             'domain' => $domain,
             'categories' => $location
                 ? $this->getCategoriesForLocation($domain->name_slug, $location)->get()
                 : Category::where('domain', $domain->name_slug)->get(),
+            'shiftStatus' => $location ? [
+                'is_open' => WalletShiftGuard::isOpenForSale($domain->name_slug, (int) $location->id, $businessDate),
+                'business_date' => $businessDate,
+            ] : null,
             'salesSettings' => [
                 'apply_vat_automatically' => $vat['apply_vat_automatically'],
                 'vat_rate_percent' => $vat['vat_rate_percent'],
@@ -300,6 +307,10 @@ class SaleController extends Controller
         $location = Helpers::getActiveLocation($domain);
         $isSplit = $validated['payment_method'] === 'split';
 
+        if ($location) {
+            WalletShiftGuard::ensureShiftOpenForSale($domain->name_slug, (int) $location->id, now()->toDateString());
+        }
+
         // Card, e-wallet and bank payments name the channel used (terminal, GCash, BDO…) at this store.
         if ($isSplit) {
             $validated['payments'] = $this->validatedSplitPayments(
@@ -422,6 +433,7 @@ class SaleController extends Controller
                         'payment_status' => 'paid',
                     ]);
                     $sale->payments()->createMany($splitParts);
+                    app(SalePaymentWalletPosting::class)->postForCompletedSale($sale);
 
                     if ($customer) {
                         $sale->updateCustomer($customer->id);
@@ -466,6 +478,7 @@ class SaleController extends Controller
                         'location_id' => $location->id,
                         'payment_status' => 'paid',
                     ]);
+                    app(SalePaymentWalletPosting::class)->postForCompletedSale($sale);
 
                     // 5. Process loyalty if customer is provided (earn points on net amount paid)
                     if ($validated['customer_id']) {
@@ -1716,6 +1729,18 @@ class SaleController extends Controller
                 ]);
                 if ($splitParts !== []) {
                     $sale->payments()->createMany($splitParts);
+                }
+
+                // Backdated to a day whose shift is already closed: still finalize the sale (it already
+                // happened in the real world) but don't let the ledger posting abort the whole sync.
+                try {
+                    app(SalePaymentWalletPosting::class)->postForCompletedSale($sale);
+                } catch (ValidationException $e) {
+                    \Log::warning('Offline sale synced without a wallet posting (shift closed for its date).', [
+                        'sale_id' => $sale->id,
+                        'invoice_number' => $sale->invoice_number,
+                        'message' => collect($e->errors())->flatten()->first(),
+                    ]);
                 }
 
                 OfflineSaleSync::query()

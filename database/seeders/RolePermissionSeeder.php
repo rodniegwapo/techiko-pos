@@ -1092,6 +1092,8 @@ class RolePermissionSeeder extends Seeder
             'sales-history.index',
             'sales-history.show',
             'sales-history.void',
+            // Opening today's shift from the POS "no shift open" block
+            'wallet-cash-ledger.opening-cash.store',
             'sales.loyalty-redemption',
             'sales.find-sale-item',
             'sales.sales.assignCustomer',
