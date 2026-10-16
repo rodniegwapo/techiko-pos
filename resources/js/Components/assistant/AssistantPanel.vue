@@ -130,7 +130,7 @@ async function ask(text = message.value) {
     message.value = "";
     asking.value = true;
     view.value = "chat";
-    const turn = { question: q, answer: null, links: [], actions: [], forms: [], error: null };
+    const turn = { question: q, answer: null, links: [], actions: [], forms: [], error: null, billingUrl: null };
     turns.value.push(turn);
     scrollDown();
     try {
@@ -154,6 +154,8 @@ async function ask(text = message.value) {
         // Out of the organization's monthly AI credits.
         if (e?.response?.status === 402) {
             creditsLeft.value = 0;
+            // Set when a plan has more credits and this user can open the plans.
+            turn.billingUrl = e.response.data?.billing_url ?? null;
         }
     } finally {
         asking.value = false;
@@ -264,7 +266,17 @@ function onKeydown(e) {
                 <div class="ml-auto w-fit max-w-[85%] whitespace-pre-wrap break-words rounded-lg bg-green-100 px-3 py-2 text-sm text-gray-800">{{ turn.question }}</div>
                 <div class="w-fit max-w-[95%] rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-800" data-testid="assistant-answer">
                     <a-skeleton v-if="!turn.answer && !turn.error" active :paragraph="{ rows: 2 }" :title="false" />
-                    <p v-else-if="turn.error" class="text-red-600">{{ turn.error }}</p>
+                    <div v-else-if="turn.error">
+                        <p class="text-red-600">{{ turn.error }}</p>
+                        <a
+                            v-if="turn.billingUrl"
+                            :href="turn.billingUrl"
+                            class="mt-1 inline-block text-xs font-medium text-blue-600 hover:underline"
+                            data-testid="assistant-upgrade"
+                        >
+                            See plans →
+                        </a>
+                    </div>
                     <template v-else>
                         <template v-for="(block, j) in answerBlocks(turn.answer)" :key="j">
                             <component

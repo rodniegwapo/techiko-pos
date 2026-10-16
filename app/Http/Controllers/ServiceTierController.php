@@ -18,14 +18,13 @@ use Inertia\Response;
  */
 class ServiceTierController extends Controller
 {
-    /** What a plan can include (Domain::FEATURES), as super admins see it. */
+    /** What a plan can include (Domain::PLAN_FEATURES), as super admins see it. Every plan has the AI assistant. */
     private const FEATURE_LABELS = [
         'sales_history_unlimited' => 'Full sales history and CSV export',
         'multi_location' => 'More than one location',
         'advanced_inventory' => 'Stock movements, valuation and transfers',
         'expenses' => 'Expenses',
         'finance' => 'Finance (statements, P&L, VAT report)',
-        'ai' => 'AI assistant',
     ];
 
     public function index(): Response
@@ -86,7 +85,7 @@ class ServiceTierController extends Controller
         $data = $request->validate([
             // Left out, a plan keeps what it includes.
             'features' => ['sometimes', 'array'],
-            'features.*' => ['string', 'distinct', Rule::in(Domain::FEATURES)],
+            'features.*' => ['string', 'distinct', Rule::in(Domain::PLAN_FEATURES)],
             'name' => ['required', 'string', 'max:60'],
             'amount' => ['required', 'numeric', 'min:0', 'max:1000000', 'decimal:0,2'],
             'ai_monthly_credits' => ['nullable', 'integer', 'min:0', 'max:1000000'],

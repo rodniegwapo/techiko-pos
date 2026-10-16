@@ -125,13 +125,13 @@ class AiUsagePageTest extends TestCase
         $this->assertSame(15, array_sum(array_column($usage['monthly'], 'credits')));
     }
 
-    public function test_the_page_needs_the_ai_feature(): void
+    public function test_every_plan_has_the_page_even_with_the_old_ai_switch_off(): void
     {
         $domain = $this->domain(ai: false);
 
         $this->actingAs($this->member($domain))
             ->getJson(route('domains.ai-usage.index', ['domain' => $domain->name_slug]))
-            ->assertForbidden();
+            ->assertOk();
     }
 
     public function test_a_super_admin_sets_the_plan_and_custom_credits(): void

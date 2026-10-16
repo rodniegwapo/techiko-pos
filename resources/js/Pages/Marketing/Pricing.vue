@@ -39,6 +39,7 @@ const plans = [
             "Unlimited products, discounts and loyalty",
             "Stock tracking and low-stock alerts",
             "1 location, 2 users, last 31 days of sales history",
+            "AI assistant with 30 credits a month",
         ],
         ctaLabel: "Create account",
         ctaHref: () => route("register"),
@@ -54,7 +55,7 @@ const plans = [
         features: [
             "Everything in Free",
             "Full sales history with CSV export",
-            "Up to 5 users",
+            "Up to 5 users and 500 AI credits a month",
             "Email support",
         ],
         ctaLabel: "Contact us",
@@ -72,6 +73,7 @@ const plans = [
         features: [
             "Everything in Professional",
             "Unlimited stores, locations and users",
+            "1,000 AI credits a month",
             "Stock transfers, movements and valuation",
             "Expenses and priority support",
         ],

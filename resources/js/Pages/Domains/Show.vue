@@ -55,21 +55,20 @@ const regional = computed(() => [
 /*** === FEATURES (super admins turn paid features on per organization) === ***/
 const savedFeatures = () => ({
     finance: domain.value.settings?.features?.finance === true,
-    ai: domain.value.settings?.features?.ai === true,
 });
 
 const features = reactive({ ...savedFeatures(), saving: false });
 
 const featuresChanged = computed(() => {
     const saved = savedFeatures();
-    return saved.finance !== features.finance || saved.ai !== features.ai;
+    return saved.finance !== features.finance;
 });
 
 const saveFeatures = () => {
     features.saving = true;
     router.patch(
         route("domains.features.update", { domain: domain.value.name_slug }),
-        { finance: features.finance, ai: features.ai },
+        { finance: features.finance },
         {
             preserveScroll: true,
             onSuccess: () => {
@@ -382,7 +381,7 @@ const handleBack = () => {
 
                 <!-- Side column -->
                 <div class="min-w-0 space-y-6">
-                    <!-- Features (paid add-ons; off until a super admin turns them on) -->
+                    <!-- Features (Finance can be given outside the plan; AI comes with every plan) -->
                     <section
                         v-if="isSuperUser"
                         class="rounded-lg bg-white p-6"
@@ -409,19 +408,13 @@ const handleBack = () => {
                                 </span>
                             </a-checkbox>
 
-                            <a-checkbox
-                                v-model:checked="features.ai"
-                                class="!ml-0 flex items-start"
-                                data-testid="feature-ai"
-                            >
-                                <span class="flex items-center gap-1 font-medium">
-                                    <IconSparkles :size="16" /> AI assistant
+                            <p class="flex items-start gap-1 text-xs text-gray-500" data-testid="feature-ai-note">
+                                <IconSparkles :size="16" class="shrink-0 text-gray-400" />
+                                <span>
+                                    The AI assistant comes with every plan, limited by its monthly AI
+                                    credits. To turn it off here, set the AI credits below to 0.
                                 </span>
-                                <span class="block text-xs text-gray-500">
-                                    Help assistant in the chat drawer: teaches staff step by step
-                                    and can do tasks for them after they confirm.
-                                </span>
-                            </a-checkbox>
+                            </p>
                         </div>
 
                         <a-button
@@ -518,17 +511,17 @@ const handleBack = () => {
                                 Estimated AI cost: <strong class="tabular-nums">{{ aiCost }}</strong>
                                 <span class="text-xs text-gray-400">(only super admins see this)</span>
                             </p>
-                            <a v-if="features.ai" :href="billing.ai_usage_url" class="mt-1 inline-block text-xs font-medium text-blue-600 hover:underline">
+                            <a :href="billing.ai_usage_url" class="mt-1 inline-block text-xs font-medium text-blue-600 hover:underline">
                                 View AI usage →
                             </a>
                         </div>
 
                         <a-alert
-                            v-if="!features.ai && !features.finance"
+                            v-if="plan.ai_monthly_credits_override === 0"
                             class="mt-3"
                             type="info"
                             show-icon
-                            message="AI is off for this organization (neither Finance nor the AI assistant is on), so no credits will be used."
+                            message="AI is off for this organization: with 0 credits, the assistant and Finance's AI explanations can't be used."
                         />
 
                         <a-button

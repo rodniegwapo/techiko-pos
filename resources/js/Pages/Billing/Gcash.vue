@@ -29,7 +29,7 @@ const props = defineProps({
         type: Object,
         default: null,
     },
-    /** This month's AI credits (null when the organization doesn't have the AI feature). */
+    /** This month's AI credits (every plan has the AI assistant). */
     aiCredits: {
         type: Object,
         default: null,

@@ -349,7 +349,7 @@ class AppAssistantTest extends TestCase
         $ask()->assertStatus(429);
     }
 
-    public function test_ask_needs_the_assistant_permission_and_ai_feature(): void
+    public function test_ask_needs_the_assistant_permission_and_ai_credits(): void
     {
         AppAssistantAgent::fake()->preventStrayPrompts();
 
@@ -358,10 +358,12 @@ class AppAssistantTest extends TestCase
             ->postJson($this->askUrl($noPermission['domain']), ['message' => 'How do I add a product?'])
             ->assertForbidden();
 
-        $noFeature = $this->staff(['assistant.ask'], ai: false);
-        $this->actingAs($noFeature['user'])
-            ->postJson($this->askUrl($noFeature['domain']), ['message' => 'How do I add a product?'])
-            ->assertStatus(403);
+        // Every plan has the assistant; a super admin turns it off with 0 credits.
+        $noCredits = $this->staff(['assistant.ask'], ai: false);
+        $noCredits['domain']->update(['ai_monthly_credits_override' => 0]);
+        $this->actingAs($noCredits['user'])
+            ->postJson($this->askUrl($noCredits['domain']), ['message' => 'How do I add a product?'])
+            ->assertStatus(402);
     }
 
     public function test_ask_reports_when_the_ai_is_not_set_up(): void

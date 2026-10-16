@@ -7,7 +7,7 @@ import { pageProps, responseProps } from "../support/inertia.js";
  * (5 and 60 days ago). The free one also has a cashier, so it is at its 2-user limit.
  *
  * Expects the plans as seeded (ServiceTierSeeder): Basic = full history; Standard adds more
- * locations, advanced inventory and expenses; Premium adds Finance and AI. Needs
+ * locations, advanced inventory and expenses; Premium adds Finance. Every plan has the AI assistant. Needs
  * FEATURE_PLAN_GATING=true in the app's .env; the suite skips itself otherwise.
  */
 
@@ -16,11 +16,11 @@ const base = (plan) => `/domains/e2e-plan-${plan}`;
 /** Role ids from RoleSeeder: 5 is cashier. */
 const CASHIER_ROLE_ID = 5;
 
-/** What each plan should give, by feature key (Domain::FEATURES). */
+/** What each plan should give, by feature key (Domain::FEATURES). Every plan has the AI assistant, limited by its credits. */
 const EXPECTED = {
-    free: [],
-    basic: ["sales_history_unlimited"],
-    standard: ["sales_history_unlimited", "multi_location", "advanced_inventory", "expenses"],
+    free: ["ai"],
+    basic: ["sales_history_unlimited", "ai"],
+    standard: ["sales_history_unlimited", "multi_location", "advanced_inventory", "expenses", "ai"],
     premium: ["sales_history_unlimited", "multi_location", "advanced_inventory", "expenses", "finance", "ai"],
 };
 
@@ -31,7 +31,6 @@ const PAID_PAGES = [
     { path: "/expenses", feature: "expenses" },
     { path: "/finance", feature: "finance" },
     { path: "/vat-report", feature: "finance" },
-    { path: "/ai-usage", feature: "ai" },
 ];
 
 /** Users and locations a test created, removed again after it: [api, url]. */
@@ -120,7 +119,8 @@ test.describe("plans", () => {
                 await expectLock("Valuation Report", "advanced_inventory");
                 await expectLock("Expenses", "expenses");
                 await expectLock("Balance sheet", "finance");
-                await expectLock("AI usage", "ai");
+                // Every plan has the AI assistant.
+                await expect(locked("AI usage"), `AI usage on ${plan}`).toHaveCount(0);
 
                 // Free pages never carry a lock.
                 for (const title of ["Products", "Stock Adjustments", "Locations"]) {

@@ -5,6 +5,7 @@ namespace App\Services\Ai;
 use App\Exceptions\OutOfAiCreditsException;
 use App\Models\AiUsage;
 use App\Models\Domain;
+use App\Models\ServiceTier;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
@@ -62,12 +63,45 @@ class AiCreditService
 
         if ($remaining !== null && $remaining < $this->creditsFor($feature)) {
             $allowance = $this->monthlyAllowance($domain);
+            $resets = 'They reset on '.now()->addMonthNoOverflow()->startOfMonth()->format('F j');
+            $plan = $this->planWithMoreCredits($domain);
+            $user = auth()->user();
+            $canPay = $plan !== null && $user instanceof User && $user->hasPermissionToRoute('billing.servicing.index');
 
             throw new OutOfAiCreditsException(
                 "Your organization has used all {$allowance} AI credits for ".now()->format('F').'. '
-                .'They reset on '.now()->addMonthNoOverflow()->startOfMonth()->format('F j').', or contact us to change your plan.',
+                .match (true) {
+                    $plan === null => "{$resets}, or contact us to change your plan.",
+                    default => "{$resets}, or upgrade to {$plan->name} for "
+                        .($plan->ai_monthly_credits === null ? 'unlimited credits' : number_format($plan->ai_monthly_credits).' credits a month').'.',
+                },
+                $canPay ? route('domains.billing.servicing.index', ['domain' => $domain->name_slug]) : null,
             );
         }
+    }
+
+    /**
+     * The cheapest plan on the billing page that gives more credits than the organization has now,
+     * or null when there is none or a super admin's override sets its credits (a plan wouldn't change them).
+     */
+    public function planWithMoreCredits(Domain $domain): ?ServiceTier
+    {
+        if ($domain->ai_monthly_credits_override !== null) {
+            return null;
+        }
+
+        $allowance = $this->monthlyAllowance($domain);
+        if ($allowance === null) {
+            return null;
+        }
+
+        return ServiceTier::query()
+            ->where('is_active', true)
+            ->where('shown_on_billing', true)
+            ->when($domain->current_service_tier_id, fn ($q, $id) => $q->whereKeyNot($id))
+            ->where(fn ($q) => $q->whereNull('ai_monthly_credits')->orWhere('ai_monthly_credits', '>', $allowance))
+            ->orderBy('amount')
+            ->first();
     }
 
     /** Charges one successful AI answer. A call that never reached the AI (no response) is free. */

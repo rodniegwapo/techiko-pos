@@ -185,22 +185,17 @@ class DomainController extends Controller
     }
 
     /**
-     * Turn Finance (with its AI explanations) and the AI assistant on or off for an organization.
-     * The two are independent. Other settings (e.g. sales) are kept.
+     * Turn Finance (with its AI explanations) on or off for an organization, outside its plan. The AI
+     * assistant comes with every plan (a 0-credit override turns it off). Other settings are kept.
      */
     public function updateFeatures(Request $request, Domain $domain)
     {
         $validated = $request->validate([
             'finance' => ['required', 'boolean'],
-            'ai' => ['required', 'boolean'],
         ]);
 
-        $finance = (bool) $validated['finance'];
         $settings = $domain->settings ?? [];
-        $settings['features'] = [
-            'finance' => $finance,
-            'ai' => (bool) $validated['ai'],
-        ];
+        $settings['features'] = ['finance' => (bool) $validated['finance']];
         $domain->update(['settings' => $settings]);
 
         return back()->with('success', 'Features updated.');

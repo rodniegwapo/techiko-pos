@@ -237,20 +237,31 @@ class Domain extends Model
     }
 
     /**
-     * Paid features. A plan includes some of them (ServiceTier::features; the free plan none),
-     * and a super admin can still give Finance or the AI assistant to one organization.
+     * Features the frontend asks about (shared as domainFeatures). All but "ai" are paid: a plan
+     * includes some of them (ServiceTier::features; the free plan none), and a super admin can
+     * still give Finance to one organization.
      */
     public const FEATURES = ['sales_history_unlimited', 'multi_location', 'advanced_inventory', 'expenses', 'finance', 'ai'];
 
+    /** Features a plan can include (ServiceTier::features). */
+    public const PLAN_FEATURES = ['sales_history_unlimited', 'multi_location', 'advanced_inventory', 'expenses', 'finance'];
+
     /** Features a super admin can turn on for one organization outside its plan. */
-    public const OVERRIDABLE_FEATURES = ['finance', 'ai'];
+    public const OVERRIDABLE_FEATURES = ['finance'];
 
     /** Days of sales history an organization without sales_history_unlimited can look back on. */
     public const FREE_SALES_HISTORY_DAYS = 31;
 
-    /** Finance includes its AI explanations; "ai" is the AI assistant in the chat drawer, a separate add-on. */
+    /**
+     * Finance includes its AI explanations. "ai" is the AI assistant in the chat drawer: every plan
+     * has it, limited only by the month's AI credits (AiCreditService; a 0-credit override turns it off).
+     */
     public function hasFeature(string $key): bool
     {
+        if ($key === 'ai') {
+            return true;
+        }
+
         if (! in_array($key, self::FEATURES, true)) {
             return false;
         }

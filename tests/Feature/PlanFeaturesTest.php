@@ -2,12 +2,15 @@
 
 namespace Tests\Feature;
 
+use App\Exceptions\OutOfAiCreditsException;
 use App\Http\Middleware\RoleBasedAccessControl;
 use App\Http\Middleware\UserPermissionCheckMiddleware;
+use App\Models\AiUsage;
 use App\Models\Domain;
 use App\Models\InventoryLocation;
 use App\Models\ServiceTier;
 use App\Models\User;
+use App\Services\Ai\AiCreditService;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -72,11 +75,33 @@ class PlanFeaturesTest extends TestCase
         return route($name, ['domain' => $domain->name_slug]);
     }
 
-    public function test_the_free_plan_has_no_paid_features(): void
+    public function test_the_free_plan_has_no_paid_features_but_has_the_ai_assistant(): void
     {
         ['domain' => $domain] = $this->seedOrg();
 
-        $this->assertSame(array_fill_keys(Domain::FEATURES, false), $domain->features());
+        $this->assertSame([...array_fill_keys(Domain::PLAN_FEATURES, false), 'ai' => true], $domain->features());
+    }
+
+    public function test_a_free_organization_out_of_ai_credits_is_offered_the_next_plan(): void
+    {
+        $this->tier('basic', '499.00', [])->update(['ai_monthly_credits' => 500]);
+        $this->tier('premium', '1999.00', ['finance'])->update(['ai_monthly_credits' => 2000]);
+        ['domain' => $domain, 'user' => $user] = $this->seedOrg();
+        AiUsage::query()->forceCreate(['domain' => $domain->name_slug, 'feature' => 'assistant', 'credits' => 30]);
+
+        $this->actingAs($user);
+        try {
+            app(AiCreditService::class)->assertHasCredits($domain, 'assistant');
+            $this->fail('Expected the credits to be used up.');
+        } catch (OutOfAiCreditsException $e) {
+            $this->assertStringContainsString('used all 30 AI credits', $e->getMessage());
+            $this->assertStringContainsString('upgrade to Basic servicing for 500 credits a month', $e->getMessage());
+            $this->assertSame($this->url('domains.billing.servicing.index', $domain), $e->billingUrl);
+        }
+
+        // A super admin's override sets the credits, so no plan is offered.
+        $domain->update(['ai_monthly_credits_override' => 0]);
+        $this->assertNull(app(AiCreditService::class)->planWithMoreCredits($domain->fresh()));
     }
 
     public function test_a_plan_gives_what_it_includes(): void
@@ -219,6 +244,10 @@ class PlanFeaturesTest extends TestCase
         $this->actingAs($admin)->get(route('service-tiers.index'))
             ->assertInertia(fn (Assert $page) => $page
                 ->where('tiers.0.features', ['multi_location', 'expenses'])
-                ->has('featureOptions', count(Domain::FEATURES)));
+                ->has('featureOptions', count(Domain::PLAN_FEATURES)));
+
+        // Every plan has the AI assistant, so it isn't one of the features a plan picks.
+        $this->actingAs($admin)->put(route('service-tiers.update', $tier), [...$plan, 'features' => ['ai']])
+            ->assertSessionHasErrors('features.0');
     }
 }

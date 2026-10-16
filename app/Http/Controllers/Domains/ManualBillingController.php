@@ -53,8 +53,8 @@ class ManualBillingController extends Controller
             'payments' => collect($this->payments->history($domain, 12, withVoided: false))
                 ->map(fn (array $row) => collect($row)->except(['note', 'recorded_by', 'voided'])->all())
                 ->all(),
-            'aiCredits' => $domain->hasFeature('ai') ? $this->aiCredits->propsForFrontend($domain) : null,
-            'aiUsageUrl' => $domain->hasFeature('ai') && $request->user()?->hasPermissionToRoute('ai-usage.index')
+            'aiCredits' => $this->aiCredits->propsForFrontend($domain),
+            'aiUsageUrl' => $request->user()?->hasPermissionToRoute('ai-usage.index')
                 ? route('domains.ai-usage.index', ['domain' => $domain->name_slug])
                 : null,
             'showManualGcash' => (bool) config('manual_billing.show_manual_gcash_section'),

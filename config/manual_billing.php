@@ -73,7 +73,7 @@ return [
             '✅ Everything in Standard',
             '📊 Finance: P&L, cash flow, balance sheet, VAT report',
             '📒 Supplier bills, receivables, loans and assets',
-            '✨ AI assistant and monthly business reviews',
+            '✨ AI explanations and monthly business reviews',
         ],
     ],
 
@@ -88,6 +88,7 @@ return [
         'Stock tracking, adjustments and low-stock alerts',
         'Utang and cash drawer',
         '1 location, 2 users, last 31 days of sales history',
+        'AI assistant for your staff',
     ],
 
 ];
