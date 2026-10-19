@@ -33,3 +33,5 @@ yarn-error.log
 /.idea
 /.vscode
 app.asar
+# Playwright HTML report when run with --reporter=html outside the config (the config writes to tests/e2e/playwright-report)
+/playwright-report/
