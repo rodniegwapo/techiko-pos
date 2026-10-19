@@ -64,10 +64,12 @@ class HandleInertiaRequests extends Middleware
             // The sidebar and route helpers switch into an organization only on its own pages.
             'inOrganization' => $this->inOrganization($request),
             // For the "subscription ends soon" banner and the locked (greyed-out) sidebar, on the organization's pages.
+            // A VIP organization has no end date to be warned about and is never locked.
             'subscriptionStatus' => $currentDomain && $this->inOrganization($request) ? [
+                'vip' => $currentDomain->isVip(),
                 'locked' => $currentDomain->isLocked(),
-                'ends_at' => $currentDomain->subscription_ends_at?->toDateString(),
-                'ends_in_days' => $currentDomain->subscriptionEndsInDays(),
+                'ends_at' => $currentDomain->isVip() ? null : $currentDomain->subscription_ends_at?->toDateString(),
+                'ends_in_days' => $currentDomain->isVip() ? null : $currentDomain->subscriptionEndsInDays(),
             ] : null,
             // Paid features this organization has (its plan, or given by a super admin); the menu locks what's off.
             'domainFeatures' => $currentDomain?->features() ?? array_fill_keys(Domain::FEATURES, false),

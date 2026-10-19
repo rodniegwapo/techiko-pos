@@ -40,6 +40,9 @@ const props = defineProps({
     paymentsReady: { type: Boolean, default: false },
     /** { id, name, slug, amount }, or null on the Free plan. */
     currentTier: { type: Object, default: null },
+    /** VIP (set by Techiko): every feature, no limits, nothing to pay. */
+    isVip: { type: Boolean, default: false },
+    vipSince: { type: String, default: null },
 });
 
 const longDate = (date) => (date ? dayjs(date).format("MMM D, YYYY") : "");
@@ -221,8 +224,44 @@ function submit() {
         </ContentHeader>
 
         <div class="mx-auto max-w-6xl space-y-6 pb-10">
+            <!-- VIP: everything included, nothing to pay -->
+            <section v-if="isVip" class="rounded-lg border border-amber-200 bg-white p-6 shadow-sm" data-testid="vip-plan">
+                <div class="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                        <p class="text-xs font-medium uppercase tracking-wide text-gray-500">Current plan</p>
+                        <div class="mt-1 flex flex-wrap items-center gap-2">
+                            <h2 class="text-2xl font-bold text-gray-900">VIP account</h2>
+                            <a-tag color="gold" class="!m-0">VIP</a-tag>
+                        </div>
+                        <p class="mt-1 text-sm text-gray-600">
+                            Every feature is included, with no limits on users, products or stores, and unlimited AI
+                            credits. There is nothing to pay or renew.
+                        </p>
+                        <p v-if="vipSince" class="mt-1 text-xs text-gray-500">VIP since {{ longDate(vipSince) }}</p>
+                    </div>
+                    <a-button data-testid="contact-team" @click="contactTeam('I have a question about our VIP account.')">
+                        Contact us
+                    </a-button>
+                </div>
+
+                <dl class="mt-5 grid grid-cols-2 gap-3 border-t border-gray-100 pt-5 sm:grid-cols-4" data-testid="plan-usage">
+                    <div v-for="row in usage" :key="row.label" class="rounded-md bg-gray-50 px-3 py-2">
+                        <dt class="text-xs text-gray-500">{{ row.label }}</dt>
+                        <dd class="text-base font-semibold tabular-nums text-gray-900">{{ row.value }}</dd>
+                    </div>
+                </dl>
+
+                <div v-if="aiCredits" class="mt-5 border-t border-gray-100 pt-5 text-sm">
+                    <AiCreditsMeter :credits="aiCredits">
+                        <Link v-if="aiUsageUrl" :href="aiUsageUrl" class="mt-2 inline-block text-xs font-medium text-blue-600 hover:underline">
+                            See AI usage details →
+                        </Link>
+                    </AiCreditsMeter>
+                </div>
+            </section>
+
             <!-- Current plan and what it uses -->
-            <section class="rounded-lg bg-white p-6 shadow-sm" data-testid="current-plan">
+            <section v-else class="rounded-lg bg-white p-6 shadow-sm" data-testid="current-plan">
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <p class="text-xs font-medium uppercase tracking-wide text-gray-500">Current plan</p>
@@ -273,7 +312,7 @@ function submit() {
             </section>
 
             <!-- Plans -->
-            <section class="rounded-lg bg-white p-6 shadow-sm" aria-labelledby="plans-heading">
+            <section v-if="!isVip" class="rounded-lg bg-white p-6 shadow-sm" aria-labelledby="plans-heading">
                 <h2 id="plans-heading" class="text-xl font-bold tracking-tight text-gray-800">Plans & pricing</h2>
                 <p class="mt-2 max-w-2xl text-sm text-gray-600">
                     Every organization starts free. Each paid plan includes everything in the plans before it.
@@ -401,7 +440,7 @@ function submit() {
             </section>
 
             <!-- Manual GCash (offline option, off by default) -->
-            <section v-if="showManualGcash" class="rounded-lg bg-white p-6 shadow-sm">
+            <section v-if="showManualGcash && !isVip" class="rounded-lg bg-white p-6 shadow-sm">
                 <h2 class="mb-1 text-lg font-semibold text-gray-900">Pay with GCash</h2>
                 <p class="mb-4 text-sm text-gray-600">
                     Choose a plan above, send the amount to our GCash QR, then submit the reference number.

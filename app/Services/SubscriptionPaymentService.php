@@ -111,7 +111,8 @@ class SubscriptionPaymentService
     /** @return array{due_on: string, amount: ?float, days_left: int}|null When the next payment is due, and how much the current plan costs. */
     public function nextPayment(Domain $domain): ?array
     {
-        if (! $domain->subscription_ends_at) {
+        // Nothing is due for a VIP organization.
+        if (! $domain->subscription_ends_at || $domain->isVip()) {
             return null;
         }
         $domain->loadMissing('currentServiceTier');

@@ -20,9 +20,13 @@ use Illuminate\Validation\Rule;
  */
 class SubscriptionRenewalController extends Controller
 {
-    /** Who in an organization may pay its subscription. */
+    /** Who in an organization may pay its subscription. Nobody, for a VIP organization: nothing is due. */
     public static function canPay(User $user, Domain $domain): bool
     {
+        if ($domain->isVip()) {
+            return false;
+        }
+
         return $user->isSuperUser()
             || ($user->domain === $domain->name_slug && $user->hasPermissionToRoute('billing.servicing.index'));
     }

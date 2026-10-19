@@ -83,6 +83,7 @@ class DomainController extends Controller
                 'subscription_started_at' => $domain->subscription_started_at?->toDateString(),
                 'subscription_ends_at' => $domain->subscription_ends_at?->toDateString(),
                 'locked_at' => $domain->locked_at?->toIso8601String(),
+                'vip_at' => $domain->vip_at?->toIso8601String(),
                 'next_payment' => $this->payments->nextPayment($domain),
                 'payments' => $this->payments->history($domain),
                 'ai_monthly_credits_override' => $domain->ai_monthly_credits_override,
@@ -143,9 +144,30 @@ class DomainController extends Controller
     {
         $locked = $request->validate(['locked' => ['required', 'boolean']])['locked'];
 
+        if ($locked && $domain->isVip()) {
+            throw ValidationException::withMessages(['locked' => 'A VIP organization can\'t be locked. Turn VIP off first.']);
+        }
+
         $domain->update(['locked_at' => $locked ? ($domain->locked_at ?? now()) : null]);
 
         return back()->with('success', $locked ? "{$domain->name} is locked. Its users now see the on-hold page." : "{$domain->name} is unlocked.");
+    }
+
+    /**
+     * Makes an organization VIP (every premium feature and limit, unlimited AI credits, no
+     * subscription warnings, never locked, nothing to pay), or ends it. Super admins only.
+     */
+    public function updateVip(Request $request, Domain $domain)
+    {
+        $vip = $request->validate(['vip' => ['required', 'boolean']])['vip'];
+
+        $domain->update($vip
+            ? ['vip_at' => $domain->vip_at ?? now(), 'locked_at' => null]
+            : ['vip_at' => null]);
+
+        return back()->with('success', $vip
+            ? "{$domain->name} is now VIP: every feature, no limits, nothing to pay."
+            : "{$domain->name} is no longer VIP. Its plan applies again.");
     }
 
     /**

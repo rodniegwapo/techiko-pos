@@ -20,7 +20,7 @@ class DomainSubscriptionService
 
     public function effectiveMaxProducts(Domain $domain): ?int
     {
-        if (config('features.unlimited_products', true)) {
+        if (config('features.unlimited_products', true) || $domain->isVip()) {
             return null;
         }
 
@@ -36,6 +36,10 @@ class DomainSubscriptionService
 
     public function effectiveMaxUsers(Domain $domain): ?int
     {
+        if ($domain->isVip()) {
+            return null;
+        }
+
         $domain->loadMissing('currentServiceTier');
         $tier = $domain->currentServiceTier;
 
@@ -127,8 +131,9 @@ class DomainSubscriptionService
         $productsUnlimited = (bool) config('features.unlimited_products', true);
 
         return [
-            'is_paid' => (bool) $domain->current_service_tier_id,
-            'tier_name' => $domain->currentServiceTier?->name,
+            'is_paid' => (bool) $domain->current_service_tier_id || $domain->isVip(),
+            'is_vip' => $domain->isVip(),
+            'tier_name' => $domain->isVip() ? 'VIP' : $domain->currentServiceTier?->name,
             'product_count' => $productCount,
             'max_products' => $maxProducts,
             'products_unlimited' => $productsUnlimited,

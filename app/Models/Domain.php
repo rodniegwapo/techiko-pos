@@ -30,13 +30,23 @@ class Domain extends Model
         'subscription_started_at' => 'datetime',
         'subscription_ends_at' => 'date:Y-m-d',
         'locked_at' => 'datetime',
+        'vip_at' => 'datetime',
         'ai_monthly_credits_override' => 'integer',
     ];
 
-    /** Locked by a super admin for not paying: its users only see the "on hold" page. */
+    /**
+     * Made VIP by a super admin: every premium feature and limit, unlimited AI credits, no
+     * subscription warnings, never locked, nothing to pay.
+     */
+    public function isVip(): bool
+    {
+        return $this->vip_at !== null;
+    }
+
+    /** Locked by a super admin for not paying: its users only see the "on hold" page. A VIP never is. */
     public function isLocked(): bool
     {
-        return $this->locked_at !== null;
+        return $this->locked_at !== null && ! $this->isVip();
     }
 
     /** Days until the subscription ends (0 on the last day, negative once it has ended), or null without an end date. */
@@ -264,6 +274,11 @@ class Domain extends Model
 
         if (! in_array($key, self::FEATURES, true)) {
             return false;
+        }
+
+        // A VIP organization has everything.
+        if ($this->isVip()) {
+            return true;
         }
 
         $on = fn (string $k) => data_get($this->settings, "features.{$k}") === true;

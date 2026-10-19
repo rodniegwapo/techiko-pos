@@ -235,6 +235,23 @@ const setLocked = (locked) => {
 };
 const lockedSince = computed(() => (props.billing?.locked_at ? dayjs(props.billing.locked_at).format("MMM D, YYYY") : null));
 
+/*** === VIP (every premium feature, no limits or warnings, never locked, nothing to pay) === ***/
+const vip = reactive({ saving: false });
+const setVip = (on) => {
+    vip.saving = true;
+    router.patch(
+        route("domains.vip.update", { domain: domain.value.name_slug }),
+        { vip: on },
+        {
+            preserveScroll: true,
+            onSuccess: () => notification.success({ message: on ? "Organization is now VIP" : "VIP removed" }),
+            onError: () => notification.error({ message: "Couldn't change VIP" }),
+            onFinish: () => (vip.saving = false),
+        },
+    );
+};
+const vipSince = computed(() => (props.billing?.vip_at ? dayjs(props.billing.vip_at).format("MMM D, YYYY") : null));
+
 const planOptions = computed(() => [
     { value: null, label: `Free starter · ${props.billing?.free_credits ?? 0} AI credits` },
     ...(props.billing?.tiers ?? []).map((tier) => ({
@@ -293,6 +310,7 @@ const handleBack = () => {
         <div class="w-full min-w-0">
             <ContentHeader class="mb-6" :title="domain.name">
                 <template #actions>
+                    <a-tag v-if="billing?.vip_at" color="gold" class="self-center" data-testid="vip-tag">VIP</a-tag>
                     <a-button @click="handleBack">
                         <template #icon><IconArrowLeft :size="16" class="mr-1 inline" /></template>
                         Back
@@ -686,14 +704,44 @@ const handleBack = () => {
                                 <p class="text-xs text-gray-500">Users can still log in but only see an "on hold" page.</p>
                             </div>
                             <a-popconfirm
+                                :disabled="!!billing.vip_at"
                                 :title="billing.locked_at ? `Unlock ${domain.name}? Its users get their pages back.` : `Lock ${domain.name}? Its users will only see the on-hold page.`"
                                 :ok-text="billing.locked_at ? 'Unlock' : 'Lock'"
                                 cancel-text="Cancel"
                                 @confirm="setLocked(!billing.locked_at)"
                             >
-                                <a-switch :checked="!!billing.locked_at" :loading="locking.saving" data-testid="lock-switch" />
+                                <a-switch :checked="!!billing.locked_at" :disabled="!!billing.vip_at" :loading="locking.saving" data-testid="lock-switch" />
                             </a-popconfirm>
                         </div>
+                        <p v-if="billing.vip_at" class="mb-0 mt-1 text-xs text-gray-500">A VIP organization can't be locked.</p>
+
+                        <div class="mt-4 flex items-center justify-between gap-3 border-t border-gray-100 pt-4" data-testid="domain-vip">
+                            <div>
+                                <p class="text-sm font-medium text-gray-800">
+                                    VIP account
+                                    <a-tag v-if="billing.vip_at" color="gold" class="ml-1">VIP</a-tag>
+                                </p>
+                                <p class="text-xs text-gray-500">
+                                    Every premium feature, no user/product/store limits, unlimited AI credits, no subscription
+                                    warnings, never locked, nothing to pay.
+                                </p>
+                            </div>
+                            <a-popconfirm
+                                :title="billing.vip_at ? `Remove VIP from ${domain.name}? Its plan applies again.` : `Make ${domain.name} VIP? It gets everything, with nothing to pay.`"
+                                :ok-text="billing.vip_at ? 'Remove VIP' : 'Make VIP'"
+                                cancel-text="Cancel"
+                                @confirm="setVip(!billing.vip_at)"
+                            >
+                                <a-switch :checked="!!billing.vip_at" :loading="vip.saving" data-testid="vip-switch" />
+                            </a-popconfirm>
+                        </div>
+                        <a-alert
+                            v-if="billing.vip_at"
+                            class="mt-3"
+                            type="success"
+                            show-icon
+                            :message="`VIP since ${vipSince}. Plan, end date and AI credits below don't limit it.`"
+                        />
                         <a-alert
                             v-if="billing.locked_at"
                             class="mt-3"

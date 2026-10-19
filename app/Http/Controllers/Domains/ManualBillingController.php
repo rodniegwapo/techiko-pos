@@ -50,6 +50,9 @@ class ManualBillingController extends Controller
         })->values();
 
         return Inertia::render('Billing/Gcash', [
+            // VIP: everything included, nothing to pay (the page shows a VIP card instead of plans).
+            'isVip' => $domain->isVip(),
+            'vipSince' => $domain->vip_at?->toDateString(),
             'tiers' => $tierRows,
             'gcashQrUrl' => config('manual_billing.gcash_qr_path'),
             'currencySymbol' => config('manual_billing.currency_symbol'),
@@ -89,7 +92,7 @@ class ManualBillingController extends Controller
 
     public function store(Request $request, Domain $domain)
     {
-        if (! config('manual_billing.show_manual_gcash_section')) {
+        if (! config('manual_billing.show_manual_gcash_section') || $domain->isVip()) {
             abort(403);
         }
 

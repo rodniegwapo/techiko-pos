@@ -22,6 +22,11 @@ class AiCreditService
     /** Credits per month, or null when unlimited. A super admin's override beats the plan. */
     public function monthlyAllowance(Domain $domain): ?int
     {
+        // A VIP organization has no cap.
+        if ($domain->isVip()) {
+            return null;
+        }
+
         if ($domain->ai_monthly_credits_override !== null) {
             return $domain->ai_monthly_credits_override;
         }
@@ -133,9 +138,13 @@ class AiCreditService
         ]);
     }
 
-    /** Where the allowance comes from: a super admin's override, the paid plan, or the free plan. */
+    /** Where the allowance comes from: VIP, a super admin's override, the paid plan, or the free plan. */
     public function allowanceSource(Domain $domain): string
     {
+        if ($domain->isVip()) {
+            return 'vip';
+        }
+
         if ($domain->ai_monthly_credits_override !== null) {
             return 'override';
         }
