@@ -345,7 +345,9 @@ class SalesHistoryController extends Controller
             ? (int) $validated['location_id']
             : null;
         if (! $request->filled('location_id') && $this->canSeeAllSales($request->user())) {
-            $locationId = Helpers::getActiveLocation($domain)?->id;
+            $active = Helpers::getActiveLocation($domain);
+            // A warehouse doesn't sell: from there the list shows every store's sales.
+            $locationId = $active?->isWarehouse() ? null : $active?->id;
         }
         if ($locationId && ! InventoryLocation::query()->forDomain($domain->name_slug)->whereKey($locationId)->exists()) {
             $locationId = null;

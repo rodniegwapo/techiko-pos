@@ -154,10 +154,10 @@ class StaffLimitsTest extends TestCase
                 ->where('currentLocation.id', $this->store->id)
                 ->where('availableLocations', fn ($locations) => collect($locations)->pluck('id')->all() === [$this->store->id]));
 
-        // A manager still works there.
+        // A manager still works there (on a page a warehouse shows).
         $manager = $this->staff('manager', 3, $this->warehouse);
         $this->actingAs($manager)
-            ->get(route('domains.customers.index', ['domain' => $this->domain->name_slug]))
+            ->get(route('domains.credits.index', ['domain' => $this->domain->name_slug]))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page->where('currentLocation.id', $this->warehouse->id));
     }

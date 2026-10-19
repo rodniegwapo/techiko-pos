@@ -72,18 +72,18 @@ const switchLocation = async (location) => {
         visible.value = false;
 
         // Full page reload with new location in URL. A warehouse doesn't sell, so leaving a sales
-        // screen for one goes to its Inventory dashboard instead.
+        // screen for one goes to its home, the Dashboard of the whole business, instead.
         const url = new URL(window.location);
         const onSalesScreen = /\/sales(\/|$)/.test(url.pathname);
         if (location.type === "warehouse" && onSalesScreen) {
-            const inventory = new URL(
-                window.route("domains.inventory.index", {
+            const home = new URL(
+                window.route("domains.dashboard", {
                     domain: currentDomain.value.name_slug,
                 }),
                 window.location.origin,
             );
-            inventory.searchParams.set("location_id", location.id);
-            window.location.href = inventory.toString();
+            home.searchParams.set("location_id", location.id);
+            window.location.href = home.toString();
             return;
         }
         url.searchParams.set("location_id", location.id);

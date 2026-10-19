@@ -253,6 +253,9 @@ function onMobilePaginationChange(pageNum) {
             <template v-if="column.key == 'price'">
                 <div class="flex items-center">
                     <IconCurrencyPeso /> {{ record.price }}
+                    <a-tooltip v-if="record.base_price != null" :title="`Store price (product price ${record.base_price})`">
+                        <a-tag color="blue" class="ml-2" data-testid="store-price-tag">Store</a-tag>
+                    </a-tooltip>
                 </div>
             </template>
             <template v-if="column.key == 'cost'">

@@ -11,11 +11,14 @@ class LocationProduct extends Pivot
     protected $fillable = [
         'location_id',
         'product_id',
-        'is_active'
+        'is_active',
+        'price',
     ];
-    
+
     protected $casts = [
-        'is_active' => 'boolean'
+        'is_active' => 'boolean',
+        // The store's own selling price; null = the product's price.
+        'price' => 'decimal:2',
     ];
     
     /**

@@ -190,6 +190,14 @@ class PermissionModuleSeeder extends Seeder
                 'is_active' => true,
             ],
             [
+                'name' => 'purchase-orders',
+                'display_name' => 'Purchasing',
+                'icon' => 'truck',
+                'description' => 'Order stock from suppliers and receive it',
+                'sort_order' => 19,
+                'is_active' => true,
+            ],
+            [
                 'name' => 'profit-loss',
                 'display_name' => 'Profit & Loss',
                 'icon' => 'report-analytics',

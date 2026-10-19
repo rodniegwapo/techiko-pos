@@ -9,8 +9,10 @@ use App\Models\ConversationMessage;
 use App\Models\Domain;
 use App\Models\InventoryLocation;
 use App\Services\ImpersonationService;
+use App\Support\LocationAreas;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -69,7 +71,13 @@ class HandleInertiaRequests extends Middleware
             ] : null,
             // Paid features this organization has (its plan, or given by a super admin); the menu locks what's off.
             'domainFeatures' => $currentDomain?->features() ?? array_fill_keys(Domain::FEATURES, false),
-            'currentLocation' => $this->getCurrentLocation($request),
+            'currentLocation' => $currentLocation = $this->getCurrentLocation($request),
+            // Parts of the app this location doesn't show (sidebar); EnsureLocationArea turns the pages away.
+            'locationAreas' => [
+                'hidden' => LocationAreas::hiddenAt($currentLocation instanceof InventoryLocation ? $currentLocation : null, $request->user()),
+                'prefixes' => collect(config('location_areas.areas', []))
+                    ->map(fn ($prefixes) => array_map(fn ($p) => Str::after($p, 'domains.'), $prefixes)),
+            ],
             'availableLocations' => $this->getAvailableLocations($request),
             'default_store' => $request->user() ? $this->getDefaultStore($request) : null,
             'impersonation' => $impersonationService->getImpersonationData(),

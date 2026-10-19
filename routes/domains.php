@@ -26,6 +26,7 @@ use App\Http\Controllers\Domains\PaymentCardTypeController;
 use App\Http\Controllers\Domains\PayMongoQrPhController;
 use App\Http\Controllers\Domains\ProductController;
 use App\Http\Controllers\Domains\ProfitLossController;
+use App\Http\Controllers\Domains\PurchaseOrderController;
 use App\Http\Controllers\Domains\RecurringExpenseController;
 use App\Http\Controllers\Domains\SaleController;
 use App\Http\Controllers\Domains\SaleDiscountController;
@@ -56,7 +57,7 @@ Route::prefix('domains/{domain:name_slug}')
     });
 
 Route::prefix('domains/{domain:name_slug}')
-    ->middleware(['auth', 'verified', 'domain.unlocked', 'user.permission', 'role.access'])
+    ->middleware(['auth', 'verified', 'domain.unlocked', 'user.permission', 'role.access', 'location.area'])
     ->name('domains.')
     ->group(function () {
         // Organization settings (Sales VAT, etc.)
@@ -392,6 +393,16 @@ Route::prefix('domains/{domain:name_slug}')
             Route::post('/locations/{location}/set-default', [InventoryLocationController::class, 'setDefault'])->name('locations.set-default');
             Route::post('/locations/{location}/toggle-status', [InventoryLocationController::class, 'toggleStatus'])->name('locations.toggle-status');
             Route::post('/locations/{location}/switch', [InventoryLocationController::class, 'switch'])->name('locations.switch');
+        });
+
+        // Purchasing: order stock from suppliers and receive it (a delivery becomes a supplier bill)
+        Route::prefix('purchasing')->name('purchase-orders.')->group(function () {
+            Route::get('/', [PurchaseOrderController::class, 'index'])->name('index');
+            Route::post('/', [PurchaseOrderController::class, 'store'])->name('store');
+            Route::put('/{purchaseOrder}', [PurchaseOrderController::class, 'update'])->whereNumber('purchaseOrder')->name('update');
+            Route::post('/{purchaseOrder}/order', [PurchaseOrderController::class, 'order'])->whereNumber('purchaseOrder')->name('order');
+            Route::post('/{purchaseOrder}/receive', [PurchaseOrderController::class, 'receive'])->whereNumber('purchaseOrder')->name('receive');
+            Route::post('/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel'])->whereNumber('purchaseOrder')->name('cancel');
         });
 
         // Terminal Setup (Organization-specific)

@@ -151,12 +151,10 @@ class UserService
      */
     public function getManageableRoles(User $currentUser)
     {
-        $manageableRoles = $currentUser->isSuperUser() 
-            ? array_keys(UserHierarchyService::getRoleHierarchy())
-            : UserHierarchyService::getManageableRoles($currentUser);
-            
-        // Highest role first, so the list reads in hierarchy order.
-        return Role::whereIn('name', $manageableRoles)->orderBy('level')->get(['id', 'name']);
+        // Highest role first, so the list reads in hierarchy order. Same rule as saving.
+        return UserHierarchyService::assignableRoles($currentUser)
+            ->map(fn (Role $role) => ['id' => $role->id, 'name' => $role->name])
+            ->values();
     }
 
     /**
@@ -164,15 +162,7 @@ class UserService
      */
     public function getAvailableRolesForCreation(User $currentUser)
     {
-        return Role::query()
-            ->when($currentUser->hasRole('manager'), function ($query) {
-                // Manager can only create cashier and supervisor roles
-                return $query->whereIn('name', ['cashier', 'supervisor']);
-            })
-            ->when($currentUser->hasRole('admin') && !$currentUser->hasRole('super admin'), function ($query) {
-                return $query->where('name', '!=', 'super admin');
-            })
-            ->pluck('id');
+        return UserHierarchyService::assignableRoles($currentUser)->pluck('id');
     }
 
     /**
@@ -205,6 +195,7 @@ class UserService
         // Assign role with correct guard
         $role = Role::findById($data['role_id'], 'web');
         $user->assignRole($role);
+        $user->syncRoleLevel();
 
         return $user->load('roles');
     }
@@ -232,6 +223,11 @@ class UserService
 
             if (!empty($data['password'])) {
                 $updateData['password'] = Hash::make($data['password']);
+            }
+
+            // Not one's own status: that stays with someone above them.
+            if (isset($data['status']) && $currentUser->id !== $user->id) {
+                $updateData['status'] = $data['status'];
             }
         } else {
             // Manager can only update non-sensitive fields
@@ -265,6 +261,7 @@ class UserService
         ) {
             $role = Role::findById($data['role_id'], 'web');
             $user->syncRoles([$role]);
+            $user->syncRoleLevel();
         }
 
         return $user->fresh()->load('roles');
@@ -275,9 +272,9 @@ class UserService
      */
     private function canUpdateSensitiveFields(User $currentUser, User $targetUser): bool
     {
-        return $currentUser->isSuperUser() || 
-               ($currentUser->hasAnyRole(['super admin', 'admin']) && 
-                ($currentUser->hasRole('super admin') || !$targetUser->hasRole('super admin')));
+        // Their own details, or someone they rank above (a manager their cashiers and supervisors).
+        return $currentUser->id === $targetUser->id
+            || UserHierarchyService::canEditUser($currentUser, $targetUser);
     }
 
     /**
@@ -339,11 +336,7 @@ class UserService
         $canUpdateSensitive = $this->canUpdateSensitiveFields($currentUser, $targetUser);
         
         if ($canUpdateSensitive) {
-            $availableRoles = Role::query()
-                ->when($currentUser->hasRole('admin') && !$currentUser->hasRole('super admin'), function ($query) {
-                    return $query->where('name', '!=', 'super admin');
-                })
-                ->pluck('id');
+            $availableRoles = UserHierarchyService::assignableRoles($currentUser)->pluck('id');
 
             $isSelfRoleLocked = $currentUser->id === $targetUser->id
                 && ! $currentUser->isSuperUser();
@@ -359,7 +352,8 @@ class UserService
                             $fail('You are not authorized to assign this role.');
                         }
                     }],
-                'supervisor_id' => 'nullable|exists:users,id'
+                'supervisor_id' => 'nullable|exists:users,id',
+                'status' => 'sometimes|in:active,inactive',
             ];
 
             // Add domain validation for global view
@@ -368,6 +362,14 @@ class UserService
             }
 
             return $rules;
+        }
+
+        // Someone ranked at or above them: their details and role can't be changed from here, and
+        // saying so beats dropping the change and reporting success.
+        if (request()->hasAny(['name', 'email', 'role_id', 'password'])) {
+            throw ValidationException::withMessages([
+                'role_id' => ["You can't change this user's details or role."],
+            ]);
         }
 
         return [

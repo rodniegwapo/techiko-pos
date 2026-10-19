@@ -178,6 +178,8 @@ class SaleController extends Controller
             ->orderBy('name')->orderBy('id')
             ->forPage($page, $perPage)
             ->get();
+        // Priced as this store sells them.
+        Product::applyStorePrices($products, $location->id);
 
         return ProductResource::collection($products)->additional([
             'meta' => [
@@ -235,6 +237,8 @@ class SaleController extends Controller
             ->orderBy('name')->orderBy('id')
             ->forPage($page, $perPage)
             ->get();
+        // Priced as this store sells them, so a sale rung up offline matches.
+        Product::applyStorePrices($products, $location->id);
 
         return ProductResource::collection($products)->additional([
             'meta' => [
@@ -1719,10 +1723,12 @@ class SaleController extends Controller
                         continue;
                     }
 
+                    // Priced on the server at this store's price, not the copy the device kept offline.
+                    $product = Product::query()->where('domain', $domain->name_slug)->findOrFail((int) $row['product_id']);
                     $sale->saleItems()->create([
-                        'product_id' => (int) $row['product_id'],
+                        'product_id' => $product->id,
                         'quantity' => (int) $row['quantity'],
-                        'unit_price' => (float) $row['unit_price'],
+                        'unit_price' => round($product->priceAt($location->id), 2),
                     ]);
                 }
 

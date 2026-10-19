@@ -40,8 +40,8 @@ class Helpers
 
     /**
      * Where an organization user lands (after login, impersonation, or being sent away from a page):
-     * the sales screen, unless their store is a warehouse, which doesn't sell. Then Inventory, or the
-     * dashboard or their profile when they can't open Inventory.
+     * the sales screen, unless their store is a warehouse, which doesn't sell. Then the dashboard
+     * (the whole business), or Inventory, or their profile when they can open neither.
      */
     public static function homeRouteFor(User $user, ?InventoryLocation $location = null): string
     {
@@ -57,11 +57,11 @@ class Helpers
         $can = fn (string $routeName) => $user->isSuperUser()
             || $user->getAllPermissions()->contains('route_name', $routeName);
 
-        if ($can('inventory.index')) {
-            return 'domains.inventory.index';
+        if ($can('dashboard')) {
+            return 'domains.dashboard';
         }
 
-        return $can('dashboard') ? 'domains.dashboard' : 'profile.edit';
+        return $can('inventory.index') ? 'domains.inventory.index' : 'profile.edit';
     }
 
     /**

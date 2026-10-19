@@ -468,6 +468,8 @@ class ProductController extends Controller
         $this->applySort($query, $request->sort, $location);
 
         $products = $query->paginate(15);
+        // Shown at this store's price; the list marks the ones with their own.
+        Product::applyStorePrices($products->getCollection(), $location?->id);
 
         $categoriesQuery = $this->buildCategoriesQuery($domain, $location);
 
@@ -551,6 +553,14 @@ class ProductController extends Controller
             if ($location) {
                 $product->addToLocation($location, true);
             }
+        }
+
+        // "Price at this store": empty sells at the product's price.
+        if ($request->has('store_price') && ($store = $this->resolveActiveLocation($request, $domain))) {
+            $request->validate(['store_price' => ['nullable', 'numeric', 'min:0']]);
+            $product->locations()->updateExistingPivot($store->id, [
+                'price' => $request->filled('store_price') ? round((float) $request->input('store_price'), 2) : null,
+            ]);
         }
 
         $this->queueSharedCatalogSuggestionIfNeeded($request, $domain, $product);
@@ -676,6 +686,7 @@ class ProductController extends Controller
                     $product->representation_type,
                 ),
                 'modifier_group_ids' => $product->modifierGroups()->pluck('modifier_groups.id'),
+                'store_price' => $product->storePriceAt($location?->id),
             ],
             'categories' => $categories,
             'modifierGroups' => $this->modifierGroupOptions($domain),

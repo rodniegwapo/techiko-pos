@@ -16,6 +16,7 @@ use App\Models\WalletCashReconciliation;
 use App\Support\FinanceAccess;
 use App\Support\Wallet\ChannelBalances;
 use App\Support\Wallet\MoneyTimeline;
+use App\Support\Wallet\StoresCash;
 use App\Support\Wallet\WalletCashBridgeExpected;
 use App\Support\Wallet\WalletCashDailyExpected;
 use App\Support\Wallet\WalletLedgerViewData;
@@ -37,6 +38,14 @@ class PaymentCardTypeController extends Controller
     {
         if (! $request->user()->hasPermissionToRoute('wallet.money-movement')) {
             abort(403);
+        }
+
+        // A warehouse has no drawer of its own: it sees what the stores have already closed.
+        $location = WalletLocationResolver::resolve($request, $domain);
+        if ($location->isWarehouse()) {
+            return Inertia::render('Wallet/StoresCash', [
+                'storesCash' => StoresCash::build($request, $domain),
+            ]);
         }
 
         return Inertia::render(

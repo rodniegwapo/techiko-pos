@@ -276,6 +276,19 @@ class User extends Authenticatable implements MustVerifyEmail
      * Check if user has location restriction
      */
     /**
+     * Keeps users.role_level equal to the assigned role's level, for the checks that still read
+     * it. Never 1 (that would make a super user): only is_super_user grants that.
+     */
+    public function syncRoleLevel(): void
+    {
+        $level = $this->roles()->min('level');
+        if ($level === null) {
+            return;
+        }
+        $this->forceFill(['role_level' => $this->is_super_user ? (int) $level : max(2, (int) $level)])->save();
+    }
+
+    /**
      * A cashier (or a role ranked lower), by the assigned role's level: users.role_level defaults
      * to 3 for staff made in the app, so it can't tell a cashier apart.
      */

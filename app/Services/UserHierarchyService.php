@@ -93,6 +93,60 @@ class UserHierarchyService
     }
 
     /**
+     * The roles a user may give someone, used both for the role list and when saving, so the two
+     * always agree. A super user may give any role; an admin any role at their level or below;
+     * anyone else only roles ranked below their own. Never "super admin" unless a super user.
+     *
+     * @return Collection<int, Role>
+     */
+    public static function assignableRoles(User $actor): Collection
+    {
+        if ($actor->isSuperUser()) {
+            return Role::query()->orderBy('level')->get(['id', 'name', 'level']);
+        }
+
+        $level = $actor->roles()->min('level');
+        if ($level === null) {
+            return collect();
+        }
+        $level = (int) $level;
+
+        return Role::query()
+            ->where('name', '!=', 'super admin')
+            ->where('level', '>', 1)
+            // Admins may make other admins; everyone else only people ranked below them.
+            ->where('level', $level <= 2 ? '>=' : '>', $level)
+            ->orderBy('level')
+            ->get(['id', 'name', 'level']);
+    }
+
+    /**
+     * Whether $actor may edit $target's details and role: a super user anyone; an admin anyone in
+     * the organization except a super admin; anyone else only people ranked below them.
+     */
+    public static function canEditUser(User $actor, User $target): bool
+    {
+        if ($actor->isSuperUser()) {
+            return true;
+        }
+        if ($target->isSuperUser() || $target->hasRole('super admin')) {
+            return false;
+        }
+
+        $actorLevel = $actor->roles()->min('level');
+        if ($actorLevel === null) {
+            return false;
+        }
+        if ((int) $actorLevel <= 2) {
+            return true;
+        }
+
+        $targetLevel = $target->roles()->min('level');
+
+        return $targetLevel !== null && (int) $targetLevel > (int) $actorLevel;
+    }
+
+    /**
      * Check if a user can manage another user (dynamic)
      */
     public static function canManageUser(User $manager, User $subordinate): bool

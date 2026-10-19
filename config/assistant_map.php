@@ -47,6 +47,7 @@ return [
     ['route' => 'inventory.adjustments.index', 'path' => 'Inventory → Stock Adjustments', 'about' => 'correct stock counts (damaged, lost, recount); an adjustment is a draft until it is submitted and approved'],
     ['route' => 'inventory.locations.index', 'path' => 'Inventory → Locations', 'about' => 'the stores and warehouses: add, edit, activate or deactivate, and set the default store'],
     ['route' => 'inventory.valuation', 'path' => 'Inventory → Valuation Report', 'about' => 'the value of stock on hand at cost, by product and store'],
+    ['route' => 'purchase-orders.index', 'path' => 'Purchasing', 'about' => 'purchase orders to suppliers: create, send, receive deliveries (stock comes in and the supplier bill is updated), cancel'],
 
     ['route' => 'loyalty.index', 'path' => 'Loyalty Program', 'about' => 'loyalty points and tiers for customers, adjusting points and loyalty analytics'],
     ['route' => 'voids.index', 'path' => 'Void Logs', 'about' => 'voided items and sales, with who voided them and why'],

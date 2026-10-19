@@ -64,7 +64,7 @@ class Product extends Model
     {
         return $this->belongsToMany(InventoryLocation::class, 'location_product', 'product_id', 'location_id')
             ->using(LocationProduct::class)
-            ->withPivot('is_active')
+            ->withPivot('is_active', 'price')
             ->withTimestamps();
     }
 
@@ -76,8 +76,62 @@ class Product extends Model
         return $this->belongsToMany(InventoryLocation::class, 'location_product', 'product_id', 'location_id')
             ->using(LocationProduct::class)
             ->wherePivot('is_active', true)
-            ->withPivot('is_active')
+            ->withPivot('is_active', 'price')
             ->withTimestamps();
+    }
+
+    /** The store's own price for this product, or null when it sells at the product's price. */
+    public function storePriceAt(?int $locationId): ?float
+    {
+        if (! $locationId) {
+            return null;
+        }
+        $price = \Illuminate\Support\Facades\DB::table('location_product')
+            ->where('product_id', $this->id)
+            ->where('location_id', $locationId)
+            ->value('price');
+
+        return $price !== null ? (float) $price : null;
+    }
+
+    /** What this product sells for at a store: the store's own price, else the product's price. */
+    public function priceAt(?int $locationId): float
+    {
+        return $this->storePriceAt($locationId) ?? (float) $this->price;
+    }
+
+    /**
+     * Store prices for many products at once (catalog lists): [product_id => price] for those with one.
+     *
+     * @param  iterable<int>  $productIds
+     * @return array<int, float>
+     */
+    public static function storePricesAt(?int $locationId, iterable $productIds): array
+    {
+        if (! $locationId) {
+            return [];
+        }
+
+        return \Illuminate\Support\Facades\DB::table('location_product')
+            ->where('location_id', $locationId)
+            ->whereIn('product_id', collect($productIds)->all())
+            ->whereNotNull('price')
+            ->pluck('price', 'product_id')
+            ->map(fn ($p) => (float) $p)
+            ->all();
+    }
+
+    /** Shows each product in the list at its price at this store (in memory, nothing saved). */
+    public static function applyStorePrices(iterable $products, ?int $locationId): void
+    {
+        $products = collect($products);
+        $prices = self::storePricesAt($locationId, $products->pluck('id'));
+        foreach ($products as $product) {
+            if (array_key_exists($product->id, $prices)) {
+                $product->setAttribute('base_price', $product->price);
+                $product->setAttribute('price', $prices[$product->id]);
+            }
+        }
     }
 
     /**

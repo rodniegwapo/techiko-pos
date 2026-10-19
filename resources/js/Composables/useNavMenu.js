@@ -23,6 +23,7 @@ import {
     IconMessages,
     IconMail,
     IconSparkles,
+    IconTruck,
 } from "@tabler/icons-vue";
 import { router, usePage } from "@inertiajs/vue3";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
@@ -240,6 +241,17 @@ const menuItems = [
                 feature: "advanced_inventory",
             },
         ],
+    },
+    {
+        key: "purchasing",
+        title: "Purchasing",
+        icon: IconTruck,
+        routeName: "purchase-orders.index",
+        path: "/purchasing",
+        section: "stock",
+        domainOnly: true,
+        hideForSuperOutsideDomain: true,
+        keywords: "purchase order supplier receive stock delivery",
     },
     {
         key: "finance-group",
@@ -500,6 +512,13 @@ export function useNavMenu() {
     // ===================================
     // FILTER MENUS BASED ON PERMISSIONS
     // ===================================
+    const inHiddenArea = (routeName) => {
+        const areas = page.props.locationAreas;
+        return (areas?.hidden ?? []).some((area) =>
+            (areas?.prefixes?.[area] ?? []).some((prefix) => routeName.startsWith(prefix)),
+        );
+    };
+
     const menus = computed(() => {
         const filterMenuItems = (items) =>
             items
@@ -539,6 +558,12 @@ export function useNavMenu() {
                         ["sales", "offline-sales"].includes(item.key) &&
                         page.props.currentLocation?.type === "warehouse"
                     ) {
+                        return false;
+                    }
+
+                    // Parts this location doesn't show (config/location_areas.php): the books at a store,
+                    // customers and card terminals at a warehouse. The server turns these pages away too.
+                    if (item.routeName && inHiddenArea(item.routeName)) {
                         return false;
                     }
 

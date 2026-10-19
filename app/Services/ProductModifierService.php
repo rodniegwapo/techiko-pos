@@ -93,7 +93,8 @@ class ProductModifierService
         $attributes = [
             'product_id' => $product->id,
             'quantity' => $quantity,
-            'unit_price' => round((float) $product->price + $resolved['price_delta'], 2),
+            // The store's own price when it has one (Product::priceAt).
+            'unit_price' => round($product->priceAt($sale->location_id) + $resolved['price_delta'], 2),
             'modifier_key' => $resolved['key'],
             'notes' => $notes,
         ];

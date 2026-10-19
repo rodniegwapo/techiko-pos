@@ -113,9 +113,9 @@ class UserPolicy
             return ! $model->hasRole('super admin');
         }
 
-        // managers can edit non-sensitive fields of cashiers and supervisors only
+        // managers can edit the people ranked below them (supervisors, cashiers, custom roles below)
         if ($user->hasRole('manager')) {
-            return $model->hasAnyRole(['cashier', 'supervisor']);
+            return \App\Services\UserHierarchyService::canEditUser($user, $model);
         }
 
         return false;
