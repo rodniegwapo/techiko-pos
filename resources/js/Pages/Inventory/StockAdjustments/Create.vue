@@ -37,6 +37,13 @@ const form = reactive({
   description: "",
   items: [],
   domain: page.props.isGlobalView ? null : (page.props.currentDomain?.name_slug || null),
+  save_as_draft: false,
+});
+
+// Admins (and super users) need no one's approval: their adjustment applies when saved.
+const appliesRightAway = computed(() => {
+  const user = page.props.auth?.user?.data;
+  return !!user?.is_super_user || (user?.roles ?? []).some((r) => ["admin", "super admin"].includes(r.name?.toLowerCase()));
 });
 
 const loading = ref(false);
@@ -237,6 +244,7 @@ const handleSubmit = async () => {
       reason: form.reason,
       description: form.description,
       domain: form.domain || undefined,
+      save_as_draft: appliesRightAway.value && form.save_as_draft,
       items: form.items.map((item) => ({
         product_id: item.product_id,
         actual_quantity: item.actual_quantity,
@@ -429,6 +437,16 @@ const handleCancel = () => {
               :rows="3"
               :disabled="loading"
             />
+          </div>
+
+          <!-- An admin's adjustment applies right away, unless kept as a draft to apply later -->
+          <div v-if="appliesRightAway" class="md:col-span-2">
+            <a-checkbox v-model:checked="form.save_as_draft" :disabled="loading" data-testid="save-as-draft">
+              Save as a draft (apply later)
+            </a-checkbox>
+            <p class="mb-0 mt-1 text-xs text-gray-500">
+              Otherwise the counted quantities are applied to the store's stock as soon as you save.
+            </p>
           </div>
         </div>
       </a-card>

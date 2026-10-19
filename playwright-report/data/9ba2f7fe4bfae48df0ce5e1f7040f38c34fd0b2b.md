@@ -1,0 +1,659 @@
+# Instructions
+
+- Following Playwright test failed.
+- Explain why, be concise, respect Playwright best practices.
+- Provide a snippet of code with the fix, if possible.
+
+# Test info
+
+- Name: users\users.spec.js >> Adding and editing a user (admin) >> the new account can sign in with the password it was given
+- Location: tests\e2e\users\users.spec.js:264:5
+
+# Error details
+
+```
+Error: expect(locator).toBeVisible() failed
+
+Locator: locator('.ant-notification-notice').filter({ hasText: 'User Created' })
+Expected: visible
+Timeout: 5000ms
+Error: element(s) not found
+
+Call log:
+  - Expect "toBeVisible" locator('.ant-notification-notice').filter({ hasText: 'User Created' }) with timeout 5000ms
+  - waiting for locator('.ant-notification-notice').filter({ hasText: 'User Created' })
+
+```
+
+```yaml
+- complementary:
+  - img "Techiko Logo"
+  - button:
+    - img
+  - button "Search pages":
+    - img
+    - text: Search pages… Ctrl K
+  - menu:
+    - menuitem "Dashboard Jollibee Corporation":
+      - img
+      - text: Dashboard Jollibee Corporation
+    - listitem:
+      - text: Sell
+      - list:
+        - menuitem "Sales":
+          - img
+          - text: Sales
+        - menuitem "Offline sales":
+          - img
+          - text: Offline sales
+        - menuitem "Sales History":
+          - img
+          - text: Sales History
+        - menuitem "Customers":
+          - img
+          - text: Customers
+        - menuitem "Credit Management":
+          - img
+          - text: Credit Management
+        - menuitem "Loyalty Program":
+          - img
+          - text: Loyalty Program
+        - menuitem "Void Logs":
+          - img
+          - text: Void Logs
+    - listitem:
+      - text: Catalog & stock
+      - list:
+        - img
+        - text: Products
+        - img
+        - text: Inventory
+        - menuitem "Purchasing":
+          - img
+          - text: Purchasing
+    - listitem:
+      - text: Money
+      - list:
+        - img
+        - text: Finance
+        - img
+        - text: Cash & wallet
+    - listitem:
+      - text: Team & settings
+      - list:
+        - menuitem "Users":
+          - img
+          - text: Users
+        - menuitem "Settings":
+          - img
+          - text: Settings
+        - menuitem "Billing":
+          - img
+          - text: Billing
+        - menuitem "AI usage":
+          - img
+          - text: AI usage
+  - img "avatar"
+  - text: Jollibee Admin admin@jollibee-corp.com
+- main:
+  - button "Jollibee Main Store - Makati":
+    - img
+    - text: Jollibee Main Store - Makati
+    - img
+  - paragraph: User Management
+  - paragraph: Monday, October 19, 2026 14:45:57
+  - heading "User Management" [level=1]
+  - button "redo":
+    - img "redo"
+  - textbox "Search users by name or email..."
+  - button "search":
+    - img "search"
+  - button "Add User":
+    - img
+    - text: Add User
+  - button "User Hierarchy":
+    - img
+    - text: User Hierarchy
+  - button "filter":
+    - img "filter"
+  - alert:
+    - img "info-circle"
+    - text: "Viewing inventory for: Jollibee Main Store - Makati 123 Ayala Avenue, Makati City"
+    - button "close":
+      - img "close"
+  - table:
+    - rowgroup:
+      - row "User Role(s) Status Location Created Actions":
+        - columnheader "User"
+        - columnheader "Role(s)"
+        - columnheader "Status"
+        - columnheader "Location"
+        - columnheader "Created"
+        - columnheader "Actions"
+    - rowgroup:
+      - row "EW E2E Wallet Partner 3 e2e-wallet-partner-3@techiko.test manager Active E2E Wallet Store 3 Oct 19, 2026 View Details Edit User Set PIN":
+        - cell "EW E2E Wallet Partner 3 e2e-wallet-partner-3@techiko.test"
+        - cell "manager"
+        - cell "Active":
+          - switch [checked]
+          - text: Active
+        - cell "E2E Wallet Store 3":
+          - text: E2E Wallet Store 3
+          - button "View location details for E2E Wallet Store 3":
+            - img
+        - cell "Oct 19, 2026"
+        - cell "View Details Edit User Set PIN":
+          - button "View Details":
+            - img
+          - button "Edit User":
+            - img
+          - button "Set PIN":
+            - img
+      - row "EW E2E Wallet Manager 4 e2e-wallet-manager-4@techiko.test manager Active E2E Wallet Store 4 Oct 19, 2026 View Details Edit User Set PIN":
+        - cell "EW E2E Wallet Manager 4 e2e-wallet-manager-4@techiko.test"
+        - cell "manager"
+        - cell "Active":
+          - switch [checked]
+          - text: Active
+        - cell "E2E Wallet Store 4":
+          - text: E2E Wallet Store 4
+          - button "View location details for E2E Wallet Store 4":
+            - img
+        - cell "Oct 19, 2026"
+        - cell "View Details Edit User Set PIN":
+          - button "View Details":
+            - img
+          - button "Edit User":
+            - img
+          - button "Set PIN":
+            - img
+      - row "EW E2E Wallet Partner 4 e2e-wallet-partner-4@techiko.test manager Active E2E Wallet Store 4 Oct 19, 2026 View Details Edit User Set PIN":
+        - cell "EW E2E Wallet Partner 4 e2e-wallet-partner-4@techiko.test"
+        - cell "manager"
+        - cell "Active":
+          - switch [checked]
+          - text: Active
+        - cell "E2E Wallet Store 4":
+          - text: E2E Wallet Store 4
+          - button "View location details for E2E Wallet Store 4":
+            - img
+        - cell "Oct 19, 2026"
+        - cell "View Details Edit User Set PIN":
+          - button "View Details":
+            - img
+          - button "Edit User":
+            - img
+          - button "Set PIN":
+            - img
+      - row "EW E2E Wallet Partner 1 e2e-wallet-partner-1@techiko.test manager Active E2E Wallet Store 1 Oct 19, 2026 View Details Edit User Set PIN":
+        - cell "EW E2E Wallet Partner 1 e2e-wallet-partner-1@techiko.test"
+        - cell "manager"
+        - cell "Active":
+          - switch [checked]
+          - text: Active
+        - cell "E2E Wallet Store 1":
+          - text: E2E Wallet Store 1
+          - button "View location details for E2E Wallet Store 1":
+            - img
+        - cell "Oct 19, 2026"
+        - cell "View Details Edit User Set PIN":
+          - button "View Details":
+            - img
+          - button "Edit User":
+            - img
+          - button "Set PIN":
+            - img
+      - row "EW E2E Wallet Manager 2 e2e-wallet-manager-2@techiko.test manager Active E2E Wallet Store 2 Oct 19, 2026 View Details Edit User Set PIN":
+        - cell "EW E2E Wallet Manager 2 e2e-wallet-manager-2@techiko.test"
+        - cell "manager"
+        - cell "Active":
+          - switch [checked]
+          - text: Active
+        - cell "E2E Wallet Store 2":
+          - text: E2E Wallet Store 2
+          - button "View location details for E2E Wallet Store 2":
+            - img
+        - cell "Oct 19, 2026"
+        - cell "View Details Edit User Set PIN":
+          - button "View Details":
+            - img
+          - button "Edit User":
+            - img
+          - button "Set PIN":
+            - img
+      - row "EW E2E Wallet Partner 2 e2e-wallet-partner-2@techiko.test manager Active E2E Wallet Store 2 Oct 19, 2026 View Details Edit User Set PIN":
+        - cell "EW E2E Wallet Partner 2 e2e-wallet-partner-2@techiko.test"
+        - cell "manager"
+        - cell "Active":
+          - switch [checked]
+          - text: Active
+        - cell "E2E Wallet Store 2":
+          - text: E2E Wallet Store 2
+          - button "View location details for E2E Wallet Store 2":
+            - img
+        - cell "Oct 19, 2026"
+        - cell "View Details Edit User Set PIN":
+          - button "View Details":
+            - img
+          - button "Edit User":
+            - img
+          - button "Set PIN":
+            - img
+      - row "EW E2E Wallet Manager 3 e2e-wallet-manager-3@techiko.test manager Active E2E Wallet Store 3 Oct 19, 2026 View Details Edit User Set PIN":
+        - cell "EW E2E Wallet Manager 3 e2e-wallet-manager-3@techiko.test"
+        - cell "manager"
+        - cell "Active":
+          - switch [checked]
+          - text: Active
+        - cell "E2E Wallet Store 3":
+          - text: E2E Wallet Store 3
+          - button "View location details for E2E Wallet Store 3":
+            - img
+        - cell "Oct 19, 2026"
+        - cell "View Details Edit User Set PIN":
+          - button "View Details":
+            - img
+          - button "Edit User":
+            - img
+          - button "Set PIN":
+            - img
+      - row "EW E2E Wallet Manager 1 e2e-wallet-manager-1@techiko.test manager Active E2E Wallet Store 1 Oct 19, 2026 View Details Edit User Set PIN":
+        - cell "EW E2E Wallet Manager 1 e2e-wallet-manager-1@techiko.test"
+        - cell "manager"
+        - cell "Active":
+          - switch [checked]
+          - text: Active
+        - cell "E2E Wallet Store 1":
+          - text: E2E Wallet Store 1
+          - button "View location details for E2E Wallet Store 1":
+            - img
+        - cell "Oct 19, 2026"
+        - cell "View Details Edit User Set PIN":
+          - button "View Details":
+            - img
+          - button "Edit User":
+            - img
+          - button "Set PIN":
+            - img
+      - row "EC E2E Cashier 1 e2e-cashier-1@techiko.test cashier Active Jollibee Main Store - Makati Oct 19, 2026 View Details Edit User Set PIN":
+        - cell "EC E2E Cashier 1 e2e-cashier-1@techiko.test"
+        - cell "cashier"
+        - cell "Active":
+          - switch [checked]
+          - text: Active
+        - cell "Jollibee Main Store - Makati":
+          - text: Jollibee Main Store - Makati
+          - button "View location details for Jollibee Main Store - Makati":
+            - img
+        - cell "Oct 19, 2026"
+        - cell "View Details Edit User Set PIN":
+          - button "View Details":
+            - img
+          - button "Edit User":
+            - img
+          - button "Set PIN":
+            - img
+      - row "EC E2E Cashier 2 e2e-cashier-2@techiko.test cashier Active Jollibee Main Store - Makati Oct 19, 2026 View Details Edit User Set PIN":
+        - cell "EC E2E Cashier 2 e2e-cashier-2@techiko.test"
+        - cell "cashier"
+        - cell "Active":
+          - switch [checked]
+          - text: Active
+        - cell "Jollibee Main Store - Makati":
+          - text: Jollibee Main Store - Makati
+          - button "View location details for Jollibee Main Store - Makati":
+            - img
+        - cell "Oct 19, 2026"
+        - cell "View Details Edit User Set PIN":
+          - button "View Details":
+            - img
+          - button "Edit User":
+            - img
+          - button "Set PIN":
+            - img
+      - row "EC E2E Cashier 3 e2e-cashier-3@techiko.test cashier Active Jollibee Main Store - Makati Oct 19, 2026 View Details Edit User Set PIN":
+        - cell "EC E2E Cashier 3 e2e-cashier-3@techiko.test"
+        - cell "cashier"
+        - cell "Active":
+          - switch [checked]
+          - text: Active
+        - cell "Jollibee Main Store - Makati":
+          - text: Jollibee Main Store - Makati
+          - button "View location details for Jollibee Main Store - Makati":
+            - img
+        - cell "Oct 19, 2026"
+        - cell "View Details Edit User Set PIN":
+          - button "View Details":
+            - img
+          - button "Edit User":
+            - img
+          - button "Set PIN":
+            - img
+      - row "EC E2E Cashier 4 e2e-cashier-4@techiko.test cashier Active Jollibee Main Store - Makati Oct 19, 2026 View Details Edit User Set PIN":
+        - cell "EC E2E Cashier 4 e2e-cashier-4@techiko.test"
+        - cell "cashier"
+        - cell "Active":
+          - switch [checked]
+          - text: Active
+        - cell "Jollibee Main Store - Makati":
+          - text: Jollibee Main Store - Makati
+          - button "View location details for Jollibee Main Store - Makati":
+            - img
+        - cell "Oct 19, 2026"
+        - cell "View Details Edit User Set PIN":
+          - button "View Details":
+            - img
+          - button "Edit User":
+            - img
+          - button "Set PIN":
+            - img
+      - row "EN E2E No Dashboard e2e-no-dashboard@techiko.test Active Jollibee Main Store - Makati Oct 19, 2026 View Details Edit User Set PIN":
+        - cell "EN E2E No Dashboard e2e-no-dashboard@techiko.test"
+        - cell
+        - cell "Active":
+          - switch [checked]
+          - text: Active
+        - cell "Jollibee Main Store - Makati":
+          - text: Jollibee Main Store - Makati
+          - button "View location details for Jollibee Main Store - Makati":
+            - img
+        - cell "Oct 19, 2026"
+        - cell "View Details Edit User Set PIN":
+          - button "View Details":
+            - img
+          - button "Edit User":
+            - img
+          - button "Set PIN":
+            - img
+      - row "JC Jollibee Cashier - SM Mall cashier2@jollibee-corp.com cashier Active Jollibee Main Store - Makati Oct 19, 2026 View Details Edit User Set PIN":
+        - cell "JC Jollibee Cashier - SM Mall cashier2@jollibee-corp.com"
+        - cell "cashier"
+        - cell "Active":
+          - switch [checked]
+          - text: Active
+        - cell "Jollibee Main Store - Makati":
+          - text: Jollibee Main Store - Makati
+          - button "View location details for Jollibee Main Store - Makati":
+            - img
+        - cell "Oct 19, 2026"
+        - cell "View Details Edit User Set PIN":
+          - button "View Details":
+            - img
+          - button "Edit User":
+            - img
+          - button "Set PIN":
+            - img
+      - row "JA Jollibee Admin admin@jollibee-corp.com admin Active All locations Oct 19, 2026 View Details Edit User Set PIN":
+        - cell "JA Jollibee Admin admin@jollibee-corp.com"
+        - cell "admin"
+        - cell "Active":
+          - switch [checked] [disabled]
+          - text: Active
+        - cell "All locations"
+        - cell "Oct 19, 2026"
+        - cell "View Details Edit User Set PIN":
+          - button "View Details":
+            - img
+          - button "Edit User":
+            - img
+          - button "Set PIN":
+            - img
+  - list:
+    - listitem: 1-15 of 18 items
+    - listitem "Previous Page":
+      - button "left" [disabled]:
+        - img "left"
+    - listitem "1"
+    - listitem "2"
+    - listitem "Next Page":
+      - button "right":
+        - img "right"
+- button "Open chat with team":
+  - img
+- dialog "Add New User":
+  - document:
+    - button "Close":
+      - img "close"
+    - text: Add New User * Full Name
+    - textbox "* Full Name":
+      - /placeholder: Enter user's full name
+      - text: E2E Can Sign In
+    - text: "* Email Address"
+    - textbox "* Email Address":
+      - /placeholder: user@example.com
+      - text: e2e-user-vwltie@techiko.test
+    - text: "* Role"
+    - combobox "* Role"
+    - text: Cashier * Store / location
+    - combobox "* Store / location"
+    - text: Select where they work
+    - alert: Please select where they work
+    - text: They work at this location and see its sales, stock and cash. Assign Supervisor
+    - combobox "Assign Supervisor"
+    - text: Select assign supervisor * Password
+    - textbox "* Password":
+      - /placeholder: Enter password
+      - text: e2e-password
+    - img "eye-invisible"
+    - text: Confirm Password
+    - textbox "Confirm Password":
+      - /placeholder: Confirm password
+      - text: e2e-password
+    - img "eye-invisible"
+    - heading "safety-certificate Role Permissions" [level=4]:
+      - img "safety-certificate"
+      - text: Role Permissions
+    - strong: Cashier
+    - text: "- Basic sales operations and customer service"
+    - heading "Preview" [level=4]
+    - text: EC E2E Can Sign In e2e-user-vwltie@techiko.test Cashier
+    - button "Cancel"
+    - button "Add User"
+```
+
+# Test source
+
+```ts
+  168 |         await openUsers(page);
+  169 | 
+  170 |         await search(page, USERS.cashier.email);
+  171 | 
+  172 |         // cashier1 is seeded into JB-MAIN (UserSeeder), so the column must not claim there is none.
+  173 |         const location = cell(rows(page).first(), "location");
+  174 |         await expect(location).not.toContainText("No location assigned");
+  175 | 
+  176 |         // The column is an info button; the store itself is named in the panel it opens.
+  177 |         await location.getByRole("button").click();
+  178 |         const details = page.getByRole("dialog").filter({ hasText: "Location Information" });
+  179 |         await expect(details).toContainText("Jollibee Main Store");
+  180 |         await expect(details).toContainText("store");
+  181 |     });
+  182 | 
+  183 |     test("an account with no store says so", async ({ page }) => {
+  184 |         await openUsers(page);
+  185 | 
+  186 |         await search(page, USERS.admin.email);
+  187 | 
+  188 |         await expect(cell(rows(page).first(), "location")).toContainText("No location assigned");
+  189 |     });
+  190 | 
+  191 |     for (const [what, term] of [
+  192 |         ["name", "Manager"],
+  193 |         ["email", USERS.manager.email],
+  194 |     ]) {
+  195 |         test(`search finds an account by ${what}`, async ({ page }) => {
+  196 |             await openUsers(page);
+  197 | 
+  198 |             await search(page, term);
+  199 | 
+  200 |             await expect(rowWith(page, USERS.manager.email)).toHaveCount(1);
+  201 |         });
+  202 |     }
+  203 | 
+  204 |     test("the search box shows the term the list is filtered by", async ({ page }) => {
+  205 |         await openUsers(page, listUrl(`?search=${encodeURIComponent(USERS.manager.email)}`));
+  206 | 
+  207 |         await expect(page.getByPlaceholder("Search users by name or email...")).toHaveValue(USERS.manager.email);
+  208 |         await expect(rows(page)).toHaveCount(1);
+  209 |     });
+  210 | 
+  211 |     test("the role filter shows only that role", async ({ page }) => {
+  212 |         await openUsers(page);
+  213 | 
+  214 |         await filterBy(page, "Role", "manager", "role", "manager");
+  215 | 
+  216 |         await expect(rowWith(page, USERS.manager.email)).toHaveCount(1);
+  217 |         await expect(rowWith(page, USERS.cashier.email)).toHaveCount(0);
+  218 |         for (const roles of await cell(rows(page), "roles").allInnerTexts()) {
+  219 |             expect(roles.trim()).toBe("manager");
+  220 |         }
+  221 |         await expect(page.locator(".ant-tag").filter({ hasText: "Role" })).toContainText("manager");
+  222 |     });
+  223 | 
+  224 |     test("only this organization's accounts are listed", async ({ page }) => {
+  225 |         await openUsers(page);
+  226 | 
+  227 |         const domains = new Set((await allUsers(page.request)).map((u) => u.domain));
+  228 |         expect([...domains]).toEqual(["jollibee-corp"]);
+  229 |     });
+  230 | 
+  231 |     test("a user's details open in a dialog", async ({ page }) => {
+  232 |         await openUsers(page);
+  233 |         await search(page, USERS.manager.email);
+  234 | 
+  235 |         await rows(page).first().getByRole("button", { name: "View Details" }).click();
+  236 | 
+  237 |         const dialog = page.getByRole("dialog").filter({ hasText: "User Details" });
+  238 |         await expect(dialog).toContainText(USERS.manager.email);
+  239 |         await expect(dialog).toContainText("manager");
+  240 |     });
+  241 | });
+  242 | 
+  243 | test.describe("Adding and editing a user (admin)", () => {
+  244 |     test.use({ account: "admin" });
+  245 |     // These add accounts, whose email has to be free. One at a time, in order.
+  246 |     test.describe.configure({ mode: "default" });
+  247 | 
+  248 |     test("a new user is added to the list", async ({ page }) => {
+  249 |         const email = uniqueEmail();
+  250 |         const name = `E2E Added ${email.slice(9, 15)}`;
+  251 |         await openUsers(page);
+  252 | 
+  253 |         await addUser(page, { name, email });
+  254 | 
+  255 |         await expect(notice(page, "User Created")).toBeVisible();
+  256 |         const user = await remember(page, email);
+  257 |         expect(user.name).toBe(name);
+  258 |         expect(user.domain, "created inside this organization").toBe("jollibee-corp");
+  259 |         await search(page, email);
+  260 |         await expect(cell(rows(page).first(), "roles")).toContainText("cashier");
+  261 |         await expect(cell(rows(page).first(), "status")).toContainText("Active");
+  262 |     });
+  263 | 
+  264 |     test("the new account can sign in with the password it was given", async ({ page, serverAs }) => {
+  265 |         const email = uniqueEmail();
+  266 |         await openUsers(page);
+  267 |         await addUser(page, { name: "E2E Can Sign In", email });
+> 268 |         await expect(notice(page, "User Created")).toBeVisible();
+      |                                                    ^ Error: expect(locator).toBeVisible() failed
+  269 |         await remember(page, email);
+  270 | 
+  271 |         // serverAs only knows the named accounts, so post the login form the way it does.
+  272 |         const fresh = await serverAs("admin");
+  273 |         await fresh.get("/login");
+  274 |         const xsrf = (await fresh.storageState()).cookies.find((c) => c.name === "XSRF-TOKEN");
+  275 |         const res = await fresh.post("/login", {
+  276 |             form: { email, password: PASSWORD },
+  277 |             headers: { "X-XSRF-TOKEN": decodeURIComponent(xsrf.value), Accept: "text/html" },
+  278 |             maxRedirects: 0,
+  279 |         });
+  280 | 
+  281 |         expect(res.status(), "the new account is accepted at login").toBe(302);
+  282 |         expect(res.headers().location).not.toMatch(/\/login$/);
+  283 |     });
+  284 | 
+  285 |     test("a user needs a name", async ({ page }) => {
+  286 |         await openUsers(page);
+  287 | 
+  288 |         await page.getByRole("button", { name: "Add User" }).click();
+  289 |         const dialog = page.getByRole("dialog").filter({ hasText: "Add New User" });
+  290 |         await dialog.getByRole("textbox", { name: /Email Address/ }).fill(uniqueEmail());
+  291 |         await dialog.getByRole("button", { name: "Add User" }).last().click();
+  292 | 
+  293 |         await expect(dialog.locator(".ant-form-item-explain-error").first()).toBeVisible();
+  294 |         await expect(dialog).toBeVisible();
+  295 |     });
+  296 | 
+  297 |     test("the two passwords have to match", async ({ page }) => {
+  298 |         await openUsers(page);
+  299 | 
+  300 |         await addUser(page, {
+  301 |             name: "E2E Mismatched",
+  302 |             email: uniqueEmail(),
+  303 |             confirmation: `${PASSWORD}-other`,
+  304 |         });
+  305 | 
+  306 |         const dialog = page.getByRole("dialog").filter({ hasText: "Add New User" });
+  307 |         await expect(dialog.locator(".ant-form-item-explain-error")).toContainText("Passwords do not match");
+  308 |         await expect(dialog).toBeVisible();
+  309 |     });
+  310 | 
+  311 |     test("an email already in use is refused", async ({ page }) => {
+  312 |         await openUsers(page);
+  313 | 
+  314 |         await addUser(page, { name: "E2E Duplicate Email", email: USERS.manager.email });
+  315 | 
+  316 |         await expect(notice(page, "already been taken")).toBeVisible();
+  317 |     });
+  318 | 
+  319 |     test("editing a user saves it and says so", async ({ page }) => {
+  320 |         const email = uniqueEmail();
+  321 |         await openUsers(page);
+  322 |         await addUser(page, { name: "E2E Before Edit", email });
+  323 |         await expect(notice(page, "User Created")).toBeVisible();
+  324 |         await remember(page, email);
+  325 |         await search(page, email);
+  326 | 
+  327 |         await rows(page).first().getByRole("button", { name: "Edit User" }).click();
+  328 |         const dialog = page.getByRole("dialog").filter({ hasText: "Edit User" });
+  329 |         await dialog.getByRole("textbox", { name: /Full Name/ }).fill("E2E After Edit");
+  330 |         await dialog.getByRole("button", { name: "Update User" }).last().click();
+  331 | 
+  332 |         await expect(notice(page, "User Updated")).toBeVisible();
+  333 |         await expect(dialog, "the dialog closes once it is saved").toBeHidden();
+  334 |         await expect(rows(page).first()).toContainText("E2E After Edit");
+  335 |     });
+  336 | 
+  337 |     test("a PIN can be set for a user", async ({ page }) => {
+  338 |         const email = uniqueEmail();
+  339 |         await openUsers(page);
+  340 |         await addUser(page, { name: "E2E Needs A Pin", email });
+  341 |         await expect(notice(page, "User Created")).toBeVisible();
+  342 |         await remember(page, email);
+  343 |         await search(page, email);
+  344 | 
+  345 |         await rows(page).first().getByRole("button", { name: "Set PIN" }).click();
+  346 |         const dialog = page.getByRole("dialog").filter({ hasText: "Set user PIN" });
+  347 |         await dialog.getByLabel("PIN", { exact: true }).fill("9317");
+  348 |         await dialog.getByLabel("Confirm PIN").fill("9317");
+  349 |         await dialog.getByRole("button", { name: "Save PIN" }).click();
+  350 | 
+  351 |         await expect(notice(page, "PIN saved")).toBeVisible();
+  352 |         await expect(dialog).toBeHidden();
+  353 |     });
+  354 | 
+  355 |     test("a PIN has to be repeated correctly", async ({ page }) => {
+  356 |         const email = uniqueEmail();
+  357 |         await openUsers(page);
+  358 |         await addUser(page, { name: "E2E Bad Pin Confirm", email });
+  359 |         await expect(notice(page, "User Created")).toBeVisible();
+  360 |         await remember(page, email);
+  361 |         await search(page, email);
+  362 | 
+  363 |         await rows(page).first().getByRole("button", { name: "Set PIN" }).click();
+  364 |         const dialog = page.getByRole("dialog").filter({ hasText: "Set user PIN" });
+  365 |         await dialog.getByLabel("PIN", { exact: true }).fill("9317");
+  366 |         await dialog.getByLabel("Confirm PIN").fill("1111");
+  367 |         await dialog.getByRole("button", { name: "Save PIN" }).click();
+  368 | 
+```

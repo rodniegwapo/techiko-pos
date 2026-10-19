@@ -1,7 +1,7 @@
 import { test, expect, apiJson } from "../support/fixtures.js";
 import { pickSelectOption, notice } from "../support/antd.js";
 import { pageProps, responseProps, responseVersion } from "../support/inertia.js";
-import { USERS } from "../support/users.js";
+import { USERS, storeLocationId } from "../support/users.js";
 
 /**
  * The global users page at /users: User Management across every organization.
@@ -72,6 +72,7 @@ async function makeUser(api, { domain = JOLLIBEE.slug, name = "E2E Global User",
         password: PASSWORD,
         password_confirmation: PASSWORD,
         role_id: CASHIER_ROLE_ID,
+        location_id: await storeLocationId(api, domain),
         domain,
     });
     expect(res.status, `create ${email}`).toBe(201);
@@ -203,6 +204,11 @@ test.describe("Managing users across organizations (super user)", () => {
         await dialog.getByRole("textbox", { name: /Email Address/ }).fill(email);
         await pickSelectOption(page, dialog.locator('.ant-form-item:has(label:text-is("Domain"))'), 0, MCDONALDS.name);
         await pickSelectOption(page, dialog.locator('.ant-form-item:has(label:text-is("Role"))'), 0, "cashier");
+        // The organization has more than one store, so the form asks where they work.
+        const location = dialog.locator('.ant-form-item:has(label:text-is("Store / location"))');
+        if (await location.count()) {
+            await pickSelectOption(page, location, 0, "McDonald");
+        }
         await dialog.getByLabel("Password", { exact: true }).fill(PASSWORD);
         await dialog.getByLabel("Confirm Password").fill(PASSWORD);
         await dialog.getByRole("button", { name: "Add User" }).last().click();

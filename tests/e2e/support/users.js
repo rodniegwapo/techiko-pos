@@ -1,3 +1,5 @@
+import { responseProps } from "./inertia.js";
+
 /**
  * Accounts the e2e suite signs in as.
  * - admin/manager/cashier (Jollibee) and mcCashier come from database/seeders/UserSeeder.php
@@ -56,6 +58,15 @@ for (const plan of ["free", "basic", "standard", "premium"]) {
 }
 
 export const OTHER_DOMAIN = "mcdonalds-corp";
+
+/**
+ * A store of the organization, for new staff: managers and the roles below them must be given
+ * where they work when an organization has more than one location. Read from the Users page.
+ */
+export async function storeLocationId(api, domain = "jollibee-corp") {
+    const props = await responseProps(await api.get(`/domains/${domain}/users`));
+    return (props.locations ?? []).find((l) => l.type !== "warehouse")?.id ?? null;
+}
 
 /** Seeded worker cashiers (E2ESalesSeeder::WORKER_CASHIERS). */
 export const WORKER_CASHIER_COUNT = 4;

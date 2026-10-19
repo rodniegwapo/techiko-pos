@@ -1,7 +1,7 @@
 import { test, expect, apiJson } from "../support/fixtures.js";
 import { pickSelectOption, notice } from "../support/antd.js";
 import { pageProps, responseProps } from "../support/inertia.js";
-import { USERS } from "../support/users.js";
+import { USERS, storeLocationId } from "../support/users.js";
 
 /**
  * The users page (User Management).
@@ -67,6 +67,11 @@ async function addUser(page, { name, email, role = "cashier", password = PASSWOR
     await dialog.getByRole("textbox", { name: /Email Address/ }).fill(email);
     if (role) {
         await pickSelectOption(page, dialog.locator(".ant-form-item").filter({ hasText: "Role" }), 0, role);
+    }
+    // Staff in an organization with more than one location are told where they work.
+    const location = dialog.locator(".ant-form-item").filter({ hasText: "Store / location" });
+    if (await location.count()) {
+        await pickSelectOption(page, location, 0, "Jollibee Main Store");
     }
     if (password) {
         await dialog.getByLabel("Password", { exact: true }).fill(password);
@@ -169,23 +174,24 @@ test.describe("Users list (admin)", () => {
 
         await search(page, USERS.cashier.email);
 
-        // cashier1 is seeded into JB-MAIN (UserSeeder), so the column must not claim there is none.
+        // cashier1 is seeded into JB-MAIN (UserSeeder), so the column names it.
         const location = cell(rows(page).first(), "location");
+        await expect(location).toContainText("Jollibee Main Store");
         await expect(location).not.toContainText("No location assigned");
 
-        // The column is an info button; the store itself is named in the panel it opens.
+        // Its info button opens the store's details.
         await location.getByRole("button").click();
         const details = page.getByRole("dialog").filter({ hasText: "Location Information" });
         await expect(details).toContainText("Jollibee Main Store");
         await expect(details).toContainText("store");
     });
 
-    test("an account with no store says so", async ({ page }) => {
+    test("an admin isn't tied to one store", async ({ page }) => {
         await openUsers(page);
 
         await search(page, USERS.admin.email);
 
-        await expect(cell(rows(page).first(), "location")).toContainText("No location assigned");
+        await expect(cell(rows(page).first(), "location")).toContainText("All locations");
     });
 
     for (const [what, term] of [
@@ -477,12 +483,14 @@ test.describe("Users access (API)", () => {
         const superUser = await serverAs("super");
         const email = uniqueEmail();
 
+        const location_id = await storeLocationId(api);
         const made = await apiJson(api, "POST", usersPath, {
             name: "E2E Pinned Then Deleted",
             email,
             password: PASSWORD,
             password_confirmation: PASSWORD,
             role_id: CASHIER_ROLE_ID,
+            location_id,
         });
         expect(made.status).toBe(201);
         const id = made.body.user.data?.id ?? made.body.user.id;
@@ -505,6 +513,7 @@ test.describe("Users access (API)", () => {
             password: PASSWORD,
             password_confirmation: PASSWORD,
             role_id: CASHIER_ROLE_ID,
+            location_id,
         });
         created.push(reuse.body.user.data?.id ?? reuse.body.user.id);
         const again = await apiJson(api, "PUT", `${usersPath}/${created.at(-1)}/pin`, {
@@ -579,6 +588,7 @@ test.describe("Verifying a user", () => {
             password: PASSWORD,
             password_confirmation: PASSWORD,
             role_id: CASHIER_ROLE_ID,
+            location_id: await storeLocationId(api, domain ?? USERS.admin.domain),
             ...(domain ? { domain } : {}),
         });
         expect(res.status, `create ${email}`).toBe(201);

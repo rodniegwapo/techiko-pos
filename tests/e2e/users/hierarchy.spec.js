@@ -1,7 +1,7 @@
 import { test, expect, apiJson } from "../support/fixtures.js";
 import { notice } from "../support/antd.js";
 import { pageProps, responseProps } from "../support/inertia.js";
-import { USERS } from "../support/users.js";
+import { USERS, storeLocationId } from "../support/users.js";
 
 /**
  * The user hierarchy page (User Hierarchy), reached from the users list.
@@ -65,6 +65,7 @@ async function addReport(api, { name, role = MANAGER_ROLE_ID, supervisorId }) {
         password_confirmation: PASSWORD,
         role_id: role,
         supervisor_id: supervisorId,
+        location_id: await storeLocationId(api),
     });
     expect(made.status, `create ${name}: ${JSON.stringify(made.body)?.slice(0, 200)}`).toBe(201);
 

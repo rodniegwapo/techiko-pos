@@ -110,7 +110,8 @@ async function createTier(page, attrs = {}) {
         name,
         display_name: `E2E Tier ${name}`,
         multiplier: 1.5,
-        spending_threshold: 12500,
+        // Out of every member's reach: a tier customers reach takes them in (and then can't be deleted).
+        spending_threshold: 99_999_999,
         color: "#123456",
         description: "Playwright tier",
         sort_order: 9,
@@ -431,9 +432,11 @@ test.describe("Loyalty analytics (admin)", () => {
         const bronze = res.body.tier_distribution.find((t) => t.tier === "bronze");
 
         const distribution = panel(page).locator("div.rounded-lg.border").filter({ hasText: "Tier Distribution" });
-        await expect(distribution).toContainText("bronze");
+        // Named as in Tier Management.
+        await expect(distribution).toContainText(bronze.name);
         await expect(distribution).toContainText(String(bronze.count));
-        await expect(distribution).toContainText(`${bronze.percentage}%`);
+        // The page shows one decimal place (50.0%).
+        await expect(distribution).toContainText(`${Number(bronze.percentage).toFixed(1)}%`);
     });
 
     test("the points overview shows what was issued, redeemed and is still active", async ({ page }) => {

@@ -85,8 +85,13 @@ const getApiUrl = (endpoint) => {
   return `/api/loyalty/${endpoint}`;
 };
 
+// Answers can come back out of order (the tab's first load against a filter picked right after
+// it), so only the latest request's answer is shown.
+let latestRequest = 0;
+
 // Load tiers with search and filter
 const loadTiers = async (page = 1) => {
+  const request = ++latestRequest;
   loading.value = true;
   try {
     const params = new URLSearchParams();
@@ -96,6 +101,9 @@ const loadTiers = async (page = 1) => {
     params.append("per_page", pagination.value.per_page);
 
     const response = await axios.get(`${getApiUrl("tiers")}?${params}`);
+    if (request !== latestRequest) {
+      return;
+    }
     tiers.value = response.data.data;
     pagination.value = response.data.meta;
   } catch (error) {
@@ -105,7 +113,9 @@ const loadTiers = async (page = 1) => {
       description: "Failed to load tiers",
     });
   } finally {
-    loading.value = false;
+    if (request === latestRequest) {
+      loading.value = false;
+    }
   }
 };
 

@@ -156,10 +156,10 @@ class StockAdjustmentController extends Controller
             $user
         );
 
-        // An admin's adjustment needs no one else's approval: it applies right away. If applying
-        // fails it stays a draft, saved, to approve from the list.
+        // An admin's adjustment needs no one else's approval: it applies right away, unless they
+        // keep it as a draft to apply later. If applying fails it stays a draft, to approve from the list.
         $approved = false;
-        if (FinanceAccess::canSeeAllStores($user)) {
+        if (FinanceAccess::canSeeAllStores($user) && ! $request->boolean('save_as_draft')) {
             try {
                 $adjustment->approve($user);
                 $approved = true;

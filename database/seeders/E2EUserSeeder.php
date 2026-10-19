@@ -25,6 +25,18 @@ class E2EUserSeeder extends Seeder
 {
     public const PASSWORD = 'e2e-password';
 
+    /** Demo staff and their stores, as UserSeeder seeds them. */
+    private const DEMO_STAFF_LOCATIONS = [
+        'manager@jollibee-corp.com' => 'JB-MAIN',
+        'branch@jollibee-corp.com' => 'JB-BRANCH',
+        'cashier1@jollibee-corp.com' => 'JB-MAIN',
+        'cashier2@jollibee-corp.com' => 'JB-BRANCH',
+        'manager@mcdonalds-corp.com' => 'MC-MAIN',
+        'branch@mcdonalds-corp.com' => 'MC-BRANCH',
+        'cashier1@mcdonalds-corp.com' => 'MC-MAIN',
+        'cashier2@mcdonalds-corp.com' => 'MC-BRANCH',
+    ];
+
     public function run(): void
     {
         if (! app()->environment(['local', 'testing'])) {
@@ -80,6 +92,15 @@ class E2EUserSeeder extends Seeder
 
         $limited->syncRoles([]);
         $limited->syncPermissions($permissions);
+
+        // The specs expect the demo staff at the stores UserSeeder gave them; editing a user on the
+        // Users page (which now asks where staff work) can move them, so each run puts them back.
+        foreach (self::DEMO_STAFF_LOCATIONS as $email => $code) {
+            $locationId = InventoryLocation::where('code', $code)->value('id');
+            if ($locationId) {
+                User::where('email', $email)->update(['location_id' => $locationId]);
+            }
+        }
 
         // Nobody reports to anybody to begin with, so the hierarchy page starts each run from the
         // same shape and its auto-assignment has something left to do. A run that stops halfway

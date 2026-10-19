@@ -354,7 +354,12 @@ const selectedRole = computed(() => {
 });
 
 // Managers and the roles below them are tied to one location (admins work across all of them).
-const workLocations = computed(() => page.props.locations ?? []);
+// On the page for every organization, the chosen organization's locations.
+const workLocations = computed(() =>
+    page.props.isGlobalView
+        ? page.props.locationsByDomain?.[form.domain] ?? []
+        : page.props.locations ?? [],
+);
 const roleIsBound = computed(() => (selectedRole.value?.level ?? 0) >= 3);
 const isCashierRole = computed(() => (selectedRole.value?.level ?? 0) >= 5);
 const showLocation = computed(() => roleIsBound.value && workLocations.value.length > 1);

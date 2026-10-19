@@ -1,0 +1,496 @@
+# Instructions
+
+- Following Playwright test failed.
+- Explain why, be concise, respect Playwright best practices.
+- Provide a snippet of code with the fix, if possible.
+
+# Test info
+
+- Name: users\global-users.spec.js >> Managing users across organizations (super user) >> impersonating a user signs in as them, and stopping brings the super user back
+- Location: tests\e2e\users\global-users.spec.js:251:5
+
+# Error details
+
+```
+Error: create e2e-user-cy3u9s@techiko.test
+
+expect(received).toBe(expected) // Object.is equality
+
+Expected: 201
+Received: 422
+```
+
+# Page snapshot
+
+```yaml
+- generic [ref=e4]:
+  - complementary [ref=e6]:
+    - generic [ref=e8]:
+      - generic [ref=e9]:
+        - img "Techiko Logo" [ref=e11]
+        - button [ref=e12] [cursor=pointer]
+      - generic [ref=e16]:
+        - button "Search pages" [ref=e18] [cursor=pointer]:
+          - generic [ref=e22]: Search pages…
+          - generic [ref=e23]: Ctrl K
+        - menu [ref=e24]:
+          - menuitem "Dashboard Global Admin" [ref=e25] [cursor=pointer]:
+            - generic [ref=e31]:
+              - text: Dashboard
+              - generic [ref=e32]: Global Admin
+          - listitem [ref=e34]:
+            - generic [ref=e35]: Catalog & stock
+            - list [ref=e36]:
+              - generic [ref=e37] [cursor=pointer]: Products
+          - listitem [ref=e46]:
+            - generic [ref=e47]: Team & settings
+            - list [ref=e48]:
+              - menuitem "Users" [ref=e49] [cursor=pointer]
+              - menuitem "Roles" [ref=e61] [cursor=pointer]
+          - listitem [ref=e69]:
+            - generic [ref=e70]: Techiko admin
+            - list [ref=e71]:
+              - menuitem "Domains" [ref=e72] [cursor=pointer]
+              - menuitem "Plans" [ref=e80] [cursor=pointer]
+              - menuitem "Manual GCash payments" [ref=e87] [cursor=pointer]
+              - menuitem "Messages" [ref=e95] [cursor=pointer]
+              - menuitem "Permissions" [ref=e102] [cursor=pointer]
+              - menuitem "Test email" [ref=e108] [cursor=pointer]
+      - generic [ref=e119] [cursor=pointer]:
+        - img "avatar" [ref=e120]
+        - generic [ref=e121]:
+          - generic [ref=e122]: E2E Super User
+          - generic [ref=e123]: e2e-super@techiko.test
+  - main [ref=e124]:
+    - generic [ref=e125]:
+      - generic [ref=e126]:
+        - paragraph [ref=e128]: Dashboard
+        - paragraph [ref=e129]: Here's your dashboard today · Monday, October 19, 2026 14:44:17
+      - generic [ref=e130]:
+        - generic [ref=e132]:
+          - generic [ref=e133]:
+            - generic [ref=e134]: Today's Sales
+            - generic [ref=e135]: ₱7,420.00
+            - generic [ref=e136]:
+              - generic [ref=e138]: +724.4%
+              - generic [ref=e139]: vs yesterday
+          - img "dollar" [ref=e141]
+        - generic [ref=e145]:
+          - generic [ref=e146]:
+            - generic [ref=e147]: This Week Revenue
+            - generic [ref=e148]: ₱7,420.00
+            - generic [ref=e149]:
+              - generic [ref=e151]: +470.8%
+              - generic [ref=e152]: vs last week
+          - img "line-chart" [ref=e154]
+        - generic [ref=e158]:
+          - generic [ref=e159]:
+            - generic [ref=e160]: Pending Orders
+            - generic [ref=e161]: "10"
+            - generic [ref=e162]:
+              - generic [ref=e164]: +100%
+              - generic [ref=e165]: vs yesterday
+          - img "shopping-cart" [ref=e167]
+        - generic [ref=e171]:
+          - generic [ref=e172]:
+            - generic [ref=e173]: Inventory Value
+            - generic [ref=e174]: ₱31,106,600.00
+            - generic [ref=e175]:
+              - generic [ref=e177]: +2%
+              - generic [ref=e178]: vs last month
+          - img "box-plot" [ref=e180]
+      - generic [ref=e183]:
+        - generic [ref=e184]:
+          - generic [ref=e185]:
+            - generic [ref=e186]:
+              - heading "Weekly View" [level=3] [ref=e187]
+              - paragraph [ref=e188]: Monday to Sunday of current week
+            - generic [ref=e189]:
+              - generic [ref=e190] [cursor=pointer]:
+                - generic [ref=e191]:
+                  - radio "Daily" [checked]
+                - generic [ref=e192]: Daily
+              - generic [ref=e193] [cursor=pointer]:
+                - generic [ref=e194]:
+                  - radio "Weekly"
+                - generic [ref=e195]: Weekly
+              - generic [ref=e196] [cursor=pointer]:
+                - generic [ref=e197]:
+                  - radio "Monthly"
+                - generic [ref=e198]: Monthly
+          - generic [ref=e201]:
+            - img [ref=e202]:
+              - generic [ref=e204]:
+                - generic [ref=e205]:
+                  - generic "₱8,000" [ref=e206]
+                  - generic "₱6,000" [ref=e207]
+                  - generic "₱4,000" [ref=e208]
+                  - generic "₱2,000" [ref=e209]
+                  - generic "₱0" [ref=e210]
+                - generic [ref=e211]: Sales (₱)
+              - generic [ref=e221]:
+                - generic "Tue" [ref=e222]
+                - generic "Wed" [ref=e223]
+                - generic "Thu" [ref=e224]
+                - generic "Fri" [ref=e225]
+                - generic "Sat" [ref=e226]
+                - generic "Sun" [ref=e227]
+                - generic "Mon" [ref=e228]
+              - generic [ref=e229]:
+                - generic [ref=e230]:
+                  - generic "40" [ref=e231]
+                  - generic "30" [ref=e232]
+                  - generic "20" [ref=e233]
+                  - generic "10" [ref=e234]
+                  - generic "0" [ref=e235]
+                - generic [ref=e236]: Transactions
+              - generic [ref=e238]: Weekly Sales Overview (Oct 19 - Oct 25)
+            - generic [ref=e239]:
+              - generic [ref=e240]: Sales
+              - generic [ref=e244]: Transactions
+            - generic: ● ●
+          - generic [ref=e248]:
+            - generic [ref=e249]:
+              - generic [ref=e250]: Sales Revenue (₱)
+              - generic [ref=e253]: Transaction Count
+            - generic [ref=e256]: Data updates automatically when time range changes
+        - generic [ref=e257]:
+          - generic [ref=e258]:
+            - generic [ref=e259]: Top Products
+            - generic [ref=e260]: This week
+          - generic [ref=e261]:
+            - generic [ref=e262]:
+              - generic [ref=e263]:
+                - generic [ref=e264]: "#1"
+                - generic [ref=e266]:
+                  - generic [ref=e267]: Book - Novel
+                  - generic [ref=e268]: 44 sales
+              - generic [ref=e269]:
+                - paragraph [ref=e270]: ₱1,004,564.00
+                - paragraph [ref=e271]: revenue
+            - generic [ref=e272]:
+              - generic [ref=e273]:
+                - generic [ref=e274]: "#2"
+                - generic [ref=e276]:
+                  - generic [ref=e277]: Office Chair
+                  - generic [ref=e278]: 30 sales
+              - generic [ref=e279]:
+                - paragraph [ref=e280]: ₱602,790.00
+                - paragraph [ref=e281]: revenue
+            - generic [ref=e282]:
+              - generic [ref=e283]:
+                - generic [ref=e284]: "#3"
+                - generic [ref=e286]:
+                  - generic [ref=e287]: Board Game
+                  - generic [ref=e288]: 26 sales
+              - generic [ref=e289]:
+                - paragraph [ref=e290]: ₱283,062.00
+                - paragraph [ref=e291]: revenue
+            - generic [ref=e292]:
+              - generic [ref=e293]:
+                - generic [ref=e294]: "#4"
+                - generic [ref=e296]:
+                  - generic [ref=e297]: E2E Burger
+                  - generic [ref=e298]: 10 sales
+              - generic [ref=e299]:
+                - paragraph [ref=e300]: ₱1,000.00
+                - paragraph [ref=e301]: revenue
+            - generic [ref=e302]:
+              - generic [ref=e303]:
+                - generic [ref=e304]: "#5"
+                - generic [ref=e306]:
+                  - generic [ref=e307]: Perfume
+                  - generic [ref=e308]: 7 sales
+              - generic [ref=e309]:
+                - paragraph [ref=e310]: ₱315,217.00
+                - paragraph [ref=e311]: revenue
+      - generic [ref=e312]:
+        - generic [ref=e313]:
+          - generic [ref=e314]:
+            - img "warning" [ref=e316]
+            - generic [ref=e319]:
+              - generic [ref=e320]: Inventory Alerts
+              - generic [ref=e321]: 5 products need attention
+          - generic [ref=e323]:
+            - generic [ref=e324]:
+              - generic [ref=e325]:
+                - generic [ref=e326]: Book - Novel
+                - generic [ref=e327]: "SKU: JOLLIBEECORP-8"
+              - generic [ref=e328]:
+                - generic [ref=e329]: Out of Stock
+                - generic [ref=e330]: "Min: 15.00"
+            - generic [ref=e331]:
+              - generic [ref=e332]:
+                - generic [ref=e333]: Board Game
+                - generic [ref=e334]: "SKU: MCDONALDSCORP-6"
+              - generic [ref=e335]:
+                - generic [ref=e336]: Out of Stock
+                - generic [ref=e337]: "Min: 7.00"
+            - generic [ref=e338]:
+              - generic [ref=e339]:
+                - generic [ref=e340]: E2E Sold Out
+                - generic [ref=e341]: "SKU: E2E-SOLD-OUT"
+              - generic [ref=e342]:
+                - generic [ref=e343]: Out of Stock
+                - generic [ref=e344]: "Min: 0.00"
+            - generic [ref=e345]:
+              - generic [ref=e346]:
+                - generic [ref=e347]: E2E Product C W1
+                - generic [ref=e348]: "SKU: E2E-W1-PC"
+              - generic [ref=e349]:
+                - generic [ref=e350]: Out of Stock
+                - generic [ref=e351]: "Min: 0.00"
+            - generic [ref=e352]:
+              - generic [ref=e353]:
+                - generic [ref=e354]: E2E Product C W2
+                - generic [ref=e355]: "SKU: E2E-W2-PC"
+              - generic [ref=e356]:
+                - generic [ref=e357]: Out of Stock
+                - generic [ref=e358]: "Min: 0.00"
+        - generic [ref=e360]:
+          - generic [ref=e361]:
+            - img "shop" [ref=e363]
+            - generic [ref=e366]:
+              - generic [ref=e367]: Today's Store Performance
+              - generic [ref=e368]: Sales across all locations
+          - generic [ref=e369]:
+            - generic [ref=e370]:
+              - generic [ref=e371]:
+                - generic [ref=e372]:
+                  - generic [ref=e373]: "#1"
+                  - generic [ref=e375]:
+                    - generic [ref=e376]: Jollibee Main Store - Makati
+                    - generic [ref=e377]: store
+                - generic [ref=e378]:
+                  - generic [ref=e379]: ₱1,200.00
+                  - generic [ref=e380]: 12 transactions
+              - generic [ref=e381]:
+                - generic [ref=e382]:
+                  - generic [ref=e383]: "#2"
+                  - generic [ref=e385]:
+                    - generic [ref=e386]: Jollibee Branch Store - SM Mall
+                    - generic [ref=e387]: store
+                - generic [ref=e388]:
+                  - generic [ref=e389]: ₱0.00
+                  - generic [ref=e390]: 0 transactions
+              - generic [ref=e391]:
+                - generic [ref=e392]:
+                  - generic [ref=e393]: "#3"
+                  - generic [ref=e395]:
+                    - generic [ref=e396]: Jollibee Distribution Center
+                    - generic [ref=e397]: warehouse
+                - generic [ref=e398]:
+                  - generic [ref=e399]: ₱0.00
+                  - generic [ref=e400]: 0 transactions
+              - generic [ref=e401]:
+                - generic [ref=e402]:
+                  - generic [ref=e403]: "#4"
+                  - generic [ref=e405]:
+                    - generic [ref=e406]: Customer Returns - Jollibee Corporation
+                    - generic [ref=e407]: customer
+                - generic [ref=e408]:
+                  - generic [ref=e409]: ₱0.00
+                  - generic [ref=e410]: 0 transactions
+              - generic [ref=e411]:
+                - generic [ref=e412]:
+                  - generic [ref=e413]: "#5"
+                  - generic [ref=e415]:
+                    - generic [ref=e416]: McDonald's Main Store - Ortigas
+                    - generic [ref=e417]: store
+                - generic [ref=e418]:
+                  - generic [ref=e419]: ₱0.00
+                  - generic [ref=e420]: 0 transactions
+            - generic [ref=e422]:
+              - generic [ref=e423]:
+                - generic [ref=e424]: Σ
+                - generic [ref=e426]:
+                  - generic [ref=e427]: Total Sales Today
+                  - generic [ref=e428]: 11 locations
+              - generic [ref=e429]:
+                - generic [ref=e430]: ₱1,200.00
+                - generic [ref=e431]: 12 transactions
+  - button "Open chat with team" [ref=e433] [cursor=pointer]
+```
+
+# Test source
+
+```ts
+  1   | import { test, expect, apiJson } from "../support/fixtures.js";
+  2   | import { pickSelectOption, notice } from "../support/antd.js";
+  3   | import { pageProps, responseProps, responseVersion } from "../support/inertia.js";
+  4   | import { USERS } from "../support/users.js";
+  5   | 
+  6   | /**
+  7   |  * The global users page at /users: User Management across every organization.
+  8   |  *
+  9   |  * users.spec.js covers an organization's own page (/domains/jollibee-corp/users) as its admin.
+  10  |  * This one is the super user's view of everybody, which adds a Domain and a Hierarchy column, a
+  11  |  * Domain filter, a Domain field on the Add User form, and the delete and impersonate actions an
+  12  |  * organization's admin is never offered.
+  13  |  *
+  14  |  * The seeded accounts are what the rest of the suite signs in as, so nothing here changes one: a
+  15  |  * test that needs to edit, verify, delete or impersonate a user makes its own first, and every
+  16  |  * user a test made is removed afterwards.
+  17  |  */
+  18  | 
+  19  | const usersPath = "/users";
+  20  | const listUrl = (query = "") => `${usersPath}${query}`;
+  21  | const PER_PAGE = 15;
+  22  | const PASSWORD = "e2e-password";
+  23  | /** Role ids from RoleSeeder: 1 super admin, 2 admin, 3 manager, 4 supervisor, 5 cashier. */
+  24  | const CASHIER_ROLE_ID = 5;
+  25  | const JOLLIBEE = { name: "Jollibee Corporation", slug: "jollibee-corp" };
+  26  | const MCDONALDS = { name: "McDonald's Corporation", slug: "mcdonalds-corp" };
+  27  | 
+  28  | const rows = (page) => page.locator(".ant-table-tbody tr.ant-table-row");
+  29  | const rowWith = (page, text) => rows(page).filter({ hasText: text });
+  30  | 
+  31  | /** Users the running test made; removed again in afterEach. */
+  32  | const created = [];
+  33  | 
+  34  | const uniqueEmail = () => `e2e-user-${Math.random().toString(36).slice(2, 8)}@techiko.test`;
+  35  | 
+  36  | async function openUsers(page, url = listUrl()) {
+  37  |     await page.goto(url);
+  38  |     await expect(page.locator(".ant-table")).toBeVisible();
+  39  | }
+  40  | 
+  41  | async function search(page, text) {
+  42  |     const found = page.waitForResponse((r) => new URL(r.url()).searchParams.get("search") === text);
+  43  |     await page.getByPlaceholder("Search users by name or email...").fill(text);
+  44  |     await found;
+  45  | }
+  46  | 
+  47  | /** Picks a value in the filter popover and waits for the list it asks for. */
+  48  | async function filterBy(page, label, option, param, value) {
+  49  |     await page.locator("button:has(.anticon-filter)").click();
+  50  |     const popover = page.locator(".ant-popover:not(.ant-popover-hidden)").filter({ hasText: "Filters:" });
+  51  |     const loaded = page.waitForResponse((r) => new URL(r.url()).searchParams.get(param) === value);
+  52  |     await pickSelectOption(page, popover.locator(`.ant-form-item:has(label:text-is("${label}"))`), 0, option);
+  53  |     await loaded;
+  54  |     // The popover covers the table while it is open.
+  55  |     await page.keyboard.press("Escape");
+  56  | }
+  57  | 
+  58  | /** The list as the server has it for a query, read fresh (an Inertia reload leaves `data-page` alone). */
+  59  | async function listed(context, query = "") {
+  60  |     return (await responseProps(await context.get(listUrl(query)))).items;
+  61  | }
+  62  | 
+  63  | const userWithEmail = async (context, email) =>
+  64  |     (await listed(context, `?search=${encodeURIComponent(email)}`)).data.find((u) => u.email === email);
+  65  | 
+  66  | /** Makes a cashier in an organization over HTTP, remembered for cleanup; verified unless asked not to be. */
+  67  | async function makeUser(api, { domain = JOLLIBEE.slug, name = "E2E Global User", verified = true } = {}) {
+  68  |     const email = uniqueEmail();
+  69  |     const res = await apiJson(api, "POST", "/api/users", {
+  70  |         name,
+  71  |         email,
+  72  |         password: PASSWORD,
+  73  |         password_confirmation: PASSWORD,
+  74  |         role_id: CASHIER_ROLE_ID,
+  75  |         domain,
+  76  |     });
+> 77  |     expect(res.status, `create ${email}`).toBe(201);
+      |                                           ^ Error: create e2e-user-cy3u9s@techiko.test
+  78  |     const user = res.body.user.data ?? res.body.user;
+  79  |     created.push(user.id);
+  80  | 
+  81  |     if (verified) {
+  82  |         expect((await apiJson(api, "PATCH", `/api/users/${user.id}/verify-email`)).status, `verify ${email}`).toBe(200);
+  83  |     }
+  84  | 
+  85  |     return user;
+  86  | }
+  87  | 
+  88  | test.afterEach(async ({ serverAs, observe }) => {
+  89  |     if (!created.length) {
+  90  |         return;
+  91  |     }
+  92  |     const superUser = await serverAs("super");
+  93  |     while (created.length) {
+  94  |         const id = created.pop();
+  95  |         const res = await apiJson(superUser, "DELETE", `/api/users/${id}`);
+  96  |         // 404 means the test already deleted it; anything else left behind would sit in every later run.
+  97  |         if (res.status >= 400 && res.status !== 404) {
+  98  |             observe(`user ${id} could not be removed after the test (${res.status})`);
+  99  |         }
+  100 |     }
+  101 | });
+  102 | 
+  103 | test.describe("Users across organizations (super user)", () => {
+  104 |     test.use({ account: "super" });
+  105 | 
+  106 |     test("lists every organization's users 15 to a page, with their organization and level", async ({ page }) => {
+  107 |         await openUsers(page);
+  108 | 
+  109 |         const { items, isGlobalView } = await pageProps(page);
+  110 |         expect(isGlobalView).toBe(true);
+  111 |         expect(items.meta.total, "more than one page of them").toBeGreaterThan(PER_PAGE);
+  112 |         await expect(rows(page)).toHaveCount(PER_PAGE);
+  113 | 
+  114 |         const headers = page.locator(".ant-table-thead th");
+  115 |         await expect(headers.filter({ hasText: "Domain" }), "which organization each belongs to").toHaveCount(1);
+  116 |         await expect(headers.filter({ hasText: "Hierarchy" })).toHaveCount(1);
+  117 |     });
+  118 | 
+  119 |     test("page 2 lists the next users", async ({ page }) => {
+  120 |         await openUsers(page);
+  121 |         const firstPageTop = await rows(page).first().innerText();
+  122 | 
+  123 |         const loaded = page.waitForResponse((r) => new URL(r.url()).searchParams.get("page") === "2");
+  124 |         await page.locator(".ant-pagination-item-2").click();
+  125 |         await loaded;
+  126 | 
+  127 |         await expect(rows(page).first()).toBeVisible();
+  128 |         expect(await rows(page).first().innerText()).not.toBe(firstPageTop);
+  129 |     });
+  130 | 
+  131 |     test("search finds a user in another organization and names it", async ({ page }) => {
+  132 |         await openUsers(page);
+  133 | 
+  134 |         await search(page, USERS.mcCashier.email);
+  135 | 
+  136 |         await expect(rows(page)).toHaveCount(1);
+  137 |         await expect(rows(page).first()).toContainText(MCDONALDS.slug);
+  138 |     });
+  139 | 
+  140 |     test("the super user's own row shows them as a super user of no organization", async ({ page }) => {
+  141 |         await openUsers(page);
+  142 | 
+  143 |         await search(page, USERS.super.email);
+  144 | 
+  145 |         const row = rowWith(page, USERS.super.email);
+  146 |         await expect(row).toHaveCount(1);
+  147 |         await expect(row).toContainText("Super User");
+  148 |         await expect(row, "no organization").toContainText("N/A");
+  149 |         // Nobody deletes or impersonates themselves.
+  150 |         await expect(row.getByRole("button", { name: "Delete User" })).toHaveCount(0);
+  151 |         await expect(row.getByRole("button", { name: "Impersonate User" })).toHaveCount(0);
+  152 |     });
+  153 | 
+  154 |     test("the domain filter shows one organization's users only", async ({ page }) => {
+  155 |         await openUsers(page);
+  156 | 
+  157 |         await filterBy(page, "Domain", MCDONALDS.name, "domain", MCDONALDS.slug);
+  158 | 
+  159 |         await expect(page.getByText(`Domain : ${MCDONALDS.name}`)).toBeVisible();
+  160 |         await expect(rows(page).first()).toBeVisible();
+  161 |         await expect(rowWith(page, JOLLIBEE.slug), "nobody from the other organization").toHaveCount(0);
+  162 |         for (const row of await rows(page).all()) {
+  163 |             await expect(row).toContainText(MCDONALDS.slug);
+  164 |         }
+  165 |     });
+  166 | 
+  167 |     test("the role filter works across organizations", async ({ page }) => {
+  168 |         await openUsers(page);
+  169 | 
+  170 |         await filterBy(page, "Role", "cashier", "role", "cashier");
+  171 | 
+  172 |         const cashiers = await rows(page).all();
+  173 |         expect(cashiers.length).toBeGreaterThan(0);
+  174 |         for (const row of cashiers) {
+  175 |             await expect(row).toContainText("cashier");
+  176 |         }
+  177 |         await expect(rowWith(page, USERS.mcCashier.email), "McDonald's cashier among them").toHaveCount(1);
+```

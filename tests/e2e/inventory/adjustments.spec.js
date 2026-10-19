@@ -70,6 +70,8 @@ async function createDraft(page, { actualQuantity, description }) {
         type: "decrease",
         reason: "damaged_goods",
         description,
+        // An admin's adjustment would apply at once; these tests need a draft.
+        save_as_draft: true,
         items: [{ product_id: products.gadget.id, actual_quantity: actualQuantity, unit_cost: products.gadget.cost }],
     });
 
@@ -85,6 +87,8 @@ async function createDraftAs(api, description, actualQuantity = 1) {
         type: "decrease",
         reason: "damaged_goods",
         description,
+        // An admin's adjustment would apply at once; these tests need a draft.
+        save_as_draft: true,
         items: [{ product_id: products.gadget.id, actual_quantity: actualQuantity, unit_cost: products.gadget.cost }],
     });
 
@@ -136,9 +140,10 @@ test.describe("Stock adjustments list (admin)", () => {
     test("each row shows how many products it adjusts and the signed value", async ({ page }) => {
         await openAdjustments(page);
 
-        await expect(cell(rowWith(page, adj().draft.number), "items")).toHaveText("2");
+        // The count, with the products' names under it.
+        await expect(cell(rowWith(page, adj().draft.number), "items")).toHaveText(/^2/);
         await expect(cell(rowWith(page, adj().draft.number), "value")).toHaveText("+₱40.00");
-        await expect(cell(rowWith(page, adj().pending.number), "items")).toHaveText("1");
+        await expect(cell(rowWith(page, adj().pending.number), "items")).toHaveText(/^1/);
         await expect(cell(rowWith(page, adj().pending.number), "value")).toHaveText("-₱25.00");
         await expect(cell(rowWith(page, adj().rejected.number), "value")).toHaveText("-₱62.50");
     });
@@ -486,6 +491,8 @@ test.describe("Creating a stock adjustment (admin)", () => {
         const onHand = Number((await line.locator("div.bg-gray-50").first().innerText()).trim());
         await line.locator(".ant-input-number-input").first().fill(String(onHand - 2));
         await page.getByPlaceholder("Optional description or notes about this adjustment").fill(note);
+        // An admin's adjustment applies at once unless kept as a draft.
+        await page.getByTestId("save-as-draft").check();
         await page.getByRole("button", { name: "Save Adjustment" }).click();
 
         await expect(notice(page, "Adjustment Created")).toBeVisible();

@@ -253,6 +253,25 @@ class StockAdjustmentReflectsStockTest extends TestCase
         $this->assertSame(9, $this->quantityAt($ctx['product'], $ctx['locA']));
     }
 
+    public function test_an_admin_can_keep_an_adjustment_as_a_draft(): void
+    {
+        $ctx = $this->seedContext();
+
+        $this->actingAs($ctx['user'])
+            ->postJson(route('domains.inventory.adjustments.store', ['domain' => $ctx['domain']->name_slug]), [
+                'location_id' => $ctx['locA']->id,
+                'type' => 'recount',
+                'reason' => 'physical_count',
+                'save_as_draft' => true,
+                'items' => [['product_id' => $ctx['product']->id, 'actual_quantity' => 9]],
+            ])
+            ->assertOk()
+            ->assertJsonPath('approved', false);
+
+        $this->assertSame('draft', StockAdjustment::query()->latest('id')->first()->status);
+        $this->assertSame(12, $this->quantityAt($ctx['product'], $ctx['locA']));
+    }
+
     public function test_a_staff_members_adjustment_still_waits_for_approval(): void
     {
         $ctx = $this->seedContext();

@@ -17,20 +17,22 @@ const GATED_PAGES = [
     { title: "Customers", path: "customers", allowed: ["admin", "manager", "cashier"] },
     { title: "Credit Management", path: "credits", allowed: ["admin", "manager", "cashier"] },
     { title: "Loyalty Program", path: "loyalty", allowed: ["admin", "manager", "cashier"] },
-    // VAT report now sits in the Finance group, so the sidebar shows the group.
-    { title: "VAT report", menu: "Finance", path: "vat-report", allowed: ["admin", "manager"] },
+    // Expenses sits in the Finance group, so the sidebar shows the group. (The rest of Finance is kept
+    // at the warehouse for store staff: see "Finance at a store" below.)
+    { title: "Expenses", menu: "Finance", path: "expenses", allowed: ["admin", "manager"] },
     { title: "Settings", path: "settings", allowed: ["admin", "manager"] },
     { title: "Void Logs", path: "void-logs", allowed: ["admin", "manager"] },
     { title: "Users", path: "users", allowed: ["admin"] },
 ];
 
-/** Sidebar entry by title, e.g. "Sales" (not "Offline sales"); allows a trailing tag like "Dashboard Global Admin". */
-// The whole name, so "Sales" doesn't also find "Sales History"; Dashboard carries a badge in its
-// name ("Organization", or "Global Admin" for a super user).
+/**
+ * Sidebar entry by its whole title, so "Sales" doesn't also find "Sales History". Dashboard carries
+ * a badge naming where you are (the organization's name, or "Global Admin" for a super user).
+ */
 const sidebarItem = (page, title) =>
     page
         .getByRole("complementary")
-        .getByRole("menuitem", { name: new RegExp(`^${title}( Organization| Global Admin)?$`) });
+        .getByRole("menuitem", { name: new RegExp(title === "Dashboard" ? "^Dashboard( .+)?$" : `^${title}$`) });
 
 const absolute = (path) => new URL(path, test.info().project.use.baseURL).href;
 
@@ -199,6 +201,31 @@ test.describe("Dashboard location restrictions", () => {
             });
         });
     }
+});
+
+test.describe("Finance at a store", () => {
+    // Jollibee has a warehouse, so its store staff find the books there; owners and admins see them anywhere.
+    test.describe("manager", () => {
+        test.use({ account: "manager" });
+
+        test("is sent home from the VAT report, with where to find it", async ({ serverAs }) => {
+            const res = await (await serverAs("manager")).get(`/domains/${USERS.manager.domain}/vat-report`);
+
+            expect(res.url(), "not left on the VAT report").not.toBe(absolute(`/domains/${USERS.manager.domain}/vat-report`));
+            expect((await responseProps(res)).flash.notice).toContain("Finance is kept at the warehouse");
+        });
+    });
+
+    test.describe("admin", () => {
+        test.use({ account: "admin" });
+
+        test("opens the VAT report at a store", async ({ serverAs }) => {
+            const url = `/domains/${USERS.admin.domain}/vat-report`;
+            const res = await (await serverAs("admin")).get(url);
+
+            expect(res.url()).toBe(absolute(url));
+        });
+    });
 });
 
 test.describe("Dashboard without the dashboard permission", () => {
