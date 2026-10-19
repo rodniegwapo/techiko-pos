@@ -58,6 +58,7 @@ class BalanceItemsController extends Controller
                     'balance' => $position['balance'],
                     'as_of' => $position['as_of'],
                     'received_since' => $position['received'],
+                    'paid_out_since' => $position['as_of'] ? $a->paidOutSince($position['as_of'], $today->toDateString()) : 0.0,
                     'history' => $a->balances->take(10)->values(),
                 ];
             });

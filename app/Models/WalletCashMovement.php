@@ -33,6 +33,9 @@ class WalletCashMovement extends Model
     /** Written only when a sale with a posted sale_payment movement is voided. */
     public const KIND_SALE_VOID = 'sale_void';
 
+    /** Written only when a customer pays their credit (utang) in cash. */
+    public const KIND_CREDIT_PAYMENT = 'credit_payment';
+
     public const SYSTEM_KINDS = [
         self::KIND_EXPENSE,
         'supplier_payment',
@@ -43,6 +46,7 @@ class WalletCashMovement extends Model
         'owner_investment',
         self::KIND_SALE_PAYMENT,
         self::KIND_SALE_VOID,
+        self::KIND_CREDIT_PAYMENT,
     ];
 
     protected $casts = [

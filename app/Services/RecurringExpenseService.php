@@ -85,6 +85,7 @@ class RecurringExpenseService
             'description' => $template->description,
             'payee' => $template->payee,
             'payment_method' => $template->payment_method,
+            'financial_account_id' => $template->financial_account_id,
             'recurring_expense_id' => $template->id,
             'user_id' => $template->user_id,
         ];

@@ -7,6 +7,7 @@ import dayjs from "dayjs";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { validationMessage } from "@/Composables/useValidationMessage.js";
 import { paymentMethodLabel } from "../paymentMethods";
+import PaidFromAccountSelect from "@/Pages/Finance/components/PaidFromAccountSelect.vue";
 import PrimaryButton from "@/Components/PrimaryButton.vue";
 
 const props = defineProps({
@@ -44,6 +45,7 @@ const form = useForm({
     description: "",
     payee: "",
     payment_method: "cash_register",
+    financial_account_id: null,
     location: null,
     reference_no: "",
     notes: "",
@@ -64,6 +66,7 @@ watch(
         form.description = e?.description ?? "";
         form.payee = e?.payee ?? "";
         form.payment_method = e?.payment_method ?? "cash_register";
+        form.financial_account_id = e?.financial_account_id ?? null;
         form.location = e
             ? e.location_id ?? BUSINESS_WIDE
             : props.restrictedLocationId ?? defaultStoreId() ?? BUSINESS_WIDE;
@@ -241,6 +244,8 @@ const submit = () => {
                         data-testid="expense-payment-method"
                     />
                 </a-form-item>
+
+                <PaidFromAccountSelect :form="form" :accounts="options.accounts || []" size="large" />
             </div>
 
             <a-alert

@@ -1560,7 +1560,8 @@ watch(
                 class="shrink-0"
             >
                 <template #message>
-                    <div class="flex flex-wrap items-center justify-between gap-2">
+                    <!-- Room on the right for the pinned store switcher -->
+                    <div class="flex flex-wrap items-center justify-between gap-2 md:pr-64">
                         <span>
                             No shift is open for this location today. Start
                             the shift before taking payments.

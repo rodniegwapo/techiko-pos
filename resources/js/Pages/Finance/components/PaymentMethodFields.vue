@@ -1,5 +1,6 @@
 <script setup>
 import { paymentMethodLabel } from "@/Pages/Expenses/paymentMethods";
+import PaidFromAccountSelect from "./PaidFromAccountSelect.vue";
 
 /**
  * How money was paid (or received), in the same terms as Expenses. Through the cash register
@@ -10,6 +11,8 @@ defineProps({
     direction: { type: String, default: "out" },
     methods: { type: Array, default: () => [] },
     locations: { type: Array, default: () => [] },
+    /** Bank and e-wallet accounts to pick from; leave empty where the account isn't recorded. */
+    accounts: { type: Array, default: () => [] },
 });
 </script>
 
@@ -37,4 +40,6 @@ defineProps({
         <a-select v-model:value="form.location_id" placeholder="Which store's cash register?"
             :options="locations.map((l) => ({ value: l.id, label: l.name }))" />
     </a-form-item>
+
+    <PaidFromAccountSelect v-if="accounts.length" :form="form" :accounts="accounts" />
 </template>

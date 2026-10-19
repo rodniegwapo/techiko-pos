@@ -283,6 +283,9 @@ const investmentColumns = [
                                         <div v-if="record.channel" class="text-xs text-blue-600" data-testid="account-channel">
                                             Fed by {{ record.channel }}<template v-if="record.received_since > 0">: +{{ formattedTotal(record.received_since) }} in sales since the last balance</template>
                                         </div>
+                                        <div v-if="record.paid_out_since > 0" class="text-xs text-amber-700" data-testid="account-paid-out">
+                                            −{{ formattedTotal(record.paid_out_since) }} paid out (expenses &amp; supplier bills) since the last balance. Update the balance once it shows on the account.
+                                        </div>
                                     </template>
                                     <template v-else-if="column.key === 'actions'">
                                         <div class="flex justify-end gap-1">

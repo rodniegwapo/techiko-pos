@@ -7,7 +7,7 @@ import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
 import { useHelpers } from "@/Composables/useHelpers";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
-import { paymentMethodLabel } from "../paymentMethods";
+import { paidFromLabel } from "../paymentMethods";
 
 const props = defineProps({
     expenses: { type: Array, default: () => [] },
@@ -78,7 +78,7 @@ const onMobilePaginationChange = (pageNum) =>
                 <a-tag v-else>Business-wide</a-tag>
             </template>
             <template v-else-if="column.key === 'payment'">
-                {{ paymentMethodLabel(record.payment_method) }}
+                {{ paidFromLabel(record.payment_method, record.account_name) }}
                 <a-tooltip v-if="record.in_wallet_ledger" title="Also recorded as cash out in the Wallet ledger">
                     <a-tag color="blue" class="ml-1">Wallet</a-tag>
                 </a-tooltip>
@@ -140,7 +140,7 @@ const onMobilePaginationChange = (pageNum) =>
                         <span class="truncate text-right font-medium">{{ record.location_name || "Business-wide" }}</span>
                         <span class="text-gray-500">Paid from</span>
                         <span class="text-right font-medium">
-                            {{ paymentMethodLabel(record.payment_method) }}
+                            {{ paidFromLabel(record.payment_method, record.account_name) }}
                             <a-tag v-if="record.in_wallet_ledger" color="blue" class="ml-1 mr-0">Wallet</a-tag>
                         </span>
                         <template v-if="record.payee">

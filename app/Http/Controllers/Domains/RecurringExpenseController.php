@@ -9,6 +9,7 @@ use App\Models\RecurringExpense;
 use App\Models\User;
 use App\Services\RecurringExpenseService;
 use App\Support\FinanceAccess;
+use App\Support\PaidFromAccount;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -106,6 +107,7 @@ class RecurringExpenseController extends Controller
             'description' => ['required', 'string', 'max:255'],
             'payee' => ['nullable', 'string', 'max:255'],
             'payment_method' => ['required', Rule::in(\App\Models\Expense::PAYMENT_METHODS)],
+            'financial_account_id' => PaidFromAccount::rules($domain->name_slug),
             'location_id' => ['nullable', 'integer'],
             'frequency' => ['required', Rule::in(RecurringExpense::FREQUENCIES)],
             'day_of_month' => ['required_if:frequency,monthly', 'nullable', 'integer', 'between:1,31'],
@@ -128,6 +130,7 @@ class RecurringExpenseController extends Controller
         }
 
         $data['location_id'] = $locationId;
+        $data['financial_account_id'] = PaidFromAccount::keep($data['payment_method'], $data['financial_account_id'] ?? null);
         $data['start_date'] = Carbon::parse($data['start_date'])->toDateString();
         if ($data['frequency'] === 'monthly') {
             $data['day_of_week'] = null;

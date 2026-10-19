@@ -13,6 +13,8 @@ use App\Models\WalletCashCountSubmission;
 use App\Models\WalletCashMovement;
 use App\Models\WalletCashOpeningAudit;
 use App\Models\WalletCashReconciliation;
+use App\Support\FinanceAccess;
+use App\Support\Wallet\MoneyTimeline;
 use App\Support\Wallet\WalletCashBridgeExpected;
 use App\Support\Wallet\WalletCashDailyExpected;
 use App\Support\Wallet\WalletLedgerViewData;
@@ -127,6 +129,16 @@ class PaymentCardTypeController extends Controller
             $ledger['todayManualNet'] = WalletLedgerViewData::todayManualNet($domain, $location, $today);
             $props['ledger'] = $ledger;
             $props['runningCashBalance'] = WalletLedgerViewData::runningCashBalance($domain, $location);
+        }
+
+        // Every peso in and out, bank and e-wallet payments included: admins, and managers for their own store.
+        if ($walletPageMode === 'money-movement') {
+            $user = $request->user();
+            $props['canViewAllMoney'] = FinanceAccess::canManage($user)
+                && (FinanceAccess::canSeeAllStores($user) || FinanceAccess::restrictedLocationId($user) === (int) $location->id);
+            $props['allMoney'] = $props['canViewAllMoney'] && $request->query('view') === 'all'
+                ? MoneyTimeline::build($request, $domain, $location)
+                : null;
         }
 
         return $props;

@@ -18,7 +18,7 @@ import FinancePeriod from "./components/FinancePeriod.vue";
 import ExplainButton from "./components/ExplainButton.vue";
 import MetricCard from "./components/MetricCard.vue";
 import PaymentMethodFields from "./components/PaymentMethodFields.vue";
-import { paymentMethodLabel } from "@/Pages/Expenses/paymentMethods";
+import { paidFromLabel } from "@/Pages/Expenses/paymentMethods";
 
 const props = defineProps({
     filters: { type: Object, required: true },
@@ -28,6 +28,7 @@ const props = defineProps({
     categories: { type: Array, default: () => [] },
     locations: { type: Array, default: () => [] },
     paymentMethods: { type: Array, default: () => [] },
+    accounts: { type: Array, default: () => [] },
     defaultLocationId: { type: Number, default: null },
     aiEnabled: { type: Boolean, default: false },
     domainName: { type: String, default: "" },
@@ -143,6 +144,7 @@ const paymentForm = useForm({
     payment_date: dayjs().format("YYYY-MM-DD"),
     amount: null,
     payment_method: "cash_register",
+    financial_account_id: null,
     location_id: props.defaultLocationId,
     reference_no: "",
     notes: "",
@@ -364,7 +366,7 @@ const smallBillColumns = [
                                 <div v-for="p in record.payments" :key="p.id" class="flex flex-wrap items-center justify-between gap-2 py-1 text-sm">
                                     <span class="text-gray-700">
                                         {{ fmtDate(p.payment_date) }} · {{ formattedTotal(p.amount) }} ·
-                                        {{ paymentMethodLabel(p.payment_method) }}{{ p.location ? ` (${p.location.name})` : "" }}
+                                        {{ paidFromLabel(p.payment_method, p.financial_account?.name) }}{{ p.location ? ` (${p.location.name})` : "" }}
                                         <span v-if="p.reference_no" class="text-gray-400"> · {{ p.reference_no }}</span>
                                     </span>
                                     <a-popconfirm v-if="hasPermission('finance.bill-payments.destroy')" title="Delete this payment?" ok-text="Delete"
@@ -451,7 +453,7 @@ const smallBillColumns = [
                             @change="(d) => (paymentForm.payment_date = d ? d.format('YYYY-MM-DD') : null)" />
                     </a-form-item>
                 </div>
-                <PaymentMethodFields :form="paymentForm" :methods="paymentMethods" :locations="locations" />
+                <PaymentMethodFields :form="paymentForm" :methods="paymentMethods" :locations="locations" :accounts="accounts" />
                 <a-form-item label="Reference (optional)">
                     <a-input v-model:value="paymentForm.reference_no" placeholder="Check no., transfer reference…" />
                 </a-form-item>

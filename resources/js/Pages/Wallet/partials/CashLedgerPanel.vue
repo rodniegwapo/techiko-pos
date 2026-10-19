@@ -102,6 +102,7 @@ const SYSTEM_KIND_LABELS = {
     loan_payment: "Loan repayment",
     asset_purchase: "Equipment / asset bought",
     owner_investment: "Owner investment",
+    credit_payment: "Credit payment (cash)",
 };
 
 /** Stable backend tokens in `notes` for system-generated cash-control lines. */

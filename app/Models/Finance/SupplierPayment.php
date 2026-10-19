@@ -41,4 +41,9 @@ class SupplierPayment extends Model
     {
         return $this->belongsTo(WalletCashMovement::class);
     }
+
+    public function financialAccount(): BelongsTo
+    {
+        return $this->belongsTo(FinancialAccount::class);
+    }
 }
