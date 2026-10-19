@@ -253,11 +253,15 @@ const handleSubmit = async () => {
     );
 
     if (response.data.success) {
-      notification.success({
-        message: "Adjustment Created",
-        description:
-          "Saved as a draft. Submit it for approval — stock updates once it's approved.",
-      });
+      notification.success(
+        response.data.approved
+          ? { message: "Adjustment Applied", description: "Stock is updated." }
+          : {
+              message: "Adjustment Created",
+              description:
+                "Saved as a draft. Submit it for approval — stock updates once it's approved.",
+            }
+      );
       router.visit(getRoute("inventory.adjustments.index", getLocationQueryFromPage()));
     } else {
       notification.error({
@@ -496,8 +500,8 @@ const handleCancel = () => {
                 "
                 class="font-medium"
               >
-                {{ totalValueChange >= 0 ? "+" : "" }}${{
-                  Math.abs(totalValueChange).toFixed(2)
+                {{ totalValueChange >= 0 ? "+" : "−" }}₱{{
+                  Math.abs(totalValueChange).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                 }}
               </span>
             </div>

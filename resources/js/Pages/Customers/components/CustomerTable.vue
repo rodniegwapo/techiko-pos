@@ -44,9 +44,9 @@
           <div class="flex items-center mb-1">
             <div
               class="w-3 h-3 rounded-full mr-2"
-              :style="{ backgroundColor: getTierColor(record.tier) }"
+              :style="{ backgroundColor: tierColor(record) }"
             ></div>
-            <span class="font-medium capitalize">{{ record.tier || 'Bronze' }}</span>
+            <span class="font-medium">{{ tierName(record) }}</span>
           </div>
           <div class="text-sm text-blue-600 font-medium">
             {{ record.loyalty_points?.toLocaleString() || 0 }} points
@@ -123,10 +123,10 @@
               <div class="mt-1 flex flex-wrap gap-1">
                 <a-tag
                   v-if="record.loyalty_points !== null"
-                  class="m-0 capitalize"
-                  :color="getTierTagColor(record.tier)"
+                  class="m-0"
+                  :color="tierColor(record)"
                 >
-                  {{ record.tier || 'Bronze' }}
+                  {{ tierName(record) }}
                 </a-tag>
                 <a-tag
                   v-if="record.loyalty_points !== null"
@@ -211,6 +211,7 @@ import { usePage } from "@inertiajs/vue3";
 import { useMediaQuery } from "@vueuse/core";
 import { IconEye, IconEdit, IconWorld } from "@tabler/icons-vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
+import { tierColor, tierName } from "@/Composables/tierDisplay";
 
 const page = usePage();
 const isMdUp = useMediaQuery("(min-width: 768px)");
@@ -328,26 +329,6 @@ const getAvatarColor = (name) => {
 // Spending arrives as a decimal string, which toLocaleString would hand back unformatted.
 const peso = (value) =>
   `₱${Number(value ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
-
-const getTierColor = (tier) => {
-  const tierColors = {
-    bronze: "#CD7F32",
-    silver: "#C0C0C0",
-    gold: "#FFD700",
-    platinum: "#E5E4E2",
-  };
-  return tierColors[tier] || tierColors.bronze;
-};
-
-const getTierTagColor = (tier) => {
-  const tagColors = {
-    bronze: "orange",
-    silver: "default",
-    gold: "gold",
-    platinum: "purple",
-  };
-  return tagColors[tier] || "orange";
-};
 
 const formatDate = (date) => {
   if (!date) return "N/A";

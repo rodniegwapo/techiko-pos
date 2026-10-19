@@ -81,10 +81,10 @@
               <div class="flex items-center">
                 <div
                   class="w-6 h-6 rounded-full mr-3 border-2 border-white shadow-sm"
-                  :style="{ backgroundColor: getTierColor(customer.tier) }"
+                  :style="{ backgroundColor: tierColor(customer) }"
                 ></div>
                 <div>
-                  <div class="font-semibold capitalize">{{ customer.tier || 'Bronze' }} Member</div>
+                  <div class="font-semibold">{{ tierName(customer) }} Member</div>
                   <div class="text-sm text-gray-600">Current Tier</div>
                 </div>
               </div>
@@ -149,6 +149,7 @@
 <script setup>
 import { computed } from "vue";
 import { useMediaQuery } from "@vueuse/core";
+import { tierColor, tierName } from "@/Composables/tierDisplay";
 import { 
   UserOutlined, 
   EditOutlined, 
@@ -201,16 +202,6 @@ const getAvatarColor = (name) => {
   if (!name) return colors[0];
   const index = name.charCodeAt(0) % colors.length;
   return colors[index];
-};
-
-const getTierColor = (tier) => {
-  const tierColors = {
-    bronze: "#CD7F32",
-    silver: "#C0C0C0",
-    gold: "#FFD700",
-    platinum: "#E5E4E2",
-  };
-  return tierColors[tier] || tierColors.bronze;
 };
 
 // Spending arrives as a decimal string, which toLocaleString would hand back unformatted.

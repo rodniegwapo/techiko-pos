@@ -265,7 +265,17 @@ function onKeydown(e) {
             <div v-for="(turn, i) in loadingChat ? [] : turns" :key="i" class="space-y-2">
                 <div class="ml-auto w-fit max-w-[85%] whitespace-pre-wrap break-words rounded-lg bg-green-100 px-3 py-2 text-sm text-gray-800">{{ turn.question }}</div>
                 <div class="w-fit max-w-[95%] rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-800" data-testid="assistant-answer">
-                    <a-skeleton v-if="!turn.answer && !turn.error" active :paragraph="{ rows: 2 }" :title="false" />
+                    <div
+                        v-if="!turn.answer && !turn.error"
+                        class="flex items-center gap-2 text-gray-500"
+                        role="status"
+                        data-testid="assistant-thinking"
+                    >
+                        <span class="flex gap-1" aria-hidden="true">
+                            <span v-for="d in [0, 150, 300]" :key="d" class="h-1.5 w-1.5 animate-bounce rounded-full bg-gray-400" :style="{ animationDelay: `${d}ms` }" />
+                        </span>
+                        <span>Thinking…</span>
+                    </div>
                     <div v-else-if="turn.error">
                         <p class="text-red-600">{{ turn.error }}</p>
                         <a

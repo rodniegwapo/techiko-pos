@@ -11,6 +11,7 @@ use App\Models\InventoryLocation;
 use App\Models\Product\Product;
 use App\Models\StockAdjustment;
 use App\Services\InventoryService;
+use App\Support\FinanceAccess;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Arr;
@@ -54,7 +55,7 @@ class StockAdjustmentController extends Controller
             ]);
         }
 
-        $query = StockAdjustment::with(['location', 'createdBy', 'approvedBy'])
+        $query = StockAdjustment::with(['location', 'createdBy', 'approvedBy', 'items:id,stock_adjustment_id,product_id', 'items.product:id,name'])
             ->withCount('items')
             ->where('location_id', $location->id)
             ->when($request->input('search'), fn ($q, $s) => $q->search($s))
@@ -64,6 +65,11 @@ class StockAdjustmentController extends Controller
             ->orderBy('created_at', 'desc');
 
         $adjustments = $query->paginate($perPage);
+        // The list names the products adjusted rather than just counting them; the item rows
+        // themselves are read on the details dialog.
+        $adjustments->getCollection()->each(fn (StockAdjustment $a) => $a
+            ->setAttribute('product_names', $a->items->map(fn ($item) => $item->product?->name)->filter()->unique()->values())
+            ->unsetRelation('items'));
 
         return Inertia::render('Inventory/StockAdjustments/Index', [
             'adjustments' => StockAdjustmentResource::collection($adjustments),
@@ -143,15 +149,29 @@ class StockAdjustmentController extends Controller
         $location = InventoryLocation::forDomain($domain->name_slug)->findOrFail($validated['location_id']);
         $validated['domain'] = $location->domain ?? $domain->name_slug;
 
+        $user = auth()->user();
         $adjustment = $this->inventoryService->createStockAdjustment(
             $validated,
             $validated['items'],
-            auth()->user()
+            $user
         );
+
+        // An admin's adjustment needs no one else's approval: it applies right away. If applying
+        // fails it stays a draft, saved, to approve from the list.
+        $approved = false;
+        if (FinanceAccess::canSeeAllStores($user)) {
+            try {
+                $adjustment->approve($user);
+                $approved = true;
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
 
         return response()->json([
             'success' => true,
-            'message' => 'Stock adjustment created successfully',
+            'message' => $approved ? 'Stock adjustment applied' : 'Stock adjustment created successfully',
+            'approved' => $approved,
             'adjustment' => $adjustment,
         ]);
     }

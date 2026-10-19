@@ -1,6 +1,7 @@
 <script setup>
 import { ref, reactive, computed, watch } from 'vue';
 import { useMediaQuery } from '@vueuse/core';
+import { tierColor, tierName } from '@/Composables/tierDisplay';
 import {
   PlusOutlined,
   MinusOutlined
@@ -86,16 +87,6 @@ const calculateNewTotal = () => {
   }
 };
 
-const getTierColor = (tier) => {
-  const tierColors = {
-    bronze: '#CD7F32',
-    silver: '#C0C0C0',
-    gold: '#FFD700',
-    platinum: '#E5E4E2'
-  };
-  return tierColors[tier] || tierColors.bronze;
-};
-
 const handleSave = async () => {
   try {
     await formRef.value.validate();
@@ -132,8 +123,8 @@ const handleSave = async () => {
             <div class="font-medium">{{ customer.name }}</div>
             <div class="text-sm text-gray-500">Current Points: {{ customer.loyalty_points?.toLocaleString() || 0 }}</div>
           </div>
-          <a-tag :color="getTierColor(customer.tier)">
-            {{ customer.tier ? customer.tier.charAt(0).toUpperCase() + customer.tier.slice(1) : 'Bronze' }}
+          <a-tag :color="tierColor(customer)">
+            {{ tierName(customer) }}
           </a-tag>
         </div>
       </div>

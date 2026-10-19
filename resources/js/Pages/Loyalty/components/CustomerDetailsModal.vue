@@ -51,8 +51,8 @@
             <div class="text-sm text-gray-500">Lifetime Spent</div>
           </div>
           <div class="text-center">
-            <div class="text-2xl font-bold" :style="{ color: getTierColor(customer.tier) }">
-              {{ customer.tier ? customer.tier.charAt(0).toUpperCase() + customer.tier.slice(1) : 'Bronze' }}
+            <div class="text-2xl font-bold" :style="{ color: tierColor(customer) }">
+              {{ tierName(customer) }}
             </div>
             <div class="text-sm text-gray-500">Current Tier</div>
           </div>
@@ -63,7 +63,8 @@
       <div class="bg-gray-50 rounded-lg p-4 border">
         <h4 class="font-medium text-gray-900 mb-3">Tier Progress</h4>
         <div class="space-y-3">
-          <div v-for="tier in tierProgress" :key="tier.name" class="flex items-center justify-between">
+          <p v-if="!tierProgress.length" class="text-sm text-gray-500">No tiers set up yet.</p>
+          <div v-for="tier in tierProgress" :key="tier.key" class="flex items-center justify-between">
             <div class="flex items-center">
               <div 
                 class="w-4 h-4 rounded-full mr-3"
@@ -100,6 +101,7 @@
 <script setup>
 import { computed } from 'vue';
 import { useMediaQuery } from '@vueuse/core';
+import { tierColor, tierName } from '@/Composables/tierDisplay';
 
 const isMdUp = useMediaQuery('(min-width: 768px)');
 const modalWidth = computed(() =>
@@ -125,6 +127,11 @@ const props = defineProps({
   customer: {
     type: Object,
     default: null
+  },
+  /** Tier options: { value, label, color, spending_threshold } */
+  tiers: {
+    type: Array,
+    default: () => []
   }
 });
 
@@ -132,34 +139,22 @@ const props = defineProps({
 defineEmits(['close']);
 
 // Computed
+// The organization's tiers from Tier Management, lowest threshold first.
 const tierProgress = computed(() => {
   if (!props.customer) return [];
-  
-  const tiers = [
-    { name: 'Bronze', threshold: 0, color: '#CD7F32' },
-    { name: 'Silver', threshold: 20000, color: '#C0C0C0' },
-    { name: 'Gold', threshold: 50000, color: '#FFD700' },
-    { name: 'Platinum', threshold: 100000, color: '#E5E4E2' }
-  ];
-  
-  const currentTier = props.customer.tier || 'bronze';
-  
-  return tiers.map(tier => ({
-    ...tier,
-    current: tier.name.toLowerCase() === currentTier
-  }));
-});
 
-// Methods
-const getTierColor = (tier) => {
-  const tierColors = {
-    bronze: '#CD7F32',
-    silver: '#C0C0C0',
-    gold: '#FFD700',
-    platinum: '#E5E4E2'
-  };
-  return tierColors[tier] || tierColors.bronze;
-};
+  const currentTier = props.customer.tier || 'bronze';
+
+  return [...props.tiers]
+    .sort((a, b) => Number(a.spending_threshold) - Number(b.spending_threshold))
+    .map((tier) => ({
+      key: tier.value,
+      name: tier.label,
+      threshold: Number(tier.spending_threshold) || 0,
+      color: tier.color,
+      current: tier.value === currentTier,
+    }));
+});
 
 const formatDate = (date) => {
   if (!date) return null;

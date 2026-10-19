@@ -89,6 +89,7 @@ class SaleController extends Controller
                 'vat_rate_percent' => $vat['vat_rate_percent'],
                 'vat_pricing_mode' => $vat['vat_pricing_mode'],
                 'hide_out_of_stock' => $domain->salesHidesOutOfStock(),
+                'allow_overselling' => $domain->salesAllowsOverselling(),
             ],
             'loyaltyRedemptionSettings' => [
                 'points_per_currency_unit' => (float) config('loyalty.points_per_currency_unit', 100),

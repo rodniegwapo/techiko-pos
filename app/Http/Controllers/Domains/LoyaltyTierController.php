@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Domains;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\LoyaltyTierResource;
+use App\Models\Customer;
 use App\Models\Domain;
 use App\Models\LoyaltyTier;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
@@ -67,6 +69,7 @@ class LoyaltyTierController extends Controller
         $validated['domain'] = $domain->name_slug;
 
         $tier = LoyaltyTier::create($validated);
+        $this->recalculateCustomerTiers($domain->name_slug);
 
         return response()->json([
             'success' => true,
@@ -112,7 +115,21 @@ class LoyaltyTierController extends Controller
             'is_active' => 'boolean',
         ]);
 
-        $tier->update($validated);
+        $previousName = $tier->name;
+        DB::transaction(function () use ($tier, $validated, $previousName, $domain) {
+            $tier->update($validated);
+
+            // Customers hold the tier by name: follow a rename so they don't drop back to bronze.
+            if ($previousName !== $tier->name) {
+                Customer::query()->where('domain', $domain->name_slug)->where('tier', $previousName)
+                    ->update(['tier' => $tier->name]);
+            }
+        });
+
+        // A new threshold, or a tier switched on or off, moves customers between tiers.
+        if ($tier->wasChanged(['spending_threshold', 'is_active'])) {
+            $this->recalculateCustomerTiers($domain->name_slug);
+        }
 
         return response()->json([
             'success' => true,
@@ -149,5 +166,15 @@ class LoyaltyTierController extends Controller
             'success' => true,
             'message' => 'Tier deleted successfully'
         ]);
+    }
+
+    /** Puts each of the organization's customers in the tier their lifetime spending now reaches. */
+    private function recalculateCustomerTiers(string $domain): void
+    {
+        Customer::query()->where('domain', $domain)->chunkById(200, function ($customers) {
+            foreach ($customers as $customer) {
+                $customer->updateTierBasedOnSpending();
+            }
+        });
     }
 }

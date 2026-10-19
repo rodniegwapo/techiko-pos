@@ -233,6 +233,66 @@ class StockAdjustmentReflectsStockTest extends TestCase
         );
     }
 
+    public function test_an_admins_adjustment_applies_without_approval(): void
+    {
+        $ctx = $this->seedContext();
+
+        $this->actingAs($ctx['user'])
+            ->postJson(route('domains.inventory.adjustments.store', ['domain' => $ctx['domain']->name_slug]), [
+                'location_id' => $ctx['locA']->id,
+                'type' => 'recount',
+                'reason' => 'physical_count',
+                'items' => [['product_id' => $ctx['product']->id, 'actual_quantity' => 9]],
+            ])
+            ->assertOk()
+            ->assertJsonPath('approved', true);
+
+        $adjustment = StockAdjustment::query()->latest('id')->first();
+        $this->assertSame('approved', $adjustment->status);
+        $this->assertSame($ctx['user']->id, (int) $adjustment->approved_by);
+        $this->assertSame(9, $this->quantityAt($ctx['product'], $ctx['locA']));
+    }
+
+    public function test_a_staff_members_adjustment_still_waits_for_approval(): void
+    {
+        $ctx = $this->seedContext();
+        $role = \Spatie\Permission\Models\Role::query()->firstOrCreate(['name' => 'manager', 'guard_name' => 'web']);
+        $role->forceFill(['level' => 3])->save();
+        $manager = User::factory()->create([
+            'domain' => $ctx['domain']->name_slug, 'is_super_user' => false, 'location_id' => $ctx['locA']->id,
+        ]);
+        $manager->assignRole($role);
+
+        $this->actingAs($manager)
+            ->postJson(route('domains.inventory.adjustments.store', ['domain' => $ctx['domain']->name_slug]), [
+                'location_id' => $ctx['locA']->id,
+                'type' => 'recount',
+                'reason' => 'physical_count',
+                'items' => [['product_id' => $ctx['product']->id, 'actual_quantity' => 9]],
+            ])
+            ->assertOk()
+            ->assertJsonPath('approved', false);
+
+        $this->assertSame('draft', StockAdjustment::query()->latest('id')->first()->status);
+        $this->assertSame(12, $this->quantityAt($ctx['product'], $ctx['locA']));
+    }
+
+    public function test_the_list_names_the_products_adjusted(): void
+    {
+        $ctx = $this->seedContext();
+        $this->draft($ctx, 10);
+
+        $this->actingAs($ctx['user'])
+            ->get(route('domains.inventory.adjustments.index', [
+                'domain' => $ctx['domain']->name_slug,
+                'location_id' => $ctx['locA']->id,
+            ]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('adjustments.data.0.product_names', ['Adjust Widget'])
+                ->missing('adjustments.data.0.items'));
+    }
+
     public function test_stock_moving_before_approval_still_ends_at_the_counted_quantity(): void
     {
         $ctx = $this->seedContext();

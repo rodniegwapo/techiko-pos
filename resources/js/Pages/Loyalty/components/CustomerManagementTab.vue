@@ -14,6 +14,7 @@ import { IconEdit, IconTrash, IconEye } from "@tabler/icons-vue";
 import axios from "axios";
 import IconButtonTooltip from "@/Components/buttons/IconTooltip.vue";
 import CustomerDetailsModal from "./CustomerDetailsModal.vue";
+import { tierColor, tierName } from "@/Composables/tierDisplay";
 import PointsAdjustmentModal from "./PointsAdjustmentModal.vue";
 import RefreshButton from "@/Components/buttons/Refresh.vue";
 
@@ -187,16 +188,6 @@ const handlePointsAdjustment = async (adjustmentData) => {
   }
 };
 
-const getTierColor = (tier) => {
-  const tierColors = {
-    bronze: "#CD7F32",
-    silver: "#C0C0C0",
-    gold: "#FFD700",
-    platinum: "#E5E4E2",
-  };
-  return tierColors[tier] || tierColors.bronze;
-};
-
 // Spending arrives as a decimal string, which toLocaleString would hand back unformatted.
 const peso = (value) =>
   `₱${Number(value ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -287,13 +278,9 @@ onMounted(() => {
         </template>
 
         <template v-if="column.key === 'tier'">
-          <a-tag class="w-fit" :color="getTierColor(record.tier)">
+          <a-tag class="w-fit" :color="tierColor(record)">
             <crown-outlined class="mr-1" />
-            {{
-              record.tier
-                ? record.tier.charAt(0).toUpperCase() + record.tier.slice(1)
-                : "Bronze"
-            }}
+            {{ tierName(record) }}
           </a-tag>
         </template>
 
@@ -355,14 +342,9 @@ onMounted(() => {
                 {{ record.phone }}
               </div>
               <div class="mt-2">
-                <a-tag class="m-0 w-fit" :color="getTierColor(record.tier)">
+                <a-tag class="m-0 w-fit" :color="tierColor(record)">
                   <crown-outlined class="mr-1" />
-                  {{
-                    record.tier
-                      ? record.tier.charAt(0).toUpperCase() +
-                        record.tier.slice(1)
-                      : "Bronze"
-                  }}
+                  {{ tierName(record) }}
                 </a-tag>
               </div>
             </div>
@@ -426,6 +408,7 @@ onMounted(() => {
     <CustomerDetailsModal
       :visible="showCustomerModal"
       :customer="selectedCustomer"
+      :tiers="tierOptions.filter((t) => t.value)"
       @close="showCustomerModal = false"
     />
 

@@ -28,8 +28,7 @@ const form = useForm({
         props.salesSettings?.vat_pricing_mode === "inclusive"
             ? "inclusive"
             : "exclusive",
-    allow_overselling:
-        props.salesSettings?.allow_overselling !== false,
+    allow_overselling: props.salesSettings?.allow_overselling === true,
     hide_out_of_stock: props.salesSettings?.hide_out_of_stock === true,
 });
 

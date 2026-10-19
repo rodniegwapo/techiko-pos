@@ -1,6 +1,7 @@
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { Head, router, usePage } from "@inertiajs/vue3";
+import axios from "axios";
 import { watchDebounced } from "@vueuse/core";
 import { IconPlus, IconUsers } from "@tabler/icons-vue";
 import { useTable } from "@/Composables/useTable";
@@ -58,6 +59,24 @@ const getItems = () => {
 
 watchDebounced(search, getItems, { debounce: 300 });
 
+// The organization's tiers as named in Tier Management (the classic four until they load).
+const tierOptions = ref([
+  { label: "Bronze", value: "bronze" },
+  { label: "Silver", value: "silver" },
+  { label: "Gold", value: "gold" },
+  { label: "Platinum", value: "platinum" },
+]);
+onMounted(async () => {
+  try {
+    const { data } = await axios.get("/api/customers/tier-options");
+    if (Array.isArray(data) && data.length) {
+      tierOptions.value = data.map((t) => ({ label: t.label, value: t.value }));
+    }
+  } catch (error) {
+    console.error("Failed to load tier options:", error);
+  }
+});
+
 // Filters setup
 const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
   getItems,
@@ -77,14 +96,7 @@ const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
       label: "Tier",
       key: "tier",
       ref: tier,
-      getLabel: toLabel(
-        computed(() => [
-          { label: "Bronze", value: "bronze" },
-          { label: "Silver", value: "silver" },
-          { label: "Gold", value: "gold" },
-          { label: "Platinum", value: "platinum" },
-        ])
-      ),
+      getLabel: toLabel(tierOptions),
     },
     {
       label: "Registration Period",
@@ -103,7 +115,7 @@ const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
 });
 
 // FilterDropdown configuration
-const filtersConfig = [
+const filtersConfig = computed(() => [
   {
     key: "loyalty_status",
     label: "Loyalty Status",
@@ -117,12 +129,7 @@ const filtersConfig = [
     key: "tier",
     label: "Tier",
     type: "select",
-    options: [
-      { label: "Bronze", value: "bronze" },
-      { label: "Silver", value: "silver" },
-      { label: "Gold", value: "gold" },
-      { label: "Platinum", value: "platinum" },
-    ],
+    options: tierOptions.value,
   },
   {
     key: "date_range",
@@ -135,7 +142,7 @@ const filtersConfig = [
       { label: "Last year", value: "1_year" },
     ],
   },
-];
+]);
 
 // Table composable
 const tableFilters = { search, loyalty_status, tier, date_range };

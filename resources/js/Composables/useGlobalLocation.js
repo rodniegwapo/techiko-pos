@@ -109,7 +109,9 @@ export function useGlobalLocation() {
             
         } catch (error) {
             console.error('Failed to set default location:', error)
-            
+            // The session ran out and the page is reloading to sign in again.
+            if (error.sessionExpired) return
+
             // Show error notification
             notification.error({
                 message: 'Location Update Failed',

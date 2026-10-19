@@ -15,9 +15,9 @@
             <div class="flex items-center">
               <div
                 class="w-4 h-4 rounded-full mr-3"
-                :style="{ backgroundColor: getTierColor(tier.tier) }"
+                :style="{ backgroundColor: tier.color || getTierColor(tier.tier) }"
               ></div>
-              <span class="font-medium capitalize">{{ tier.tier }}</span>
+              <span class="font-medium capitalize">{{ tier.name || tier.tier }}</span>
             </div>
             <div class="text-right">
                 <div class="font-medium">{{ tier.count || 0 }}</div>

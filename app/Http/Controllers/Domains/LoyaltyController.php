@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Domains;
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\Domain;
+use App\Models\LoyaltyTier;
 use App\Models\Sale;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -94,17 +95,20 @@ class LoyaltyController extends Controller
             ->get();
 
         $totalCustomers = Customer::where('domain', $domain->name_slug)->count();
+        // Names and colours as set in Tier Management; the classic ones only for a tier it doesn't have.
+        $tiers = LoyaltyTier::query()->forDomain($domain->name_slug)->get(['name', 'display_name', 'color'])->keyBy('name');
         $tierColors = ['bronze' => '#CD7F32', 'silver' => '#C0C0C0', 'gold' => '#FFD700', 'platinum' => '#E5E4E2'];
 
-        $tierDistribution = $tierStats->map(function ($stat) use ($totalCustomers, $tierColors) {
+        $tierDistribution = $tierStats->map(function ($stat) use ($totalCustomers, $tierColors, $tiers) {
             $percentage = $totalCustomers > 0 ? round(($stat->count / $totalCustomers) * 100, 1) : 0;
+            $tier = $tiers->get($stat->tier);
 
             return [
                 'tier' => $stat->tier,
-                'name' => ucfirst($stat->tier),
+                'name' => $tier?->display_name ?? ucfirst($stat->tier),
                 'count' => (int) $stat->count,
                 'percentage' => $percentage,
-                'color' => $tierColors[$stat->tier] ?? $tierColors['bronze'],
+                'color' => $tier?->color ?? $tierColors[$stat->tier] ?? $tierColors['bronze'],
             ];
         });
 

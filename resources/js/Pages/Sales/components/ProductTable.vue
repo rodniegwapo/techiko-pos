@@ -86,7 +86,11 @@ const isCoffeeshop = computed(() => props.variant === "coffeeshop");
 
 const emit = defineEmits(["cart-updated", "offline-add-product", "load-more"]);
 
+// Settings → Sell when out of stock: products at zero stay addable.
+const allowOverselling = computed(() => page.props.salesSettings?.allow_overselling === true);
+
 function isOutOfStock(product) {
+    if (allowOverselling.value) return false;
     if (!product?.track_inventory) return false;
     if (
         product.location_quantity_available === null ||

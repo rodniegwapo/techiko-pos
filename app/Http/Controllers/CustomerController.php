@@ -59,12 +59,14 @@ class CustomerController extends Controller
         $tiers = LoyaltyTier::active()
             ->when($domain, fn ($query) => $query->forDomain($domain))
             ->ordered()
-            ->get(['name', 'display_name']);
+            ->get(['name', 'display_name', 'color', 'spending_threshold']);
 
         return response()->json(
             $tiers->map(fn ($tier) => [
                 'value' => $tier->name,
                 'label' => $tier->display_name,
+                'color' => $tier->color,
+                'spending_threshold' => (float) $tier->spending_threshold,
             ])
                 // Organizations name their tiers independently; the filter offers each name once.
                 ->unique('value')

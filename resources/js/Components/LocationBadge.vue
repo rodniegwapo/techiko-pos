@@ -90,6 +90,8 @@ const switchLocation = async (location) => {
         window.location.href = url.toString();
     } catch (error) {
         console.error("Failed to switch location:", error);
+        // The session ran out and the page is reloading to sign in again.
+        if (error.sessionExpired) return;
 
         // Show error notification
         notification.error({
