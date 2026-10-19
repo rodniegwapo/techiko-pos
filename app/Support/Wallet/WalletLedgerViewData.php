@@ -73,6 +73,7 @@ class WalletLedgerViewData
         $base = WalletCashMovement::query()
             ->forWalletContext($domain->name_slug, $location->id)
             ->whereDate('movement_date', $dateYmd)
+            ->inDrawer()
             ->forManualLedgerRunningBalance();
         $inSum = (clone $base)->where('direction', 'in')->sum('amount');
         $outSum = (clone $base)->where('direction', 'out')->sum('amount');
@@ -80,10 +81,12 @@ class WalletLedgerViewData
         return round(((float) $inSum - (float) $outSum), 2);
     }
 
+    /** All-time cash in minus cash out of the drawer; channel money is in ChannelBalances. */
     public static function runningCashBalance(Domain $domain, InventoryLocation $location): float
     {
         $base = WalletCashMovement::query()
             ->forWalletContext($domain->name_slug, $location->id)
+            ->inDrawer()
             ->forManualLedgerRunningBalance();
         $inSum = (clone $base)->where('direction', 'in')->sum('amount');
         $outSum = (clone $base)->where('direction', 'out')->sum('amount');

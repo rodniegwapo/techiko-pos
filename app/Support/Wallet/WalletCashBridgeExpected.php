@@ -34,6 +34,8 @@ final class WalletCashBridgeExpected
     public static function physicalMovementBase(Builder $query): Builder
     {
         return $query
+            // A payment channel's lines move that channel's money, not the drawer's cash.
+            ->inDrawer()
             // paidCashSalesGroupedByDay() already counts these straight from Sale/SalePayment, and
             // e-wallet sale movements aren't physical cash in the drawer at all.
             ->whereNotIn('kind', [WalletCashMovement::KIND_SALE_PAYMENT, WalletCashMovement::KIND_SALE_VOID])

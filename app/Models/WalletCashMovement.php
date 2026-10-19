@@ -67,6 +67,15 @@ class WalletCashMovement extends Model
     }
 
     /**
+     * Money in the cash drawer itself. A line with a payment channel moves that channel's money
+     * (GCash, a bank account) and leaves the drawer's cash alone.
+     */
+    public function scopeInDrawer(Builder $query): Builder
+    {
+        return $query->whereNull('payment_card_type_id');
+    }
+
+    /**
      * Same rule as {@see WalletCashDailyExpected}: exclude book-only AUTO_CC_OPENING and
      * AUTO_CC_COUNTED_VARIANCE; still include end-shift cashout (cash left the drawer).
      */

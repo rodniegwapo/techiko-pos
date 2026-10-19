@@ -5,6 +5,7 @@ import { router, usePage } from "@inertiajs/vue3";
 import WalletShell from "@/Pages/Wallet/WalletShell.vue";
 import CashLedgerPanel from "@/Pages/Wallet/partials/CashLedgerPanel.vue";
 import AllMoneyTable from "@/Pages/Wallet/partials/AllMoneyTable.vue";
+import ChannelBalances from "@/Pages/Wallet/partials/ChannelBalances.vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 
 const page = usePage();
@@ -58,6 +59,10 @@ const props = defineProps({
     allMoney: {
         type: Object,
         default: null,
+    },
+    channelBalances: {
+        type: Array,
+        default: () => [],
     },
 });
 
@@ -129,8 +134,15 @@ const isShiftClosed = computed(() => !!props.cashControl?.is_closed);
                     <a-radio-button value="all">All money</a-radio-button>
                 </a-radio-group>
                 <AllMoneyTable v-if="showAllMoney" :all-money="allMoney" :keep-query="keepQuery" />
+                <ChannelBalances
+                    v-if="!showAllMoney && ledger"
+                    :channels="channelBalances"
+                    :drawer-balance="runningCashBalance"
+                    :active-location-id="activeLocationId"
+                    :is-shift-closed="isShiftClosed"
+                />
                 <CashLedgerPanel
-                    v-else-if="ledger"
+                    v-if="!showAllMoney && ledger"
                     :movements="ledger.movements"
                     :filters="ledger.filters"
                     :ledger-balance="ledger.ledgerBalance"

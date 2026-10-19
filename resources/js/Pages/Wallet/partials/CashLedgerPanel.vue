@@ -351,13 +351,28 @@ function closeModal() {
     modalVisible.value = false;
 }
 
+/** Kinds whose direction is fixed: a withdrawal or transfer out takes money out, a transfer in puts it in. */
+const FIXED_DIRECTION = {
+    owner_draw: "out",
+    ewallet_transfer_in: "in",
+    ewallet_transfer_out: "out",
+};
+const directionLocked = computed(() => entryForm.kind in FIXED_DIRECTION);
+const needsChannel = computed(() =>
+    ["ewallet_transfer_in", "ewallet_transfer_out"].includes(entryForm.kind),
+);
+
+// Changing the kind keeps the channel already chosen; only the withdrawal form picks it differently.
 watch(
     () => entryForm.kind,
-    (k) => {
+    (k, prev) => {
+        if (FIXED_DIRECTION[k]) {
+            entryForm.direction = FIXED_DIRECTION[k];
+        }
         if (k === "owner_draw") {
-            entryForm.direction = "out";
-        } else {
-            resetDrawFields();
+            entryForm.drawSource = entryForm.payment_card_type_id ? "card_type" : "cash_register";
+        } else if (prev === "owner_draw" && entryForm.drawSource === "cash_register") {
+            entryForm.payment_card_type_id = null;
         }
     },
 );
@@ -408,6 +423,11 @@ function submitEntry() {
         !entryForm.payment_card_type_id
     ) {
         antMessage.warning("Choose a terminal / card rail.");
+
+        return;
+    }
+    if (needsChannel.value && !entryForm.payment_card_type_id) {
+        antMessage.warning("Choose the payment channel the money moves in or out of.");
 
         return;
     }
@@ -561,7 +581,7 @@ watch(
                     <div v-if="runningCashBalance != null" class="min-w-0">
                         <div
                             class="text-xs font-medium uppercase text-gray-500"
-                            title="All-time cash in minus cash out for this location; not expected drawer cash for the selected business date."
+                            title="All-time cash in minus cash out of this store's cash drawer (payment channels not included); not expected drawer cash for the selected business date."
                         >
                             Running cash
                         </div>
@@ -769,11 +789,16 @@ watch(
                     >
                         <a-radio-button
                             value="in"
-                            :disabled="isOwnerDraw"
+                            :disabled="directionLocked && entryForm.direction !== 'in'"
                         >
                             Cash in
                         </a-radio-button>
-                        <a-radio-button value="out">Cash out</a-radio-button>
+                        <a-radio-button
+                            value="out"
+                            :disabled="directionLocked && entryForm.direction !== 'out'"
+                        >
+                            Cash out
+                        </a-radio-button>
                     </a-radio-group>
                 </div>
                 <div>
@@ -839,13 +864,14 @@ watch(
                 </div>
                 <div v-if="!isOwnerDraw">
                     <label class="mb-1 block text-xs font-medium text-gray-700"
-                        >Rail (optional)</label
+                        >{{ needsChannel ? "Payment channel" : "Where the money is (optional)" }}</label
                     >
                     <a-select
                         v-model:value="entryForm.payment_card_type_id"
-                        allow-clear
-                        placeholder="Cash register — no terminal rail"
+                        :allow-clear="!needsChannel"
+                        :placeholder="needsChannel ? 'Choose the channel' : 'Cash drawer'"
                         class="w-full"
+                        data-testid="ledger-entry-channel"
                         :options="
                             railCardTypes.map((c) => ({
                                 value: c.id,
@@ -853,6 +879,9 @@ watch(
                             }))
                         "
                     />
+                    <p class="mb-0 mt-1 text-xs text-gray-500">
+                        An entry on a channel changes that channel's balance, not the cash drawer's.
+                    </p>
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-gray-700"

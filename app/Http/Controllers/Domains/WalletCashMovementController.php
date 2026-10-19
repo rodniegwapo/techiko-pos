@@ -70,8 +70,17 @@ class WalletCashMovementController extends Controller
     {
         $location = WalletLocationResolver::resolve($request, $domain);
 
+        $kind = (string) $request->input('kind');
+        // A transfer moves money into or out of a payment channel, so it names the channel and its
+        // direction is the transfer's own.
+        $isTransfer = in_array($kind, ['ewallet_transfer_in', 'ewallet_transfer_out'], true);
+
         $validated = $request->validate([
-            'direction' => ['required', 'string', 'in:in,out'],
+            'direction' => [
+                'required', 'string', 'in:in,out',
+                Rule::when($kind === 'ewallet_transfer_in', ['in:in']),
+                Rule::when($kind === 'ewallet_transfer_out', ['in:out']),
+            ],
             'amount' => ['required', 'numeric', 'min:0.01', 'max:99999999.99'],
             'kind' => ['required', 'string', 'in:'.implode(',', WalletCashMovement::KINDS)],
             'draw_source' => [
@@ -89,12 +98,18 @@ class WalletCashMovementController extends Controller
                     && (string) $request->input('draw_source') === 'cash_register'
                 ),
                 Rule::requiredIf(
-                    (string) $request->input('kind') === 'owner_draw'
-                    && (string) $request->input('draw_source') === 'card_type'
+                    ((string) $request->input('kind') === 'owner_draw'
+                    && (string) $request->input('draw_source') === 'card_type')
+                    || $isTransfer
                 ),
             ],
             'movement_date' => ['required', 'date', 'before_or_equal:today'],
             'notes' => ['nullable', 'string', 'max:2000'],
+        ], [
+            'payment_card_type_id.required' => 'Choose the payment channel the money moves in or out of.',
+            'direction.in' => $kind === 'ewallet_transfer_out'
+                ? 'A transfer out takes money out of the channel.'
+                : 'A transfer in puts money into the channel.',
         ]);
         $this->ensureDateNotClosed($domain->name_slug, (int) $location->id, (string) $validated['movement_date']);
 
