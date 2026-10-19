@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Http\Middleware\RoleBasedAccessControl;
 use App\Http\Middleware\UserPermissionCheckMiddleware;
 use App\Models\Domain;
+use App\Models\InventoryLocation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -114,6 +115,66 @@ class UserRoleAssignmentTest extends TestCase
             'name' => $cashier->name, 'email' => $cashier->email, 'role_id' => $this->roles['admin']->id,
         ])->assertStatus(422)->assertJsonValidationErrors('role_id');
         $this->assertTrue($cashier->fresh()->hasRole('supervisor'));
+    }
+
+    private function location(string $name, string $type = 'store'): InventoryLocation
+    {
+        return InventoryLocation::query()->create([
+            'domain' => $this->domain->name_slug, 'name' => $name, 'code' => Str::upper(Str::random(8)),
+            'type' => $type, 'is_active' => true, 'is_default' => false,
+        ]);
+    }
+
+    public function test_staff_are_given_where_they_work_when_there_is_more_than_one_location(): void
+    {
+        $makati = $this->location('Makati');
+        $warehouse = $this->location('Warehouse', 'warehouse');
+        $admin = $this->member('admin');
+
+        // Required for a manager-or-below role.
+        $this->create($admin, 'cashier')->assertStatus(422)->assertJsonValidationErrors('location_id');
+
+        // A cashier works at a store, not the warehouse.
+        $this->actingAs($admin)->postJson(route('domains.users.store', ['domain' => $this->domain->name_slug]), [
+            'name' => 'New cashier', 'email' => Str::random(8).'@example.test',
+            'password' => 'secret123', 'password_confirmation' => 'secret123',
+            'role_id' => $this->roles['cashier']->id, 'location_id' => $warehouse->id,
+        ])->assertStatus(422)->assertJsonValidationErrors('location_id');
+
+        $this->actingAs($admin)->postJson(route('domains.users.store', ['domain' => $this->domain->name_slug]), [
+            'name' => 'New cashier', 'email' => Str::random(8).'@example.test',
+            'password' => 'secret123', 'password_confirmation' => 'secret123',
+            'role_id' => $this->roles['cashier']->id, 'location_id' => $makati->id,
+        ])->assertCreated();
+        $cashier = User::query()->where('name', 'New cashier')->sole();
+        $this->assertSame($makati->id, (int) $cashier->location_id);
+
+        // A manager may work at the warehouse; moving a user is saved.
+        $this->actingAs($admin)->putJson(route('domains.users.update', ['domain' => $this->domain->name_slug, 'user' => $cashier->id]), [
+            'name' => $cashier->name, 'email' => $cashier->email, 'role_id' => $this->roles['manager']->id, 'location_id' => $warehouse->id,
+        ])->assertOk();
+        $this->assertSame($warehouse->id, (int) $cashier->fresh()->location_id);
+
+        // An admin isn't tied to one location.
+        $this->create($admin, 'admin')->assertCreated();
+
+        // Another organization's store isn't on offer.
+        $other = InventoryLocation::query()->create([
+            'domain' => 'someone-else', 'name' => 'Theirs', 'code' => Str::upper(Str::random(8)),
+            'type' => 'store', 'is_active' => true, 'is_default' => false,
+        ]);
+        $this->actingAs($admin)->putJson(route('domains.users.update', ['domain' => $this->domain->name_slug, 'user' => $cashier->id]), [
+            'name' => $cashier->name, 'email' => $cashier->email, 'role_id' => $this->roles['manager']->id, 'location_id' => $other->id,
+        ])->assertStatus(422)->assertJsonValidationErrors('location_id');
+    }
+
+    public function test_with_one_location_staff_are_placed_there(): void
+    {
+        $only = $this->location('Only Store');
+
+        $this->create($this->member('admin'), 'cashier')->assertCreated();
+
+        $this->assertSame($only->id, (int) User::query()->where('name', 'New cashier')->sole()->location_id);
     }
 
     public function test_a_super_admin_role_never_makes_a_normal_account_a_super_user(): void

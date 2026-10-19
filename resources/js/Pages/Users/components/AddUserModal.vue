@@ -57,6 +57,23 @@
                 </a-form-item>
             </div>
 
+            <!-- Where a manager (or someone below) works; needed when there is more than one location -->
+            <a-form-item
+                v-if="showLocation"
+                label="Store / location"
+                name="location_id"
+                extra="They work at this location and see its sales, stock and cash."
+            >
+                <a-select
+                    v-model:value="form.location_id"
+                    class="w-full"
+                    placeholder="Select where they work"
+                    :options="locationOptions"
+                    :disabled="isEditingSelf"
+                    data-testid="user-location"
+                />
+            </a-form-item>
+
             <!-- Domain field for global view or super users -->
             <a-form-item
                 v-if="page.props.isGlobalView || currentUser.is_super_user"
@@ -273,6 +290,7 @@ const form = reactive({
     password_confirmation: "",
     role_id: null,
     supervisor_id: null,
+    location_id: null,
     domain: page.props.isGlobalView
         ? null
         : page.props.currentDomain?.name_slug || null,
@@ -335,6 +353,23 @@ const selectedRole = computed(() => {
     return props.roles.find((role) => role.id === form.role_id);
 });
 
+// Managers and the roles below them are tied to one location (admins work across all of them).
+const workLocations = computed(() => page.props.locations ?? []);
+const roleIsBound = computed(() => (selectedRole.value?.level ?? 0) >= 3);
+const isCashierRole = computed(() => (selectedRole.value?.level ?? 0) >= 5);
+const showLocation = computed(() => roleIsBound.value && workLocations.value.length > 1);
+const locationOptions = computed(() =>
+    workLocations.value
+        // A cashier works at a store, not a warehouse.
+        .filter((l) => !(isCashierRole.value && l.type === "warehouse"))
+        .map((l) => ({ value: l.id, label: l.type === "warehouse" ? `${l.name} (warehouse)` : l.name })),
+);
+watch(locationOptions, (options) => {
+    if (form.location_id && !options.some((o) => o.value === form.location_id)) {
+        form.location_id = null;
+    }
+});
+
 // Dynamic assignment label based on selected role
 const assignLabel = computed(() => {
     if (!selectedRole.value) return null;
@@ -381,6 +416,9 @@ const rules = computed(() => ({
     role_id: isOwnRoleLocked.value
         ? []
         : [{ required: true, message: "Please select a role" }],
+    location_id: showLocation.value && !isEditingSelf.value
+        ? [{ required: true, message: "Please select where they work" }]
+        : [],
 }));
 
 // Watch for user changes
@@ -398,6 +436,7 @@ watch(
                 password_confirmation: "",
                 role_id: userData.roles?.[0]?.id || null,
                 supervisor_id: userData.supervisor_id || null,
+                location_id: userData.location_id || userData.location?.id || null,
                 domain: userData.domain || null,
             });
 
@@ -414,6 +453,7 @@ watch(
                 password_confirmation: "",
                 role_id: null,
                 supervisor_id: null,
+                location_id: null,
             });
             availableSupervisors.value = [];
         }
@@ -546,6 +586,11 @@ const handleSave = async () => {
         // Own role is locked for non-super users — omit role_id so it cannot be changed
         if (!isOwnRoleLocked.value) {
             userData.role_id = form.role_id;
+        }
+
+        // Where they work (not one's own); admins aren't tied to one location.
+        if (!isEditingSelf.value) {
+            userData.location_id = roleIsBound.value ? form.location_id : null;
         }
 
         // Only include password if it's provided

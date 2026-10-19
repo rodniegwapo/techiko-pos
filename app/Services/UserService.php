@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\InventoryLocation;
 use App\Models\User;
 use App\Services\UserHierarchyService;
 use Illuminate\Http\Request;
@@ -153,8 +154,54 @@ class UserService
     {
         // Highest role first, so the list reads in hierarchy order. Same rule as saving.
         return UserHierarchyService::assignableRoles($currentUser)
-            ->map(fn (Role $role) => ['id' => $role->id, 'name' => $role->name])
+            ->map(fn (Role $role) => ['id' => $role->id, 'name' => $role->name, 'level' => (int) $role->level])
             ->values();
+    }
+
+    /** The places a user can work at: the organization's active stores and warehouses. */
+    public static function workLocations(?string $domain)
+    {
+        return InventoryLocation::query()->forDomain((string) $domain)->active()
+            ->where(fn ($q) => $q->whereNull('type')->orWhereIn('type', ['store', 'warehouse']))
+            ->orderBy('name')
+            ->get(['id', 'name', 'type']);
+    }
+
+    /**
+     * Rules for the location a user works at. Managers and the roles below them are tied to one
+     * location, so when there is more than one they must be given one; a cashier only a store.
+     *
+     * @return list<mixed>
+     */
+    private function locationRules(?string $domain, bool $roleSent): array
+    {
+        $locations = self::workLocations($domain);
+        $role = $roleSent && request()->input('role_id') ? Role::query()->find(request()->input('role_id')) : null;
+        $boundToOne = $role && (int) $role->level >= 3;
+
+        return [
+            $boundToOne && $locations->count() > 1 ? 'required' : 'nullable',
+            'integer',
+            function ($attribute, $value, $fail) use ($locations, $role) {
+                $location = $locations->firstWhere('id', (int) $value);
+                if (! $location) {
+                    $fail('Choose one of this organization\'s stores or warehouses.');
+                } elseif ($role && (int) $role->level >= 5 && $location->type === 'warehouse') {
+                    $fail('A cashier works at a store, not a warehouse.');
+                }
+            },
+        ];
+    }
+
+    /** Where a new or changed user works: the one chosen, or the only location there is. */
+    private function resolveLocationId(array $data, ?string $domain, ?Role $role): ?int
+    {
+        if (! empty($data['location_id'])) {
+            return (int) $data['location_id'];
+        }
+        $locations = self::workLocations($domain);
+
+        return $role && (int) $role->level >= 3 && $locations->count() === 1 ? (int) $locations->first()->id : null;
     }
 
     /**
@@ -190,10 +237,12 @@ class UserService
             $userData['domain'] = $currentUser->domain;
         }
 
+        $role = Role::findById($data['role_id'], 'web');
+        $userData['location_id'] = $this->resolveLocationId($data, $userData['domain'] ?? null, $role);
+
         $user = User::create($userData);
 
         // Assign role with correct guard
-        $role = Role::findById($data['role_id'], 'web');
         $user->assignRole($role);
         $user->syncRoleLevel();
 
@@ -228,6 +277,12 @@ class UserService
             // Not one's own status: that stays with someone above them.
             if (isset($data['status']) && $currentUser->id !== $user->id) {
                 $updateData['status'] = $data['status'];
+            }
+
+            // Where they work; not one's own (the store a user is tied to is set from above).
+            if (array_key_exists('location_id', $data) && $currentUser->id !== $user->id) {
+                $role = isset($data['role_id']) ? Role::findById($data['role_id'], 'web') : $user->roles()->orderBy('level')->first();
+                $updateData['location_id'] = $this->resolveLocationId($data, $updateData['domain'] ?? $user->domain, $role);
             }
         } else {
             // Manager can only update non-sensitive fields
@@ -317,7 +372,12 @@ class UserService
                     $fail('You are not authorized to assign this role.');
                 }
             }],
-            'supervisor_id' => 'nullable|exists:users,id'
+            'supervisor_id' => 'nullable|exists:users,id',
+            'location_id' => $this->locationRules(
+                // input(), not request('domain'): that falls back to the {domain} route parameter.
+                $currentUser->isSuperUser() ? (request()->input('domain') ?: $currentUser->domain) : $currentUser->domain,
+                true,
+            ),
         ];
 
         // Add domain validation for global view
@@ -354,6 +414,11 @@ class UserService
                     }],
                 'supervisor_id' => 'nullable|exists:users,id',
                 'status' => 'sometimes|in:active,inactive',
+                // Their own location is set from above, so it isn't required when editing oneself.
+                'location_id' => $this->locationRules(
+                    request()->input('domain') ?: $targetUser->domain,
+                    ! $isSelfRoleLocked && $currentUser->id !== $targetUser->id,
+                ),
             ];
 
             // Add domain validation for global view
