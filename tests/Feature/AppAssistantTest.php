@@ -586,7 +586,8 @@ class AppAssistantTest extends TestCase
 
     public function test_the_app_map_covers_every_page_of_the_sidebar(): void
     {
-        preg_match_all('/routeName:\s*"([^"]+)"/', file_get_contents(resource_path('js/Components/sidebar/leftMenu.vue')), $matches);
+        // The sidebar's items are defined in useNavMenu.js (leftMenu.vue renders them).
+        preg_match_all('/routeName:\s*"([^"]+)"/', file_get_contents(resource_path('js/Composables/useNavMenu.js')), $matches);
         $sidebarDomainPages = array_values(array_filter(array_unique($matches[1]), fn ($r) => Route::has('domains.'.$r)));
         $mapped = array_column(config('assistant_map'), 'route');
 

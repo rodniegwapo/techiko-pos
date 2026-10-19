@@ -16,6 +16,7 @@ use Database\Seeders\ProductSoldTypeSeeder;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Tests\Concerns\OpensTodaysShift;
 use Tests\TestCase;
 
 /**
@@ -24,11 +25,13 @@ use Tests\TestCase;
  */
 class PaymentChannelsTest extends TestCase
 {
+    use OpensTodaysShift;
     use RefreshDatabase;
 
     protected function setUp(): void
     {
         parent::setUp();
+        $this->openTodaysShiftForNewStores();
         $this->withoutMiddleware([
             UserPermissionCheckMiddleware::class,
             RoleBasedAccessControl::class,

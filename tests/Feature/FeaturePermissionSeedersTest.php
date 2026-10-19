@@ -58,7 +58,12 @@ class FeaturePermissionSeedersTest extends TestCase
 
     public function test_the_seeders_cover_every_route_behind_their_feature(): void
     {
-        $this->assertSame($this->routesBehind('finance'), $this->sorted(FinancePermissionSeeder::ROUTES));
+        // Expenses has its own feature gate (it can come without the rest of Finance), but the
+        // Finance seeder sets up its permissions too.
+        $this->assertSame(
+            $this->sorted([...$this->routesBehind('finance'), ...$this->routesBehind('expenses')]),
+            $this->sorted(FinancePermissionSeeder::ROUTES),
+        );
         $this->assertSame($this->routesBehind('ai'), $this->sorted(AssistantPermissionSeeder::ROUTES));
     }
 
