@@ -26,6 +26,8 @@ use App\Services\InventoryService;
 use App\Services\LoyaltyRedemptionService;
 use App\Services\ProductModifierService;
 use App\Services\SaleService;
+use App\Services\Wallet\SalePaymentWalletPosting;
+use App\Support\Wallet\WalletShiftGuard;
 use App\Traits\LocationCategoryScoping;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
@@ -71,17 +73,23 @@ class SaleController extends Controller
     {
         $location = Helpers::getActiveLocation($domain);
         $vat = $domain->salesVatSettings();
+        $businessDate = now()->toDateString();
 
         return Inertia::render('Sales/Index', [
             'domain' => $domain,
             'categories' => $location
                 ? $this->getCategoriesForLocation($domain->name_slug, $location)->get()
                 : Category::where('domain', $domain->name_slug)->get(),
+            'shiftStatus' => $location ? [
+                'is_open' => WalletShiftGuard::isOpenForSale($domain->name_slug, (int) $location->id, $businessDate),
+                'business_date' => $businessDate,
+            ] : null,
             'salesSettings' => [
                 'apply_vat_automatically' => $vat['apply_vat_automatically'],
                 'vat_rate_percent' => $vat['vat_rate_percent'],
                 'vat_pricing_mode' => $vat['vat_pricing_mode'],
                 'hide_out_of_stock' => $domain->salesHidesOutOfStock(),
+                'allow_overselling' => $domain->salesAllowsOverselling(),
             ],
             'loyaltyRedemptionSettings' => [
                 'points_per_currency_unit' => (float) config('loyalty.points_per_currency_unit', 100),
@@ -170,6 +178,8 @@ class SaleController extends Controller
             ->orderBy('name')->orderBy('id')
             ->forPage($page, $perPage)
             ->get();
+        // Priced as this store sells them.
+        Product::applyStorePrices($products, $location->id);
 
         return ProductResource::collection($products)->additional([
             'meta' => [
@@ -227,6 +237,8 @@ class SaleController extends Controller
             ->orderBy('name')->orderBy('id')
             ->forPage($page, $perPage)
             ->get();
+        // Priced as this store sells them, so a sale rung up offline matches.
+        Product::applyStorePrices($products, $location->id);
 
         return ProductResource::collection($products)->additional([
             'meta' => [
@@ -294,11 +306,31 @@ class SaleController extends Controller
             'sale_amount' => 'nullable|numeric|min:0',
             'loyalty_points_to_redeem' => 'nullable|integer|min:0',
             'payment_method' => 'required|string|in:cash,card,e-wallet,bank,credit,split',
+            // A sale rung up later (e.g. one written down while the POS was off): supervisors and up only.
+            'transaction_date' => ['nullable', 'date', 'before_or_equal:today'],
             ...$this->splitPaymentRules(allowCredit: true),
         ]);
 
         $location = Helpers::getActiveLocation($domain);
         $isSplit = $validated['payment_method'] === 'split';
+
+        $saleDay = isset($validated['transaction_date'])
+            ? Carbon::parse($validated['transaction_date'])->toDateString()
+            : now()->toDateString();
+        $backDated = $saleDay !== now()->toDateString();
+        if ($backDated && $request->user()->isCashierOrBelow()) {
+            throw ValidationException::withMessages([
+                'transaction_date' => 'Only a supervisor or above can record a sale on an earlier date.',
+            ]);
+        }
+
+        if ($location) {
+            // Today's sales need today's shift open; an earlier day only must not be closed.
+            $backDated
+                ? WalletShiftGuard::ensureDateNotClosed($domain->name_slug, (int) $location->id, $saleDay, 'transaction_date')
+                : WalletShiftGuard::ensureShiftOpenForSale($domain->name_slug, (int) $location->id, $saleDay);
+        }
+        $transactionDate = $backDated ? Carbon::parse($saleDay)->setTimeFrom(now()) : null;
 
         // Card, e-wallet and bank payments name the channel used (terminal, GCash, BDO…) at this store.
         if ($isSplit) {
@@ -333,6 +365,7 @@ class SaleController extends Controller
                 $location,
                 $domain,
                 $redemptionService,
+                $transactionDate,
             ) {
                 $sale->refresh();
 
@@ -379,7 +412,7 @@ class SaleController extends Controller
 
                 // 1. Complete sale and process inventory
                 $sale->refresh();
-                $this->saleService->completeSale($sale, auth()->user());
+                $this->saleService->completeSale($sale, auth()->user(), transactionDate: $transactionDate);
 
                 // 2. Handle overselling situations (create automatic stock adjustments)
                 $oversoldItems = [];
@@ -422,6 +455,7 @@ class SaleController extends Controller
                         'payment_status' => 'paid',
                     ]);
                     $sale->payments()->createMany($splitParts);
+                    app(SalePaymentWalletPosting::class)->postForCompletedSale($sale);
 
                     if ($customer) {
                         $sale->updateCustomer($customer->id);
@@ -466,6 +500,7 @@ class SaleController extends Controller
                         'location_id' => $location->id,
                         'payment_status' => 'paid',
                     ]);
+                    app(SalePaymentWalletPosting::class)->postForCompletedSale($sale);
 
                     // 5. Process loyalty if customer is provided (earn points on net amount paid)
                     if ($validated['customer_id']) {
@@ -1688,10 +1723,12 @@ class SaleController extends Controller
                         continue;
                     }
 
+                    // Priced on the server at this store's price, not the copy the device kept offline.
+                    $product = Product::query()->where('domain', $domain->name_slug)->findOrFail((int) $row['product_id']);
                     $sale->saleItems()->create([
-                        'product_id' => (int) $row['product_id'],
+                        'product_id' => $product->id,
                         'quantity' => (int) $row['quantity'],
-                        'unit_price' => (float) $row['unit_price'],
+                        'unit_price' => round($product->priceAt($location->id), 2),
                     ]);
                 }
 
@@ -1716,6 +1753,18 @@ class SaleController extends Controller
                 ]);
                 if ($splitParts !== []) {
                     $sale->payments()->createMany($splitParts);
+                }
+
+                // Backdated to a day whose shift is already closed: still finalize the sale (it already
+                // happened in the real world) but don't let the ledger posting abort the whole sync.
+                try {
+                    app(SalePaymentWalletPosting::class)->postForCompletedSale($sale);
+                } catch (ValidationException $e) {
+                    \Log::warning('Offline sale synced without a wallet posting (shift closed for its date).', [
+                        'sale_id' => $sale->id,
+                        'invoice_number' => $sale->invoice_number,
+                        'message' => collect($e->errors())->flatten()->first(),
+                    ]);
                 }
 
                 OfflineSaleSync::query()

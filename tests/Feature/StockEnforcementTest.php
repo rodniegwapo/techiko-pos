@@ -13,15 +13,18 @@ use App\Models\Sale;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Tests\Concerns\OpensTodaysShift;
 use Tests\TestCase;
 
 class StockEnforcementTest extends TestCase
 {
+    use OpensTodaysShift;
     use RefreshDatabase;
 
     protected function setUp(): void
     {
         parent::setUp();
+        $this->openTodaysShiftForNewStores();
         $this->withoutMiddleware([
             UserPermissionCheckMiddleware::class,
             RoleBasedAccessControl::class,

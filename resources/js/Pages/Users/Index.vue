@@ -267,7 +267,6 @@ const getRoleColorHex = (level) => {
                 <!-- <a-alert
                     v-if="
                         props.subscription?.users_at_capacity &&
-                        props.subscription?.billing_url &&
                         !props.isGlobalView
                     "
                     type="warning"
@@ -277,8 +276,7 @@ const getRoleColorHex = (level) => {
                 >
                     <template #description>
                         This plan allows {{ props.subscription?.max_users }} domain users (including admins).
-                        <a class="ml-1" :href="props.subscription.billing_url">Servicing payment</a>
-                        for a higher tier.
+                        Contact us to change your plan for more users.
                     </template>
                 </a-alert> -->
 

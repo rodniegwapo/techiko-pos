@@ -11,6 +11,7 @@ use Laravel\Ai\Exceptions\InsufficientCreditsException;
 use Laravel\Ai\Exceptions\ProviderConnectionException;
 use Laravel\Ai\Exceptions\ProviderOverloadedException;
 use Laravel\Ai\Exceptions\RateLimitedException;
+use Laravel\Ai\Responses\TextResponse;
 use RuntimeException;
 use Throwable;
 
@@ -19,6 +20,9 @@ use Throwable;
  */
 trait HandlesAiErrors
 {
+    /** The provider's response to the last successful prompt (tokens used, provider and model), for AI credits. */
+    private ?TextResponse $lastResponse = null;
+
     private const OUT_OF_CREDITS = 'The AI assistant is unavailable: the AI account has run out of credits. Ask your administrator to add credits.';
 
     /**
@@ -29,6 +33,7 @@ trait HandlesAiErrors
     protected function send(Closure $call): string
     {
         $who = class_basename(static::class);
+        $this->lastResponse = null;
 
         try {
             $text = trim((string) $call());
@@ -55,10 +60,23 @@ trait HandlesAiErrors
 
         // An empty answer also covers one the provider blocked, or a question that ran out of steps.
         if ($text === '') {
+            $this->lastResponse = null;
             throw new RuntimeException($this->emptyAnswerMessage());
         }
 
         return $text;
+    }
+
+    /** Keeps the provider's response from inside a send() closure, so the caller can charge AI credits for it. */
+    protected function remember(TextResponse $response): TextResponse
+    {
+        return $this->lastResponse = $response;
+    }
+
+    /** The last answer's response, or null when the last prompt failed or none was sent (e.g. a cached explanation). */
+    public function lastResponse(): ?TextResponse
+    {
+        return $this->lastResponse;
     }
 
     /**

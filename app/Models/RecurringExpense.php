@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Finance\FinancialAccount;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
@@ -37,6 +38,11 @@ class RecurringExpense extends Model
     public function location(): BelongsTo
     {
         return $this->belongsTo(InventoryLocation::class, 'location_id');
+    }
+
+    public function financialAccount(): BelongsTo
+    {
+        return $this->belongsTo(FinancialAccount::class);
     }
 
     public function expenses(): HasMany

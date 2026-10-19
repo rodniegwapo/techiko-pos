@@ -1,6 +1,8 @@
 <?php
 
+use App\Http\Controllers\Domains\AiUsageController;
 use App\Http\Controllers\Domains\AssistantController;
+use App\Http\Controllers\Domains\AssistantConversationController;
 use App\Http\Controllers\Domains\CategoryController;
 use App\Http\Controllers\Domains\CreditController;
 use App\Http\Controllers\Domains\CustomerController;
@@ -24,11 +26,14 @@ use App\Http\Controllers\Domains\PaymentCardTypeController;
 use App\Http\Controllers\Domains\PayMongoQrPhController;
 use App\Http\Controllers\Domains\ProductController;
 use App\Http\Controllers\Domains\ProfitLossController;
+use App\Http\Controllers\Domains\PurchaseOrderController;
 use App\Http\Controllers\Domains\RecurringExpenseController;
 use App\Http\Controllers\Domains\SaleController;
 use App\Http\Controllers\Domains\SaleDiscountController;
 use App\Http\Controllers\Domains\SalesHistoryController;
 use App\Http\Controllers\Domains\SharedCatalogLookupController;
+use App\Http\Controllers\Domains\SubscriptionOnHoldController;
+use App\Http\Controllers\Domains\SubscriptionRenewalController;
 use App\Http\Controllers\Domains\UserController;
 use App\Http\Controllers\Domains\UserPinController;
 use App\Http\Controllers\Domains\VatReportController;
@@ -40,8 +45,19 @@ use App\Http\Controllers\VoidLogController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
+// What a locked organization's users see (needs no page permission; the controller checks they belong to it).
 Route::prefix('domains/{domain:name_slug}')
-    ->middleware(['auth', 'verified', 'user.permission', 'role.access'])
+    ->middleware(['auth', 'verified'])
+    ->name('domains.')
+    ->group(function () {
+        Route::get('/subscription-on-hold', SubscriptionOnHoldController::class)->name('subscription-on-hold');
+        // "Pay now" from that page (PayMongo QR Ph); the controller checks who may pay.
+        Route::post('/renew', [SubscriptionRenewalController::class, 'start'])->middleware('throttle:10,1')->name('renew.start');
+        Route::get('/renew/status', [SubscriptionRenewalController::class, 'status'])->name('renew.status');
+    });
+
+Route::prefix('domains/{domain:name_slug}')
+    ->middleware(['auth', 'verified', 'domain.unlocked', 'user.permission', 'role.access', 'location.area'])
     ->name('domains.')
     ->group(function () {
         // Organization settings (Sales VAT, etc.)
@@ -54,7 +70,15 @@ Route::prefix('domains/{domain:name_slug}')
             Route::post('/ask', [AssistantController::class, 'ask'])->name('ask');
             Route::post('/actions/{token}/confirm', [AssistantController::class, 'confirm'])->where('token', '[A-Za-z0-9]{40}')->name('actions.confirm');
             Route::post('/actions/{token}/cancel', [AssistantController::class, 'cancel'])->where('token', '[A-Za-z0-9]{40}')->name('actions.cancel');
+
+            // The user's own saved chats (kept 90 days)
+            Route::get('/conversations', [AssistantConversationController::class, 'index'])->name('conversations.index');
+            Route::get('/conversations/{conversation}', [AssistantConversationController::class, 'show'])->whereNumber('conversation')->name('conversations.show');
+            Route::delete('/conversations/{conversation}', [AssistantConversationController::class, 'destroy'])->whereNumber('conversation')->name('conversations.destroy');
         });
+
+        // The organization's plan and this month's AI credits (credits only, no costs).
+        Route::get('/ai-usage', [AiUsageController::class, 'index'])->middleware('domain.feature:ai')->name('ai-usage.index');
 
         Route::get('/billing/gcash', function (Request $request) {
             $domain = $request->route('domain');
@@ -209,12 +233,12 @@ Route::prefix('domains/{domain:name_slug}')
 
         // Sales history (read-only list of completed sales, receipt reprint, CSV)
         Route::get('/sales-history', [SalesHistoryController::class, 'index'])->name('sales-history.index');
-        Route::get('/sales-history/export', [SalesHistoryController::class, 'export'])->name('sales-history.export');
+        Route::get('/sales-history/export', [SalesHistoryController::class, 'export'])->middleware('domain.feature:sales_history_unlimited')->name('sales-history.export');
         Route::get('/sales-history/{sale}', [SalesHistoryController::class, 'show'])->whereNumber('sale')->name('sales-history.show');
         Route::post('/sales-history/{sale}/void', [SalesHistoryController::class, 'void'])->whereNumber('sale')->name('sales-history.void');
 
-        Route::middleware('domain.feature:finance')->group(function () {
-            // Expenses (feed the Profit & Loss report; cash-register expenses also post to the wallet ledger)
+        // Expenses (feed the Profit & Loss report; cash-register expenses also post to the wallet ledger)
+        Route::middleware('domain.feature:expenses')->group(function () {
             Route::get('/expenses/export', [ExpenseController::class, 'export'])->name('expenses.export');
             Route::get('/expenses/{expense}/receipt', [ExpenseController::class, 'receipt'])->whereNumber('expense')->name('expenses.receipt');
             Route::post('/expenses/categories', [ExpenseCategoryController::class, 'store'])->name('expenses.categories.store');
@@ -226,7 +250,9 @@ Route::prefix('domains/{domain:name_slug}')
             Route::resource('expenses', ExpenseController::class)
                 ->only(['index', 'store', 'update', 'destroy'])
                 ->names('expenses');
+        });
 
+        Route::middleware('domain.feature:finance')->group(function () {
             // Finance (owner's money view: dashboard, statements, customer credit, AI explanations).
             // The income statement is the Profit & Loss report; this address forwards to it.
             Route::get('/finance', [FinanceController::class, 'dashboard'])->name('finance.dashboard');
@@ -344,12 +370,15 @@ Route::prefix('domains/{domain:name_slug}')
         Route::prefix('inventory')->name('inventory.')->group(function () {
             Route::get('/', [InventoryController::class, 'index'])->name('index');
             Route::get('/products', [InventoryController::class, 'products'])->name('products');
-            Route::get('/movements', [InventoryController::class, 'movements'])->name('movements');
             Route::get('/low-stock', [InventoryController::class, 'lowStock'])->name('low-stock');
-            Route::get('/valuation', [InventoryController::class, 'valuation'])->name('valuation');
-
             Route::post('/receive', [InventoryController::class, 'receive'])->name('receive');
-            Route::post('/transfer', [InventoryController::class, 'transfer'])->name('transfer');
+
+            // Advanced inventory: stock history, valuation and moving stock between locations (paid plans).
+            Route::middleware('domain.feature:advanced_inventory')->group(function () {
+                Route::get('/movements', [InventoryController::class, 'movements'])->name('movements');
+                Route::get('/valuation', [InventoryController::class, 'valuation'])->name('valuation');
+                Route::post('/transfer', [InventoryController::class, 'transfer'])->name('transfer');
+            });
 
             // Search routes
             Route::get('/search/products', [InventoryController::class, 'searchProducts'])->name('search.products');
@@ -364,6 +393,16 @@ Route::prefix('domains/{domain:name_slug}')
             Route::post('/locations/{location}/set-default', [InventoryLocationController::class, 'setDefault'])->name('locations.set-default');
             Route::post('/locations/{location}/toggle-status', [InventoryLocationController::class, 'toggleStatus'])->name('locations.toggle-status');
             Route::post('/locations/{location}/switch', [InventoryLocationController::class, 'switch'])->name('locations.switch');
+        });
+
+        // Purchasing: order stock from suppliers and receive it (a delivery becomes a supplier bill)
+        Route::prefix('purchasing')->name('purchase-orders.')->group(function () {
+            Route::get('/', [PurchaseOrderController::class, 'index'])->name('index');
+            Route::post('/', [PurchaseOrderController::class, 'store'])->name('store');
+            Route::put('/{purchaseOrder}', [PurchaseOrderController::class, 'update'])->whereNumber('purchaseOrder')->name('update');
+            Route::post('/{purchaseOrder}/order', [PurchaseOrderController::class, 'order'])->whereNumber('purchaseOrder')->name('order');
+            Route::post('/{purchaseOrder}/receive', [PurchaseOrderController::class, 'receive'])->whereNumber('purchaseOrder')->name('receive');
+            Route::post('/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel'])->whereNumber('purchaseOrder')->name('cancel');
         });
 
         // Terminal Setup (Organization-specific)

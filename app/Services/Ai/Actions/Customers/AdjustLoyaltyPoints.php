@@ -43,6 +43,11 @@ class AdjustLoyaltyPoints implements AssistantAction
 
     public function prepare(array $input, ActionContext $context): PreparedAction
     {
+        // A cashier's adjustment needs a manager's PIN, entered on the Loyalty page.
+        if ($context->user->isCashierOrBelow()) {
+            throw new ActionInputException('A manager has to approve points adjustments: use Loyalty Program → Adjust points with a manager\'s PIN.');
+        }
+
         $customer = CustomerLookup::find($input['customer_id'] ?? null, $context);
         $type = $input['type'] ?? null;
         $points = (int) ($input['points'] ?? 0);

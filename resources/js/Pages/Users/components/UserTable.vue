@@ -62,6 +62,12 @@ const props = defineProps({
 // Emits
 const emit = defineEmits(["change", "edit", "view", "set-pin", "refresh"]);
 
+/** Admins (and super users) aren't tied to one location. */
+const worksEverywhere = (record) => {
+    const user = record.data || record;
+    return !!user.is_super_user || (user.roles ?? []).some((r) => ["admin", "super admin"].includes(r.name?.toLowerCase()));
+};
+
 // Table columns
 const columns = computed(() => {
     const baseColumns = [
@@ -627,14 +633,14 @@ function onMobilePaginationChange(pageNum) {
             </template>
 
             <template v-if="column.key === 'location'">
-                <div class="flex items-center">
-                    <LocationInfo
-                        v-if="(record.data || record).location"
-                        :location="(record.data || record).location"
-                    />
-                    <span v-else class="text-sm text-gray-400"
-                        >No location assigned</span
-                    >
+                <div class="flex items-center gap-1" data-testid="user-location">
+                    <template v-if="(record.data || record).location">
+                        <span class="text-sm text-gray-900">{{ (record.data || record).location.name }}</span>
+                        <a-tag v-if="(record.data || record).location.type === 'warehouse'" class="m-0" color="blue">Warehouse</a-tag>
+                        <LocationInfo :location="(record.data || record).location" />
+                    </template>
+                    <span v-else-if="worksEverywhere(record)" class="text-sm text-gray-500">All locations</span>
+                    <span v-else class="text-sm text-gray-400">No location assigned</span>
                 </div>
             </template>
 
@@ -808,6 +814,14 @@ function onMobilePaginationChange(pageNum) {
                         <div
                             class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-sm"
                         >
+                            <span class="text-gray-500">Location</span>
+                            <span class="text-right font-medium text-gray-900">
+                                <template v-if="unwrapUser(record).location">
+                                    {{ unwrapUser(record).location.name }}<template v-if="unwrapUser(record).location.type === 'warehouse'"> (warehouse)</template>
+                                </template>
+                                <template v-else-if="worksEverywhere(record)">All locations</template>
+                                <span v-else class="font-normal text-gray-400">No location assigned</span>
+                            </span>
                             <span class="text-gray-500">Status</span>
                             <div
                                 class="flex items-center justify-end gap-2"

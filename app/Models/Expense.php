@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Finance\FinancialAccount;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -42,5 +43,10 @@ class Expense extends Model
     public function walletCashMovement(): BelongsTo
     {
         return $this->belongsTo(WalletCashMovement::class);
+    }
+
+    public function financialAccount(): BelongsTo
+    {
+        return $this->belongsTo(FinancialAccount::class);
     }
 }

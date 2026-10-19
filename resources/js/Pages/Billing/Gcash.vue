@@ -1,80 +1,143 @@
 <script setup>
-import { computed, watch } from "vue";
-import { Head, useForm, usePage } from "@inertiajs/vue3";
+import { computed, ref, watch } from "vue";
+import { Head, Link, router, useForm, usePage } from "@inertiajs/vue3";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
-import ContentLayout from "@/Components/ContentLayout.vue";
 import ManualGcashDesktopQrAside from "@/Pages/Billing/ManualGcashDesktopQrAside.vue";
 import ManualGcashPayment from "@/Pages/Billing/ManualGcashPayment.vue";
+import AiCreditsMeter from "@/Components/ai/AiCreditsMeter.vue";
+import PayPlanModal from "@/Components/billing/PayPlanModal.vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
+import { openTeamChat } from "@/Composables/useTeamChat";
 import { message } from "ant-design-vue";
 import { IconCheck } from "@tabler/icons-vue";
+import dayjs from "dayjs";
 
+/**
+ * Billing: the organization's current plan and what it uses, the plans with Upgrade buttons, and
+ * what was paid. Upgrade and Renew pay with a PayMongo QR Ph code (PayPlanModal); a paid code
+ * switches the plan right away.
+ */
 const props = defineProps({
-    tiers: { type: Array, default: () => [] },
+    tiers: { type: Array, default: () => [] }, // each with relation: current | upgrade | downgrade
     gcashQrUrl: { type: String, default: "/images/gcash-qr.svg" },
     currencySymbol: { type: String, default: "₱" },
     currentDomain: { type: Object, default: () => ({}) },
-    subscription: {
-        type: Object,
-        default: null,
-    },
-    showManualGcash: {
-        type: Boolean,
-        default: false,
-    },
-    freeTier: {
-        type: Object,
-        default: null,
-    },
+    subscription: { type: Object, default: null },
+    showManualGcash: { type: Boolean, default: false },
+    freeTier: { type: Object, default: null },
+    /** This month's AI credits (every plan has the AI assistant). */
+    aiCredits: { type: Object, default: null },
+    /** The AI usage page, when this user may open it. */
+    aiUsageUrl: { type: String, default: null },
+    /** When the next payment is due ({ due_on, amount, days_left }), or null without a due date. */
+    nextPayment: { type: Object, default: null },
+    /** Past payments, newest first (read-only). */
+    payments: { type: Array, default: () => [] },
+    /** This user may pay for the organization. */
+    canPay: { type: Boolean, default: false },
+    /** Online payment (PayMongo) is set up. */
+    paymentsReady: { type: Boolean, default: false },
+    /** { id, name, slug, amount }, or null on the Free plan. */
+    currentTier: { type: Object, default: null },
+    /** VIP (set by Techiko): every feature, no limits, nothing to pay. */
+    isVip: { type: Boolean, default: false },
+    vipSince: { type: String, default: null },
 });
+
+const longDate = (date) => (date ? dayjs(date).format("MMM D, YYYY") : "");
+const money = (amount) => `${props.currencySymbol}${Number(amount).toLocaleString("en-PH", { minimumFractionDigits: 2 })}`;
+const limitOf = (count, max) => (max == null ? `${count ?? 0}` : `${count ?? 0} / ${max}`);
+const dueLabel = (days) => {
+    if (days > 1) return `due in ${days} days`;
+    if (days === 1) return "due tomorrow";
+    if (days === 0) return "due today";
+    return days === -1 ? "overdue by 1 day" : `overdue by ${-days} days`;
+};
+const nextPaymentClass = computed(() => {
+    const days = props.nextPayment?.days_left;
+    return days < 0 ? "text-red-700" : days <= 7 ? "text-amber-700" : "text-gray-600";
+});
+const paymentColumns = [
+    { title: "Paid on", dataIndex: "paid_on", key: "paid_on", customRender: ({ text }) => longDate(text) },
+    { title: "Amount", dataIndex: "amount", key: "amount", align: "right", customRender: ({ text }) => money(text) },
+    {
+        title: "Covers",
+        key: "covers",
+        customRender: ({ record }) => `${longDate(record.period_start)} → ${longDate(record.period_end)}`,
+    },
+    { title: "Method", dataIndex: "method", key: "method" },
+    { title: "Reference", dataIndex: "reference_number", key: "reference_number", ellipsis: true },
+];
+
+function aiCreditsLabel(credits) {
+    return credits == null ? "Unlimited AI credits" : `${Number(credits).toLocaleString()} AI credits / month`;
+}
 
 const page = usePage();
 const { getRoute } = useDomainRoutes();
 
-const form = useForm({
-    service_tier_id: null,
-    gcash_reference: "",
-});
-
-const hasTiers = computed(
-    () => Array.isArray(props.tiers) && props.tiers.length > 0,
+watch(
+    () => page.props.flash?.success,
+    (msg) => msg && message.success(msg),
+    { immediate: true },
 );
 
-const selectedTier = computed(() =>
-    props.tiers.find((t) => t.id === form.service_tier_id),
-);
+const hasTiers = computed(() => props.tiers.length > 0);
+const isPaid = computed(() => !!props.subscription?.is_paid);
+/** Online payment can be offered to this user. */
+const canPayOnline = computed(() => props.canPay && props.paymentsReady);
 
-const qrSrc = computed(() => {
-    if (p.startsWith("http")) {
-        return p;
+/*** === CURRENT PLAN === ***/
+const usage = computed(() => {
+    const s = props.subscription ?? {};
+    const rows = [
+        { label: "Users", value: limitOf(s.user_count, s.max_users) },
+        { label: "Locations", value: limitOf(s.location_count, s.max_locations) },
+    ];
+    if (!s.products_unlimited) {
+        rows.push({ label: "Products", value: limitOf(s.product_count, s.max_products) });
     }
-    return p.startsWith("/") ? p : `/${p}`;
+    rows.push({ label: "Sales history", value: s.history_days == null ? "Full" : `Last ${s.history_days} days` });
+    return rows;
 });
 
-const showPlaceholderQrNotice = computed(
-    () =>
-        import.meta.env.DEV &&
-        String(props.gcashQrUrl || "").includes("gcash-qr.svg"),
-);
+/*** === PAY (upgrade / renew) === ***/
+const payTiers = computed(() => props.tiers.filter((t) => t.relation !== "downgrade").map((t) => ({ id: t.id, name: t.name, amount: Number(t.amount) })));
+const pay = ref({ open: false, tierId: null, title: "", note: "" });
 
-const hasBundledQrPhOffered = computed(() =>
-    props.tiers.some((t) => t.uses_vite_bundle_qrph),
-);
+const openUpgrade = (tier) => {
+    pay.value = {
+        open: true,
+        tierId: tier.id,
+        title: `Upgrade to ${tier.name}`,
+        note: isPaid.value
+            ? "{plan} starts right away; your paid-through date moves forward {months}."
+            : "{plan} starts right away and is paid through {months} from today.",
+    };
+};
+const openRenew = () => {
+    pay.value = {
+        open: true,
+        tierId: props.currentTier?.id ?? null,
+        title: "Pay for your plan",
+        note: "Your paid-through date moves forward {months}.",
+    };
+};
+const onPaid = () => {
+    message.success("Payment received. Your plan is updated.");
+    setTimeout(() => {
+        pay.value.open = false;
+        router.reload({ preserveScroll: true });
+    }, 2000);
+};
 
-const bundledQrTier = computed(
-    () => props.tiers.find((t) => t.uses_vite_bundle_qrph) ?? null,
-);
+/** "Contact us" opens the chat with the Techiko team, with a message ready to send. */
+const contactTeam = (text) => openTeamChat(text);
 
-/** One paid tier flagged like Pricing “Most popular” (bundled/basic first, else lowest sort_order then amount). */
+/*** === PLANS === ***/
 const popularTierId = computed(() => {
-    const bundled = props.tiers.find((t) => t.uses_vite_bundle_qrph);
-    if (bundled) {
-        return bundled.id;
-    }
-    if (!props.tiers.length) {
-        return null;
-    }
+    if (!props.tiers.length) return null;
     return (
         [...props.tiers].sort((a, b) => {
             const ao = Number(a.sort_order ?? 0);
@@ -85,131 +148,64 @@ const popularTierId = computed(() => {
     );
 });
 
-function isPopularTier(tier) {
-    return popularTierId.value != null && tier.id === popularTierId.value;
-}
-
-const servicingPriceFootnote = computed(() => "One-time servicing · PHP");
-
-const planCardSlots = computed(() => {
-    let n = props.tiers.length;
-    if (props.freeTier) {
-        n += 1;
+const freeTierLimitsLabel = computed(() => {
+    const free = props.freeTier ?? {};
+    const parts = [];
+    if (props.subscription?.products_unlimited || free.product_limit == null) {
+        parts.push("Unlimited products");
+    } else {
+        parts.push(`${free.product_limit ?? props.subscription?.free_product_limit} products`);
     }
-    return n;
+    if (free.user_limit != null) parts.push(`${free.user_limit} users`);
+    if (free.location_limit != null) parts.push(`${free.location_limit} location`);
+    if (free.history_days != null) parts.push(`Last ${free.history_days} days of sales history`);
+    if (props.aiCredits) parts.push(aiCreditsLabel(props.aiCredits.free_allowance));
+    return parts.join(" · ");
 });
-
-/** Match Marketing/Pricing grid rhythm: narrow column on mobile, 3 cols when Total ≤ 3. */
-const plansGridClass = computed(() => {
-    const n = planCardSlots.value;
-    const base =
-        "grid gap-8 w-full max-md:mx-auto max-md:max-w-md md:max-w-none";
-    if (n <= 1) {
-        return `${base} grid-cols-1`;
-    }
-    if (n <= 3) {
-        return `${base} grid-cols-1 md:grid-cols-3`;
-    }
-    return `${base} grid-cols-1 sm:grid-cols-2 xl:grid-cols-4`;
-});
-
-const selectedTierAmountFormatted = computed(() =>
-    selectedTier.value != null
-        ? Number(selectedTier.value.amount).toFixed(2)
-        : "",
-);
-
-const stepCurrentGcash = computed(() => {
-    if (!form.service_tier_id) {
-        return 0;
-    }
-    if (!String(form.gcash_reference || "").trim()) {
-        return 1;
-    }
-    return 2;
-});
-
-const stepCurrentQrPh = computed(() =>
-    form.service_tier_id || bundledQrTier.value ? 1 : 0,
-);
-
-watch(
-    () => page.props.flash?.success,
-    (msg) => {
-        if (msg) {
-            message.success(msg);
-        }
-    },
-    { immediate: true },
-);
-
-function selectTier(id) {
-    form.service_tier_id = id;
-}
-
-const freeTierMarketing = computed(
-    () => props.freeTier?.marketing_features ?? [],
-);
-
-const freeTierSubLabel = computed(() => {
-    if (!props.subscription) {
-        return "Included when you join an organization.";
-    }
-    if (props.subscription.is_paid) {
-        return "Starter baseline—not selectable. Use paid tiers below for servicing checkout.";
-    }
-    return "Your current tier. Upgrade anytime using a paid plan.";
-});
-
-function tierCardClasses(tier) {
-    const selected = form.service_tier_id === tier.id;
-    const popular = isPopularTier(tier);
-    const base = [
-        "relative flex h-full min-h-full flex-col rounded-2xl border p-6 text-left outline-none transition-all md:p-8",
-        "cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2",
-    ];
-
-    if (selected) {
-        return [
-            ...base,
-            "border border-gray-200 border-t-4 border-t-teal-500 bg-white shadow-lg ring-2 ring-blue-500/15",
-        ];
-    }
-    if (popular) {
-        return [
-            ...base,
-            "border border-gray-200 border-t-4 border-t-teal-500 bg-white shadow-lg hover:shadow-xl",
-        ];
-    }
-
-    return [
-        ...base,
-        "border border-gray-200 bg-gray-50 shadow-sm hover:border-blue-200 hover:shadow-md",
-    ];
-}
-
-const qrPhPanelClass =
-    "rounded-2xl border border-gray-200 border-t-4 border-t-teal-500 bg-white/90 shadow-sm space-y-3 p-6";
 
 function tierLimitsLabel(tier) {
     const parts = [];
-    if (tier.max_products != null) {
-        parts.push(`Max ${tier.max_products} products`);
-    } else {
-        parts.push("Unlimited products");
+    if (!props.subscription?.products_unlimited) {
+        parts.push(tier.max_products != null ? `Max ${tier.max_products} products` : "Unlimited products");
     }
-    if (tier.max_users != null) {
-        parts.push(`Max ${tier.max_users} domain users`);
-    } else {
-        parts.push("Unlimited users");
-    }
+    parts.push(tier.max_users != null ? `Up to ${tier.max_users} users` : "Unlimited users");
+    if (props.aiCredits) parts.push(aiCreditsLabel(tier.ai_monthly_credits));
     return parts.join(" · ");
 }
 
-function submit() {
-    if (!hasTiers.value) {
-        return;
+const plansGridClass = computed(() => {
+    const n = props.tiers.length + (props.freeTier ? 1 : 0);
+    const base = "grid gap-6 w-full max-md:mx-auto max-md:max-w-md md:max-w-none";
+    if (n <= 1) return `${base} grid-cols-1`;
+    if (n <= 3) return `${base} grid-cols-1 md:grid-cols-3`;
+    return `${base} grid-cols-1 sm:grid-cols-2 xl:grid-cols-4`;
+});
+
+function tierCardClasses(tier) {
+    const base = "relative flex h-full flex-col rounded-2xl border p-6 text-left transition-all";
+    if (tier.relation === "current") {
+        return `${base} border-emerald-300 border-t-4 border-t-emerald-500 bg-white shadow-md`;
     }
+    if (tier.id === popularTierId.value && tier.relation === "upgrade") {
+        return `${base} border-gray-200 border-t-4 border-t-teal-500 bg-white shadow-lg`;
+    }
+    return `${base} border-gray-200 bg-gray-50 shadow-sm`;
+}
+
+/*** === MANUAL GCASH (off unless config manual_billing.show_manual_gcash_section) === ***/
+const form = useForm({ service_tier_id: null, gcash_reference: "" });
+const selectedTier = computed(() => props.tiers.find((t) => t.id === form.service_tier_id));
+const qrSrc = computed(() => {
+    const p = props.gcashQrUrl || "";
+    if (p.startsWith("http")) return p;
+    return p.startsWith("/") ? p : `/${p}`;
+});
+const showPlaceholderQrNotice = computed(() => import.meta.env.DEV && String(props.gcashQrUrl || "").includes("gcash-qr.svg"));
+const referenceHelp = computed(
+    () => form.errors.gcash_reference || "Usually letters and digits—paste the value shown on your GCash receipt.",
+);
+function submit() {
+    if (!hasTiers.value) return;
     form.post(getRoute("billing.servicing.manual_gcash"), {
         preserveScroll: true,
         onSuccess: () => {
@@ -218,437 +214,279 @@ function submit() {
         },
     });
 }
-
-const freeTierBadge = computed(() => {
-    if (!props.subscription) {
-        return {
-            label: "Included with signup",
-            pillClass: "bg-slate-200 text-slate-800",
-        };
-    }
-    if (props.subscription.is_paid) {
-        return {
-            label: "Starter baseline",
-            pillClass: "bg-slate-200 text-slate-600",
-        };
-    }
-    return {
-        label: "Current tier",
-        pillClass: "bg-emerald-100 text-emerald-900",
-    };
-});
-
-const referenceHelp = computed(() => {
-    if (form.errors.gcash_reference) {
-        return form.errors.gcash_reference;
-    }
-    return "Usually letters and digits—paste the value shown on your GCash receipt.";
-});
 </script>
 
 <template>
     <AuthenticatedLayout>
-        <Head title="Servicing plans & payment" />
-        <ContentHeader class="mb-2" title="Servicing plans & payment" />
-        <p class="mb-6 text-sm text-gray-600 max-w-2xl -mt-2">
-            Upgrade your servicing subscription for higher limits and features.
-            Techiko POS includes basic inventory, utang (basic), and wallet,
-            with a
-            <strong>30-day full-feature trial</strong> for qualifying
-            organizations.
-        </p>
-        <ContentLayout :title="currentDomain?.name || 'Organization'">
-            <template #table>
-                <div
-                    class="max-w-6xl mx-auto px-2 sm:px-4 py-2 pb-10 space-y-8"
-                >
-                    <div
-                        class="text-sm text-gray-600 leading-relaxed border-l-4 border-teal-600/80 pl-4 py-2 bg-teal-50/40 rounded-r-lg"
-                    >
-                        <template v-if="showManualGcash">
-                            Scan the merchant QR below for Basic, or submit a
-                            manual GCash receipt reference. Amounts must match
-                            the plan you selected.
-                        </template>
-                        <template v-else>
-                            Paid tiers unlock limits after verified payment.
-                            Basic can use the static merchant QR shown on this
-                            page—it does not expire.
-                        </template>
-                    </div>
+        <Head title="Billing" />
+        <ContentHeader class="mb-6" title="Billing">
+            <template #meta>Your plan, what it includes, and your payments.</template>
+        </ContentHeader>
 
-                    <a-steps
-                        v-if="showManualGcash"
-                        size="small"
-                        :current="stepCurrentGcash"
-                        class="[&_.ant-steps-item-title]:text-sm"
-                    >
-                        <a-step title="Choose plan" />
-                        <a-step title="Pay with GCash" />
-                        <a-step title="Submit reference" />
-                    </a-steps>
-                    <a-steps
-                        v-else-if="hasBundledQrPhOffered"
-                        size="small"
-                        :current="stepCurrentQrPh"
-                        class="[&_.ant-steps-item-title]:text-sm"
-                    >
-                        <a-step title="Choose plan" />
-                        <a-step title="Pay with QR Ph" />
-                    </a-steps>
-
-                    <a-alert
-                        v-if="!hasTiers"
-                        type="warning"
-                        message="No servicing plans available"
-                        description="Ask your administrator to configure service tiers."
-                        show-icon
-                        class="mb-2"
-                    />
-
-                    <div
-                        v-if="subscription"
-                        class="rounded-lg border border-gray-200 bg-white px-5 py-4 shadow-sm text-sm text-gray-800"
-                    >
-                        <p class="font-semibold text-gray-900 mb-1">
-                            Current usage
-                        </p>
-                        <p>
-                            <span v-if="subscription.is_paid">
-                                Active servicing plan:
-                                <strong>{{ subscription.tier_name }}</strong
-                                >.
-                            </span>
-                            <span v-else-if="subscription.products_unlimited">
-                                Product catalog is currently unlimited for this
-                                organization. You can still upgrade to a paid
-                                servicing tier for other benefits below.
-                            </span>
-                            <span v-else>
-                                Free tier: up to
-                                <strong>{{
-                                    subscription.free_product_limit
-                                }}</strong>
-                                products until you subscribe to a paid plan.
-                            </span>
-                        </p>
-                        <p class="mt-2 text-xs text-gray-600">
-                            Products: {{ subscription.product_count }}
-                            <template v-if="subscription.max_products != null">
-                                / {{ subscription.max_products }}
-                            </template>
-                            · Users:
-                            {{ subscription.user_count }}
-                            <template v-if="subscription.max_users != null">
-                                / {{ subscription.max_users }}
-                            </template>
-                        </p>
-                    </div>
-
-                    <div
-                        class="grid grid-cols-1 items-start gap-10"
-                        :class="{ 'lg:grid-cols-2 lg:gap-10': showManualGcash }"
-                    >
-                        <div class="space-y-8 min-w-0">
-                            <section
-                                class="border border-gray-200 bg-white py-8 md:py-10 px-3 sm:px-6 rounded-xl shadow-sm"
-                                aria-labelledby="servicing-plans-heading"
-                            >
-                                <h2
-                                    id="servicing-plans-heading"
-                                    class="text-xl font-bold tracking-tight text-gray-800 md:text-2xl"
-                                >
-                                    Plans & pricing
-                                </h2>
-                                <p
-                                    class="mt-3 max-w-2xl text-sm text-gray-600 md:text-base"
-                                >
-                                    Free starter is included; paid servicing
-                                    tiers unlock higher limits below. Select a
-                                    tier to continue (merchant QR and/or manual
-                                    reference, depending on setup).
-                                </p>
-
-                                <div :class="['mt-8 md:mt-10', plansGridClass]">
-                                    <div
-                                        v-if="freeTier"
-                                        class="relative mx-auto w-full flex flex-col rounded-2xl border border-gray-200 bg-gray-50 p-6 text-left opacity-95 pointer-events-none select-none md:p-8"
-                                        aria-disabled="true"
-                                        role="presentation"
-                                    >
-                                        <div
-                                            class="flex flex-wrap items-start justify-between gap-2"
-                                        >
-                                            <h3
-                                                class="text-lg font-bold text-gray-800"
-                                            >
-                                                Free starter
-                                            </h3>
-                                            <span
-                                                class="rounded-full px-3 py-1 text-xs font-semibold shrink-0"
-                                                :class="freeTierBadge.pillClass"
-                                            >
-                                                {{ freeTierBadge.label }}
-                                            </span>
-                                        </div>
-                                        <div class="mt-2 space-y-1">
-                                            <p
-                                                class="flex flex-wrap items-baseline gap-x-1.5"
-                                            >
-                                                <span
-                                                    class="text-3xl font-bold tabular-nums tracking-tight text-gray-800"
-                                                    >{{ currencySymbol }}0<span
-                                                        class="text-base font-semibold text-gray-600"
-                                                        >.00</span
-                                                    ></span
-                                                >
-                                            </p>
-                                            <p class="text-sm text-gray-500">
-                                                {{ servicingPriceFootnote }}
-                                            </p>
-                                            <p
-                                                class="text-sm text-gray-600 leading-snug"
-                                            >
-                                                {{ freeTierSubLabel }}
-                                            </p>
-                                            <p
-                                                class="text-xs text-gray-500 pt-1"
-                                            >
-                                                Cap:
-                                                <template
-                                                    v-if="
-                                                        subscription?.products_unlimited ||
-                                                        freeTier?.product_limit ==
-                                                            null
-                                                    "
-                                                >
-                                                    Unlimited products
-                                                </template>
-                                                <template v-else>
-                                                    {{
-                                                        freeTier.product_limit ??
-                                                        subscription?.free_product_limit
-                                                    }}
-                                                    products
-                                                </template>
-                                                · utang/wallet basics
-                                            </p>
-                                        </div>
-                                        <ul
-                                            v-if="freeTierMarketing.length"
-                                            class="mt-6 flex flex-1 flex-col gap-3 border-t border-gray-200 pt-6 text-sm text-gray-600 list-none m-0"
-                                        >
-                                            <li
-                                                v-for="(
-                                                    line, fx
-                                                ) in freeTierMarketing"
-                                                :key="fx"
-                                                class="flex gap-2"
-                                            >
-                                                <IconCheck
-                                                    :size="20"
-                                                    :strokeWidth="1.75"
-                                                    class="mt-0.5 shrink-0 text-teal-600"
-                                                    aria-hidden="true"
-                                                />
-                                                <span>{{ line }}</span>
-                                            </li>
-                                        </ul>
-                                    </div>
-                                    <div
-                                        v-for="tier in tiers"
-                                        :key="tier.id"
-                                        class="mx-auto w-full"
-                                    >
-                                        <div
-                                            role="button"
-                                            tabindex="0"
-                                            :class="tierCardClasses(tier)"
-                                            @click="selectTier(tier.id)"
-                                            @keydown.enter.prevent="
-                                                selectTier(tier.id)
-                                            "
-                                        >
-                                            <p
-                                                v-if="isPopularTier(tier)"
-                                                class="mb-2 self-start rounded-full bg-gradient-to-r from-blue-600 to-teal-500 px-3 py-1 text-xs font-semibold text-white"
-                                            >
-                                                Most popular
-                                            </p>
-                                            <div
-                                                class="flex items-start justify-between gap-2"
-                                            >
-                                                <h3
-                                                    class="text-lg font-bold text-gray-800 leading-snug"
-                                                >
-                                                    {{ tier.name }}
-                                                </h3>
-                                                <IconCheck
-                                                    v-if="
-                                                        form.service_tier_id ===
-                                                        tier.id
-                                                    "
-                                                    :size="22"
-                                                    :strokeWidth="2"
-                                                    class="mt-1 shrink-0 text-teal-600"
-                                                    aria-hidden="false"
-                                                    aria-label="Selected plan"
-                                                />
-                                            </div>
-                                            <p
-                                                v-if="
-                                                    form.service_tier_id ===
-                                                    tier.id
-                                                "
-                                                class="mt-1 text-xs font-semibold text-teal-700"
-                                            >
-                                                Selected plan
-                                            </p>
-                                            <div class="mt-2 space-y-1">
-                                                <p
-                                                    class="flex flex-wrap items-baseline gap-x-1.5"
-                                                >
-                                                    <span
-                                                        class="text-3xl font-bold tabular-nums tracking-tight text-gray-800"
-                                                        >{{ currencySymbol
-                                                        }}{{
-                                                            Number(
-                                                                tier.amount,
-                                                            ).toFixed(2)
-                                                        }}</span
-                                                    >
-                                                </p>
-                                                <p
-                                                    class="text-sm text-gray-500"
-                                                >
-                                                    {{ servicingPriceFootnote }}
-                                                </p>
-                                                <p
-                                                    class="text-sm text-gray-600 leading-snug"
-                                                >
-                                                    {{ tierLimitsLabel(tier) }}
-                                                </p>
-                                            </div>
-                                            <ul
-                                                v-if="
-                                                    (
-                                                        tier.marketing_features ??
-                                                        []
-                                                    ).length
-                                                "
-                                                class="mt-6 flex flex-1 flex-col gap-3 border-t border-gray-200 pt-6 text-sm text-gray-600 list-none m-0"
-                                            >
-                                                <li
-                                                    v-for="(
-                                                        line, fIdx
-                                                    ) in tier.marketing_features"
-                                                    :key="fIdx"
-                                                    class="flex gap-2"
-                                                >
-                                                    <IconCheck
-                                                        :size="20"
-                                                        :strokeWidth="1.75"
-                                                        class="mt-0.5 shrink-0 text-teal-600"
-                                                        aria-hidden="true"
-                                                    />
-                                                    <span>{{ line }}</span>
-                                                </li>
-                                            </ul>
-                                        </div>
-                                    </div>
-                                </div>
-                                <p
-                                    class="mt-8 text-center text-sm text-gray-500"
-                                >
-                                    Servicing amounts in Philippine Pesos (PHP).
-                                </p>
-                                <p
-                                    v-if="form.errors.service_tier_id"
-                                    class="text-red-500 text-sm mt-4 text-center"
-                                >
-                                    {{ form.errors.service_tier_id }}
-                                </p>
-                            </section>
-
-                            <div class="mt-10 space-y-8">
-                                <div
-                                    v-if="hasTiers && bundledQrTier"
-                                    :class="qrPhPanelClass"
-                                >
-                                    <h2
-                                        class="text-xl font-bold tracking-tight text-gray-800"
-                                    >
-                                        Pay with QR Ph
-                                    </h2>
-                                    <p
-                                        v-if="form.service_tier_id"
-                                        class="text-sm text-gray-600"
-                                    >
-                                        Scan the code below with your bank or
-                                        e-wallet app. Send exactly
-                                        {{ currencySymbol
-                                        }}{{ selectedTierAmountFormatted }}
-                                        for
-                                        <strong>{{ selectedTier.name }}</strong
-                                        >.
-                                    </p>
-                                    <p
-                                        v-else
-                                        class="text-sm text-gray-600"
-                                    >
-                                        Select a plan above, then send exactly
-                                        that amount when you scan—amounts
-                                        differ by tier.
-                                    </p>
-                                    <div
-                                        class="rounded-xl border border-gray-100 bg-white p-5 flex flex-col items-center shadow-sm"
-                                    >
-                                        <img
-                                            src="@assets/qrph/qrph_basic.jpg"
-                                            alt="QR Ph merchant code"
-                                            class="max-w-[280px] w-full h-auto rounded-md"
-                                        />
-                                    </div>
-                                </div>
-                                <a-alert
-                                    v-if="hasTiers && !bundledQrTier"
-                                    type="warning"
-                                    show-icon
-                                    class="text-sm"
-                                    message="No Basic merchant QR available"
-                                    :description="
-                                        showManualGcash
-                                            ? 'The Basic bundled QR slug is missing or misconfigured. Use manual GCash below or contact your administrator.'
-                                            : 'Ask your administrator to configure the bundled Basic servicing tier so this page can display the merchant QR.'
-                                    "
-                                />
-                            </div>
-
-                            <ManualGcashPayment
-                                v-if="showManualGcash"
-                                :form="form"
-                                :currency-symbol="currencySymbol"
-                                :qr-src="qrSrc"
-                                :show-placeholder-qr-notice="
-                                    showPlaceholderQrNotice
-                                "
-                                :reference-help="referenceHelp"
-                                :selected-tier="selectedTier"
-                                :has-tiers="hasTiers"
-                                :submit="submit"
-                            />
+        <div class="mx-auto max-w-6xl space-y-6 pb-10">
+            <!-- VIP: everything included, nothing to pay -->
+            <section v-if="isVip" class="rounded-lg border border-amber-200 bg-white p-6 shadow-sm" data-testid="vip-plan">
+                <div class="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                        <p class="text-xs font-medium uppercase tracking-wide text-gray-500">Current plan</p>
+                        <div class="mt-1 flex flex-wrap items-center gap-2">
+                            <h2 class="text-2xl font-bold text-gray-900">VIP account</h2>
+                            <a-tag color="gold" class="!m-0">VIP</a-tag>
                         </div>
+                        <p class="mt-1 text-sm text-gray-600">
+                            Every feature is included, with no limits on users, products or stores, and unlimited AI
+                            credits. There is nothing to pay or renew.
+                        </p>
+                        <p v-if="vipSince" class="mt-1 text-xs text-gray-500">VIP since {{ longDate(vipSince) }}</p>
+                    </div>
+                    <a-button data-testid="contact-team" @click="contactTeam('I have a question about our VIP account.')">
+                        Contact us
+                    </a-button>
+                </div>
 
-                        <ManualGcashDesktopQrAside
-                            v-if="showManualGcash"
-                            :qr-src="qrSrc"
-                            :show-placeholder-qr-notice="
-                                showPlaceholderQrNotice
-                            "
-                        />
+                <dl class="mt-5 grid grid-cols-2 gap-3 border-t border-gray-100 pt-5 sm:grid-cols-4" data-testid="plan-usage">
+                    <div v-for="row in usage" :key="row.label" class="rounded-md bg-gray-50 px-3 py-2">
+                        <dt class="text-xs text-gray-500">{{ row.label }}</dt>
+                        <dd class="text-base font-semibold tabular-nums text-gray-900">{{ row.value }}</dd>
+                    </div>
+                </dl>
+
+                <div v-if="aiCredits" class="mt-5 border-t border-gray-100 pt-5 text-sm">
+                    <AiCreditsMeter :credits="aiCredits">
+                        <Link v-if="aiUsageUrl" :href="aiUsageUrl" class="mt-2 inline-block text-xs font-medium text-blue-600 hover:underline">
+                            See AI usage details →
+                        </Link>
+                    </AiCreditsMeter>
+                </div>
+            </section>
+
+            <!-- Current plan and what it uses -->
+            <section v-else class="rounded-lg bg-white p-6 shadow-sm" data-testid="current-plan">
+                <div class="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                        <p class="text-xs font-medium uppercase tracking-wide text-gray-500">Current plan</p>
+                        <div class="mt-1 flex flex-wrap items-center gap-2">
+                            <h2 class="text-2xl font-bold text-gray-900" data-testid="current-plan-name">
+                                {{ currentTier?.name ?? "Free" }}
+                            </h2>
+                            <a-tag color="green" class="!m-0">Current plan</a-tag>
+                        </div>
+                        <p class="mt-1 text-sm text-gray-600">
+                            <template v-if="currentTier">{{ money(currentTier.amount) }} / month</template>
+                            <template v-else>{{ currencySymbol }}0 · Free forever</template>
+                        </p>
+                        <p v-if="nextPayment" class="mt-1 text-sm" :class="nextPaymentClass">
+                            Paid through <strong>{{ longDate(nextPayment.due_on) }}</strong>
+                            ({{ dueLabel(nextPayment.days_left) }})
+                        </p>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <a-button
+                            v-if="isPaid && canPayOnline"
+                            type="primary"
+                            data-testid="renew-plan"
+                            @click="openRenew"
+                        >
+                            Pay / renew
+                        </a-button>
+                        <a-button data-testid="contact-team" @click="contactTeam(`I have a question about my plan (${currentTier?.name ?? 'Free'}).`)">
+                            Contact us
+                        </a-button>
                     </div>
                 </div>
-            </template>
-        </ContentLayout>
+
+                <dl class="mt-5 grid grid-cols-2 gap-3 border-t border-gray-100 pt-5 sm:grid-cols-4" data-testid="plan-usage">
+                    <div v-for="row in usage" :key="row.label" class="rounded-md bg-gray-50 px-3 py-2">
+                        <dt class="text-xs text-gray-500">{{ row.label }}</dt>
+                        <dd class="text-base font-semibold tabular-nums text-gray-900">{{ row.value }}</dd>
+                    </div>
+                </dl>
+
+                <div v-if="aiCredits" class="mt-5 border-t border-gray-100 pt-5 text-sm">
+                    <AiCreditsMeter :credits="aiCredits" upgrade-hint="Upgrade your plan below, or wait for the reset.">
+                        <Link v-if="aiUsageUrl" :href="aiUsageUrl" class="mt-2 inline-block text-xs font-medium text-blue-600 hover:underline">
+                            See AI usage details →
+                        </Link>
+                    </AiCreditsMeter>
+                </div>
+            </section>
+
+            <!-- Plans -->
+            <section v-if="!isVip" class="rounded-lg bg-white p-6 shadow-sm" aria-labelledby="plans-heading">
+                <h2 id="plans-heading" class="text-xl font-bold tracking-tight text-gray-800">Plans & pricing</h2>
+                <p class="mt-2 max-w-2xl text-sm text-gray-600">
+                    Every organization starts free. Each paid plan includes everything in the plans before it.
+                    Upgrading pays with a QR Ph code, and the new plan starts as soon as it's paid.
+                </p>
+                <a-alert
+                    v-if="!hasTiers"
+                    class="mt-4"
+                    type="warning"
+                    show-icon
+                    message="No plans available"
+                    description="Ask your administrator to set up the plans."
+                />
+                <a-alert
+                    v-else-if="!paymentsReady"
+                    class="mt-4"
+                    type="info"
+                    show-icon
+                    message="Online payment isn't set up yet. Contact us to change your plan."
+                    data-testid="payments-not-ready"
+                />
+
+                <div :class="['mt-6', plansGridClass]">
+                    <!-- Free -->
+                    <div
+                        v-if="freeTier"
+                        class="relative flex h-full flex-col rounded-2xl border p-6"
+                        :class="isPaid ? 'border-gray-200 bg-gray-50' : 'border-emerald-300 border-t-4 border-t-emerald-500 bg-white shadow-md'"
+                        data-testid="plan-card-free"
+                    >
+                        <div class="flex flex-wrap items-start justify-between gap-2">
+                            <h3 class="text-lg font-bold text-gray-800">Free</h3>
+                            <span
+                                class="shrink-0 rounded-full px-3 py-1 text-xs font-semibold"
+                                :class="isPaid ? 'bg-slate-200 text-slate-600' : 'bg-emerald-100 text-emerald-900'"
+                            >
+                                {{ isPaid ? "Included" : "Current plan" }}
+                            </span>
+                        </div>
+                        <p class="mt-2 text-3xl font-bold tabular-nums text-gray-800">{{ currencySymbol }}0</p>
+                        <p class="text-sm text-gray-500">Per month · PHP</p>
+                        <p class="pt-1 text-xs text-gray-500">{{ freeTierLimitsLabel }}</p>
+                        <ul
+                            v-if="freeTier.marketing_features?.length"
+                            class="m-0 mt-5 flex flex-1 list-none flex-col gap-3 border-t border-gray-200 pt-5 text-sm text-gray-600"
+                        >
+                            <li v-for="(line, fx) in freeTier.marketing_features" :key="fx" class="flex gap-2">
+                                <IconCheck :size="20" :stroke-width="1.75" class="mt-0.5 shrink-0 text-teal-600" aria-hidden="true" />
+                                <span>{{ line }}</span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- Paid plans -->
+                    <div
+                        v-for="tier in tiers"
+                        :key="tier.id"
+                        :class="[tierCardClasses(tier), { 'cursor-pointer': showManualGcash }]"
+                        :data-testid="`plan-card-${tier.slug}`"
+                        @click="showManualGcash && (form.service_tier_id = tier.id)"
+                    >
+                        <p
+                            v-if="tier.id === popularTierId && tier.relation === 'upgrade'"
+                            class="mb-2 self-start rounded-full bg-gradient-to-r from-blue-600 to-teal-500 px-3 py-1 text-xs font-semibold text-white"
+                        >
+                            Most popular
+                        </p>
+                        <div class="flex items-start justify-between gap-2">
+                            <h3 class="text-lg font-bold leading-snug text-gray-800">{{ tier.name }}</h3>
+                            <span
+                                v-if="tier.relation === 'current'"
+                                class="shrink-0 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-900"
+                            >
+                                Current plan
+                            </span>
+                        </div>
+                        <p class="mt-2 text-3xl font-bold tabular-nums text-gray-800">{{ money(tier.amount) }}</p>
+                        <p class="text-sm text-gray-500">Per month · PHP</p>
+                        <p class="text-sm leading-snug text-gray-600">{{ tierLimitsLabel(tier) }}</p>
+                        <ul
+                            v-if="(tier.marketing_features ?? []).length"
+                            class="m-0 mt-5 flex flex-1 list-none flex-col gap-3 border-t border-gray-200 pt-5 text-sm text-gray-600"
+                        >
+                            <li v-for="(line, fIdx) in tier.marketing_features" :key="fIdx" class="flex gap-2">
+                                <IconCheck :size="20" :stroke-width="1.75" class="mt-0.5 shrink-0 text-teal-600" aria-hidden="true" />
+                                <span>{{ line }}</span>
+                            </li>
+                        </ul>
+
+                        <div class="mt-6">
+                            <template v-if="tier.relation === 'upgrade'">
+                                <a-button
+                                    v-if="canPayOnline"
+                                    type="primary"
+                                    block
+                                    :data-testid="`upgrade-${tier.slug}`"
+                                    @click.stop="openUpgrade(tier)"
+                                >
+                                    Upgrade to {{ tier.name }}
+                                </a-button>
+                                <a-button
+                                    v-else-if="canPay"
+                                    block
+                                    :data-testid="`upgrade-${tier.slug}`"
+                                    @click.stop="contactTeam(`I'd like to upgrade to ${tier.name}.`)"
+                                >
+                                    Contact us to upgrade
+                                </a-button>
+                                <p v-else class="text-center text-xs text-gray-500">Ask your admin to upgrade.</p>
+                            </template>
+                            <a-button
+                                v-else-if="tier.relation === 'downgrade' && canPay"
+                                block
+                                type="text"
+                                class="!text-gray-500"
+                                :data-testid="`switch-${tier.slug}`"
+                                @click.stop="contactTeam(`I'd like to switch to ${tier.name}.`)"
+                            >
+                                Contact us to switch
+                            </a-button>
+                        </div>
+                    </div>
+                </div>
+                <p class="mt-6 text-center text-sm text-gray-500">Prices in Philippine Pesos (PHP).</p>
+            </section>
+
+            <!-- Manual GCash (offline option, off by default) -->
+            <section v-if="showManualGcash && !isVip" class="rounded-lg bg-white p-6 shadow-sm">
+                <h2 class="mb-1 text-lg font-semibold text-gray-900">Pay with GCash</h2>
+                <p class="mb-4 text-sm text-gray-600">
+                    Choose a plan above, send the amount to our GCash QR, then submit the reference number.
+                </p>
+                <div class="grid grid-cols-1 items-start gap-10 lg:grid-cols-2">
+                    <ManualGcashPayment
+                        :form="form"
+                        :currency-symbol="currencySymbol"
+                        :qr-src="qrSrc"
+                        :show-placeholder-qr-notice="showPlaceholderQrNotice"
+                        :reference-help="referenceHelp"
+                        :selected-tier="selectedTier"
+                        :has-tiers="hasTiers"
+                        :submit="submit"
+                    />
+                    <ManualGcashDesktopQrAside :qr-src="qrSrc" :show-placeholder-qr-notice="showPlaceholderQrNotice" />
+                </div>
+            </section>
+
+            <!-- Payments (recorded by Techiko or paid online) -->
+            <section
+                v-if="payments.length"
+                class="rounded-lg bg-white p-6 text-sm text-gray-800 shadow-sm"
+                data-testid="your-subscription"
+            >
+                <h2 class="mb-3 text-lg font-semibold text-gray-900">Payments</h2>
+                <a-table
+                    size="small"
+                    :columns="paymentColumns"
+                    :data-source="payments"
+                    :pagination="false"
+                    row-key="id"
+                    :scroll="{ x: 640 }"
+                />
+            </section>
+        </div>
+
+        <PayPlanModal
+            v-model:open="pay.open"
+            :tiers="payTiers"
+            :initial-tier-id="pay.tierId"
+            :title="pay.title"
+            :note="pay.note"
+            paid-message="Payment received. Your plan is updated."
+            :currency-symbol="currencySymbol"
+            @paid="onPaid"
+        />
     </AuthenticatedLayout>
 </template>

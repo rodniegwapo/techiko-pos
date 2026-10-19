@@ -9,8 +9,10 @@ use App\Models\ConversationMessage;
 use App\Models\Domain;
 use App\Models\InventoryLocation;
 use App\Services\ImpersonationService;
+use App\Support\LocationAreas;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -59,9 +61,25 @@ class HandleInertiaRequests extends Middleware
                 ? Conversation::unreadInboxConversationsForStaffCount()
                 : 0,
             'currentDomain' => $currentDomain,
-            // Paid features this organization has (Finance, AI support); the menu and pages hide what's off.
-            'domainFeatures' => $currentDomain?->features() ?? ['finance' => false, 'ai' => false],
-            'currentLocation' => $this->getCurrentLocation($request),
+            // The sidebar and route helpers switch into an organization only on its own pages.
+            'inOrganization' => $this->inOrganization($request),
+            // For the "subscription ends soon" banner and the locked (greyed-out) sidebar, on the organization's pages.
+            // A VIP organization has no end date to be warned about and is never locked.
+            'subscriptionStatus' => $currentDomain && $this->inOrganization($request) ? [
+                'vip' => $currentDomain->isVip(),
+                'locked' => $currentDomain->isLocked(),
+                'ends_at' => $currentDomain->isVip() ? null : $currentDomain->subscription_ends_at?->toDateString(),
+                'ends_in_days' => $currentDomain->isVip() ? null : $currentDomain->subscriptionEndsInDays(),
+            ] : null,
+            // Paid features this organization has (its plan, or given by a super admin); the menu locks what's off.
+            'domainFeatures' => $currentDomain?->features() ?? array_fill_keys(Domain::FEATURES, false),
+            'currentLocation' => $currentLocation = $this->getCurrentLocation($request),
+            // Parts of the app this location doesn't show (sidebar); EnsureLocationArea turns the pages away.
+            'locationAreas' => [
+                'hidden' => LocationAreas::hiddenAt($currentLocation instanceof InventoryLocation ? $currentLocation : null, $request->user()),
+                'prefixes' => collect(config('location_areas.areas', []))
+                    ->map(fn ($prefixes) => array_map(fn ($p) => Str::after($p, 'domains.'), $prefixes)),
+            ],
             'availableLocations' => $this->getAvailableLocations($request),
             'default_store' => $request->user() ? $this->getDefaultStore($request) : null,
             'impersonation' => $impersonationService->getImpersonationData(),
@@ -74,8 +92,9 @@ class HandleInertiaRequests extends Middleware
      */
     private function getCurrentDomain(Request $request)
     {
-        // Get domain from route parameter
-        $domain = $request->route('domain');
+        // Get domain from route parameter, only on the organization's own pages (routes/domains.php).
+        // Super admins' Domains pages (/domains/{domain}, /domains/{domain}/edit) only look at an organization.
+        $domain = $this->inOrganization($request) ? $request->route('domain') : null;
         $domainSlug = data_get($domain, 'name_slug') ?? $domain;
 
         if ($domainSlug) {
@@ -89,6 +108,12 @@ class HandleInertiaRequests extends Middleware
         }
 
         return null;
+    }
+
+    /** Whether this is one of an organization's own pages (/domains/{domain}/...), not the Domains admin. */
+    private function inOrganization(Request $request): bool
+    {
+        return str_starts_with(ltrim((string) $request->route()?->getPrefix(), '/'), 'domains/{domain');
     }
 
     /**
@@ -126,7 +151,12 @@ class HandleInertiaRequests extends Middleware
             return collect();
         }
 
-        return InventoryLocation::active()->forDomain($domain->name_slug)->get();
+        return InventoryLocation::active()->forDomain($domain->name_slug)
+            // Cashiers work at stores only (see Helpers::getActiveLocation).
+            ->when($request->user()?->isCashierOrBelow(), fn ($q) => $q->where(
+                fn ($q) => $q->whereNull('type')->orWhere('type', '!=', 'warehouse')
+            ))
+            ->get();
     }
 
     /**

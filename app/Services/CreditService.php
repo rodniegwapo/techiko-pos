@@ -5,8 +5,11 @@ namespace App\Services;
 use App\Models\CreditTransaction;
 use App\Models\Customer;
 use App\Models\Sale;
+use App\Models\WalletCashMovement;
+use App\Support\Wallet\WalletShiftGuard;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class CreditService
@@ -53,13 +56,19 @@ class CreditService
     /**
      * Process a payment against credit
      */
-    public function processPayment(Customer $customer, float $amount, array $transactionIds = [], ?string $paymentMethod = null, ?string $referenceNumber = null, ?string $notes = null, string $transactionType = 'payment'): CreditTransaction
+    public function processPayment(Customer $customer, float $amount, array $transactionIds = [], ?string $paymentMethod = null, ?string $referenceNumber = null, ?string $notes = null, string $transactionType = 'payment', ?int $locationId = null): CreditTransaction
     {
         $balance = (float) $customer->credit_balance;
 
         // For payment and refund types, validate amount doesn't exceed balance
         if (in_array($transactionType, ['payment', 'refund'], true) && abs((float) $amount) > $balance) {
             throw new \Exception('Payment amount cannot exceed credit balance.');
+        }
+
+        // Paid in cash at a store: the cash goes into that store's drawer, which must not be closed for today.
+        $intoDrawer = $transactionType === 'payment' && $paymentMethod === 'cash' && $locationId !== null;
+        if ($intoDrawer) {
+            WalletShiftGuard::ensureDateNotClosed($customer->domain, $locationId, today()->toDateString(), 'payment_method');
         }
 
         // A payment settles charges: the ones picked first, then the oldest still owed.
@@ -76,6 +85,24 @@ class CreditService
             notes: $notes ?? ucfirst($transactionType).' transaction'.(! empty($transactionIds) ? ' - Applied to transactions' : ''),
             paymentMethod: $transactionType === 'payment' ? $paymentMethod : null
         );
+
+        if ($transactionType === 'payment' && $locationId !== null) {
+            $transaction->location_id = $locationId;
+            if ($intoDrawer) {
+                $transaction->wallet_cash_movement_id = WalletCashMovement::query()->create([
+                    'domain' => $customer->domain,
+                    'location_id' => $locationId,
+                    'payment_card_type_id' => null,
+                    'direction' => 'in',
+                    'amount' => round(abs($amount), 2),
+                    'kind' => WalletCashMovement::KIND_CREDIT_PAYMENT,
+                    'notes' => Str::limit('Credit payment: '.$customer->name, 250),
+                    'movement_date' => today()->toDateString(),
+                    'user_id' => $transaction->user_id,
+                ])->id;
+            }
+            $transaction->save();
+        }
 
         Log::info('Credit transaction processed', [
             'customer_id' => $customer->id,

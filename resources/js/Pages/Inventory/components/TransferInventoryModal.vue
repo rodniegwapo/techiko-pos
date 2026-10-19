@@ -89,6 +89,8 @@ const rowFor = (product, available) => ({
   sku: product.SKU,
   unit: product.unit_of_measure || "pcs",
   available: Math.max(0, Number(available) || 0),
+  // What the destination store has of it already; null until a destination is picked.
+  atDestination: null,
   quantity: 1,
   error: null,
 });
@@ -146,6 +148,26 @@ const refreshStock = async (item) => {
   }
 };
 
+/** What the destination store already has of this product. */
+const refreshDestinationStock = async (item) => {
+  if (!item || !form.to_location_id) {
+    if (item) item.atDestination = null;
+    return;
+  }
+  const locationId = form.to_location_id;
+  try {
+    const params = { product_id: item.product_id, location_id: locationId, per_page: 1 };
+    if (form.domain) params.domain = form.domain;
+    const response = await axios.get(inventoryApi.products, { params });
+    // The destination may have changed while this was loading.
+    if (form.to_location_id === locationId) {
+      item.atDestination = Math.max(0, Number(response.data.data?.[0]?.quantity_available) || 0);
+    }
+  } catch (error) {
+    console.error("Failed to fetch destination stock:", error);
+  }
+};
+
 watch(
   () => form.from_location_id,
   (newLocationId, oldLocationId) => {
@@ -174,7 +196,10 @@ watch(
 
 watch(
   () => form.to_location_id,
-  (newLocationId) => loadStoreItemCount(newLocationId, toStore),
+  (newLocationId) => {
+    loadStoreItemCount(newLocationId, toStore);
+    items.value.forEach(refreshDestinationStock);
+  },
 );
 
 const searchProducts = async () => {
@@ -221,6 +246,7 @@ const addProduct = (product) => {
   }
 
   items.value.push(rowFor(product, product.location_quantity_available));
+  refreshDestinationStock(items.value[items.value.length - 1]);
   productSearch.value = "";
   searchResults.value = [];
 };
@@ -542,6 +568,13 @@ watch(
             <div class="col-span-12 min-w-0 md:col-span-6">
               <p class="truncate font-medium text-gray-900">{{ item.name }}</p>
               <p class="text-xs text-gray-500">SKU: {{ item.sku || "—" }}</p>
+              <p
+                v-if="item.atDestination !== null"
+                class="mb-0 text-xs text-blue-600"
+                :data-testid="`transfer-row-${index}-destination`"
+              >
+                At {{ locationName(form.to_location_id) }}: {{ item.atDestination }} {{ item.unit }}
+              </p>
             </div>
             <div
               class="col-span-4 text-sm md:col-span-2 md:text-right"

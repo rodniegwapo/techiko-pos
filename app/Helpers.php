@@ -40,8 +40,8 @@ class Helpers
 
     /**
      * Where an organization user lands (after login, impersonation, or being sent away from a page):
-     * the sales screen, unless their store is a warehouse, which doesn't sell. Then Inventory, or the
-     * dashboard or their profile when they can't open Inventory.
+     * the sales screen, unless their store is a warehouse, which doesn't sell. Then the dashboard
+     * (the whole business), or Inventory, or their profile when they can open neither.
      */
     public static function homeRouteFor(User $user, ?InventoryLocation $location = null): string
     {
@@ -57,17 +57,37 @@ class Helpers
         $can = fn (string $routeName) => $user->isSuperUser()
             || $user->getAllPermissions()->contains('route_name', $routeName);
 
-        if ($can('inventory.index')) {
-            return 'domains.inventory.index';
+        if ($can('dashboard')) {
+            return 'domains.dashboard';
         }
 
-        return $can('dashboard') ? 'domains.dashboard' : 'profile.edit';
+        return $can('inventory.index') ? 'domains.inventory.index' : 'profile.edit';
     }
 
     /**
      * Get the active location for a user based on their role and domain
      */
     public static function getActiveLocation($domain = null, $locationId = null)
+    {
+        $location = self::resolveActiveLocation($domain, $locationId);
+        $user = auth()->user();
+
+        // Cashiers work at stores only: a warehouse asked for (even in the URL) gives way to the
+        // organization's default store.
+        if ($location?->isWarehouse() && $user?->isCashierOrBelow()) {
+            $domainSlug = $domain instanceof \App\Models\Domain ? $domain->name_slug : $domain;
+
+            return InventoryLocation::active()->forDomain($domainSlug)
+                ->where(fn ($q) => $q->whereNull('type')->orWhere('type', '!=', 'warehouse'))
+                ->orderByDesc('is_default')
+                ->orderBy('id')
+                ->first();
+        }
+
+        return $location;
+    }
+
+    private static function resolveActiveLocation($domain = null, $locationId = null)
     {
         $user = auth()->user();
 

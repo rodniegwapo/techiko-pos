@@ -1,11 +1,15 @@
 <script setup>
 import { computed } from "vue";
-import { usePage } from "@inertiajs/vue3";
+import { router, usePage } from "@inertiajs/vue3";
 
 import WalletShell from "@/Pages/Wallet/WalletShell.vue";
 import CashLedgerPanel from "@/Pages/Wallet/partials/CashLedgerPanel.vue";
+import AllMoneyTable from "@/Pages/Wallet/partials/AllMoneyTable.vue";
+import ChannelBalances from "@/Pages/Wallet/partials/ChannelBalances.vue";
+import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 
 const page = usePage();
+const { getRoute } = useDomainRoutes();
 
 const props = defineProps({
     cardTypes: {
@@ -48,7 +52,37 @@ const props = defineProps({
         type: Boolean,
         default: true,
     },
+    canViewAllMoney: {
+        type: Boolean,
+        default: false,
+    },
+    allMoney: {
+        type: Object,
+        default: null,
+    },
+    channelBalances: {
+        type: Array,
+        default: () => [],
+    },
 });
+
+const showAllMoney = computed(() => !!props.allMoney);
+
+/** Store and business date stay put when switching views or filtering. */
+const keepQuery = computed(() => {
+    const q = queryObjectFromPageUrl(page.url);
+    return Object.fromEntries(
+        ["location_id", "business_date"].filter((k) => q[k]).map((k) => [k, q[k]]),
+    );
+});
+
+function switchView(view) {
+    router.get(
+        getRoute("wallet.money-movement"),
+        { ...keepQuery.value, view: view === "all" ? "all" : undefined },
+        { preserveScroll: true },
+    );
+}
 
 /** @param {string} url */
 function queryObjectFromPageUrl(url) {
@@ -88,8 +122,27 @@ const isShiftClosed = computed(() => !!props.cashControl?.is_closed);
     <WalletShell v-bind="props" :is-money-movement-page="true">
         <template #primary>
             <div class="mt-6 max-w-7xl w-full min-w-0">
+                <a-radio-group
+                    v-if="canViewAllMoney"
+                    :value="showAllMoney ? 'all' : 'drawer'"
+                    button-style="solid"
+                    class="mb-4"
+                    data-testid="money-view"
+                    @change="(e) => switchView(e.target.value)"
+                >
+                    <a-radio-button value="drawer">Drawer &amp; channels</a-radio-button>
+                    <a-radio-button value="all">All money</a-radio-button>
+                </a-radio-group>
+                <AllMoneyTable v-if="showAllMoney" :all-money="allMoney" :keep-query="keepQuery" />
+                <ChannelBalances
+                    v-if="!showAllMoney && ledger"
+                    :channels="channelBalances"
+                    :drawer-balance="runningCashBalance"
+                    :active-location-id="activeLocationId"
+                    :is-shift-closed="isShiftClosed"
+                />
                 <CashLedgerPanel
-                    v-if="ledger"
+                    v-if="!showAllMoney && ledger"
                     :movements="ledger.movements"
                     :filters="ledger.filters"
                     :ledger-balance="ledger.ledgerBalance"

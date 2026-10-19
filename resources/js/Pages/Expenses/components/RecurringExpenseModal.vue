@@ -6,6 +6,7 @@ import { useMediaQuery } from "@vueuse/core";
 import dayjs from "dayjs";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { paymentMethodLabel } from "../paymentMethods";
+import PaidFromAccountSelect from "@/Pages/Finance/components/PaidFromAccountSelect.vue";
 import PrimaryButton from "@/Components/PrimaryButton.vue";
 
 const props = defineProps({
@@ -40,6 +41,7 @@ const form = useForm({
     description: "",
     payee: "",
     payment_method: "bank",
+    financial_account_id: null,
     location: null,
     frequency: "monthly",
     day_of_month: dayjs().date(),
@@ -59,6 +61,7 @@ watch(
         form.description = r?.description ?? "";
         form.payee = r?.payee ?? "";
         form.payment_method = r?.payment_method ?? "bank";
+        form.financial_account_id = r?.financial_account_id ?? null;
         form.location = r ? r.location_id ?? BUSINESS_WIDE : props.restrictedLocationId ?? defaultStoreId() ?? BUSINESS_WIDE;
         form.frequency = r?.frequency ?? "monthly";
         form.day_of_month = r?.day_of_month ?? dayjs().date();
@@ -157,6 +160,7 @@ const submit = () => {
                 <a-form-item label="Paid from" required :validate-status="form.errors.payment_method ? 'error' : ''" :help="form.errors.payment_method">
                     <a-select v-model:value="form.payment_method" :options="paymentOptions" size="large" />
                 </a-form-item>
+                <PaidFromAccountSelect :form="form" :accounts="options.accounts || []" size="large" />
                 <a-form-item label="Repeats" required>
                     <a-radio-group v-model:value="form.frequency" button-style="solid" size="large">
                         <a-radio-button value="monthly">Monthly</a-radio-button>

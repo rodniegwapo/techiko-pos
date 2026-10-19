@@ -46,9 +46,27 @@ const props = defineProps({
         type: Boolean,
         default: false,
     },
+    /** The list's current "Sort by" value, shown as the sorted heading. */
+    sort: {
+        type: String,
+        default: null,
+    },
+    /** { columnKey: { ascend: sortValue, descend: sortValue } } for the sortable headings. */
+    columnSorts: {
+        type: Object,
+        default: () => ({}),
+    },
 });
 
 const products = computed(() => page.props?.items?.data ?? []);
+
+/** Makes a heading sortable, marked as sorted when it matches the list's sort. */
+const sortable = (column) => {
+    const sorts = props.columnSorts[column.key];
+    if (!sorts) return column;
+    const sortOrder = props.sort === sorts.ascend ? "ascend" : props.sort === sorts.descend ? "descend" : null;
+    return { ...column, sorter: true, sortOrder };
+};
 
 const showSuperUserDomain = computed(
     () => page.props.auth?.user?.data?.is_super_user && props.isGlobalView,
@@ -115,7 +133,7 @@ const columns = computed(() => {
         width: "1%",
     });
 
-    return baseColumns;
+    return baseColumns.map(sortable);
 });
 
 /** Image products show their picture; the rest show initials on their saved colour. */
@@ -205,7 +223,7 @@ function onMobilePaginationChange(pageNum) {
         "
         :pagination="pagination"
         :loading="spinning"
-        @change="$emit('handleTableChange', $event)"
+        @change="(paginationInfo, _filters, sorter) => $emit('handleTableChange', paginationInfo, sorter)"
     >
         <template #bodyCell="{ column, record }">
             <template v-if="column.key == 'avatar'">
@@ -235,6 +253,9 @@ function onMobilePaginationChange(pageNum) {
             <template v-if="column.key == 'price'">
                 <div class="flex items-center">
                     <IconCurrencyPeso /> {{ record.price }}
+                    <a-tooltip v-if="record.base_price != null" :title="`Store price (product price ${record.base_price})`">
+                        <a-tag color="blue" class="ml-2" data-testid="store-price-tag">Store</a-tag>
+                    </a-tooltip>
                 </div>
             </template>
             <template v-if="column.key == 'cost'">

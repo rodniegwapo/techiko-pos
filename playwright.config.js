@@ -43,6 +43,12 @@ export default defineConfig({
             name: "chromium",
             // Signed out by default; specs pick an account with test.use({ account: "cashier" }) (support/fixtures.js).
             use: { ...devices["Desktop Chrome"] },
+            testIgnore: "**/plans/plan-settings.spec.js",
         },
+        // Edits the plans every organization shares, so it never runs beside other tests: only when
+        // asked for (E2E_PLAN_SETTINGS=1), after them (npm run test:e2e:plans).
+        ...(process.env.E2E_PLAN_SETTINGS
+            ? [{ name: "plan-settings", use: { ...devices["Desktop Chrome"] }, testMatch: "**/plans/plan-settings.spec.js" }]
+            : []),
     ],
 });

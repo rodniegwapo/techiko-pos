@@ -4,17 +4,35 @@ namespace App\Http\Controllers\Domains;
 
 use App\Http\Controllers\Controller;
 use App\Models\Domain;
+use App\Models\InventoryLocation;
 use App\Models\Sale;
+use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class DomainSettingsController extends Controller
 {
+    /** Currencies an organization can show its money in. */
+    public const CURRENCIES = ['PHP', 'USD', 'EUR', 'GBP', 'JPY'];
+
     public function index(Request $request, Domain $domain)
     {
         $settings = $domain->settings ?? [];
 
         return Inertia::render('Settings/Index', [
+            'account' => [
+                'name' => $domain->name,
+                'plan' => $domain->currentServiceTier?->name,
+                'subscription_ends_at' => $domain->subscription_ends_at?->toDateString(),
+                'locations' => InventoryLocation::query()->forDomain($domain->name_slug)->active()->count(),
+                'users' => User::query()->where('domain', $domain->name_slug)->count(),
+                'created_at' => $domain->created_at?->toDateString(),
+            ],
+            'currency' => [
+                'code' => $domain->currency_code ?: 'PHP',
+                'options' => self::CURRENCIES,
+            ],
             'salesSettings' => [
                 'apply_vat_automatically' => (bool) data_get($settings, 'sales.apply_vat_automatically', false),
                 'vat_rate_percent' => (float) data_get($settings, 'sales.vat_rate_percent', 12),
@@ -35,7 +53,12 @@ class DomainSettingsController extends Controller
             'vat_pricing_mode' => ['sometimes', 'string', 'in:exclusive,inclusive'],
             'allow_overselling' => ['sometimes', 'boolean'],
             'hide_out_of_stock' => ['sometimes', 'boolean'],
+            'currency_code' => ['sometimes', 'string', Rule::in(self::CURRENCIES)],
         ]);
+
+        if (array_key_exists('currency_code', $validated)) {
+            $domain->currency_code = $validated['currency_code'];
+        }
 
         $vatBefore = $domain->salesVatSettings();
         $current = $domain->settings ?? [];

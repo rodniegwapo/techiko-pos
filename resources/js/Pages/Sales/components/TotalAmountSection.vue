@@ -4,6 +4,7 @@ import ApplyOrderDiscountModal from "./ApplyOrderDiscountModal.vue";
 import CardPaymentTypeModal from "./CardPaymentTypeModal.vue";
 import LoyaltyRedemptionModal from "./LoyaltyRedemptionModal.vue";
 import SplitPaymentPanel from "./SplitPaymentPanel.vue";
+import StartShiftModal from "./StartShiftModal.vue";
 import {
     firstSplitPartnerMethod,
     newSplitRow,
@@ -22,13 +23,19 @@ import { Modal, notification } from "ant-design-vue";
 import { DownOutlined } from "@ant-design/icons-vue";
 import { ExclamationCircleOutlined } from "@ant-design/icons-vue";
 import axios from "axios";
-import { usePage } from "@inertiajs/vue3";
+import { usePage, router } from "@inertiajs/vue3";
+import dayjs from "dayjs";
 
 const { formData, errors } = useGlobalVariables();
 const { getRoute } = useDomainRoutes();
 const { formattedTotal } = useHelpers();
 const { checkCreditAvailability } = useCredit();
 const page = usePage();
+
+// Supervisors and up can record a sale on an earlier day (cashiers sell today only).
+const canBackdate = computed(() => page.props.auth?.user?.data?.needs_manager_approval === false);
+const saleDate = ref(dayjs());
+const isBackdated = computed(() => canBackdate.value && !saleDate.value.isSame(dayjs(), "day"));
 
 const salesCartIsOnline = inject(
     "isSalesOnline",
@@ -364,6 +371,7 @@ const customerChange = computed(() => {
 });
 
 const proceedPaymentLoading = ref(false);
+const shiftModalOpen = ref(false);
 
 const cardTypeModalOpen = ref(false);
 const selectedPaymentCardTypeId = ref(null);
@@ -572,6 +580,9 @@ const handleProceedPayment = async () => {
         if (isSplit.value) {
             body.payments = splitPayload(splitRows.value);
         }
+        if (isBackdated.value) {
+            body.transaction_date = saleDate.value.format("YYYY-MM-DD");
+        }
         const response = await axios.post(
             getRoute("sales.payment.store", {
                 sale: orderId.value,
@@ -581,6 +592,7 @@ const handleProceedPayment = async () => {
 
         // Clean up and finalize
         amountReceived.value = 0;
+        saleDate.value = dayjs();
         selectedPaymentCardTypeId.value = null;
         paymentReference.value = "";
         paymentMethod.value = "cash";
@@ -645,6 +657,18 @@ const handleProceedPayment = async () => {
             return;
         }
 
+        const shiftMessage = error.response?.data?.errors?.shift;
+        if (shiftMessage) {
+            notification.warning({
+                message: "Shift required",
+                description: Array.isArray(shiftMessage)
+                    ? shiftMessage[0]
+                    : shiftMessage,
+            });
+            shiftModalOpen.value = true;
+            return;
+        }
+
         const errorMessage =
             error.response?.data?.message ||
             error.message ||
@@ -658,6 +682,12 @@ const handleProceedPayment = async () => {
         proceedPaymentLoading.value = false;
     }
 };
+
+/** The shift was opened from the "no shift open" modal raised by a failed payment: resubmit it. */
+async function onShiftStarted() {
+    router.reload({ only: ["shiftStatus"] });
+    await handleProceedPayment();
+}
 
 const disabledPaymentButtonColor = computed(() => {
     if (paymentMethod.value === "credit") {
@@ -1142,6 +1172,23 @@ defineExpose({
                     <a-input readonly :value="formattedTotal(customerChange)" />
                 </div>
 
+                <!-- Sale date: supervisors and up can record a sale on an earlier day -->
+                <div
+                    v-if="canBackdate && salesCartIsOnline && !hideProceedButton"
+                    class="flex items-start flex-col gap-2"
+                >
+                    <span class="text-gray-700 whitespace-nowrap">Sale date:</span>
+                    <a-date-picker
+                        v-model:value="saleDate"
+                        :allow-clear="false"
+                        :disabled-date="(d) => d && d.isAfter(dayjs(), 'day')"
+                        format="MMM D, YYYY"
+                        class="w-40"
+                        data-testid="sale-date"
+                    />
+                    <span v-if="isBackdated" class="text-xs text-amber-700">Recorded as a past sale</span>
+                </div>
+
                 <!-- Proceed Payment / Offline save -->
                 <div v-if="!hideProceedButton" class="flex flex-col gap-2">
                     <div class="invisible">Proceed Payment</div>
@@ -1205,6 +1252,11 @@ defineExpose({
                 :patching="loyaltyPatching"
                 @close="loyaltyRedemptionModalOpen = false"
                 @apply="onLoyaltyModalApply"
+            />
+
+            <StartShiftModal
+                v-model:visible="shiftModalOpen"
+                @started="onShiftStarted"
             />
         </div>
     </div>

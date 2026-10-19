@@ -30,6 +30,11 @@ class PayMongoQrPhController extends Controller
         /** @var User $user */
         $user = $request->user();
 
+        // Nothing is due for a VIP organization.
+        if ($domain->isVip()) {
+            return response()->json(['message' => 'This organization is VIP: there is nothing to pay.'], 422);
+        }
+
         $validated = $request->validate([
             'service_tier_id' => [
                 'required',

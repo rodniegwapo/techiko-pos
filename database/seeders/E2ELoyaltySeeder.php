@@ -37,6 +37,13 @@ class E2ELoyaltySeeder extends Seeder
         $fixtures = DB::transaction(function () {
             Customer::where('email', 'like', 'e2e-loy-%@techiko.test')->delete();
 
+            // Tiers a spec made ("etier…") and couldn't delete because members were moved into them:
+            // their members go back to bronze and the tiers are removed, so each run starts clean.
+            foreach (LoyaltyTier::query()->where('name', 'like', 'etier%')->get() as $leftover) {
+                Customer::where('domain', $leftover->domain)->where('tier', $leftover->name)->update(['tier' => 'bronze']);
+                $leftover->delete();
+            }
+
             // name, tier, points, lifetime spent
             $bronze = $this->member('E2E Loy Bronze', 'bronze', 150, 1234.50);
             $silver = $this->member('E2E Loy Silver', 'silver', 2500, 25000);

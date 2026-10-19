@@ -1,5 +1,6 @@
 <script setup>
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, onMounted, onBeforeUnmount } from "vue";
+import { OPEN_TEAM_CHAT_EVENT } from "@/Composables/useTeamChat";
 import { router, usePage } from "@inertiajs/vue3";
 import { IconMessageCircle } from "@tabler/icons-vue";
 import { message as antMessage } from "ant-design-vue";
@@ -182,6 +183,18 @@ function submit() {
         },
     );
 }
+
+// Opened from elsewhere (openTeamChat, e.g. Billing's "Contact us"): the team tab, with the message ready.
+function onOpenTeamChat(event) {
+    tab.value = "team";
+    const text = event.detail?.message ?? "";
+    if (text && !body.value.trim()) {
+        body.value = text;
+    }
+    open.value = true;
+}
+onMounted(() => window.addEventListener(OPEN_TEAM_CHAT_EVENT, onOpenTeamChat));
+onBeforeUnmount(() => window.removeEventListener(OPEN_TEAM_CHAT_EVENT, onOpenTeamChat));
 
 function onComposerKeydown(e) {
     if (e.key !== "Enter") {

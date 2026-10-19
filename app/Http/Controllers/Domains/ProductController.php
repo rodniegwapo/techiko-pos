@@ -292,19 +292,26 @@ class ProductController extends Controller
     /** Sort options for the products list; newest first unless asked otherwise. */
     private function applySort(Builder $query, ?string $sort, ?InventoryLocation $location): void
     {
+        $quantityHere = fn () => ProductInventory::query()
+            ->select('quantity_available')
+            ->whereColumn('product_inventory.product_id', 'products.id')
+            ->where('location_id', $location->id)
+            ->limit(1);
+        $categoryName = fn () => Category::query()
+            ->select('name')
+            ->whereColumn('categories.id', 'products.category_id')
+            ->limit(1);
+
         match ($sort) {
             'name' => $query->orderBy('name')->orderBy('id'),
+            'name_desc' => $query->orderByDesc('name')->orderBy('id'),
             'price_asc' => $query->orderBy('price')->orderBy('id'),
             'price_desc' => $query->orderByDesc('price')->orderBy('id'),
-            'qty_asc' => $location
-                ? $query->orderBy(
-                    ProductInventory::query()
-                        ->select('quantity_available')
-                        ->whereColumn('product_inventory.product_id', 'products.id')
-                        ->where('location_id', $location->id)
-                        ->limit(1)
-                )->orderBy('id')
-                : $query->latest(),
+            // Grouped by category, then by name within each.
+            'category' => $query->orderBy($categoryName())->orderBy('name')->orderBy('id'),
+            'category_desc' => $query->orderByDesc($categoryName())->orderBy('name')->orderBy('id'),
+            'qty_asc' => $location ? $query->orderBy($quantityHere())->orderBy('id') : $query->latest(),
+            'qty_desc' => $location ? $query->orderByDesc($quantityHere())->orderBy('id') : $query->latest(),
             default => $query->latest(),
         };
     }
@@ -461,6 +468,8 @@ class ProductController extends Controller
         $this->applySort($query, $request->sort, $location);
 
         $products = $query->paginate(15);
+        // Shown at this store's price; the list marks the ones with their own.
+        Product::applyStorePrices($products->getCollection(), $location?->id);
 
         $categoriesQuery = $this->buildCategoriesQuery($domain, $location);
 
@@ -544,6 +553,14 @@ class ProductController extends Controller
             if ($location) {
                 $product->addToLocation($location, true);
             }
+        }
+
+        // "Price at this store": empty sells at the product's price.
+        if ($request->has('store_price') && ($store = $this->resolveActiveLocation($request, $domain))) {
+            $request->validate(['store_price' => ['nullable', 'numeric', 'min:0']]);
+            $product->locations()->updateExistingPivot($store->id, [
+                'price' => $request->filled('store_price') ? round((float) $request->input('store_price'), 2) : null,
+            ]);
         }
 
         $this->queueSharedCatalogSuggestionIfNeeded($request, $domain, $product);
@@ -669,6 +686,7 @@ class ProductController extends Controller
                     $product->representation_type,
                 ),
                 'modifier_group_ids' => $product->modifierGroups()->pluck('modifier_groups.id'),
+                'store_price' => $product->storePriceAt($location?->id),
             ],
             'categories' => $categories,
             'modifierGroups' => $this->modifierGroupOptions($domain),

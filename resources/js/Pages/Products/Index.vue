@@ -48,10 +48,22 @@ const TRACK_STOCK_OPTIONS = [
 const SORT_OPTIONS = [
     { label: "Newest first", value: "newest" },
     { label: "Name (A–Z)", value: "name" },
+    { label: "Name (Z–A)", value: "name_desc" },
+    { label: "Category (A–Z)", value: "category" },
+    { label: "Category (Z–A)", value: "category_desc" },
     { label: "Price (low to high)", value: "price_asc" },
     { label: "Price (high to low)", value: "price_desc" },
     { label: "Quantity (low to high)", value: "qty_asc" },
+    { label: "Quantity (high to low)", value: "qty_desc" },
 ];
+
+/** Clicking a column heading picks the matching "Sort by" option. */
+const COLUMN_SORTS = {
+    name: { ascend: "name", descend: "name_desc" },
+    category: { ascend: "category", descend: "category_desc" },
+    price: { ascend: "price_asc", descend: "price_desc" },
+    location_quantity_available: { ascend: "qty_asc", descend: "qty_desc" },
+};
 
 const locationIdQuery = () => {
     if (typeof window === "undefined") {
@@ -195,6 +207,18 @@ const showStockStatus = (status) => {
 const { pagination, handleTableChange } = useTable("items", tableFilters, {
     preserveQueryKeys: ["location_id"],
 });
+
+// A heading click changes "Sort by" (which reloads from page 1); paging keeps the current sort.
+const onTableChange = (paginationInfo, sorter) => {
+    if (sorter && "columnKey" in sorter) {
+        const next = sorter.order ? COLUMN_SORTS[sorter.columnKey]?.[sorter.order] ?? null : null;
+        if (next !== (sort.value || null)) {
+            filters.value = { ...filters.value, sort: next };
+            return;
+        }
+    }
+    handleTableChange(paginationInfo);
+};
 
 const { hasPermission } = usePermissionsV2();
 const canCreate = computed(() => hasPermission("products.create"));
@@ -348,7 +372,9 @@ const hasMultipleStores = computed(() => {
             <!-- Table -->
             <template #table>
                 <ProductTable
-                    @handle-table-change="handleTableChange"
+                    @handle-table-change="onTableChange"
+                    :sort="sort"
+                    :column-sorts="COLUMN_SORTS"
                     :pagination="pagination"
                     :is-global-view="page.props.isGlobalView"
                 />

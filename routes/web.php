@@ -10,6 +10,8 @@ use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeployController;
 use App\Http\Controllers\DomainController;
+use App\Http\Controllers\DomainPaymentController;
+use App\Http\Controllers\ServiceTierController;
 use App\Http\Controllers\ImpersonationController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryLocationController;
@@ -180,6 +182,28 @@ Route::middleware(['auth', 'verified', 'user.permission'])->prefix('domains')->n
     Route::patch('/{domain}/features', [DomainController::class, 'updateFeatures'])
         ->middleware('check.super.user')
         ->name('features.update');
+    // Its plan and monthly AI credits; super admins only.
+    Route::patch('/{domain}/subscription', [DomainController::class, 'updateSubscription'])
+        ->middleware('check.super.user')
+        ->name('subscription.update');
+    // Lock an organization that hasn't paid (its users only see the "on hold" page); super admins only.
+    Route::patch('/{domain}/lock', [DomainController::class, 'updateLock'])
+        ->middleware('check.super.user')
+        ->name('lock.update');
+    // VIP: every premium feature, no limits or warnings, never locked; super admins only.
+    Route::patch('/{domain}/vip', [DomainController::class, 'updateVip'])
+        ->middleware('check.super.user')
+        ->name('vip.update');
+    // Subscription payments (e.g. a bank transfer with its reference number); super admins only.
+    Route::post('/{domain}/payments', [DomainPaymentController::class, 'store'])
+        ->middleware('check.super.user')
+        ->name('payments.store');
+    Route::post('/{domain}/payments/{payment}/void', [DomainPaymentController::class, 'void'])
+        ->middleware('check.super.user')
+        ->name('payments.void');
+    Route::post('/{domain}/payments/{payment}/confirm', [DomainPaymentController::class, 'confirm'])
+        ->middleware('check.super.user')
+        ->name('payments.confirm');
 });
 
 // Global routes (not domain-specific)
@@ -283,6 +307,13 @@ Route::middleware(['auth', 'verified', 'check.super.user'])->group(function () {
     // Questions the AI assistant couldn't help with
     Route::get('/assistant/unanswered', [AssistantUnansweredController::class, 'index'])->name('assistant-unanswered.index');
     Route::post('/assistant/unanswered/{question}/resolve', [AssistantUnansweredController::class, 'resolve'])->name('assistant-unanswered.resolve');
+
+    // Plans organizations subscribe to: prices, AI credits and limits
+    Route::get('/plans', [ServiceTierController::class, 'index'])->name('service-tiers.index');
+    Route::post('/plans', [ServiceTierController::class, 'store'])->name('service-tiers.store');
+    // The Free plan isn't a service tier (free organizations have none); its limits are an app setting.
+    Route::put('/plans/free', [ServiceTierController::class, 'updateFree'])->name('service-tiers.free.update');
+    Route::put('/plans/{serviceTier}', [ServiceTierController::class, 'update'])->name('service-tiers.update');
 
     Route::get('/mail/test', [MailTestController::class, 'create'])->name('mail.test');
     Route::post('/mail/test', [MailTestController::class, 'store'])

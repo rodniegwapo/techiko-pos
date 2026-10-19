@@ -40,6 +40,16 @@ class UserController extends Controller
             'hierarchy' => UserHierarchyService::getRoleHierarchy(),
             'isGlobalView' => $isSuperUser,
             'domains' => $isSuperUser ? \App\Models\Domain::select('id', 'name', 'name_slug')->get() : [],
+            // Each organization's stores and warehouses, for the form's location field (it shows the
+            // chosen organization's); an organization's admin gets their own.
+            'locationsByDomain' => $isSuperUser
+                ? \App\Models\InventoryLocation::query()->active()
+                    ->where(fn ($q) => $q->whereNull('type')->orWhereIn('type', ['store', 'warehouse']))
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'type', 'domain'])
+                    ->groupBy('domain')
+                : [],
+            'locations' => $isSuperUser ? [] : UserService::workLocations($currentUser->domain),
         ]);
     }
 

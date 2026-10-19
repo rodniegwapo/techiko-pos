@@ -34,6 +34,15 @@ const {
     <AuthenticatedLayout>
         <ContentHeader title="Dashboard" :isDashboard="true"> </ContentHeader>
 
+        <a-alert
+            v-if="$page.props.allLocations"
+            type="info"
+            show-icon
+            class="mb-4"
+            message="All locations: this warehouse's dashboard adds up every store."
+            data-testid="dashboard-all-locations"
+        />
+
         <SummaryCards :cards="summaryCards" />
 
         <div class="flex w-full flex-col gap-6 mb-8 lg:flex-row">

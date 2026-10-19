@@ -3,7 +3,7 @@
 return [
     /*
     |--------------------------------------------------------------------------
-    | Domain sidebar: Servicing payment (/domains/{slug}/billing/servicing)
+    | Domain sidebar: Billing (/domains/{slug}/billing/servicing)
     |--------------------------------------------------------------------------
     | When false, the menu entry is hidden; routes and pages stay registered.
     */
@@ -32,6 +32,21 @@ return [
     */
     'unlimited_products' => filter_var(
         env('FEATURE_UNLIMITED_PRODUCTS', true),
+        FILTER_VALIDATE_BOOLEAN
+    ),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Plan features (what the free plan leaves out)
+    |--------------------------------------------------------------------------
+    | When true, an organization only gets the features its plan includes
+    | (service_tiers.features; see Domain::FEATURES): the free plan has 31 days
+    | of sales history, 1 location and 2 users. When false, everything stays
+    | open as before, except Finance and AI, which a super admin turns on.
+    | Turn on together with the billing menu and the pricing page.
+    */
+    'plan_gating' => filter_var(
+        env('FEATURE_PLAN_GATING', false),
         FILTER_VALIDATE_BOOLEAN
     ),
 ];

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Permission;
 use Database\Seeders\AssistantPermissionSeeder;
 use Database\Seeders\FinancePermissionSeeder;
+use Database\Seeders\PurchasingPermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -57,8 +58,42 @@ class FeaturePermissionSeedersTest extends TestCase
 
     public function test_the_seeders_cover_every_route_behind_their_feature(): void
     {
-        $this->assertSame($this->routesBehind('finance'), $this->sorted(FinancePermissionSeeder::ROUTES));
+        // Expenses has its own feature gate (it can come without the rest of Finance), but the
+        // Finance seeder sets up its permissions too.
+        $this->assertSame(
+            $this->sorted([...$this->routesBehind('finance'), ...$this->routesBehind('expenses')]),
+            $this->sorted(FinancePermissionSeeder::ROUTES),
+        );
         $this->assertSame($this->routesBehind('ai'), $this->sorted(AssistantPermissionSeeder::ROUTES));
+    }
+
+    public function test_the_purchasing_seeder_covers_every_purchasing_route(): void
+    {
+        $routes = [];
+        foreach (Route::getRoutes() as $route) {
+            if (str_starts_with((string) $route->getName(), 'domains.purchase-orders.')) {
+                $routes[] = preg_replace('/^domains\./', '', $route->getName());
+            }
+        }
+
+        $this->assertSame($this->sorted($routes), $this->sorted(PurchasingPermissionSeeder::ROUTES));
+    }
+
+    public function test_purchasing_permissions_are_added_for_the_default_roles_only(): void
+    {
+        $admin = $this->role('admin');
+        $manager = $this->role('manager');
+        $cashier = $this->role('cashier');
+
+        $this->seed(PurchasingPermissionSeeder::class);
+        $this->seed(PurchasingPermissionSeeder::class);
+
+        $purchasing = $this->sorted(PurchasingPermissionSeeder::ROUTES);
+        foreach ([$admin, $manager] as $role) {
+            $this->assertSame([], array_values(array_diff($purchasing, $this->routesOf($role))));
+        }
+        $this->assertSame([], array_values(array_intersect($purchasing, $this->routesOf($cashier))));
+        $this->assertSame(count($purchasing), Permission::query()->whereIn('route_name', $purchasing)->count());
     }
 
     public function test_finance_permissions_are_added_once_for_the_default_roles(): void
@@ -124,7 +159,11 @@ class FeaturePermissionSeedersTest extends TestCase
         $this->seed(AssistantPermissionSeeder::class);
 
         foreach ($roles as $role) {
-            $this->assertSame($this->sorted(AssistantPermissionSeeder::ROUTES), $this->routesOf($role), $role->name);
+            // The AI usage page only for the roles that see billing.
+            $expected = in_array($role->name, AssistantPermissionSeeder::USAGE_ROLES, true)
+                ? AssistantPermissionSeeder::ROUTES
+                : array_diff(AssistantPermissionSeeder::ROUTES, AssistantPermissionSeeder::USAGE_ROUTES);
+            $this->assertSame($this->sorted(array_values($expected)), $this->routesOf($role), $role->name);
         }
         $this->assertSame(
             DB::table('permission_modules')->where('name', 'assistant')->value('id'),

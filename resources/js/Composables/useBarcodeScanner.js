@@ -9,6 +9,7 @@ export function useBarcodeScanner(onScan, { ignoreDialogs = false } = {}) {
     const barcodeBuffer = ref("");
     const lastKeyTime = ref(0);
     const BARCODE_DELAY = 50; // ms
+    const MIN_SCAN_LENGTH = 3;
 
     const handleGlobalKeydown = (e) => {
         if (
@@ -19,17 +20,15 @@ export function useBarcodeScanner(onScan, { ignoreDialogs = false } = {}) {
             return;
         }
 
-        const tagName = e.target.tagName;
-        const isInput = tagName === "INPUT" || tagName === "TEXTAREA";
-
         const now = Date.now();
 
         if (e.key === "Enter") {
             if (barcodeBuffer.value.length > 0) {
-                // Heuristic: Valid scan if typed fast OR reasonably long
+                // A scan: at least MIN_SCAN_LENGTH keys typed scanner-fast, ending in Enter. Amounts
+                // typed by hand (e.g. "1000" in Amount received) reset the buffer on every key.
                 if (
-                    now - lastKeyTime.value < BARCODE_DELAY * 10 ||
-                    barcodeBuffer.value.length > 3
+                    barcodeBuffer.value.length >= MIN_SCAN_LENGTH &&
+                    now - lastKeyTime.value < BARCODE_DELAY * 10
                 ) {
                     // Prevent default form submission or other Enter behaviors
                     e.preventDefault();
@@ -45,13 +44,9 @@ export function useBarcodeScanner(onScan, { ignoreDialogs = false } = {}) {
         // Filter out special keys like Control, Shift, etc.
         if (e.key.length > 1) return;
 
-        // Reset buffer if typing is too slow (likely manual typing),
-        // unless we are in an input (where we might want to capture fast typing/paste as scan too)
-        // But logic copied from Sales/Index.vue says:
+        // Typing slower than a scanner is manual typing, in an input or not: start over.
         if (now - lastKeyTime.value > BARCODE_DELAY) {
-            if (!isInput) {
-                barcodeBuffer.value = ""; // Reset
-            }
+            barcodeBuffer.value = "";
         }
 
         // Always append key to buffer to track potential scans

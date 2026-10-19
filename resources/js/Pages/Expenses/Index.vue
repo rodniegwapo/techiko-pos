@@ -46,6 +46,7 @@ const dateRange = ref([dayjs(props.filters.start_date), dayjs(props.filters.end_
 const location = ref(props.filters.location ?? null);
 const category = ref(props.filters.category_id ?? null);
 const payment = ref(props.filters.payment_method ?? null);
+const account = ref(props.filters.account_id ?? null);
 const search = ref(props.filters.search ?? "");
 
 const locationOptions = computed(() => [
@@ -54,6 +55,9 @@ const locationOptions = computed(() => [
 ]);
 const categoryOptions = computed(() =>
     (props.options.categories || []).map((c) => ({ value: c.id, label: c.name })),
+);
+const accountOptions = computed(() =>
+    (props.options.accounts || []).map((a) => ({ value: a.id, label: a.name })),
 );
 const paymentOptions = computed(() =>
     (props.options.payment_methods || []).map((m) => ({ value: m, label: paymentMethodLabel(m) })),
@@ -65,6 +69,7 @@ const queryParams = (extra = {}) => ({
     location: location.value || undefined,
     category_id: category.value || undefined,
     payment_method: payment.value || undefined,
+    account_id: account.value || undefined,
     search: search.value || undefined,
     per_page: props.items.per_page,
     ...extra,
@@ -94,6 +99,9 @@ const filterConfigs = [
         : []),
     { label: "Category", key: "category", ref: category, getLabel: toLabel(categoryOptions) },
     { label: "Paid from", key: "payment", ref: payment, getLabel: toLabel(paymentOptions) },
+    ...((props.options.accounts || []).length
+        ? [{ label: "Account", key: "account", ref: account, getLabel: toLabel(accountOptions) }]
+        : []),
 ];
 
 const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
@@ -108,6 +116,9 @@ const filtersConfig = computed(() => [
         : []),
     { key: "category", label: "Category", type: "select", options: categoryOptions.value },
     { key: "payment", label: "Paid from", type: "select", options: paymentOptions.value },
+    ...(accountOptions.value.length
+        ? [{ key: "account", label: "Account", type: "select", options: accountOptions.value }]
+        : []),
 ]);
 
 /** The period the server actually applied (this month when no date is chosen). */

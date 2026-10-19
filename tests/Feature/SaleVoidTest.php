@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
+use Tests\Concerns\OpensTodaysShift;
 use Tests\TestCase;
 
 /**
@@ -31,6 +32,7 @@ use Tests\TestCase;
  */
 class SaleVoidTest extends TestCase
 {
+    use OpensTodaysShift;
     use RefreshDatabase;
 
     private const PIN = '4321';
@@ -38,6 +40,7 @@ class SaleVoidTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->openTodaysShiftForNewStores();
         $this->withoutMiddleware([
             UserPermissionCheckMiddleware::class,
             RoleBasedAccessControl::class,
@@ -188,7 +191,8 @@ class SaleVoidTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->has('items.data', 2)
                 ->where('summary.sales_count', 1)
-                ->where('summary.net', round((float) $kept->grand_total, 2))
+                // Compared as a number: JSON sends a whole amount like 500.0 as 500.
+                ->where('summary.net', fn ($net) => (float) $net === round((float) $kept->grand_total, 2))
                 ->where('summary.voided_sales', 1)
             );
 

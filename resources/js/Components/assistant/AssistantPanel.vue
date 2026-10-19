@@ -2,7 +2,8 @@
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import axios from "axios";
 import { router, usePage } from "@inertiajs/vue3";
-import { IconSparkles, IconSend, IconExternalLink, IconTrash } from "@tabler/icons-vue";
+import dayjs from "dayjs";
+import { IconSparkles, IconSend, IconExternalLink, IconTrash, IconHistory, IconMessagePlus, IconArrowLeft } from "@tabler/icons-vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import ActionConfirmCard from "./ActionConfirmCard.vue";
 import FillInFormCard from "./FillInFormCard.vue";
@@ -12,7 +13,7 @@ import { answerBlocks, suggestionsFor } from "./assistantAnswer";
  * The AI assistant tab of the chat drawer. Staff ask how to do things ("how do I add a
  * product?") and get the steps for the tasks their role allows, with a button to open the page,
  * or ask it to make a change: it shows a card, and nothing is saved until they press Confirm.
- * The conversation is kept for this browser tab, so it survives moving between pages.
+ * Chats are saved to the user's account for 90 days; History reopens or deletes them.
  */
 const emit = defineEmits(["ask-human", "navigate"]);
 
@@ -35,36 +36,88 @@ const turns = ref([]); // { question, answer, links, actions, forms, error }
 const asking = ref(false);
 const language = ref("en");
 const remaining = ref(null);
+const creditsLeft = ref(null); // the organization's AI credits left this month (null = unlimited or not known yet)
 const list = ref(null);
 const input = ref(null);
 
+// Chats are saved to the user's account; this tab only remembers which one is open.
+const conversationId = ref(null);
+const view = ref("chat"); // "chat" | "history"
+const chats = ref([]); // { id, title, last_message_at }
+const loadingChats = ref(false);
+const loadingChat = ref(false);
+
 onMounted(() => {
+    let saved = null;
     try {
-        const saved = JSON.parse(sessionStorage.getItem(storageKey.value) || "null");
-        if (saved) {
-            turns.value = (saved.turns || []).filter((t) => t.answer);
-            language.value = saved.language || "en";
-        }
+        saved = JSON.parse(sessionStorage.getItem(storageKey.value) || "null");
     } catch {
-        // Storage unavailable (private mode): start empty.
+        // Storage unavailable (private mode): start a new chat.
     }
-    scrollDown();
+    language.value = saved?.language || "en";
+    if (saved?.conversationId) {
+        openChat(saved.conversationId);
+    }
 });
 
-watch(
-    [turns, language],
-    () => {
-        try {
-            sessionStorage.setItem(
-                storageKey.value,
-                JSON.stringify({ turns: turns.value.filter((t) => t.answer).slice(-20), language: language.value }),
-            );
-        } catch {
-            // ignore
-        }
-    },
-    { deep: true },
-);
+watch([conversationId, language], () => {
+    try {
+        sessionStorage.setItem(storageKey.value, JSON.stringify({ conversationId: conversationId.value, language: language.value }));
+    } catch {
+        // ignore
+    }
+});
+
+async function openChat(id) {
+    loadingChat.value = true;
+    view.value = "chat";
+    try {
+        const { data } = await axios.get(getRoute("assistant.conversations.show", { conversation: id }));
+        conversationId.value = data.id;
+        turns.value = data.turns;
+        language.value = data.language || language.value;
+    } catch {
+        // Deleted or older than 90 days: start fresh.
+        newChat();
+    } finally {
+        loadingChat.value = false;
+        scrollDown();
+    }
+}
+
+function newChat() {
+    conversationId.value = null;
+    turns.value = [];
+    view.value = "chat";
+    input.value?.focus();
+}
+
+async function showHistory() {
+    view.value = "history";
+    loadingChats.value = true;
+    try {
+        const { data } = await axios.get(getRoute("assistant.conversations.index"));
+        chats.value = data.data;
+    } catch {
+        chats.value = [];
+    } finally {
+        loadingChats.value = false;
+    }
+}
+
+async function deleteChat(chat) {
+    await axios.delete(getRoute("assistant.conversations.destroy", { conversation: chat.id }));
+    chats.value = chats.value.filter((c) => c.id !== chat.id);
+    if (conversationId.value === chat.id) {
+        conversationId.value = null;
+        turns.value = [];
+    }
+}
+
+const chatTime = (at) => {
+    const d = dayjs(at);
+    return d.isSame(dayjs(), "day") ? d.format("h:mm A") : d.isSame(dayjs(), "year") ? d.format("MMM D") : d.format("MMM D, YYYY");
+};
 
 async function scrollDown() {
     await nextTick();
@@ -76,28 +129,34 @@ async function ask(text = message.value) {
     if (q.length < 2 || asking.value) return;
     message.value = "";
     asking.value = true;
-    const history = turns.value
-        .filter((t) => t.answer)
-        .slice(-6)
-        .map((t) => ({ question: t.question, answer: withOutcomes(t) }));
-    const turn = { question: q, answer: null, links: [], actions: [], forms: [], error: null };
+    view.value = "chat";
+    const turn = { question: q, answer: null, links: [], actions: [], forms: [], error: null, billingUrl: null };
     turns.value.push(turn);
     scrollDown();
     try {
         const { data } = await axios.post(getRoute("assistant.ask"), {
             message: q,
-            history,
+            conversation_id: conversationId.value ?? undefined,
             page: currentRoute.value || undefined,
             language: language.value,
             location_id: page.props.currentLocation?.id ?? undefined,
         });
+        conversationId.value = data.conversation_id ?? conversationId.value;
+        turn.id = data.message_id;
         turn.answer = data.answer;
         turn.links = data.links || [];
         turn.actions = data.pending_actions || [];
         turn.forms = data.forms || [];
         remaining.value = data.remaining;
+        creditsLeft.value = data.credits_remaining ?? null;
     } catch (e) {
         turn.error = e?.response?.data?.message || "Could not get an answer right now. Please try again.";
+        // Out of the organization's monthly AI credits.
+        if (e?.response?.status === 402) {
+            creditsLeft.value = 0;
+            // Set when a plan has more credits and this user can open the plans.
+            turn.billingUrl = e.response.data?.billing_url ?? null;
+        }
     } finally {
         asking.value = false;
         turns.value = [...turns.value];
@@ -105,14 +164,6 @@ async function ask(text = message.value) {
         // Ready for the next message without clicking back into the box.
         input.value?.focus();
     }
-}
-
-/** The answer plus what became of its cards, so the assistant knows on the next message. */
-function withOutcomes(turn) {
-    const outcomes = (turn.actions || [])
-        .filter((a) => a.state)
-        .map((a) => `[${a.title}: ${a.state}${a.result?.message ? " - " + a.result.message : ""}]`);
-    return [turn.answer, ...outcomes].join("\n").slice(0, 4000);
 }
 
 function onSettled(turn, action, result) {
@@ -140,10 +191,6 @@ function openLink(link) {
     router.visit(link.url);
 }
 
-function clearChat() {
-    turns.value = [];
-}
-
 function onKeydown(e) {
     // Leave Enter alone while an IME (e.g. Japanese input) is composing a word.
     if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
@@ -156,22 +203,54 @@ function onKeydown(e) {
 <template>
     <div class="flex h-full min-h-0 min-w-0 flex-1 flex-col" data-testid="assistant-panel">
         <div class="flex shrink-0 items-center justify-between gap-2 px-4 pb-2 pt-1">
-            <p class="text-sm text-gray-600">Ask how to do anything in Techiko POS.</p>
+            <a-button v-if="view === 'history'" size="small" type="text" class="!flex items-center gap-1 !px-1" @click="view = 'chat'">
+                <IconArrowLeft :size="16" /> Back to chat
+            </a-button>
+            <p v-else class="text-sm text-gray-600">Ask how to do anything in Techiko POS.</p>
             <div class="flex items-center gap-1">
-                <a-radio-group v-model:value="language" size="small">
+                <a-radio-group v-if="view === 'chat'" v-model:value="language" size="small">
                     <a-radio-button value="en">EN</a-radio-button>
                     <a-radio-button value="taglish">Taglish</a-radio-button>
                 </a-radio-group>
-                <a-tooltip v-if="turns.length" title="Clear conversation">
-                    <a-button size="small" type="text" aria-label="Clear conversation" @click="clearChat">
-                        <IconTrash :size="16" />
+                <a-tooltip v-if="view === 'chat'" title="Past chats">
+                    <a-button size="small" type="text" aria-label="Past chats" data-testid="assistant-history" @click="showHistory">
+                        <IconHistory :size="16" />
+                    </a-button>
+                </a-tooltip>
+                <a-tooltip v-if="turns.length || view === 'history'" title="New chat">
+                    <a-button size="small" type="text" aria-label="New chat" data-testid="assistant-new-chat" @click="newChat">
+                        <IconMessagePlus :size="16" />
                     </a-button>
                 </a-tooltip>
             </div>
         </div>
 
-        <div ref="list" class="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pr-3" data-testid="assistant-turns">
-            <div v-if="!turns.length" class="space-y-3">
+        <div v-if="view === 'history'" class="min-h-0 flex-1 overflow-y-auto px-4 pr-3" data-testid="assistant-chats">
+            <a-skeleton v-if="loadingChats" active :paragraph="{ rows: 4 }" :title="false" />
+            <a-empty v-else-if="!chats.length" description="No saved chats yet" class="!mt-10" />
+            <ul v-else class="divide-y divide-gray-100">
+                <li v-for="chat in chats" :key="chat.id" class="flex items-center gap-2">
+                    <button
+                        type="button"
+                        class="min-w-0 flex-1 rounded px-2 py-2 text-left hover:bg-gray-50"
+                        :class="{ 'bg-blue-50': chat.id === conversationId }"
+                        @click="openChat(chat.id)"
+                    >
+                        <span class="block truncate text-sm text-gray-800">{{ chat.title }}</span>
+                        <span class="block text-xs text-gray-500">{{ chatTime(chat.last_message_at) }}</span>
+                    </button>
+                    <a-popconfirm title="Delete this chat?" ok-text="Delete" cancel-text="Keep" @confirm="deleteChat(chat)">
+                        <a-button size="small" type="text" danger aria-label="Delete chat">
+                            <IconTrash :size="15" />
+                        </a-button>
+                    </a-popconfirm>
+                </li>
+            </ul>
+        </div>
+
+        <div v-else ref="list" class="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pr-3" data-testid="assistant-turns">
+            <a-skeleton v-if="loadingChat" active :paragraph="{ rows: 3 }" :title="false" />
+            <div v-else-if="!turns.length" class="space-y-3">
                 <div class="flex items-start gap-2 rounded-lg bg-blue-50 px-3 py-2 text-sm text-gray-800">
                     <IconSparkles :size="18" class="mt-0.5 shrink-0 text-blue-600" />
                     <p>Hi! I can show you step by step how to add products, update your store, change settings and more, or do it for you. What would you like to do?</p>
@@ -183,11 +262,31 @@ function onKeydown(e) {
                 </div>
             </div>
 
-            <div v-for="(turn, i) in turns" :key="i" class="space-y-2">
+            <div v-for="(turn, i) in loadingChat ? [] : turns" :key="i" class="space-y-2">
                 <div class="ml-auto w-fit max-w-[85%] whitespace-pre-wrap break-words rounded-lg bg-green-100 px-3 py-2 text-sm text-gray-800">{{ turn.question }}</div>
                 <div class="w-fit max-w-[95%] rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-800" data-testid="assistant-answer">
-                    <a-skeleton v-if="!turn.answer && !turn.error" active :paragraph="{ rows: 2 }" :title="false" />
-                    <p v-else-if="turn.error" class="text-red-600">{{ turn.error }}</p>
+                    <div
+                        v-if="!turn.answer && !turn.error"
+                        class="flex items-center gap-2 text-gray-500"
+                        role="status"
+                        data-testid="assistant-thinking"
+                    >
+                        <span class="flex gap-1" aria-hidden="true">
+                            <span v-for="d in [0, 150, 300]" :key="d" class="h-1.5 w-1.5 animate-bounce rounded-full bg-gray-400" :style="{ animationDelay: `${d}ms` }" />
+                        </span>
+                        <span>Thinking…</span>
+                    </div>
+                    <div v-else-if="turn.error">
+                        <p class="text-red-600">{{ turn.error }}</p>
+                        <a
+                            v-if="turn.billingUrl"
+                            :href="turn.billingUrl"
+                            class="mt-1 inline-block text-xs font-medium text-blue-600 hover:underline"
+                            data-testid="assistant-upgrade"
+                        >
+                            See plans →
+                        </a>
+                    </div>
                     <template v-else>
                         <template v-for="(block, j) in answerBlocks(turn.answer)" :key="j">
                             <component
@@ -259,7 +358,9 @@ function onKeydown(e) {
                 AI answers can be wrong.
                 <a-button type="link" size="small" class="!h-auto !p-0 !text-xs" @click="emit('ask-human')">Ask a person instead</a-button>
                 <span v-if="remaining !== null"> · {{ remaining }} messages left today</span>
+                <span v-if="creditsLeft !== null"> · {{ creditsLeft.toLocaleString() }} AI credits left this month</span>
             </p>
+            <p class="mt-0.5 text-xs text-gray-400" data-testid="assistant-saved-notice">Chats are saved to your account for 90 days.</p>
         </div>
     </div>
 </template>

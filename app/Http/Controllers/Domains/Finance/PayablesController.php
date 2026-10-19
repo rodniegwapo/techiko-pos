@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Domain;
 use App\Models\Expense;
 use App\Models\ExpenseCategory;
+use App\Models\Finance\FinancialAccount;
 use App\Models\Finance\Supplier;
 use App\Models\Finance\SupplierBill;
 use App\Models\Finance\SupplierPayment;
@@ -13,6 +14,7 @@ use App\Models\InventoryLocation;
 use App\Services\Ai\FinancialAssistant;
 use App\Services\Finance\CashRegisterPosting;
 use App\Services\Finance\FinancialReportService;
+use App\Support\PaidFromAccount;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -59,7 +61,7 @@ class PayablesController extends Controller
                 'supplier:id,name',
                 'category:id,name',
                 'location:id,name',
-                'payments' => fn ($q) => $q->with('location:id,name'),
+                'payments' => fn ($q) => $q->with(['location:id,name', 'financialAccount:id,name']),
             ])
             // Open bills: soonest due first; otherwise newest first.
             ->when(in_array($status, ['open', 'overdue'], true),
@@ -91,6 +93,7 @@ class PayablesController extends Controller
             'categories' => ExpenseCategory::query()->forDomain($slug)->where('is_active', true)->orderBy('name')->get(['id', 'name', 'type']),
             'locations' => InventoryLocation::query()->forDomain($slug)->active()->orderBy('name')->get(['id', 'name']),
             'paymentMethods' => Expense::PAYMENT_METHODS,
+            'accounts' => FinancialAccount::query()->forDomain($slug)->where('is_active', true)->orderBy('name')->get(['id', 'name', 'type']),
             'defaultLocationId' => $request->user()->location_id,
             'aiEnabled' => app(FinancialAssistant::class)->isConfigured(),
             'domainName' => $domain->name,
@@ -172,6 +175,7 @@ class PayablesController extends Controller
                 'integer',
                 Rule::exists('inventory_locations', 'id')->where('domain', $domain->name_slug),
             ],
+            'financial_account_id' => PaidFromAccount::rules($domain->name_slug),
             'reference_no' => ['nullable', 'string', 'max:80'],
             'notes' => ['nullable', 'string', 'max:255'],
         ]);
@@ -191,6 +195,7 @@ class PayablesController extends Controller
                 'payment_date' => $validated['payment_date'],
                 'amount' => $validated['amount'],
                 'payment_method' => $validated['payment_method'],
+                'financial_account_id' => PaidFromAccount::keep($validated['payment_method'], $validated['financial_account_id'] ?? null),
                 'reference_no' => $validated['reference_no'] ?? null,
                 'notes' => $validated['notes'] ?? null,
                 'user_id' => $request->user()->id,

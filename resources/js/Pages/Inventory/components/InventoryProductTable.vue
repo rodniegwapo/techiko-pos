@@ -12,8 +12,17 @@ import {
 } from "@tabler/icons-vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { useHelpers } from "@/Composables/useHelpers";
+import { avatarStyle, initials } from "@/Composables/avatarColors";
 
 const { formatCurrency, formatDate } = useHelpers();
+
+/** Same colour and initials as the product's avatar on the Products page. */
+function productAvatarStyle(product) {
+    return avatarStyle(
+        product?.name,
+        product?.representation_type === "color" ? product.representation : null,
+    );
+}
 const page = usePage();
 const isMdUp = useMediaQuery("(min-width: 768px)");
 
@@ -36,7 +45,25 @@ const props = defineProps({
         type: Boolean,
         default: false,
     },
+    /** The list's current "Sort by" value, shown as the sorted heading. */
+    sort: {
+        type: String,
+        default: null,
+    },
+    /** { columnKey: { ascend: sortValue, descend: sortValue } } for the sortable headings. */
+    columnSorts: {
+        type: Object,
+        default: () => ({}),
+    },
 });
+
+/** Makes a heading sortable, marked as sorted when it matches the list's sort. */
+const sortable = (column) => {
+    const sorts = props.columnSorts[column.key];
+    if (!sorts) return column;
+    const sortOrder = props.sort === sorts.ascend ? "ascend" : props.sort === sorts.descend ? "descend" : null;
+    return { ...column, sorter: true, sortOrder };
+};
 
 const showSuperUserDomain = computed(
     () =>
@@ -79,7 +106,7 @@ const columns = computed(() => {
         width: "1%",
     });
 
-    return baseColumns;
+    return baseColumns.map(sortable);
 });
 
 const getStockStatusColor = (status) => {
@@ -167,7 +194,7 @@ function onMobilePaginationChange(pageNum) {
         :data-source="dataSource"
         :pagination="pagination"
         :loading="loading"
-        @change="$emit('handleTableChange', $event)"
+        @change="(paginationInfo, _filters, sorter) => $emit('handleTableChange', paginationInfo, sorter)"
     >
         <!-- Product Column -->
         <template #bodyCell="{ column, record }">
@@ -187,18 +214,12 @@ function onMobilePaginationChange(pageNum) {
                             class="w-full h-full object-cover rounded-lg"
                         />
                         <div
-                            v-else-if="
-                                record.product?.representation_type ===
-                                    'color' && record.product?.representation
-                            "
-                            class="w-full h-full rounded-lg"
-                            :style="{
-                                backgroundColor: `#${record.product.representation}`,
-                            }"
-                        ></div>
-                        <span v-else class="text-xs text-gray-500">
-                            {{ record.product?.name?.charAt(0) || "P" }}
-                        </span>
+                            v-else
+                            class="w-full h-full rounded-lg flex items-center justify-center text-sm font-semibold"
+                            :style="productAvatarStyle(record.product)"
+                        >
+                            {{ initials(record.product?.name) }}
+                        </div>
                     </div>
 
                     <!-- Product Info -->
@@ -350,19 +371,12 @@ function onMobilePaginationChange(pageNum) {
                                 class="h-full w-full rounded-lg object-cover"
                             />
                             <div
-                                v-else-if="
-                                    record.product?.representation_type ===
-                                        'color' &&
-                                    record.product?.representation
-                                "
-                                class="h-full w-full rounded-lg"
-                                :style="{
-                                    backgroundColor: `#${record.product.representation}`,
-                                }"
-                            ></div>
-                            <span v-else class="text-xs text-gray-500">
-                                {{ record.product?.name?.charAt(0) || "P" }}
-                            </span>
+                                v-else
+                                class="flex h-full w-full items-center justify-center rounded-lg text-sm font-semibold"
+                                :style="productAvatarStyle(record.product)"
+                            >
+                                {{ initials(record.product?.name) }}
+                            </div>
                         </div>
                         <div class="min-w-0 flex-1">
                             <div

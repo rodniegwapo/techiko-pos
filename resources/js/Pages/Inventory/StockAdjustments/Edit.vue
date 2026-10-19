@@ -377,8 +377,8 @@ const handleCancel = () => {
                 "
                 class="font-medium"
               >
-                {{ totalValueChange >= 0 ? "+" : "" }}${{
-                  Math.abs(totalValueChange).toFixed(2)
+                {{ totalValueChange >= 0 ? "+" : "−" }}₱{{
+                  Math.abs(totalValueChange).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                 }}
               </span>
             </div>

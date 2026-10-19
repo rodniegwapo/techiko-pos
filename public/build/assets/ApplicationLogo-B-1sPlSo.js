@@ -1,0 +1,1 @@
+import{_ as r}from"./logo3-B4uwTTf7.js";import{_ as e}from"./_plugin-vue_export-helper-DlAUqK2U.js";import{o as s,h as t,e as n}from"./app-CfTq1kTe.js";const a={};function c(p,o){return s(),t("span",null,[...o[0]||(o[0]=[n("img",{src:r,alt:"Techiko Logo",class:"w-[100px]"},null,-1)])])}const _=e(a,[["render",c]]);export{_ as A};

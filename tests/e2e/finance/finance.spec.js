@@ -10,7 +10,9 @@ async function pickOption(page, label) {
     await page.locator(".ant-select-dropdown:visible .ant-select-item-option", { hasText: label }).first().click();
 }
 
-for (const role of ["admin", "manager"]) {
+// Admins only: Jollibee has a warehouse, so its store managers find Finance there, not at their
+// store (dashboard.spec.js "Finance at a store").
+for (const role of ["admin"]) {
     test.describe(`Finance as ${role}`, () => {
         test.use({ account: role });
 
@@ -29,7 +31,8 @@ for (const role of ["admin", "manager"]) {
             for (const label of ["Sales", "Money received", "Inventory", "Customer credit", "Supplier bills", "Expenses"]) {
                 await expect(health.getByText(label, { exact: true })).toBeVisible();
             }
-            await expect(page.getByText("not professional financial advice")).toBeVisible();
+            // The suggestions' own disclaimer (the Ask panel on the page has one too).
+            await expect(page.getByText("Suggestions are based on your POS records and are not professional financial advice")).toBeVisible();
 
             const { overview } = await pageProps(page);
             const c = overview.current;

@@ -180,6 +180,7 @@ class InventoryMovement extends Model
         return [
             'Sale',
             'Purchase',
+            'PurchaseOrder',
             'StockAdjustment',
             'InventoryTransfer',
             'CustomerReturn',

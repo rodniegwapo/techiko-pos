@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Domains;
 
+use App\Helpers;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\CreditCustomerResource;
 use App\Models\CreditTransaction;
@@ -206,7 +207,9 @@ class CreditController extends Controller
                 paymentMethod: $validated['payment_method'] ?? null,
                 referenceNumber: $validated['reference_number'] ?? null,
                 notes: $validated['notes'] ?? null,
-                transactionType: $validated['transaction_type']
+                transactionType: $validated['transaction_type'],
+                // The store it was taken at; cash goes into that store's drawer.
+                locationId: Helpers::getActiveLocation($domain)?->id,
             );
 
             DB::commit();

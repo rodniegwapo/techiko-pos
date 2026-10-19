@@ -5,9 +5,12 @@ namespace App\Http\Controllers\Domains;
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\Domain;
+use App\Models\LoyaltyTier;
 use App\Models\Sale;
+use App\Support\ManagerApproval;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class LoyaltyController extends Controller
@@ -94,17 +97,20 @@ class LoyaltyController extends Controller
             ->get();
 
         $totalCustomers = Customer::where('domain', $domain->name_slug)->count();
+        // Names and colours as set in Tier Management; the classic ones only for a tier it doesn't have.
+        $tiers = LoyaltyTier::query()->forDomain($domain->name_slug)->get(['name', 'display_name', 'color'])->keyBy('name');
         $tierColors = ['bronze' => '#CD7F32', 'silver' => '#C0C0C0', 'gold' => '#FFD700', 'platinum' => '#E5E4E2'];
 
-        $tierDistribution = $tierStats->map(function ($stat) use ($totalCustomers, $tierColors) {
+        $tierDistribution = $tierStats->map(function ($stat) use ($totalCustomers, $tierColors, $tiers) {
             $percentage = $totalCustomers > 0 ? round(($stat->count / $totalCustomers) * 100, 1) : 0;
+            $tier = $tiers->get($stat->tier);
 
             return [
                 'tier' => $stat->tier,
-                'name' => ucfirst($stat->tier),
+                'name' => $tier?->display_name ?? ucfirst($stat->tier),
                 'count' => (int) $stat->count,
                 'percentage' => $percentage,
-                'color' => $tierColors[$stat->tier] ?? $tierColors['bronze'],
+                'color' => $tier?->color ?? $tierColors[$stat->tier] ?? $tierColors['bronze'],
             ];
         });
 
@@ -141,11 +147,21 @@ class LoyaltyController extends Controller
             return response()->json(['message' => 'Customer does not belong to this domain'], 403);
         }
 
+        // A cashier changes points only with a manager's or admin's PIN from this organization.
+        $needsApproval = $request->user()->isCashierOrBelow();
+
         $validated = $request->validate([
             'type' => 'required|in:add,subtract,set',
             'amount' => 'required|integer|min:0',
             'reason' => 'nullable|string|max:255',
+            'pin_code' => [$needsApproval ? 'required' : 'nullable', 'string', 'max:20'],
+        ], [
+            'pin_code.required' => 'A manager has to approve this: enter their PIN.',
         ]);
+
+        $approverId = $needsApproval
+            ? ManagerApproval::approverFor($validated['pin_code'], $domain->name_slug)
+            : $request->user()->id;
 
         DB::transaction(function () use ($customer, $validated) {
             $currentPoints = $customer->loyalty_points ?? 0;
@@ -164,6 +180,15 @@ class LoyaltyController extends Controller
 
             $customer->update(['loyalty_points' => $newPoints]);
         });
+
+        Log::info('Loyalty points adjusted', [
+            'customer_id' => $customer->id,
+            'type' => $validated['type'],
+            'amount' => $validated['amount'],
+            'reason' => $validated['reason'] ?? null,
+            'by' => $request->user()->id,
+            'approved_by' => $approverId,
+        ]);
 
         return response()->json([
             'success' => true,

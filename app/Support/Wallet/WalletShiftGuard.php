@@ -24,4 +24,23 @@ class WalletShiftGuard
             ]);
         }
     }
+
+    /** Unlike isClosed(), "no reconciliation row yet" does NOT count as open here. */
+    public static function isOpenForSale(string $domainSlug, int $locationId, string $dateYmd): bool
+    {
+        return WalletCashReconciliation::query()
+            ->forWalletContext($domainSlug, $locationId)
+            ->whereDate('business_date', $dateYmd)
+            ->where('is_closed', false)
+            ->exists();
+    }
+
+    public static function ensureShiftOpenForSale(string $domainSlug, int $locationId, string $dateYmd, string $field = 'shift'): void
+    {
+        if (! self::isOpenForSale($domainSlug, $locationId, $dateYmd)) {
+            throw ValidationException::withMessages([
+                $field => 'No shift is open for this location today. Start the shift before taking payment.',
+            ]);
+        }
+    }
 }

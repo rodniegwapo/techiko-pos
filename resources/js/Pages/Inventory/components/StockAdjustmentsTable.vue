@@ -91,6 +91,11 @@ const columns = computed(() => {
       key: "value",
       align: "left",
     },
+    {
+      title: "By",
+      key: "people",
+      align: "left",
+    },
   ];
 
   // Add domain column for super users only in global view
@@ -164,6 +169,13 @@ const deleteAdjustment = (adjustment) => {
   );
 };
 
+/** "Coke, Sprite +3 more" */
+const productsLabel = (names) => {
+  if (!names?.length) return "";
+  const shown = names.slice(0, 2).join(", ");
+  return names.length > 2 ? `${shown} +${names.length - 2} more` : shown;
+};
+
 const dataSource = computed(() => {
   return (
     props.adjustments?.data?.map((adjustment) => ({
@@ -182,6 +194,7 @@ const dataSource = computed(() => {
       approved_at: adjustment.approved_at,
       description: adjustment.description,
       items_count: adjustment.items_count, // ✅ Add items_count to top level
+      products: productsLabel(adjustment.product_names),
       adjustment: adjustment,
     })) || []
   );
@@ -251,6 +264,9 @@ function onMobilePaginationChange(pageNum) {
       <!-- Items Column -->
       <template v-else-if="column.key === 'items'">
         <div class="font-semibold">{{ record?.items_count }}</div>
+        <div v-if="record.products" class="max-w-[220px] truncate text-xs text-gray-500" :title="record.adjustment.product_names?.join(', ')">
+          {{ record.products }}
+        </div>
       </template>
 
       <!-- Value Column -->
@@ -267,6 +283,17 @@ function onMobilePaginationChange(pageNum) {
             {{ record.value_change > 0 ? "+" : ""
             }}{{ formatCurrency(record.value_change) }}
           </p>
+        </div>
+      </template>
+
+      <!-- Who made it, and who approved it -->
+      <template v-else-if="column.key === 'people'">
+        <div class="text-xs leading-5" data-testid="adjustment-people">
+          <div><span class="text-gray-500">Created:</span> {{ record.created_by?.name || "—" }}</div>
+          <div v-if="record.approved_by">
+            <span class="text-gray-500">Approved:</span> {{ record.approved_by.name }}
+            <span v-if="record.approved_at" class="text-gray-400">· {{ formatDate(record.approved_at) }}</span>
+          </div>
         </div>
       </template>
 
@@ -389,6 +416,7 @@ function onMobilePaginationChange(pageNum) {
               <span class="text-gray-500">Items</span>
               <span class="text-right font-semibold text-gray-900">
                 {{ record.items_count ?? 0 }}
+                <span v-if="record.products" class="block text-xs font-normal text-gray-500">{{ record.products }}</span>
               </span>
               <span class="text-gray-500">Value</span>
               <span
@@ -402,6 +430,12 @@ function onMobilePaginationChange(pageNum) {
                 {{ record.value_change > 0 ? "+" : ""
                 }}{{ formatCurrency(record.value_change) }}
               </span>
+              <span class="text-gray-500">Created by</span>
+              <span class="text-right font-medium text-gray-900">{{ record.created_by?.name || "—" }}</span>
+              <template v-if="record.approved_by">
+                <span class="text-gray-500">Approved by</span>
+                <span class="text-right font-medium text-gray-900">{{ record.approved_by.name }}</span>
+              </template>
               <template v-if="showSuperUserDomain">
                 <span class="text-gray-500">Domain</span>
                 <span

@@ -55,6 +55,8 @@ class UserController extends Controller
         return Inertia::render('Users/Index', [
             'items' => UserResource::collection($users),
             'roles' => $roles,
+            // Where a manager or someone below works (the user form's location field).
+            'locations' => UserService::workLocations($domain->name_slug),
             // So the search box and the filter tags show what the list is filtered by.
             'filters' => $request->only(['search', 'role', 'status']),
             'hierarchy' => UserHierarchyService::getRoleHierarchy(),

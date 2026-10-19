@@ -173,19 +173,29 @@ test.describe("Ledger movements", () => {
     });
 
     test.describe("filters", () => {
-        /** Seeds three entries across two days of this test's window. */
-        async function seedEntries(api, day) {
+        /** Seeds three entries across two days of this test's window; the e-wallet transfer is on the card rail. */
+        async function seedEntries(api, day, cardTypeId) {
             expectSaved(await postLedger(api, { direction: "in", amount: 100, kind: "cash_sale_topup", movement_date: day(0), notes: "F-topup" }), "topup");
             expectSaved(
                 await postLedger(api, { direction: "out", amount: 30, kind: "owner_draw", draw_source: "cash_register", movement_date: day(0), notes: "F-draw" }),
                 "draw",
             );
-            expectSaved(await postLedger(api, { direction: "in", amount: 70, kind: "ewallet_transfer_in", movement_date: day(1), notes: "F-ewallet" }), "ewallet");
+            expectSaved(
+                await postLedger(api, {
+                    direction: "in",
+                    amount: 70,
+                    kind: "ewallet_transfer_in",
+                    payment_card_type_id: cardTypeId,
+                    movement_date: day(1),
+                    notes: "F-ewallet",
+                }),
+                "ewallet",
+            );
         }
 
-        test("the date range limits rows and the ledger net", async ({ page, serverAs }) => {
+        test("the date range limits rows and the ledger net", async ({ page, serverAs }, testInfo) => {
             const { day } = dateWindow();
-            await seedEntries(await serverAs("wallet-manager"), day);
+            await seedEntries(await serverAs("wallet-manager"), day, walletFixture(testInfo).cardTypeId);
             const wallet = await MoneyMovementPage.open(page, day(0));
 
             await wallet.filter({ from: day(0), to: day(0) });
@@ -197,9 +207,9 @@ test.describe("Ledger movements", () => {
             await expect(wallet.headline("Ledger net")).toHaveText(money(140));
         });
 
-        test("the kind filter shows only that kind", async ({ page, serverAs }) => {
+        test("the kind filter shows only that kind", async ({ page, serverAs }, testInfo) => {
             const { day } = dateWindow();
-            await seedEntries(await serverAs("wallet-manager"), day);
+            await seedEntries(await serverAs("wallet-manager"), day, walletFixture(testInfo).cardTypeId);
             const wallet = await MoneyMovementPage.open(page, day(0));
 
             await wallet.filter({ from: day(0), to: day(1), kind: "Transfer in (e-wallet)" });
@@ -212,7 +222,7 @@ test.describe("Ledger movements", () => {
         test("the rail filter separates cash register and card rail entries", async ({ page, serverAs }, testInfo) => {
             const { day } = dateWindow();
             const api = await serverAs("wallet-manager");
-            await seedEntries(api, day);
+            await seedEntries(api, day, walletFixture(testInfo).cardTypeId);
             expectSaved(
                 await postLedger(api, {
                     direction: "out",
@@ -227,11 +237,12 @@ test.describe("Ledger movements", () => {
             const wallet = await MoneyMovementPage.open(page, day(0));
 
             await wallet.filter({ from: day(0), to: day(1), rail: "E2E Wallet Visa" });
-            await expect(wallet.rows).toHaveCount(1);
-            await expect(wallet.rows.first()).toContainText("F-card");
+            await expect(wallet.rows).toHaveCount(2);
+            await expect(wallet.row("F-card")).toHaveCount(1);
+            await expect(wallet.row("F-ewallet")).toHaveCount(1);
 
             await wallet.filter({ rail: "Cash register (no card rail)" });
-            await expect(wallet.rows).toHaveCount(3);
+            await expect(wallet.rows).toHaveCount(2);
             await expect(wallet.row("F-card")).toHaveCount(0);
         });
     });

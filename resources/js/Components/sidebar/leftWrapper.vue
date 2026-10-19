@@ -62,7 +62,7 @@ const { isCollapsed, toggle, mobileDrawerOpen, closeMobileDrawer } =
                     </a>
                 </div>
 
-                <left-menu />
+                <left-menu :collapsed="isCollapsed" />
                 <left-account-settings
                     :user="user"
                     :leftSidebatdCollapsed="isCollapsed"

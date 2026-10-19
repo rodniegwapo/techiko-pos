@@ -20,6 +20,8 @@ class AuthUserResource extends JsonResource
             'email' => $this->email,
             'profileUrl' => $profileUrl,
             'name' => $this->name,
+            // Cashiers need a manager's PIN for things like points adjustments.
+            'needs_manager_approval' => $this->resource->isCashierOrBelow(),
             'roles' => $this->roles->map(function ($role) {
                 return [
                     'id' => $role->id,

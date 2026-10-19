@@ -33,6 +33,8 @@ const props = defineProps({
     options: { type: Object, default: () => ({}) },
     restrictedToOwnSales: { type: Boolean, default: false },
     domainName: { type: String, default: "" },
+    // { days, earliest_date } when the plan only keeps recent history (no CSV export either).
+    historyLimit: { type: Object, default: null },
 });
 
 const { getRoute } = useDomainRoutes();
@@ -276,7 +278,7 @@ const summaryCards = computed(() => {
                 />
                 <FilterDropdown v-model="filters" :filters="filtersConfig" />
                 <a
-                    v-if="hasPermission('sales-history.export')"
+                    v-if="!historyLimit && $page.props.domainFeatures?.sales_history_unlimited && hasPermission('sales-history.export')"
                     :href="exportUrl"
                     data-testid="sales-history-export"
                 >
@@ -298,6 +300,16 @@ const summaryCards = computed(() => {
                         <IconCalendarEvent :size="18" class="text-gray-400" />
                         <span data-testid="sales-history-period">{{ periodLabel }}</span>
                     </div>
+
+                    <p
+                        v-if="historyLimit"
+                        class="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800"
+                        data-testid="sales-history-limit"
+                    >
+                        Your plan shows the last {{ historyLimit.days }} days of sales (from
+                        {{ dayjs(historyLimit.earliest_date).format("MMM D, YYYY") }}). Upgrade for your full
+                        history and CSV export.
+                    </p>
 
                     <div class="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                         <div

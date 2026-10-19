@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Ai\Agents\AppAssistantAgent;
 use App\Http\Middleware\RoleBasedAccessControl;
+use App\Models\AssistantConversation;
 use App\Models\AssistantUnansweredQuestion;
 use App\Models\Category;
 use App\Models\Domain;
@@ -348,7 +349,7 @@ class AppAssistantTest extends TestCase
         $ask()->assertStatus(429);
     }
 
-    public function test_ask_needs_the_assistant_permission_and_ai_feature(): void
+    public function test_ask_needs_the_assistant_permission_and_ai_credits(): void
     {
         AppAssistantAgent::fake()->preventStrayPrompts();
 
@@ -357,10 +358,12 @@ class AppAssistantTest extends TestCase
             ->postJson($this->askUrl($noPermission['domain']), ['message' => 'How do I add a product?'])
             ->assertForbidden();
 
-        $noFeature = $this->staff(['assistant.ask'], ai: false);
-        $this->actingAs($noFeature['user'])
-            ->postJson($this->askUrl($noFeature['domain']), ['message' => 'How do I add a product?'])
-            ->assertStatus(403);
+        // Every plan has the assistant; a super admin turns it off with 0 credits.
+        $noCredits = $this->staff(['assistant.ask'], ai: false);
+        $noCredits['domain']->update(['ai_monthly_credits_override' => 0]);
+        $this->actingAs($noCredits['user'])
+            ->postJson($this->askUrl($noCredits['domain']), ['message' => 'How do I add a product?'])
+            ->assertStatus(402);
     }
 
     public function test_ask_reports_when_the_ai_is_not_set_up(): void
@@ -458,8 +461,13 @@ class AppAssistantTest extends TestCase
 
         $token = $this->propose($ctx, 'create_product', ['name' => 'Chickenjoy 2pc', 'price' => 120, 'category_id' => $category->id]);
         $this->assertFalse(Product::query()->where('name', 'Chickenjoy 2pc')->exists(), 'nothing is saved before Confirm');
+        $saved = AssistantConversation::query()
+            ->create(['domain' => $ctx['domain']->name_slug, 'user_id' => $ctx['user']->id, 'title' => 'Add', 'last_message_at' => now()])
+            ->messages()->create(['question' => 'Add it', 'answer' => 'Confirm below.', 'pending_actions' => [['token' => $token, 'title' => 'Add product']]]);
+        app(PendingActions::class)->attachMessage($token, $saved->id);
 
         $this->confirm($ctx, $token)->assertOk()->assertJsonPath('message', 'Added "Chickenjoy 2pc" to Main.');
+        $this->assertSame('done', $saved->fresh()->pending_actions[0]['state'], 'the saved chat shows it was done');
 
         $product = Product::query()->where('domain', $ctx['domain']->name_slug)->where('name', 'Chickenjoy 2pc')->sole();
         $this->assertEquals(120, $product->price);
@@ -578,7 +586,8 @@ class AppAssistantTest extends TestCase
 
     public function test_the_app_map_covers_every_page_of_the_sidebar(): void
     {
-        preg_match_all('/routeName:\s*"([^"]+)"/', file_get_contents(resource_path('js/Components/sidebar/leftMenu.vue')), $matches);
+        // The sidebar's items are defined in useNavMenu.js (leftMenu.vue renders them).
+        preg_match_all('/routeName:\s*"([^"]+)"/', file_get_contents(resource_path('js/Composables/useNavMenu.js')), $matches);
         $sidebarDomainPages = array_values(array_filter(array_unique($matches[1]), fn ($r) => Route::has('domains.'.$r)));
         $mapped = array_column(config('assistant_map'), 'route');
 

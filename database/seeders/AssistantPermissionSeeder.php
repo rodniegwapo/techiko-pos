@@ -16,16 +16,27 @@ class AssistantPermissionSeeder extends Seeder
 {
     use SeedsFeaturePermissions;
 
+    /** Every route behind domain.feature:ai. */
     public const ROUTES = [
         'assistant.ask',
         'assistant.actions.confirm',
         'assistant.actions.cancel',
+        'assistant.conversations.index',
+        'assistant.conversations.show',
+        'assistant.conversations.destroy',
+        ...self::USAGE_ROUTES,
     ];
 
     public const ROLES = ['super admin', 'admin', 'manager', 'supervisor', 'cashier'];
 
+    /** The AI usage page goes with the plan and billing, so only the roles that see billing get it. */
+    public const USAGE_ROUTES = ['ai-usage.index'];
+
+    public const USAGE_ROLES = ['super admin', 'admin', 'manager'];
+
     public function run(): void
     {
-        $this->seedFeaturePermissions('AI assistant', ['assistant'], self::ROUTES, self::ROLES);
+        $this->seedFeaturePermissions('AI assistant', ['assistant'], array_values(array_diff(self::ROUTES, self::USAGE_ROUTES)), self::ROLES);
+        $this->seedFeaturePermissions('AI usage', ['assistant'], self::USAGE_ROUTES, self::USAGE_ROLES);
     }
 }

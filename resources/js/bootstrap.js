@@ -9,13 +9,33 @@ window.axios = axios;
 
 window.axios.defaults.headers.common["X-Requested-With"] = "XMLHttpRequest";
 
-// Session / CSRF token expired (e.g. the POS sat idle): reload so the server can redirect to login with a fresh token.
+// CSRF token expired (e.g. the POS sat idle, or another tab rotated it): fetch a fresh token and try
+// once more. If it still fails the session itself is gone, so reload and let the server redirect to
+// login. The rejected error is marked so callers can skip their own "failed" message.
 window.axios.interceptors.response.use(
     (response) => response,
-    (error) => {
-        if (error.response?.status === 419) {
-            window.location.reload();
+    async (error) => {
+        const config = error.config;
+        if (error.response?.status !== 419) {
+            return Promise.reject(error);
         }
+        if (config && !config._csrfRetried) {
+            config._csrfRetried = true;
+            try {
+                await window.axios.get("/sanctum/csrf-cookie");
+                // A token copied from the page's meta tag is the stale one; the fresh cookie is sent instead.
+                config.headers?.delete?.("X-CSRF-TOKEN");
+                return await window.axios.request(config);
+            } catch (retryError) {
+                error = retryError;
+                // 401: the fresh token came with a fresh, signed-out session.
+                if (![401, 419].includes(retryError.response?.status)) {
+                    return Promise.reject(retryError);
+                }
+            }
+        }
+        error.sessionExpired = true;
+        window.location.reload();
         return Promise.reject(error);
     }
 );

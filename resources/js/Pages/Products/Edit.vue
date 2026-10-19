@@ -66,7 +66,11 @@ const form = useForm({
     // The form always says it sent the modifier field, so clearing it clears them.
     modifier_groups_present: true,
     modifier_group_ids: props.product.modifier_group_ids ?? [],
+    // This store's own price; empty = the product's price. Only sent when a store is active.
+    store_price: props.product.store_price ?? null,
 });
+
+const currentStore = computed(() => page.props.currentLocation ?? null);
 
 const imageFileList = ref(
     props.product.representation_type === "image" &&
@@ -219,6 +223,11 @@ const handleUpdate = () => {
     form
         .transform((data) => {
             const payload = { ...data, _method: "put" };
+            if (!currentStore.value) {
+                delete payload.store_price;
+            } else if (payload.store_price === null || payload.store_price === undefined) {
+                payload.store_price = "";
+            }
             if (!(payload.representation_image instanceof File)) {
                 delete payload.representation_image;
             }
@@ -448,6 +457,23 @@ useBarcodeScanner((code) => {
                                         :min="0"
                                         :precision="2"
                                         size="large"
+                                    />
+                                </a-form-item>
+
+                                <a-form-item
+                                    v-if="currentStore"
+                                    :label="`Price at ${currentStore.name}`"
+                                    :validate-status="validationHasError(form.errors, 'store_price') ? 'error' : ''"
+                                    :help="validationMessage(form.errors, 'store_price') || 'Leave empty to sell at the price above.'"
+                                    class="mb-0"
+                                >
+                                    <a-input-number
+                                        v-model:value="form.store_price"
+                                        placeholder="Same as price"
+                                        :min="0"
+                                        :precision="2"
+                                        size="large"
+                                        data-testid="store-price"
                                     />
                                 </a-form-item>
                             </div>

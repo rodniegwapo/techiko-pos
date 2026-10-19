@@ -28,7 +28,34 @@ class Domain extends Model
         'settings' => 'array',
         'is_active' => 'boolean',
         'subscription_started_at' => 'datetime',
+        'subscription_ends_at' => 'date:Y-m-d',
+        'locked_at' => 'datetime',
+        'vip_at' => 'datetime',
+        'ai_monthly_credits_override' => 'integer',
     ];
+
+    /**
+     * Made VIP by a super admin: every premium feature and limit, unlimited AI credits, no
+     * subscription warnings, never locked, nothing to pay.
+     */
+    public function isVip(): bool
+    {
+        return $this->vip_at !== null;
+    }
+
+    /** Locked by a super admin for not paying: its users only see the "on hold" page. A VIP never is. */
+    public function isLocked(): bool
+    {
+        return $this->locked_at !== null && ! $this->isVip();
+    }
+
+    /** Days until the subscription ends (0 on the last day, negative once it has ended), or null without an end date. */
+    public function subscriptionEndsInDays(): ?int
+    {
+        return $this->subscription_ends_at
+            ? (int) today()->diffInDays($this->subscription_ends_at->copy()->startOfDay(), false)
+            : null;
+    }
 
     protected $attributes = [
         'timezone' => 'Asia/Manila',
@@ -100,6 +127,12 @@ class Domain extends Model
     public function sales()
     {
         return $this->hasMany(Sale::class);
+    }
+
+    /** Its subscription payments (see SubscriptionPaymentService). */
+    public function subscriptionPayments()
+    {
+        return $this->hasMany(SubscriptionPayment::class, 'domain', 'name_slug');
     }
 
     public function currentServiceTier()
@@ -213,22 +246,58 @@ class Domain extends Model
         return (bool) ($s['allow_overselling'] ?? false);
     }
 
-    /** Features an organization has to be given (by a super admin); all are off until turned on. */
-    public const FEATURES = ['finance', 'ai'];
+    /**
+     * Features the frontend asks about (shared as domainFeatures). All but "ai" are paid: a plan
+     * includes some of them (ServiceTier::features; the free plan none), and a super admin can
+     * still give Finance to one organization.
+     */
+    public const FEATURES = ['sales_history_unlimited', 'multi_location', 'advanced_inventory', 'expenses', 'finance', 'ai'];
 
-    /** Finance includes its AI explanations; "ai" is the AI assistant in the chat drawer, a separate add-on. */
+    /** Features a plan can include (ServiceTier::features). */
+    public const PLAN_FEATURES = ['sales_history_unlimited', 'multi_location', 'advanced_inventory', 'expenses', 'finance'];
+
+    /** Features a super admin can turn on for one organization outside its plan. */
+    public const OVERRIDABLE_FEATURES = ['finance'];
+
+    /** Days of sales history an organization without sales_history_unlimited can look back on. */
+    public const FREE_SALES_HISTORY_DAYS = 31;
+
+    /**
+     * Finance includes its AI explanations. "ai" is the AI assistant in the chat drawer: every plan
+     * has it, limited only by the month's AI credits (AiCreditService; a 0-credit override turns it off).
+     */
     public function hasFeature(string $key): bool
     {
-        $on = fn (string $k) => data_get($this->settings, "features.{$k}") === true;
+        if ($key === 'ai') {
+            return true;
+        }
 
-        return match ($key) {
-            'finance' => $on('finance'),
-            'ai' => $on('ai'),
-            default => false,
-        };
+        if (! in_array($key, self::FEATURES, true)) {
+            return false;
+        }
+
+        // A VIP organization has everything.
+        if ($this->isVip()) {
+            return true;
+        }
+
+        $on = fn (string $k) => data_get($this->settings, "features.{$k}") === true;
+        // Expenses used to come with Finance, so an organization given Finance keeps them.
+        $given = $key === 'expenses' ? $on('finance') : (in_array($key, self::OVERRIDABLE_FEATURES, true) && $on($key));
+
+        if ($given) {
+            return true;
+        }
+
+        // Until plans are enforced, everything except the given features stays open as before.
+        if (! config('features.plan_gating', false)) {
+            return ! in_array($key, [...self::OVERRIDABLE_FEATURES, 'expenses'], true);
+        }
+
+        return in_array($key, $this->currentServiceTier?->features ?? [], true);
     }
 
-    /** @return array{finance: bool, ai: bool} */
+    /** @return array<string, bool> keyed by Domain::FEATURES */
     public function features(): array
     {
         return collect(self::FEATURES)->mapWithKeys(fn ($k) => [$k => $this->hasFeature($k)])->all();

@@ -47,21 +47,22 @@ test.describe("Switching stores with the location badge (admin)", () => {
         expect((await pageProps(page)).currentLocation.code, "sales page").toBe(branchLocation.code);
     });
 
-    test("a warehouse doesn't sell: switching to one from Sales lands on Inventory without Sales in the menu", async ({ page }) => {
+    test("a warehouse doesn't sell: switching to one from Sales lands on the Dashboard without Sales in the menu", async ({ page }) => {
         const { warehouseLocation, mainLocation } = fixture();
         await page.goto(jb("/sales"));
         await page.locator(".location-badge").getByRole("button").click();
         await page.locator(".ant-popover:not(.ant-popover-hidden)").getByText(warehouseLocation.name, { exact: true }).click();
 
-        await expect(page).toHaveURL(new RegExp(`${jb("/inventory")}\\?location_id=${warehouseLocation.id}$`));
+        await expect(page).toHaveURL(new RegExp(`${jb("/dashboard")}\\?location_id=${warehouseLocation.id}$`));
         const menu = page.getByRole("menu").first();
         await expect(menu.getByRole("menuitem", { name: "Sales History" })).toBeVisible();
         await expect(menu.getByRole("menuitem", { name: /^Sales$/ })).toHaveCount(0);
         await expect(menu.getByRole("menuitem", { name: "Offline sales" })).toHaveCount(0);
+        await expect(menu.getByRole("menuitem", { name: "Customers" })).toHaveCount(0);
 
         // Opening the sales screen directly is turned away too.
         await page.goto(jb("/sales"));
-        await expect(page).toHaveURL(new RegExp(`${jb("/inventory")}(\\?|$)`));
+        await expect(page).toHaveURL(new RegExp(`${jb("/dashboard")}(\\?|$)`));
         await expect(page.getByText("Selling isn't available at a warehouse")).toBeVisible();
 
         // Back to a store for the tests that follow in this session.

@@ -8,7 +8,7 @@ import { IconEdit, IconTrash, IconPlayerPause, IconPlayerPlay } from "@tabler/ic
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useHelpers } from "@/Composables/useHelpers";
-import { paymentMethodLabel } from "../paymentMethods";
+import { paidFromLabel } from "../paymentMethods";
 
 defineProps({
     items: { type: Array, default: () => [] },
@@ -91,7 +91,7 @@ const nextLabel = (record) => (record.is_active ? dayjs(record.next_run_date).fo
             <template #bodyCell="{ column, record }">
                 <template v-if="column.key === 'description'">
                     <div class="font-medium" :class="{ 'text-gray-400': !record.is_active }">{{ record.description }}</div>
-                    <div class="text-xs text-gray-500">{{ paymentMethodLabel(record.payment_method) }}</div>
+                    <div class="text-xs text-gray-500">{{ paidFromLabel(record.payment_method, record.account_name) }}</div>
                 </template>
                 <template v-else-if="column.key === 'store'">
                     <span v-if="record.location_name">{{ record.location_name }}</span>

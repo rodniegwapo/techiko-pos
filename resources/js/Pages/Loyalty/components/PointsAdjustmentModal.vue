@@ -1,6 +1,8 @@
 <script setup>
 import { ref, reactive, computed, watch } from 'vue';
 import { useMediaQuery } from '@vueuse/core';
+import { usePage } from '@inertiajs/vue3';
+import { tierColor, tierName } from '@/Composables/tierDisplay';
 import {
   PlusOutlined,
   MinusOutlined
@@ -43,8 +45,13 @@ const formRef = ref();
 const form = reactive({
   type: 'add',
   amount: null,
-  reason: ''
+  reason: '',
+  pin_code: ''
 });
+
+// A cashier's adjustment needs a manager's or admin's PIN.
+const page = usePage();
+const needsApproval = computed(() => page.props.auth?.user?.data?.needs_manager_approval === true);
 
 // Form validation rules
 const rules = {
@@ -57,6 +64,9 @@ const rules = {
   ],
   reason: [
     { required: true, message: 'Please enter reason for adjustment' }
+  ],
+  pin_code: [
+    { validator: (_rule, value) => (!needsApproval.value || value ? Promise.resolve() : Promise.reject("Enter a manager's PIN")) }
   ]
 };
 
@@ -69,6 +79,7 @@ watch(
       form.type = 'add';
       form.amount = null;
       form.reason = '';
+      form.pin_code = '';
       formRef.value?.clearValidate?.();
     }
   }
@@ -84,16 +95,6 @@ const calculateNewTotal = () => {
   } else {
     return Math.max(0, currentPoints - amount);
   }
-};
-
-const getTierColor = (tier) => {
-  const tierColors = {
-    bronze: '#CD7F32',
-    silver: '#C0C0C0',
-    gold: '#FFD700',
-    platinum: '#E5E4E2'
-  };
-  return tierColors[tier] || tierColors.bronze;
 };
 
 const handleSave = async () => {
@@ -132,8 +133,8 @@ const handleSave = async () => {
             <div class="font-medium">{{ customer.name }}</div>
             <div class="text-sm text-gray-500">Current Points: {{ customer.loyalty_points?.toLocaleString() || 0 }}</div>
           </div>
-          <a-tag :color="getTierColor(customer.tier)">
-            {{ customer.tier ? customer.tier.charAt(0).toUpperCase() + customer.tier.slice(1) : 'Bronze' }}
+          <a-tag :color="tierColor(customer)">
+            {{ tierName(customer) }}
           </a-tag>
         </div>
       </div>
@@ -185,6 +186,20 @@ const handleSave = async () => {
             v-model:value="form.reason"
             placeholder="Enter reason for adjustment..."
             :rows="3"
+          />
+        </a-form-item>
+
+        <a-form-item
+          v-if="needsApproval"
+          label="Manager PIN"
+          name="pin_code"
+          extra="A manager or admin approves this by entering their PIN."
+        >
+          <a-input-password
+            v-model:value="form.pin_code"
+            placeholder="Manager or admin PIN"
+            autocomplete="off"
+            data-testid="points-manager-pin"
           />
         </a-form-item>
       </a-form>

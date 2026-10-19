@@ -2,6 +2,7 @@
 
 namespace App\Models\Finance;
 
+use App\Models\Expense;
 use App\Models\PaymentCardType;
 use App\Models\Sale;
 use App\Models\SalePayment;
@@ -76,6 +77,26 @@ class FinancialAccount extends Model
             'as_of' => $entry->as_of_date->toDateString(),
             'received' => $received,
         ];
+    }
+
+    /**
+     * Expenses and supplier bills paid from this account after one day up to another. Shown next to
+     * the balance only; the entered balance already reflects them once the owner updates it.
+     */
+    public function paidOutSince(string $afterDate, string $toDate): float
+    {
+        $expenses = Expense::query()
+            ->where('financial_account_id', $this->id)
+            ->where('expense_date', '>', $afterDate)
+            ->where('expense_date', '<=', $toDate)
+            ->sum('amount');
+        $supplierPayments = SupplierPayment::query()
+            ->where('financial_account_id', $this->id)
+            ->where('payment_date', '>', $afterDate)
+            ->where('payment_date', '<=', $toDate)
+            ->sum('amount');
+
+        return round((float) $expenses + (float) $supplierPayments, 2);
     }
 
     /** The balance at the end of a day (null when none was entered by then). */

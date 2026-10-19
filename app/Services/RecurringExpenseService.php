@@ -27,9 +27,9 @@ class RecurringExpenseService
             ->where('is_active', true)
             ->whereDate('next_run_date', '<=', $today)
             ->when($domainSlug, fn ($q) => $q->forDomain($domainSlug))
-            // Only organizations given Finance (Expenses is part of it) get their recurring expenses.
-            ->whereIn('domain', Domain::query()->get()
-                ->filter(fn (Domain $domain) => $domain->hasFeature('finance'))
+            // Only organizations with Expenses (their plan, or given Finance) get their recurring expenses.
+            ->whereIn('domain', Domain::query()->with('currentServiceTier')->get()
+                ->filter(fn (Domain $domain) => $domain->hasFeature('expenses'))
                 ->pluck('name_slug'))
             ->get();
 
@@ -85,6 +85,7 @@ class RecurringExpenseService
             'description' => $template->description,
             'payee' => $template->payee,
             'payment_method' => $template->payment_method,
+            'financial_account_id' => $template->financial_account_id,
             'recurring_expense_id' => $template->id,
             'user_id' => $template->user_id,
         ];

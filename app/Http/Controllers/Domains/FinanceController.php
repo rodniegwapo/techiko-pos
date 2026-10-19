@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Domain;
 use App\Models\Finance\MonthlyReview;
 use App\Models\InventoryLocation;
+use App\Services\Ai\AiCreditService;
 use App\Services\Ai\FinanceTools;
 use App\Services\Ai\FinancialAssistant;
 use App\Services\Finance\FinancialInsightService;
@@ -42,6 +43,7 @@ class FinanceController extends Controller
         private readonly FinancialInsightService $insights,
         private readonly FinancialAssistant $assistant,
         private readonly FinancialSnapshotService $snapshots,
+        private readonly AiCreditService $credits,
     ) {}
 
     public function dashboard(Request $request, Domain $domain)
@@ -82,6 +84,8 @@ class FinanceController extends Controller
             return response()->json(['message' => 'The AI assistant is not set up yet. Ask your administrator to add an AI API key.'], 503);
         }
 
+        $this->credits->assertHasCredits($domain, 'finance_question');
+
         $limit = (int) config('services.finance_ai.daily_question_limit', 30);
         $counter = 'finance-ai-questions:'.$domain->name_slug.':'.today()->toDateString();
         $asked = (int) Cache::get($counter, 0);
@@ -107,9 +111,12 @@ class FinanceController extends Controller
             return response()->json(['message' => $e->getMessage()], 502);
         }
 
+        $this->credits->record($domain, $request->user(), 'finance_question', $this->assistant->lastResponse());
+
         return response()->json([
             'answer' => $answer,
             'remaining' => max(0, $limit - $asked - 1),
+            'credits_remaining' => $this->credits->remaining($domain),
             'disclaimer' => 'AI answer from your POS records. Suggestions only, not professional financial advice.',
         ]);
     }
@@ -210,14 +217,22 @@ class FinanceController extends Controller
                 $this->factSheet($domain, $overview),
                 $validated['language'] ?? 'en',
                 $validated['metric'] ?? null,
+                // Cached explanations are free; only a new one needs credits (402 when used up).
+                fn () => $this->credits->assertHasCredits($domain, 'finance_explain'),
             );
         } catch (RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 502);
         }
 
+        // A cached explanation didn't call the AI, so it is free.
+        if (! $answer['cached']) {
+            $this->credits->record($domain, $request->user(), 'finance_explain', $this->assistant->lastResponse());
+        }
+
         return response()->json([
             'text' => $answer['text'],
             'cached' => $answer['cached'],
+            'credits_remaining' => $this->credits->remaining($domain),
             'disclaimer' => 'AI-generated explanation of your POS figures. Suggestions only, not professional financial advice.',
         ]);
     }

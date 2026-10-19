@@ -119,7 +119,7 @@ class Customer extends Model
         $previousTier = $this->tier;
 
         // Get appropriate tier based on spending, among this customer's organization's tiers
-        $newTierModel = \App\Models\LoyaltyTier::getTierForSpending($this->lifetime_spent, $this->domain);
+        $newTierModel = \App\Models\LoyaltyTier::getTierForSpending($this->lifetime_spent ?? 0, $this->domain);
 
         if ($newTierModel && $previousTier !== $newTierModel->name) {
             $this->update([

@@ -27,6 +27,15 @@ class WalletCashMovement extends Model
      * in cash, other income put in the drawer). They can't be added or picked by hand in the
      * ledger; the record they belong to points at them through wallet_cash_movement_id.
      */
+    /** Written only when a sale is completed with a cash/e-wallet payment. */
+    public const KIND_SALE_PAYMENT = 'sale_payment';
+
+    /** Written only when a sale with a posted sale_payment movement is voided. */
+    public const KIND_SALE_VOID = 'sale_void';
+
+    /** Written only when a customer pays their credit (utang) in cash. */
+    public const KIND_CREDIT_PAYMENT = 'credit_payment';
+
     public const SYSTEM_KINDS = [
         self::KIND_EXPENSE,
         'supplier_payment',
@@ -35,6 +44,9 @@ class WalletCashMovement extends Model
         'loan_payment',
         'asset_purchase',
         'owner_investment',
+        self::KIND_SALE_PAYMENT,
+        self::KIND_SALE_VOID,
+        self::KIND_CREDIT_PAYMENT,
     ];
 
     protected $casts = [
@@ -52,6 +64,15 @@ class WalletCashMovement extends Model
         return $query
             ->where('domain', $domainSlug)
             ->where('location_id', $locationId);
+    }
+
+    /**
+     * Money in the cash drawer itself. A line with a payment channel moves that channel's money
+     * (GCash, a bank account) and leaves the drawer's cash alone.
+     */
+    public function scopeInDrawer(Builder $query): Builder
+    {
+        return $query->whereNull('payment_card_type_id');
     }
 
     /**

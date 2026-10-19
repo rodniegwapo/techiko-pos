@@ -13,7 +13,8 @@ class MarketingTest extends TestCase
 
     public function test_marketing_pages_return_ok(): void
     {
-        foreach (['/services', '/about', '/contact', '/pricing'] as $path) {
+        // /pricing is switched off for now (its route is commented out in routes/web.php).
+        foreach (['/services', '/about', '/contact'] as $path) {
             $this->get($path)->assertOk();
         }
     }
@@ -34,6 +35,7 @@ class MarketingTest extends TestCase
 
         $response->assertOk();
         $response->assertHeader('Content-Type', 'text/plain; charset=UTF-8');
-        $response->assertSee('Sitemap: '.rtrim(config('app.url'), '/').'/sitemap.xml', false);
+        // A static file written for the live site, so it names the live domain, not this app's URL.
+        $this->assertMatchesRegularExpression('#^Sitemap: https?://[^\s]+/sitemap\.xml$#m', $response->getContent());
     }
 }

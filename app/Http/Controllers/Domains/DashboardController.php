@@ -23,7 +23,9 @@ class DashboardController extends Controller
      */
     public function index(Request $request, Domain $domain)
     {
-        $location = Helpers::getActiveLocation($domain, $request->input('location_id'));
+        $active = Helpers::getActiveLocation($domain, $request->input('location_id'));
+        // A warehouse runs the whole business: its dashboard sums every location.
+        $location = $active?->isWarehouse() ? null : $active;
 
         // Only essential KPIs - let frontend handle complex analytics
         $stats = [
@@ -35,10 +37,9 @@ class DashboardController extends Controller
             'top_users' => $this->getTopUsers($location, $domain->name_slug),
         ];
 
-        $availableLocations = InventoryLocation::active()->forDomain($domain->name_slug)->get();
-
         return Inertia::render('Dashboard/Index', [
             'stats' => $stats,
+            'allLocations' => $location === null,
         ]);
     }
 
@@ -56,8 +57,11 @@ class DashboardController extends Controller
         $domain = $domainParam instanceof Domain ? $domainParam->name_slug : $domainParam;
         $timeRange = $request->input('time_range', 'daily');
 
-        // Get the active location for filtering
+        // Get the active location for filtering (a warehouse's chart covers every location)
         $location = Helpers::getActiveLocation($domainParam, $request->input('location_id'));
+        if ($location?->isWarehouse()) {
+            $location = null;
+        }
 
         // Return raw data - let frontend handle formatting
         $salesQuery = Sale::where('domain', $domain)
@@ -137,7 +141,9 @@ class DashboardController extends Controller
         $activeOrders = (clone $pendingQuery)->count();
 
         // Inventory Value
-        $inventoryValue = $location ? $location->getTotalInventoryValue() : 0;
+        $inventoryValue = $location
+            ? $location->getTotalInventoryValue()
+            : InventoryLocation::active()->forDomain($domain)->get()->sum(fn ($l) => $l->getTotalInventoryValue());
 
         return [
             'today_sales' => [

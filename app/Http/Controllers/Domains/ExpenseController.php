@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Domain;
 use App\Models\Expense;
 use App\Models\ExpenseCategory;
+use App\Models\Finance\FinancialAccount;
 use App\Models\InventoryLocation;
 use App\Models\RecurringExpense;
 use App\Models\User;
@@ -14,6 +15,7 @@ use App\Services\ExpenseService;
 use App\Services\RecurringExpenseService;
 use App\Support\ExpenseReceiptStorage;
 use App\Support\FinanceAccess;
+use App\Support\PaidFromAccount;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -62,7 +64,7 @@ class ExpenseController extends Controller
 
         $perPage = min(max((int) $request->input('per_page', 20), 1), 100);
         $items = (clone $query)
-            ->with(['category:id,name', 'location:id,name', 'user:id,name'])
+            ->with(['category:id,name', 'location:id,name', 'user:id,name', 'financialAccount:id,name'])
             ->orderByDesc('expense_date')
             ->orderByDesc('id')
             ->paginate($perPage)
@@ -77,6 +79,7 @@ class ExpenseController extends Controller
                 'location' => $filters['location'],
                 'category_id' => $filters['category_id'],
                 'payment_method' => $filters['payment_method'],
+                'account_id' => $filters['account_id'],
                 'search' => $filters['search'],
             ],
             'summary' => [
@@ -92,6 +95,8 @@ class ExpenseController extends Controller
                     ->orderBy('name')
                     ->get(['id', 'name', 'type', 'is_active', 'is_default']),
                 'payment_methods' => Expense::PAYMENT_METHODS,
+                'accounts' => FinancialAccount::query()->forDomain($domain->name_slug)->where('is_active', true)
+                    ->orderBy('name')->get(['id', 'name', 'type']),
             ],
             'canSeeAllStores' => FinanceAccess::canSeeAllStores($user),
             'restrictedLocationId' => FinanceAccess::restrictedLocationId($user),
@@ -157,7 +162,7 @@ class ExpenseController extends Controller
         $user = $this->authorizeFinance($request);
         $filters = $this->resolveFilters($request, $domain);
         $query = $this->baseQuery($domain, $user, $filters)
-            ->with(['category:id,name', 'location:id,name', 'user:id,name'])
+            ->with(['category:id,name', 'location:id,name', 'user:id,name', 'financialAccount:id,name'])
             ->orderBy('expense_date')
             ->orderBy('id');
 
@@ -174,7 +179,7 @@ class ExpenseController extends Controller
                 return;
             }
             fprintf($out, chr(0xEF).chr(0xBB).chr(0xBF));
-            fputcsv($out, ['date', 'category', 'description', 'payee', 'store', 'paid_from', 'reference_no', 'amount', 'recorded_by', 'notes']);
+            fputcsv($out, ['date', 'category', 'description', 'payee', 'store', 'paid_from', 'account', 'reference_no', 'amount', 'recorded_by', 'notes']);
 
             foreach ($query->lazy(500) as $expense) {
                 fputcsv($out, [
@@ -184,6 +189,7 @@ class ExpenseController extends Controller
                     $expense->payee,
                     $expense->location?->name ?? 'Business-wide',
                     $expense->payment_method,
+                    $expense->financialAccount?->name,
                     $expense->reference_no,
                     number_format((float) $expense->amount, 2, '.', ''),
                     $expense->user?->name,
@@ -206,6 +212,7 @@ class ExpenseController extends Controller
             'description' => $expense->description,
             'payee' => $expense->payee,
             'payment_method' => $expense->payment_method,
+            'financial_account_id' => $expense->financial_account_id,
             'frequency' => $frequency,
             'day_of_month' => $frequency === 'monthly' ? $date->day : null,
             'day_of_week' => $frequency === 'weekly' ? $date->dayOfWeek : null,
@@ -227,7 +234,7 @@ class ExpenseController extends Controller
             ->when(! FinanceAccess::canSeeAllStores($user), fn ($q) => $q->where(
                 fn ($q) => $q->where('location_id', $restrictedTo)->orWhereNull('location_id')
             ))
-            ->with(['category:id,name', 'location:id,name'])
+            ->with(['category:id,name', 'location:id,name', 'financialAccount:id,name'])
             ->orderByDesc('is_active')
             ->orderBy('next_run_date')
             ->get()
@@ -237,6 +244,8 @@ class ExpenseController extends Controller
                 'payee' => $r->payee,
                 'amount' => round((float) $r->amount, 2),
                 'payment_method' => $r->payment_method,
+                'financial_account_id' => $r->financial_account_id,
+                'account_name' => $r->financialAccount?->name,
                 'expense_category_id' => $r->expense_category_id,
                 'category_name' => $r->category?->name,
                 'location_id' => $r->location_id,
@@ -274,6 +283,7 @@ class ExpenseController extends Controller
             'description' => ['required', 'string', 'max:255'],
             'payee' => ['nullable', 'string', 'max:255'],
             'payment_method' => ['required', Rule::in(Expense::PAYMENT_METHODS)],
+            'financial_account_id' => PaidFromAccount::rules($domain->name_slug),
             'location_id' => ['nullable', 'integer'],
             'reference_no' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string', 'max:2000'],
@@ -296,12 +306,13 @@ class ExpenseController extends Controller
 
         unset($data['receipt'], $data['remove_receipt']);
         $data['location_id'] = $locationId;
+        $data['financial_account_id'] = PaidFromAccount::keep($data['payment_method'], $data['financial_account_id'] ?? null);
 
         return $data;
     }
 
     /**
-     * @return array{start: Carbon, end: Carbon, location: int|string|null, category_id: ?int, payment_method: ?string, search: ?string}
+     * @return array{start: Carbon, end: Carbon, location: int|string|null, category_id: ?int, payment_method: ?string, account_id: ?int, search: ?string}
      */
     private function resolveFilters(Request $request, Domain $domain): array
     {
@@ -311,6 +322,7 @@ class ExpenseController extends Controller
             'location' => ['nullable', 'string', 'max:20'],
             'category_id' => ['nullable', 'integer'],
             'payment_method' => ['nullable', Rule::in(Expense::PAYMENT_METHODS)],
+            'account_id' => ['nullable', 'integer'],
             'search' => ['nullable', 'string', 'max:100'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
             'page' => ['nullable', 'integer', 'min:1'],
@@ -333,6 +345,7 @@ class ExpenseController extends Controller
             'location' => $location,
             'category_id' => isset($validated['category_id']) ? (int) $validated['category_id'] : null,
             'payment_method' => $validated['payment_method'] ?? null,
+            'account_id' => isset($validated['account_id']) ? (int) $validated['account_id'] : null,
             'search' => isset($validated['search']) ? trim($validated['search']) : null,
         ];
     }
@@ -352,6 +365,7 @@ class ExpenseController extends Controller
             ->when(is_int($filters['location']), fn ($q) => $q->where('location_id', $filters['location']))
             ->when($filters['category_id'], fn ($q, $id) => $q->where('expense_category_id', $id))
             ->when($filters['payment_method'], fn ($q, $method) => $q->where('payment_method', $method))
+            ->when($filters['account_id'], fn ($q, $id) => $q->where('financial_account_id', $id))
             ->when($filters['search'], function ($q, $search) {
                 $q->where(function ($q) use ($search) {
                     $q->where('description', 'like', "%{$search}%")
@@ -407,6 +421,8 @@ class ExpenseController extends Controller
             'payee' => $expense->payee,
             'amount' => round((float) $expense->amount, 2),
             'payment_method' => $expense->payment_method,
+            'financial_account_id' => $expense->financial_account_id,
+            'account_name' => $expense->financialAccount?->name,
             'reference_no' => $expense->reference_no,
             'notes' => $expense->notes,
             'expense_category_id' => $expense->expense_category_id,
