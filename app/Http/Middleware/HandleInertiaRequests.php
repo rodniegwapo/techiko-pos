@@ -141,7 +141,12 @@ class HandleInertiaRequests extends Middleware
             return collect();
         }
 
-        return InventoryLocation::active()->forDomain($domain->name_slug)->get();
+        return InventoryLocation::active()->forDomain($domain->name_slug)
+            // Cashiers work at stores only (see Helpers::getActiveLocation).
+            ->when($request->user()?->isCashierOrBelow(), fn ($q) => $q->where(
+                fn ($q) => $q->whereNull('type')->orWhere('type', '!=', 'warehouse')
+            ))
+            ->get();
     }
 
     /**

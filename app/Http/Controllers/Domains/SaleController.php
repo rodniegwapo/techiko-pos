@@ -302,15 +302,31 @@ class SaleController extends Controller
             'sale_amount' => 'nullable|numeric|min:0',
             'loyalty_points_to_redeem' => 'nullable|integer|min:0',
             'payment_method' => 'required|string|in:cash,card,e-wallet,bank,credit,split',
+            // A sale rung up later (e.g. one written down while the POS was off): supervisors and up only.
+            'transaction_date' => ['nullable', 'date', 'before_or_equal:today'],
             ...$this->splitPaymentRules(allowCredit: true),
         ]);
 
         $location = Helpers::getActiveLocation($domain);
         $isSplit = $validated['payment_method'] === 'split';
 
-        if ($location) {
-            WalletShiftGuard::ensureShiftOpenForSale($domain->name_slug, (int) $location->id, now()->toDateString());
+        $saleDay = isset($validated['transaction_date'])
+            ? Carbon::parse($validated['transaction_date'])->toDateString()
+            : now()->toDateString();
+        $backDated = $saleDay !== now()->toDateString();
+        if ($backDated && $request->user()->isCashierOrBelow()) {
+            throw ValidationException::withMessages([
+                'transaction_date' => 'Only a supervisor or above can record a sale on an earlier date.',
+            ]);
         }
+
+        if ($location) {
+            // Today's sales need today's shift open; an earlier day only must not be closed.
+            $backDated
+                ? WalletShiftGuard::ensureDateNotClosed($domain->name_slug, (int) $location->id, $saleDay, 'transaction_date')
+                : WalletShiftGuard::ensureShiftOpenForSale($domain->name_slug, (int) $location->id, $saleDay);
+        }
+        $transactionDate = $backDated ? Carbon::parse($saleDay)->setTimeFrom(now()) : null;
 
         // Card, e-wallet and bank payments name the channel used (terminal, GCash, BDO…) at this store.
         if ($isSplit) {
@@ -345,6 +361,7 @@ class SaleController extends Controller
                 $location,
                 $domain,
                 $redemptionService,
+                $transactionDate,
             ) {
                 $sale->refresh();
 
@@ -391,7 +408,7 @@ class SaleController extends Controller
 
                 // 1. Complete sale and process inventory
                 $sale->refresh();
-                $this->saleService->completeSale($sale, auth()->user());
+                $this->saleService->completeSale($sale, auth()->user(), transactionDate: $transactionDate);
 
                 // 2. Handle overselling situations (create automatic stock adjustments)
                 $oversoldItems = [];

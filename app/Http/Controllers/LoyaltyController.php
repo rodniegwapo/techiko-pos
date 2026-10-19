@@ -174,11 +174,19 @@ class LoyaltyController extends Controller
 
     public function adjustPoints(Request $request, Customer $customer)
     {
+        // Same rule as the organization's Loyalty page: a cashier needs a manager's PIN.
+        $needsApproval = $request->user()->isCashierOrBelow();
         $validated = $request->validate([
             'type' => 'required|in:add,subtract,set',
             'amount' => 'required|integer|min:0',
             'reason' => 'nullable|string|max:255',
+            'pin_code' => [$needsApproval ? 'required' : 'nullable', 'string', 'max:20'],
+        ], [
+            'pin_code.required' => 'A manager has to approve this: enter their PIN.',
         ]);
+        if ($needsApproval) {
+            \App\Support\ManagerApproval::approverFor($validated['pin_code'], $customer->domain);
+        }
 
         DB::transaction(function () use ($customer, $validated) {
             $currentPoints = $customer->loyalty_points ?? 0;

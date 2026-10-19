@@ -45,7 +45,25 @@ const props = defineProps({
         type: Boolean,
         default: false,
     },
+    /** The list's current "Sort by" value, shown as the sorted heading. */
+    sort: {
+        type: String,
+        default: null,
+    },
+    /** { columnKey: { ascend: sortValue, descend: sortValue } } for the sortable headings. */
+    columnSorts: {
+        type: Object,
+        default: () => ({}),
+    },
 });
+
+/** Makes a heading sortable, marked as sorted when it matches the list's sort. */
+const sortable = (column) => {
+    const sorts = props.columnSorts[column.key];
+    if (!sorts) return column;
+    const sortOrder = props.sort === sorts.ascend ? "ascend" : props.sort === sorts.descend ? "descend" : null;
+    return { ...column, sorter: true, sortOrder };
+};
 
 const showSuperUserDomain = computed(
     () =>
@@ -88,7 +106,7 @@ const columns = computed(() => {
         width: "1%",
     });
 
-    return baseColumns;
+    return baseColumns.map(sortable);
 });
 
 const getStockStatusColor = (status) => {
@@ -176,7 +194,7 @@ function onMobilePaginationChange(pageNum) {
         :data-source="dataSource"
         :pagination="pagination"
         :loading="loading"
-        @change="$emit('handleTableChange', $event)"
+        @change="(paginationInfo, _filters, sorter) => $emit('handleTableChange', paginationInfo, sorter)"
     >
         <!-- Product Column -->
         <template #bodyCell="{ column, record }">

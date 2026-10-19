@@ -7,8 +7,10 @@ use App\Models\Customer;
 use App\Models\Domain;
 use App\Models\LoyaltyTier;
 use App\Models\Sale;
+use App\Support\ManagerApproval;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class LoyaltyController extends Controller
@@ -145,11 +147,21 @@ class LoyaltyController extends Controller
             return response()->json(['message' => 'Customer does not belong to this domain'], 403);
         }
 
+        // A cashier changes points only with a manager's or admin's PIN from this organization.
+        $needsApproval = $request->user()->isCashierOrBelow();
+
         $validated = $request->validate([
             'type' => 'required|in:add,subtract,set',
             'amount' => 'required|integer|min:0',
             'reason' => 'nullable|string|max:255',
+            'pin_code' => [$needsApproval ? 'required' : 'nullable', 'string', 'max:20'],
+        ], [
+            'pin_code.required' => 'A manager has to approve this: enter their PIN.',
         ]);
+
+        $approverId = $needsApproval
+            ? ManagerApproval::approverFor($validated['pin_code'], $domain->name_slug)
+            : $request->user()->id;
 
         DB::transaction(function () use ($customer, $validated) {
             $currentPoints = $customer->loyalty_points ?? 0;
@@ -168,6 +180,15 @@ class LoyaltyController extends Controller
 
             $customer->update(['loyalty_points' => $newPoints]);
         });
+
+        Log::info('Loyalty points adjusted', [
+            'customer_id' => $customer->id,
+            'type' => $validated['type'],
+            'amount' => $validated['amount'],
+            'reason' => $validated['reason'] ?? null,
+            'by' => $request->user()->id,
+            'approved_by' => $approverId,
+        ]);
 
         return response()->json([
             'success' => true,

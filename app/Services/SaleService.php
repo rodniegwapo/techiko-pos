@@ -16,6 +16,7 @@ use App\Models\User;
 use App\Models\UserPin;
 use App\Models\VoidLog;
 use App\Services\Wallet\SalePaymentWalletPosting;
+use App\Support\ManagerApproval;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -339,19 +340,7 @@ class SaleService
     private function validateCashierPin(string $pinCode, ?string $domain): int
     {
         // Only a manager or admin of the cashier's own organization can approve.
-        $managerPin = UserPin::whereHas('user', fn ($q) => $q->where('domain', $domain))
-            ->whereHas('user.roles', function ($q) {
-                $q->whereIn('name', ['manager', 'admin']);
-            })->get()
-            ->first(fn ($pin) => Hash::check($pinCode, $pin->pin_code));
-
-        if (! $managerPin) {
-            throw ValidationException::withMessages([
-                'pin_code' => ['The provided Pin Code is incorrect.'],
-            ]);
-        }
-
-        return $managerPin->user_id;
+        return ManagerApproval::approverFor($pinCode, $domain);
     }
 
     /**
@@ -377,13 +366,16 @@ class SaleService
     /**
      * Complete sale and process inventory
      */
-    public function completeSale(Sale $sale, $user, ?InventoryLocation $location = null)
+    /**
+     * @param  \DateTimeInterface|null  $transactionDate  When the sale took place, for one recorded later; now when null.
+     */
+    public function completeSale(Sale $sale, $user, ?InventoryLocation $location = null, ?\DateTimeInterface $transactionDate = null)
     {
         if ($sale->payment_status === 'paid') {
             throw new \Exception('Sale is already completed');
         }
 
-        return DB::transaction(function () use ($sale, $user, $location) {
+        return DB::transaction(function () use ($sale, $user, $location, $transactionDate) {
             $inventoryLocation = $this->resolveInventoryLocationForSale($sale, $location);
 
             $inventoryLocation = $inventoryLocation
@@ -422,7 +414,7 @@ class SaleService
             // Update sale status
             $sale->update([
                 'payment_status' => 'paid',
-                'transaction_date' => now(),
+                'transaction_date' => $transactionDate ?? now(),
             ]);
 
             return $sale;

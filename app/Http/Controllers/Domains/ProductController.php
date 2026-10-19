@@ -292,19 +292,26 @@ class ProductController extends Controller
     /** Sort options for the products list; newest first unless asked otherwise. */
     private function applySort(Builder $query, ?string $sort, ?InventoryLocation $location): void
     {
+        $quantityHere = fn () => ProductInventory::query()
+            ->select('quantity_available')
+            ->whereColumn('product_inventory.product_id', 'products.id')
+            ->where('location_id', $location->id)
+            ->limit(1);
+        $categoryName = fn () => Category::query()
+            ->select('name')
+            ->whereColumn('categories.id', 'products.category_id')
+            ->limit(1);
+
         match ($sort) {
             'name' => $query->orderBy('name')->orderBy('id'),
+            'name_desc' => $query->orderByDesc('name')->orderBy('id'),
             'price_asc' => $query->orderBy('price')->orderBy('id'),
             'price_desc' => $query->orderByDesc('price')->orderBy('id'),
-            'qty_asc' => $location
-                ? $query->orderBy(
-                    ProductInventory::query()
-                        ->select('quantity_available')
-                        ->whereColumn('product_inventory.product_id', 'products.id')
-                        ->where('location_id', $location->id)
-                        ->limit(1)
-                )->orderBy('id')
-                : $query->latest(),
+            // Grouped by category, then by name within each.
+            'category' => $query->orderBy($categoryName())->orderBy('name')->orderBy('id'),
+            'category_desc' => $query->orderByDesc($categoryName())->orderBy('name')->orderBy('id'),
+            'qty_asc' => $location ? $query->orderBy($quantityHere())->orderBy('id') : $query->latest(),
+            'qty_desc' => $location ? $query->orderByDesc($quantityHere())->orderBy('id') : $query->latest(),
             default => $query->latest(),
         };
     }

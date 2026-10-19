@@ -275,6 +275,20 @@ class User extends Authenticatable implements MustVerifyEmail
     /**
      * Check if user has location restriction
      */
+    /**
+     * A cashier (or a role ranked lower), by the assigned role's level: users.role_level defaults
+     * to 3 for staff made in the app, so it can't tell a cashier apart.
+     */
+    public function isCashierOrBelow(): bool
+    {
+        if ($this->is_super_user) {
+            return false;
+        }
+        $level = $this->roles->min('level');
+
+        return (int) ($level ?? $this->role_level) >= 5;
+    }
+
     public function hasLocationRestriction(): bool
     {
         return $this->role_level >= 3;

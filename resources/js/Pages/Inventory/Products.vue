@@ -28,6 +28,25 @@ const search = ref("");
 const stock_status = ref(null);
 const location_id = ref(null);
 const domain = ref(null);
+const sort = ref(null);
+
+const SORT_OPTIONS = [
+    { label: "Lowest stock first", value: "qty_asc" },
+    { label: "Highest stock first", value: "qty_desc" },
+    { label: "Name (A–Z)", value: "name" },
+    { label: "Name (Z–A)", value: "name_desc" },
+    { label: "Category (A–Z)", value: "category" },
+    { label: "Category (Z–A)", value: "category_desc" },
+    { label: "Value (low to high)", value: "value_asc" },
+    { label: "Value (high to low)", value: "value_desc" },
+];
+
+/** Clicking a column heading picks the matching "Sort by" option. */
+const COLUMN_SORTS = {
+    product: { ascend: "name", descend: "name_desc" },
+    stock: { ascend: "qty_asc", descend: "qty_desc" },
+    value: { ascend: "value_asc", descend: "value_desc" },
+};
 
 // Props from backend
 const props = defineProps({
@@ -59,6 +78,7 @@ const getItems = () => {
             stock_status: stock_status.value || undefined,
             location_id: location_id.value || undefined,
             domain: domain.value || undefined,
+            sort: sort.value || undefined,
         },
         onStart: () => (spinning.value = true),
         onFinish: () => (spinning.value = false),
@@ -94,6 +114,12 @@ const { filters, activeFilters, handleClearSelectedFilter } = useFilters({
             ref: stock_status,
             getLabel: toLabel(computed(() => stockStatusOptions.value)),
         },
+        {
+            label: "Sort by",
+            key: "sort",
+            ref: sort,
+            getLabel: toLabel(computed(() => SORT_OPTIONS)),
+        },
         ...(page.props.isGlobalView
             ? [
                   {
@@ -115,6 +141,7 @@ const filtersConfig = [
         type: "select",
         options: stockStatusOptions.value,
     },
+    { key: "sort", label: "Sort by", type: "select", options: SORT_OPTIONS },
     ...(page.props.isGlobalView
         ? [
               {
@@ -128,10 +155,22 @@ const filtersConfig = [
 ];
 
 // Group filters in one object
-const tableFilters = { search, stock_status, domain };
+const tableFilters = { search, stock_status, domain, sort };
 
 // Table management
 const { pagination, handleTableChange } = useTable("inventories", tableFilters);
+
+// A heading click changes "Sort by" (which reloads from page 1); paging keeps the current sort.
+const onTableChange = (paginationInfo, sorter) => {
+    if (sorter && "columnKey" in sorter) {
+        const next = sorter.order ? COLUMN_SORTS[sorter.columnKey]?.[sorter.order] ?? null : null;
+        if (next !== (sort.value || null)) {
+            filters.value = { ...filters.value, sort: next };
+            return;
+        }
+    }
+    handleTableChange(paginationInfo);
+};
 
 // Methods
 const changeLocation = (newLocationId) => {
@@ -244,7 +283,9 @@ const handleTransferStock = (inventory) => {
                     :pagination="pagination"
                     :loading="spinning"
                     :is-global-view="page.props.isGlobalView"
-                    @handle-table-change="handleTableChange"
+                    :sort="sort"
+                    :column-sorts="COLUMN_SORTS"
+                    @handle-table-change="onTableChange"
                     @show-details="showProductDetails"
                     @transfer-stock="handleTransferStock"
                 />

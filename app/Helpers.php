@@ -69,6 +69,26 @@ class Helpers
      */
     public static function getActiveLocation($domain = null, $locationId = null)
     {
+        $location = self::resolveActiveLocation($domain, $locationId);
+        $user = auth()->user();
+
+        // Cashiers work at stores only: a warehouse asked for (even in the URL) gives way to the
+        // organization's default store.
+        if ($location?->isWarehouse() && $user?->isCashierOrBelow()) {
+            $domainSlug = $domain instanceof \App\Models\Domain ? $domain->name_slug : $domain;
+
+            return InventoryLocation::active()->forDomain($domainSlug)
+                ->where(fn ($q) => $q->whereNull('type')->orWhere('type', '!=', 'warehouse'))
+                ->orderByDesc('is_default')
+                ->orderBy('id')
+                ->first();
+        }
+
+        return $location;
+    }
+
+    private static function resolveActiveLocation($domain = null, $locationId = null)
+    {
         $user = auth()->user();
 
         // Handle case where domain might be a string or object

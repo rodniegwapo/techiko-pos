@@ -14,6 +14,24 @@ import { validationSummaryNotice } from "./useValidationMessage.js";
 dayjs.extend(utc);
 dayjs.extend(timezone);
 dayjs.extend(isocalendar);
+
+const moneyFormats = {};
+
+/** Money in the organization's currency (Settings → Currency); pesos when none is set. */
+function moneyFormat() {
+    const code = router.page?.props?.currentDomain?.currency_code || "PHP";
+    if (!moneyFormats[code]) {
+        try {
+            moneyFormats[code] = new Intl.NumberFormat(code === "PHP" ? "en-PH" : "en-US", {
+                style: "currency",
+                currency: code,
+            });
+        } catch {
+            moneyFormats[code] = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" });
+        }
+    }
+    return moneyFormats[code];
+}
 /**
  * Composable for showing delete confirmation modals
  *
@@ -178,14 +196,7 @@ export function useHelpers() {
         );
     };
 
-    const formattedTotal = (total) => {
-        const formattedTotal = new Intl.NumberFormat("en-PH", {
-            style: "currency",
-            currency: "PHP",
-        }).format(total);
-
-        return formattedTotal;
-    };
+    const formattedTotal = (total) => moneyFormat().format(total);
 
     const formattedPercent = (value) => {
         return new Intl.NumberFormat("en-PH", {
@@ -198,12 +209,9 @@ export function useHelpers() {
     // Format currency (alias for formattedTotal)
     const formatCurrency = (value) => {
         if (value === null || value === undefined || isNaN(value)) {
-            return "₱0.00";
+            return moneyFormat().format(0);
         }
-        return new Intl.NumberFormat("en-PH", {
-            style: "currency",
-            currency: "PHP",
-        }).format(value);
+        return moneyFormat().format(value);
     };
 
     // Format date

@@ -89,8 +89,8 @@ class InventoryController extends Controller
             $query->whereHas('product', fn ($q) => $q->where('category_id', $request->category_id));
         }
 
-        $inventories = $query->orderBy('quantity_available', 'asc')
-            ->paginate($request->per_page ?? 20);
+        $this->applyInventorySort($query, $request->input('sort'));
+        $inventories = $query->paginate($request->per_page ?? 20);
 
         if ($request->expectsJson() || $request->is('api/*')) {
             $inventoryData = $inventories->items();
@@ -121,10 +121,36 @@ class InventoryController extends Controller
             'inventories' => ProductInventoryResource::collection($inventories),
             'locations' => InventoryLocation::active()->forDomain($slug)->get(),
             'categories' => $this->getCategoriesForLocation($slug, $location)->get(),
-            'filters' => $request->only(['search', 'stock_status', 'category_id']),
+            'filters' => $request->only(['search', 'stock_status', 'category_id', 'sort']),
             'isGlobalView' => false,
             'current_location' => $location,
         ]);
+    }
+
+    /** Lowest stock first unless another order is asked for. */
+    private function applyInventorySort($query, ?string $sort): void
+    {
+        $productColumn = fn (string $column) => Product::query()
+            ->select($column)
+            ->whereColumn('products.id', 'product_inventory.product_id')
+            ->limit(1);
+        $categoryName = fn () => Category::query()
+            ->select('categories.name')
+            ->join('products', 'products.category_id', '=', 'categories.id')
+            ->whereColumn('products.id', 'product_inventory.product_id')
+            ->limit(1);
+
+        match ($sort) {
+            'name' => $query->orderBy($productColumn('name')),
+            'name_desc' => $query->orderByDesc($productColumn('name')),
+            'category' => $query->orderBy($categoryName())->orderBy($productColumn('name')),
+            'category_desc' => $query->orderByDesc($categoryName())->orderBy($productColumn('name')),
+            'qty_desc' => $query->orderByDesc('quantity_available'),
+            'value_asc' => $query->orderBy('total_value'),
+            'value_desc' => $query->orderByDesc('total_value'),
+            default => $query->orderBy('quantity_available'),
+        };
+        $query->orderBy('product_inventory.id');
     }
 
     public function movements(Request $request, Domain $domain)

@@ -19,7 +19,28 @@ const props = defineProps({
             hide_out_of_stock: false,
         }),
     },
+    /** { name, plan, subscription_ends_at, locations, users, created_at } */
+    account: {
+        type: Object,
+        default: null,
+    },
+    currency: {
+        type: Object,
+        default: () => ({ code: "PHP", options: ["PHP"] }),
+    },
 });
+
+const CURRENCY_NAMES = {
+    PHP: "Philippine peso (₱)",
+    USD: "US dollar ($)",
+    EUR: "Euro (€)",
+    GBP: "British pound (£)",
+    JPY: "Japanese yen (¥)",
+};
+const currencyOptions = (props.currency?.options ?? ["PHP"]).map((code) => ({
+    value: code,
+    label: CURRENCY_NAMES[code] ?? code,
+}));
 
 const form = useForm({
     apply_vat_automatically: !!props.salesSettings?.apply_vat_automatically,
@@ -30,6 +51,7 @@ const form = useForm({
             : "exclusive",
     allow_overselling: props.salesSettings?.allow_overselling === true,
     hide_out_of_stock: props.salesSettings?.hide_out_of_stock === true,
+    currency_code: props.currency?.code ?? "PHP",
 });
 
 function submit() {
@@ -46,6 +68,61 @@ const domainName =
     <AuthenticatedLayout>
         <Head title="Settings" />
         <ContentHeader class="mb-6" :title="`Settings — ${domainName}`" />
+        <ContentLayout v-if="account" title="Account overview" class="mb-6">
+            <template #table>
+                <div class="px-6 pt-2 pb-6" data-testid="account-overview">
+                    <dl class="grid max-w-2xl grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
+                        <div>
+                            <dt class="text-xs uppercase text-gray-500">Organization</dt>
+                            <dd class="mb-0 font-medium text-gray-900">{{ account.name }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs uppercase text-gray-500">Plan</dt>
+                            <dd class="mb-0 font-medium text-gray-900">
+                                {{ account.plan || "—" }}
+                                <span v-if="account.subscription_ends_at" class="text-sm font-normal text-gray-500">
+                                    · until {{ account.subscription_ends_at }}
+                                </span>
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs uppercase text-gray-500">Active locations</dt>
+                            <dd class="mb-0 font-medium text-gray-900">{{ account.locations }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs uppercase text-gray-500">Users</dt>
+                            <dd class="mb-0 font-medium text-gray-900">{{ account.users }}</dd>
+                        </div>
+                        <div v-if="account.created_at">
+                            <dt class="text-xs uppercase text-gray-500">Customer since</dt>
+                            <dd class="mb-0 font-medium text-gray-900">{{ account.created_at }}</dd>
+                        </div>
+                    </dl>
+                </div>
+            </template>
+        </ContentLayout>
+        <ContentLayout title="Currency" class="mb-6">
+            <template #table>
+                <div class="px-6 pt-2 pb-6">
+                    <a-form layout="vertical" class="max-w-2xl" @submit.prevent="submit">
+                        <a-form-item label="Show money in" :help="form.errors.currency_code">
+                            <a-select
+                                v-model:value="form.currency_code"
+                                class="w-full max-w-xs"
+                                data-testid="currency-select"
+                                :options="currencyOptions"
+                            />
+                            <p class="mb-0 mt-1 text-xs text-gray-500">
+                                Totals across the app use this currency. Prices aren't converted.
+                            </p>
+                        </a-form-item>
+                        <a-form-item class="mb-0">
+                            <a-button type="primary" html-type="submit" :loading="form.processing">Save</a-button>
+                        </a-form-item>
+                    </a-form>
+                </div>
+            </template>
+        </ContentLayout>
         <ContentLayout title="Sales">
             <template #table>
                 <!-- px-6 offsets ContentLayout’s -mx-6 on #table so form aligns with the card title row -->

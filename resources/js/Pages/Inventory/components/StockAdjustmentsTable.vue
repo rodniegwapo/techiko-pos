@@ -91,6 +91,11 @@ const columns = computed(() => {
       key: "value",
       align: "left",
     },
+    {
+      title: "By",
+      key: "people",
+      align: "left",
+    },
   ];
 
   // Add domain column for super users only in global view
@@ -281,6 +286,17 @@ function onMobilePaginationChange(pageNum) {
         </div>
       </template>
 
+      <!-- Who made it, and who approved it -->
+      <template v-else-if="column.key === 'people'">
+        <div class="text-xs leading-5" data-testid="adjustment-people">
+          <div><span class="text-gray-500">Created:</span> {{ record.created_by?.name || "—" }}</div>
+          <div v-if="record.approved_by">
+            <span class="text-gray-500">Approved:</span> {{ record.approved_by.name }}
+            <span v-if="record.approved_at" class="text-gray-400">· {{ formatDate(record.approved_at) }}</span>
+          </div>
+        </div>
+      </template>
+
       <!-- Actions Column -->
       <template v-else-if="column.key === 'actions'">
         <div class="flex justify-center gap-1">
@@ -414,6 +430,12 @@ function onMobilePaginationChange(pageNum) {
                 {{ record.value_change > 0 ? "+" : ""
                 }}{{ formatCurrency(record.value_change) }}
               </span>
+              <span class="text-gray-500">Created by</span>
+              <span class="text-right font-medium text-gray-900">{{ record.created_by?.name || "—" }}</span>
+              <template v-if="record.approved_by">
+                <span class="text-gray-500">Approved by</span>
+                <span class="text-right font-medium text-gray-900">{{ record.approved_by.name }}</span>
+              </template>
               <template v-if="showSuperUserDomain">
                 <span class="text-gray-500">Domain</span>
                 <span
