@@ -80,7 +80,8 @@ class WalletCashControlTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Inertia $page) => $page
                 ->component('Wallet/CardTerminals')
-                ->where('walletPageMode', 'card-types')
+                // The drawer has its own page now; the channels page doesn't carry it.
+                ->missing('cashControl')
             );
     }
 
@@ -219,17 +220,16 @@ class WalletCashControlTest extends TestCase
             WalletCashMovement::query()->where('notes', 'AUTO_CC_COUNTED_VARIANCE')->count()
         );
 
-        $indexUrl = route('domains.payment-card-types.index', [
+        $indexUrl = route('domains.wallet.drawer', [
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
-            'tab' => 'card-types',
         ]);
 
         $this->actingAs($ctx['user'])->get($indexUrl)
             ->assertOk()
             ->assertInertia(fn (Inertia $page) => $page
-                ->component('Wallet/CardTerminals')
+                ->component('Wallet/Drawer')
                 ->where('cashControl.counted_by', $ctx['user']->id)
                 ->where('cashControl.counted_by_user.id', $ctx['user']->id)
                 ->where('cashControl.counted_by_user.name', $ctx['user']->name)
@@ -305,17 +305,16 @@ class WalletCashControlTest extends TestCase
 
         $this->assertSame(2, WalletCashCountSubmission::query()->count());
 
-        $indexUrl = route('domains.payment-card-types.index', [
+        $indexUrl = route('domains.wallet.drawer', [
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
-            'tab' => 'card-types',
         ]);
 
         $this->actingAs($ctx['user'])->get($indexUrl)
             ->assertOk()
             ->assertInertia(fn (Inertia $page) => $page
-                ->component('Wallet/CardTerminals')
+                ->component('Wallet/Drawer')
                 ->where('cashControl.count_submission_history.0.counted_cash', 90)
                 ->where('cashControl.count_submission_history.1.counted_cash', 95)
             );
@@ -453,17 +452,16 @@ class WalletCashControlTest extends TestCase
             'user_id' => $ctx['user']->id,
         ]);
 
-        $url = route('domains.payment-card-types.index', [
+        $url = route('domains.wallet.drawer', [
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
-            'tab' => 'card-types',
         ]);
 
         $this->actingAs($ctx['user'])->get($url)
             ->assertOk()
             ->assertInertia(fn (Inertia $page) => $page
-                ->component('Wallet/CardTerminals')
+                ->component('Wallet/Drawer')
                 ->where('cashControl.business_date', $date)
                 ->where('cashControl.opening_cash', 1000)
                 ->where('cashControl.paid_cash_sales', 200)
@@ -498,17 +496,16 @@ class WalletCashControlTest extends TestCase
             'counted_at' => now(),
         ]);
 
-        $url = route('domains.payment-card-types.index', [
+        $url = route('domains.wallet.drawer', [
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
             'business_date' => $selectedDate,
-            'tab' => 'card-types',
         ]);
 
         $this->actingAs($ctx['user'])->get($url)
             ->assertOk()
             ->assertInertia(fn (Inertia $page) => $page
-                ->component('Wallet/CardTerminals')
+                ->component('Wallet/Drawer')
                 ->where('cashControl.business_date', $selectedDate)
                 ->where('cashControl.opening_is_saved', false)
                 ->where('cashControl.opening_suggestion', 900)
@@ -601,11 +598,10 @@ class WalletCashControlTest extends TestCase
         $this->assertNotNull($reconRow);
         $this->assertNull($reconRow->counted_at);
 
-        $walletUrl = route('domains.payment-card-types.index', [
+        $walletUrl = route('domains.wallet.drawer', [
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
-            'tab' => 'card-types',
         ]);
         $this->actingAs($ctx['user'])->get($walletUrl)
             ->assertOk()
@@ -814,11 +810,10 @@ class WalletCashControlTest extends TestCase
             'transaction_date' => $date.' 13:00:00',
         ]);
 
-        $walletUrl = route('domains.payment-card-types.index', [
+        $walletUrl = route('domains.wallet.drawer', [
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
-            'tab' => 'card-types',
         ]);
 
         $this->actingAs($ctx['user'])->get($walletUrl)
@@ -945,11 +940,10 @@ class WalletCashControlTest extends TestCase
             'closed_at' => now(),
         ]);
 
-        $url = route('domains.payment-card-types.index', [
+        $url = route('domains.wallet.drawer', [
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
-            'tab' => 'card-types',
         ]);
 
         $this->actingAs($ctx['user'])->get($url)
@@ -966,11 +960,10 @@ class WalletCashControlTest extends TestCase
         $ctx = $this->seedContext();
         $futureDate = now()->addDay()->toDateString();
 
-        $url = route('domains.payment-card-types.index', [
+        $url = route('domains.wallet.drawer', [
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
             'business_date' => $futureDate,
-            'tab' => 'card-types',
         ]);
 
         $this->actingAs($ctx['user'])->get($url)
@@ -1094,17 +1087,16 @@ class WalletCashControlTest extends TestCase
             'notes' => 'AUTO_CC_ENDSHIFT_CASHOUT',
         ]);
 
-        $walletUrl = route('domains.payment-card-types.index', [
+        $walletUrl = route('domains.wallet.drawer', [
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
             'business_date' => $targetDate,
-            'tab' => 'card-types',
         ]);
 
         $this->actingAs($ctx['user'])->get($walletUrl)
             ->assertOk()
             ->assertInertia(fn (Inertia $page) => $page
-                ->component('Wallet/CardTerminals')
+                ->component('Wallet/Drawer')
                 ->where('cashControl.bridge_anchor_business_date', $anchorDate)
                 ->where('cashControl.bridge_expected_cash', 250)
             );

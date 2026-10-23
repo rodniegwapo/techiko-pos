@@ -77,7 +77,7 @@ class ChannelBalancesTest extends TestCase
 
     private function page()
     {
-        return $this->actingAs($this->user)->get(route('domains.wallet.money-movement', [
+        return $this->actingAs($this->user)->get(route('domains.wallet.balances', [
             'domain' => $this->domain->name_slug, 'location_id' => $this->store->id,
         ]))->assertOk();
     }
@@ -90,7 +90,7 @@ class ChannelBalancesTest extends TestCase
         $this->sale('card', 999, $this->terminal, 'voided');
 
         $this->page()->assertInertia(fn (Inertia $page) => $page
-            ->component('Wallet/MoneyMovement')
+            ->component('Wallet/Balances')
             ->where('channelBalances', fn ($rows) => collect($rows)->pluck('balance', 'name')->all() === [
                 'BDO Terminal' => 300, 'GCash' => 380,
             ]));
@@ -103,9 +103,8 @@ class ChannelBalancesTest extends TestCase
         $this->movement($this->gcash, 'in', 50, 'ewallet_transfer_in');
 
         $this->page()->assertInertia(fn (Inertia $page) => $page
-            ->where('runningCashBalance', 1000)
-            ->where('cashControl.manual_in', 1000)
-            ->where('cashControl.manual_out', 0)
+            // The drawer card shows today's Expected; the channel lines don't touch it.
+            ->where('drawerExpected', 1000)
             ->where('channelBalances.0.name', 'BDO Terminal')
             ->where('channelBalances.1.balance', -150));
     }
@@ -122,7 +121,7 @@ class ChannelBalancesTest extends TestCase
 
         $this->page()->assertInertia(fn (Inertia $page) => $page
             ->where('channelBalances.1.balance', 500)
-            ->where('runningCashBalance', 0));
+            ->where('drawerExpected', 0));
     }
 
     public function test_an_e_wallet_transfer_names_its_channel_and_direction(): void

@@ -113,7 +113,7 @@ class LocationAreasTest extends TestCase
         $this->actingAs($this->admin)->get($this->url('domains.dashboard', $this->warehouse))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->where('locationAreas.hidden', ['selling_floor', 'payment_channels'])
+                ->where('locationAreas.hidden', ['selling_floor', 'payment_channels', 'cash_drawer'])
                 ->where('allLocations', true));
 
         $this->actingAs($this->staff('manager', 3))->get($this->url('domains.dashboard', $this->store))
@@ -141,7 +141,7 @@ class LocationAreasTest extends TestCase
             'user_id' => $this->admin->id,
         ]);
 
-        $this->actingAs($this->admin)->get($this->url('domains.wallet.money-movement', $this->warehouse))
+        $this->actingAs($this->admin)->get($this->url('domains.wallet.drawer', $this->warehouse))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Wallet/StoresCash')
@@ -151,9 +151,14 @@ class LocationAreasTest extends TestCase
                 ->where('storesCash.rows.0.cash_out', 1500)
                 ->where('storesCash.totals.shifts', 1));
 
-        // The store itself still gets its own money movement page.
-        $this->actingAs($this->admin)->get($this->url('domains.wallet.money-movement', $this->store))
+        // The store itself gets its own drawer.
+        $this->actingAs($this->admin)->get($this->url('domains.wallet.drawer', $this->store))
             ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page->component('Wallet/MoneyMovement'));
+            ->assertInertia(fn (Assert $page) => $page->component('Wallet/Drawer'));
+
+        // A warehouse has no drawer of its own to list or check back on.
+        foreach (['domains.wallet.cash-in-out', 'domains.wallet.history', 'domains.wallet.balances'] as $route) {
+            $this->actingAs($this->admin)->get($this->url($route, $this->warehouse))->assertRedirect();
+        }
     }
 }

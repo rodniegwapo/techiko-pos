@@ -1,43 +1,65 @@
 import { test, expect, apiJson } from "../support/fixtures.js";
-import { MoneyMovementPage, dateWindow, futureYmd, ledgerUrl, walletFixture, walletUrl } from "../support/wallet.js";
+import {
+    DrawerPage,
+    balancesUrl,
+    cashInOutUrl,
+    dateWindow,
+    drawerUrl,
+    futureYmd,
+    historyUrl,
+    ledgerUrl,
+    walletFixture,
+    walletUrl,
+} from "../support/wallet.js";
 import { pageProps } from "../support/inertia.js";
 
 const sidebarItem = (page, title) =>
     page.getByRole("complementary").getByRole("menuitem", { name: new RegExp(`^${title}(\\s|$)`) });
 
-test.describe("Money movement access", () => {
+test.describe("Cash & wallet access", () => {
     test("guests are sent to login", async ({ page }) => {
-        await page.goto(walletUrl);
+        await page.goto(drawerUrl);
         await expect(page).toHaveURL(/\/login$/);
     });
 
     test.describe("as a manager", () => {
         test.use({ account: "wallet-manager" });
 
-        test("opens the page for their own store", async ({ page }, testInfo) => {
-            const wallet = await MoneyMovementPage.open(page);
+        test("opens Today's drawer for their own store", async ({ page }, testInfo) => {
+            await DrawerPage.open(page);
 
-            await expect(page.getByRole("main").getByText("Money movement", { exact: true }).first()).toBeVisible();
-            await expect(page.getByRole("heading", { name: "Ledger movements" })).toBeVisible();
-            await expect(page.getByRole("button", { name: /Add entry/ })).toBeEnabled();
-            await expect(page.getByRole("button", { name: "End Shift" })).toBeVisible();
+            await expect(page.getByRole("main").getByText("Today's drawer", { exact: true }).first()).toBeVisible();
+            await expect(page.getByTestId("open-end-shift")).toBeVisible();
 
             const props = await pageProps(page);
             expect(props.activeLocation.id).toBe(walletFixture(testInfo).locationId);
-            expect(props.canViewMoneyMovement).toBe(true);
-            expect(wallet).toBeTruthy();
         });
 
-        test("the sidebar links to money movement", async ({ page }) => {
-            await MoneyMovementPage.open(page);
+        test("the four pages are tabs that keep the day being looked at", async ({ page }) => {
+            const { day } = dateWindow();
+            await DrawerPage.open(page, day(0));
+
+            const tabs = page.getByTestId("wallet-tabs");
+            for (const key of ["drawer", "cash-in-out", "balances", "history"]) {
+                await expect(tabs.getByTestId(`wallet-tab-${key}`)).toBeVisible();
+            }
+            await tabs.getByTestId("wallet-tab-history").click();
+            await expect(page).toHaveURL(new RegExp(`${historyUrl}\\?.*business_date=${day(0)}`));
+            await expect(page.getByTestId("history-counts")).toContainText(day(0));
+        });
+
+        test("the sidebar lists the four pages", async ({ page }) => {
+            await DrawerPage.open(page);
 
             const sidebar = page.getByRole("complementary");
             await sidebar.getByText("Cash & wallet", { exact: true }).click();
-            await expect(sidebar.getByText("Money movement", { exact: true })).toBeVisible();
+            for (const title of ["Today's drawer", "Cash in & out", "Where money is", "Drawer history"]) {
+                await expect(sidebar.getByText(title, { exact: true })).toBeVisible();
+            }
         });
 
         test("defaults the business date to today", async ({ page }) => {
-            await MoneyMovementPage.open(page);
+            await DrawerPage.open(page);
 
             const props = await pageProps(page);
             expect(props.cashControl.business_date).toBe(new Date().toISOString().slice(0, 10));
@@ -46,7 +68,7 @@ test.describe("Money movement access", () => {
         test("a future business date is rejected", async ({ serverAs }) => {
             const api = await serverAs("wallet-manager");
 
-            const res = await apiJson(api, "GET", `${walletUrl}?business_date=${futureYmd()}`);
+            const res = await apiJson(api, "GET", `${drawerUrl}?business_date=${futureYmd()}`);
 
             expect(res.status).toBe(422);
             expect(Object.keys(res.body.errors)).toContain("business_date");
@@ -57,29 +79,48 @@ test.describe("Money movement access", () => {
                 (await import("../support/sales.js")).fixtureIds().wallet.workers,
             ).filter((w) => w.locationId !== walletFixture(testInfo).locationId);
 
-            await page.goto(`${walletUrl}?location_id=${others[0].locationId}`);
+            await page.goto(`${drawerUrl}?location_id=${others[0].locationId}`);
 
             const props = await pageProps(page);
             expect(props.activeLocation.id, "a manager is restricted to their assigned store").toBe(walletFixture(testInfo).locationId);
         });
+
+        test("old Money movement links land on the page for that job", async ({ page }) => {
+            const { day } = dateWindow();
+
+            await page.goto(`${walletUrl}?business_date=${day(0)}`);
+            await expect(page).toHaveURL(new RegExp(`${drawerUrl}\\?.*business_date=${day(0)}`));
+
+            await page.goto(`${walletUrl}?date_from=${day(0)}&date_to=${day(0)}`);
+            await expect(page).toHaveURL(new RegExp(cashInOutUrl));
+
+            await page.goto(ledgerUrl());
+            await expect(page).toHaveURL(new RegExp(cashInOutUrl));
+
+            await page.goto(`${walletUrl}?view=all`);
+            await expect(page).toHaveURL(new RegExp(`${balancesUrl}\\?.*tab=all`));
+        });
     });
 
-    test("an admin can open the page", async ({ serverAs }) => {
+    test("an admin can open every page", async ({ serverAs }) => {
         const api = await serverAs("admin");
-        const res = await api.get(walletUrl);
-
-        expect(res.status()).toBe(200);
-        expect(new URL(res.url()).pathname).toBe(walletUrl);
+        for (const url of [drawerUrl, cashInOutUrl, balancesUrl, historyUrl]) {
+            const res = await api.get(url);
+            expect(res.status(), url).toBe(200);
+            expect(new URL(res.url()).pathname).toBe(url);
+        }
     });
 
     test.describe("as a cashier (no wallet permission)", () => {
         test.use({ account: "worker-cashier" });
 
-        test("is redirected away from the page", async ({ serverAs }) => {
+        test("is sent away from each page", async ({ serverAs }) => {
             const api = await serverAs("worker-cashier");
-            const res = await api.get(walletUrl, { headers: { Referer: new URL(`/domains/${"jollibee-corp"}/sales`, "http://techiko-pos.test").href } });
-
-            expect(new URL(res.url()).pathname).not.toBe(walletUrl);
+            const referer = new URL(`/domains/jollibee-corp/sales`, "http://techiko-pos.test").href;
+            for (const url of [drawerUrl, cashInOutUrl, balancesUrl, historyUrl]) {
+                const res = await api.get(url, { headers: { Referer: referer } });
+                expect(new URL(res.url()).pathname, url).not.toBe(url);
+            }
         });
 
         test("gets 403 from the ledger API", async ({ serverAs }) => {
@@ -110,7 +151,7 @@ test.describe("Money movement access", () => {
     test("another organization's manager is denied", async ({ serverAs }) => {
         const api = await serverAs("mcManager");
 
-        const page = await apiJson(api, "GET", walletUrl);
+        const page = await apiJson(api, "GET", drawerUrl);
         expect(page.status).toBe(403);
 
         const post = await apiJson(api, "POST", ledgerUrl(), {

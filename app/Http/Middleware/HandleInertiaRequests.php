@@ -10,6 +10,7 @@ use App\Models\Domain;
 use App\Models\InventoryLocation;
 use App\Services\ImpersonationService;
 use App\Support\LocationAreas;
+use App\Support\RoutePermission;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -80,6 +81,8 @@ class HandleInertiaRequests extends Middleware
                 'prefixes' => collect(config('location_areas.areas', []))
                     ->map(fn ($prefixes) => array_map(fn ($p) => Str::after($p, 'domains.'), $prefixes)),
             ],
+            // Pages that open with another page's permission (RoutePermission::ALIASES).
+            'routePermissionAliases' => RoutePermission::ALIASES,
             'availableLocations' => $this->getAvailableLocations($request),
             'default_store' => $request->user() ? $this->getDefaultStore($request) : null,
             'impersonation' => $impersonationService->getImpersonationData(),

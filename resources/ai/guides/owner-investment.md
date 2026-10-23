@@ -10,4 +10,4 @@ keywords: owner investment, capital, puhunan, added capital, owner money, invest
 3. Enter the **Amount**, the **Date** and how the money came in.
 4. Optional: **Notes** (e.g. "Capital for the new branch"). Click **Save**.
 
-Owner investments add to the owner's share in the balance sheet; they are not income. When the owner takes money out, record it as an owner draw under **Cash & wallet → Money movement** (**Add entry** → **Cash out**); the total withdrawn shows under **Owner investments**.
+Owner investments add to the owner's share in the balance sheet; they are not income. When the owner takes money out, record it as an owner draw under **Cash & wallet → Cash in & out** (**− Cash out** → **Owner took cash**); the total withdrawn shows under **Owner investments**.

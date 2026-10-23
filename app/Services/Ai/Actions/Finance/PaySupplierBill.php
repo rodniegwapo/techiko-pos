@@ -99,7 +99,7 @@ class PaySupplierBill implements AssistantAction, HasInputTemplate
         if (! isset(RecordExpense::METHODS[$method])) {
             throw new ActionInputException('Say how it was paid: '.implode(', ', array_keys(RecordExpense::METHODS)).'.');
         }
-        if ($method === 'cash_register' && ! $context->location) {
+        if ($method === 'cash_register' && (! $context->location || $context->location->isWarehouse())) {
             throw new ActionInputException('Cash from the register needs a store. The user should pick a store first.');
         }
         try {
@@ -170,6 +170,9 @@ class PaySupplierBill implements AssistantAction, HasInputTemplate
         }
         if ($input['payment_method'] === 'cash_register' && ! $context->location) {
             return ActionResult::failed('The store this was meant for no longer exists.');
+        }
+        if ($input['payment_method'] === 'cash_register' && $context->location->isWarehouse()) {
+            return ActionResult::failed('Cash from the register needs a store, not a warehouse.');
         }
 
         return $this->call->run(

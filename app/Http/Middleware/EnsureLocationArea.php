@@ -17,8 +17,9 @@ class EnsureLocationArea
 {
     public const MESSAGES = [
         'finance' => 'Finance is kept at the warehouse. Switch to the warehouse to open it.',
-        'selling_floor' => "Customers, loyalty and voids are for stores. Switch to a store to open them.",
+        'selling_floor' => 'Customers, loyalty and voids are for stores. Switch to a store to open them.',
         'payment_channels' => 'Card terminals and e-wallets belong to a store. Switch to a store to open them.',
+        'cash_drawer' => 'The cash drawer belongs to a store. Switch to a store to open it.',
     ];
 
     public function handle(Request $request, Closure $next): Response

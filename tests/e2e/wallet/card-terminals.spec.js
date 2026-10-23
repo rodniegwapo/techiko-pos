@@ -1,7 +1,7 @@
 import { test, expect, apiJson } from "../support/fixtures.js";
 import { notice } from "../support/antd.js";
 import { pageProps } from "../support/inertia.js";
-import { cardTypeUrl, cardTypesUrl, money, walletFixture, walletUrl } from "../support/wallet.js";
+import { cardTypeUrl, cardTypesUrl, drawerUrl, money, walletFixture } from "../support/wallet.js";
 
 /** Unique card type name per test, so parallel and repeated runs never collide. */
 const uniqueName = (label) => `E2E Terminal ${label} ${Date.now().toString(36)}${Math.floor(Math.random() * 1000)}`;
@@ -60,13 +60,14 @@ test.describe("Card terminals page", () => {
         await expect(credit).toContainText(amount("Yesterday", cardSales.creditYesterday));
     });
 
-    test("links to money movement", async ({ page }) => {
+    test("sits under Where money is, with the drawer one tab away", async ({ page }) => {
         await openCardTerminals(page);
 
-        await page.getByRole("button", { name: "Open money movement" }).click();
+        await expect(page.getByTestId("wallet-tab-balances")).toHaveClass(/border-teal-600/);
+        await page.getByTestId("wallet-tab-drawer").click();
 
-        await expect(page).toHaveURL(new RegExp(walletUrl));
-        await expect(page.getByRole("heading", { name: "Ledger movements" })).toBeVisible();
+        await expect(page).toHaveURL(new RegExp(drawerUrl));
+        await expect(page.getByTestId("drawer-expected")).toBeVisible();
     });
 
     test.describe("adding a card type", () => {

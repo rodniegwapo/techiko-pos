@@ -355,18 +355,32 @@ const menuItems = [
         domainOnly: true,
         children: [
             {
-                key: "wallet-money-movement",
-                title: "Money movement",
-                routeName: "wallet.money-movement",
-                path: "/wallet/money-movement",
-                keywords: "cash drawer gcash",
+                key: "wallet-drawer",
+                title: "Today's drawer",
+                routeName: "wallet.drawer",
+                path: "/wallet/drawer",
+                keywords: "cash drawer shift opening count end shift money movement",
             },
             {
-                key: "wallet-card-terminals",
-                title: "Payment channels",
-                routeName: "payment-card-types.index",
-                path: "/payment-card-types",
-                keywords: "card terminals",
+                key: "wallet-cash-in-out",
+                title: "Cash in & out",
+                routeName: "wallet.cash-in-out",
+                path: "/wallet/cash-in-out",
+                keywords: "owner draw float gcash transfer ledger",
+            },
+            {
+                key: "wallet-balances",
+                title: "Where money is",
+                routeName: "wallet.balances",
+                path: "/wallet/balances",
+                keywords: "gcash bank card terminals payment channels balance",
+            },
+            {
+                key: "wallet-history",
+                title: "Drawer history",
+                routeName: "wallet.history",
+                path: "/wallet/history",
+                keywords: "counts opening changes closed shifts",
             },
         ],
     },
@@ -664,7 +678,7 @@ export function useNavMenu() {
                 return null;
             }
 
-            if (menu.key === "wallet-money-movement" || menu.key === "wallet-card-terminals") {
+            if (menu.key.startsWith("wallet-") && menu.key !== "wallet-group") {
                 router.get(routePath, { ...getLocationQueryFromPage(), ...walletMenuQuery() });
             } else if (getCurrentDomainFromUrl()) {
                 router.get(routePath, getLocationQueryFromPage());

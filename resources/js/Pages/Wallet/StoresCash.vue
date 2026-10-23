@@ -10,7 +10,7 @@ import { useHelpers } from "@/Composables/useHelpers";
 
 /**
  * The warehouse's Cash & Wallet: each store's closed shifts with their last count and the cash
- * taken out at end of shift. Read-only; stores record these on their own Money movement page.
+ * taken out at end of shift. Read-only; stores record these on their own Today's drawer page.
  */
 const props = defineProps({
     storesCash: { type: Object, required: true },
@@ -26,7 +26,7 @@ const filters = reactive({
 });
 
 const apply = () =>
-    router.get(getRoute("wallet.money-movement"), { ...filters }, { preserveScroll: true, preserveState: true });
+    router.get(getRoute("wallet.drawer"), { ...filters }, { preserveScroll: true, preserveState: true });
 
 const money = (v) => (v === null || v === undefined ? "—" : formattedTotal(Number(v)));
 
@@ -86,7 +86,7 @@ const totals = computed(() => props.storesCash.totals ?? {});
             </template>
             <template #table>
                 <p class="mb-3 px-1 text-xs text-gray-500">
-                    What each store counted when it closed its shift, and the cash it took out. Stores record these on their own Money movement page.
+                    What each store counted when it closed its shift, and the cash it took out. Stores record these on their own Today's drawer page.
                 </p>
                 <a-table
                     v-if="isMdUp"

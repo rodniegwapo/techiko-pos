@@ -38,6 +38,7 @@ use App\Http\Controllers\Domains\UserController;
 use App\Http\Controllers\Domains\UserPinController;
 use App\Http\Controllers\Domains\VatReportController;
 use App\Http\Controllers\Domains\WalletCashMovementController;
+use App\Http\Controllers\Domains\WalletPagesController;
 use App\Http\Controllers\MandatoryDiscountController;
 use App\Http\Controllers\Products\DiscountController;
 use App\Http\Controllers\TerminalController;
@@ -306,8 +307,15 @@ Route::prefix('domains/{domain:name_slug}')
             });
         });
 
-        // Wallet — money movement (cash control + ledger); distinct URL from card-type setup
-        Route::get('/wallet/money-movement', [PaymentCardTypeController::class, 'moneyMovement'])->name('wallet.money-movement');
+        // Cash & wallet: Today's drawer, Cash in & out, Where money is, Drawer history
+        Route::prefix('wallet')->name('wallet.')->group(function () {
+            Route::get('/drawer', [WalletPagesController::class, 'drawer'])->name('drawer');
+            Route::get('/cash-in-out', [WalletPagesController::class, 'cashInOut'])->name('cash-in-out');
+            Route::get('/balances', [WalletPagesController::class, 'balances'])->name('balances');
+            Route::get('/history', [WalletPagesController::class, 'history'])->name('history');
+            // The old all-in-one page: sends old links to the right page above.
+            Route::get('/money-movement', [PaymentCardTypeController::class, 'moneyMovement'])->name('money-movement');
+        });
 
         // Payment card types (Wallet) — domain-scoped
         Route::prefix('payment-card-types')->name('payment-card-types.')->group(function () {

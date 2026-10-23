@@ -13,3 +13,5 @@ keywords: supplier bill, payable, utang sa supplier, invoice from supplier, bill
 6. Optional: **Store (optional)** and **Notes**. Click **Save**.
 
 The bill shows under **Coming up** or **Overdue bills** until it is paid. The assistant can record a bill or add a supplier for you after you confirm.
+
+Stock ordered on a purchase order gets its bill automatically: in **Purchasing**, each **Receive** adds what arrived to the order's bill. Turn on **Pay now** there to pay it straight away.

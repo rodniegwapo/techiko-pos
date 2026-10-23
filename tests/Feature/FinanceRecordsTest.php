@@ -258,6 +258,30 @@ class FinanceRecordsTest extends TestCase
         $this->assertSame(0, WalletCashMovement::query()->count());
     }
 
+    public function test_a_warehouse_has_no_cash_drawer_to_pay_from(): void
+    {
+        $ctx = $this->seedDomainContext();
+        $warehouse = InventoryLocation::query()->create([
+            'domain' => $ctx['domain']->name_slug,
+            'name' => 'Main warehouse',
+            'code' => Str::upper(Str::random(8)),
+            'type' => 'warehouse',
+            'is_active' => true,
+        ]);
+        $bill = $this->bill($ctx, $this->supplier($ctx), 300);
+
+        $this->actingAs($ctx['user'])
+            ->post($this->url($ctx, 'finance.bill-payments.store', ['bill' => $bill->id]), [
+                'payment_date' => today()->toDateString(),
+                'amount' => 100,
+                'payment_method' => 'cash_register',
+                'location_id' => $warehouse->id,
+            ])
+            ->assertSessionHasErrors('location_id');
+
+        $this->assertSame(0, SupplierPayment::query()->count());
+    }
+
     public function test_income_statement_reaches_net_profit(): void
     {
         $ctx = $this->seedDomainContext();

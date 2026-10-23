@@ -12,3 +12,5 @@ keywords: pay supplier, supplier payment, bayad sa supplier, paid bill, settle b
 5. Click **Save payment**. The amount owed goes down; a bill paid in full drops off the list.
 
 The assistant can record a payment on a bill for you after you confirm.
+
+Paying when the stock arrives: in **Purchasing**, click **Receive** on the order, turn on **Pay now**, and choose how it was paid. Paid by **Cash on hand (register)** asks which store's **Cash drawer** the cash came out of (warehouses have no drawer). Whatever isn't paid stays on the supplier bill.

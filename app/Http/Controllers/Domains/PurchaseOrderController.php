@@ -5,12 +5,20 @@ namespace App\Http\Controllers\Domains;
 use App\Helpers;
 use App\Http\Controllers\Controller;
 use App\Models\Domain;
+use App\Models\Expense;
+use App\Models\Finance\FinancialAccount;
 use App\Models\Finance\Supplier;
 use App\Models\Finance\SupplierBill;
 use App\Models\InventoryLocation;
 use App\Models\Product\Product;
 use App\Models\Purchasing\PurchaseOrder;
+use App\Models\User;
+use App\Services\Finance\SupplierPaymentService;
 use App\Services\InventoryService;
+use App\Support\FinanceAccess;
+use App\Support\PaidFromAccount;
+use App\Support\RouteFeature;
+use App\Support\RoutePermission;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -21,11 +29,15 @@ use Inertia\Inertia;
 /**
  * Purchasing: order stock from a supplier for a store or warehouse, then receive it. Each delivery
  * brings the stock in (an inventory "purchase" movement) and puts its value on the order's
- * supplier bill, so it shows under Finance → Supplier bills to be paid.
+ * supplier bill, so it shows under Finance → Supplier bills to be paid. It can also be paid
+ * right away (Pay now), e.g. from a store's cash drawer.
  */
 class PurchaseOrderController extends Controller
 {
-    public function __construct(private readonly InventoryService $inventory) {}
+    public function __construct(
+        private readonly InventoryService $inventory,
+        private readonly SupplierPaymentService $payments,
+    ) {}
 
     public function index(Request $request, Domain $domain)
     {
@@ -56,12 +68,29 @@ class PurchaseOrderController extends Controller
             ->paginate(15)
             ->withQueryString();
 
+        $activeLocation = Helpers::getActiveLocation($domain);
+        $canPayNow = $this->canPayNow($request->user(), $domain);
+        $restrictedTo = FinanceAccess::restrictedLocationId($request->user());
+
         return Inertia::render('Purchasing/Index', [
             'orders' => $orders,
             'filters' => $validated,
             'suppliers' => Supplier::query()->forDomain($slug)->where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'locations' => InventoryLocation::query()->forDomain($slug)->active()->orderBy('name')->get(['id', 'name', 'type']),
-            'defaultLocationId' => Helpers::getActiveLocation($domain)?->id,
+            'defaultLocationId' => $activeLocation?->id,
+            // Paying the supplier while receiving: only for those who may pay bills.
+            'canPayNow' => $canPayNow,
+            'paymentMethods' => $canPayNow ? Expense::PAYMENT_METHODS : [],
+            'accounts' => $canPayNow
+                ? FinancialAccount::query()->forDomain($slug)->where('is_active', true)->orderBy('name')->get(['id', 'name', 'type'])
+                : [],
+            'drawerLocations' => $canPayNow
+                ? InventoryLocation::query()->forDomain($slug)->active()
+                    ->where(fn ($q) => $q->whereNull('type')->orWhere('type', '!=', 'warehouse'))
+                    ->when($restrictedTo, fn ($q, $id) => $q->whereKey($id))
+                    ->orderBy('name')->get(['id', 'name', 'type'])
+                : [],
+            'activeStoreId' => $activeLocation && ! $activeLocation->isWarehouse() ? $activeLocation->id : null,
         ]);
     }
 
@@ -79,6 +108,7 @@ class PurchaseOrderController extends Controller
                 'ordered_at' => $data['send'] ? now() : null,
                 'expected_date' => $data['expected_date'] ?? null,
                 'notes' => $data['notes'] ?? null,
+                ...$this->payFrom($data, $request->user()),
                 'user_id' => $request->user()->id,
             ]);
             $order->lines()->createMany($this->lines($data));
@@ -95,7 +125,7 @@ class PurchaseOrderController extends Controller
         }
         $data = $this->validated($request, $domain);
 
-        DB::transaction(function () use ($purchaseOrder, $data, $domain) {
+        DB::transaction(function () use ($purchaseOrder, $data, $domain, $request) {
             $purchaseOrder->update([
                 'supplier_id' => $this->supplierId($data, $domain),
                 'location_id' => $data['location_id'],
@@ -103,6 +133,7 @@ class PurchaseOrderController extends Controller
                 'ordered_at' => $data['send'] ? now() : null,
                 'expected_date' => $data['expected_date'] ?? null,
                 'notes' => $data['notes'] ?? null,
+                ...$this->payFrom($data, $request->user()),
             ]);
             $purchaseOrder->lines()->delete();
             $purchaseOrder->lines()->createMany($this->lines($data));
@@ -131,10 +162,20 @@ class PurchaseOrderController extends Controller
             throw ValidationException::withMessages(['status' => 'Only a sent order can be received.']);
         }
 
+        // Pay now: today, from a store's cash drawer or another way. The rest stays on the bill.
+        $payNow = $request->filled('pay_now');
+        if ($payNow && ! $this->canPayNow($request->user(), $domain)) {
+            throw ValidationException::withMessages(['pay_now' => 'You can\'t pay supplier bills. Receive it, and someone who can pays it under Finance → Supplier bills.']);
+        }
+        if ($payNow) {
+            $request->merge(['pay_now' => [...(array) $request->input('pay_now'), 'payment_date' => today()->toDateString()]]);
+        }
+
         $validated = $request->validate([
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.id' => ['required', 'integer'],
             'lines.*.quantity' => ['required', 'numeric', 'min:0'],
+            ...($payNow ? ['pay_now' => ['array'], ...SupplierPaymentService::rules($domain->name_slug, 'pay_now.')] : []),
         ]);
 
         $lines = $purchaseOrder->lines()->get()->keyBy('id');
@@ -159,7 +200,7 @@ class PurchaseOrderController extends Controller
             throw ValidationException::withMessages(['lines' => 'Enter how many of something arrived.']);
         }
 
-        DB::transaction(function () use ($purchaseOrder, $arrived, $request) {
+        $paid = DB::transaction(function () use ($purchaseOrder, $arrived, $request, $validated) {
             $this->inventory->receiveInventory(
                 $arrived->map(fn ($a) => [
                     'product_id' => $a['line']->product_id,
@@ -183,8 +224,17 @@ class PurchaseOrderController extends Controller
                 'received_at' => $complete ? now() : null,
             ]);
 
-            $this->syncBill($purchaseOrder, $request->user()->id);
+            $bill = $this->syncBill($purchaseOrder, $request->user()->id);
+
+            // A failed payment (too much, closed shift…) undoes the delivery too.
+            return isset($validated['pay_now'])
+                ? $this->payments->record($bill, $validated['pay_now'], $request->user(), 'pay_now.')
+                : null;
         });
+
+        if ($paid) {
+            return back()->with('success', 'Delivery received and ₱'.number_format((float) $paid->amount, 2).' paid to '.$purchaseOrder->supplier?->name.'.');
+        }
 
         return back()->with('success', 'Delivery received: stock and the supplier bill are updated.');
     }
@@ -202,7 +252,7 @@ class PurchaseOrderController extends Controller
     }
 
     /** The bill holds what has been received so far, at the order's costs. */
-    private function syncBill(PurchaseOrder $order, int $userId): void
+    private function syncBill(PurchaseOrder $order, int $userId): SupplierBill
     {
         $order->load(['lines', 'supplier']);
         $amount = round($order->lines->sum(fn ($l) => $l->quantity_received * $l->unit_cost), 2);
@@ -212,11 +262,12 @@ class PurchaseOrderController extends Controller
             $bill->update(['amount' => max($amount, (float) $bill->paid_amount)]);
             $bill->refreshPaid();
 
-            return;
+            return $bill;
         }
 
         $terms = (int) ($order->supplier?->payment_terms_days ?? 0);
-        SupplierBill::query()->create([
+
+        return SupplierBill::query()->create([
             'domain' => $order->domain,
             'location_id' => $order->location_id,
             'supplier_id' => $order->supplier_id,
@@ -247,7 +298,18 @@ class PurchaseOrderController extends Controller
             'lines.*.product_id' => ['required', 'integer', 'distinct', Rule::exists('products', 'id')->where('domain', $slug)],
             'lines.*.quantity_ordered' => ['required', 'numeric', 'gt:0'],
             'lines.*.unit_cost' => ['required', 'numeric', 'min:0'],
+            // How it will be paid (optional): Receive → Pay now starts from it.
+            'pay_method' => ['nullable', Rule::in(Expense::PAYMENT_METHODS)],
+            'pay_location_id' => [
+                'nullable',
+                'required_if:pay_method,cash_register',
+                'integer',
+                Rule::exists('inventory_locations', 'id')->where('domain', $slug)
+                    ->where(fn ($q) => $q->whereNull('type')->orWhere('type', '!=', 'warehouse')),
+            ],
+            'pay_account_id' => PaidFromAccount::rules($slug),
         ], [
+            'pay_location_id.required_if' => 'Choose which store\'s cash drawer will pay.',
             'lines.required' => 'Add at least one product.',
             'lines.*.product_id.distinct' => 'Each product goes on the order once.',
         ]) + ['send' => $request->boolean('send')];
@@ -274,6 +336,39 @@ class PurchaseOrderController extends Controller
             ['domain' => $domain->name_slug, 'name' => trim($data['supplier_name'])],
             ['is_active' => true],
         )->id;
+    }
+
+    /**
+     * The order's "Pay from", kept only for those who may pay bills; a manager only names their
+     * own store's drawer.
+     *
+     * @return array{pay_method: ?string, pay_location_id: ?int, pay_account_id: ?int}
+     */
+    private function payFrom(array $data, User $user): array
+    {
+        $method = $data['pay_method'] ?? null;
+        if (! $method || ! RoutePermission::allows($user, 'finance.bill-payments.store')) {
+            return ['pay_method' => null, 'pay_location_id' => null, 'pay_account_id' => null];
+        }
+
+        $locationId = $method === 'cash_register' ? (int) $data['pay_location_id'] : null;
+        $restrictedTo = FinanceAccess::restrictedLocationId($user);
+        if ($locationId && $restrictedTo !== null && $locationId !== $restrictedTo) {
+            throw ValidationException::withMessages(['pay_location_id' => 'You can only pay from your own store\'s cash drawer.']);
+        }
+
+        return [
+            'pay_method' => $method,
+            'pay_location_id' => $locationId,
+            'pay_account_id' => PaidFromAccount::keep($method, $data['pay_account_id'] ?? null),
+        ];
+    }
+
+    /** Paying a bill needs the bill-payment permission and Finance. */
+    private function canPayNow(?User $user, Domain $domain): bool
+    {
+        return RoutePermission::allows($user, 'finance.bill-payments.store')
+            && RouteFeature::allows($domain, 'finance.bill-payments.store');
     }
 
     private function ensureOwned(PurchaseOrder $order, Domain $domain): void

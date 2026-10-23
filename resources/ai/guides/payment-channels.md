@@ -5,7 +5,7 @@ page: payment-card-types.index
 requires: payment-card-types.index, payment-card-types.store
 keywords: payment channel, add gcash, add maya, card terminal, bank, payment method, e-wallet option, payment options
 ---
-1. In the sidebar, open **Cash & wallet → Payment channels**.
+1. In the sidebar, open **Cash & wallet → Where money is** and click **Manage channels**.
 2. Click **Add channel**.
 3. Choose the **Channel type** (card, e-wallet or bank) and the **Display name** (e.g. GCash, Maya, BDO, Visa terminal). Keep it **Active**.
 4. Click **Save**. Cashiers can now pick it when taking a card, e-wallet or bank payment.

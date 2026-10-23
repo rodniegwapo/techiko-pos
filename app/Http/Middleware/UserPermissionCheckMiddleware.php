@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\RoutePermission;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -61,20 +62,9 @@ class UserPermissionCheckMiddleware
             return true;
         }
 
-        // Normalize domain routes to base routes for permission matching
-        $permissionRoute = $this->normalizeRouteForPermission($routeName);
-
-        if ($permissionRoute === 'billing.gcash.legacy') {
-            $permissionRoute = 'billing.servicing.index';
-        }
-
-        $permissions = $user->getAllPermissions();
-
-        if ($permissionRoute === 'payment-card-types.details') {
-            return $permissions->contains('route_name', 'payment-card-types.money');
-        }
-
-        return $permissions->contains('route_name', $permissionRoute);
+        // Normalize domain routes to base routes for permission matching; RoutePermission
+        // knows the pages that open with another page's permission.
+        return RoutePermission::allows($user, $this->normalizeRouteForPermission($routeName));
     }
 
     /**

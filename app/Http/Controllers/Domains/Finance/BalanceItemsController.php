@@ -102,7 +102,7 @@ class BalanceItemsController extends Controller
             'channels' => PaymentCardType::query()->forDomain($slug)->active()->with('location:id,name')->orderBy('name')->get(['id', 'name', 'kind', 'location_id'])
                 ->map(fn (PaymentCardType $t) => ['id' => $t->id, 'name' => $t->name, 'kind' => $t->kind, 'location' => $t->location?->name]),
             'liabilityCategories' => OtherLiability::CATEGORIES,
-            'locations' => InventoryLocation::query()->forDomain($slug)->active()->orderBy('name')->get(['id', 'name']),
+            'locations' => InventoryLocation::query()->forDomain($slug)->active()->orderBy('name')->get(['id', 'name', 'type']),
             'paymentMethods' => Expense::PAYMENT_METHODS,
             'assetCategories' => FixedAsset::CATEGORIES,
             'defaultLocationId' => $request->user()->location_id,

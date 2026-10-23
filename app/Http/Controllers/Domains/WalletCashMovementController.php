@@ -62,7 +62,7 @@ class WalletCashMovementController extends Controller
         $qs = $request->getQueryString();
 
         return redirect()->to(
-            route('domains.wallet.money-movement', ['domain' => $domain]).($qs ? '?'.$qs : '')
+            route('domains.wallet.cash-in-out', ['domain' => $domain]).($qs ? '?'.$qs : '')
         );
     }
 
