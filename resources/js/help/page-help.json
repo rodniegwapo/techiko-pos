@@ -83,7 +83,7 @@
         ]
     },
     "Finance/CashFlow": {
-        "title": "Cash flow",
+        "title": "Money in & out",
         "en": "Where money came from and where it went in a period. It explains why profit and cash on hand are different.",
         "tl": "Saan galing ang pera at saan napunta sa isang panahon. Ipinapaliwanag kung bakit magkaiba ang kita at ang hawak na pera.",
         "guides": [
@@ -94,7 +94,7 @@
         ]
     },
     "Finance/BalanceSheet": {
-        "title": "Balance sheet",
+        "title": "What you own & owe",
         "en": "What the business owns (cash, stock, equipment) and what it owes (bills, loans) on a given day.",
         "tl": "Ang mga pag-aari ng negosyo (pera, stock, gamit) at ang mga utang nito (bayarin, loan) sa isang araw.",
         "guides": [
@@ -105,7 +105,7 @@
         ]
     },
     "Finance/Receivables": {
-        "title": "Receivables",
+        "title": "Customers' utang",
         "en": "Money customers still owe the business, such as credit (utang), and which payments are late.",
         "tl": "Pera na inuutang pa ng mga customer sa negosyo, gaya ng utang, at kung alin ang lampas na sa due date.",
         "guides": [
@@ -117,7 +117,7 @@
         ]
     },
     "Finance/Payables": {
-        "title": "Supplier bills",
+        "title": "Bills to pay",
         "en": "What the business owes suppliers. Record bills, see what is due soon and pay them.",
         "tl": "Mga utang ng negosyo sa mga supplier. Itala ang bill, tingnan ang malapit nang i-due, at bayaran ang mga ito.",
         "guides": [
@@ -141,7 +141,7 @@
         ]
     },
     "Finance/AssetsAndLoans": {
-        "title": "Accounts, loans & assets",
+        "title": "Bank, loans & equipment",
         "en": "Bank and e-wallet balances, loans and their repayments, equipment, and money the owner put in or took out.",
         "tl": "Balanse sa bangko at e-wallet, mga loan at bayad dito, mga gamit ng negosyo, at perang inilagay o kinuha ng may-ari.",
         "guides": [
@@ -154,7 +154,7 @@
         ]
     },
     "Finance/MonthlyReviews": {
-        "title": "Monthly reviews",
+        "title": "Monthly review",
         "en": "A short review of each month compared with the month before: what went well, what needs attention, and what to do next.",
         "tl": "Maikling pagsusuri ng bawat buwan kumpara sa nakaraang buwan: ano ang maganda, ano ang dapat ayusin, at ano ang susunod na gagawin.",
         "guides": [

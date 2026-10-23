@@ -87,8 +87,8 @@ class WalletPagesTest extends TestCase
     {
         $drawerOnly = $this->user(['wallet.money-movement']);
         $this->actingAs($drawerOnly)->get($this->url('drawer'))->assertOk();
-        $this->actingAs($drawerOnly)->get($this->url('history'))->assertOk()->assertInertia(fn (Assert $page) => $page
-            ->component('Wallet/History')->has('cashControl.count_submission_history')->has('closedShifts.rows'));
+        // Drawer history (past counts, short/over) is for those who keep the books.
+        $this->actingAs($drawerOnly)->get($this->url('history'))->assertForbidden();
         $this->actingAs($drawerOnly)->get($this->url('cash-in-out'))->assertForbidden();
         $this->actingAs($drawerOnly)->get($this->url('balances'))->assertForbidden();
 
@@ -98,6 +98,8 @@ class WalletPagesTest extends TestCase
         $this->actingAs($ledger)->get($this->url('balances'))->assertOk()->assertInertia(fn (Assert $page) => $page
             ->component('Wallet/Balances')->where('canSeeBalances', true)->where('drawerExpected', 0));
         $this->actingAs($ledger)->get($this->url('drawer'))->assertForbidden();
+        $this->actingAs($ledger)->get($this->url('history'))->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->component('Wallet/History')->has('cashControl.count_submission_history')->has('closedShifts.rows'));
 
         // Channels only: Where money is opens, without the balances.
         $channels = $this->user(['payment-card-types.index']);
@@ -139,7 +141,7 @@ class WalletPagesTest extends TestCase
 
     public function test_route_permission_follows_the_aliases(): void
     {
-        $this->assertSame(['wallet.money-movement'], RoutePermission::permissionsFor('domains.wallet.history'));
+        $this->assertSame(['wallet-cash-ledger.index'], RoutePermission::permissionsFor('domains.wallet.history'));
         $this->assertSame(['products.index'], RoutePermission::permissionsFor('domains.products.index'));
 
         $money = $this->user(['payment-card-types.money']);

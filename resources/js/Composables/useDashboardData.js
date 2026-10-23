@@ -23,8 +23,11 @@ export function useDashboardData() {
     const graphFilter = ref("daily");
 
     onMounted(() => {
-        selectedLocation.value =
-            props.filters?.location_id || props.currentLocation?.id || null;
+        // A warehouse's dashboard sums every store: no location filter to start from.
+        const atWarehouse = props.allLocations || props.currentLocation?.type === "warehouse";
+        selectedLocation.value = atWarehouse
+            ? null
+            : props.filters?.location_id || props.currentLocation?.id || null;
     });
 
     const getItems = () => {

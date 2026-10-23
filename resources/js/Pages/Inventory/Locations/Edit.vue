@@ -2,6 +2,7 @@
 import { reactive, ref, onMounted } from "vue";
 import { router, Head } from "@inertiajs/vue3";
 import { SaveOutlined, ArrowLeftOutlined } from "@ant-design/icons-vue";
+import { notification } from "ant-design-vue";
 import { IconBuilding, IconBuildingWarehouse, IconTruck, IconUser } from "@tabler/icons-vue";
 
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
@@ -68,7 +69,11 @@ const submit = async () => {
   errors.value = {};
 
   router.put(getRoute("inventory.locations.update", { location: props.location?.data?.id }), form, {
-    onSuccess: () => {},
+    // Say it worked, then back to the list.
+    onSuccess: (page) => {
+      notification.success({ message: page.props.flash?.success || "Location updated" });
+      router.visit(getRoute("inventory.locations.index"));
+    },
     onError: (formErrors) => {
       errors.value = formErrors;
     },

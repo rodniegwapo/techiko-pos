@@ -165,7 +165,7 @@ class PayablesController extends Controller
     {
         abort_unless($bill->domain === $domain->name_slug, 404);
 
-        $validated = $request->validate(SupplierPaymentService::rules($domain->name_slug));
+        $validated = $request->validate(SupplierPaymentService::rules($domain->name_slug), SupplierPaymentService::messages());
 
         DB::transaction(fn () => $this->payments->record($bill, $validated, $request->user()));
 

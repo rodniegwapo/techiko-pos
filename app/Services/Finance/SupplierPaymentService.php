@@ -12,7 +12,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 /**
- * A payment on a supplier bill: Finance → Supplier bills → Pay, and Purchasing → Receive → Pay now.
+ * A payment on a supplier bill: Finance → Bills to pay → Pay, and Purchasing → Receive → Pay now.
  * Paid from the cash drawer means a ledger line out of that store's drawer. Call inside a
  * transaction: the bill is locked while it is paid.
  */
@@ -42,6 +42,17 @@ class SupplierPaymentService
             $prefix.'financial_account_id' => PaidFromAccount::rules($domainSlug),
             $prefix.'reference_no' => ['nullable', 'string', 'max:80'],
             $prefix.'notes' => ['nullable', 'string', 'max:255'],
+        ];
+    }
+
+    /** @return array<string, string> Plain words for the fields people get wrong. */
+    public static function messages(string $prefix = ''): array
+    {
+        return [
+            $prefix.'location_id.required_if' => 'Pick which store\'s cash drawer paid this.',
+            $prefix.'location_id.exists' => 'Pick a store\'s cash drawer; a warehouse has none.',
+            $prefix.'payment_date.before_or_equal' => 'A payment can\'t be dated in the future.',
+            $prefix.'amount.min' => 'Enter how much was paid.',
         ];
     }
 

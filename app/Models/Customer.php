@@ -10,6 +10,19 @@ class Customer extends Model
 {
     use HasFactory, Searchable;
 
+    protected static function booted(): void
+    {
+        // A new customer starts on their organization's lowest tier from Tier Management, not a
+        // fixed "bronze" the organization may not have.
+        static::creating(function (Customer $customer) {
+            $tiers = LoyaltyTier::query()->active()->where('domain', $customer->domain);
+            if ($customer->tier && (clone $tiers)->where('name', $customer->tier)->exists()) {
+                return;
+            }
+            $customer->tier = LoyaltyTier::lowestFor($customer->domain)?->name ?? $customer->tier ?? 'bronze';
+        });
+    }
+
     protected $guarded = [
         'id',
         'created_at',
@@ -39,7 +52,8 @@ class Customer extends Model
     // }
 
     // Add scope for easy domain filtering
-    public function scopeForDomain($query, $domain) {
+    public function scopeForDomain($query, $domain)
+    {
         return $query->where('domain', $domain);
     }
 
@@ -74,15 +88,11 @@ class Customer extends Model
 
     public function getTierInfo(): array
     {
-        // The tier as this customer's own organization defines it.
-        $tiers = \App\Models\LoyaltyTier::query()->where('domain', $this->domain);
-
-        $tierModel = (clone $tiers)->where('name', $this->tier ?? 'bronze')->first();
-
-        if (! $tierModel) {
-            // Fallback to bronze if tier not found
-            $tierModel = (clone $tiers)->where('name', 'bronze')->first();
-        }
+        // The tier as this customer's own organization defines it in Tier Management; a tier that
+        // was switched off or removed falls back to the organization's starting tier.
+        $tierModel = LoyaltyTier::query()->active()->where('domain', $this->domain)
+            ->where('name', $this->tier)->first()
+            ?? LoyaltyTier::lowestFor($this->domain);
 
         if (! $tierModel) {
             // Ultimate fallback if no tiers exist
@@ -119,7 +129,9 @@ class Customer extends Model
         $previousTier = $this->tier;
 
         // Get appropriate tier based on spending, among this customer's organization's tiers
-        $newTierModel = \App\Models\LoyaltyTier::getTierForSpending($this->lifetime_spent ?? 0, $this->domain);
+        // Below every threshold (or the old tier was switched off): the starting tier.
+        $newTierModel = LoyaltyTier::getTierForSpending($this->lifetime_spent ?? 0, $this->domain)
+            ?? LoyaltyTier::lowestFor($this->domain);
 
         if ($newTierModel && $previousTier !== $newTierModel->name) {
             $this->update([
@@ -200,7 +212,7 @@ class Customer extends Model
 
     public function canPurchaseOnCredit(float $amount): bool
     {
-        if (!$this->credit_enabled) {
+        if (! $this->credit_enabled) {
             return false;
         }
 

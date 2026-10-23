@@ -19,7 +19,8 @@ class RoutePermission
     public const ALIASES = [
         // The wallet pages, split out of the old Money movement page.
         'wallet.drawer' => ['wallet.money-movement'],
-        'wallet.history' => ['wallet.money-movement'],
+        // Past counts and their short/over: for those who keep the books, not the cashier.
+        'wallet.history' => ['wallet-cash-ledger.index'],
         'wallet.cash-in-out' => ['wallet-cash-ledger.index'],
         'wallet.balances' => ['wallet-cash-ledger.index', 'payment-card-types.index'],
         'payment-card-types.details' => ['payment-card-types.money'],

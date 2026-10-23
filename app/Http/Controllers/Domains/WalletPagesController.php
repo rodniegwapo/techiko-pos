@@ -37,9 +37,22 @@ class WalletPagesController extends Controller
             ]);
         }
 
+        $cashControl = CashControlSnapshot::build($domain, $location, $this->businessDate($request), (int) $request->user()->id);
+        // A cashier counts and sees what should be in the drawer, not whether their count came out
+        // short or over: that, and the count history, stay with managers.
+        $canSeeCountResult = FinanceAccess::canManage($request->user());
+        if (! $canSeeCountResult) {
+            $cashControl = [
+                ...collect($cashControl)->reject(fn ($v, $key) => str_starts_with($key, 'bridge_'))->all(),
+                'variance' => null,
+                'count_submission_history' => [],
+            ];
+        }
+
         return Inertia::render('Wallet/Drawer', [
             ...$this->pageProps($request, $domain, $location),
-            'cashControl' => CashControlSnapshot::build($domain, $location, $this->businessDate($request), (int) $request->user()->id),
+            'cashControl' => $cashControl,
+            'canSeeCountResult' => $canSeeCountResult,
         ]);
     }
 

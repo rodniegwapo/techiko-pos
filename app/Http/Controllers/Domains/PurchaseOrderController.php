@@ -29,7 +29,7 @@ use Inertia\Inertia;
 /**
  * Purchasing: order stock from a supplier for a store or warehouse, then receive it. Each delivery
  * brings the stock in (an inventory "purchase" movement) and puts its value on the order's
- * supplier bill, so it shows under Finance → Supplier bills to be paid. It can also be paid
+ * supplier bill, so it shows under Finance → Bills to pay to be paid. It can also be paid
  * right away (Pay now), e.g. from a store's cash drawer.
  */
 class PurchaseOrderController extends Controller
@@ -165,7 +165,7 @@ class PurchaseOrderController extends Controller
         // Pay now: today, from a store's cash drawer or another way. The rest stays on the bill.
         $payNow = $request->filled('pay_now');
         if ($payNow && ! $this->canPayNow($request->user(), $domain)) {
-            throw ValidationException::withMessages(['pay_now' => 'You can\'t pay supplier bills. Receive it, and someone who can pays it under Finance → Supplier bills.']);
+            throw ValidationException::withMessages(['pay_now' => 'You can\'t pay supplier bills. Receive it, and someone who can pays it under Finance → Bills to pay.']);
         }
         if ($payNow) {
             $request->merge(['pay_now' => [...(array) $request->input('pay_now'), 'payment_date' => today()->toDateString()]]);
@@ -176,7 +176,7 @@ class PurchaseOrderController extends Controller
             'lines.*.id' => ['required', 'integer'],
             'lines.*.quantity' => ['required', 'numeric', 'min:0'],
             ...($payNow ? ['pay_now' => ['array'], ...SupplierPaymentService::rules($domain->name_slug, 'pay_now.')] : []),
-        ]);
+        ], SupplierPaymentService::messages('pay_now.'));
 
         $lines = $purchaseOrder->lines()->get()->keyBy('id');
         $arrived = collect($validated['lines'])

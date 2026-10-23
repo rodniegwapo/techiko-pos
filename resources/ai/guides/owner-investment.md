@@ -5,7 +5,7 @@ page: finance.balance-items.index
 requires: finance.balance-items.index, finance.owner-investments.store
 keywords: owner investment, capital, puhunan, added capital, owner money, investment, owner withdrawal, owner draw
 ---
-1. In the sidebar, open **Finance → Accounts, loans & assets** and go to **Owner investments**.
+1. In the sidebar, open **Finance → Bank, loans & equipment** and go to **Owner investments**.
 2. Click **Record investment**.
 3. Enter the **Amount**, the **Date** and how the money came in.
 4. Optional: **Notes** (e.g. "Capital for the new branch"). Click **Save**.

@@ -63,8 +63,8 @@ const overdueColumns = [
 
 <template>
     <AuthenticatedLayout>
-        <Head title="Customer credit" />
-        <ContentHeader class="mb-4 md:mb-6" title="Customer credit" />
+        <Head title="Customers' utang" />
+        <ContentHeader class="mb-4 md:mb-6" title="Customers' utang" />
         <ContentLayout title="How much do my customers owe me?" filter-class="flex flex-wrap items-center justify-end gap-2 w-full min-w-0">
             <template #filters>
                 <RefreshButton :loading="spinning" @click="load()" />

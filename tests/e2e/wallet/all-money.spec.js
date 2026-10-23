@@ -5,7 +5,16 @@ const DOMAIN = USERS.admin.domain;
 const url = (path) => `/domains/${DOMAIN}${path}`;
 
 async function pickOption(page, label) {
-    await page.locator(".ant-select-dropdown:visible .ant-select-item-option", { hasText: label }).first().click();
+    // The list is virtual: an option far down (e.g. after many test runs' accounts) isn't in the
+    // page until scrolled to.
+    const dropdown = page.locator(".ant-select-dropdown:visible").last();
+    const option = dropdown.locator(".ant-select-item-option", { hasText: label }).first();
+    const holder = dropdown.locator(".rc-virtual-list-holder");
+    for (let i = 0; i < 200 && !(await option.isVisible()); i++) {
+        await holder.evaluate((el) => (el.scrollTop += 120));
+        await page.waitForTimeout(40);
+    }
+    await option.click();
 }
 const input = (scope, testId) => scope.getByTestId(testId).locator("input").or(scope.getByTestId(testId)).first();
 

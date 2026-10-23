@@ -20,6 +20,8 @@ const props = defineProps({
     cashControl: { type: Object, required: true },
     activeLocation: { type: Object, default: null },
     canViewAllMoney: { type: Boolean, default: false },
+    /** Managers see whether a count came out short or over; a cashier sees what should be there. */
+    canSeeCountResult: { type: Boolean, default: true },
 });
 
 const { hasPermission } = usePermissionsV2();
@@ -108,7 +110,7 @@ async function endShift(action) {
 
             <!-- The three numbers -->
             <div class="lg:col-span-3">
-                <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div class="grid grid-cols-1 gap-3" :class="canSeeCountResult ? 'sm:grid-cols-3' : 'sm:grid-cols-2'">
                     <div class="rounded-lg border border-gray-200 bg-white px-4 py-4 shadow-sm">
                         <div class="text-xs font-medium uppercase text-gray-500">Expected</div>
                         <div class="mt-1 font-mono text-2xl font-bold tabular-nums text-gray-900" data-testid="drawer-expected">
@@ -122,7 +124,7 @@ async function endShift(action) {
                         </div>
                         <div v-if="cashControl.counted_by_user" class="text-xs text-gray-500">by {{ cashControl.counted_by_user.name }}</div>
                     </div>
-                    <div class="rounded-lg border border-gray-200 bg-white px-4 py-4 shadow-sm">
+                    <div v-if="canSeeCountResult" class="rounded-lg border border-gray-200 bg-white px-4 py-4 shadow-sm">
                         <div class="text-xs font-medium uppercase text-gray-500">Short / Over</div>
                         <div
                             class="mt-1 font-mono text-2xl font-bold tabular-nums"
@@ -154,7 +156,7 @@ async function endShift(action) {
                     </a-button>
                     <span v-else class="text-xs text-gray-500">Only the person who ended this shift can reopen it.</span>
                 </div>
-                <p class="mb-0 mt-3 text-xs text-gray-500">
+                <p v-if="canSeeCountResult" class="mb-0 mt-3 text-xs text-gray-500">
                     Counts, opening changes and past shifts are in
                     <a-button type="link" class="h-auto p-0 text-xs" @click="visit('wallet.history')">Drawer history</a-button>.
                 </p>
@@ -171,6 +173,7 @@ async function endShift(action) {
         <CountCashModal
             :open="modal === 'count'"
             :cash-control="cashControl"
+            :show-result="canSeeCountResult"
             :saving="actions.busy.value === 'count'"
             @close="modal = null"
             @save="saveCount"

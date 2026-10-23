@@ -297,8 +297,10 @@ class DashboardController extends Controller
     {
         $today = now()->startOfDay();
 
+        // Stores only: a warehouse doesn't sell.
         $locations = InventoryLocation::active()
             ->forDomain($domain)
+            ->where(fn ($q) => $q->whereNull('type')->orWhere('type', '!=', 'warehouse'))
             ->with(['sales' => function ($query) use ($today, $domain) {
                 $query->where('payment_status', 'paid')
                     ->where('domain', $domain)

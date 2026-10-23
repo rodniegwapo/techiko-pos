@@ -363,7 +363,6 @@ class SaleController extends Controller
                 &$loyaltyResults,
                 &$creditResults,
                 $location,
-                $domain,
                 $redemptionService,
                 $transactionDate,
             ) {
@@ -991,7 +990,7 @@ class SaleController extends Controller
                 'name' => $customer->name,
                 'phone' => $customer->phone,
                 'loyalty_points' => $customer->loyalty_points,
-                'tier_info' => $customer->tier_info,
+                'tier_info' => $customer->getTierInfo(),
                 'loyalty_id' => $customer->loyalty_id,
                 'membership_number' => $customer->membership_number,
             ];

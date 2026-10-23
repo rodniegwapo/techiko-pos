@@ -28,7 +28,7 @@ class LoyaltyTier extends Model
     protected $casts = [
         'multiplier' => 'decimal:2',
         'spending_threshold' => 'decimal:2',
-        'is_active' => 'boolean'
+        'is_active' => 'boolean',
     ];
 
     /**
@@ -41,7 +41,8 @@ class LoyaltyTier extends Model
     // }
 
     // Add scope for easy domain filtering
-    public function scopeForDomain($query, $domain) {
+    public function scopeForDomain($query, $domain)
+    {
         return $query->where('domain', $domain);
     }
 
@@ -63,6 +64,16 @@ class LoyaltyTier extends Model
             ->when($domain, fn ($query) => $query->forDomain($domain))
             ->where('spending_threshold', '<=', $amount)
             ->orderBy('spending_threshold', 'desc')
+            ->first();
+    }
+
+    /** The tier a customer starts on: the organization's active tier with the lowest threshold. */
+    public static function lowestFor(?string $domain)
+    {
+        return static::active()
+            ->when($domain, fn ($query) => $query->forDomain($domain))
+            ->orderBy('spending_threshold')
+            ->orderBy('sort_order')
             ->first();
     }
 

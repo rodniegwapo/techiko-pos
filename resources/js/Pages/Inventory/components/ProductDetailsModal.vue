@@ -369,8 +369,8 @@ const allLocations = computed(() => props.product?.product?.locations || []);
         </div>
       </div>
 
-      <!-- Financial Information -->
-      <div>
+      <!-- Financial Information: at cost, for those who keep the books -->
+      <div v-if="$page.props.canSeeCost">
         <h4 class="text-lg font-semibold mb-3 flex items-center">
           <IconCurrencyDollar :size="20" class="mr-2" />
           Financial Information
@@ -411,7 +411,7 @@ const allLocations = computed(() => props.product?.product?.locations || []);
                 formatCurrency(product.product?.price)
               }}</span>
             </div>
-            <div class="flex justify-between gap-2">
+            <div v-if="$page.props.canSeeCost" class="flex justify-between gap-2">
               <span class="text-gray-600">Cost Price:</span>
               <span class="font-semibold">{{
                 formatCurrency(product.product?.cost)

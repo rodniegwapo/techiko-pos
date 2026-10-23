@@ -438,6 +438,9 @@ useBarcodeScanner((code) => {
                                         :precision="2"
                                         size="large"
                                     />
+                                    <p class="mb-0 mt-1 text-xs text-gray-500">
+                                        Updated to the average cost each time stock is received.
+                                    </p>
                                 </a-form-item>
 
                                 <a-form-item

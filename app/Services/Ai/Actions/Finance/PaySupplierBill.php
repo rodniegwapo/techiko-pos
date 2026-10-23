@@ -15,7 +15,7 @@ use Carbon\Carbon;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Collection;
 
-/** Records a payment on a supplier bill, like Finance → Supplier bills → Pay. */
+/** Records a payment on a supplier bill, like Finance → Bills to pay → Pay. */
 class PaySupplierBill implements AssistantAction, HasInputTemplate
 {
     use DescribesValues;

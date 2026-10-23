@@ -8,6 +8,8 @@ const props = defineProps({
     open: { type: Boolean, default: false },
     cashControl: { type: Object, required: true },
     saving: { type: Boolean, default: false },
+    /** Off for cashiers: they count, a manager sees short or over. */
+    showResult: { type: Boolean, default: true },
 });
 const emit = defineEmits(["close", "save"]);
 const { formattedTotal } = useHelpers();
@@ -47,7 +49,7 @@ const preview = computed(() =>
                 Count the cash in the drawer. Expected: <span class="font-semibold">{{ formattedTotal(Number(cashControl.expected_cash) || 0) }}</span>
             </p>
             <a-input-number v-model:value="amount" :min="0" :step="0.01" :precision="2" class="w-full" addon-before="₱" data-testid="count-amount" />
-            <p v-if="preview" class="m-0 text-sm font-medium" :class="TONE_CLASSES[preview.tone]" data-testid="count-preview">
+            <p v-if="preview && showResult" class="m-0 text-sm font-medium" :class="TONE_CLASSES[preview.tone]" data-testid="count-preview">
                 {{ preview.amount ? `${preview.label} ${formattedTotal(preview.amount)}` : preview.label }}
             </p>
             <a-textarea v-model:value="notes" :rows="2" placeholder="Notes (optional)" />

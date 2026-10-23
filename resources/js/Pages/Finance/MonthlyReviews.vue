@@ -47,8 +47,8 @@ const summary = computed(() => answerSections(props.selected?.ai_summary));
 
 <template>
     <AuthenticatedLayout>
-        <Head title="Monthly reviews" />
-        <ContentHeader class="mb-4 md:mb-6" title="Monthly business reviews" />
+        <Head title="Monthly review" />
+        <ContentHeader class="mb-4 md:mb-6" title="Monthly review" />
         <ContentLayout title="How did the month go?" filter-class="flex flex-wrap items-center justify-end gap-2 w-full min-w-0">
             <template #filters>
                 <RefreshButton :loading="spinning" @click="router.reload()" />

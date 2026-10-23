@@ -11,7 +11,7 @@ use App\Services\Ai\Actions\HasInputTemplate;
 use App\Services\Ai\Actions\PreparedAction;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 
-/** Adds a supplier, like Finance → Supplier bills → add supplier. */
+/** Adds a supplier, like Finance → Bills to pay → add supplier. */
 class CreateSupplier implements AssistantAction, HasInputTemplate
 {
     public function __construct(private readonly ControllerCall $call) {}

@@ -244,8 +244,8 @@ const investmentColumns = [
 
 <template>
     <AuthenticatedLayout>
-        <Head title="Accounts, loans & assets" />
-        <ContentHeader class="mb-4 md:mb-6" title="Accounts, loans & assets" />
+        <Head title="Bank, loans & equipment" />
+        <ContentHeader class="mb-4 md:mb-6" title="Bank, loans & equipment" />
         <ContentLayout title="Everything else on the balance sheet" filter-class="flex flex-wrap items-center justify-end gap-2 w-full min-w-0">
             <template #filters>
                 <RefreshButton :loading="spinning" @click="reload" />

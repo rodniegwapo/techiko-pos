@@ -3,15 +3,18 @@
 namespace App\Models\Product;
 
 use App\Models\Category;
-use App\Models\SaleItem;
-use App\Models\ProductInventory;
-use App\Models\InventoryMovement;
 use App\Models\InventoryLocation;
+use App\Models\InventoryMovement;
 use App\Models\LocationProduct;
+use App\Models\ModifierGroup;
+use App\Models\ProductInventory;
+use App\Models\SaleItem;
+use App\Support\CostVisibility;
 use App\Traits\Searchable;
 use Database\Factories\Product\ProductFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 class Product extends Model
 {
@@ -19,13 +22,19 @@ class Product extends Model
 
     protected $guarded = [];
 
+    /** Cost stays with those who keep the books (CostVisibility); cashiers get prices and stock. */
+    public function toArray()
+    {
+        return CostVisibility::strip(parent::toArray(), ['cost']);
+    }
+
     protected $searchable = [
         'price',
         'cost',
         'name',
         'SKU',
         'barcode',
-        'category.name'
+        'category.name',
     ];
 
     protected $casts = [
@@ -86,7 +95,7 @@ class Product extends Model
         if (! $locationId) {
             return null;
         }
-        $price = \Illuminate\Support\Facades\DB::table('location_product')
+        $price = DB::table('location_product')
             ->where('product_id', $this->id)
             ->where('location_id', $locationId)
             ->value('price');
@@ -112,7 +121,7 @@ class Product extends Model
             return [];
         }
 
-        return \Illuminate\Support\Facades\DB::table('location_product')
+        return DB::table('location_product')
             ->where('location_id', $locationId)
             ->whereIn('product_id', collect($productIds)->all())
             ->whereNotNull('price')
@@ -150,12 +159,11 @@ class Product extends Model
     /** The option groups picked when this product is rung up (Size, Add-ons…), in their order. */
     public function modifierGroups()
     {
-        return $this->belongsToMany(\App\Models\ModifierGroup::class, 'product_modifier_group')
+        return $this->belongsToMany(ModifierGroup::class, 'product_modifier_group')
             ->withPivot('sort_order')
             ->orderBy('product_modifier_group.sort_order')
             ->orderBy('modifier_groups.id');
     }
-
 
     /**
      * Get the inventory records for this product
@@ -187,6 +195,7 @@ class Product extends Model
     public function defaultInventory()
     {
         $defaultLocation = InventoryLocation::getDefault();
+
         return $defaultLocation ? $this->inventoryAt($defaultLocation) : null;
     }
 
@@ -209,14 +218,15 @@ class Product extends Model
     /**
      * Check if product is in stock at any location
      */
-    public function isInStock($quantity = 1, InventoryLocation $location = null)
+    public function isInStock($quantity = 1, ?InventoryLocation $location = null)
     {
-        if (!$this->track_inventory) {
+        if (! $this->track_inventory) {
             return true; // Non-tracked items are always "in stock"
         }
 
         if ($location) {
             $inventory = $this->inventoryAt($location);
+
             return $inventory ? $inventory->isInStock($quantity) : false;
         }
 
@@ -226,14 +236,15 @@ class Product extends Model
     /**
      * Check if product is low stock
      */
-    public function isLowStock(InventoryLocation $location = null)
+    public function isLowStock(?InventoryLocation $location = null)
     {
-        if (!$this->track_inventory) {
+        if (! $this->track_inventory) {
             return false;
         }
 
         if ($location) {
             $inventory = $this->inventoryAt($location);
+
             return $inventory ? $inventory->isLowStock() : true;
         }
 
@@ -243,14 +254,15 @@ class Product extends Model
     /**
      * Get stock status
      */
-    public function getStockStatus(InventoryLocation $location = null)
+    public function getStockStatus(?InventoryLocation $location = null)
     {
-        if (!$this->track_inventory) {
+        if (! $this->track_inventory) {
             return 'in_stock';
         }
 
         if ($location) {
             $inventory = $this->inventoryAt($location);
+
             return $inventory ? $inventory->getStockStatus() : 'out_of_stock';
         }
 
@@ -278,7 +290,7 @@ class Product extends Model
     /**
      * Scope for products that are in stock
      */
-    public function scopeInStock($query, InventoryLocation $location = null)
+    public function scopeInStock($query, ?InventoryLocation $location = null)
     {
         if ($location) {
             return $query->whereHas('inventories', function ($q) use ($location) {
@@ -295,7 +307,7 @@ class Product extends Model
     /**
      * Scope for products that are low stock
      */
-    public function scopeLowStock($query, InventoryLocation $location = null)
+    public function scopeLowStock($query, ?InventoryLocation $location = null)
     {
         $query->where('track_inventory', true);
 
@@ -313,7 +325,7 @@ class Product extends Model
     /**
      * Scope for products that are out of stock
      */
-    public function scopeOutOfStock($query, InventoryLocation $location = null)
+    public function scopeOutOfStock($query, ?InventoryLocation $location = null)
     {
         $query->where('track_inventory', true);
 
@@ -333,7 +345,7 @@ class Product extends Model
     public function addToLocation(InventoryLocation $location, bool $isActive = true)
     {
         return $this->activeLocations()->syncWithoutDetaching([
-            $location->id => ['is_active' => $isActive]
+            $location->id => ['is_active' => $isActive],
         ]);
     }
 
@@ -362,9 +374,11 @@ class Product extends Model
 
         if ($isCurrentlyActive) {
             $this->removeFromLocation($location);
+
             return false;
         } else {
             $this->addToLocation($location);
+
             return true;
         }
     }

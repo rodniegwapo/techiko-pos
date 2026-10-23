@@ -308,7 +308,9 @@ const columns = [
                         <template v-else-if="column.key === 'total'">
                             <div>{{ formattedTotal(orderTotal(record)) }}</div>
                             <div v-if="record.bill" class="text-xs text-gray-500">
-                                Received {{ formattedTotal(receivedTotal(record)) }} · billed {{ formattedTotal(Number(record.bill.amount)) }}
+                                Received {{ formattedTotal(receivedTotal(record)) }} ·
+                                <span v-if="Number(record.bill.paid_amount) >= Number(record.bill.amount)" class="text-green-700" data-testid="po-paid">paid</span>
+                                <span v-else>{{ formattedTotal(Number(record.bill.amount) - Number(record.bill.paid_amount)) }} to pay</span>
                             </div>
                         </template>
                         <template v-else-if="column.key === 'actions'">

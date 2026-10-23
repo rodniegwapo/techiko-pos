@@ -298,6 +298,30 @@ class InventoryService
         }
 
         $inventory->save();
+
+        if ($movement->movement_type === 'purchase' && $movement->unit_cost) {
+            $this->averageProductCost($inventory->product_id);
+        }
+    }
+
+    /**
+     * After stock is bought, the product's cost (what each sale records as its cost) becomes the
+     * average of what the stock on hand cost, across every store: old stock at its old cost, new
+     * stock at what it was bought for.
+     */
+    protected function averageProductCost(int $productId): void
+    {
+        $totals = ProductInventory::query()
+            ->where('product_id', $productId)
+            ->where('quantity_on_hand', '>', 0)
+            ->selectRaw('SUM(quantity_on_hand * average_cost) AS value, SUM(quantity_on_hand) AS quantity')
+            ->first();
+
+        if ($totals && (float) $totals->quantity > 0) {
+            Product::query()->whereKey($productId)->update([
+                'cost' => round((float) $totals->value / (float) $totals->quantity, 2),
+            ]);
+        }
     }
 
     /**
@@ -627,6 +651,7 @@ class InventoryService
 
         // Count products directly from product_inventory table for this location
         $totalProducts = ProductInventory::where('location_id', $location->id)
+            ->carriedAtLocation()
             ->whereHas('product', function ($query) use ($domain) {
                 if ($domain) {
                     $query->forDomain($domain);

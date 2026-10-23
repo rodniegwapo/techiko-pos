@@ -398,17 +398,17 @@ watch(
             class="w-full"
             :disabled="loading"
             :loading="storeLoading"
+            option-label-prop="label"
           >
             <a-select-option
               v-for="location in locations"
               :key="location.id"
               :value="location.id"
+              :label="location.name"
             >
-              <div class="flex justify-between items-center">
-                <span>{{ location.name }}</span>
-                <span class="text-gray-500 text-xs">
-                  {{ location.address }}
-                </span>
+              <div class="min-w-0">
+                <div class="truncate">{{ location.name }}</div>
+                <div v-if="location.address" class="truncate text-xs text-gray-500">{{ location.address }}</div>
               </div>
             </a-select-option>
           </a-select>
@@ -441,17 +441,17 @@ watch(
             class="w-full"
             :disabled="loading"
             :loading="storeLoading"
+            option-label-prop="label"
           >
             <a-select-option
               v-for="location in availableToLocations"
               :key="location.id"
               :value="location.id"
+              :label="location.name"
             >
-              <div class="flex justify-between items-center">
-                <span>{{ location.name }}</span>
-                <span class="text-gray-500 text-xs">
-                  {{ location.address }}
-                </span>
+              <div class="min-w-0">
+                <div class="truncate">{{ location.name }}</div>
+                <div v-if="location.address" class="truncate text-xs text-gray-500">{{ location.address }}</div>
               </div>
             </a-select-option>
           </a-select>

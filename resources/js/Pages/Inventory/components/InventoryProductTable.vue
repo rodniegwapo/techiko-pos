@@ -86,7 +86,8 @@ const columns = computed(() => {
             align: "left",
         },
         { title: "Status", dataIndex: "status", key: "status", align: "left" },
-        { title: "Value", dataIndex: "value", key: "value", align: "left" },
+        // Stock value is at cost: for those who keep the books.
+        ...(page.props.canSeeCost ? [{ title: "Value", dataIndex: "value", key: "value", align: "left" }] : []),
     ];
 
     // Add domain column for super users only in global view
@@ -437,6 +438,7 @@ function onMobilePaginationChange(pageNum) {
                                     </span>
                                 </span>
                             </template>
+                            <template v-if="page.props.canSeeCost">
                             <span class="text-gray-500">Value</span>
                             <span
                                 class="text-right font-semibold text-green-600"
@@ -453,6 +455,7 @@ function onMobilePaginationChange(pageNum) {
                                     )
                                 }}
                             </span>
+                            </template>
                             <template v-if="showSuperUserDomain">
                                 <span class="text-gray-500">Domain</span>
                                 <span

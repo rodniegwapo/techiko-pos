@@ -13,8 +13,9 @@ use App\Models\InventoryMovement;
 use App\Models\Product\Product;
 use App\Models\ProductInventory;
 use App\Services\InventoryService;
-use App\Traits\MovementTypes;
+use App\Support\CostVisibility;
 use App\Traits\HandlesStockTransfers;
+use App\Traits\MovementTypes;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -270,13 +271,17 @@ class InventoryController extends Controller
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.quantity' => 'required|integer|min:1',
-            'items.*.unit_cost' => 'required|numeric|min:0',
+            'items.*.unit_cost' => 'nullable|numeric|min:0',
             'items.*.batch_number' => 'nullable|string|max:255',
             'items.*.expiry_date' => 'nullable|date',
             'items.*.notes' => 'nullable|string|max:500',
             'reference_type' => ['nullable', 'string', Rule::in($validReferenceTypes)],
             'reference_id' => 'nullable|integer',
         ]);
+        // Someone who doesn't see cost receives at the product's own cost (InventoryService falls back to it).
+        if (! CostVisibility::allowed()) {
+            $validated['items'] = array_map(fn ($item) => [...$item, 'unit_cost' => null], $validated['items']);
+        }
 
         $location = InventoryLocation::findOrFail($validated['location_id']);
         $locationDomain = $location->domain;

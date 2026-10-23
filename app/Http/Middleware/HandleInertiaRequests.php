@@ -10,6 +10,7 @@ use App\Models\Domain;
 use App\Models\InventoryLocation;
 use App\Services\Ai\GuideLibrary;
 use App\Services\ImpersonationService;
+use App\Support\CostVisibility;
 use App\Support\LocationAreas;
 use App\Support\RoutePermission;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -82,6 +83,8 @@ class HandleInertiaRequests extends Middleware
                 'prefixes' => collect(config('location_areas.areas', []))
                     ->map(fn ($prefixes) => array_map(fn ($p) => Str::after($p, 'domains.'), $prefixes)),
             ],
+            // Cost, margin and stock value: for those who keep the books (CostVisibility).
+            'canSeeCost' => $user ? CostVisibility::allowed() : false,
             // How-to guides this user may follow, { key: title }, for the pages' "?" help.
             'helpGuides' => fn () => $request->user() && $currentDomain
                 ? array_map(fn (array $g) => $g['title'], app(GuideLibrary::class)->allowedFor($request->user(), $currentDomain))

@@ -2,6 +2,7 @@
 import { reactive, ref, computed } from "vue";
 import { router, Head, usePage } from "@inertiajs/vue3";
 import { SaveOutlined, ArrowLeftOutlined } from "@ant-design/icons-vue";
+import { notification } from "ant-design-vue";
 import {
   IconBuilding,
   IconBuildingWarehouse,
@@ -59,8 +60,10 @@ const submit = async () => {
   errors.value = {};
 
   router.post(getRoute("inventory.locations.store"), form, {
-    onSuccess: () => {
-      // Success handled by redirect
+    // Say it worked, then back to the list.
+    onSuccess: (page) => {
+      notification.success({ message: page.props.flash?.success || "Location created" });
+      router.visit(getRoute("inventory.locations.index"));
     },
     onError: (formErrors) => {
       errors.value = formErrors;

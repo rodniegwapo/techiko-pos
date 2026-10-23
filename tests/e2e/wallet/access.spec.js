@@ -111,13 +111,15 @@ test.describe("Cash & wallet access", () => {
         }
     });
 
-    test.describe("as a cashier (no wallet permission)", () => {
+    test.describe("as a cashier (Today's drawer only)", () => {
         test.use({ account: "worker-cashier" });
 
-        test("is sent away from each page", async ({ serverAs }) => {
+        test("opens Today's drawer and is sent away from the other wallet pages", async ({ serverAs }) => {
             const api = await serverAs("worker-cashier");
             const referer = new URL(`/domains/jollibee-corp/sales`, "http://techiko-pos.test").href;
-            for (const url of [drawerUrl, cashInOutUrl, balancesUrl, historyUrl]) {
+            const drawer = await api.get(drawerUrl, { headers: { Referer: referer } });
+            expect(new URL(drawer.url()).pathname).toBe(drawerUrl);
+            for (const url of [cashInOutUrl, balancesUrl, historyUrl]) {
                 const res = await api.get(url, { headers: { Referer: referer } });
                 expect(new URL(res.url()).pathname, url).not.toBe(url);
             }
@@ -137,14 +139,23 @@ test.describe("Cash & wallet access", () => {
             expect(res.status).toBe(403);
         });
 
-        test("doesn't see Cash & wallet in the sidebar", async ({ page }) => {
+        test("sees only Today's drawer under Cash & wallet", async ({ page }) => {
             await page.goto(`/domains/jollibee-corp/customers`);
             await expect(sidebarItem(page, "Customers")).toBeVisible();
 
-            await expect(
-                page.getByRole("complementary").getByText("Cash & wallet", { exact: true }),
-                "a menu group with no permitted pages should be hidden",
-            ).toHaveCount(0);
+            const sidebar = page.getByRole("complementary");
+            await sidebar.getByText("Cash & wallet", { exact: true }).click();
+            await expect(sidebar.getByText("Today's drawer", { exact: true })).toBeVisible();
+            for (const title of ["Cash in & out", "Where money is", "Drawer history"]) {
+                await expect(sidebar.getByText(title, { exact: true }), title).toHaveCount(0);
+            }
+        });
+
+        test("counts the cash but doesn't see short or over", async ({ page }) => {
+            await page.goto(drawerUrl);
+            await expect(page.getByTestId("drawer-expected")).toBeVisible();
+            await expect(page.getByTestId("open-count-cash")).toBeVisible();
+            await expect(page.getByTestId("drawer-result")).toHaveCount(0);
         });
     });
 

@@ -59,7 +59,7 @@ test.describe("icon rail", () => {
 
         await sider.locator(".ant-menu-submenu-title", { hasText: "Finance" }).hover();
         const flyout = page.locator(".ant-menu-submenu-popup:visible");
-        await flyout.locator(".ant-menu-item", { hasText: "Cash flow" }).click();
+        await flyout.locator(".ant-menu-item", { hasText: "Money in & out" }).click();
         await expect(page).toHaveURL(/\/domains\/e2e-plan-premium\/finance\/cash-flow/);
         await expect(sider.locator(".ant-menu-inline-collapsed")).toBeVisible();
 
@@ -77,7 +77,7 @@ test.describe("Ctrl+K page search", () => {
             await page.goto("/domains/e2e-plan-premium/dashboard");
             await openSearch(page);
             await searchInput(page).fill("cash flow");
-            await expect(searchItems(page).first()).toContainText("Finance › Cash flow");
+            await expect(searchItems(page).first()).toContainText("Finance › Money in & out");
             await searchInput(page).press("Enter");
             await expect(page).toHaveURL(/\/domains\/e2e-plan-premium\/finance\/cash-flow/);
             await expect(page.getByTestId("nav-search")).toBeHidden();
@@ -87,7 +87,7 @@ test.describe("Ctrl+K page search", () => {
             await page.goto("/domains/e2e-plan-premium/dashboard");
             await openSearch(page);
             await searchInput(page).fill("p&l");
-            await expect(searchItems(page).first()).toContainText("Income statement");
+            await expect(searchItems(page).first()).toContainText("Profit & loss");
 
             await searchInput(page).fill("stores");
             await expect(searchItems(page).first()).toContainText("Inventory › Locations");
@@ -119,7 +119,7 @@ test.describe("Ctrl+K page search", () => {
             await openSearch(page);
             await searchInput(page).fill("cash flow");
             const item = searchItems(page).first();
-            await expect(item).toContainText("Cash flow");
+            await expect(item).toContainText("Money in & out");
             await expect(item.getByTestId("nav-search-upgrade")).toBeVisible();
             await searchInput(page).press("Enter");
             await expect(page).toHaveURL(/\/domains\/e2e-plan-free\/billing\/servicing/);

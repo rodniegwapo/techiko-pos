@@ -99,7 +99,8 @@ const columns = computed(() => {
             key: "price",
             align: "left",
         },
-        { title: "Cost", dataIndex: "cost", key: "cost", align: "left" },
+        // Cost is for those who keep the books.
+        ...(page.props.canSeeCost ? [{ title: "Cost", dataIndex: "cost", key: "cost", align: "left" }] : []),
         {
             title: "SKU",
             dataIndex: "SKU",

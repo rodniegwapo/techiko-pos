@@ -62,8 +62,8 @@ const accounts = computed(() => props.current.account_balances ?? { accounts: []
 
 <template>
     <AuthenticatedLayout>
-        <Head title="Cash flow" />
-        <ContentHeader class="mb-4 md:mb-6" title="Cash flow" />
+        <Head title="Money in & out" />
+        <ContentHeader class="mb-4 md:mb-6" title="Money in & out" />
         <ContentLayout title="Where did my money go?" filter-class="flex flex-wrap items-center justify-end gap-2 w-full min-w-0">
             <template #filters>
                 <RefreshButton :loading="spinning" @click="load()" />

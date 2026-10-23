@@ -1112,6 +1112,10 @@ class RolePermissionSeeder extends Seeder
             'sales-history.void',
             // Opening today's shift from the POS "no shift open" block
             'wallet-cash-ledger.opening-cash.store',
+            // Today's drawer: count the cash and end the shift (they see Expected, not short/over)
+            'wallet.money-movement',
+            'wallet-cash-ledger.counted-cash.store',
+            'wallet-cash-ledger.end-shift',
             'sales.loyalty-redemption',
             'sales.find-sale-item',
             'sales.sales.assignCustomer',
