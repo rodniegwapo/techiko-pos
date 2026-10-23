@@ -36,6 +36,9 @@ class WalletCashMovement extends Model
     /** Written only when a customer pays their credit (utang) in cash. */
     public const KIND_CREDIT_PAYMENT = 'credit_payment';
 
+    /** Cash the owner took from another store's drawer and put in this one (paired by transfer_group). */
+    public const KIND_OWNER_TRANSFER_IN = 'owner_transfer_in';
+
     public const SYSTEM_KINDS = [
         self::KIND_EXPENSE,
         'supplier_payment',
@@ -47,6 +50,7 @@ class WalletCashMovement extends Model
         self::KIND_SALE_PAYMENT,
         self::KIND_SALE_VOID,
         self::KIND_CREDIT_PAYMENT,
+        self::KIND_OWNER_TRANSFER_IN,
     ];
 
     protected $casts = [

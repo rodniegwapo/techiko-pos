@@ -6,19 +6,27 @@ use App\Http\Middleware\UserPermissionCheckMiddleware;
 use App\Models\Category;
 use App\Models\Customer;
 use App\Models\Domain;
+use App\Models\Expense;
+use App\Models\ExpenseCategory;
 use App\Models\Finance\Supplier;
 use App\Models\Finance\SupplierBill;
 use App\Models\Finance\SupplierPayment;
 use App\Models\InventoryLocation;
 use App\Models\LoyaltyTier;
+use App\Models\Permission;
 use App\Models\Product\Product;
 use App\Models\ProductInventory;
 use App\Models\User;
+use App\Models\UserPin;
+use App\Models\WalletCashCountSubmission;
+use App\Models\WalletCashMovement;
 use App\Models\WalletCashReconciliation;
 use App\Services\InventoryService;
+use App\Support\Wallet\WalletCashDailyExpected;
 use Database\Seeders\ProductSoldTypeSeeder;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
@@ -128,10 +136,11 @@ class BacklogFixesTest extends TestCase
                 ->where('cashControl.count_submission_history', [])
                 ->missing('cashControl.bridge_expected_cash'));
 
+        // Ending the shift goes through close-shift, where a manager approves the cash.
         $this->actingAs($cashier)->post($this->url('wallet-cash-ledger.end-shift'), [
             'location_id' => $this->store->id, 'business_date' => $today, 'end_shift_action' => 'save_as_opening_cash',
-        ])->assertSessionHasNoErrors();
-        $this->assertTrue((bool) WalletCashReconciliation::query()->sole()->is_closed);
+        ])->assertSessionHasErrors('end_shift_action');
+        $this->assertFalse((bool) WalletCashReconciliation::query()->sole()->is_closed);
     }
 
     public function test_customers_follow_the_tiers_set_in_tier_management(): void
@@ -212,6 +221,156 @@ class BacklogFixesTest extends TestCase
         );
 
         $this->assertEquals(130, (float) $product->fresh()->cost);
+    }
+
+    public function test_a_cashier_ends_the_shift_in_one_step_with_a_managers_pin(): void
+    {
+        $this->domain->update(['settings' => ['features' => ['finance' => true, 'expenses' => true]]]);
+        $cashierRole = Role::query()->firstOrCreate(['name' => 'cashier', 'guard_name' => 'web']);
+        $cashierRole->forceFill(['level' => 4])->save();
+        $managerRole = Role::query()->firstOrCreate(['name' => 'manager', 'guard_name' => 'web']);
+        $managerRole->forceFill(['level' => 3])->save();
+        $cashier = User::factory()->create(['domain' => $this->domain->name_slug, 'is_super_user' => false, 'location_id' => $this->store->id]);
+        $cashier->assignRole($cashierRole);
+        $manager = User::factory()->create(['domain' => $this->domain->name_slug, 'is_super_user' => false, 'location_id' => $this->store->id]);
+        $manager->assignRole($managerRole);
+        UserPin::query()->forceCreate(['user_id' => $manager->id, 'pin_code' => Hash::make('4321')]);
+        $ice = ExpenseCategory::query()->create(['domain' => $this->domain->name_slug, 'name' => 'Supplies', 'is_active' => true]);
+        $today = today()->toDateString();
+        WalletCashReconciliation::query()->create([
+            'domain' => $this->domain->name_slug, 'location_id' => $this->store->id, 'business_date' => $today, 'opening_cash' => 1000,
+        ]);
+        $close = fn (array $more) => $this->actingAs($cashier)->post($this->url('wallet-cash-ledger.close-shift'), [
+            'location_id' => $this->store->id, 'business_date' => $today, 'counted_cash' => 950,
+            'end_shift_action' => 'save_as_opening_cash',
+            'expenses' => [['expense_category_id' => $ice->id, 'amount' => 50, 'description' => 'Ice']],
+            ...$more,
+        ]);
+
+        // No PIN, or a wrong one: nothing is saved.
+        $close([])->assertSessionHasErrors('pin_code');
+        $close(['pin_code' => '0000'])->assertSessionHasErrors('pin_code');
+        $this->assertSame(0, Expense::query()->count());
+        $this->assertFalse((bool) WalletCashReconciliation::query()->sole()->is_closed);
+
+        $close(['pin_code' => '4321'])->assertSessionHasNoErrors();
+
+        // The ₱50 expense came out of the drawer first, so 950 counted against 1000 is exact.
+        $expense = Expense::query()->sole();
+        $this->assertSame('cash_register', $expense->payment_method);
+        $submission = WalletCashCountSubmission::query()->sole();
+        $this->assertEquals(950, (float) $submission->expected_cash_snapshot);
+        $this->assertEquals(0, (float) $submission->variance_snapshot);
+        $this->assertSame($manager->id, (int) $submission->approved_by);
+        $recon = WalletCashReconciliation::query()->sole();
+        $this->assertTrue((bool) $recon->is_closed);
+        $this->assertEquals(950, (float) $recon->opening_cash);
+    }
+
+    public function test_a_manager_ends_the_shift_without_a_pin(): void
+    {
+        $admin = User::factory()->create(['domain' => $this->domain->name_slug, 'is_super_user' => true, 'location_id' => $this->store->id]);
+        $today = today()->toDateString();
+        WalletCashReconciliation::query()->create([
+            'domain' => $this->domain->name_slug, 'location_id' => $this->store->id, 'business_date' => $today, 'opening_cash' => 300,
+        ]);
+
+        $this->actingAs($admin)->post($this->url('wallet-cash-ledger.close-shift'), [
+            'location_id' => $this->store->id, 'business_date' => $today, 'counted_cash' => 300, 'end_shift_action' => 'cashout_now',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertTrue((bool) WalletCashReconciliation::query()->sole()->is_closed);
+        $this->assertNull(WalletCashCountSubmission::query()->sole()->approved_by);
+    }
+
+    public function test_owners_see_every_stores_money_side_by_side(): void
+    {
+        $admin = User::factory()->create(['domain' => $this->domain->name_slug, 'is_super_user' => true, 'location_id' => $this->store->id]);
+        $branch = InventoryLocation::query()->create([
+            'domain' => $this->domain->name_slug, 'name' => 'Cantilan Branch', 'code' => Str::upper(Str::random(8)),
+            'type' => 'store', 'is_active' => true,
+        ]);
+        WalletCashReconciliation::query()->create([
+            'domain' => $this->domain->name_slug, 'location_id' => $branch->id, 'business_date' => today()->toDateString(), 'opening_cash' => 700,
+        ]);
+
+        $this->actingAs($admin)->get($this->url('wallet.balances', ['location_id' => $this->store->id, 'tab' => 'stores']))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('tab', 'stores')
+                ->has('allStores.stores', 2)
+                ->where('allStores.stores.0.name', 'Cantilan Branch')
+                ->where('allStores.stores.0.drawer', 700)
+                ->where('allStores.total', 700));
+
+        // At the warehouse (head office) the same overview sits on Stores' cash.
+        $this->actingAs($admin)->get($this->url('wallet.drawer', ['location_id' => $this->warehouse->id]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->component('Wallet/StoresCash')->has('allStores.stores', 2));
+
+        // A store manager sees their own store only.
+        $managerRole = Role::query()->firstOrCreate(['name' => 'manager', 'guard_name' => 'web']);
+        $managerRole->forceFill(['level' => 3])->save();
+        $manager = User::factory()->create(['domain' => $this->domain->name_slug, 'is_super_user' => false, 'location_id' => $this->store->id]);
+        $manager->assignRole($managerRole);
+        $manager->givePermissionTo(Permission::query()->firstOrCreate(
+            ['route_name' => 'wallet-cash-ledger.index', 'guard_name' => 'web'], ['name' => 'Test ledger '.Str::uuid()],
+        ));
+        $this->actingAs($manager)->get($this->url('wallet.balances', ['location_id' => $this->store->id, 'tab' => 'stores']))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('tab', 'balances')->where('allStores', null)->where('canSeeAllStores', false));
+    }
+
+    public function test_an_owner_withdrawal_can_go_into_another_stores_drawer(): void
+    {
+        $admin = User::factory()->create(['domain' => $this->domain->name_slug, 'is_super_user' => true, 'location_id' => $this->store->id]);
+        $branch = InventoryLocation::query()->create([
+            'domain' => $this->domain->name_slug, 'name' => 'Cantilan Branch', 'code' => Str::upper(Str::random(8)),
+            'type' => 'store', 'is_active' => true,
+        ]);
+        $today = today()->toDateString();
+        $take = fn (array $more) => $this->actingAs($admin)->post($this->url('wallet-cash-ledger.store'), [
+            'location_id' => $this->store->id, 'kind' => 'owner_draw', 'direction' => 'out', 'draw_source' => 'cash_register',
+            'amount' => 2000, 'movement_date' => $today, ...$more,
+        ]);
+
+        $take(['to_location_id' => $branch->id])->assertSessionHasNoErrors();
+
+        $out = WalletCashMovement::query()->where('location_id', $this->store->id)->sole();
+        $in = WalletCashMovement::query()->where('location_id', $branch->id)->sole();
+        $this->assertSame(['out', 'in'], [$out->direction, $in->direction]);
+        $this->assertSame('owner_transfer_in', $in->kind);
+        $this->assertNotNull($out->transfer_group);
+        $this->assertSame($out->transfer_group, $in->transfer_group);
+
+        // The branch's Expected goes up by what came in.
+        $expected = WalletCashDailyExpected::compute($this->domain->name_slug, $branch->id, $today, null);
+        $this->assertEquals(2000, $expected['manual_in']);
+
+        // Not into a warehouse, nor into a store whose day is already closed.
+        $take(['to_location_id' => $this->warehouse->id])->assertSessionHasErrors('to_location_id');
+        WalletCashReconciliation::query()->create([
+            'domain' => $this->domain->name_slug, 'location_id' => $branch->id, 'business_date' => $today, 'opening_cash' => 0, 'is_closed' => true,
+        ]);
+        $take(['to_location_id' => $branch->id])->assertSessionHasErrors('to_location_id');
+        $this->assertSame(2, WalletCashMovement::query()->count());
+    }
+
+    public function test_finance_at_a_warehouse_covers_every_store(): void
+    {
+        $admin = User::factory()->create(['domain' => $this->domain->name_slug, 'is_super_user' => true, 'location_id' => $this->store->id]);
+
+        // The warehouse is the business's head office: its Finance pages total every store.
+        $this->actingAs($admin)->get($this->url('finance.dashboard', ['location_id' => $this->warehouse->id]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('filters.location_id', null));
+
+        $this->actingAs($admin)->get($this->url('finance.dashboard', ['location_id' => $this->store->id]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('filters.location_id', $this->store->id));
+
+        $this->assertNull(InventoryLocation::reportScope($this->warehouse->id, $this->domain->name_slug));
+        $this->assertNull(InventoryLocation::reportScope($this->store->id, 'another-business'));
     }
 
     public function test_store_performance_leaves_out_the_warehouse(): void

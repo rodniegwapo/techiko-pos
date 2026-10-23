@@ -4,9 +4,12 @@ namespace App\Http\Controllers\Domains;
 
 use App\Http\Controllers\Controller;
 use App\Models\Domain;
+use App\Models\ExpenseCategory;
 use App\Models\InventoryLocation;
 use App\Support\FinanceAccess;
+use App\Support\RouteFeature;
 use App\Support\RoutePermission;
+use App\Support\Wallet\AllStoresMoney;
 use App\Support\Wallet\CashControlSnapshot;
 use App\Support\Wallet\ChannelBalances;
 use App\Support\Wallet\MoneyTimeline;
@@ -34,6 +37,8 @@ class WalletPagesController extends Controller
         if ($location->isWarehouse()) {
             return Inertia::render('Wallet/StoresCash', [
                 'storesCash' => StoresCash::build($request, $domain),
+                // Where every store's money is right now (owners and admins).
+                'allStores' => FinanceAccess::canSeeAllStores($request->user()) ? AllStoresMoney::build($domain, (int) $request->user()->id) : null,
             ]);
         }
 
@@ -53,6 +58,12 @@ class WalletPagesController extends Controller
             ...$this->pageProps($request, $domain, $location),
             'cashControl' => $cashControl,
             'canSeeCountResult' => $canSeeCountResult,
+            // Ending the shift: a cashier's count is approved with a manager's PIN.
+            'needsManagerPin' => ! $canSeeCountResult,
+            // Cash expenses paid from the drawer can be added when ending the shift.
+            'expenseCategories' => RouteFeature::allows($domain, 'expenses.store')
+                ? ExpenseCategory::query()->forDomain($domain->name_slug)->where('is_active', true)->orderBy('name')->get(['id', 'name'])
+                : [],
         ]);
     }
 
@@ -65,6 +76,10 @@ class WalletPagesController extends Controller
             ...$this->pageProps($request, $domain, $location),
             'ledger' => $ledger,
             'channels' => $ledger['railCardTypes'],
+            // Where an owner withdrawal can go instead of the owner's pocket: the other stores.
+            'otherStores' => InventoryLocation::query()->forDomain($domain->name_slug)->active()
+                ->where(fn ($q) => $q->whereNull('type')->orWhere('type', '!=', 'warehouse'))
+                ->whereKeyNot($location->id)->orderBy('name')->get(['id', 'name']),
             'todayIsClosed' => WalletShiftGuard::isClosed($domain->name_slug, (int) $location->id, now()->toDateString()),
         ]);
     }
@@ -75,7 +90,12 @@ class WalletPagesController extends Controller
         $user = $request->user();
         $props = $this->pageProps($request, $domain, $location);
 
-        $tab = $request->query('tab') === 'all' && $props['canViewAllMoney'] ? 'all' : 'balances';
+        $canSeeAllStores = FinanceAccess::canSeeAllStores($user);
+        $tab = match (true) {
+            $request->query('tab') === 'all' && $props['canViewAllMoney'] => 'all',
+            $request->query('tab') === 'stores' && $canSeeAllStores => 'stores',
+            default => 'balances',
+        };
         $canSeeBalances = RoutePermission::allows($user, 'wallet-cash-ledger.index');
 
         return Inertia::render('Wallet/Balances', [
@@ -89,6 +109,9 @@ class WalletPagesController extends Controller
             'channelBalances' => $canSeeBalances ? ChannelBalances::forLocation($domain->name_slug, (int) $location->id) : [],
             'todayIsClosed' => WalletShiftGuard::isClosed($domain->name_slug, (int) $location->id, now()->toDateString()),
             'allMoney' => $tab === 'all' ? MoneyTimeline::build($request, $domain, $location) : null,
+            // Every store's drawer and channels side by side: for owners and admins.
+            'canSeeAllStores' => $canSeeAllStores,
+            'allStores' => $tab === 'stores' ? AllStoresMoney::build($domain, (int) $user->id) : null,
         ]);
     }
 

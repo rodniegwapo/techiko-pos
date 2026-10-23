@@ -26,6 +26,7 @@ export const SYSTEM_KIND_LABELS = {
     sale_payment: "Sale",
     sale_void: "Sale voided",
     credit_payment: "Credit payment",
+    owner_transfer_in: "Cash from another store",
 };
 
 /** Lines Today's drawer writes itself; the server marks them in `notes`. */

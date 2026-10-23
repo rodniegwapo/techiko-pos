@@ -14,6 +14,8 @@ const props = defineProps({
     /** in | out | move, or null when closed */
     mode: { type: String, default: null },
     channels: { type: Array, default: () => [] },
+    /** Other stores an owner withdrawal can go to, instead of the owner keeping it. */
+    otherStores: { type: Array, default: () => [] },
     locationId: { type: Number, default: null },
     todayYmd: { type: String, required: true },
 });
@@ -31,7 +33,7 @@ const TYPES = {
     ],
 };
 
-const form = reactive({ kind: null, amount: null, from: "drawer", channel: null, moveDirection: "in", date: props.todayYmd, notes: "", saving: false });
+const form = reactive({ kind: null, amount: null, from: "drawer", channel: null, toStore: null, moveDirection: "in", date: props.todayYmd, notes: "", saving: false });
 
 watch(
     () => props.mode,
@@ -41,6 +43,7 @@ watch(
             kind: mode === "move" ? null : TYPES[mode][0].value,
             amount: null,
             from: "drawer",
+            toStore: null,
             channel: props.channels.length === 1 ? props.channels[0].id : null,
             moveDirection: "in",
             date: props.todayYmd,
@@ -64,7 +67,15 @@ function payload() {
     }
     if (form.kind === "owner_draw") {
         const fromChannel = form.from === "channel";
-        return { ...base, kind: "owner_draw", direction: "out", draw_source: fromChannel ? "card_type" : "cash_register", payment_card_type_id: fromChannel ? form.channel : null };
+        return {
+            ...base,
+            kind: "owner_draw",
+            direction: "out",
+            draw_source: fromChannel ? "card_type" : "cash_register",
+            payment_card_type_id: fromChannel ? form.channel : null,
+            // Into another store's drawer, or (no store) the owner keeps it.
+            to_location_id: !fromChannel && form.toStore ? form.toStore : undefined,
+        };
     }
     return { ...base, kind: form.kind, direction: props.mode, payment_card_type_id: null };
 }
@@ -97,6 +108,17 @@ function save() {
                     <a-radio-button v-for="t in TYPES[mode]" :key="t.value" :value="t.value">{{ t.label }}</a-radio-button>
                 </a-radio-group>
                 <div v-if="typeHint" class="mt-1 text-xs text-gray-500">{{ typeHint }}</div>
+            </a-form-item>
+
+            <a-form-item v-if="form.kind === 'owner_draw' && form.from === 'drawer' && otherStores.length" label="Where the cash went">
+                <a-select
+                    v-model:value="form.toStore"
+                    allow-clear
+                    placeholder="The owner kept it"
+                    :options="otherStores.map((s) => ({ value: s.id, label: `Into ${s.name}'s drawer` }))"
+                    data-testid="owner-to-store"
+                />
+                <div class="mt-1 text-xs text-gray-500">Moving it to another store's drawer adds it there too.</div>
             </a-form-item>
 
             <a-form-item v-if="form.kind === 'owner_draw' && channels.length" label="Taken from">

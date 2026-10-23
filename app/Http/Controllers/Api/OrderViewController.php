@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\InventoryLocation;
 use App\Models\Sale;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,13 +15,18 @@ class OrderViewController extends Controller
      */
     public function show(Request $request, string $orderId): JsonResponse
     {
+        // Only an order of the store whose display link this is.
+        $store = InventoryLocation::forDisplayToken($request->query('display'));
+        if (! $store) {
+            return $this->unknownDisplay();
+        }
+
         try {
-            // Find the order (sale) by ID
             $order = Sale::with([
                 'saleItems.product',
                 'saleItems.modifiers',
                 'customer.tier',
-            ])->findOrFail($orderId);
+            ])->where('location_id', $store->id)->where('domain', $store->domain)->findOrFail($orderId);
 
             // Check if order is still active (not completed/voided)
             if (in_array($order->payment_status, ['paid', 'voided'])) {
@@ -93,15 +99,22 @@ class OrderViewController extends Controller
      */
     public function getRecentPending(Request $request): JsonResponse
     {
+        // The display shows its own store's open order, never another business's.
+        $store = InventoryLocation::forDisplayToken($request->query('display'));
+        if (! $store) {
+            return $this->unknownDisplay();
+        }
+
         try {
-            // Find the most recent pending order
             $order = Sale::with([
                 'saleItems.product',
                 'saleItems.modifiers',
                 'customer.tier',
             ])
                 ->where('payment_status', 'pending')
-                ->latest()
+                ->where('location_id', $store->id)
+                ->where('domain', $store->domain)
+                ->latest('updated_at')
                 ->first();
 
             if (! $order) {
@@ -182,5 +195,14 @@ class OrderViewController extends Controller
             'platinum' => '#E5E4E2',
             default => '#CD7F32'
         };
+    }
+
+    /** A display link without a valid store token: nothing to show. */
+    private function unknownDisplay(): JsonResponse
+    {
+        return response()->json([
+            'error' => 'Unknown display',
+            'message' => 'Open the customer display from the Sales screen of your store.',
+        ], 404);
     }
 }

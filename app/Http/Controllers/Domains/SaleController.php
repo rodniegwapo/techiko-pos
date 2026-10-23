@@ -77,6 +77,10 @@ class SaleController extends Controller
 
         return Inertia::render('Sales/Index', [
             'domain' => $domain,
+            // The customer-facing screen for this store: its link carries the store's secret.
+            'customerDisplayUrl' => $location && ! $location->isWarehouse()
+                ? route('customer-order', ['display' => $location->displayToken()])
+                : null,
             'categories' => $location
                 ? $this->getCategoriesForLocation($domain->name_slug, $location)->get()
                 : Category::where('domain', $domain->name_slug)->get(),

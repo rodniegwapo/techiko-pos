@@ -199,7 +199,7 @@ export class DrawerPage {
         const dialog = this.dialog("End shift");
         await expect(dialog).toBeVisible();
         await dialog.getByTestId(choice === "Take the cash out" ? "end-shift-cashout" : "end-shift-keep").click();
-        return this.save("/cash-ledger/end-shift", () => dialog.getByTestId("confirm-end-shift").click());
+        return this.save("/cash-ledger/close-shift", () => dialog.getByTestId("confirm-end-shift").click());
     }
 
     async reopenShift() {

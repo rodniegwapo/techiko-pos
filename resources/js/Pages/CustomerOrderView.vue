@@ -18,6 +18,7 @@ import { useCustomerOrder } from "./CustomerOrder/composables/useCustomerOrder.j
 // Use the customer order composable
 const {
     order,
+    missingDisplay,
     orderItems,
     customer,
     lastUpdated,
@@ -82,6 +83,15 @@ const testOrderEvent = async () => {
 <template>
     <div class="min-h-screen bg-gray-50">
         <Head title="Customer Order View" />
+
+        <!-- Opened without its store's link: nothing to show (orders are never shared between stores). -->
+        <div v-if="missingDisplay" class="flex min-h-screen items-center justify-center p-6 text-center" data-testid="display-unpaired">
+            <div>
+                <p class="text-xl font-semibold text-gray-800">This display isn't linked to a store</p>
+                <p class="mt-2 text-gray-600">On the Sales screen, click <b>Customer display</b> and open that link on this screen.</p>
+            </div>
+        </div>
+        <template v-else>
 
         <!-- Header -->
         <OrderHeader
@@ -175,5 +185,6 @@ const testOrderEvent = async () => {
 
         <!-- Footer -->
         <OrderFooter :order-id="orderId" :last-updated="lastUpdated" />
+        </template>
     </div>
 </template>

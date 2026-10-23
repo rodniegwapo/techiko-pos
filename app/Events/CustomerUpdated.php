@@ -2,6 +2,7 @@
 
 namespace App\Events;
 
+use App\Models\InventoryLocation;
 use App\Models\Sale;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
@@ -13,17 +14,21 @@ class CustomerUpdated implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public function __construct(public Sale $sale) 
+    public function __construct(public Sale $sale)
     {
-        \Log::info("CustomerUpdated event created", [
+        \Log::info('CustomerUpdated event created', [
             'sale_id' => $sale->id,
-            'customer_id' => $sale->customer_id
+            'customer_id' => $sale->customer_id,
         ]);
     }
 
     public function broadcastOn(): Channel
     {
-        return new Channel('order'); // Use the same channel as OrderUpdated
+        // Only the customer display of this sale's store hears it: the channel is named by the
+        // store's secret display token, never one channel shared by every business.
+        $store = $this->sale->location ?? InventoryLocation::query()->find($this->sale->location_id);
+
+        return new Channel($store ? $store->displayChannel() : 'customer-display.unassigned');
     }
 
     public function broadcastAs(): string
@@ -38,13 +43,13 @@ class CustomerUpdated implements ShouldBroadcast
             'saleItems.modifiers',
             'saleDiscounts',
             'saleItems.discounts',
-            'customer'
+            'customer',
         ]);
 
         // Transform the data to match the API format
         $orderData = [
             'id' => $sale->id,
-            'order_number' => $sale->order_number ?? 'ORD-' . str_pad($sale->id, 6, '0', STR_PAD_LEFT),
+            'order_number' => $sale->order_number ?? 'ORD-'.str_pad($sale->id, 6, '0', STR_PAD_LEFT),
             'status' => $sale->payment_status,
             'created_at' => $sale->created_at,
             'updated_at' => $sale->updated_at,
@@ -79,7 +84,7 @@ class CustomerUpdated implements ShouldBroadcast
 
         return [
             'event_type' => 'customer_updated',
-            'order' => $orderData
+            'order' => $orderData,
         ];
     }
 }

@@ -94,10 +94,7 @@ class FinanceController extends Controller
         }
         Cache::put($counter, $asked + 1, now()->endOfDay());
 
-        $locationId = isset($validated['location_id'])
-            && InventoryLocation::query()->forDomain($domain->name_slug)->whereKey($validated['location_id'])->exists()
-            ? (int) $validated['location_id']
-            : null;
+        $locationId = InventoryLocation::reportScope($validated['location_id'] ?? null, $domain->name_slug);
 
         try {
             $answer = $this->assistant->answer(
@@ -304,10 +301,8 @@ class FinanceController extends Controller
             $validated['end_date'] ?? null,
         );
 
-        $locationId = isset($validated['location_id']) ? (int) $validated['location_id'] : null;
-        if ($locationId && ! InventoryLocation::query()->forDomain($domain->name_slug)->whereKey($locationId)->exists()) {
-            $locationId = null;
-        }
+        // At a warehouse the whole business: it sells nothing of its own.
+        $locationId = InventoryLocation::reportScope($validated['location_id'] ?? null, $domain->name_slug);
 
         return [$period, $locationId];
     }

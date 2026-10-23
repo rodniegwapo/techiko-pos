@@ -1598,8 +1598,18 @@ watch(
                         </span>
                     </div>
                 </template>
-                <template v-if="lastOfflineSyncLabel" #meta>
-                    Last offline sync: {{ lastOfflineSyncLabel }}
+                <template v-if="lastOfflineSyncLabel || $page.props.customerDisplayUrl" #meta>
+                    <template v-if="lastOfflineSyncLabel">Last offline sync: {{ lastOfflineSyncLabel }}</template>
+                    <template v-if="lastOfflineSyncLabel && $page.props.customerDisplayUrl"> · </template>
+                    <!-- This store's customer-facing screen: open it on the screen facing the customer. -->
+                    <a
+                        v-if="$page.props.customerDisplayUrl"
+                        :href="$page.props.customerDisplayUrl"
+                        target="_blank"
+                        rel="noopener"
+                        class="text-teal-700 hover:underline"
+                        data-testid="customer-display-link"
+                    >Customer display</a>
                 </template>
             </ContentHeader>
 
@@ -1625,6 +1635,14 @@ watch(
                         >
                             Last offline sync: {{ lastOfflineSyncLabel }}
                         </p>
+                        <a
+                            v-if="$page.props.customerDisplayUrl"
+                            :href="$page.props.customerDisplayUrl"
+                            target="_blank"
+                            rel="noopener"
+                            class="mt-1 inline-block text-xs text-[var(--cs-muted)] underline"
+                            data-testid="customer-display-link"
+                        >Customer display</a>
                     </div>
                 </template>
                 <template v-if="!isCoffeeshopLayout" #titleMeta>

@@ -5,6 +5,7 @@ import { useMediaQuery } from "@vueuse/core";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
 import ContentLayout from "@/Components/ContentLayout.vue";
+import AllStoresTable from "@/Pages/Wallet/components/balances/AllStoresTable.vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useHelpers } from "@/Composables/useHelpers";
 
@@ -14,6 +15,8 @@ import { useHelpers } from "@/Composables/useHelpers";
  */
 const props = defineProps({
     storesCash: { type: Object, required: true },
+    /** Owners and admins: where each store's money is right now. */
+    allStores: { type: Object, default: null },
 });
 
 const { getRoute } = useDomainRoutes();
@@ -68,6 +71,11 @@ const totals = computed(() => props.storesCash.totals ?? {});
                     {{ money(totals.variance) }}
                 </div>
             </div>
+        </div>
+
+        <div v-if="allStores" class="mb-6">
+            <h3 class="mb-2 text-base font-semibold text-gray-800">Money in each store now</h3>
+            <AllStoresTable :all-stores="allStores" />
         </div>
 
         <ContentLayout title="Closed shifts by store">

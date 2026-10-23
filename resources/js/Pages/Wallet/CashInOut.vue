@@ -17,6 +17,7 @@ import { useWalletQuery } from "./composables/useWalletQuery";
 const props = defineProps({
     ledger: { type: Object, required: true },
     channels: { type: Array, default: () => [] },
+    otherStores: { type: Array, default: () => [] },
     activeLocation: { type: Object, default: null },
     todayIsClosed: { type: Boolean, default: false },
     canViewAllMoney: { type: Boolean, default: false },
@@ -160,6 +161,6 @@ const pagination = computed(() => ({
             </template>
         </div>
 
-        <CashMovementModal :mode="mode" :channels="channels" :location-id="locationId" :today-ymd="todayYmd" @close="mode = null" />
+        <CashMovementModal :mode="mode" :channels="channels" :other-stores="otherStores" :location-id="locationId" :today-ymd="todayYmd" @close="mode = null" />
     </WalletLayout>
 </template>

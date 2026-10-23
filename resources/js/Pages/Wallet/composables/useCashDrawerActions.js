@@ -48,9 +48,10 @@ export function useCashDrawerActions(locationId, businessDate) {
         saveCount: (amount, notes) =>
             post("count", "wallet-cash-ledger.counted-cash.store", { counted_cash: Number(amount || 0), notes: notes || null },
                 "Count saved.", "Could not save the count."),
-        endShift: (action) =>
-            post("end", "wallet-cash-ledger.end-shift", { end_shift_action: action },
-                "Shift ended.", "Could not end the shift. Count the cash first."),
+        /** Count, cash expenses, a manager's PIN for a cashier, and closing, all in one go. */
+        endShift: (payload) =>
+            post("end", "wallet-cash-ledger.close-shift", payload,
+                "Shift ended.", "Could not end the shift."),
         reopenShift: () =>
             post("reopen", "wallet-cash-ledger.reopen-shift", {}, "Shift reopened.", "Could not reopen the shift."),
     };

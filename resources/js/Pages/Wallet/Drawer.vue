@@ -22,6 +22,10 @@ const props = defineProps({
     canViewAllMoney: { type: Boolean, default: false },
     /** Managers see whether a count came out short or over; a cashier sees what should be there. */
     canSeeCountResult: { type: Boolean, default: true },
+    /** A cashier's cash is approved with a manager's PIN when ending the shift. */
+    needsManagerPin: { type: Boolean, default: false },
+    /** Cash expenses can be added when ending the shift (empty without Expenses). */
+    expenseCategories: { type: Array, default: () => [] },
 });
 
 const { hasPermission } = usePermissionsV2();
@@ -62,8 +66,8 @@ async function saveOpening(amount, reason) {
 async function saveCount(amount, notes) {
     if (await actions.saveCount(amount, notes)) modal.value = null;
 }
-async function endShift(action) {
-    if (await actions.endShift(action)) modal.value = null;
+async function endShift(payload) {
+    if (await actions.endShift(payload)) modal.value = null;
 }
 </script>
 
@@ -182,8 +186,10 @@ async function endShift(action) {
             :open="modal === 'end'"
             :cash-control="cashControl"
             :saving="actions.busy.value === 'end'"
+            :needs-manager-pin="needsManagerPin"
+            :expense-categories="expenseCategories"
+            :show-expected="canSeeCountResult"
             @close="modal = null"
-            @count="modal = 'count'"
             @end="endShift"
         />
     </WalletLayout>

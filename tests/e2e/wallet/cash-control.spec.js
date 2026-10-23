@@ -209,16 +209,32 @@ test.describe("Today's drawer", () => {
     });
 
     test.describe("ending the shift", () => {
-        test("End shift asks for a count first", async ({ page }) => {
+        test("End shift counts the cash, takes cash expenses and ends in one step", async ({ page }) => {
             const { day } = dateWindow();
             const drawer = await DrawerPage.open(page, day(0));
+            await drawer.setOpening(500);
 
             await page.getByTestId("open-end-shift").click();
-
             const dialog = drawer.dialog("End shift");
-            await expect(dialog.getByTestId("end-shift-count-first")).toBeVisible();
-            await dialog.getByRole("button", { name: "Count cash" }).click();
-            await expect(drawer.dialog("Count cash").getByTestId("count-amount")).toBeVisible();
+            // Nothing to end with until the cash is counted.
+            await expect(dialog.getByTestId("confirm-end-shift")).toBeDisabled();
+
+            await numberInput(dialog, "end-shift-counted").fill("470");
+            const expenses = dialog.getByTestId("end-shift-expenses");
+            if (await expenses.isVisible()) {
+                await dialog.getByTestId("end-shift-add-expense").click();
+                const row = dialog.getByTestId("end-shift-expense").first();
+                await row.locator(".ant-select").click();
+                await page.locator(".ant-select-dropdown:visible .ant-select-item-option").first().click();
+                await row.getByPlaceholder("What").fill("Ice");
+                await row.locator(".ant-input-number input").fill("30");
+            }
+            await dialog.getByTestId("end-shift-keep").click();
+            const res = await drawer.save("/cash-ledger/close-shift", () => dialog.getByTestId("confirm-end-shift").click());
+
+            expect(res.status()).toBeLessThan(400);
+            await expect(page.getByTestId("shift-closed")).toBeVisible();
+            await expect(drawer.expected).toHaveText(money(470));
         });
 
         test("taking the cash out ends the shift and records it", async ({ page }) => {

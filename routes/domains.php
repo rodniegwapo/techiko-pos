@@ -334,6 +334,8 @@ Route::prefix('domains/{domain:name_slug}')
             Route::post('/opening-cash', [WalletCashMovementController::class, 'setOpeningCash'])->name('opening-cash.store');
             Route::post('/counted-cash', [WalletCashMovementController::class, 'submitCountedCash'])->name('counted-cash.store');
             Route::post('/end-shift', [WalletCashMovementController::class, 'endShift'])->name('end-shift');
+            // End the shift in one step: cash expenses, the count (a cashier's approved with a manager's PIN), then close.
+            Route::post('/close-shift', [WalletCashMovementController::class, 'closeShiftWithCount'])->name('close-shift');
             Route::post('/reopen-shift', [WalletCashMovementController::class, 'reopenShift'])->name('reopen-shift');
         });
 
