@@ -1,0 +1,762 @@
+{
+    "Dashboard/Index": {
+        "title": "Dashboard",
+        "en": "A quick look at how the business is doing today: sales, top products and what needs attention.",
+        "tl": "Mabilisang tingin kung kumusta ang negosyo ngayong araw: benta, mabentang produkto, at mga dapat asikasuhin.",
+        "guides": [
+            "switch-store"
+        ],
+        "ask": [
+            "How are sales today?"
+        ]
+    },
+    "Sales/Index": {
+        "title": "Sales",
+        "en": "The cash register. Add products to the order, take payment and print the receipt.",
+        "tl": "Ito ang kaha. Ilagay ang mga produkto sa order, tanggapin ang bayad, at i-print ang resibo.",
+        "guides": [
+            "make-a-sale",
+            "split-payment",
+            "pwd-senior-discount"
+        ],
+        "ask": [
+            "How do I make a sale?"
+        ]
+    },
+    "Sales/OfflineTransactions": {
+        "title": "Offline sales",
+        "en": "Sales made while there was no internet. They are sent to the system once you are back online.",
+        "tl": "Mga benta habang walang internet. Ipapadala ang mga ito sa sistema kapag may internet na ulit.",
+        "guides": [
+            "offline-sales"
+        ],
+        "ask": [
+            "How do offline sales work?"
+        ]
+    },
+    "SalesHistory/Index": {
+        "title": "Sales history",
+        "en": "Every completed sale. Find a receipt, see what was sold, void a sale or export the list.",
+        "tl": "Lahat ng natapos na benta. Hanapin ang resibo, tingnan ang nabenta, i-void ang benta, o i-export ang listahan.",
+        "guides": [
+            "find-receipt",
+            "void-sale",
+            "export-sales"
+        ],
+        "ask": [
+            "How do I find a past receipt?"
+        ]
+    },
+    "VoidLog/Index": {
+        "title": "Voids",
+        "en": "Who voided which sale or item, when, and why. Use it to check for mistakes or misuse.",
+        "tl": "Sino ang nag-void ng benta o item, kailan, at bakit. Gamitin ito para makita ang mali o pang-aabuso.",
+        "guides": [
+            "void-logs"
+        ],
+        "ask": [
+            "Who voided sales today?"
+        ]
+    },
+    "Expenses/Index": {
+        "title": "Expenses",
+        "en": "Money the business spends, like rent, electricity and salaries. Expenses paid in cash come out of the cash drawer.",
+        "tl": "Mga ginagastos ng negosyo, gaya ng upa, kuryente at sahod. Ang gastos na binayaran ng cash ay ibabawas sa cash drawer.",
+        "guides": [
+            "record-expense",
+            "recurring-expense",
+            "expense-categories"
+        ],
+        "ask": [
+            "How do I record an expense?"
+        ]
+    },
+    "Finance/Dashboard": {
+        "title": "Finance",
+        "en": "Profit, cash and what the business owns and owes, all in one place.",
+        "tl": "Kita, pera, at mga pag-aari at utang ng negosyo, makikita lahat dito.",
+        "guides": [
+            "finance-reports"
+        ],
+        "ask": [
+            "Am I making a profit this month?"
+        ]
+    },
+    "Finance/CashFlow": {
+        "title": "Cash flow",
+        "en": "Where money came from and where it went in a period. It explains why profit and cash on hand are different.",
+        "tl": "Saan galing ang pera at saan napunta sa isang panahon. Ipinapaliwanag kung bakit magkaiba ang kita at ang hawak na pera.",
+        "guides": [
+            "finance-reports"
+        ],
+        "ask": [
+            "Why is my cash lower than my profit?"
+        ]
+    },
+    "Finance/BalanceSheet": {
+        "title": "Balance sheet",
+        "en": "What the business owns (cash, stock, equipment) and what it owes (bills, loans) on a given day.",
+        "tl": "Ang mga pag-aari ng negosyo (pera, stock, gamit) at ang mga utang nito (bayarin, loan) sa isang araw.",
+        "guides": [
+            "finance-reports"
+        ],
+        "ask": [
+            "What does my balance sheet say?"
+        ]
+    },
+    "Finance/Receivables": {
+        "title": "Receivables",
+        "en": "Money customers still owe the business, such as credit (utang), and which payments are late.",
+        "tl": "Pera na inuutang pa ng mga customer sa negosyo, gaya ng utang, at kung alin ang lampas na sa due date.",
+        "guides": [
+            "overdue-credit",
+            "credit-payment"
+        ],
+        "ask": [
+            "Who owes me money?"
+        ]
+    },
+    "Finance/Payables": {
+        "title": "Supplier bills",
+        "en": "What the business owes suppliers. Record bills, see what is due soon and pay them.",
+        "tl": "Mga utang ng negosyo sa mga supplier. Itala ang bill, tingnan ang malapit nang i-due, at bayaran ang mga ito.",
+        "guides": [
+            "supplier-bill",
+            "pay-supplier-bill",
+            "add-supplier"
+        ],
+        "ask": [
+            "Which supplier bills are due?"
+        ]
+    },
+    "Finance/OtherIncome": {
+        "title": "Other income",
+        "en": "Income that does not come from sales, like rent received or interest.",
+        "tl": "Kita na hindi galing sa benta, gaya ng natanggap na upa o interes.",
+        "guides": [
+            "other-income"
+        ],
+        "ask": [
+            "How do I record other income?"
+        ]
+    },
+    "Finance/AssetsAndLoans": {
+        "title": "Accounts, loans & assets",
+        "en": "Bank and e-wallet balances, loans and their repayments, equipment, and money the owner put in or took out.",
+        "tl": "Balanse sa bangko at e-wallet, mga loan at bayad dito, mga gamit ng negosyo, at perang inilagay o kinuha ng may-ari.",
+        "guides": [
+            "bank-ewallet-balance",
+            "record-loan",
+            "owner-investment"
+        ],
+        "ask": [
+            "How do I record a loan?"
+        ]
+    },
+    "Finance/MonthlyReviews": {
+        "title": "Monthly reviews",
+        "en": "A short review of each month compared with the month before: what went well, what needs attention, and what to do next.",
+        "tl": "Maikling pagsusuri ng bawat buwan kumpara sa nakaraang buwan: ano ang maganda, ano ang dapat ayusin, at ano ang susunod na gagawin.",
+        "guides": [
+            "monthly-review"
+        ],
+        "ask": [
+            "How did last month go?"
+        ]
+    },
+    "Reports/ProfitLoss": {
+        "title": "Profit & loss",
+        "en": "Sales minus the cost of goods and expenses, so you see if the business made or lost money in a period.",
+        "tl": "Benta bawas ang puhunan sa paninda at gastos, para makita kung kumita o nalugi ang negosyo sa isang panahon.",
+        "guides": [
+            "finance-reports"
+        ],
+        "ask": [
+            "What is my profit this month?"
+        ]
+    },
+    "Reports/VatReport": {
+        "title": "VAT report",
+        "en": "The VAT collected on sales for a period, ready to export for filing.",
+        "tl": "Ang VAT na nakolekta sa mga benta sa isang panahon, handang i-export para sa pag-file.",
+        "guides": [
+            "vat-report"
+        ],
+        "ask": [
+            "How much VAT did I collect?"
+        ]
+    },
+    "Wallet/Drawer": {
+        "title": "Today's drawer",
+        "en": "How much cash should be in the drawer today. Set the opening cash, count the cash, and end the shift.",
+        "tl": "Kung magkano dapat ang pera sa drawer ngayon. Ilagay ang panimulang pera, bilangin ang pera, at isara ang shift.",
+        "guides": [
+            "end-shift",
+            "opening-cash"
+        ],
+        "ask": [
+            "Why is my drawer short?"
+        ]
+    },
+    "Wallet/CashInOut": {
+        "title": "Cash in & out",
+        "en": "Every peso put into or taken out of the cash drawer, like float added, the owner taking cash, or expenses paid in cash.",
+        "tl": "Bawat pisong inilagay o kinuha sa cash drawer, gaya ng dagdag na barya, perang kinuha ng may-ari, o gastos na binayaran ng cash.",
+        "guides": [
+            "cash-in-out"
+        ],
+        "ask": [
+            "How do I record cash taken by the owner?"
+        ]
+    },
+    "Wallet/Balances": {
+        "title": "Where money is",
+        "en": "How much is in the cash drawer and in each payment channel, like GCash, a bank or a card terminal.",
+        "tl": "Kung magkano ang nasa cash drawer at sa bawat payment channel, gaya ng GCash, bangko o card terminal.",
+        "guides": [
+            "payment-channels"
+        ],
+        "ask": [
+            "How much is in GCash?"
+        ]
+    },
+    "Wallet/History": {
+        "title": "Drawer history",
+        "en": "Past cash counts, changes to opening cash, and ended shifts, for checking back when the drawer did not match.",
+        "tl": "Mga nakaraang bilang ng pera, pagbabago sa panimulang pera, at mga isinarang shift, para masilip kapag hindi tugma ang drawer.",
+        "guides": [
+            "end-shift"
+        ],
+        "ask": [
+            "When was the drawer last short?"
+        ]
+    },
+    "Wallet/StoresCash": {
+        "title": "Stores' cash",
+        "en": "The shifts each store has ended: what was counted, what was expected, and the cash taken out.",
+        "tl": "Mga shift na isinara ng bawat store: ang nabilang, ang inaasahan, at ang perang kinuha.",
+        "guides": [],
+        "ask": [
+            "Which store was short this week?"
+        ]
+    },
+    "Wallet/CardTerminals": {
+        "title": "Payment channels",
+        "en": "The ways customers pay besides cash, like card terminals, GCash, Maya and banks. Add, edit or turn them off here.",
+        "tl": "Mga paraan ng pagbayad bukod sa cash, gaya ng card terminal, GCash, Maya at bangko. Dito magdagdag, mag-edit o mag-off.",
+        "guides": [
+            "payment-channels",
+            "card-ewallet-payment"
+        ],
+        "ask": [
+            "How do I add GCash?"
+        ]
+    },
+    "Wallet/CardTerminalMoneyDetails": {
+        "title": "Money received",
+        "en": "Every paid sale that came in through this payment channel, so you can match it with its app or statement.",
+        "tl": "Lahat ng bayad na benta na pumasok sa payment channel na ito, para maitugma sa app o statement nito.",
+        "guides": [
+            "payment-channels"
+        ],
+        "ask": [
+            "How much came in through this channel today?"
+        ]
+    },
+    "Products/Index": {
+        "title": "Products",
+        "en": "The items this store sells. Add, edit, set prices, and add an existing product to this store.",
+        "tl": "Mga paninda ng store na ito. Magdagdag, mag-edit, maglagay ng presyo, at idagdag ang produkto mula sa ibang store.",
+        "guides": [
+            "add-product",
+            "edit-product",
+            "add-existing-product-to-store"
+        ],
+        "ask": [
+            "How do I change a price?"
+        ]
+    },
+    "Products/Create": {
+        "title": "Add product",
+        "en": "Create a new product: its name, price, cost, category and whether stock is tracked.",
+        "tl": "Gumawa ng bagong produkto: pangalan, presyo, puhunan, kategorya, at kung bibilangin ang stock nito.",
+        "guides": [
+            "add-product"
+        ],
+        "ask": [
+            "What is the difference between price and cost?"
+        ]
+    },
+    "Products/Edit": {
+        "title": "Edit product",
+        "en": "Change a product's details, like its price, cost, category or barcode.",
+        "tl": "Baguhin ang detalye ng produkto, gaya ng presyo, puhunan, kategorya o barcode.",
+        "guides": [
+            "edit-product"
+        ],
+        "ask": [
+            "Will changing the price affect past sales?"
+        ]
+    },
+    "Products/Modifiers": {
+        "title": "Modifiers",
+        "en": "Options customers can choose for a product, like size, sugar level or add-ons, with their extra price.",
+        "tl": "Mga pagpipilian ng customer para sa produkto, gaya ng laki, tamis o dagdag, kasama ang dagdag na presyo.",
+        "guides": [
+            "modifier-groups"
+        ],
+        "ask": [
+            "How do I add sizes to a drink?"
+        ]
+    },
+    "Categories/Index": {
+        "title": "Categories",
+        "en": "Groups for products, used on the sales screen and in reports.",
+        "tl": "Mga grupo ng produkto, ginagamit sa sales screen at sa mga report.",
+        "guides": [
+            "add-category"
+        ],
+        "ask": [
+            "How do I add a category?"
+        ]
+    },
+    "Discounts/Index": {
+        "title": "Discounts",
+        "en": "Promos and discounts the store can give, on items or on the whole order.",
+        "tl": "Mga promo at discount na maibibigay ng store, sa item o sa buong order.",
+        "guides": [
+            "create-discount",
+            "sale-discount"
+        ],
+        "ask": [
+            "How do I create a promo?"
+        ]
+    },
+    "MandatoryDiscounts/Index": {
+        "title": "PWD, Senior & Student discounts",
+        "en": "The discount rates required by law for PWD, Senior Citizens and students.",
+        "tl": "Ang mga discount na itinakda ng batas para sa PWD, Senior Citizen at estudyante.",
+        "guides": [
+            "mandatory-discounts",
+            "pwd-senior-discount"
+        ],
+        "ask": [
+            "How is the Senior discount computed?"
+        ]
+    },
+    "Inventory/Index": {
+        "title": "Inventory",
+        "en": "An overview of stock: what is running low, what is out, and the value of stock on hand.",
+        "tl": "Buod ng stock: alin ang paubos na, alin ang ubos na, at magkano ang halaga ng stock na hawak.",
+        "guides": [
+            "low-stock-reorder",
+            "check-stock"
+        ],
+        "ask": [
+            "What is running low?"
+        ]
+    },
+    "Inventory/Products": {
+        "title": "Stock levels",
+        "en": "How many of each product are in each store. Receive deliveries and move stock between stores here.",
+        "tl": "Ilan ang bawat produkto sa bawat store. Dito tumanggap ng delivery at maglipat ng stock sa ibang store.",
+        "guides": [
+            "check-stock",
+            "receive-stock",
+            "transfer-stock"
+        ],
+        "ask": [
+            "How do I receive stock?"
+        ]
+    },
+    "Inventory/Movements": {
+        "title": "Stock movements",
+        "en": "Every change to stock: sales, deliveries, transfers and corrections, with who did it and when.",
+        "tl": "Bawat pagbabago sa stock: benta, delivery, paglipat at pagtama, kasama kung sino at kailan.",
+        "guides": [
+            "stock-movements"
+        ],
+        "ask": [
+            "Why did this product's stock go down?"
+        ]
+    },
+    "Inventory/Valuation": {
+        "title": "Stock value",
+        "en": "How much the stock on hand is worth, at cost and at selling price.",
+        "tl": "Magkano ang halaga ng stock na hawak, sa puhunan at sa presyo ng benta.",
+        "guides": [
+            "inventory-valuation"
+        ],
+        "ask": [
+            "How much is my stock worth?"
+        ]
+    },
+    "Inventory/Locations/Index": {
+        "title": "Stores & warehouses",
+        "en": "The business's stores, branches and warehouses. Add one, update its details or choose the default.",
+        "tl": "Mga store, branch at warehouse ng negosyo. Magdagdag, i-update ang detalye, o piliin ang default.",
+        "guides": [
+            "add-store",
+            "update-store",
+            "default-store"
+        ],
+        "ask": [
+            "How do I add a branch?"
+        ]
+    },
+    "Inventory/Locations/Create": {
+        "title": "Add store",
+        "en": "Add a new store, branch or warehouse. A store sells; a warehouse only keeps and moves stock.",
+        "tl": "Magdagdag ng bagong store, branch o warehouse. Ang store ay nagbebenta; ang warehouse ay nag-iimbak at naglilipat lang ng stock.",
+        "guides": [
+            "add-store"
+        ],
+        "ask": [
+            "What is the difference between a store and a warehouse?"
+        ]
+    },
+    "Inventory/Locations/Edit": {
+        "title": "Edit store",
+        "en": "Change a store's name, address, type or whether it is active.",
+        "tl": "Baguhin ang pangalan, address, uri ng store, o kung aktibo ito.",
+        "guides": [
+            "update-store"
+        ],
+        "ask": [
+            "What happens if I turn a store off?"
+        ]
+    },
+    "Inventory/Locations/Show": {
+        "title": "Store details",
+        "en": "One store's details, its stock and its staff.",
+        "tl": "Detalye ng isang store, ang stock nito at ang mga tauhan nito.",
+        "guides": [
+            "update-store"
+        ],
+        "ask": [
+            "How is this store doing?"
+        ]
+    },
+    "Inventory/StockAdjustments/Index": {
+        "title": "Stock adjustments",
+        "en": "Corrections to stock for damaged, expired or lost items, or after a recount. Some need approval before they apply.",
+        "tl": "Pagtama sa stock dahil sa sira, expired o nawalang item, o pagkatapos magbilang ulit. May mga kailangang aprubahan muna.",
+        "guides": [
+            "stock-adjustment",
+            "approve-adjustment"
+        ],
+        "ask": [
+            "How do I approve an adjustment?"
+        ]
+    },
+    "Inventory/StockAdjustments/Create": {
+        "title": "New stock adjustment",
+        "en": "Record a stock correction: which items, how many, and the reason.",
+        "tl": "Itala ang pagtama sa stock: aling mga item, ilan, at ang dahilan.",
+        "guides": [
+            "stock-adjustment"
+        ],
+        "ask": [
+            "Which reason should I pick for expired items?"
+        ]
+    },
+    "Inventory/StockAdjustments/Edit": {
+        "title": "Edit stock adjustment",
+        "en": "Change a draft stock correction before it is sent for approval.",
+        "tl": "Baguhin ang draft na pagtama sa stock bago ipadala para aprubahan.",
+        "guides": [
+            "stock-adjustment"
+        ],
+        "ask": [
+            "Who can approve this adjustment?"
+        ]
+    },
+    "Purchasing/Index": {
+        "title": "Purchasing",
+        "en": "Orders to suppliers. When stock arrives, receive it: the stock goes up and the supplier bill is updated. You can pay right away from a store's cash drawer.",
+        "tl": "Mga order sa supplier. Pagdating ng stock, i-receive ito: tataas ang stock at maa-update ang bill ng supplier. Puwedeng bayaran agad mula sa cash drawer ng store.",
+        "guides": [
+            "pay-supplier-bill",
+            "supplier-bill"
+        ],
+        "ask": [
+            "How do I pay a supplier when stock arrives?"
+        ]
+    },
+    "Customers/Index": {
+        "title": "Customers",
+        "en": "The people who buy from the business: their details, purchases, loyalty points and credit.",
+        "tl": "Ang mga bumibili sa negosyo: kanilang detalye, mga binili, loyalty points at utang.",
+        "guides": [
+            "add-customer"
+        ],
+        "ask": [
+            "Who are my best customers?"
+        ]
+    },
+    "Credits/Index": {
+        "title": "Credit (utang)",
+        "en": "Customers who buy on credit: how much each owes, credit limits, and payments received.",
+        "tl": "Mga customer na umuutang: magkano ang utang ng bawat isa, ang credit limit, at mga bayad na natanggap.",
+        "guides": [
+            "credit-payment",
+            "credit-limit",
+            "overdue-credit"
+        ],
+        "ask": [
+            "Who has overdue utang?"
+        ]
+    },
+    "Credits/Show": {
+        "title": "Customer credit",
+        "en": "One customer's credit: what they owe, their unpaid sales and their payments.",
+        "tl": "Utang ng isang customer: magkano ang utang, mga hindi pa bayad na benta, at mga bayad niya.",
+        "guides": [
+            "credit-payment",
+            "credit-limit"
+        ],
+        "ask": [
+            "How do I record a payment on this utang?"
+        ]
+    },
+    "Loyalty/Index": {
+        "title": "Loyalty",
+        "en": "Points customers earn when they buy, the tiers they reach, and adding or taking away points.",
+        "tl": "Mga puntos na nakukuha ng customer kapag bumibili, ang mga tier na naaabot nila, at pagdagdag o pagbawas ng puntos.",
+        "guides": [
+            "loyalty-tiers",
+            "adjust-loyalty-points",
+            "redeem-loyalty"
+        ],
+        "ask": [
+            "How do customers earn points?"
+        ]
+    },
+    "Users/Index": {
+        "title": "Users",
+        "en": "The staff who use the system: add them, set their role and store, their PIN and their supervisor.",
+        "tl": "Ang mga tauhang gumagamit ng sistema: idagdag sila, itakda ang role at store, ang PIN, at ang supervisor nila.",
+        "guides": [
+            "add-user",
+            "edit-user",
+            "user-pin"
+        ],
+        "ask": [
+            "How do I add a cashier?"
+        ]
+    },
+    "Users/Show": {
+        "title": "User details",
+        "en": "One staff member's details, role, store and recent activity.",
+        "tl": "Detalye ng isang tauhan, ang kanyang role, store at mga ginawa kamakailan.",
+        "guides": [
+            "edit-user"
+        ],
+        "ask": [
+            "What can this user do?"
+        ]
+    },
+    "Users/Edit": {
+        "title": "Edit user",
+        "en": "Change a staff member's details, role or store.",
+        "tl": "Baguhin ang detalye, role o store ng isang tauhan.",
+        "guides": [
+            "edit-user",
+            "user-pin"
+        ],
+        "ask": [
+            "Which role should a cashier have?"
+        ]
+    },
+    "Users/Hierarchy": {
+        "title": "Who reports to whom",
+        "en": "The chain of supervisors: which staff report to which supervisor or manager.",
+        "tl": "Ang hanay ng mga supervisor: sinong tauhan ang nasa ilalim ng aling supervisor o manager.",
+        "guides": [
+            "assign-supervisor"
+        ],
+        "ask": [
+            "How do I assign a supervisor?"
+        ]
+    },
+    "Roles/Index": {
+        "title": "Roles",
+        "en": "Roles decide what staff can see and do, like cashier, supervisor or manager.",
+        "tl": "Ang role ang nagtatakda kung ano ang makikita at magagawa ng tauhan, gaya ng cashier, supervisor o manager.",
+        "guides": [],
+        "ask": [
+            "What can a manager do that a cashier can't?"
+        ]
+    },
+    "Roles/Create": {
+        "title": "New role",
+        "en": "Create a role and choose which pages and actions it allows.",
+        "tl": "Gumawa ng role at piliin kung aling mga page at gawain ang pinapayagan nito.",
+        "guides": [],
+        "ask": [
+            "Which permissions does a cashier need?"
+        ]
+    },
+    "Roles/Edit": {
+        "title": "Edit role",
+        "en": "Change what a role allows. Everyone with this role is affected.",
+        "tl": "Baguhin kung ano ang pinapayagan ng role. Apektado ang lahat ng may ganitong role.",
+        "guides": [],
+        "ask": [
+            "What will change for staff with this role?"
+        ]
+    },
+    "Roles/Show": {
+        "title": "Role details",
+        "en": "What this role allows and who has it.",
+        "tl": "Kung ano ang pinapayagan ng role na ito at kung sino ang may hawak nito.",
+        "guides": [],
+        "ask": [
+            "Who has this role?"
+        ]
+    },
+    "Roles/PermissionMatrix": {
+        "title": "Permission matrix",
+        "en": "All roles side by side, showing which permissions each one has.",
+        "tl": "Lahat ng role na magkakatabi, makikita kung aling mga pahintulot ang mayroon ang bawat isa.",
+        "guides": [],
+        "ask": [
+            "Which roles can void a sale?"
+        ]
+    },
+    "Permissions/Index": {
+        "title": "Permissions",
+        "en": "Every action in the system that can be allowed or blocked for a role.",
+        "tl": "Bawat gawain sa sistema na puwedeng payagan o harangan para sa isang role.",
+        "guides": [],
+        "ask": [
+            "What does this permission allow?"
+        ]
+    },
+    "Permissions/Show": {
+        "title": "Permission details",
+        "en": "What this permission allows and which roles have it.",
+        "tl": "Kung ano ang pinapayagan ng pahintulot na ito at kung aling mga role ang mayroon nito.",
+        "guides": [],
+        "ask": [
+            "Which roles have this permission?"
+        ]
+    },
+    "Settings/Index": {
+        "title": "Settings",
+        "en": "How the business sells: VAT, receipts, and other selling options.",
+        "tl": "Kung paano nagbebenta ang negosyo: VAT, resibo, at iba pang setting sa pagbebenta.",
+        "guides": [
+            "sales-settings"
+        ],
+        "ask": [
+            "How do I turn on VAT?"
+        ]
+    },
+    "AiUsage/Index": {
+        "title": "AI usage",
+        "en": "How much the AI assistant has been used, and how much of the plan's limit is left.",
+        "tl": "Gaano kadalas nagamit ang AI assistant, at magkano pa ang natitira sa limit ng plan.",
+        "guides": [],
+        "ask": [
+            "How many AI questions are left this month?"
+        ]
+    },
+    "Billing/Gcash": {
+        "title": "Billing",
+        "en": "Pay for or upgrade your Techiko plan, and see past payments.",
+        "tl": "Bayaran o i-upgrade ang iyong Techiko plan, at tingnan ang mga nakaraang bayad.",
+        "guides": [
+            "servicing-payment"
+        ],
+        "ask": [
+            "When is my plan due?"
+        ]
+    },
+    "Billing/ManualPayments/Index": {
+        "title": "Manual payments",
+        "en": "Plan payments sent by GCash or bank that need checking and approving.",
+        "tl": "Mga bayad sa plan na ipinadala sa GCash o bangko na kailangang suriin at aprubahan.",
+        "guides": [],
+        "ask": []
+    },
+    "Catalog/SharedProducts/Index": {
+        "title": "Shared products",
+        "en": "Products every business can copy from, so they don't have to type common items again.",
+        "tl": "Mga produktong puwedeng kopyahin ng lahat ng negosyo, para hindi na i-type ulit ang mga karaniwang item.",
+        "guides": [],
+        "ask": []
+    },
+    "Catalog/SharedSuggestions/Index": {
+        "title": "Product suggestions",
+        "en": "Products businesses suggested adding to the shared catalog, waiting for review.",
+        "tl": "Mga produktong iminungkahi ng mga negosyo na idagdag sa shared catalog, naghihintay ng pagsusuri.",
+        "guides": [],
+        "ask": []
+    },
+    "Domains/Index": {
+        "title": "Organizations",
+        "en": "Every business using Techiko: their plan, features and status.",
+        "tl": "Lahat ng negosyong gumagamit ng Techiko: ang kanilang plan, features at status.",
+        "guides": [],
+        "ask": []
+    },
+    "Domains/Show": {
+        "title": "Organization details",
+        "en": "One business's plan, features, stores and users.",
+        "tl": "Ang plan, features, mga store at users ng isang negosyo.",
+        "guides": [],
+        "ask": []
+    },
+    "Messages/Index": {
+        "title": "Messages",
+        "en": "Chats with businesses that need help or have questions.",
+        "tl": "Mga usapan kasama ang mga negosyong nangangailangan ng tulong o may tanong.",
+        "guides": [],
+        "ask": []
+    },
+    "Messages/AssistantUnanswered": {
+        "title": "Unanswered questions",
+        "en": "Questions the AI assistant could not answer, so the guides can be improved.",
+        "tl": "Mga tanong na hindi nasagot ng AI assistant, para mapaganda ang mga gabay.",
+        "guides": [],
+        "ask": []
+    },
+    "Plans/Index": {
+        "title": "Plans",
+        "en": "The plans businesses can subscribe to, with their prices and features.",
+        "tl": "Mga plan na puwedeng i-subscribe ng mga negosyo, kasama ang presyo at features.",
+        "guides": [],
+        "ask": []
+    },
+    "Mail/Test": {
+        "title": "Test email",
+        "en": "Send a test email to check that the system can send mail.",
+        "tl": "Magpadala ng test email para masigurong nakakapagpadala ng email ang sistema.",
+        "guides": [],
+        "ask": []
+    },
+    "Profile/Edit": {
+        "title": "Profile",
+        "en": "Your own account: your name, email and password.",
+        "tl": "Ang sarili mong account: pangalan, email at password.",
+        "guides": [],
+        "ask": [
+            "How do I change my password?"
+        ]
+    },
+    "Domains/Create": {
+        "title": "New organization",
+        "en": "Set up a new business that will use Techiko: its name, address and settings.",
+        "tl": "Mag-set up ng bagong negosyong gagamit ng Techiko: pangalan, address at mga setting nito.",
+        "guides": [],
+        "ask": []
+    },
+    "Domains/Edit": {
+        "title": "Edit organization",
+        "en": "Change a business's name, address and settings.",
+        "tl": "Baguhin ang pangalan, address at mga setting ng isang negosyo.",
+        "guides": [],
+        "ask": []
+    }
+}

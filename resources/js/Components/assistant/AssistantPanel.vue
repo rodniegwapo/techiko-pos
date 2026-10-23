@@ -16,6 +16,10 @@ import { answerBlocks, suggestionsFor } from "./assistantAnswer";
  * Chats are saved to the user's account for 90 days; History reopens or deletes them.
  */
 const emit = defineEmits(["ask-human", "navigate"]);
+const props = defineProps({
+    /** A question sent from elsewhere (a page's "?" help): { id, text }, asked once it arrives. */
+    question: { type: Object, default: null },
+});
 
 const page = usePage();
 const { getRoute } = useDomainRoutes();
@@ -47,7 +51,15 @@ const chats = ref([]); // { id, title, last_message_at }
 const loadingChats = ref(false);
 const loadingChat = ref(false);
 
-onMounted(() => {
+const askedQuestionId = ref(null);
+function askSentQuestion() {
+    if (props.question?.text && props.question.id !== askedQuestionId.value) {
+        askedQuestionId.value = props.question.id;
+        ask(props.question.text);
+    }
+}
+
+onMounted(async () => {
     let saved = null;
     try {
         saved = JSON.parse(sessionStorage.getItem(storageKey.value) || "null");
@@ -56,8 +68,11 @@ onMounted(() => {
     }
     language.value = saved?.language || "en";
     if (saved?.conversationId) {
-        openChat(saved.conversationId);
+        await openChat(saved.conversationId);
     }
+    // Asked after the saved chat is back, so the question joins it instead of being replaced.
+    askSentQuestion();
+    watch(() => props.question?.id, askSentQuestion);
 });
 
 watch([conversationId, language], () => {

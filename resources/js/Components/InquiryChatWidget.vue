@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount } from "vue";
 import { OPEN_TEAM_CHAT_EVENT } from "@/Composables/useTeamChat";
+import { OPEN_ASSISTANT_EVENT } from "@/Composables/useAssistant";
 import { router, usePage } from "@inertiajs/vue3";
 import { IconMessageCircle } from "@tabler/icons-vue";
 import { message as antMessage } from "ant-design-vue";
@@ -196,6 +197,18 @@ function onOpenTeamChat(event) {
 onMounted(() => window.addEventListener(OPEN_TEAM_CHAT_EVENT, onOpenTeamChat));
 onBeforeUnmount(() => window.removeEventListener(OPEN_TEAM_CHAT_EVENT, onOpenTeamChat));
 
+// Opened from a page's "?" help (openAssistant): the assistant tab, asking the question.
+const sentQuestion = ref(null);
+function onOpenAssistant(event) {
+    if (!assistantAvailable.value) return;
+    tab.value = "assistant";
+    const text = event.detail?.question ?? "";
+    if (text) sentQuestion.value = { id: Date.now(), text };
+    open.value = true;
+}
+onMounted(() => window.addEventListener(OPEN_ASSISTANT_EVENT, onOpenAssistant));
+onBeforeUnmount(() => window.removeEventListener(OPEN_ASSISTANT_EVENT, onOpenAssistant));
+
 function onComposerKeydown(e) {
     if (e.key !== "Enter") {
         return;
@@ -253,6 +266,7 @@ function onComposerKeydown(e) {
             </div>
             <AssistantPanel
                 v-if="assistantAvailable && tab === 'assistant'"
+                :question="sentQuestion"
                 @ask-human="tab = 'team'"
                 @navigate="open = false"
             />

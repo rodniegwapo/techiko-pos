@@ -8,6 +8,7 @@ use App\Models\Conversation;
 use App\Models\ConversationMessage;
 use App\Models\Domain;
 use App\Models\InventoryLocation;
+use App\Services\Ai\GuideLibrary;
 use App\Services\ImpersonationService;
 use App\Support\LocationAreas;
 use App\Support\RoutePermission;
@@ -81,6 +82,10 @@ class HandleInertiaRequests extends Middleware
                 'prefixes' => collect(config('location_areas.areas', []))
                     ->map(fn ($prefixes) => array_map(fn ($p) => Str::after($p, 'domains.'), $prefixes)),
             ],
+            // How-to guides this user may follow, { key: title }, for the pages' "?" help.
+            'helpGuides' => fn () => $request->user() && $currentDomain
+                ? array_map(fn (array $g) => $g['title'], app(GuideLibrary::class)->allowedFor($request->user(), $currentDomain))
+                : [],
             // Pages that open with another page's permission (RoutePermission::ALIASES).
             'routePermissionAliases' => RoutePermission::ALIASES,
             'availableLocations' => $this->getAvailableLocations($request),
