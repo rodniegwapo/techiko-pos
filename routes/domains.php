@@ -34,6 +34,8 @@ use App\Http\Controllers\Domains\SalesHistoryController;
 use App\Http\Controllers\Domains\SharedCatalogLookupController;
 use App\Http\Controllers\Domains\SubscriptionOnHoldController;
 use App\Http\Controllers\Domains\SubscriptionRenewalController;
+use App\Http\Controllers\Domains\TimeclockController;
+use App\Http\Controllers\Domains\TimesheetController;
 use App\Http\Controllers\Domains\UserController;
 use App\Http\Controllers\Domains\UserPinController;
 use App\Http\Controllers\Domains\VatReportController;
@@ -413,6 +415,15 @@ Route::prefix('domains/{domain:name_slug}')
             Route::post('/{purchaseOrder}/order', [PurchaseOrderController::class, 'order'])->whereNumber('purchaseOrder')->name('order');
             Route::post('/{purchaseOrder}/receive', [PurchaseOrderController::class, 'receive'])->whereNumber('purchaseOrder')->name('receive');
             Route::post('/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel'])->whereNumber('purchaseOrder')->name('cancel');
+        });
+
+        // Timeclock: staff clock in and out on the POS with their own PIN; managers keep the timesheets
+        Route::post('/timeclock/punch', [TimeclockController::class, 'punch'])->name('timesheets.punch');
+        Route::prefix('timesheets')->name('timesheets.')->group(function () {
+            Route::get('/', [TimesheetController::class, 'index'])->name('index');
+            Route::get('/export', [TimesheetController::class, 'export'])->name('export');
+            Route::post('/', [TimesheetController::class, 'store'])->name('store');
+            Route::put('/{timeEntry}', [TimesheetController::class, 'update'])->whereNumber('timeEntry')->name('update');
         });
 
         // Terminal Setup (Organization-specific)

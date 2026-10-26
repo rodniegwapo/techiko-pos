@@ -6,6 +6,7 @@ use App\Models\Permission;
 use Database\Seeders\AssistantPermissionSeeder;
 use Database\Seeders\FinancePermissionSeeder;
 use Database\Seeders\PurchasingPermissionSeeder;
+use Database\Seeders\TimeclockPermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -169,5 +170,28 @@ class FeaturePermissionSeedersTest extends TestCase
             DB::table('permission_modules')->where('name', 'assistant')->value('id'),
             Permission::query()->where('route_name', 'assistant.ask')->value('module_id'),
         );
+    }
+
+    public function test_the_timeclock_seeder_covers_every_timesheet_route_and_gives_the_till_staff_only_the_punch(): void
+    {
+        $routes = [];
+        foreach (Route::getRoutes() as $route) {
+            if (str_starts_with((string) $route->getName(), 'domains.timesheets.')) {
+                $routes[] = preg_replace('/^domains\./', '', $route->getName());
+            }
+        }
+        $this->assertSame($this->sorted($routes), $this->sorted(TimeclockPermissionSeeder::ROUTES));
+
+        $manager = $this->role('manager');
+        $cashier = $this->role('cashier');
+        $supervisor = $this->role('supervisor');
+
+        $this->seed(TimeclockPermissionSeeder::class);
+        $this->seed(TimeclockPermissionSeeder::class);
+
+        $this->assertSame($this->sorted(TimeclockPermissionSeeder::ROUTES), $this->routesOf($manager));
+        $this->assertSame(['timesheets.punch'], $this->routesOf($cashier));
+        $this->assertSame(['timesheets.punch'], $this->routesOf($supervisor));
+        $this->assertSame(count(TimeclockPermissionSeeder::ROUTES), Permission::query()->whereIn('route_name', TimeclockPermissionSeeder::ROUTES)->count());
     }
 }

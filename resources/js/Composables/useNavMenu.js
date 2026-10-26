@@ -24,6 +24,7 @@ import {
     IconMail,
     IconSparkles,
     IconTruck,
+    IconClock,
 } from "@tabler/icons-vue";
 import { router, usePage } from "@inertiajs/vue3";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
@@ -394,6 +395,17 @@ const menuItems = [
         path: "/users",
         section: "team",
         keywords: "staff employees cashiers",
+    },
+    {
+        key: "timesheets",
+        title: "Timesheets",
+        icon: IconClock,
+        routeName: "timesheets.index",
+        path: "/timesheets",
+        section: "team",
+        domainOnly: true,
+        hideForSuperOutsideDomain: true,
+        keywords: "timeclock clock in out hours attendance payroll",
     },
     {
         key: "roles",

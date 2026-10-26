@@ -198,6 +198,14 @@ class PermissionModuleSeeder extends Seeder
                 'is_active' => true,
             ],
             [
+                'name' => 'timesheets',
+                'display_name' => 'Timeclock',
+                'icon' => 'clock',
+                'description' => 'Clock in and out on the POS, and the timesheets that add up the hours',
+                'sort_order' => 19,
+                'is_active' => true,
+            ],
+            [
                 'name' => 'profit-loss',
                 'display_name' => 'Profit & Loss',
                 'icon' => 'report-analytics',

@@ -758,5 +758,14 @@
         "tl": "Baguhin ang pangalan, address at mga setting ng isang negosyo.",
         "guides": [],
         "ask": []
+    },
+    "Timesheets/Index": {
+        "title": "Timesheets",
+        "en": "Who worked when, and the hours to pay. Staff clock in and out on the Sales page with their own PIN. Here you close a forgotten clock-out, add a missed shift, and export the hours for payroll.",
+        "tl": "Sino ang pumasok at kailan, at ilang oras ang babayaran. Nagta-time in at time out ang staff sa Sales page gamit ang sarili nilang PIN. Dito mo isasara ang nakalimutang time out, idaragdag ang shift na hindi na-record, at ie-export ang oras para sa sahod.",
+        "guides": [],
+        "ask": [
+            "How do I fix a forgotten clock-out?"
+        ]
     }
 }

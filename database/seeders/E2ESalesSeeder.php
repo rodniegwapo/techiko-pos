@@ -3,8 +3,8 @@
 namespace Database\Seeders;
 
 use App\Models\Category;
-use App\Models\Customer;
 use App\Models\CreditTransaction;
+use App\Models\Customer;
 use App\Models\InventoryLocation;
 use App\Models\MandatoryDiscount;
 use App\Models\ModifierGroup;
@@ -13,6 +13,7 @@ use App\Models\Product\Discount;
 use App\Models\Product\Product;
 use App\Models\ProductInventory;
 use App\Models\Sale;
+use App\Models\TimeEntry;
 use App\Models\User;
 use App\Models\UserPin;
 use Illuminate\Database\Seeder;
@@ -335,6 +336,9 @@ class E2ESalesSeeder extends Seeder
             $userPin->pin_code = Hash::make($pin);
             $userPin->active = true;
             $userPin->save();
+
+            // timeclock.spec.js clocks these PINs in and out: each run starts with no shifts.
+            TimeEntry::query()->where('user_id', $user->id)->delete();
         }
     }
 

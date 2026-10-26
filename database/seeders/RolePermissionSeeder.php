@@ -128,6 +128,11 @@ class RolePermissionSeeder extends Seeder
             'purchase-orders.order',
             'purchase-orders.receive',
             'purchase-orders.cancel',
+            'timesheets.index',
+            'timesheets.export',
+            'timesheets.store',
+            'timesheets.update',
+            'timesheets.punch',
             'expenses.index',
             'expenses.store',
             'expenses.update',
@@ -511,6 +516,11 @@ class RolePermissionSeeder extends Seeder
             'purchase-orders.order',
             'purchase-orders.receive',
             'purchase-orders.cancel',
+            'timesheets.index',
+            'timesheets.export',
+            'timesheets.store',
+            'timesheets.update',
+            'timesheets.punch',
             'expenses.index',
             'expenses.store',
             'expenses.update',
@@ -791,6 +801,11 @@ class RolePermissionSeeder extends Seeder
             'purchase-orders.order',
             'purchase-orders.receive',
             'purchase-orders.cancel',
+            'timesheets.index',
+            'timesheets.export',
+            'timesheets.store',
+            'timesheets.update',
+            'timesheets.punch',
             'expenses.index',
             'expenses.store',
             'expenses.update',
@@ -945,6 +960,9 @@ class RolePermissionSeeder extends Seeder
         $supervisor = Role::findOrCreate('supervisor', 'web');
         $supervisor->update(['level' => 4, 'description' => 'Shift supervision with limited management capabilities']);
         $supervisor->syncPermissions($this->getPermissionNamesByRoutes([
+            // Timeclock: clock in and out with their own PIN
+            'timesheets.punch',
+
             // Dashboard
             'dashboard',
             'dashboard.sales-chart',
@@ -1087,6 +1105,9 @@ class RolePermissionSeeder extends Seeder
         $cashier = Role::findOrCreate('cashier', 'web');
         $cashier->update(['level' => 5, 'description' => 'Front-line operations with sales processing capabilities']);
         $cashier->syncPermissions($this->getPermissionNamesByRoutes([
+            // Timeclock: clock in and out with their own PIN
+            'timesheets.punch',
+
             // Dashboard
             'dashboard',
             'dashboard.sales-chart',
@@ -1220,6 +1241,7 @@ class RolePermissionSeeder extends Seeder
             'apply' => 'Apply',
             'manage' => 'Manage',
             'export' => 'Export',
+            'punch' => 'Clock in / out',
             'export-json' => 'Export JSON',
             'dashboard' => 'Dashboard',
             'search' => 'Search',

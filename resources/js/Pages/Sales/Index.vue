@@ -61,6 +61,8 @@ import { notifyInsufficientStock } from "@/Composables/useCartStockNotification"
 import { hasModifiers } from "@/Composables/useProductModifiers";
 import ModifierPickerModal from "./components/ModifierPickerModal.vue";
 import QuantityPromptModal from "./components/QuantityPromptModal.vue";
+import TimeclockButton from "./components/TimeclockButton.vue";
+import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 import { allowsDecimal, toQuantity } from "@/Utils/quantity";
 import StartShiftModal from "./components/StartShiftModal.vue";
 
@@ -169,6 +171,9 @@ const loyaltyRedemptionSettings = computed(
         },
 );
 const activeLocationId = computed(() => page.props.currentLocation?.id);
+// Clock in / out with your own PIN, on the till everyone shares.
+const { hasPermission } = usePermissionsV2();
+const canPunch = computed(() => hasPermission("timesheets.punch"));
 const cashierUserId = computed(() => page.props.auth?.user?.data?.id);
 
 const shiftIsOpen = computed(() => page.props.shiftStatus?.is_open ?? true);
@@ -1612,8 +1617,9 @@ watch(
                 title="Sales"
                 class="shrink-0 md:pr-44"
             >
-                <template v-if="!isMdUp" #actions>
-                    <div class="flex items-center gap-2">
+                <template v-if="!isMdUp || canPunch" #actions>
+                    <TimeclockButton v-if="canPunch" :location-id="activeLocationId" />
+                    <div v-if="!isMdUp" class="flex items-center gap-2">
                         <span class="text-xs font-medium text-gray-800">
                             Classic
                         </span>
@@ -1672,6 +1678,9 @@ watch(
                             class="mt-1 inline-block text-xs text-[var(--cs-muted)] underline"
                             data-testid="customer-display-link"
                         >Customer display</a>
+                        <div v-if="canPunch">
+                            <TimeclockButton variant="coffeeshop" :location-id="activeLocationId" />
+                        </div>
                     </div>
                 </template>
                 <template v-if="!isCoffeeshopLayout" #titleMeta>

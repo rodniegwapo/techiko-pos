@@ -10,6 +10,22 @@ use Illuminate\Support\Facades\Hash;
 class UserPinService
 {
     /**
+     * Whoever in the organization has this PIN (active pins only), or null. PINs are unique within
+     * an organization (pinTakenInDomain), so a PIN names one person.
+     */
+    public function userForPin(string $domainSlug, string $plain): ?User
+    {
+        $pin = UserPin::query()
+            ->where('active', true)
+            ->whereHas('user', fn ($q) => $q->where('domain', $domainSlug))
+            ->with('user')
+            ->get()
+            ->first(fn (UserPin $pin) => Hash::check($plain, $pin->pin_code));
+
+        return $pin?->user;
+    }
+
+    /**
      * Whether another user in the same domain already has this plaintext PIN (active pins only).
      */
     public function pinTakenInDomain(Domain $domain, User $exceptUser, string $plain): bool

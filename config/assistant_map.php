@@ -57,6 +57,7 @@ return [
     ['route' => 'customers.index', 'path' => 'Customers', 'about' => 'the customer list: add and edit customers'],
     ['route' => 'credits.index', 'path' => 'Credit Management', 'about' => 'customer credit accounts: credit limits and terms, balances, overdue accounts and recording payments'],
     ['route' => 'users.index', 'path' => 'Users', 'about' => 'staff accounts: add users, roles, assigned store, supervisors and PINs'],
+    ['route' => 'timesheets.index', 'path' => 'Timesheets', 'about' => 'staff hours: who clocked in and out (they do it on the Sales page with their own PIN via Clock in / out), hours per person per day, fixing a forgotten clock-out or adding a missed shift with a reason, and exporting the hours to CSV for payroll'],
     ['route' => 'settings.index', 'path' => 'Settings', 'about' => 'sales settings: VAT on/off, VAT rate and pricing mode, selling when out of stock, hiding out-of-stock products'],
     ['route' => 'billing.servicing.index', 'path' => 'Billing', 'about' => 'the Techiko plan: the current plan and what it uses, upgrading (pay with a QR Ph code; the plan starts once paid), renewing and past payments'],
     ['route' => 'ai-usage.index', 'path' => 'AI usage', 'about' => "this month's AI credits: the plan's allowance, credits used and left, when they reset, and usage by day, feature and user"],
