@@ -1,5 +1,6 @@
 <script setup>
 import { ref, reactive, computed, watch } from "vue";
+import { allowsDecimal } from "@/Utils/quantity";
 import { router, Head, usePage } from "@inertiajs/vue3";
 import {
   PlusOutlined,
@@ -576,8 +577,9 @@ const handleCancel = () => {
                 <a-input-number
                   v-model:value="item.actual_quantity"
                   :min="0"
-                  :step="1"
-                  :precision="0"
+                  :step="allowsDecimal(item.product) ? 0.25 : 1"
+                  :precision="allowsDecimal(item.product) ? 3 : 0"
+                  :addon-after="allowsDecimal(item.product) ? item.product.quantity_unit : undefined"
                   class="w-full"
                   :disabled="loading"
                   @change="calculateAdjustment(item)"

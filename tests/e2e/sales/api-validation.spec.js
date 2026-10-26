@@ -31,7 +31,7 @@ test.describe("Sales API validation", () => {
             { name: "quantity 0", body: { product_id: "burger", quantity: 0 }, field: "quantity" },
             { name: "a negative quantity", body: { product_id: "burger", quantity: -1 }, field: "quantity" },
             { name: "a non-numeric quantity", body: { product_id: "burger", quantity: "abc" }, field: "quantity" },
-            { name: "a decimal quantity", body: { product_id: "burger", quantity: 1.5 }, field: "quantity" },
+            { name: "a decimal quantity for a product sold by the piece", body: { product_id: "burger", quantity: 1.5 }, field: "quantity" },
             { name: "a nonexistent product", body: { product_id: 999999, quantity: 1 }, field: "product_id" },
         ];
 

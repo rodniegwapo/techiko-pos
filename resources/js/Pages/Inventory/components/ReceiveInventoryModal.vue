@@ -1,5 +1,6 @@
 <script setup>
 import { ref, reactive, computed, watch,toRefs } from "vue";
+import { allowsDecimal } from "@/Utils/quantity";
 import { useMediaQuery } from "@vueuse/core";
 import { router } from "@inertiajs/vue3";
 import { IconPlus, IconTrash, IconSearch, IconShoppingCart, IconAlertTriangle, IconX } from "@tabler/icons-vue";
@@ -481,9 +482,10 @@ watch(
             <div class="col-span-2">
               <a-input-number
                 v-model:value="item.quantity"
-                :min="1"
-                :step="1"
-                :precision="0"
+                :min="allowsDecimal(item.product) ? 0.001 : 1"
+                :step="allowsDecimal(item.product) ? 0.25 : 1"
+                :precision="allowsDecimal(item.product) ? 3 : 0"
+                :addon-after="allowsDecimal(item.product) ? item.product.quantity_unit : undefined"
                 class="w-full"
                 :disabled="loading"
               />

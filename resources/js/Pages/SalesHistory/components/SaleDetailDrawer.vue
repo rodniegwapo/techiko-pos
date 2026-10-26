@@ -7,6 +7,7 @@ import SaleReceipt from "@/Components/Receipt/SaleReceipt.vue";
 import VoidProductModal from "@/Pages/Sales/components/VoidProductModal.vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useHelpers } from "@/Composables/useHelpers";
+import { formatQuantity } from "@/Utils/quantity";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 
 const props = defineProps({
@@ -89,7 +90,7 @@ const statusColor = (status) =>
 
 const itemColumns = [
     { title: "Item", key: "product_name", dataIndex: "product_name" },
-    { title: "Qty", key: "quantity", dataIndex: "quantity", align: "right", width: 60 },
+    { title: "Qty", key: "quantity", dataIndex: "quantity", align: "right", width: 72 },
     { title: "Price", key: "unit_price", dataIndex: "unit_price", align: "right" },
     { title: "Disc.", key: "discount", dataIndex: "discount", align: "right" },
     { title: "Subtotal", key: "subtotal", dataIndex: "subtotal", align: "right" },
@@ -159,6 +160,9 @@ const itemColumns = [
                                 </div>
                                 <a-tag v-if="record.voided" color="red" class="ml-2">Voided</a-tag>
                             </template>
+                            <template v-else-if="column.key === 'quantity'">
+                                <span :class="{ 'text-gray-400 line-through': record.voided }">{{ formatQuantity(record.quantity, record) }}</span>
+                            </template>
                             <template v-else-if="['unit_price', 'discount', 'subtotal'].includes(column.key)">
                                 <span :class="{ 'text-gray-400 line-through': record.voided }">
                                     {{ formattedTotal(record[column.key]) }}
@@ -202,7 +206,7 @@ const itemColumns = [
                         </div>
                         <div v-for="(line, i) in sale.profit.lines" :key="i" class="flex justify-between pl-3 text-xs text-gray-500">
                             <span>
-                                {{ line.product_name }} · {{ line.quantity }} ×
+                                {{ line.product_name }} · {{ formatQuantity(line.quantity, line) }} ×
                                 {{ line.unit_cost === null ? "no cost set" : formattedTotal(line.unit_cost) }}
                             </span>
                             <span>{{ line.line_cost === null ? "—" : formattedTotal(line.line_cost) }}</span>

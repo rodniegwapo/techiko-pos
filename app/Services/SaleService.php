@@ -17,6 +17,7 @@ use App\Models\UserPin;
 use App\Models\VoidLog;
 use App\Services\Wallet\SalePaymentWalletPosting;
 use App\Support\ManagerApproval;
+use App\Support\Quantity;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -75,7 +76,7 @@ class SaleService
         $inventoryItems = collect($items)->map(function ($item) {
             return [
                 'product_id' => $item['id'],
-                'quantity' => max(1, (int) $item['quantity']),
+                'quantity' => max(Quantity::MIN, Quantity::round($item['quantity'])),
             ];
         })->toArray();
 
@@ -107,7 +108,7 @@ class SaleService
                 $saleItem = $sale->saleItems()->updateOrCreate(
                     ['product_id' => $item['id']],
                     [
-                        'quantity' => max(1, (int) $item['quantity']),
+                        'quantity' => max(Quantity::MIN, Quantity::round($item['quantity'])),
                         'unit_price' => max(0, (float) $item['price']),
                     ]
                 );
@@ -469,7 +470,7 @@ class SaleService
             ->groupBy('product_id')
             ->map(fn ($rows) => [
                 'product_id' => (int) $rows->first()->product_id,
-                'quantity' => (int) $rows->sum('quantity'),
+                'quantity' => Quantity::round($rows->sum('quantity')),
             ])
             ->values()
             ->all();

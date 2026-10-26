@@ -17,9 +17,9 @@ class InventoryTransferRecommendation extends Model
     ];
 
     protected $casts = [
-        'recommended_quantity' => 'integer',
-        'current_stock_from' => 'integer',
-        'current_stock_to' => 'integer',
+        'recommended_quantity' => 'float',
+        'current_stock_from' => 'float',
+        'current_stock_to' => 'float',
         'days_of_stock_remaining' => 'integer',
         'demand_velocity_to' => 'decimal:2',
         'potential_lost_sales' => 'decimal:4',
@@ -49,7 +49,8 @@ class InventoryTransferRecommendation extends Model
     // }
 
     // Add scope for easy domain filtering
-    public function scopeForDomain($query, $domain) {
+    public function scopeForDomain($query, $domain)
+    {
         return $query->where('domain', $domain);
     }
 
@@ -124,7 +125,7 @@ class InventoryTransferRecommendation extends Model
     {
         return $query->where(function ($q) {
             $q->whereNull('expires_at')
-              ->orWhere('expires_at', '>', now());
+                ->orWhere('expires_at', '>', now());
         });
     }
 
@@ -134,6 +135,7 @@ class InventoryTransferRecommendation extends Model
     public function scopeForLocation($query, $locationId, $direction = 'to')
     {
         $column = $direction === 'to' ? 'to_location_id' : 'from_location_id';
+
         return $query->where($column, $locationId);
     }
 
@@ -142,7 +144,7 @@ class InventoryTransferRecommendation extends Model
      */
     public function getPriorityDisplayAttribute()
     {
-        return match($this->priority) {
+        return match ($this->priority) {
             'low' => 'Low Priority',
             'medium' => 'Medium Priority',
             'high' => 'High Priority',
@@ -156,7 +158,7 @@ class InventoryTransferRecommendation extends Model
      */
     public function getReasonDisplayAttribute()
     {
-        return match($this->reason) {
+        return match ($this->reason) {
             'low_stock' => 'Low Stock Alert',
             'out_of_stock' => 'Out of Stock',
             'excess_stock' => 'Excess Stock Available',
@@ -173,7 +175,7 @@ class InventoryTransferRecommendation extends Model
      */
     public function getPriorityColorAttribute()
     {
-        return match($this->priority) {
+        return match ($this->priority) {
             'low' => 'blue',
             'medium' => 'orange',
             'high' => 'red',
@@ -195,7 +197,7 @@ class InventoryTransferRecommendation extends Model
      */
     public function isActionable()
     {
-        return $this->status === 'pending' && !$this->isExpired();
+        return $this->status === 'pending' && ! $this->isExpired();
     }
 
     /**

@@ -60,6 +60,8 @@ class OrderUpdated implements ShouldBroadcast
                     'notes' => $item->notes,
                     'product_sku' => $item->product->SKU ?? 'N/A',
                     'quantity' => $item->quantity,
+                    'quantity_unit' => $item->product?->quantityUnit() ?? 'pc',
+                    'allows_decimal' => (bool) $item->product?->allowsDecimal(),
                     'unit_price' => (float) $item->unit_price,
                     'discount' => (float) $item->discount,
                     'discount_amount' => (float) $item->discount,

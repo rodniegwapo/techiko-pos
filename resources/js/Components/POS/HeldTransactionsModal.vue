@@ -70,7 +70,7 @@
                   class="flex justify-between text-sm py-1 border-b border-gray-100 last:border-0"
                 >
                   <span class="flex-1">{{ item.name }}</span>
-                  <span class="text-gray-600 mx-2">x{{ item.quantity }}</span>
+                  <span class="text-gray-600 mx-2">x{{ formatQuantity(item.quantity, item) }}</span>
                   <span class="font-medium">{{ formattedTotal(item.subtotal || item.price * item.quantity) }}</span>
                 </div>
               </div>
@@ -105,6 +105,7 @@
 
 <script setup>
 import { computed } from 'vue';
+import { formatQuantity } from '@/Utils/quantity';
 import { 
   PauseOutlined, 
   UserOutlined, 

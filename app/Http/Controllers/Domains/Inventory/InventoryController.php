@@ -16,6 +16,7 @@ use App\Models\Product\Product;
 use App\Models\ProductInventory;
 use App\Services\InventoryService;
 use App\Support\CostVisibility;
+use App\Support\Quantity;
 use App\Traits\HandlesStockTransfers;
 use App\Traits\LocationCategoryScoping;
 use Illuminate\Http\Request;
@@ -367,7 +368,7 @@ class InventoryController extends Controller
             'location_id' => 'required|exists:inventory_locations,id',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
-            'items.*.quantity' => 'required|integer|min:1',
+            'items.*.quantity' => 'required|numeric|min:0.001|max:99999',
             'items.*.unit_cost' => 'nullable|numeric|min:0',
             'items.*.batch_number' => 'nullable|string|max:255',
             'items.*.expiry_date' => 'nullable|date',
@@ -375,6 +376,8 @@ class InventoryController extends Controller
             'reference_type' => ['nullable', 'string', Rule::in($validReferenceTypes)],
             'reference_id' => 'nullable|integer',
         ]);
+        // Parts of a unit only for things sold by weight or volume.
+        Quantity::assertRowsFit($validated['items']);
         // Someone who doesn't see cost receives at the product's own cost (InventoryService falls back to it).
         if (! CostVisibility::allowed()) {
             $validated['items'] = array_map(fn ($item) => [...$item, 'unit_cost' => null], $validated['items']);

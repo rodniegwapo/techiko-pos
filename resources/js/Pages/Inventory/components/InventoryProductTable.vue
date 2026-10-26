@@ -12,6 +12,7 @@ import {
 } from "@tabler/icons-vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
 import { useHelpers } from "@/Composables/useHelpers";
+import { toQuantity } from "@/Utils/quantity";
 import { avatarStyle, initials } from "@/Composables/avatarColors";
 
 const { formatCurrency, formatDate } = useHelpers();
@@ -252,22 +253,22 @@ function onMobilePaginationChange(pageNum) {
                 <div class="flex flex-col gap-0.5">
                     <div class="flex items-center gap-2">
                         <div class="font-semibold text-lg">
-                            {{ Math.floor(record.available) }}
+                            {{ toQuantity(record.available) }}
                         </div>
                         <div class="text-xs text-gray-500">
-                            {{ record.product?.unit_of_measure || "pcs" }} (s)
+                            {{ record.product?.quantity_unit || "pc" }}
                         </div>
                     </div>
                     <div
                         v-if="
-                            Math.floor(record.onHand) !==
-                            Math.floor(record.available)
+                            toQuantity(record.onHand) !==
+                            toQuantity(record.available)
                         "
                         class="text-xs text-gray-500"
                     >
-                        On hand {{ Math.floor(record.onHand)
+                        On hand {{ toQuantity(record.onHand)
                         }}<span v-if="record.reserved > 0">
-                            · Reserved {{ Math.floor(record.reserved) }}
+                            · Reserved {{ toQuantity(record.reserved) }}
                         </span>
                     </div>
                 </div>
@@ -417,24 +418,23 @@ function onMobilePaginationChange(pageNum) {
                             <span
                                 class="text-right font-semibold text-gray-900"
                             >
-                                {{ Math.floor(record.available) }}
-                                {{ record.product?.unit_of_measure || "pcs" }}
-                                (s)
+                                {{ toQuantity(record.available) }}
+                                {{ record.product?.quantity_unit || "pc" }}
                             </span>
                             <template
                                 v-if="
-                                    Math.floor(record.onHand) !==
-                                    Math.floor(record.available)
+                                    toQuantity(record.onHand) !==
+                                    toQuantity(record.available)
                                 "
                             >
                                 <span class="text-gray-500">On hand</span>
                                 <span
                                     class="text-right font-medium text-gray-900"
                                 >
-                                    {{ Math.floor(record.onHand) }}
+                                    {{ toQuantity(record.onHand) }}
                                     <span v-if="record.reserved > 0">
                                         · Reserved
-                                        {{ Math.floor(record.reserved) }}
+                                        {{ toQuantity(record.reserved) }}
                                     </span>
                                 </span>
                             </template>

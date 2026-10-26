@@ -157,6 +157,8 @@ class SalesHistoryController extends Controller
                 'modifiers' => $item->modifierSummary(),
                 'notes' => $item->notes,
                 'quantity' => (float) $item->quantity,
+                'quantity_unit' => $item->product?->quantityUnit() ?? 'pc',
+                'allows_decimal' => (bool) $item->product?->allowsDecimal(),
                 'unit_price' => round((float) $item->unit_price, 2),
                 'discount' => round((float) $item->discount, 2),
                 // Worked out, not read: older lines whose quantity was bumped kept a stale stored subtotal.
@@ -226,6 +228,8 @@ class SalesHistoryController extends Controller
                 'modifiers' => $item->modifierSummary(),
                 'notes' => $item->notes,
                 'quantity' => (float) $item->quantity,
+                'quantity_unit' => $item->product?->quantityUnit() ?? 'pc',
+                'allows_decimal' => (bool) $item->product?->allowsDecimal(),
                 'unit_cost' => $item->unit_cost === null ? null : round((float) $item->unit_cost, 2),
                 'line_cost' => $item->unit_cost === null ? null : round((float) $item->unit_cost * (float) $item->quantity, 2),
             ])->values();

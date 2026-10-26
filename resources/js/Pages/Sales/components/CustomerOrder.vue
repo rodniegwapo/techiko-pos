@@ -31,6 +31,7 @@ import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useCredit } from "@/Composables/useCredit";
 import { notifyInsufficientStock } from "@/Composables/useCartStockNotification";
 import { useSaleTotals } from "@/Composables/useSaleTotals";
+import { allowsDecimal, formatQuantity, quantityStep, toQuantity } from "@/Utils/quantity";
 import axios from "axios";
 import { Modal, notification } from "ant-design-vue";
 import { usePage } from "@inertiajs/vue3";
@@ -131,7 +132,7 @@ function onDrawerOrderItemsKeydown(event) {
 const totalAmount = computed(() => {
     return orders.value.reduce((sum, order) => {
         const price = parseFloat(order.price) || 0;
-        const quantity = parseInt(order.quantity) || 0;
+        const quantity = toQuantity(order.quantity);
         const subtotal = !isNaN(price * quantity)
             ? price * quantity
             : quantity * price;
@@ -158,7 +159,8 @@ const handleAddOrder = async (product) => {
         const route = getRoute("users.sales.cart.add", { user: userId });
         await axios.post(route, {
             product_id: product.id,
-            quantity: 1,
+            // A quarter kilo at a time for weighed items, one otherwise.
+            quantity: quantityStep(product),
             // Onto the same line: the same options and note.
             ...(product.modifier_ids?.length ? { modifier_ids: product.modifier_ids } : {}),
             ...(product.notes ? { notes: product.notes } : {}),
@@ -190,7 +192,8 @@ const handleSubtractOrder = async (product) => {
         });
         await axios.patch(route, {
             product_id: product.id,
-            quantity: Math.max(0, product.quantity - 1),
+            // Below the smallest step the line goes.
+            quantity: Math.max(0, toQuantity(toQuantity(product.quantity) - quantityStep(product))),
             sale_item_id: product.sale_item_id ?? undefined,
         });
 
@@ -264,7 +267,9 @@ const onAddClick = async (product) => {
     if (!optimisticQuantities.value[lineKey(product)]) {
         optimisticQuantities.value[lineKey(product)] = product.quantity;
     }
-    optimisticQuantities.value[lineKey(product)] += 1;
+    optimisticQuantities.value[lineKey(product)] = toQuantity(
+        toQuantity(optimisticQuantities.value[lineKey(product)]) + quantityStep(product),
+    );
 
     try {
         // Call the API directly
@@ -293,7 +298,7 @@ const onSubtractClick = async (product) => {
     }
     optimisticQuantities.value[lineKey(product)] = Math.max(
         0,
-        optimisticQuantities.value[lineKey(product)] - 1,
+        toQuantity(toQuantity(optimisticQuantities.value[lineKey(product)]) - quantityStep(product)),
     );
 
     try {
@@ -345,11 +350,17 @@ const finishQuantityEdit = (order) => {
 const saveQuantity = async () => {
     if (!selectedOrder.value) return;
 
-    const newQuantity = parseInt(tempQuantity.value);
-    if (isNaN(newQuantity) || newQuantity < 0) {
+    const newQuantity = toQuantity(tempQuantity.value);
+    if (
+        !Number.isFinite(parseFloat(tempQuantity.value)) ||
+        newQuantity < 0 ||
+        (!allowsDecimal(selectedOrder.value) && !Number.isInteger(newQuantity))
+    ) {
         notification.error({
             message: "Invalid quantity",
-            description: "Please enter a valid number",
+            description: allowsDecimal(selectedOrder.value)
+                ? "Please enter an amount, e.g. 1.5"
+                : "Please enter a whole number",
         });
         return;
     }
@@ -1440,7 +1451,8 @@ defineExpose({
                                                             class="text-sm font-semibold text-gray-700"
                                                         >
                                                             {{
-                                                                getDisplayQuantity(
+                                                                formatQuantity(
+                                                                    getDisplayQuantity(order),
                                                                     order,
                                                                 )
                                                             }}
@@ -1484,7 +1496,8 @@ defineExpose({
                                                     </span>
                                                     <span v-else>
                                                         {{
-                                                            getDisplayQuantity(
+                                                            formatQuantity(
+                                                                getDisplayQuantity(order),
                                                                 order,
                                                             )
                                                         }}
@@ -1913,7 +1926,7 @@ defineExpose({
                     {{ selectedOrder?.name }}
                 </h4>
                 <p class="text-sm text-gray-600">
-                    Current: {{ selectedOrder?.quantity }} | Price: ₱{{
+                    Current: {{ formatQuantity(selectedOrder?.quantity, selectedOrder) }} | Price: ₱{{
                         selectedOrder?.price
                     }}
                 </p>
@@ -1928,14 +1941,16 @@ defineExpose({
                     v-model:value="tempQuantity"
                     :min="0"
                     :max="999"
-                    :precision="0"
+                    :precision="allowsDecimal(selectedOrder) ? 3 : 0"
+                    :step="quantityStep(selectedOrder)"
+                    :addon-after="allowsDecimal(selectedOrder) ? selectedOrder?.quantity_unit : undefined"
                     size="large"
                     class="w-full"
                     placeholder="Enter quantity"
                     @keyup.enter="saveQuantity"
                 />
                 <p class="text-xs text-gray-500 mt-1">
-                    Enter a number between 0 and 999
+                    {{ allowsDecimal(selectedOrder) ? `An amount up to 999 ${selectedOrder?.quantity_unit ?? ""}, e.g. 1.5` : "Enter a number between 0 and 999" }}
                 </p>
             </div>
 

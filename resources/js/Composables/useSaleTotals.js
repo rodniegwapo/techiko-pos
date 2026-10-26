@@ -1,3 +1,4 @@
+import { allowsDecimal, toQuantity } from '@/Utils/quantity'
 import { computed, unref } from 'vue'
 
 const defaultSalesSettings = {
@@ -21,7 +22,7 @@ export function useSaleTotals({
     const list = unref(orders) ?? []
     return list.reduce((sum, order) => {
       const price = parseFloat(order.price) || 0
-      const quantity = parseInt(order.quantity, 10) || 0
+      const quantity = toQuantity(order.quantity)
       const subtotal = !Number.isNaN(price * quantity)
         ? price * quantity
         : quantity * price
@@ -32,7 +33,8 @@ export function useSaleTotals({
   const itemCount = computed(() => {
     const list = unref(orders) ?? []
     return list.reduce(
-      (sum, order) => sum + (parseInt(order.quantity, 10) || 0),
+      // 1.5 kg of rice is one item, not one and a half.
+      (sum, order) => sum + (allowsDecimal(order) ? 1 : toQuantity(order.quantity)),
       0,
     )
   })

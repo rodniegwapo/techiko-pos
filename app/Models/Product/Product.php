@@ -25,7 +25,24 @@ class Product extends Model
     /** Cost stays with those who keep the books (CostVisibility); cashiers get prices and stock. */
     public function toArray()
     {
-        return CostVisibility::strip(parent::toArray(), ['cost']);
+        return [
+            ...CostVisibility::strip(parent::toArray(), ['cost']),
+            // How it is counted, for the POS and stock screens: "kg" and parts allowed, or "pc".
+            'quantity_unit' => $this->quantityUnit(),
+            'allows_decimal' => $this->allowsDecimal(),
+        ];
+    }
+
+    /** Sold by weight or volume (Kilo, Liter): may be sold in parts, e.g. 1.5 kg. */
+    public function allowsDecimal(): bool
+    {
+        return (bool) (ProductSoldType::rules()[strtolower((string) $this->sold_type)]['allows_decimal'] ?? false);
+    }
+
+    /** The unit a quantity of this product is shown in: kg, L, pc, box… */
+    public function quantityUnit(): string
+    {
+        return ProductSoldType::rules()[strtolower((string) $this->sold_type)]['unit'] ?? 'pc';
     }
 
     protected $searchable = [

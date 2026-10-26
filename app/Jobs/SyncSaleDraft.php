@@ -2,8 +2,9 @@
 
 namespace App\Jobs;
 
-use App\Models\Sale;
 use App\Models\Product\Discount;
+use App\Models\Sale;
+use App\Support\Quantity;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -45,11 +46,12 @@ class SyncSaleDraft implements ShouldBeUnique, ShouldQueue
     {
         try {
             // Validate items array
-            if (empty($this->items) || !is_array($this->items)) {
+            if (empty($this->items) || ! is_array($this->items)) {
                 Log::warning('SyncSaleDraft: Empty or invalid items array', [
                     'sale_id' => $this->sale->id,
-                    'items' => $this->items
+                    'items' => $this->items,
                 ]);
+
                 return;
             }
 
@@ -66,31 +68,32 @@ class SyncSaleDraft implements ShouldBeUnique, ShouldQueue
             DB::transaction(function () use ($discounts) {
                 foreach ($this->items as $item) {
                     // Validate required item fields
-                    if (!isset($item['id']) || !isset($item['quantity']) || !isset($item['price'])) {
+                    if (! isset($item['id']) || ! isset($item['quantity']) || ! isset($item['price'])) {
                         Log::warning('SyncSaleDraft: Missing required item fields', [
                             'sale_id' => $this->sale->id,
-                            'item' => $item
+                            'item' => $item,
                         ]);
+
                         continue;
                     }
 
                     $saleItem = $this->sale->saleItems()->updateOrCreate(
                         ['product_id' => $item['id']],
                         [
-                            'quantity' => max(1, (int) $item['quantity']), // Ensure minimum quantity of 1
+                            'quantity' => max(Quantity::MIN, Quantity::round($item['quantity'])),
                             'unit_price' => max(0, (float) $item['price']), // Ensure non-negative price
                         ]
                     );
 
                     // Handle discounts if provided
-                    if (!empty($item['discount_id']) && $discounts->has($item['discount_id'])) {
+                    if (! empty($item['discount_id']) && $discounts->has($item['discount_id'])) {
                         $discount = $discounts->get($item['discount_id']);
-                        
+
                         // Validate discount is active and applicable
-                        if ($discount->is_active && 
-                            (!$discount->start_date || now()->gte($discount->start_date)) &&
-                            (!$discount->end_date || now()->lte($discount->end_date))) {
-                            
+                        if ($discount->is_active &&
+                            (! $discount->start_date || now()->gte($discount->start_date)) &&
+                            (! $discount->end_date || now()->lte($discount->end_date))) {
+
                             $saleItem->setDiscountAmount($discount->type, (float) $discount->value);
                             $saleItem->discounts()->sync([$discount->id]);
                         } else {
@@ -113,9 +116,9 @@ class SyncSaleDraft implements ShouldBeUnique, ShouldQueue
             Log::error('SyncSaleDraft failed', [
                 'sale_id' => $this->sale->id,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
-            
+
             // Re-throw to trigger job failure handling
             throw $e;
         }

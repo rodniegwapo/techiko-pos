@@ -134,13 +134,15 @@ class E2ESalesSeeder extends Seeder
             ['name' => 'E2E Security Probe', 'price' => 10, 'stock' => 1000, 'barcode' => 'E2E000005'],
             // Only sales/modifiers.spec.js uses this: it has the "E2E Size" options, which ask before adding.
             ['name' => 'E2E Latte', 'price' => 100, 'stock' => 1000, 'barcode' => 'E2E000006'],
+            // Only sales/weighed.spec.js uses this: sold by the kilo, it asks "How much?" before adding.
+            ['name' => 'E2E Rice', 'price' => 50, 'stock' => 100, 'barcode' => 'E2E000007', 'sold_type' => 'Kilo'],
         ];
 
         foreach ($products as $row) {
             $product = Product::updateOrCreate(
                 ['domain' => self::DOMAIN, 'name' => $row['name']],
                 [
-                    'sold_type' => 'piece',
+                    'sold_type' => $row['sold_type'] ?? 'piece',
                     'price' => $row['price'],
                     'cost' => $row['price'] / 2,
                     'SKU' => str_replace(' ', '-', strtoupper($row['name'])),

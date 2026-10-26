@@ -130,6 +130,8 @@ export const E2E = {
         probe: { name: "E2E Security Probe", price: 10, stock: 1000 },
         // Only modifiers.spec.js uses this: it asks for its "E2E Size" (Regular, or Large +₱20) before adding.
         latte: { name: "E2E Latte", price: 100, stock: 1000 },
+        // Only weighed.spec.js uses this: ₱50 per kg, it asks "How much?" before adding.
+        rice: { name: "E2E Rice", price: 50, stock: 100 },
     },
     customers: {
         loyalty: { name: "E2E Loyalty Customer", points: 5000 },

@@ -22,16 +22,16 @@ class ProductInventory extends Model
     }
 
     protected $casts = [
-        'quantity_on_hand' => 'integer',
-        'quantity_reserved' => 'integer',
-        'quantity_available' => 'integer',
+        'quantity_on_hand' => 'float',
+        'quantity_reserved' => 'float',
+        'quantity_available' => 'float',
         'average_cost' => 'decimal:4',
         'last_cost' => 'decimal:4',
         'total_value' => 'decimal:4',
         'last_movement_at' => 'datetime',
         'last_restock_at' => 'datetime',
         'last_sale_at' => 'datetime',
-        'location_reorder_level' => 'integer',
+        'location_reorder_level' => 'float',
         'location_max_stock' => 'integer',
         'location_markup_percentage' => 'decimal:2',
         'auto_reorder_enabled' => 'boolean',

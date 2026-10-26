@@ -174,7 +174,7 @@ class AppAssistantActionsTest extends TestCase
         ProductInventory::query()->create(['product_id' => $burger->id, 'location_id' => $this->store->id, 'quantity_on_hand' => 10, 'quantity_reserved' => 0, 'quantity_available' => 10]);
 
         $card = $this->propose($user, 'create_stock_adjustment', ['reason' => 'damaged_goods', 'items' => [['product_id' => $burger->id, 'actual_quantity' => 7]]]);
-        $this->assertContains(['label' => 'Burger', 'value' => '10 → 7 (-3)'], $card['fields']);
+        $this->assertContains(['label' => 'Burger', 'value' => '10 → 7 pc (-3)'], $card['fields']);
         $this->confirm($user, $card)->assertOk();
 
         $adjustment = StockAdjustment::query()->where('domain', $this->domain->name_slug)->sole();

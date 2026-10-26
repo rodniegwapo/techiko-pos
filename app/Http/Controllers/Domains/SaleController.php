@@ -27,6 +27,7 @@ use App\Services\LoyaltyRedemptionService;
 use App\Services\ProductModifierService;
 use App\Services\SaleService;
 use App\Services\Wallet\SalePaymentWalletPosting;
+use App\Support\Quantity;
 use App\Support\Wallet\WalletShiftGuard;
 use App\Traits\LocationCategoryScoping;
 use Carbon\Carbon;
@@ -744,7 +745,7 @@ class SaleController extends Controller
     {
         $validated = $request->validate([
             'product_id' => ['required', $this->productInDomainRule($domain)],
-            'quantity' => 'required|integer|min:1',
+            'quantity' => ['required', 'numeric', 'min:0.001', 'max:99999', Quantity::rule(fn () => Product::find($request->input('product_id')))],
             ...self::LINE_OPTION_RULES,
         ]);
 
@@ -762,7 +763,7 @@ class SaleController extends Controller
             $saleItemId = app(ProductModifierService::class)->addToSale(
                 $sale,
                 Product::findOrFail($validated['product_id']),
-                (int) $validated['quantity'],
+                Quantity::round($validated['quantity']),
                 $validated['modifier_ids'] ?? [],
                 $validated['notes'] ?? null,
             )->id;
@@ -817,7 +818,7 @@ class SaleController extends Controller
     {
         $validated = $request->validate([
             'product_id' => ['required', $this->productInDomainRule($domain)],
-            'quantity' => 'required|integer|min:1',
+            'quantity' => ['required', 'numeric', 'min:0.001', 'max:99999', Quantity::rule(fn () => Product::find($request->input('product_id')))],
             ...self::LINE_TARGET_RULES,
         ]);
 
@@ -1200,7 +1201,7 @@ class SaleController extends Controller
         // Now add item to the sale
         $validated = $request->validate([
             'product_id' => ['required', $this->productInDomainRule($domain)],
-            'quantity' => 'required|integer|min:1',
+            'quantity' => ['required', 'numeric', 'min:0.001', 'max:99999', Quantity::rule(fn () => Product::find($request->input('product_id')))],
             ...self::LINE_OPTION_RULES,
         ]);
 
@@ -1213,7 +1214,7 @@ class SaleController extends Controller
             app(ProductModifierService::class)->addToSale(
                 $saleLocked,
                 Product::findOrFail($validated['product_id']),
-                (int) $validated['quantity'],
+                Quantity::round($validated['quantity']),
                 $validated['modifier_ids'] ?? [],
                 $validated['notes'] ?? null,
             );
@@ -1371,7 +1372,7 @@ class SaleController extends Controller
 
         $validated = $request->validate([
             'product_id' => ['required', $this->productInDomainRule($domain)],
-            'quantity' => 'required|integer|min:1',
+            'quantity' => ['required', 'numeric', 'min:0.001', 'max:99999', Quantity::rule(fn () => Product::find($request->input('product_id')))],
             ...self::LINE_TARGET_RULES,
         ]);
 
@@ -1532,7 +1533,7 @@ class SaleController extends Controller
             'sales.*.payload' => ['required', 'array'],
             'sales.*.payload.items' => ['required', 'array', 'min:1'],
             'sales.*.payload.items.*.product_id' => ['required', 'integer', 'exists:products,id'],
-            'sales.*.payload.items.*.quantity' => ['required', 'integer', 'min:1'],
+            'sales.*.payload.items.*.quantity' => ['required', 'numeric', 'min:0.001', 'max:99999'],
             'sales.*.payload.items.*.unit_price' => ['required', 'numeric', 'min:0'],
             'sales.*.payload.items.*.modifier_ids' => ['nullable', 'array', 'max:30'],
             'sales.*.payload.items.*.modifier_ids.*' => ['integer'],
@@ -1644,7 +1645,7 @@ class SaleController extends Controller
             $stockItems = collect($payload['items'])->map(function (array $row) {
                 return [
                     'product_id' => (int) $row['product_id'],
-                    'quantity' => (int) $row['quantity'],
+                    'quantity' => Quantity::round($row['quantity']),
                 ];
             })->all();
 
@@ -1718,7 +1719,7 @@ class SaleController extends Controller
                         app(ProductModifierService::class)->addToSale(
                             $sale,
                             Product::findOrFail((int) $row['product_id']),
-                            (int) $row['quantity'],
+                            Quantity::round($row['quantity']),
                             $row['modifier_ids'] ?? [],
                             $row['notes'] ?? null,
                         );
@@ -1730,7 +1731,7 @@ class SaleController extends Controller
                     $product = Product::query()->where('domain', $domain->name_slug)->findOrFail((int) $row['product_id']);
                     $sale->saleItems()->create([
                         'product_id' => $product->id,
-                        'quantity' => (int) $row['quantity'],
+                        'quantity' => Quantity::round($row['quantity']),
                         'unit_price' => round($product->priceAt($location->id), 2),
                     ]);
                 }

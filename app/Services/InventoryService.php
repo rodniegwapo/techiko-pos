@@ -10,6 +10,7 @@ use App\Models\ProductInventory;
 use App\Models\StockAdjustment;
 use App\Models\StockAdjustmentItem;
 use App\Models\User;
+use App\Support\Quantity;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -83,9 +84,10 @@ class InventoryService
         $aggregated = [];
         foreach ($items as $item) {
             $pid = (int) $item['product_id'];
-            $qty = (int) ($item['quantity'] ?? 1);
-            if ($qty < 1) {
-                $qty = 1;
+            // Parts are allowed for things sold by weight or volume (1.5 kg).
+            $qty = Quantity::round($item['quantity'] ?? 1);
+            if ($qty < Quantity::MIN) {
+                $qty = Quantity::MIN;
             }
             $aggregated[$pid] = ($aggregated[$pid] ?? 0) + $qty;
         }
@@ -122,7 +124,7 @@ class InventoryService
                 ->where('location_id', $location->id)
                 ->first();
 
-            $available = $inventory ? (int) $inventory->quantity_available : 0;
+            $available = $inventory ? Quantity::round($inventory->quantity_available) : 0;
 
             if ($available < $requestedQuantity) {
                 $unavailableItems[] = [
@@ -760,7 +762,7 @@ class InventoryService
 
                 $inventory = $this->getOrCreateInventory($product, $fromLocation);
                 if (! $inventory->isInStock($wanted)) {
-                    $available = max(0, (int) $inventory->quantity_available);
+                    $available = max(0, Quantity::round($inventory->quantity_available));
                     $short[] = [
                         'product_id' => $product->id,
                         'product_name' => $product->name,
@@ -791,15 +793,15 @@ class InventoryService
             $fromInventory = $this->getOrCreateInventory($product, $fromLocation);
 
             if (! $fromInventory->isInStock($quantity)) {
-                $available = max(0, (int) $fromInventory->quantity_available);
+                $available = max(0, Quantity::round($fromInventory->quantity_available));
 
                 throw new InsufficientStockException([
                     [
                         'product_id' => $product->id,
                         'product_name' => $product->name,
-                        'requested_quantity' => (int) $quantity,
+                        'requested_quantity' => Quantity::round($quantity),
                         'available_quantity' => $available,
-                        'shortage' => (int) $quantity - $available,
+                        'shortage' => Quantity::round($quantity - $available),
                     ],
                 ]);
             }

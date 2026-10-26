@@ -14,9 +14,9 @@ class InventoryMovement extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'quantity_before' => 'integer',
-        'quantity_change' => 'integer',
-        'quantity_after' => 'integer',
+        'quantity_before' => 'float',
+        'quantity_change' => 'float',
+        'quantity_after' => 'float',
         'unit_cost' => 'decimal:4',
         'total_cost' => 'decimal:4',
         'expiry_date' => 'date',
@@ -201,8 +201,8 @@ class InventoryMovement extends Model
         static::saving(function ($movement) {
             if ($movement->reference_type) {
                 $validTypes = static::getValidReferenceTypes();
-                if (!in_array($movement->reference_type, $validTypes)) {
-                    throw new \InvalidArgumentException("Invalid reference type: {$movement->reference_type}. Valid types are: " . implode(', ', $validTypes));
+                if (! in_array($movement->reference_type, $validTypes)) {
+                    throw new \InvalidArgumentException("Invalid reference type: {$movement->reference_type}. Valid types are: ".implode(', ', $validTypes));
                 }
             }
         });

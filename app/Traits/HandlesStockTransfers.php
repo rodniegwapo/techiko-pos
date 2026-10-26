@@ -4,6 +4,7 @@ namespace App\Traits;
 
 use App\Exceptions\InsufficientStockException;
 use App\Models\InventoryLocation;
+use App\Support\Quantity;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -29,23 +30,26 @@ trait HandlesStockTransfers
             ...($single
                 ? [
                     'product_id' => 'required|exists:products,id',
-                    'quantity' => 'required|integer|min:1',
+                    'quantity' => 'required|numeric|min:0.001|max:99999',
                 ]
                 : [
                     'items' => 'required|array|min:1|max:100',
                     'items.*.product_id' => 'required|integer|distinct|exists:products,id',
-                    'items.*.quantity' => 'required|integer|min:1',
+                    'items.*.quantity' => 'required|numeric|min:0.001|max:99999',
                 ]),
         ], [
             'items.*.product_id.distinct' => 'This product is already in the list.',
         ]);
 
         $rows = $single
-            ? [['product_id' => (int) $validated['product_id'], 'quantity' => (int) $validated['quantity']]]
+            ? [['product_id' => (int) $validated['product_id'], 'quantity' => Quantity::round($validated['quantity'])]]
             : array_map(fn ($row) => [
                 'product_id' => (int) $row['product_id'],
-                'quantity' => (int) $row['quantity'],
+                'quantity' => Quantity::round($row['quantity']),
             ], array_values($validated['items']));
+
+        // Parts of a unit only for things sold by weight or volume.
+        Quantity::assertRowsFit($rows, $single ? 'product' : 'items');
 
         return [
             'rows' => $rows,

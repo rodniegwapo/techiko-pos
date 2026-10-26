@@ -14,9 +14,9 @@ class StockAdjustmentItem extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'system_quantity' => 'integer',
-        'actual_quantity' => 'integer',
-        'adjustment_quantity' => 'integer',
+        'system_quantity' => 'float',
+        'actual_quantity' => 'float',
+        'adjustment_quantity' => 'float',
         'unit_cost' => 'decimal:4',
         'total_cost_change' => 'decimal:4',
         'expiry_date' => 'date',
