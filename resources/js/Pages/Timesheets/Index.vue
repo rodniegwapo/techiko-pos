@@ -5,6 +5,9 @@ import dayjs from "dayjs";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
 import ContentLayout from "@/Components/ContentLayout.vue";
+import FilterDropdown from "@/Components/filters/FilterDropdown.vue";
+import ActiveFilters from "@/Components/filters/ActiveFilters.vue";
+import { useFilters, toLabel } from "@/Composables/useFilters";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 
@@ -28,18 +31,42 @@ const props = defineProps({
 const { getRoute } = useDomainRoutes();
 const { hasPermission } = usePermissionsV2();
 
-const range = ref([props.filters.from, props.filters.to]);
-const locationId = ref(props.filters.location_id);
+/*** === FILTERS (the popover shared with the other list pages) === ***/
+// Keys differ from the query names on purpose: useFilters seeds any key it finds in the URL as a string.
+const dateRange = ref(props.filters.from ? [dayjs(props.filters.from), dayjs(props.filters.to)] : null);
+const store = ref(props.filters.location_id ?? null);
+
+const storeOptions = computed(() => props.locations.map((l) => ({ value: l.id, label: l.name })));
 
 const query = computed(() => ({
-    from: range.value?.[0] ?? undefined,
-    to: range.value?.[1] ?? undefined,
-    location_id: locationId.value ?? undefined,
+    from: dateRange.value?.[0] ? dayjs(dateRange.value[0]).format("YYYY-MM-DD") : undefined,
+    to: dateRange.value?.[1] ? dayjs(dateRange.value[1]).format("YYYY-MM-DD") : undefined,
+    location_id: store.value ?? undefined,
 }));
 
 function reload() {
     router.get(getRoute("timesheets.index"), query.value, { preserveState: true, preserveScroll: true, replace: true });
 }
+
+const rangeLabel = (v) =>
+    Array.isArray(v) && v[0] && v[1]
+        ? `${dayjs(v[0]).format("MMM D, YYYY")} – ${dayjs(v[1]).format("MMM D, YYYY")}`
+        : null;
+
+// Staff tied to one store cannot switch it, so that filter only exists for people who can pick any store.
+const filterConfigs = [
+    { label: "Dates", key: "date", ref: dateRange, getLabel: rangeLabel },
+    ...(props.canPickAllStores ? [{ label: "Store", key: "store", ref: store, getLabel: toLabel(storeOptions) }] : []),
+];
+const { filters, activeFilters, handleClearSelectedFilter } = useFilters({ getItems: () => reload(), configs: filterConfigs });
+
+const filtersConfig = computed(() => [
+    { key: "date", label: "Dates", type: "range" },
+    ...(props.canPickAllStores ? [{ key: "store", label: "Store", type: "select", options: storeOptions.value }] : []),
+]);
+
+/** The period the server actually applied (it falls back to a default when no dates are chosen). */
+const periodLabel = computed(() => rangeLabel([props.filters.from, props.filters.to]));
 
 const exportUrl = computed(() => {
     const params = new URLSearchParams(Object.entries(query.value).filter(([, v]) => v != null && v !== ""));
@@ -153,30 +180,22 @@ const canEdit = computed(() => hasPermission("timesheets.update"));
         <ContentLayout title="Hours worked">
             <template #filters>
                 <div class="flex w-full flex-wrap items-center justify-end gap-2">
-                    <a-range-picker
-                        v-model:value="range"
-                        value-format="YYYY-MM-DD"
-                        :allow-clear="false"
-                        class="w-full md:w-auto"
-                        data-testid="timesheets-range"
-                        @change="reload"
-                    />
-                    <a-select
-                        v-model:value="locationId"
-                        :allow-clear="canPickAllStores"
-                        :disabled="!canPickAllStores"
-                        placeholder="All stores"
-                        class="w-full md:w-48"
-                        :options="locations.map((l) => ({ value: l.id, label: l.name }))"
-                        @change="reload"
-                    />
+                    <FilterDropdown v-model="filters" :filters="filtersConfig" />
                     <a-button v-if="hasPermission('timesheets.export')" :href="exportUrl">Export CSV</a-button>
                     <a-button v-if="hasPermission('timesheets.store')" type="primary" data-testid="timesheets-add" @click="openAdd">
                         Add a shift
                     </a-button>
                 </div>
             </template>
+            <template #activeFilters>
+                <ActiveFilters
+                    :filters="activeFilters"
+                    @remove-filter="handleClearSelectedFilter"
+                    @clear-all="() => Object.keys(filters).forEach((k) => (filters[k] = null))"
+                />
+            </template>
             <template #table>
+                <div v-if="periodLabel" class="mb-3 text-sm text-gray-600" data-testid="timesheets-period">{{ periodLabel }}</div>
                 <div v-if="!people.length" class="py-10 text-center text-gray-500">
                     No one clocked in between these dates.
                 </div>
