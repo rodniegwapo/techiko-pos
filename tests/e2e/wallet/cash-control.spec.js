@@ -298,20 +298,25 @@ test.describe("Today's drawer", () => {
 test.describe("A shift ended by another manager", () => {
     test.use({ account: "wallet-partner" });
 
-    test("can't be reopened by a different manager", async ({ page, serverAs }) => {
+    test("can be reopened by a different manager, who gives a reason that is logged", async ({ page, serverAs }) => {
         const { day } = dateWindow();
         const closer = await serverAs("wallet-manager");
         expectSaved(await postCounted(closer, { business_date: day(0), counted_cash: 80 }), "count");
         expectSaved(await postEndShift(closer, { business_date: day(0), end_shift_action: "save_as_opening_cash" }), "close");
 
-        await DrawerPage.open(page, day(0));
+        const drawer = await DrawerPage.open(page, day(0));
+        await expect(page.getByTestId("reopen-shift")).toBeVisible();
 
-        await expect(page.getByText("Only the person who ended this shift can reopen it.")).toBeVisible();
-        await expect(page.getByTestId("reopen-shift")).toHaveCount(0);
-
+        // A reason is required.
         const partner = await serverAs("wallet-partner");
-        const res = await postReopen(partner, { business_date: day(0) });
-        expect(res.status).toBe(403);
-        expect((await walletState(partner, day(0))).cashControl.is_closed).toBe(true);
+        expect((await postReopen(partner, { business_date: day(0) })).status).toBe(422);
+
+        const res = await drawer.reopenShift("Forgot an expense");
+
+        expect(res.status()).toBeLessThan(400);
+        await expect(drawer.notice("Shift reopened.")).toBeVisible();
+        await expect(page.getByTestId("shift-open")).toBeVisible();
+        await expect(page.getByTestId("last-reopen")).toContainText("Forgot an expense");
+        expect((await walletState(partner, day(0))).cashControl.is_closed).toBe(false);
     });
 });

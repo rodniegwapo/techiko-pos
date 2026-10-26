@@ -69,6 +69,15 @@ async function saveCount(amount, notes) {
 async function endShift(payload) {
     if (await actions.endShift(payload)) modal.value = null;
 }
+
+const reopenReason = ref("");
+async function reopen() {
+    if (!reopenReason.value.trim()) return;
+    if (await actions.reopenShift(reopenReason.value.trim())) {
+        modal.value = null;
+        reopenReason.value = "";
+    }
+}
 </script>
 
 <template>
@@ -152,20 +161,44 @@ async function endShift(payload) {
                     <a-button
                         v-else-if="cashControl.can_reopen"
                         class="inline-flex items-center gap-1"
-                        :loading="actions.busy.value === 'reopen'"
                         data-testid="reopen-shift"
-                        @click="actions.reopenShift()"
+                        @click="modal = 'reopen'"
                     >
                         <IconLockOpen class="h-4 w-4" /> Reopen shift
                     </a-button>
-                    <span v-else class="text-xs text-gray-500">Only the person who ended this shift can reopen it.</span>
+                    <span v-else class="text-xs text-gray-500">Ask a manager or admin to reopen this shift.</span>
                 </div>
+                <p v-if="cashControl.last_reopen" class="mb-0 mt-3 text-xs text-gray-600" data-testid="last-reopen">
+                    Reopened by {{ cashControl.last_reopen.by }} at {{ dayjs(cashControl.last_reopen.at).format("h:mm A") }}: {{ cashControl.last_reopen.reason }}
+                </p>
                 <p v-if="canSeeCountResult" class="mb-0 mt-3 text-xs text-gray-500">
                     Counts, opening changes and past shifts are in
                     <a-button type="link" class="h-auto p-0 text-xs" @click="visit('wallet.history')">Drawer history</a-button>.
                 </p>
             </div>
         </div>
+
+        <a-modal
+            :visible="modal === 'reopen'"
+            title="Reopen this shift"
+            ok-text="Reopen shift"
+            :ok-button-props="{ disabled: !reopenReason.trim(), 'data-testid': 'reopen-confirm' }"
+            :confirm-loading="actions.busy.value === 'reopen'"
+            @ok="reopen"
+            @cancel="modal = null"
+        >
+            <p class="text-sm text-gray-600">
+                <template v-if="cashControl.closed_by_name">{{ cashControl.closed_by_name }} ended this shift. </template>
+                Reopening lets payments, counts and changes happen again. Your name and reason are kept in the log.
+            </p>
+            <a-input
+                v-model:value="reopenReason"
+                placeholder="Why are you reopening it? e.g. counted wrong"
+                :maxlength="255"
+                data-testid="reopen-reason"
+                @press-enter="reopen"
+            />
+        </a-modal>
 
         <SetOpeningModal
             :open="modal === 'opening'"

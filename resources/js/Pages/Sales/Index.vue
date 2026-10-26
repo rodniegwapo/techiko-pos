@@ -1597,15 +1597,21 @@ watch(
                     <!-- Room on the right for the pinned store switcher -->
                     <div class="flex flex-wrap items-center justify-between gap-2 md:pr-64">
                         <span>
-                            No shift is open for this location today. Start
-                            the shift before taking payments.
+                            <template v-if="$page.props.shiftStatus?.is_closed">
+                                Today's shift for this location was already
+                                ended. Reopen it before taking payments.
+                            </template>
+                            <template v-else>
+                                No shift is open for this location today. Start
+                                the shift before taking payments.
+                            </template>
                         </span>
                         <a-button
                             type="primary"
                             size="small"
                             @click="shiftBannerModalOpen = true"
                         >
-                            Start shift
+                            {{ $page.props.shiftStatus?.is_closed ? "Reopen shift" : "Start shift" }}
                         </a-button>
                     </div>
                 </template>

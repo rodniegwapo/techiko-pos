@@ -6,6 +6,7 @@ use App\Http\Middleware\RoleBasedAccessControl;
 use App\Http\Middleware\UserPermissionCheckMiddleware;
 use App\Models\Domain;
 use App\Models\InventoryLocation;
+use App\Models\Permission;
 use App\Models\PaymentCardType;
 use App\Models\Sale;
 use App\Models\User;
@@ -16,6 +17,7 @@ use App\Models\WalletCashReconciliation;
 use App\Support\Wallet\WalletCashBridgeExpected;
 use App\Support\Wallet\WalletLedgerViewData;
 use Carbon\Carbon;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Inertia;
@@ -31,6 +33,7 @@ class WalletCashControlTest extends TestCase
         $this->withoutMiddleware([
             UserPermissionCheckMiddleware::class,
             RoleBasedAccessControl::class,
+            ValidateCsrfToken::class,
         ]);
     }
 
@@ -535,7 +538,7 @@ class WalletCashControlTest extends TestCase
         ])->assertSessionHasErrors(['counted_cash']);
     }
 
-    public function test_end_shift_closes_shift_with_cashout_action_and_reopen_is_same_user_only(): void
+    public function test_end_shift_closes_shift_with_cashout_action_and_reopen_by_anyone_is_logged(): void
     {
         $ctx = $this->seedContext();
         $date = now()->subDays(2)->toDateString();
@@ -612,14 +615,18 @@ class WalletCashControlTest extends TestCase
                 ->where('cashControl.counted_at', null)
             );
 
+        // A reason is required, and nothing changes without it.
         $this->actingAs($otherUser)->post($reopenUrl, [
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
-        ])->assertForbidden();
+        ])->assertSessionHasErrors('reason');
+        $this->assertDatabaseHas('wallet_cash_reconciliations', ['business_date' => $date, 'is_closed' => 1]);
 
-        $this->actingAs($ctx['user'])->post($reopenUrl, [
+        // Someone other than the closer can reopen it (the route's permission is the gate), and it is logged.
+        $this->actingAs($otherUser)->post($reopenUrl, [
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
+            'reason' => 'Forgot an expense',
         ])->assertRedirect();
 
         $this->assertDatabaseHas('wallet_cash_reconciliations', [
@@ -627,6 +634,14 @@ class WalletCashControlTest extends TestCase
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
             'is_closed' => 0,
+            'reopened_by' => $otherUser->id,
+        ]);
+        $this->assertDatabaseHas('wallet_shift_reopen_logs', [
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'reopened_by' => $otherUser->id,
+            'closed_by' => $ctx['user']->id,
+            'reason' => 'Forgot an expense',
         ]);
     }
 
@@ -731,6 +746,7 @@ class WalletCashControlTest extends TestCase
         $this->actingAs($ctx['user'])->post($reopenUrl, [
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
+            'reason' => 'Counted wrong',
         ])->assertRedirect();
 
         $this->actingAs($ctx['user'])->post($countedUrl, [
@@ -794,6 +810,7 @@ class WalletCashControlTest extends TestCase
         $this->actingAs($ctx['user'])->post($reopenUrl, [
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
+            'reason' => 'Counted wrong',
         ])->assertRedirect();
 
         Sale::query()->create([
@@ -922,9 +939,17 @@ class WalletCashControlTest extends TestCase
         ])->assertSessionHasErrors(['business_date']);
     }
 
-    public function test_wallet_index_exposes_shift_closed_flags_and_can_reopen_for_closer(): void
+    public function test_wallet_index_exposes_shift_closed_flags_and_can_reopen_for_anyone_with_the_permission(): void
     {
         $ctx = $this->seedContext();
+        $other = User::factory()->create(['domain' => $ctx['domain']->name_slug, 'location_id' => $ctx['location']->id]);
+        $permission = Permission::query()->firstOrCreate(
+            ['route_name' => 'wallet-cash-ledger.reopen-shift', 'guard_name' => 'web'],
+            ['name' => 'Reopen shift', 'action' => 'reopen-shift'],
+        );
+        $ctx['user']->givePermissionTo($permission);
+        $other->givePermissionTo($permission);
+        $noPermission = User::factory()->create(['domain' => $ctx['domain']->name_slug, 'location_id' => $ctx['location']->id]);
         $date = now()->subDays(6)->toDateString();
 
         WalletCashReconciliation::query()->create([
@@ -953,6 +978,10 @@ class WalletCashControlTest extends TestCase
                 ->where('cashControl.closed_by', $ctx['user']->id)
                 ->where('cashControl.can_reopen', true)
             );
+
+        // Not only the closer: any other user with the permission, and nobody without it.
+        $this->actingAs($other)->get($url)->assertInertia(fn (Inertia $page) => $page->where('cashControl.can_reopen', true));
+        $this->actingAs($noPermission)->get($url)->assertInertia(fn (Inertia $page) => $page->where('cashControl.can_reopen', false));
     }
 
     public function test_wallet_index_rejects_future_business_date(): void

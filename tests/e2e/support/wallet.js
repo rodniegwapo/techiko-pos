@@ -202,8 +202,11 @@ export class DrawerPage {
         return this.save("/cash-ledger/close-shift", () => dialog.getByTestId("confirm-end-shift").click());
     }
 
-    async reopenShift() {
-        return this.save("/cash-ledger/reopen-shift", () => this.page.getByTestId("reopen-shift").click());
+    /** Reopening asks why; the reason is kept in the reopen log. */
+    async reopenShift(reason = "Counted wrong") {
+        await this.page.getByTestId("reopen-shift").click();
+        await this.page.getByTestId("reopen-reason").fill(reason);
+        return this.save("/cash-ledger/reopen-shift", () => this.page.getByTestId("reopen-confirm").click());
     }
 
     notice(title) {

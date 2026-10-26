@@ -28,6 +28,7 @@ use App\Services\ProductModifierService;
 use App\Services\SaleService;
 use App\Services\Wallet\SalePaymentWalletPosting;
 use App\Support\Quantity;
+use App\Models\WalletCashReconciliation;
 use App\Support\Wallet\WalletShiftGuard;
 use App\Traits\LocationCategoryScoping;
 use Carbon\Carbon;
@@ -85,10 +86,7 @@ class SaleController extends Controller
             'categories' => $location
                 ? $this->getCategoriesForLocation($domain->name_slug, $location)->get()
                 : Category::where('domain', $domain->name_slug)->get(),
-            'shiftStatus' => $location ? [
-                'is_open' => WalletShiftGuard::isOpenForSale($domain->name_slug, (int) $location->id, $businessDate),
-                'business_date' => $businessDate,
-            ] : null,
+            'shiftStatus' => $location ? $this->shiftStatus($request, $domain->name_slug, (int) $location->id, $businessDate) : null,
             'salesSettings' => [
                 'apply_vat_automatically' => $vat['apply_vat_automatically'],
                 'vat_rate_percent' => $vat['vat_rate_percent'],
@@ -102,6 +100,29 @@ class SaleController extends Controller
                 'min_points_redemption' => (int) config('loyalty.min_points_redemption', 1),
             ],
         ]);
+    }
+
+    /**
+     * Whether today's shift is open, and if it was already ended (so the Sales page offers Reopen
+     * instead of a Start that would only be refused).
+     */
+    private function shiftStatus(Request $request, string $domainSlug, int $locationId, string $businessDate): array
+    {
+        $recon = WalletCashReconciliation::query()
+            ->forWalletContext($domainSlug, $locationId)
+            ->whereDate('business_date', $businessDate)
+            ->first();
+        $isClosed = (bool) ($recon?->is_closed);
+
+        return [
+            'is_open' => $recon !== null && ! $isClosed,
+            'is_closed' => $isClosed,
+            // Anyone whose role holds the reopen permission; the reopen is logged with a reason.
+            'can_reopen' => $isClosed && WalletShiftGuard::canReopen($request->user()),
+            'closed_by_name' => $isClosed ? $recon->closedBy?->name : null,
+            'closed_at' => $isClosed ? $recon->closed_at?->toIso8601String() : null,
+            'business_date' => $businessDate,
+        ];
     }
 
     public function products(Request $request, Domain $domain)

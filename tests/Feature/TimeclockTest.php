@@ -9,6 +9,7 @@ use App\Models\InventoryLocation;
 use App\Models\TimeEntry;
 use App\Models\User;
 use App\Models\UserPin;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
@@ -38,7 +39,7 @@ class TimeclockTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->withoutMiddleware([UserPermissionCheckMiddleware::class, RoleBasedAccessControl::class]);
+        $this->withoutMiddleware([UserPermissionCheckMiddleware::class, RoleBasedAccessControl::class, ValidateCsrfToken::class]);
         // Wednesday 8:00 in Manila (the organization's time zone).
         Carbon::setTestNow(Carbon::parse('2026-10-28 08:00', 'Asia/Manila')->utc());
 

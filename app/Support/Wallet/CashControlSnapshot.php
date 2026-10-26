@@ -9,6 +9,7 @@ use App\Models\WalletCashCountSubmission;
 use App\Models\WalletCashMovement;
 use App\Models\WalletCashOpeningAudit;
 use App\Models\WalletCashReconciliation;
+use App\Models\WalletShiftReopenLog;
 
 /**
  * A store's cash drawer on one business day: opening, cash sales, cash in and out, expected and
@@ -172,6 +173,21 @@ class CashControlSnapshot
             ->values()
             ->all();
 
+        $viewer = $recon?->is_closed ? User::query()->find($viewerUserId) : null;
+        $lastReopen = null;
+        if ($recon !== null) {
+            $log = WalletShiftReopenLog::query()
+                ->where('reconciliation_id', $recon->id)
+                ->with('reopenedBy:id,name')
+                ->latest('id')
+                ->first();
+            $lastReopen = $log ? [
+                'by' => $log->reopenedBy?->name,
+                'at' => $log->created_at?->toIso8601String(),
+                'reason' => $log->reason,
+            ] : null;
+        }
+
         return [
             'business_date' => $businessDate,
             'opening_cash' => $openingCash,
@@ -196,9 +212,12 @@ class CashControlSnapshot
             'is_closed' => (bool) ($recon?->is_closed ?? false),
             'closed_at' => $recon?->closed_at?->toIso8601String(),
             'closed_by' => $recon?->closed_by ? (int) $recon->closed_by : null,
+            // Anyone whose role holds the reopen permission; each reopen is logged with a reason.
             'can_reopen' => $recon?->is_closed
-                ? (int) ($recon->closed_by ?? 0) === $viewerUserId
+                ? ($viewer !== null && WalletShiftGuard::canReopen($viewer))
                 : false,
+            'closed_by_name' => $recon?->is_closed ? $recon->closedBy?->name : null,
+            'last_reopen' => $lastReopen,
             'bridge_anchor_business_date' => $bridge['bridge_anchor_business_date'],
             'bridge_anchor_counted_cash' => $bridge['bridge_anchor_counted_cash'],
             'bridge_expected_cash' => $bridge['bridge_expected_cash'],

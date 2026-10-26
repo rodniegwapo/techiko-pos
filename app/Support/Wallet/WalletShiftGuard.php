@@ -2,6 +2,7 @@
 
 namespace App\Support\Wallet;
 
+use App\Models\User;
 use App\Models\WalletCashReconciliation;
 use Illuminate\Validation\ValidationException;
 
@@ -23,6 +24,12 @@ class WalletShiftGuard
                 $field => 'Shift is closed for this date/location. Reopen to edit.',
             ]);
         }
+    }
+
+    /** Anyone whose role holds the reopen permission may reopen a closed shift (the reopen is logged with a reason). */
+    public static function canReopen(User $user): bool
+    {
+        return $user->hasPermissionToRoute('wallet-cash-ledger.reopen-shift');
     }
 
     /** Unlike isClosed(), "no reconciliation row yet" does NOT count as open here. */

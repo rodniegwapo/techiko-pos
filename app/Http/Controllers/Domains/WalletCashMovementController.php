@@ -10,6 +10,7 @@ use App\Models\WalletCashCountSubmission;
 use App\Models\WalletCashMovement;
 use App\Models\WalletCashOpeningAudit;
 use App\Models\WalletCashReconciliation;
+use App\Models\WalletShiftReopenLog;
 use App\Services\ExpenseService;
 use App\Support\FinanceAccess;
 use App\Support\ManagerApproval;
@@ -518,6 +519,9 @@ class WalletCashMovementController extends Controller
         $location = WalletLocationResolver::resolve($request, $domain);
         $validated = $request->validate([
             'business_date' => ['required', 'date', 'before_or_equal:today'],
+            'reason' => ['required', 'string', 'max:255'],
+        ], [
+            'reason.required' => 'Say why the shift is being reopened.',
         ]);
 
         $recon = WalletCashReconciliation::query()
@@ -529,16 +533,26 @@ class WalletCashMovementController extends Controller
             return redirect()->back()->with('success', 'Shift is already open.');
         }
 
-        if ((int) $recon->closed_by !== (int) $request->user()->id) {
-            abort(403);
-        }
+        // Anyone with the reopen permission may do it (the route middleware checks that); the log keeps who and why.
+        DB::transaction(function () use ($recon, $domain, $location, $request, $validated) {
+            WalletShiftReopenLog::query()->create([
+                'domain' => $domain->name_slug,
+                'location_id' => $location->id,
+                'reconciliation_id' => $recon->id,
+                'business_date' => $validated['business_date'],
+                'reopened_by' => $request->user()->id,
+                'closed_by' => $recon->closed_by,
+                'closed_at' => $recon->closed_at,
+                'reason' => $validated['reason'],
+            ]);
 
-        $recon->is_closed = false;
-        $recon->reopened_at = now();
-        $recon->reopened_by = $request->user()->id;
-        $recon->closed_at = null;
-        $recon->closed_by = null;
-        $recon->save();
+            $recon->is_closed = false;
+            $recon->reopened_at = now();
+            $recon->reopened_by = $request->user()->id;
+            $recon->closed_at = null;
+            $recon->closed_by = null;
+            $recon->save();
+        });
 
         return redirect()->back()->with('success', 'Shift reopened.');
     }
