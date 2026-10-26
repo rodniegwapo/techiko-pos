@@ -34,6 +34,17 @@
             "How do offline sales work?"
         ]
     },
+    "SalesImport/Index": {
+        "title": "Import past sales",
+        "en": "Add old sales from a CSV file. Download the template, fill in one row per item, upload it, check the preview, then confirm. Sales are saved on their real dates.",
+        "tl": "Magdagdag ng mga lumang benta mula sa CSV file. I-download ang template, maglagay ng isang row kada item, i-upload, tingnan ang preview, at saka kumpirmahin. Mase-save ang mga benta sa tunay nilang petsa.",
+        "guides": [
+            "find-receipt"
+        ],
+        "ask": [
+            "How do I import my old sales?"
+        ]
+    },
     "SalesHistory/Index": {
         "title": "Sales history",
         "en": "Every completed sale. Find a receipt, see what was sold, void a sale or export the list.",

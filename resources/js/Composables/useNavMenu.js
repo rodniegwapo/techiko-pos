@@ -86,6 +86,16 @@ const menuItems = [
         domainOnly: true,
     },
     {
+        key: "sales-import",
+        title: "Import Sales",
+        icon: IconReceipt2,
+        routeName: "sales-import.index",
+        path: "/sales-import",
+        section: "sell",
+        keywords: "import csv backdate past old sales upload template",
+        domainOnly: true,
+    },
+    {
         key: "customers",
         title: "Customers",
         icon: IconUsers,

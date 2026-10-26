@@ -21,6 +21,8 @@ return [
     ['route' => 'sales.offline-transactions', 'path' => 'Offline sales', 'about' => 'sales made without internet that are waiting to sync, and syncing them'],
     ['route' => 'sales-history.index', 'path' => 'Sales History', 'about' => 'past sales and receipts: search, view a sale, export, and void a completed sale'],
 
+    ['route' => 'sales-import.index', 'path' => 'Import Sales', 'about' => 'add past (backdated) sales from a CSV file: download the template, upload, check the preview, then import; managers and above'],
+
     ['route' => 'finance.dashboard', 'path' => 'Finance → Overview', 'about' => 'business health at a glance: sales, profit, money in and out, with AI explanations and "Ask about your business"', 'feature' => 'finance'],
     ['route' => 'profit-loss.index', 'path' => 'Finance → Profit & loss', 'about' => 'profit and loss for a period: sales, cost of goods, gross profit, expenses and net profit; can be exported', 'feature' => 'finance'],
     ['route' => 'finance.cash-flow', 'path' => 'Finance → Money in & out', 'about' => 'money that came in and went out for a period, and why it differs from profit', 'feature' => 'finance'],

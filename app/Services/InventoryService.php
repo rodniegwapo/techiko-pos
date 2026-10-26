@@ -205,11 +205,11 @@ class InventoryService
     /**
      * Process inventory for completed sale
      */
-    public function processSaleInventory(array $items, $saleId, User $user, ?InventoryLocation $location = null): bool
+    public function processSaleInventory(array $items, $saleId, User $user, ?InventoryLocation $location = null, $movementDate = null): bool
     {
         $location = $location ?? InventoryLocation::getDefault();
 
-        return DB::transaction(function () use ($items, $saleId, $user, $location) {
+        return DB::transaction(function () use ($items, $saleId, $user, $location, $movementDate) {
             foreach ($items as $item) {
                 $product = Product::find($item['product_id']);
 
@@ -231,6 +231,8 @@ class InventoryService
                     'reference_id' => $saleId,
                     'user_id' => $user->id,
                     'notes' => "Sale - Unit Price: {$unitPrice}",
+                    // Backdated (imported) sales stamp the movement on the day the sale happened.
+                    ...($movementDate ? ['created_at' => $movementDate, 'updated_at' => $movementDate] : []),
                 ]);
             }
 

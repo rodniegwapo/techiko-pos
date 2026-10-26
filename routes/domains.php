@@ -30,6 +30,7 @@ use App\Http\Controllers\Domains\PurchaseOrderController;
 use App\Http\Controllers\Domains\RecurringExpenseController;
 use App\Http\Controllers\Domains\SaleController;
 use App\Http\Controllers\Domains\SaleDiscountController;
+use App\Http\Controllers\Domains\SaleImportController;
 use App\Http\Controllers\Domains\SalesHistoryController;
 use App\Http\Controllers\Domains\SharedCatalogLookupController;
 use App\Http\Controllers\Domains\SubscriptionOnHoldController;
@@ -239,6 +240,12 @@ Route::prefix('domains/{domain:name_slug}')
         Route::get('/sales-history/export', [SalesHistoryController::class, 'export'])->middleware('domain.feature:sales_history_unlimited')->name('sales-history.export');
         Route::get('/sales-history/{sale}', [SalesHistoryController::class, 'show'])->whereNumber('sale')->name('sales-history.show');
         Route::post('/sales-history/{sale}/void', [SalesHistoryController::class, 'void'])->whereNumber('sale')->name('sales-history.void');
+
+        // Import past (backdated) sales from a CSV: template, check, then confirm
+        Route::get('/sales-import', [SaleImportController::class, 'index'])->name('sales-import.index');
+        Route::get('/sales-import/template', [SaleImportController::class, 'template'])->name('sales-import.template');
+        Route::post('/sales-import/preview', [SaleImportController::class, 'preview'])->name('sales-import.preview');
+        Route::post('/sales-import', [SaleImportController::class, 'store'])->name('sales-import.store');
 
         // Expenses (feed the Profit & Loss report; cash-register expenses also post to the wallet ledger)
         Route::middleware('domain.feature:expenses')->group(function () {

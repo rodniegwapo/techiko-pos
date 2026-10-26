@@ -79,7 +79,7 @@ class Sale extends Model
         return $this->hasMany(SalePayment::class)->orderBy('id');
     }
 
-    public function recalcTotals(): void
+    public function recalcTotals(bool $broadcast = true): void
     {
         $itemsTotal = $this->saleItems()
             ->whereNull('deleted_at')
@@ -133,6 +133,11 @@ class Sale extends Model
         }
 
         $this->save();
+
+        // A bulk import has no customer display to refresh.
+        if (! $broadcast) {
+            return;
+        }
 
         // 🔹 Fire event here with fresh relationships
         event(new OrderUpdated($this->fresh([

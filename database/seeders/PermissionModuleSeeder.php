@@ -182,6 +182,14 @@ class PermissionModuleSeeder extends Seeder
                 'is_active' => true,
             ],
             [
+                'name' => 'sales-import',
+                'display_name' => 'Import Sales',
+                'icon' => 'file-import',
+                'description' => 'Import past sales from a CSV file',
+                'sort_order' => 19,
+                'is_active' => true,
+            ],
+            [
                 'name' => 'expenses',
                 'display_name' => 'Expenses',
                 'icon' => 'receipt-2',

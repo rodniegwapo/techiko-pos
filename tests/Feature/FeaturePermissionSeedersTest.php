@@ -5,7 +5,10 @@ namespace Tests\Feature;
 use App\Models\Permission;
 use Database\Seeders\AssistantPermissionSeeder;
 use Database\Seeders\FinancePermissionSeeder;
+use Database\Seeders\ProductModifierPermissionSeeder;
 use Database\Seeders\PurchasingPermissionSeeder;
+use Database\Seeders\SalesHistoryPermissionSeeder;
+use Database\Seeders\SalesImportPermissionSeeder;
 use Database\Seeders\TimeclockPermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -78,6 +81,78 @@ class FeaturePermissionSeedersTest extends TestCase
         }
 
         $this->assertSame($this->sorted($routes), $this->sorted(PurchasingPermissionSeeder::ROUTES));
+    }
+
+    public function test_the_sales_history_and_modifier_seeders_cover_their_routes(): void
+    {
+        $named = function (string $prefix): array {
+            $names = [];
+            foreach (Route::getRoutes() as $route) {
+                if (str_starts_with((string) $route->getName(), 'domains.'.$prefix)) {
+                    $names[] = preg_replace('/^domains\./', '', $route->getName());
+                }
+            }
+
+            return $this->sorted(array_unique($names));
+        };
+
+        $this->assertSame($named('sales-history.'), $this->sorted(SalesHistoryPermissionSeeder::ROUTES));
+        $this->assertSame($named('products.modifier-groups.'), $this->sorted(ProductModifierPermissionSeeder::ROUTES));
+    }
+
+    public function test_sales_history_and_modifier_permissions_go_to_the_right_default_roles(): void
+    {
+        $admin = $this->role('admin');
+        $supervisor = $this->role('supervisor');
+        $cashier = $this->role('cashier');
+
+        $this->seed(SalesHistoryPermissionSeeder::class);
+        $this->seed(ProductModifierPermissionSeeder::class);
+        $this->seed(SalesHistoryPermissionSeeder::class);
+
+        $this->assertSame($this->sorted(SalesHistoryPermissionSeeder::ROUTES), array_values(array_intersect($this->sorted(SalesHistoryPermissionSeeder::ROUTES), $this->routesOf($admin))));
+        // Cashiers and supervisors list, open and void, but cannot export.
+        foreach ([$supervisor, $cashier] as $role) {
+            $held = $this->routesOf($role);
+            $this->assertContains('sales-history.index', $held);
+            $this->assertNotContains('sales-history.export', $held);
+        }
+        // Cashiers can view modifiers, not change them; supervisors can change them.
+        $this->assertContains('products.modifier-groups.index', $this->routesOf($cashier));
+        $this->assertNotContains('products.modifier-groups.store', $this->routesOf($cashier));
+        $this->assertContains('products.modifier-groups.store', $this->routesOf($supervisor));
+        $this->assertSame(
+            count(SalesHistoryPermissionSeeder::ROUTES) + count(ProductModifierPermissionSeeder::ROUTES),
+            Permission::query()->whereIn('route_name', [...SalesHistoryPermissionSeeder::ROUTES, ...ProductModifierPermissionSeeder::ROUTES])->count(),
+        );
+    }
+
+    public function test_the_sales_import_seeder_covers_every_sales_import_route(): void
+    {
+        $routes = [];
+        foreach (Route::getRoutes() as $route) {
+            if (str_starts_with((string) $route->getName(), 'domains.sales-import.')) {
+                $routes[] = preg_replace('/^domains\./', '', $route->getName());
+            }
+        }
+
+        $this->assertSame($this->sorted($routes), $this->sorted(SalesImportPermissionSeeder::ROUTES));
+    }
+
+    public function test_sales_import_permissions_are_added_for_the_default_roles_only(): void
+    {
+        $admin = $this->role('admin');
+        $manager = $this->role('manager');
+        $cashier = $this->role('cashier');
+
+        $this->seed(SalesImportPermissionSeeder::class);
+        $this->seed(SalesImportPermissionSeeder::class);
+
+        $routes = $this->sorted(SalesImportPermissionSeeder::ROUTES);
+        $this->assertSame($routes, $this->routesOf($admin));
+        $this->assertSame($routes, $this->routesOf($manager));
+        $this->assertSame([], $this->routesOf($cashier));
+        $this->assertSame(count($routes), Permission::query()->whereIn('route_name', $routes)->count());
     }
 
     public function test_purchasing_permissions_are_added_for_the_default_roles_only(): void
