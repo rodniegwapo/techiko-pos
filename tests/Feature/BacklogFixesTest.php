@@ -16,8 +16,8 @@ use App\Models\LoyaltyTier;
 use App\Models\Permission;
 use App\Models\Product\Product;
 use App\Models\ProductInventory;
+use App\Models\RegisterShift;
 use App\Models\User;
-use App\Models\UserPin;
 use App\Models\WalletCashCountSubmission;
 use App\Models\WalletCashMovement;
 use App\Models\WalletCashReconciliation;
@@ -136,7 +136,7 @@ class BacklogFixesTest extends TestCase
                 ->where('cashControl.count_submission_history', [])
                 ->missing('cashControl.bridge_expected_cash'));
 
-        // Ending the shift goes through close-shift, where a manager approves the cash.
+        // A cashier ends their own shift; ending the store's day is a manager's.
         $this->actingAs($cashier)->post($this->url('wallet-cash-ledger.end-shift'), [
             'location_id' => $this->store->id, 'business_date' => $today, 'end_shift_action' => 'save_as_opening_cash',
         ])->assertSessionHasErrors('end_shift_action');
@@ -223,7 +223,7 @@ class BacklogFixesTest extends TestCase
         $this->assertEquals(130, (float) $product->fresh()->cost);
     }
 
-    public function test_a_cashier_ends_the_shift_in_one_step_with_a_managers_pin(): void
+    public function test_a_cashier_ends_their_own_shift_without_a_pin_and_a_manager_ends_the_day_after(): void
     {
         $this->domain->update(['settings' => ['features' => ['finance' => true, 'expenses' => true]]]);
         $cashierRole = Role::query()->firstOrCreate(['name' => 'cashier', 'guard_name' => 'web']);
@@ -234,37 +234,40 @@ class BacklogFixesTest extends TestCase
         $cashier->assignRole($cashierRole);
         $manager = User::factory()->create(['domain' => $this->domain->name_slug, 'is_super_user' => false, 'location_id' => $this->store->id]);
         $manager->assignRole($managerRole);
-        UserPin::query()->forceCreate(['user_id' => $manager->id, 'pin_code' => Hash::make('4321')]);
         $ice = ExpenseCategory::query()->create(['domain' => $this->domain->name_slug, 'name' => 'Supplies', 'is_active' => true]);
         $today = today()->toDateString();
-        WalletCashReconciliation::query()->create([
-            'domain' => $this->domain->name_slug, 'location_id' => $this->store->id, 'business_date' => $today, 'opening_cash' => 1000,
-        ]);
-        $close = fn (array $more) => $this->actingAs($cashier)->post($this->url('wallet-cash-ledger.close-shift'), [
-            'location_id' => $this->store->id, 'business_date' => $today, 'counted_cash' => 950,
-            'end_shift_action' => 'save_as_opening_cash',
-            'expenses' => [['expense_category_id' => $ice->id, 'amount' => 50, 'description' => 'Ice']],
-            ...$more,
-        ]);
 
-        // No PIN, or a wrong one: nothing is saved.
-        $close([])->assertSessionHasErrors('pin_code');
-        $close(['pin_code' => '0000'])->assertSessionHasErrors('pin_code');
-        $this->assertSame(0, Expense::query()->count());
+        // The first shift of the day opens the store's day with its cash.
+        $this->actingAs($cashier)->post($this->url('register-shifts.start'), ['location_id' => $this->store->id, 'opening_cash' => 1000])
+            ->assertSessionHasNoErrors();
+        $this->assertEquals(1000, (float) WalletCashReconciliation::query()->sole()->opening_cash);
+        $shift = RegisterShift::query()->sole();
+
+        $closeDay = fn (User $user) => $this->actingAs($user)->post($this->url('wallet-cash-ledger.close-shift'), [
+            'location_id' => $this->store->id, 'business_date' => $today, 'counted_cash' => 950, 'end_shift_action' => 'save_as_opening_cash',
+        ]);
+        // The store's day is a manager's to end, and only once nobody is still on shift.
+        $closeDay($cashier)->assertSessionHasErrors('end_shift_action');
+        $closeDay($manager)->assertSessionHasErrors('end_shift_action');
         $this->assertFalse((bool) WalletCashReconciliation::query()->sole()->is_closed);
 
-        $close(['pin_code' => '4321'])->assertSessionHasNoErrors();
+        // No PIN: the ₱50 paid from the drawer comes out of Expected, so 950 against 1000 is exact.
+        $this->actingAs($cashier)->post($this->url('register-shifts.end', ['registerShift' => $shift->id]), [
+            'counted_cash' => 950,
+            'expenses' => [['expense_category_id' => $ice->id, 'amount' => 50, 'description' => 'Ice']],
+        ])->assertSessionHasNoErrors();
 
-        // The ₱50 expense came out of the drawer first, so 950 counted against 1000 is exact.
-        $expense = Expense::query()->sole();
-        $this->assertSame('cash_register', $expense->payment_method);
+        $this->assertSame('cash_register', Expense::query()->sole()->payment_method);
+        $shift->refresh();
+        $this->assertSame(RegisterShift::CLOSED, $shift->status);
+        $this->assertEquals(950, $shift->expected_cash);
         $submission = WalletCashCountSubmission::query()->sole();
-        $this->assertEquals(950, (float) $submission->expected_cash_snapshot);
+        $this->assertSame($shift->id, (int) $submission->register_shift_id);
         $this->assertEquals(0, (float) $submission->variance_snapshot);
-        $this->assertSame($manager->id, (int) $submission->approved_by);
-        $recon = WalletCashReconciliation::query()->sole();
-        $this->assertTrue((bool) $recon->is_closed);
-        $this->assertEquals(950, (float) $recon->opening_cash);
+        $this->assertNull($submission->approved_by);
+
+        $closeDay($manager)->assertSessionHasNoErrors();
+        $this->assertTrue((bool) WalletCashReconciliation::query()->sole()->is_closed);
     }
 
     public function test_a_manager_ends_the_shift_without_a_pin(): void

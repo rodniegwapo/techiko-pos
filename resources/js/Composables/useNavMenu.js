@@ -396,6 +396,13 @@ const menuItems = [
                 path: "/wallet/history",
                 keywords: "counts opening changes closed shifts",
             },
+            {
+                key: "wallet-counts",
+                title: "Counted money",
+                routeName: "register-shifts.index",
+                path: "/wallet/shifts",
+                keywords: "cashier shift count approve review short over variance",
+            },
         ],
     },
     {

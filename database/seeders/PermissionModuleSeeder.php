@@ -222,6 +222,14 @@ class PermissionModuleSeeder extends Seeder
                 'is_active' => true,
             ],
             [
+                'name' => 'register-shifts',
+                'display_name' => 'Cashier shifts',
+                'icon' => 'cash-register',
+                'description' => 'Each cashier\'s own shift and count, and Counted money where managers approve them',
+                'sort_order' => 19,
+                'is_active' => true,
+            ],
+            [
                 'name' => 'timesheets',
                 'display_name' => 'Timeclock',
                 'icon' => 'clock',

@@ -29,6 +29,7 @@ use App\Http\Controllers\Domains\ProductController;
 use App\Http\Controllers\Domains\ProfitLossController;
 use App\Http\Controllers\Domains\PurchaseOrderController;
 use App\Http\Controllers\Domains\RecurringExpenseController;
+use App\Http\Controllers\Domains\RegisterShiftController;
 use App\Http\Controllers\Domains\SaleController;
 use App\Http\Controllers\Domains\SaleDiscountController;
 use App\Http\Controllers\Domains\SaleImportController;
@@ -348,6 +349,17 @@ Route::prefix('domains/{domain:name_slug}')
             // End the shift in one step: cash expenses, the count (a cashier's approved with a manager's PIN), then close.
             Route::post('/close-shift', [WalletCashMovementController::class, 'closeShiftWithCount'])->name('close-shift');
             Route::post('/reopen-shift', [WalletCashMovementController::class, 'reopenShift'])->name('reopen-shift');
+        });
+
+        // Each cashier's own shift; Counted money, where managers approve the counts.
+        Route::prefix('wallet/shifts')->name('register-shifts.')->group(function () {
+            Route::get('/', [WalletPagesController::class, 'counts'])->name('index');
+            Route::get('/money-by-user', [RegisterShiftController::class, 'moneyByUser'])->name('money-by-user');
+            Route::post('/start', [RegisterShiftController::class, 'start'])->name('start');
+            Route::get('/{registerShift}', [RegisterShiftController::class, 'show'])->whereNumber('registerShift')->name('show');
+            Route::post('/{registerShift}/end', [RegisterShiftController::class, 'end'])->whereNumber('registerShift')->name('end');
+            Route::post('/{registerShift}/reopen', [RegisterShiftController::class, 'reopen'])->whereNumber('registerShift')->name('reopen');
+            Route::post('/{registerShift}/approve', [RegisterShiftController::class, 'approve'])->whereNumber('registerShift')->name('approve');
         });
 
         // Credit Management (Organization-specific)

@@ -58,6 +58,20 @@ class WalletCashMovement extends Model
         'amount' => 'float',
     ];
 
+    /** A line someone adds while their own shift is open (dated within it) counts toward that shift's drawer. */
+    protected static function booted(): void
+    {
+        static::creating(function (WalletCashMovement $movement) {
+            if ($movement->register_shift_id || ! $movement->user_id || ! $movement->location_id || ! $movement->movement_date) {
+                return;
+            }
+            $shift = RegisterShift::openFor((string) $movement->domain, (int) $movement->location_id, (int) $movement->user_id);
+            if ($shift && $movement->movement_date->toDateString() >= $shift->business_date->toDateString()) {
+                $movement->register_shift_id = $shift->id;
+            }
+        });
+    }
+
     public function scopeForDomain($query, string $domainSlug)
     {
         return $query->where('domain', $domainSlug);

@@ -35,11 +35,12 @@ return [
     ['route' => 'finance.reviews.index', 'path' => 'Finance → Monthly review', 'about' => 'a review of each month compared with the month before: what went well, what needs attention, suggested actions', 'feature' => 'finance'],
     ['route' => 'vat-report.index', 'path' => 'Finance → VAT report', 'about' => 'VAT collected on sales for a period, with export', 'feature' => 'finance'],
 
-    ['route' => 'wallet.drawer', 'path' => "Cash & wallet → Today's drawer", 'about' => 'the cash drawer today: opening cash + cash sales + cash in − cash out = expected; counting the cash (short or over), ending and reopening the shift'],
+    ['route' => 'wallet.drawer', 'path' => "Cash & wallet → Today's drawer", 'about' => "the cash drawer today: opening cash + cash sales + cash in − cash out = expected; each cashier's own shift (start, end with a count, no PIN; reopen with a reason); View details: each person's money by where it went; managers end the store's day"],
     ['route' => 'wallet.cash-in-out', 'path' => 'Cash & wallet → Cash in & out', 'about' => 'every line in and out of the cash drawer (float added, owner took cash, corrections, expenses and suppliers paid in cash) and money moved to or from GCash, a bank or a card terminal'],
     ['route' => 'wallet.balances', 'path' => 'Cash & wallet → Where money is', 'about' => 'how much is in the cash drawer and in each payment channel (GCash, bank, card terminal), setting a channel to its actual balance, and every peso in and out (All money)'],
     ['route' => 'payment-card-types.index', 'path' => 'Cash & wallet → Where money is → Manage channels', 'about' => 'payment methods accepted besides cash (cards, GCash, Maya…) and the money received through each'],
     ['route' => 'wallet.history', 'path' => 'Cash & wallet → Drawer history', 'about' => "past counts, changes to opening cash, a check of the drawer since its last count, and the store's ended shifts"],
+    ['route' => 'register-shifts.index', 'path' => 'Cash & wallet → Counted money', 'about' => "each cashier's ended shift with their count and short/over; shifts that need review, and approving them"],
 
     ['route' => 'products.index', 'path' => 'Products → Items', 'about' => 'the product list for the current store: create, edit, add an existing product to the store, modifiers; stock status shown'],
     ['route' => 'categories.index', 'path' => 'Products → Categories', 'about' => 'product categories used to group items on the POS and in reports'],

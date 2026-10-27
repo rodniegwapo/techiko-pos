@@ -25,6 +25,8 @@ class RoutePermission
         'wallet.balances' => ['wallet-cash-ledger.index', 'payment-card-types.index'],
         // Ending the shift in one step (count + cash expenses + close) is ending the shift.
         'wallet-cash-ledger.close-shift' => ['wallet-cash-ledger.end-shift'],
+        // A shift's sales, cash lines and counts open from Counted money.
+        'register-shifts.show' => ['register-shifts.index'],
         'payment-card-types.details' => ['payment-card-types.money'],
         'billing.gcash.legacy' => ['billing.servicing.index'],
     ];

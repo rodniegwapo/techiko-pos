@@ -73,6 +73,13 @@ class RolePermissionSeeder extends Seeder
             'wallet-cash-ledger.counted-cash.store',
             'wallet-cash-ledger.end-shift',
             'wallet-cash-ledger.reopen-shift',
+            // Cashier shifts and Counted money
+            'register-shifts.start',
+            'register-shifts.end',
+            'register-shifts.reopen',
+            'register-shifts.index',
+            'register-shifts.approve',
+            'register-shifts.money-by-user',
             'vat-report.index',
             'vat-report.export',
             'vat-report.export-json',
@@ -482,6 +489,13 @@ class RolePermissionSeeder extends Seeder
             'wallet-cash-ledger.counted-cash.store',
             'wallet-cash-ledger.end-shift',
             'wallet-cash-ledger.reopen-shift',
+            // Cashier shifts and Counted money
+            'register-shifts.start',
+            'register-shifts.end',
+            'register-shifts.reopen',
+            'register-shifts.index',
+            'register-shifts.approve',
+            'register-shifts.money-by-user',
             'vat-report.index',
             'vat-report.export',
             'vat-report.export-json',
@@ -788,6 +802,13 @@ class RolePermissionSeeder extends Seeder
             'wallet-cash-ledger.counted-cash.store',
             'wallet-cash-ledger.end-shift',
             'wallet-cash-ledger.reopen-shift',
+            // Cashier shifts and Counted money
+            'register-shifts.start',
+            'register-shifts.end',
+            'register-shifts.reopen',
+            'register-shifts.index',
+            'register-shifts.approve',
+            'register-shifts.money-by-user',
             'vat-report.index',
             'vat-report.export',
             'vat-report.export-json',
@@ -1041,6 +1062,15 @@ class RolePermissionSeeder extends Seeder
 
             // Reopen a shift from the POS (logged)
             'wallet-cash-ledger.reopen-shift',
+            // Today's drawer: their own shift, and View details of who holds what
+            'wallet.money-movement',
+            // Cashier shifts and Counted money
+            'register-shifts.start',
+            'register-shifts.end',
+            'register-shifts.reopen',
+            'register-shifts.index',
+            'register-shifts.approve',
+            'register-shifts.money-by-user',
 
             // Dashboard
             'dashboard',
@@ -1231,6 +1261,10 @@ class RolePermissionSeeder extends Seeder
             'wallet-cash-ledger.end-shift',
             // Anyone on the till can reopen a shift (several drawers share a store); every reopen is logged
             'wallet-cash-ledger.reopen-shift',
+            // Their own shift: start, end with a count (no PIN), reopen with a reason
+            'register-shifts.start',
+            'register-shifts.end',
+            'register-shifts.reopen',
             'sales.loyalty-redemption',
             'sales.find-sale-item',
             'sales.sales.assignCustomer',

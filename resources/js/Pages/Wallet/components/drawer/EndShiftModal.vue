@@ -4,25 +4,26 @@ import { IconPlus, IconTrash } from "@tabler/icons-vue";
 import { useHelpers } from "@/Composables/useHelpers";
 
 /**
- * End the shift in one step: count the cash, add any expenses paid from the drawer during the
- * shift, and (for a cashier) a manager's PIN. Then the counted cash is taken out, or left in the
- * drawer as the next shift's opening.
+ * End a shift in one step: count the cash and add any expenses paid from the drawer during it.
+ * No manager's PIN: a count that is off goes to a manager on Counted money. Ending the store's
+ * day also says where the cash goes: taken out, or left in the drawer as the next opening.
  */
 const props = defineProps({
     open: { type: Boolean, default: false },
+    /** expected_cash, and counted_cash / counted_at / notes when a count was already saved. */
     cashControl: { type: Object, required: true },
     saving: { type: Boolean, default: false },
-    /** Cashiers: a manager approves the cash with their PIN. */
-    needsManagerPin: { type: Boolean, default: false },
     /** Empty when the plan has no Expenses. */
     expenseCategories: { type: Array, default: () => [] },
     /** Managers see Expected next to the count. */
     showExpected: { type: Boolean, default: true },
+    /** The cashier's own shift: no "where the cash goes" choice, that is the store's day. */
+    ownShift: { type: Boolean, default: false },
 });
 const emit = defineEmits(["close", "end"]);
 const { formattedTotal } = useHelpers();
 
-const form = reactive({ counted: null, notes: "", expenses: [], pin: "", action: "cashout_now" });
+const form = reactive({ counted: null, notes: "", expenses: [], action: "cashout_now" });
 
 watch(
     () => props.open,
@@ -33,7 +34,6 @@ watch(
             counted: c.counted_at != null ? Number(c.counted_cash) : null,
             notes: c.notes || "",
             expenses: [],
-            pin: "",
             action: "cashout_now",
         });
     },
@@ -55,20 +55,19 @@ function submit() {
     emit("end", {
         counted_cash: Number(form.counted),
         notes: form.notes || null,
-        end_shift_action: form.action,
+        ...(props.ownShift ? {} : { end_shift_action: form.action }),
         expenses: form.expenses
             .filter((e) => Number(e.amount) > 0)
             .map((e) => ({ expense_category_id: e.expense_category_id, amount: Number(e.amount), description: e.description })),
-        pin_code: props.needsManagerPin ? form.pin : undefined,
     });
 }
 </script>
 
 <template>
-    <a-modal :visible="open" title="End shift" :width="560" destroy-on-close @cancel="emit('close')">
+    <a-modal :visible="open" :title="ownShift ? 'End my shift' : 'End the store\'s day'" :width="560" destroy-on-close @cancel="emit('close')">
         <div class="flex flex-col gap-4 pt-1">
             <div>
-                <label class="mb-1 block text-sm font-medium text-gray-700">Cash in the drawer</label>
+                <label class="mb-1 block text-sm font-medium text-gray-700">{{ ownShift ? "Cash in your drawer" : "Cash in the drawer" }}</label>
                 <a-input-number
                     v-model:value="form.counted"
                     :min="0"
@@ -82,6 +81,9 @@ function submit() {
                 <p v-if="showExpected" class="mb-0 mt-1 text-xs text-gray-500">
                     Expected: {{ formattedTotal(Number(cashControl.expected_cash) || 0) }}<template v-if="expenseTotal">
                         , less {{ formattedTotal(expenseTotal) }} in expenses below</template>.
+                </p>
+                <p v-if="ownShift" class="mb-0 mt-1 text-xs text-gray-500">
+                    If the count is off, a manager reviews it. You can keep working meanwhile.
                 </p>
             </div>
 
@@ -110,7 +112,7 @@ function submit() {
                 </div>
             </div>
 
-            <a-radio-group v-model:value="form.action" class="flex flex-col gap-2">
+            <a-radio-group v-if="!ownShift" v-model:value="form.action" class="flex flex-col gap-2">
                 <a-radio value="cashout_now" :disabled="countedAmount <= 0" data-testid="end-shift-cashout">
                     Take the cash out
                     <div class="text-xs text-gray-500">The drawer starts the next shift empty.</div>
@@ -122,22 +124,17 @@ function submit() {
             </a-radio-group>
 
             <a-textarea v-model:value="form.notes" :rows="2" placeholder="Notes (optional)" />
-
-            <div v-if="needsManagerPin">
-                <label class="mb-1 block text-sm font-medium text-gray-700">Manager's PIN</label>
-                <a-input-password v-model:value="form.pin" placeholder="A manager approves the cash" autocomplete="off" data-testid="end-shift-pin" />
-            </div>
         </div>
         <template #footer>
             <a-button @click="emit('close')">Cancel</a-button>
             <a-button
                 type="primary"
                 :loading="saving"
-                :disabled="missingCount || (needsManagerPin && !form.pin)"
+                :disabled="missingCount"
                 data-testid="confirm-end-shift"
                 @click="submit"
             >
-                End shift
+                {{ ownShift ? "End my shift" : "End the day" }}
             </a-button>
         </template>
     </a-modal>

@@ -8,7 +8,8 @@ import WalletLayout from "./components/WalletLayout.vue";
 import SetOpeningModal from "./components/drawer/SetOpeningModal.vue";
 import CountCashModal from "./components/drawer/CountCashModal.vue";
 import EndShiftModal from "./components/drawer/EndShiftModal.vue";
-import { shortOver, TONE_CLASSES } from "./components/walletLabels";
+import MoneyByUserModal from "./components/drawer/MoneyByUserModal.vue";
+import { shortOver, TONE_CLASSES, SHIFT_STATUS } from "./components/walletLabels";
 import { useWalletQuery } from "./composables/useWalletQuery";
 import { useCashDrawerActions } from "./composables/useCashDrawerActions";
 
@@ -20,10 +21,15 @@ const props = defineProps({
     cashControl: { type: Object, required: true },
     activeLocation: { type: Object, default: null },
     canViewAllMoney: { type: Boolean, default: false },
-    /** Managers see whether a count came out short or over; a cashier sees what should be there. */
+    /** Managers see whether a count came out short or over, and end the store's day. */
     canSeeCountResult: { type: Boolean, default: true },
-    /** A cashier's cash is approved with a manager's PIN when ending the shift. */
-    needsManagerPin: { type: Boolean, default: false },
+    /** The user's own shift: open now (with figures), or the last one they ended today. */
+    myShift: { type: Object, default: null },
+    canStartShift: { type: Boolean, default: false },
+    /** Cashiers still on shift here: the store's day ends after them. */
+    openShiftsAtStore: { type: Array, default: () => [] },
+    /** View details: each user's money by where it went. */
+    canSeeMoneyByUser: { type: Boolean, default: false },
     /** Cash expenses can be added when ending the shift (empty without Expenses). */
     expenseCategories: { type: Array, default: () => [] },
 });
@@ -70,13 +76,35 @@ async function endShift(payload) {
     if (await actions.endShift(payload)) modal.value = null;
 }
 
+// A reopen always says why: it is kept in the log with who and when.
 const reopenReason = ref("");
+const reasonOk = computed(() => reopenReason.value.trim().length >= 3);
 async function reopen() {
-    if (await actions.reopenShift(reopenReason.value.trim())) {
+    if (!reasonOk.value) return;
+    const done = modal.value === "my-reopen"
+        ? await actions.reopenMyShift(props.myShift.id, reopenReason.value.trim())
+        : await actions.reopenShift(reopenReason.value.trim());
+    if (done) {
         modal.value = null;
         reopenReason.value = "";
     }
 }
+
+// My shift: the user's own drawer, next to the store's day.
+const myOpen = computed(() => props.myShift?.status === "open");
+const myFigures = computed(() => props.myShift?.figures ?? null);
+const myResult = computed(() => (props.myShift && !myOpen.value ? shortOver(props.myShift.variance) : null));
+const startForm = ref({ opening: 0, notes: "" });
+async function startMyShift() {
+    if (await actions.startMyShift(startForm.value.opening, startForm.value.notes)) {
+        modal.value = null;
+        startForm.value = { opening: 0, notes: "" };
+    }
+}
+async function endMyShift(payload) {
+    if (await actions.endMyShift(props.myShift.id, payload)) modal.value = null;
+}
+const stillOnShift = computed(() => props.openShiftsAtStore.map((s) => s.user).filter(Boolean).join(", "));
 </script>
 
 <template>
@@ -97,10 +125,51 @@ async function reopen() {
                 </span>
                 <span v-if="activeLocation" class="text-sm text-gray-500">{{ activeLocation.name }}</span>
             </div>
-            <a-tag v-if="isClosed" color="orange" class="m-0 inline-flex items-center gap-1" data-testid="shift-closed">
-                <IconLock class="h-3 w-3" /> Shift ended
-            </a-tag>
-            <a-tag v-else color="green" class="m-0" data-testid="shift-open">Shift open</a-tag>
+            <div class="flex flex-wrap items-center gap-2">
+                <a-button v-if="canSeeMoneyByUser" size="small" data-testid="open-money-by-user" @click="modal = 'money'">
+                    View details
+                </a-button>
+                <a-tag v-if="isClosed" color="orange" class="m-0 inline-flex items-center gap-1" data-testid="shift-closed">
+                    <IconLock class="h-3 w-3" /> Day ended
+                </a-tag>
+                <a-tag v-else color="green" class="m-0" data-testid="shift-open">Day open</a-tag>
+            </div>
+        </div>
+
+        <!-- My shift: the user's own drawer. Several cashiers can be on shift at once. -->
+        <div v-if="isToday && (myShift || canStartShift)" class="mb-4 rounded-lg border border-teal-200 bg-teal-50/40 p-4" data-testid="my-shift">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="text-sm font-semibold text-gray-800">My shift</span>
+                    <a-tag v-if="myShift" :color="SHIFT_STATUS[myShift.status]?.color" class="m-0" data-testid="my-shift-status">
+                        {{ SHIFT_STATUS[myShift.status]?.label ?? myShift.status }}
+                    </a-tag>
+                    <span v-if="myShift" class="text-xs text-gray-500">
+                        Started {{ dayjs(myShift.opened_at).format("h:mm A") }}<template v-if="myShift.closed_at">, ended {{ dayjs(myShift.closed_at).format("h:mm A") }}</template>
+                    </span>
+                    <span v-else class="text-xs text-gray-500">Not started. Start it to take payments.</span>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <a-button v-if="myOpen" type="primary" data-testid="open-end-my-shift" @click="modal = 'my-end'">End my shift</a-button>
+                    <a-button v-if="myShift?.can_reopen" data-testid="reopen-my-shift" @click="modal = 'my-reopen'">Reopen</a-button>
+                    <a-button v-if="!myOpen && canStartShift && !isClosed" :type="myShift ? 'default' : 'primary'" data-testid="open-start-my-shift" @click="modal = 'my-start'">
+                        {{ myShift ? "Start a new shift" : "Start my shift" }}
+                    </a-button>
+                </div>
+            </div>
+            <div v-if="myOpen && myFigures" class="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-5" data-testid="my-shift-figures">
+                <div><div class="text-xs text-gray-500">Opening</div><div class="font-mono tabular-nums">{{ money(myFigures.opening_cash) }}</div></div>
+                <div><div class="text-xs text-gray-500">Cash sales</div><div class="font-mono tabular-nums">+ {{ money(myFigures.paid_cash_sales) }}</div></div>
+                <div><div class="text-xs text-gray-500">Cash in</div><div class="font-mono tabular-nums">+ {{ money(myFigures.manual_in) }}</div></div>
+                <div><div class="text-xs text-gray-500">Cash out</div><div class="font-mono tabular-nums">− {{ money(myFigures.manual_out) }}</div></div>
+                <div><div class="text-xs text-gray-500">Expected</div><div class="font-mono font-semibold tabular-nums" data-testid="my-shift-expected">{{ money(myFigures.expected_cash) }}</div></div>
+            </div>
+            <p v-else-if="myShift && !myOpen" class="mb-0 mt-2 text-sm text-gray-700">
+                Counted {{ money(myShift.counted_cash) }}<template v-if="canSeeCountResult && myResult">
+                    · <span :class="TONE_CLASSES[myResult.tone]">{{ myResult.amount ? `${myResult.label} ${money(myResult.amount)}` : myResult.label }}</span></template>.
+                <template v-if="myShift.status === 'needs_review'"> The count is off from Expected, so a manager will review it. You can start a new shift meanwhile.</template>
+                <template v-else-if="myShift.status === 'approved'"> Approved<template v-if="myShift.reviewed_by"> by {{ myShift.reviewed_by }}</template>.</template>
+            </p>
         </div>
 
         <div class="grid grid-cols-1 gap-4 lg:grid-cols-5">
@@ -153,8 +222,16 @@ async function reopen() {
                     <template v-if="!isClosed">
                         <a-button v-if="canSetOpening" data-testid="open-set-opening" @click="modal = 'opening'">Set opening</a-button>
                         <a-button v-if="canCount" data-testid="open-count-cash" @click="modal = 'count'">Count cash</a-button>
-                        <a-button type="primary" class="inline-flex items-center gap-1" data-testid="open-end-shift" @click="modal = 'end'">
-                            <IconLock class="h-4 w-4" /> End shift
+                        <!-- The store's day is a manager's to end, after every cashier has ended their own shift. -->
+                        <a-button
+                            v-if="canSeeCountResult"
+                            type="primary"
+                            class="inline-flex items-center gap-1"
+                            :disabled="openShiftsAtStore.length > 0"
+                            data-testid="open-end-shift"
+                            @click="modal = 'end'"
+                        >
+                            <IconLock class="h-4 w-4" /> End the day
                         </a-button>
                     </template>
                     <a-button
@@ -163,10 +240,13 @@ async function reopen() {
                         data-testid="reopen-shift"
                         @click="modal = 'reopen'"
                     >
-                        <IconLockOpen class="h-4 w-4" /> Reopen shift
+                        <IconLockOpen class="h-4 w-4" /> Reopen the day
                     </a-button>
-                    <span v-else class="text-xs text-gray-500">Ask a manager or admin to reopen this shift.</span>
+                    <span v-else class="text-xs text-gray-500">Ask a manager or admin to reopen the day.</span>
                 </div>
+                <p v-if="!isClosed && canSeeCountResult && stillOnShift" class="mb-0 mt-2 text-xs text-gray-600" data-testid="still-on-shift">
+                    Still on shift: {{ stillOnShift }}. The day ends after each of them ends their shift.
+                </p>
                 <p v-if="cashControl.last_reopen" class="mb-0 mt-3 text-xs text-gray-600" data-testid="last-reopen">
                     Reopened by {{ cashControl.last_reopen.by }} at {{ dayjs(cashControl.last_reopen.at).format("h:mm A") }}<template v-if="cashControl.last_reopen.reason">: {{ cashControl.last_reopen.reason }}</template>
                 </p>
@@ -178,26 +258,66 @@ async function reopen() {
         </div>
 
         <a-modal
-            :visible="modal === 'reopen'"
-            title="Reopen this shift"
-            ok-text="Reopen shift"
-            :ok-button-props="{ 'data-testid': 'reopen-confirm' }"
-            :confirm-loading="actions.busy.value === 'reopen'"
+            :visible="modal === 'reopen' || modal === 'my-reopen'"
+            :title="modal === 'my-reopen' ? 'Reopen my shift' : 'Reopen the day'"
+            ok-text="Reopen"
+            :ok-button-props="{ 'data-testid': 'reopen-confirm', disabled: !reasonOk }"
+            :confirm-loading="actions.busy.value === 'reopen' || actions.busy.value === 'my-reopen'"
             @ok="reopen"
             @cancel="modal = null"
         >
             <p class="text-sm text-gray-600">
-                <template v-if="cashControl.closed_by_name">{{ cashControl.closed_by_name }} ended this shift. </template>
-                Reopening lets payments, counts and changes happen again. Your name and the time are kept in the log.
+                <template v-if="modal === 'my-reopen'">
+                    Your count stays in the history; ending the shift again adds a new count.
+                </template>
+                <template v-else>
+                    <template v-if="cashControl.closed_by_name">{{ cashControl.closed_by_name }} ended the day. </template>
+                    Reopening lets payments, counts and changes happen again.
+                </template>
+                Your name, the time and the reason are kept in the log.
             </p>
             <a-input
                 v-model:value="reopenReason"
-                placeholder="Reason (optional), e.g. counted wrong"
+                placeholder="Reason, e.g. counted wrong"
                 :maxlength="255"
                 data-testid="reopen-reason"
                 @press-enter="reopen"
             />
         </a-modal>
+
+        <a-modal
+            :visible="modal === 'my-start'"
+            title="Start my shift"
+            ok-text="Start shift"
+            :ok-button-props="{ 'data-testid': 'confirm-start-my-shift' }"
+            :confirm-loading="actions.busy.value === 'my-start'"
+            @ok="startMyShift"
+            @cancel="modal = null"
+        >
+            <p class="text-sm text-gray-600">Count the cash you start with. Your sales and cash lines count toward your own drawer.</p>
+            <label class="mb-1 block text-sm text-gray-700">Opening cash</label>
+            <a-input-number v-model:value="startForm.opening" :min="0" :precision="2" class="mb-3 w-full" addon-before="₱" data-testid="my-shift-opening" />
+            <a-input v-model:value="startForm.notes" placeholder="Note (optional)" :maxlength="255" />
+        </a-modal>
+
+        <EndShiftModal
+            v-if="myOpen"
+            :open="modal === 'my-end'"
+            :cash-control="{ expected_cash: myFigures?.expected_cash ?? 0, counted_at: null }"
+            :saving="actions.busy.value === 'my-end'"
+            :expense-categories="expenseCategories"
+            :show-expected="canSeeCountResult"
+            own-shift
+            @close="modal = null"
+            @end="endMyShift"
+        />
+        <MoneyByUserModal
+            v-if="canSeeMoneyByUser"
+            :open="modal === 'money'"
+            :location-id="locationId"
+            :business-date="businessDate"
+            @close="modal = null"
+        />
 
         <SetOpeningModal
             :open="modal === 'opening'"
@@ -218,7 +338,6 @@ async function reopen() {
             :open="modal === 'end'"
             :cash-control="cashControl"
             :saving="actions.busy.value === 'end'"
-            :needs-manager-pin="needsManagerPin"
             :expense-categories="expenseCategories"
             :show-expected="canSeeCountResult"
             @close="modal = null"

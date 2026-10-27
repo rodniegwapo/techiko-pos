@@ -242,6 +242,17 @@
             "When was the drawer last short?"
         ]
     },
+    "Wallet/Counts": {
+        "title": "Counted money",
+        "en": "Each cashier's ended shift with their count and how far it was from Expected. Shifts that came out short or over wait here for a manager to look into and approve; the cashier can keep working meanwhile.",
+        "tl": "Bawat natapos na shift ng cashier, kasama ang bilang nila at kung gaano kalayo sa Expected. Ang mga kulang o sobra ay naghihintay dito para silipin at aprubahan ng manager; puwedeng magpatuloy ang cashier habang hinihintay.",
+        "guides": [
+            "end-shift"
+        ],
+        "ask": [
+            "Which shifts still need review?"
+        ]
+    },
     "Wallet/StoresCash": {
         "title": "Stores' cash",
         "en": "The shifts each store has ended: what was counted, what was expected, and the cash taken out.",

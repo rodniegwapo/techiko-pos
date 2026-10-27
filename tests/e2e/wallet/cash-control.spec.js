@@ -215,7 +215,7 @@ test.describe("Today's drawer", () => {
             await drawer.setOpening(500);
 
             await page.getByTestId("open-end-shift").click();
-            const dialog = drawer.dialog("End shift");
+            const dialog = drawer.dialog("End the store's day");
             // Nothing to end with until the cash is counted.
             await expect(dialog.getByTestId("confirm-end-shift")).toBeDisabled();
 
@@ -246,7 +246,7 @@ test.describe("Today's drawer", () => {
             const res = await drawer.endShift("Take the cash out");
 
             expect(res.status()).toBeLessThan(400);
-            await expect(drawer.notice("Shift ended.")).toBeVisible();
+            await expect(drawer.notice("Day ended.")).toBeVisible();
             await expect(page.getByTestId("shift-closed")).toBeVisible();
             await expect(page.getByTestId("reopen-shift")).toBeVisible();
 
@@ -288,7 +288,7 @@ test.describe("Today's drawer", () => {
             const res = await drawer.reopenShift();
 
             expect(res.status()).toBeLessThan(400);
-            await expect(drawer.notice("Shift reopened.")).toBeVisible();
+            await expect(drawer.notice("Day reopened.")).toBeVisible();
             await expect(page.getByTestId("shift-open")).toBeVisible();
             await expect(page.getByTestId("open-count-cash")).toBeVisible();
         });
@@ -312,7 +312,7 @@ test.describe("A shift ended by another manager", () => {
         const res = await drawer.reopenShift("Forgot an expense");
 
         expect(res.status()).toBeLessThan(400);
-        await expect(drawer.notice("Shift reopened.")).toBeVisible();
+        await expect(drawer.notice("Day reopened.")).toBeVisible();
         await expect(page.getByTestId("shift-open")).toBeVisible();
         await expect(page.getByTestId("last-reopen")).toContainText("Forgot an expense");
         expect((await walletState(partner, day(0))).cashControl.is_closed).toBe(false);

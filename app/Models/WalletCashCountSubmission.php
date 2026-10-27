@@ -15,7 +15,13 @@ class WalletCashCountSubmission extends Model
         'expected_cash_snapshot' => 'float',
         'variance_snapshot' => 'float',
         'counted_at' => 'datetime',
+        'approved_at' => 'datetime',
     ];
+
+    public function registerShift(): BelongsTo
+    {
+        return $this->belongsTo(RegisterShift::class);
+    }
 
     public function scopeForWalletContext($query, string $domainSlug, int $locationId)
     {

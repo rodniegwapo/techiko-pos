@@ -8,6 +8,7 @@ use Database\Seeders\DineInPermissionSeeder;
 use Database\Seeders\FinancePermissionSeeder;
 use Database\Seeders\ProductModifierPermissionSeeder;
 use Database\Seeders\PurchasingPermissionSeeder;
+use Database\Seeders\RegisterShiftPermissionSeeder;
 use Database\Seeders\SalesHistoryPermissionSeeder;
 use Database\Seeders\SalesImportPermissionSeeder;
 use Database\Seeders\ShiftReopenPermissionSeeder;
@@ -142,6 +143,43 @@ class FeaturePermissionSeedersTest extends TestCase
             $this->assertContains('wallet-cash-ledger.reopen-shift', $this->routesOf($role));
         }
         $this->assertSame(1, Permission::query()->where('route_name', 'wallet-cash-ledger.reopen-shift')->count());
+    }
+
+    public function test_the_register_shift_seeder_covers_every_shift_route(): void
+    {
+        $routes = [];
+        foreach (Route::getRoutes() as $route) {
+            if (str_starts_with((string) $route->getName(), 'domains.register-shifts.')) {
+                $routes[] = preg_replace('/^domains\./', '', $route->getName());
+            }
+        }
+
+        // register-shifts.show opens with register-shifts.index (RoutePermission::ALIASES).
+        $this->assertSame(
+            $this->sorted(array_values(array_diff($routes, ['register-shifts.show']))),
+            $this->sorted([...RegisterShiftPermissionSeeder::TILL_ROUTES, ...RegisterShiftPermissionSeeder::REVIEW_ROUTES]),
+        );
+    }
+
+    public function test_cashiers_run_their_own_shift_and_supervisors_and_up_approve_counts(): void
+    {
+        $cashier = $this->role('cashier');
+        $supervisor = $this->role('supervisor');
+        $manager = $this->role('manager');
+
+        $this->seed(RegisterShiftPermissionSeeder::class);
+        $this->seed(RegisterShiftPermissionSeeder::class);
+
+        $all = $this->sorted([...RegisterShiftPermissionSeeder::TILL_ROUTES, ...RegisterShiftPermissionSeeder::REVIEW_ROUTES]);
+        $this->assertSame($this->sorted(RegisterShiftPermissionSeeder::TILL_ROUTES), $this->routesOf($cashier));
+        // Supervisors also get Today's drawer, where a shift is run (they didn't have it before).
+        $this->assertSame($this->sorted([...$all, ...RegisterShiftPermissionSeeder::DRAWER_ROUTES]), $this->routesOf($supervisor));
+        $this->assertSame($all, $this->routesOf($manager));
+        $this->assertSame(count($all), Permission::query()->whereIn('route_name', $all)->count());
+        $this->assertSame(
+            DB::table('permission_modules')->where('name', 'register-shifts')->value('id'),
+            Permission::query()->where('route_name', 'register-shifts.approve')->value('module_id'),
+        );
     }
 
     public function test_the_sales_import_seeder_covers_every_sales_import_route(): void

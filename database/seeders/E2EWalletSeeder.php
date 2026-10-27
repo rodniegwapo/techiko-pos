@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\WalletCashCountSubmission;
 use App\Models\WalletCashMovement;
 use App\Models\WalletCashOpeningAudit;
+use App\Models\RegisterShift;
 use App\Models\WalletCashReconciliation;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -56,6 +57,9 @@ class E2EWalletSeeder extends Seeder
 
                 $manager = $this->manager("e2e-wallet-manager-{$i}@techiko.test", "E2E Wallet Manager {$i}", $location);
                 $partner = $this->manager("e2e-wallet-partner-{$i}@techiko.test", "E2E Wallet Partner {$i}", $location);
+                // Each role's own shift at this store (tests/e2e/wallet/register-shift-roles.spec.js).
+                $cashier = $this->manager("e2e-wallet-cashier-{$i}@techiko.test", "E2E Wallet Cashier {$i}", $location, 'cashier', 5);
+                $supervisor = $this->manager("e2e-wallet-supervisor-{$i}@techiko.test", "E2E Wallet Supervisor {$i}", $location, 'supervisor', 4);
 
                 $card = PaymentCardType::updateOrCreate(
                     ['domain' => self::DOMAIN, 'location_id' => $location->id, 'name' => 'E2E Wallet Visa'],
@@ -80,6 +84,8 @@ class E2EWalletSeeder extends Seeder
                     'managerName' => $manager->name,
                     'partnerEmail' => $partner->email,
                     'partnerName' => $partner->name,
+                    'cashierName' => $cashier->name,
+                    'supervisorName' => $supervisor->name,
                     'cardTypeId' => $card->id,
                     'otherCardTypeId' => $otherCard->id,
                     'cardSales' => $cardSales,
@@ -92,7 +98,8 @@ class E2EWalletSeeder extends Seeder
         $this->writeFixtureIds($workers);
     }
 
-    private function manager(string $email, string $name, InventoryLocation $location): User
+    /** Staff of a worker's store: managers by default; a cashier and a supervisor for the shift tests. */
+    private function manager(string $email, string $name, InventoryLocation $location, string $role = 'manager', int $level = 3): User
     {
         $user = User::updateOrCreate(
             ['email' => $email],
@@ -101,13 +108,13 @@ class E2EWalletSeeder extends Seeder
                 'password' => Hash::make(E2EUserSeeder::PASSWORD),
                 'is_super_user' => false,
                 'domain' => self::DOMAIN,
-                'role_level' => 3,
+                'role_level' => $level,
                 'location_id' => $location->id,
                 'can_switch_locations' => false,
                 'email_verified_at' => now(),
             ]
         );
-        $user->syncRoles(['manager']);
+        $user->syncRoles([$role]);
 
         return $user;
     }
@@ -183,6 +190,7 @@ class E2EWalletSeeder extends Seeder
         WalletCashOpeningAudit::where('location_id', $location->id)->delete();
         WalletCashMovement::where('location_id', $location->id)->delete();
         WalletCashReconciliation::where('location_id', $location->id)->delete();
+        RegisterShift::where('location_id', $location->id)->delete();
     }
 
     /** Adds a `wallet` section to tests/e2e/.fixtures.json (written by E2ESalesSeeder). */

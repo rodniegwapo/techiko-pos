@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Domain;
 use App\Models\ExpenseCategory;
 use App\Models\InventoryLocation;
+use App\Models\RegisterShift;
 use App\Support\FinanceAccess;
 use App\Support\RouteFeature;
 use App\Support\RoutePermission;
@@ -13,11 +14,13 @@ use App\Support\Wallet\AllStoresMoney;
 use App\Support\Wallet\CashControlSnapshot;
 use App\Support\Wallet\ChannelBalances;
 use App\Support\Wallet\MoneyTimeline;
+use App\Support\Wallet\RegisterShiftService;
 use App\Support\Wallet\StoresCash;
 use App\Support\Wallet\WalletLedgerViewData;
 use App\Support\Wallet\WalletLocationResolver;
 use App\Support\Wallet\WalletShiftGuard;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 /**
@@ -54,12 +57,29 @@ class WalletPagesController extends Controller
             ];
         }
 
+        $user = $request->user();
+        $shifts = app(RegisterShiftService::class);
+        $mine = RegisterShift::openFor($domain->name_slug, (int) $location->id, (int) $user->id)
+            ?? RegisterShift::query()->forWalletContext($domain->name_slug, (int) $location->id)
+                ->where('user_id', $user->id)->whereDate('business_date', now()->toDateString())
+                ->latest('id')->first();
+
         return Inertia::render('Wallet/Drawer', [
             ...$this->pageProps($request, $domain, $location),
             'cashControl' => $cashControl,
             'canSeeCountResult' => $canSeeCountResult,
-            // Ending the shift: a cashier's count is approved with a manager's PIN.
-            'needsManagerPin' => ! $canSeeCountResult,
+            // The user's own shift: open now, or the last one they ended today.
+            'myShift' => $mine ? [
+                ...$mine->load('reviewedBy:id,name')->toRow(),
+                'figures' => $mine->isOpen() ? $shifts->figures($mine) : null,
+                'can_reopen' => ! $mine->isOpen() && $mine->status !== RegisterShift::APPROVED
+                    && RoutePermission::allows($user, 'register-shifts.reopen'),
+            ] : null,
+            'canStartShift' => RoutePermission::allows($user, 'register-shifts.start'),
+            // Ending the store's day stays with managers, after every cashier has ended their shift.
+            'openShiftsAtStore' => RegisterShift::query()->forWalletContext($domain->name_slug, (int) $location->id)
+                ->open()->with('user:id,name')->get()->map(fn (RegisterShift $s) => ['id' => $s->id, 'user' => $s->user?->name])->values(),
+            'canSeeMoneyByUser' => RoutePermission::allows($user, 'register-shifts.money-by-user'),
             // Cash expenses paid from the drawer can be added when ending the shift.
             'expenseCategories' => RouteFeature::allows($domain, 'expenses.store')
                 ? ExpenseCategory::query()->forDomain($domain->name_slug)->where('is_active', true)->orderBy('name')->get(['id', 'name'])
@@ -123,6 +143,40 @@ class WalletPagesController extends Controller
             ...$this->pageProps($request, $domain, $location),
             'cashControl' => CashControlSnapshot::build($domain, $location, $this->businessDate($request), (int) $request->user()->id),
             'closedShifts' => StoresCash::build($request, $domain, (int) $location->id),
+        ]);
+    }
+
+    /**
+     * Counted money: every cashier's ended shift with its count and difference, the ones waiting
+     * for review first, for a manager to approve.
+     */
+    public function counts(Request $request, Domain $domain)
+    {
+        $location = WalletLocationResolver::resolve($request, $domain);
+        $validated = $request->validate([
+            'status' => ['sometimes', 'string', Rule::in(['needs_review', 'closed', 'approved', 'open', 'all'])],
+        ]);
+        $status = $validated['status'] ?? RegisterShift::NEEDS_REVIEW;
+
+        $base = RegisterShift::query()->forWalletContext($domain->name_slug, (int) $location->id);
+        $shifts = (clone $base)
+            ->when($status !== 'all', fn ($q) => $q->where('status', $status))
+            ->with(['user:id,name', 'reviewedBy:id,name'])
+            ->withCount('reopenLogs')
+            ->orderByDesc('business_date')
+            ->orderByDesc('closed_at')
+            ->orderByDesc('id')
+            ->paginate(25)
+            ->withQueryString()
+            ->through(fn (RegisterShift $s) => [...$s->toRow(), 'reopen_count' => (int) $s->reopen_logs_count]);
+
+        return Inertia::render('Wallet/Counts', [
+            ...$this->pageProps($request, $domain, $location),
+            'status' => $status,
+            'shifts' => $shifts,
+            'statusCounts' => (clone $base)->groupBy('status')->selectRaw('status, COUNT(*) AS n')->pluck('n', 'status'),
+            'canApprove' => RoutePermission::allows($request->user(), 'register-shifts.approve'),
+            'currentUserId' => (int) $request->user()->id,
         ]);
     }
 

@@ -2,12 +2,16 @@
 key: end-shift
 title: Count the cash and end the shift
 page: wallet.drawer
-requires: wallet.drawer, wallet-cash-ledger.counted-cash.store, wallet-cash-ledger.end-shift
-keywords: end shift, close shift, count cash, counted cash, cash count, over short, kulang, sobra, closing, end of day, z
+requires: wallet.drawer, register-shifts.end
+keywords: end shift, close shift, count cash, counted cash, cash count, over short, kulang, sobra, closing, end of day, z, my shift, needs review, approve count, counted money
 ---
-1. In the sidebar, open **Cash & wallet → Today's drawer** (pick another day with the date if needed).
-2. Count the cash in the drawer. Click **Count cash**, enter the amount and click **Save count**. The page shows **Short**, **Over** or **Balanced** against the **Expected** cash.
-3. Click **End shift**.
-4. Choose what happens to the counted cash: **Take the cash out**, or **Leave it as the next shift's opening**. Click **End shift**.
+Each cashier has their own shift; several can be on shift at one store.
 
-Made a mistake? **Reopen shift** opens it again, but only for the person who ended it.
+1. In the sidebar, open **Cash & wallet → Today's drawer**.
+2. Under **My shift**, click **End my shift**.
+3. Count the cash in your drawer and enter it. Add any cash expenses you paid from the drawer during the shift. Click **End my shift**. No manager's PIN is needed.
+4. If the count is off from Expected, the shift shows **Needs review** and a manager looks into it on **Counted money**. You can start a new shift meanwhile (unless the store turned that off in Settings).
+
+Made a mistake? **Reopen** under My shift opens it again; say why. The first count stays in the history, and ending it again adds a new count. An approved shift can't be reopened: record a correction in **Cash in & out**.
+
+Managers: approve counts on **Cash & wallet → Counted money**. **View details** on Today's drawer shows what each person took in, by where it went (cash drawer, GCash, bank, card). When every cashier has ended their shift, **End the day** closes the store's day; reopening the day also needs a reason.

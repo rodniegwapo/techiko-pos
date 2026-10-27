@@ -157,8 +157,12 @@ test.describe("Wallet API validation", () => {
             expectSaved(await postOpening(api, { business_date: day(1), opening_cash: 5 }), "opening next day");
         });
 
+        test("reopening needs a reason", async () => {
+            expect422(await postReopen(api, { business_date: day(0) }), "reason");
+        });
+
         test("reopening a date that was never closed is harmless", async () => {
-            const res = await postReopen(api, { business_date: day(0) });
+            const res = await postReopen(api, { business_date: day(0), reason: "Counted wrong" });
 
             expect(res.status, "no reconciliation yet").toBe(404);
         });

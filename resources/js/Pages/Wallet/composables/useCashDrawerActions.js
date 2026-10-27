@@ -14,17 +14,18 @@ export function firstValidationMessage(err) {
 }
 
 /**
- * Today's drawer actions: set opening cash, count the cash, end and reopen the shift. Each posts
- * for one store and business date, then reloads the page.
+ * Today's drawer actions: set opening cash, count the cash, end and reopen the store's day, and the
+ * user's own shift (start, end, reopen). Each posts for one store and business date, then reloads
+ * the page.
  */
 export function useCashDrawerActions(locationId, businessDate) {
     const { getRoute } = useDomainRoutes();
     const busy = ref(null);
 
-    async function post(name, routeName, payload, done, failed) {
+    async function post(name, routeName, payload, done, failed, params = {}) {
         busy.value = name;
         try {
-            await axios.post(getRoute(routeName), {
+            await axios.post(getRoute(routeName, params), {
                 location_id: locationId.value,
                 business_date: businessDate.value,
                 ...payload,
@@ -48,12 +49,21 @@ export function useCashDrawerActions(locationId, businessDate) {
         saveCount: (amount, notes) =>
             post("count", "wallet-cash-ledger.counted-cash.store", { counted_cash: Number(amount || 0), notes: notes || null },
                 "Count saved.", "Could not save the count."),
-        /** Count, cash expenses, a manager's PIN for a cashier, and closing, all in one go. */
+        /** The store's day: count, cash expenses and closing, all in one go (managers, after every cashier's shift). */
         endShift: (payload) =>
             post("end", "wallet-cash-ledger.close-shift", payload,
-                "Shift ended.", "Could not end the shift."),
-        /** Anyone with the permission may reopen; who and when (and an optional reason) are kept in the reopen log. */
+                "Day ended.", "Could not end the day."),
+        /** Reopening needs a reason; who and when are kept in the reopen log. */
         reopenShift: (reason) =>
-            post("reopen", "wallet-cash-ledger.reopen-shift", { reason: reason || null }, "Shift reopened.", "Could not reopen the shift."),
+            post("reopen", "wallet-cash-ledger.reopen-shift", { reason }, "Day reopened.", "Could not reopen the day."),
+
+        startMyShift: (openingCash, notes) =>
+            post("my-start", "register-shifts.start", { opening_cash: Number(openingCash || 0), notes: notes || null },
+                "Shift started.", "Could not start your shift."),
+        /** No PIN: a count that is off goes to a manager on Counted money. */
+        endMyShift: (shiftId, payload) =>
+            post("my-end", "register-shifts.end", payload, "Shift ended.", "Could not end your shift.", { registerShift: shiftId }),
+        reopenMyShift: (shiftId, reason) =>
+            post("my-reopen", "register-shifts.reopen", { reason }, "Shift reopened.", "Could not reopen the shift.", { registerShift: shiftId }),
     };
 }

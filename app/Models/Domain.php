@@ -310,4 +310,12 @@ class Domain extends Model
 
         return (bool) ($s['hide_out_of_stock'] ?? false);
     }
+
+    /** A cashier may start a new shift while their last one waits for a manager's review (on unless the store turns it off). */
+    public function allowsNewShiftWhileReview(): bool
+    {
+        $s = $this->settings['sales'] ?? [];
+
+        return (bool) ($s['allow_new_shift_while_review'] ?? true);
+    }
 }

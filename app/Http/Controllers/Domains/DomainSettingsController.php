@@ -41,6 +41,7 @@ class DomainSettingsController extends Controller
                     : 'exclusive',
                 'allow_overselling' => (bool) data_get($settings, 'sales.allow_overselling', false),
                 'hide_out_of_stock' => (bool) data_get($settings, 'sales.hide_out_of_stock', false),
+                'allow_new_shift_while_review' => $domain->allowsNewShiftWhileReview(),
             ],
         ]);
     }
@@ -53,6 +54,7 @@ class DomainSettingsController extends Controller
             'vat_pricing_mode' => ['sometimes', 'string', 'in:exclusive,inclusive'],
             'allow_overselling' => ['sometimes', 'boolean'],
             'hide_out_of_stock' => ['sometimes', 'boolean'],
+            'allow_new_shift_while_review' => ['sometimes', 'boolean'],
             'currency_code' => ['sometimes', 'string', Rule::in(self::CURRENCIES)],
         ]);
 
@@ -78,6 +80,9 @@ class DomainSettingsController extends Controller
         }
         if (array_key_exists('hide_out_of_stock', $validated)) {
             $sales['hide_out_of_stock'] = (bool) $validated['hide_out_of_stock'];
+        }
+        if (array_key_exists('allow_new_shift_while_review', $validated)) {
+            $sales['allow_new_shift_while_review'] = (bool) $validated['allow_new_shift_while_review'];
         }
 
         $current['sales'] = $sales;

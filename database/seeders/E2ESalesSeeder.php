@@ -12,10 +12,12 @@ use App\Models\PaymentCardType;
 use App\Models\Product\Discount;
 use App\Models\Product\Product;
 use App\Models\ProductInventory;
+use App\Models\RegisterShift;
 use App\Models\Sale;
 use App\Models\TimeEntry;
 use App\Models\User;
 use App\Models\UserPin;
+use App\Models\WalletCashReconciliation;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -53,6 +55,7 @@ class E2ESalesSeeder extends Seeder
             $this->seedDiscounts();
             $this->seedPins();
             $this->clearPendingCarts($cashiers);
+            $this->openTodaysShifts($location, [...$cashiers, 'admin@jollibee-corp.com', 'manager@jollibee-corp.com', 'cashier1@jollibee-corp.com']);
         });
 
         $this->writeFixtureIds();
@@ -91,6 +94,28 @@ class E2ESalesSeeder extends Seeder
 
         $path = env('E2E_FIXTURES_FILE', base_path('tests/e2e/.fixtures.json'));
         file_put_contents($path, json_encode($fixtures, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    }
+
+    /**
+     * Taking payment needs the store's day open and the cashier's own shift: every account the
+     * Sales suite sells as gets one open today.
+     *
+     * @param  list<string>  $emails
+     */
+    private function openTodaysShifts(InventoryLocation $location, array $emails): void
+    {
+        $today = now()->toDateString();
+        WalletCashReconciliation::query()->updateOrCreate(
+            ['domain' => self::DOMAIN, 'location_id' => $location->id, 'business_date' => $today],
+            ['is_closed' => false, 'closed_at' => null, 'closed_by' => null],
+        );
+
+        foreach (User::whereIn('email', $emails)->pluck('id') as $userId) {
+            RegisterShift::query()->firstOrCreate(
+                ['domain' => self::DOMAIN, 'location_id' => $location->id, 'user_id' => $userId, 'status' => RegisterShift::OPEN],
+                ['business_date' => $today, 'opening_cash' => 0, 'opened_at' => now()],
+            );
+        }
     }
 
     /** One cashier per Playwright worker: each user has their own pending cart. */

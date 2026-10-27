@@ -14,6 +14,7 @@ use App\Models\WalletCashCountSubmission;
 use App\Models\WalletCashMovement;
 use App\Models\WalletCashOpeningAudit;
 use App\Models\WalletCashReconciliation;
+use App\Models\WalletShiftReopenLog;
 use App\Support\Wallet\WalletCashBridgeExpected;
 use App\Support\Wallet\WalletLedgerViewData;
 use Carbon\Carbon;
@@ -615,10 +616,17 @@ class WalletCashControlTest extends TestCase
                 ->where('cashControl.counted_at', null)
             );
 
-        // Someone other than the closer can reopen it, without giving a reason, and it is logged.
+        // A reopen needs a reason.
         $this->actingAs($otherUser)->post($reopenUrl, [
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
+        ])->assertSessionHasErrors('reason');
+
+        // Someone other than the closer can reopen it with one, and it is logged with what the day showed.
+        $this->actingAs($otherUser)->post($reopenUrl, [
+            'location_id' => $ctx['location']->id,
+            'business_date' => $date,
+            'reason' => 'Counted wrong',
         ])->assertRedirect()->assertSessionHasNoErrors();
 
         $this->assertDatabaseHas('wallet_cash_reconciliations', [
@@ -633,8 +641,9 @@ class WalletCashControlTest extends TestCase
             'location_id' => $ctx['location']->id,
             'reopened_by' => $otherUser->id,
             'closed_by' => $ctx['user']->id,
-            'reason' => null,
+            'reason' => 'Counted wrong',
         ]);
+        $this->assertNotNull(WalletShiftReopenLog::query()->latest('id')->value('before'));
     }
 
     public function test_end_shift_save_as_opening_cash_updates_opening_and_audits(): void

@@ -19,6 +19,7 @@ use App\Models\OfflineSaleSync;
 use App\Models\PaymentCardType;
 use App\Models\Product\Discount;
 use App\Models\Product\Product;
+use App\Models\RegisterShift;
 use App\Models\Sale;
 use App\Models\User;
 use App\Models\WalletCashReconciliation;
@@ -30,6 +31,7 @@ use App\Services\SaleService;
 use App\Services\TabService;
 use App\Services\Wallet\SalePaymentWalletPosting;
 use App\Support\Quantity;
+use App\Support\RoutePermission;
 use App\Support\Wallet\WalletShiftGuard;
 use App\Traits\LocationCategoryScoping;
 use Carbon\Carbon;
@@ -87,7 +89,7 @@ class SaleController extends Controller
             'categories' => $location
                 ? $this->getCategoriesForLocation($domain->name_slug, $location)->get()
                 : Category::where('domain', $domain->name_slug)->get(),
-            'shiftStatus' => $location ? $this->shiftStatus($request, $domain->name_slug, (int) $location->id, $businessDate) : null,
+            'shiftStatus' => $location ? $this->shiftStatus($request, $domain, (int) $location->id, $businessDate) : null,
             // Dine-in at this store: the Tables screen and tabs (Tables setup turns it on).
             'dineIn' => [
                 'enabled' => (bool) ($location?->dine_in && $domain->hasFeature('dine_in')),
@@ -109,22 +111,37 @@ class SaleController extends Controller
     }
 
     /**
-     * Whether today's shift is open, and if it was already ended (so the Sales page offers Reopen
-     * instead of a Start that would only be refused).
+     * The cashier's own shift (is_open: theirs is open, so they can take payment), and whether the
+     * store's whole day was ended (is_closed: then a manager reopens it, and no shift can start).
      */
-    private function shiftStatus(Request $request, string $domainSlug, int $locationId, string $businessDate): array
+    private function shiftStatus(Request $request, Domain $domain, int $locationId, string $businessDate): array
     {
+        $domainSlug = $domain->name_slug;
+        $user = $request->user();
         $recon = WalletCashReconciliation::query()
             ->forWalletContext($domainSlug, $locationId)
             ->whereDate('business_date', $businessDate)
             ->first();
         $isClosed = (bool) ($recon?->is_closed);
+        $mine = RegisterShift::openFor($domainSlug, $locationId, (int) $user->id);
+        $inReview = RegisterShift::query()->forWalletContext($domainSlug, $locationId)
+            ->where('user_id', $user->id)->where('status', RegisterShift::NEEDS_REVIEW)
+            ->latest('closed_at')->first();
 
         return [
-            'is_open' => $recon !== null && ! $isClosed,
+            'is_open' => $mine !== null && ! $isClosed,
             'is_closed' => $isClosed,
-            // Anyone whose role holds the reopen permission; the reopen is logged with a reason.
-            'can_reopen' => $isClosed && WalletShiftGuard::canReopen($request->user()),
+            'shift_id' => $mine?->id,
+            'opened_at' => $mine?->opened_at?->toIso8601String(),
+            // Their last shift's count is off and a manager hasn't looked yet.
+            'review_pending_since' => $inReview?->closed_at?->toIso8601String(),
+            'can_start' => ! $isClosed && $mine === null && RoutePermission::allows($user, 'register-shifts.start')
+                && ($inReview === null || $domain->allowsNewShiftWhileReview()),
+            // The first shift of the day suggests the store's opening; later ones start from zero.
+            'suggested_opening' => $recon && ! RegisterShift::query()->forWalletContext($domainSlug, $locationId)->whereDate('business_date', $businessDate)->exists()
+                ? (float) $recon->opening_cash : 0.0,
+            // Reopening the store's ended day: anyone whose role holds the permission; logged with a reason.
+            'can_reopen' => $isClosed && WalletShiftGuard::canReopen($user),
             'closed_by_name' => $isClosed ? $recon->closedBy?->name : null,
             'closed_at' => $isClosed ? $recon->closed_at?->toIso8601String() : null,
             'business_date' => $businessDate,
@@ -356,11 +373,12 @@ class SaleController extends Controller
             ]);
         }
 
+        $registerShift = null;
         if ($location) {
-            // Today's sales need today's shift open; an earlier day only must not be closed.
+            // Today's sales need the cashier's own shift open; an earlier day only must not be closed.
             $backDated
                 ? WalletShiftGuard::ensureDateNotClosed($domain->name_slug, (int) $location->id, $saleDay, 'transaction_date')
-                : WalletShiftGuard::ensureShiftOpenForSale($domain->name_slug, (int) $location->id, $saleDay);
+                : $registerShift = WalletShiftGuard::ensureShiftOpenForSale($domain->name_slug, (int) $location->id, $saleDay, $request->user());
         }
         $transactionDate = $backDated ? Carbon::parse($saleDay)->setTimeFrom(now()) : null;
 
@@ -397,6 +415,7 @@ class SaleController extends Controller
                 $location,
                 $redemptionService,
                 $transactionDate,
+                $registerShift,
             ) {
                 $sale->refresh();
 
@@ -441,7 +460,10 @@ class SaleController extends Controller
                     ? $this->settleSplitPayments($validated['payments'], (float) $sale->fresh()->grand_total)
                     : [];
 
-                // 1. Complete sale and process inventory
+                // 1. Complete sale and process inventory; the payment belongs to this cashier's shift.
+                if ($registerShift) {
+                    $sale->update(['register_shift_id' => $registerShift->id]);
+                }
                 $sale->refresh();
                 $this->saleService->completeSale($sale, auth()->user(), transactionDate: $transactionDate);
 
@@ -1643,6 +1665,8 @@ class SaleController extends Controller
 
                 $sale = Sale::query()->create([
                     'user_id' => $cashier->id,
+                    // Rung up offline: it counts toward the cashier's shift if one is open now.
+                    'register_shift_id' => RegisterShift::openFor($domain->name_slug, (int) $location->id, (int) $cashier->id)?->id,
                     'location_id' => $location->id,
                     'domain' => $domain->name_slug,
                     'payment_status' => 'pending',

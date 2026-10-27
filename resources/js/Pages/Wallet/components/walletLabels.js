@@ -59,3 +59,11 @@ export function shortOver(variance) {
 }
 
 export const TONE_CLASSES = { ok: "text-green-700", short: "text-red-700", over: "text-amber-700" };
+
+/** A cashier's shift: open, ended (count matched), waiting for a manager, or approved. */
+export const SHIFT_STATUS = {
+    open: { label: "Open", color: "green" },
+    closed: { label: "Ended", color: "blue" },
+    needs_review: { label: "Needs review", color: "orange" },
+    approved: { label: "Approved", color: "default" },
+};
