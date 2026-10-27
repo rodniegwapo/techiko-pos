@@ -574,7 +574,7 @@ class WalletCashControlTest extends TestCase
             'business_date' => $date,
             'is_closed' => 1,
             'closed_by' => $ctx['user']->id,
-            'counted_cash' => 0.00,
+            'counted_cash' => null,
             'counted_by' => null,
             'notes' => null,
         ]);
@@ -674,7 +674,7 @@ class WalletCashControlTest extends TestCase
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
             'opening_cash' => 180.00,
-            'counted_cash' => 0.00,
+            'counted_cash' => null,
             'counted_by' => null,
             'counted_at' => null,
             'notes' => null,
@@ -738,7 +738,7 @@ class WalletCashControlTest extends TestCase
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
             'opening_cash' => 200.00,
-            'counted_cash' => 0.00,
+            'counted_cash' => null,
             'counted_by' => null,
             'counted_at' => null,
             'is_closed' => 1,
@@ -843,6 +843,64 @@ class WalletCashControlTest extends TestCase
             );
 
         Carbon::setTestNow();
+    }
+
+    public function test_a_reopened_day_keeps_earlier_count_differences_and_needs_a_new_count(): void
+    {
+        $ctx = $this->seedContext();
+        $date = now()->subDays(2)->toDateString();
+        $body = fn (array $more = []) => ['location_id' => $ctx['location']->id, 'business_date' => $date, ...$more];
+        $route = fn (string $name) => route('domains.wallet-cash-ledger.'.$name, ['domain' => $ctx['domain']->name_slug]);
+        $differenceLines = fn () => WalletCashMovement::query()->where('location_id', $ctx['location']->id)
+            ->where('notes', 'AUTO_CC_COUNTED_VARIANCE')->pluck('amount')->all();
+
+        WalletCashReconciliation::query()->create([
+            'domain' => $ctx['domain']->name_slug, 'location_id' => $ctx['location']->id, 'business_date' => $date, 'opening_cash' => 500,
+        ]);
+
+        // ₱10 short, and the ₱490 taken out.
+        Carbon::setTestNow(now()->setTime(18, 0));
+        $this->actingAs($ctx['user'])->post($route('counted-cash.store'), $body(['counted_cash' => 490]))->assertSessionHasNoErrors();
+        $this->actingAs($ctx['user'])->post($route('end-shift'), $body(['end_shift_action' => 'cashout_now']))->assertSessionHasNoErrors();
+        $this->assertEquals([10.0], $differenceLines());
+
+        Carbon::setTestNow(now()->addMinutes(5));
+        $this->actingAs($ctx['user'])->post($route('reopen-shift'), $body(['reason' => 'One more sale']))->assertSessionHasNoErrors();
+        $this->assertEquals(490, WalletShiftReopenLog::query()->latest('id')->value('before')['cashed_out']);
+
+        // Ending it again needs a new count: the old one was for the cash already taken out.
+        $this->actingAs($ctx['user'])->post($route('end-shift'), $body(['end_shift_action' => 'save_as_opening_cash']))
+            ->assertSessionHasErrors('counted_cash');
+
+        // Counting the reopened day (₱5 over) doesn't wipe the first round's ₱10 short.
+        Carbon::setTestNow(now()->addMinutes(5));
+        $this->actingAs($ctx['user'])->post($route('counted-cash.store'), $body(['counted_cash' => 5]))->assertSessionHasNoErrors();
+        $this->assertEqualsCanonicalizing([10.0, 5.0], $differenceLines());
+        // A recount in the same round still replaces its own difference.
+        $this->actingAs($ctx['user'])->post($route('counted-cash.store'), $body(['counted_cash' => 0]))->assertSessionHasNoErrors();
+        $this->assertEquals([10.0], $differenceLines());
+
+        Carbon::setTestNow();
+    }
+
+    public function test_the_next_day_starts_from_the_float_left_when_the_day_ended(): void
+    {
+        $ctx = $this->seedContext();
+        $date = now()->subDays(3)->toDateString();
+        WalletCashReconciliation::query()->create([
+            'domain' => $ctx['domain']->name_slug, 'location_id' => $ctx['location']->id, 'business_date' => $date,
+            'opening_cash' => 120, 'counted_cash' => 275, 'counted_by' => $ctx['user']->id, 'counted_at' => now(),
+        ]);
+
+        $this->actingAs($ctx['user'])->post(route('domains.wallet-cash-ledger.end-shift', ['domain' => $ctx['domain']->name_slug]), [
+            'location_id' => $ctx['location']->id, 'business_date' => $date, 'end_shift_action' => 'save_as_opening_cash',
+        ])->assertSessionHasNoErrors();
+
+        $this->actingAs($ctx['user'])->get(route('domains.wallet.drawer', [
+            'domain' => $ctx['domain']->name_slug, 'location_id' => $ctx['location']->id, 'business_date' => now()->subDays(2)->toDateString(),
+        ]))->assertOk()->assertInertia(fn (Inertia $page) => $page
+            ->where('cashControl.opening_suggestion', 275)
+            ->where('cashControl.bridge_anchor_counted_cash', 275));
     }
 
     public function test_end_shift_cashout_requires_positive_counted_cash(): void

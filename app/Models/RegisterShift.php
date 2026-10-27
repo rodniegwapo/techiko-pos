@@ -57,6 +57,14 @@ class RegisterShift extends Model
             ->where('user_id', $userId)->open()->latest('id')->first();
     }
 
+    /** The user's open shift, only if it belongs to this business day: an earlier day's shift takes no new money. */
+    public static function openOn(string $domainSlug, int $locationId, int $userId, string $dateYmd): ?self
+    {
+        $shift = static::openFor($domainSlug, $locationId, $userId);
+
+        return $shift?->business_date?->toDateString() === $dateYmd ? $shift : null;
+    }
+
     public function isOpen(): bool
     {
         return $this->status === self::OPEN;

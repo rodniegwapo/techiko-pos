@@ -66,21 +66,36 @@ class RegisterShiftService
         if (WalletShiftGuard::isClosed($domain->name_slug, (int) $location->id, $today)) {
             throw ValidationException::withMessages(['shift' => 'The store\'s day was ended. A manager reopens it before new shifts start.']);
         }
-        if (RegisterShift::openFor($domain->name_slug, (int) $location->id, (int) $user->id)) {
-            throw ValidationException::withMessages(['shift' => 'You already have a shift open at this store.']);
+        if ($open = RegisterShift::openFor($domain->name_slug, (int) $location->id, (int) $user->id)) {
+            throw ValidationException::withMessages(['shift' => $open->business_date->toDateString() === $today
+                ? 'You already have a shift open at this store.'
+                : 'Your shift from '.$open->business_date->format('M j').' is still open. End it first.']);
         }
         if (! $domain->allowsNewShiftWhileReview() && $this->hasShiftInReview($domain->name_slug, (int) $location->id, (int) $user->id)) {
             throw ValidationException::withMessages(['shift' => 'Your last shift is waiting for a manager to review its count.']);
         }
 
         return DB::transaction(function () use ($domain, $location, $user, $openingCash, $note, $today) {
-            // The first shift of the day opens the store's day with the cash it starts with.
-            $storeDayExists = WalletCashReconciliation::query()
+            $storeDay = WalletCashReconciliation::query()
                 ->forWalletContext($domain->name_slug, (int) $location->id)
                 ->whereDate('business_date', $today)
-                ->exists();
-            if (! $storeDayExists) {
+                ->first();
+            $todaysShifts = RegisterShift::query()->forWalletContext($domain->name_slug, (int) $location->id)
+                ->whereDate('business_date', $today);
+
+            if (! $storeDay) {
+                // The first shift of the day opens the store's day with the cash it starts with.
                 WalletOpeningCash::save($domain->name_slug, $location, $today, $openingCash, (int) $user->id, $note ?: 'Opened by '.$user->name.'\'s shift');
+            } elseif ($openingCash > 0 && (clone $todaysShifts)->exists() && ! (clone $todaysShifts)->where('user_id', $user->id)->exists()) {
+                // Each cashier has their own drawer: another person's opening is more cash at the store.
+                // (The day's first shift takes its float from the store's opening; a person's next
+                // shift reuses the drawer already counted in.)
+                WalletOpeningCash::save(
+                    $domain->name_slug, $location, $today,
+                    round((float) $storeDay->opening_cash + $openingCash, 2),
+                    (int) $user->id,
+                    'Added '.$user->name.'\'s opening (₱'.number_format($openingCash, 2).')',
+                );
             }
 
             return RegisterShift::query()->create([
@@ -171,6 +186,10 @@ class RegisterShiftService
         }
         if ($shift->status === RegisterShift::APPROVED) {
             throw ValidationException::withMessages(['shift' => 'A manager already approved this shift\'s count; record a correction in Cash in & out instead.']);
+        }
+        // Reopened, an earlier day's shift would take today's sales into that day's drawer.
+        if ($shift->business_date->toDateString() < now()->toDateString()) {
+            throw ValidationException::withMessages(['shift' => 'Only today\'s shifts can be reopened. Record a correction in Cash in & out for an earlier day.']);
         }
         if (RegisterShift::openFor($shift->domain, (int) $shift->location_id, (int) $shift->user_id)) {
             throw ValidationException::withMessages(['shift' => 'End the shift that is open now before reopening this one.']);

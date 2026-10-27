@@ -47,9 +47,17 @@ class WalletShiftGuard
             ]);
         }
 
-        return RegisterShift::openFor($domainSlug, $locationId, (int) $user->id)
+        $shift = RegisterShift::openFor($domainSlug, $locationId, (int) $user->id)
             ?? throw ValidationException::withMessages([
                 $field => 'You have no shift open at this store. Start your shift before taking payment.',
             ]);
+        // A shift left open from an earlier day would take today's money into that day's drawer.
+        if ($shift->business_date->toDateString() !== $dateYmd) {
+            throw ValidationException::withMessages([
+                $field => 'Your shift from '.$shift->business_date->format('M j').' is still open. End it before taking payment.',
+            ]);
+        }
+
+        return $shift;
     }
 }

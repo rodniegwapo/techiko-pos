@@ -19,6 +19,8 @@ personal_token.pub
 .env.testing
 /tests/e2e/test-results/
 /tests/e2e/playwright-report/
+/tests/e2e/walkthrough/results/
+/tests/e2e/walkthrough/videos/
 /tests/e2e/findings-report.md
 /tests/e2e/.fixtures.json
 /blob-report/
