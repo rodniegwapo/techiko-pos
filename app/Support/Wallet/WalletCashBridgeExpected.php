@@ -65,7 +65,7 @@ final class WalletCashBridgeExpected
         $anchor = WalletCashReconciliation::query()
             ->forWalletContext($domainSlug, $locationId)
             ->whereDate('business_date', '<', $businessDate)
-            ->whereNotNull('counted_cash')
+            ->whereCashKnown()
             ->orderByDesc('business_date')
             ->first();
 
@@ -83,7 +83,7 @@ final class WalletCashBridgeExpected
         $anchorDate = $anchor->business_date instanceof Carbon
             ? $anchor->business_date->toDateString()
             : (string) $anchor->business_date;
-        $anchorCounted = round((float) $anchor->counted_cash, 2);
+        $anchorCounted = $anchor->cashLeft();
 
         $rangeStart = Carbon::parse($anchorDate)->addDay()->toDateString();
         $rangeEnd = $businessDate;

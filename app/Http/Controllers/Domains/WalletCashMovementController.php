@@ -316,10 +316,13 @@ class WalletCashMovementController extends Controller
             ]
         );
 
+        // A recount replaces this round's count difference. A day ended and reopened keeps the
+        // differences of its earlier rounds: that money was short or over before the cash moved on.
         WalletCashMovement::query()
             ->forWalletContext($domain->name_slug, $location->id)
             ->whereDate('movement_date', $validated['business_date'])
             ->where('notes', self::AUTO_COUNTED_VARIANCE_LEDGER_NOTE)
+            ->when($recon->opening_basis_at, fn ($q, $basis) => $q->where('created_at', '>', $basis))
             ->delete();
 
         $dailyExpected = WalletCashDailyExpected::compute(
@@ -411,7 +414,8 @@ class WalletCashMovementController extends Controller
             $recon->opening_source = 'manual';
             $recon->opening_source_date = null;
             $recon->opening_basis_at = now();
-            $recon->counted_cash = 0;
+            // No count until someone counts again: a reopened day can't be ended on the old one.
+            $recon->counted_cash = null;
             $recon->counted_by = null;
             $recon->counted_at = null;
             $recon->notes = null;
@@ -436,7 +440,7 @@ class WalletCashMovementController extends Controller
             $recon->opening_source = 'manual';
             $recon->opening_source_date = null;
             $recon->opening_basis_at = now();
-            $recon->counted_cash = 0;
+            $recon->counted_cash = null;
             $recon->counted_by = null;
             $recon->counted_at = null;
             $recon->notes = null;
@@ -500,6 +504,12 @@ class WalletCashMovementController extends Controller
                 'before' => [
                     'opening_cash' => (float) $recon->opening_cash,
                     'counted_cash' => $recon->counted_cash !== null ? (float) $recon->counted_cash : null,
+                    // Cash taken out of the drawer when the day was ended (so far, every round).
+                    'cashed_out' => round((float) WalletCashMovement::query()
+                        ->forWalletContext($domain->name_slug, $location->id)
+                        ->whereDate('movement_date', $validated['business_date'])
+                        ->where('notes', self::AUTO_ENDSHIFT_CASHOUT_LEDGER_NOTE)
+                        ->sum('amount'), 2),
                 ],
             ]);
 

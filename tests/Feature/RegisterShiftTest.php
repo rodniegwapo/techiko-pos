@@ -15,6 +15,7 @@ use App\Models\Sale;
 use App\Models\User;
 use App\Models\WalletCashCountSubmission;
 use App\Models\WalletCashMovement;
+use App\Models\WalletCashReconciliation;
 use App\Models\WalletShiftReopenLog;
 use Database\Seeders\ProductSoldTypeSeeder;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
@@ -214,6 +215,49 @@ class RegisterShiftTest extends TestCase
         // Ending it again adds a count; the first one stays.
         $this->end($ana, $shift, 500)->assertSessionHasNoErrors();
         $this->assertSame([480.0, 500.0], WalletCashCountSubmission::query()->orderBy('id')->pluck('counted_cash')->all());
+        $this->assertSame(RegisterShift::CLOSED, $shift->fresh()->status);
+    }
+
+    public function test_each_persons_opening_is_cash_at_the_store(): void
+    {
+        $ana = $this->user('cashier', 4);
+        $ben = $this->user('cashier', 4);
+        $storeOpening = fn () => (float) WalletCashReconciliation::query()->where('location_id', $this->store->id)->sole()->opening_cash;
+
+        // The first shift opens the store's day with its cash; Ben's own drawer adds his.
+        $this->start($ana, 1000)->assertSessionHasNoErrors();
+        $this->assertEquals(1000, $storeOpening());
+        $this->start($ben, 500)->assertSessionHasNoErrors();
+        $this->assertEquals(1500, $storeOpening());
+        $this->assertDatabaseHas('wallet_cash_opening_audits', ['new_opening_cash' => 1500, 'reason' => 'Added '.$ben->name.'\'s opening (₱500.00)']);
+
+        // Ana's next shift reuses her drawer, already counted in.
+        $this->end($ana, $this->shiftOf($ana), 1000);
+        $this->start($ana, 1000)->assertSessionHasNoErrors();
+        $this->assertEquals(1500, $storeOpening());
+    }
+
+    public function test_a_shift_from_an_earlier_day_takes_no_new_money(): void
+    {
+        $ana = $this->user('cashier', 4);
+        $this->start($ana, 100);
+        $shift = $this->shiftOf($ana);
+        // Left open last night.
+        $shift->update(['business_date' => today()->subDay()->toDateString(), 'opened_at' => now()->subDay()]);
+
+        [, $refused] = $this->sell($ana, 1);
+        $refused->assertStatus(422)->assertJsonValidationErrors('shift');
+        $this->start($ana, 0)->assertSessionHasErrors('shift');
+        $line = WalletCashMovement::query()->create([
+            'domain' => $this->domain->name_slug, 'location_id' => $this->store->id, 'direction' => 'in', 'amount' => 25,
+            'kind' => 'adjustment', 'movement_date' => today()->toDateString(), 'user_id' => $ana->id,
+        ]);
+        $this->assertNull($line->register_shift_id);
+
+        // Once ended, it isn't reopened: today's sales would land in yesterday's drawer.
+        $this->end($ana, $shift, 100)->assertSessionHasNoErrors();
+        $this->actingAs($ana)->post($this->url('register-shifts.reopen', ['registerShift' => $shift->id]), ['reason' => 'Forgot a sale'])
+            ->assertSessionHasErrors('shift');
         $this->assertSame(RegisterShift::CLOSED, $shift->fresh()->status);
     }
 

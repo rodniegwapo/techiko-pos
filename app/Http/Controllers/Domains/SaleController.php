@@ -1665,8 +1665,8 @@ class SaleController extends Controller
 
                 $sale = Sale::query()->create([
                     'user_id' => $cashier->id,
-                    // Rung up offline: it counts toward the cashier's shift if one is open now.
-                    'register_shift_id' => RegisterShift::openFor($domain->name_slug, (int) $location->id, (int) $cashier->id)?->id,
+                    // Rung up offline: it counts toward the cashier's shift of that day if it is still open.
+                    'register_shift_id' => RegisterShift::openOn($domain->name_slug, (int) $location->id, (int) $cashier->id, $transactionDate->toDateString())?->id,
                     'location_id' => $location->id,
                     'domain' => $domain->name_slug,
                     'payment_status' => 'pending',

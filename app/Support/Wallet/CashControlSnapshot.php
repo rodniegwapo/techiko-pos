@@ -39,11 +39,11 @@ class CashControlSnapshot
             $prev = WalletCashReconciliation::query()
                 ->forWalletContext($domain->name_slug, $location->id)
                 ->whereDate('business_date', '<', $businessDate)
-                ->whereNotNull('counted_cash')
+                ->whereCashKnown()
                 ->orderByDesc('business_date')
                 ->first();
 
-            $openingSuggestion = $prev ? (float) $prev->counted_cash : null;
+            $openingSuggestion = $prev?->cashLeft();
             $suggestionSourceDate = $prev?->business_date?->toDateString();
             $openingCash = (float) ($openingSuggestion ?? 0);
         }
