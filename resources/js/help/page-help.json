@@ -778,5 +778,14 @@
         "ask": [
             "How do I fix a forgotten clock-out?"
         ]
+    },
+    "DiningTables/Index": {
+        "title": "Tables",
+        "en": "For restaurants: turn dine-in on for a store, add its tables and drag them to where they stand. The Sales page there then gets a Tables button to open tabs by table or name, send orders to the kitchen, and move, merge or split them.",
+        "tl": "Para sa kainan: buksan ang dine-in sa isang store, idagdag ang mga mesa at i-drag sa tamang puwesto. Magkakaroon ang Sales page doon ng Tables button para magbukas ng tab ayon sa mesa o pangalan, magpadala ng order sa kusina, at maglipat, magsama o maghati ng tab.",
+        "guides": [],
+        "ask": [
+            "How do I open a tab for a table?"
+        ]
     }
 }

@@ -14,6 +14,10 @@ class Sale extends Model
 
     protected $guarded = [];
 
+    protected $casts = [
+        'is_tab' => 'boolean',
+    ];
+
     // Remove domain relationship - now using domain string column
     // public function domain()
     // {
@@ -30,6 +34,39 @@ class Sale extends Model
     public function scopePending($query)
     {
         return $query->where('payment_status', 'pending');
+    }
+
+    /** A dine-in tab still running: it belongs to the store, not to one cashier's cart. */
+    public function scopeOpenTabs($query)
+    {
+        return $query->where('is_tab', true)->where('payment_status', 'pending');
+    }
+
+    /** A cashier's own cart (or any sale), not a dine-in tab. */
+    public function scopeNotTab($query)
+    {
+        return $query->where('is_tab', false);
+    }
+
+    public function diningTable()
+    {
+        return $this->belongsTo(DiningTable::class);
+    }
+
+    public function openedBy()
+    {
+        return $this->belongsTo(User::class, 'opened_by');
+    }
+
+    public function kitchenTickets()
+    {
+        return $this->hasMany(KitchenTicket::class)->orderBy('number');
+    }
+
+    /** "T3", "T3 · Ana" or "Ana": how a tab is called on screen and on kitchen tickets. */
+    public function tabLabel(): string
+    {
+        return collect([$this->diningTable?->name, $this->tab_name])->filter()->implode(' · ') ?: 'Tab #'.$this->id;
     }
 
     public function saleItems()

@@ -206,6 +206,22 @@ class PermissionModuleSeeder extends Seeder
                 'is_active' => true,
             ],
             [
+                'name' => 'tabs',
+                'display_name' => 'Dine-in tabs',
+                'icon' => 'armchair',
+                'description' => 'Open tabs by table or name, send orders to the kitchen, move, merge and split them',
+                'sort_order' => 19,
+                'is_active' => true,
+            ],
+            [
+                'name' => 'dining-tables',
+                'display_name' => 'Tables',
+                'icon' => 'layout-grid',
+                'description' => 'Turn dine-in on for a store and set up its tables and floor plan',
+                'sort_order' => 19,
+                'is_active' => true,
+            ],
+            [
                 'name' => 'timesheets',
                 'display_name' => 'Timeclock',
                 'icon' => 'clock',

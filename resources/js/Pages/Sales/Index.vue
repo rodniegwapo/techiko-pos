@@ -62,6 +62,8 @@ import { hasModifiers } from "@/Composables/useProductModifiers";
 import ModifierPickerModal from "./components/ModifierPickerModal.vue";
 import QuantityPromptModal from "./components/QuantityPromptModal.vue";
 import TimeclockButton from "./components/TimeclockButton.vue";
+import TablesScreen from "./components/DineIn/TablesScreen.vue";
+import TabBar from "./components/DineIn/TabBar.vue";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 import { allowsDecimal, toQuantity } from "@/Utils/quantity";
 import StartShiftModal from "./components/StartShiftModal.vue";
@@ -202,6 +204,20 @@ async function refreshPaymentCardTypesCache() {
 const orderId = ref(null);
 const orders = ref([]);
 const currentSale = ref(null);
+
+// Dine-in (stores that serve it): the tables screen, and the open tab the cart is working on.
+// Online only: the offline cart stays one cart per cashier.
+const tablesOpen = ref(false);
+const dineInEnabled = computed(() => !!page.props.dineIn?.enabled && salesCartIsOnline.value);
+const isTab = computed(() => !!currentSale.value?.is_tab);
+// A tab that was paid or cancelled: back to the tables for the next one.
+watch(isTab, (now, before) => {
+    if (before && !now && dineInEnabled.value) tablesOpen.value = true;
+});
+async function onTabLeft() {
+    await loadCurrentPendingSale();
+    if (dineInEnabled.value) tablesOpen.value = true;
+}
 const orderDiscountAmount = ref(0);
 const orderDiscountId = ref("");
 const selectedCustomer = ref(null);
@@ -1623,7 +1639,16 @@ watch(
                 title="Sales"
                 class="shrink-0 md:pr-44"
             >
-                <template v-if="!isMdUp || canPunch" #actions>
+                <template v-if="!isMdUp || canPunch || dineInEnabled" #actions>
+                    <a-button
+                        v-if="dineInEnabled"
+                        size="small"
+                        type="primary"
+                        data-testid="tables-open"
+                        @click="tablesOpen = true"
+                    >
+                        Tables
+                    </a-button>
                     <TimeclockButton v-if="canPunch" :location-id="activeLocationId" />
                     <div v-if="!isMdUp" class="flex items-center gap-2">
                         <span class="text-xs font-medium text-gray-800">
@@ -1653,6 +1678,20 @@ watch(
                     >Customer display</a>
                 </template>
             </ContentHeader>
+
+            <TabBar
+                v-if="isTab && salesCartIsOnline"
+                :sale="currentSale"
+                :orders="orders"
+                class="shrink-0"
+                @changed="loadCurrentPendingSale"
+                @left="onTabLeft"
+            />
+            <TablesScreen
+                v-if="dineInEnabled"
+                v-model:open="tablesOpen"
+                @picked="loadCurrentPendingSale"
+            />
 
             <component :is="salesLayoutComponent" title="Create Transaction">
                 <template v-if="isCoffeeshopLayout" #hero>
@@ -1684,8 +1723,17 @@ watch(
                             class="mt-1 inline-block text-xs text-[var(--cs-muted)] underline"
                             data-testid="customer-display-link"
                         >Customer display</a>
-                        <div v-if="canPunch">
-                            <TimeclockButton variant="coffeeshop" :location-id="activeLocationId" />
+                        <div v-if="canPunch || dineInEnabled" class="flex flex-wrap items-center gap-2">
+                            <button
+                                v-if="dineInEnabled"
+                                type="button"
+                                class="mt-2 inline-flex items-center gap-1 rounded-full bg-[var(--cs-ink,#111827)] px-3 py-1 text-xs font-medium text-white"
+                                data-testid="tables-open"
+                                @click="tablesOpen = true"
+                            >
+                                Tables
+                            </button>
+                            <TimeclockButton v-if="canPunch" variant="coffeeshop" :location-id="activeLocationId" />
                         </div>
                     </div>
                 </template>

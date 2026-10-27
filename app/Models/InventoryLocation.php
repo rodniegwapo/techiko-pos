@@ -21,6 +21,7 @@ class InventoryLocation extends Model
     protected $casts = [
         'is_active' => 'boolean',
         'is_default' => 'boolean',
+        'dine_in' => 'boolean',
     ];
 
     protected $searchable = [

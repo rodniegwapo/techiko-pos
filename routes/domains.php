@@ -7,6 +7,7 @@ use App\Http\Controllers\Domains\CategoryController;
 use App\Http\Controllers\Domains\CreditController;
 use App\Http\Controllers\Domains\CustomerController;
 use App\Http\Controllers\Domains\DashboardController;
+use App\Http\Controllers\Domains\DiningTableController;
 use App\Http\Controllers\Domains\DomainSettingsController;
 use App\Http\Controllers\Domains\ExpenseCategoryController;
 use App\Http\Controllers\Domains\ExpenseController;
@@ -35,6 +36,7 @@ use App\Http\Controllers\Domains\SalesHistoryController;
 use App\Http\Controllers\Domains\SharedCatalogLookupController;
 use App\Http\Controllers\Domains\SubscriptionOnHoldController;
 use App\Http\Controllers\Domains\SubscriptionRenewalController;
+use App\Http\Controllers\Domains\TabController;
 use App\Http\Controllers\Domains\TimeclockController;
 use App\Http\Controllers\Domains\TimesheetController;
 use App\Http\Controllers\Domains\UserController;
@@ -422,6 +424,32 @@ Route::prefix('domains/{domain:name_slug}')
             Route::post('/{purchaseOrder}/order', [PurchaseOrderController::class, 'order'])->whereNumber('purchaseOrder')->name('order');
             Route::post('/{purchaseOrder}/receive', [PurchaseOrderController::class, 'receive'])->whereNumber('purchaseOrder')->name('receive');
             Route::post('/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel'])->whereNumber('purchaseOrder')->name('cancel');
+        });
+
+        // Dine-in: tabs on the POS (by table or name, sent to the kitchen) and the stores' tables
+        Route::middleware('domain.feature:dine_in')->group(function () {
+            Route::middleware('location.sellable')->prefix('tabs')->name('tabs.')->group(function () {
+                Route::get('/', [TabController::class, 'index'])->name('index');
+                Route::post('/', [TabController::class, 'store'])->name('store');
+                Route::post('/leave', [TabController::class, 'leave'])->name('leave');
+                Route::patch('/{tab}', [TabController::class, 'update'])->whereNumber('tab')->name('update');
+                Route::post('/{tab}/select', [TabController::class, 'select'])->whereNumber('tab')->name('select');
+                Route::post('/{tab}/move', [TabController::class, 'move'])->whereNumber('tab')->name('move');
+                Route::post('/{tab}/merge', [TabController::class, 'merge'])->whereNumber('tab')->name('merge');
+                Route::post('/{tab}/split', [TabController::class, 'split'])->whereNumber('tab')->name('split');
+                Route::post('/{tab}/cancel', [TabController::class, 'cancel'])->whereNumber('tab')->name('cancel');
+                Route::post('/{tab}/send', [TabController::class, 'send'])->whereNumber('tab')->name('send');
+                Route::get('/{tab}/tickets', [TabController::class, 'tickets'])->whereNumber('tab')->name('tickets');
+            });
+
+            Route::prefix('dining-tables')->name('dining-tables.')->group(function () {
+                Route::get('/', [DiningTableController::class, 'index'])->name('index');
+                Route::post('/', [DiningTableController::class, 'store'])->name('store');
+                Route::put('/settings', [DiningTableController::class, 'settings'])->name('settings');
+                Route::put('/layout', [DiningTableController::class, 'layout'])->name('layout');
+                Route::put('/{diningTable}', [DiningTableController::class, 'update'])->whereNumber('diningTable')->name('update');
+                Route::delete('/{diningTable}', [DiningTableController::class, 'destroy'])->whereNumber('diningTable')->name('destroy');
+            });
         });
 
         // Timeclock: staff clock in and out on the POS with their own PIN; managers keep the timesheets

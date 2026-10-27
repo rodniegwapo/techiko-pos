@@ -60,11 +60,10 @@ const closedAt = computed(() => {
 const reopenReason = ref("");
 
 function reopen() {
-    if (!reopenReason.value.trim()) return;
     saving.value = true;
     router.post(
         getRoute("wallet-cash-ledger.reopen-shift"),
-        { location_id: locationId.value, business_date: businessDate.value, reason: reopenReason.value.trim() },
+        { location_id: locationId.value, business_date: businessDate.value, reason: reopenReason.value.trim() || null },
         {
             preserveScroll: true,
             preserveState: true,
@@ -125,7 +124,7 @@ async function submit() {
                 Ask a manager or admin to reopen it.
             </p>
             <div v-else class="flex flex-col gap-1">
-                <span class="text-sm text-gray-700">Why are you reopening it?</span>
+                <span class="text-sm text-gray-700">Reason (optional)</span>
                 <a-input
                     v-model:value="reopenReason"
                     placeholder="e.g. counted wrong"
@@ -133,11 +132,11 @@ async function submit() {
                     data-testid="shift-reopen-reason"
                     @press-enter="reopen"
                 />
-                <span v-if="closedByName" class="text-xs text-gray-500">{{ closedByName }} ended this shift. Your name and reason are kept in the log.</span>
+                <span v-if="closedByName" class="text-xs text-gray-500">{{ closedByName }} ended this shift. Your name and the time are kept in the log.</span>
             </div>
             <div class="flex justify-end gap-2 pt-2">
                 <a-button @click="close">Close</a-button>
-                <a-button v-if="canReopen" type="primary" :loading="saving" :disabled="!reopenReason.trim()" data-testid="shift-reopen" @click="reopen">
+                <a-button v-if="canReopen" type="primary" :loading="saving" data-testid="shift-reopen" @click="reopen">
                     Reopen shift
                 </a-button>
             </div>

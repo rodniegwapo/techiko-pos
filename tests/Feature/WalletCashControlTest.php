@@ -6,8 +6,8 @@ use App\Http\Middleware\RoleBasedAccessControl;
 use App\Http\Middleware\UserPermissionCheckMiddleware;
 use App\Models\Domain;
 use App\Models\InventoryLocation;
-use App\Models\Permission;
 use App\Models\PaymentCardType;
+use App\Models\Permission;
 use App\Models\Sale;
 use App\Models\User;
 use App\Models\WalletCashCountSubmission;
@@ -615,19 +615,11 @@ class WalletCashControlTest extends TestCase
                 ->where('cashControl.counted_at', null)
             );
 
-        // A reason is required, and nothing changes without it.
+        // Someone other than the closer can reopen it, without giving a reason, and it is logged.
         $this->actingAs($otherUser)->post($reopenUrl, [
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
-        ])->assertSessionHasErrors('reason');
-        $this->assertDatabaseHas('wallet_cash_reconciliations', ['business_date' => $date, 'is_closed' => 1]);
-
-        // Someone other than the closer can reopen it (the route's permission is the gate), and it is logged.
-        $this->actingAs($otherUser)->post($reopenUrl, [
-            'location_id' => $ctx['location']->id,
-            'business_date' => $date,
-            'reason' => 'Forgot an expense',
-        ])->assertRedirect();
+        ])->assertRedirect()->assertSessionHasNoErrors();
 
         $this->assertDatabaseHas('wallet_cash_reconciliations', [
             'domain' => $ctx['domain']->name_slug,
@@ -641,7 +633,7 @@ class WalletCashControlTest extends TestCase
             'location_id' => $ctx['location']->id,
             'reopened_by' => $otherUser->id,
             'closed_by' => $ctx['user']->id,
-            'reason' => 'Forgot an expense',
+            'reason' => null,
         ]);
     }
 

@@ -17,6 +17,8 @@ class SaleItem extends Model
         'unit_cost' => 'decimal:4',
         // Whole for things sold by the piece; parts for things sold by weight or volume (1.5 kg).
         'quantity' => 'float',
+        // Dine-in: how much of the line is already on a kitchen ticket.
+        'sent_quantity' => 'float',
     ];
 
     protected static function booted()

@@ -21,14 +21,15 @@ use App\Models\Product\Discount;
 use App\Models\Product\Product;
 use App\Models\Sale;
 use App\Models\User;
+use App\Models\WalletCashReconciliation;
 use App\Services\CreditService;
 use App\Services\InventoryService;
 use App\Services\LoyaltyRedemptionService;
 use App\Services\ProductModifierService;
 use App\Services\SaleService;
+use App\Services\TabService;
 use App\Services\Wallet\SalePaymentWalletPosting;
 use App\Support\Quantity;
-use App\Models\WalletCashReconciliation;
 use App\Support\Wallet\WalletShiftGuard;
 use App\Traits\LocationCategoryScoping;
 use Carbon\Carbon;
@@ -87,6 +88,11 @@ class SaleController extends Controller
                 ? $this->getCategoriesForLocation($domain->name_slug, $location)->get()
                 : Category::where('domain', $domain->name_slug)->get(),
             'shiftStatus' => $location ? $this->shiftStatus($request, $domain->name_slug, (int) $location->id, $businessDate) : null,
+            // Dine-in at this store: the Tables screen and tabs (Tables setup turns it on).
+            'dineIn' => [
+                'enabled' => (bool) ($location?->dine_in && $domain->hasFeature('dine_in')),
+                'activeTabId' => $location?->dine_in ? app(TabService::class)->activeTab($domain, $location)?->id : null,
+            ],
             'salesSettings' => [
                 'apply_vat_automatically' => $vat['apply_vat_automatically'],
                 'vat_rate_percent' => $vat['vat_rate_percent'],
@@ -741,6 +747,35 @@ class SaleController extends Controller
         return $user;
     }
 
+    /**
+     * The sale the cart endpoints work on, newest first: the dine-in tab this till has open, or
+     * else the cashier's own cart at their store (never a tab, so a tab someone opened doesn't
+     * turn into their cart).
+     */
+    protected function cartQuery(Domain $domain, $userId)
+    {
+        $query = Sale::forDomain($domain->name_slug)->pending()->orderBy('created_at', 'desc');
+
+        $location = Helpers::getActiveLocation($domain);
+        if ($tab = app(TabService::class)->activeTab($domain, $location)) {
+            return $query->whereKey($tab->id);
+        }
+
+        $query->notTab()->where('user_id', $userId);
+
+        if ($this->worksInSwitchedStore()) {
+            // Not tied to one store: the store picked in the header
+            if ($location) {
+                $query->where('location_id', $location->id);
+            }
+        } else {
+            // Regular users: their assigned store
+            $query->where('location_id', auth()->user()->location_id);
+        }
+
+        return $query;
+    }
+
     public function storeDraft(Request $request, Domain $domain)
     {
         $user = $request->user();
@@ -812,6 +847,8 @@ class SaleController extends Controller
      */
     public function removeItemFromCart(Request $request, Domain $domain, Sale $sale)
     {
+        $this->ensureSaleBelongsToDomain($sale, $domain);
+
         $validated = $request->validate([
             'product_id' => ['required', $this->productInDomainRule($domain)],
             ...self::LINE_TARGET_RULES,
@@ -877,6 +914,8 @@ class SaleController extends Controller
      */
     public function getCartState(Request $request, Domain $domain, Sale $sale)
     {
+        $this->ensureSaleBelongsToDomain($sale, $domain);
+
         $sale->load(['saleItems.product', 'saleItems.modifiers', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount']);
 
         return response()->json([
@@ -1100,28 +1139,9 @@ class SaleController extends Controller
      */
     public function getCurrentPendingSale(Request $request, Domain $domain)
     {
-        $userId = auth()->id();
-        $currentUser = auth()->user();
-
-        $query = Sale::forDomain($domain->name_slug)
-            ->pending()
-            ->where('user_id', $userId)
-            ->orderBy('created_at', 'desc')
-            ->with(['saleItems.product', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount', 'saleItems.discounts']);
-
-        // Apply location-based filtering based on user role
-        if ($this->worksInSwitchedStore()) {
-            // Not tied to one store: the store picked in the header
-            $location = Helpers::getActiveLocation($domain);
-            if ($location) {
-                $query->where('location_id', $location->id);
-            }
-        } else {
-            // Regular users: Filter by their assigned location
-            $query->where('location_id', $currentUser->location_id);
-        }
-
-        $sale = $query->first();
+        $sale = $this->cartQuery($domain, auth()->id())
+            ->with(['saleItems.product', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount', 'saleItems.discounts'])
+            ->first();
 
         // Always return success, even if no sale found
         return response()->json([
@@ -1181,27 +1201,8 @@ class SaleController extends Controller
 
         $user = $this->cartUserInDomain($request, $domain);
 
-        $currentUser = auth()->user();
-
-        $query = Sale::forDomain($domain->name_slug)
-            ->pending()
-            ->where('user_id', $userId)
-            ->orderBy('created_at', 'desc');
-
-        // Apply location-based filtering based on user role
-        if ($this->worksInSwitchedStore()) {
-            // Not tied to one store: the store picked in the header
-            $location = Helpers::getActiveLocation($domain);
-            if ($location) {
-                $query->where('location_id', $location->id);
-            }
-        } else {
-            // Regular users: Filter by their assigned location
-            $query->where('location_id', $currentUser->location_id);
-        }
-
-        // Get or create latest pending sale for this user
-        $sale = $query->first();
+        // Get or create latest pending sale for this user (or the till's open tab)
+        $sale = $this->cartQuery($domain, $userId)->first();
 
         // If no pending sale exists, create one with location
         if (! $sale) {
@@ -1267,29 +1268,9 @@ class SaleController extends Controller
         // Explicitly get the 'user' parameter from the route
         $userId = $request->route('user');
 
-        $currentUser = auth()->user();
-
-        $query = Sale::forDomain($domain->name_slug)
-            ->pending()
-            ->orderBy('created_at', 'desc')
-            ->with(['saleItems.product', 'saleItems.modifiers', 'saleItems.discounts', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount']);
-
-        // Apply location-based filtering based on user role
-        if ($this->worksInSwitchedStore()) {
-            // Not tied to one store: the store picked in the header
-            $location = Helpers::getActiveLocation($domain);
-            if ($location) {
-                $query->where('location_id', $location->id);
-            }
-            // Always scope to target user
-            $query->where('user_id', $userId);
-        } else {
-            // Regular users: Filter by their assigned location and user ID
-            $query->where('location_id', $currentUser->location_id)
-                ->where('user_id', $userId);
-        }
-
-        $sale = $query->first();
+        $sale = $this->cartQuery($domain, $userId)
+            ->with(['saleItems.product', 'saleItems.modifiers', 'saleItems.discounts', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount', 'diningTable:id,name,area'])
+            ->first();
 
         // Get all available discount options
         // Handle NULL start_date - if start_date is NULL, treat as "always active"
@@ -1363,29 +1344,8 @@ class SaleController extends Controller
         // Explicitly get the 'user' parameter from the route
         $userId = $request->route('user');
 
-        $currentUser = auth()->user();
-
-        $query = Sale::forDomain($domain->name_slug)
-            ->pending()
-            ->orderBy('created_at', 'desc');
-
-        // Apply location-based filtering based on user role
-        if ($this->worksInSwitchedStore()) {
-            // Not tied to one store: the store picked in the header
-            $location = Helpers::getActiveLocation($domain);
-            if ($location) {
-                $query->where('location_id', $location->id);
-            }
-            // Always scope to target user
-            $query->where('user_id', $userId);
-        } else {
-            // Regular users: Filter by their assigned location and user ID
-            $query->where('location_id', $currentUser->location_id)
-                ->where('user_id', $userId);
-        }
-
-        // Get user's latest pending sale
-        $sale = $query->first();
+        // Get user's latest pending sale (or the till's open tab)
+        $sale = $this->cartQuery($domain, $userId)->first();
 
         if (! $sale) {
             return response()->json(['success' => false, 'message' => 'No pending sale found'], 404);
@@ -1429,29 +1389,8 @@ class SaleController extends Controller
         // Explicitly get the 'user' parameter from the route
         $userId = $request->route('user');
 
-        $currentUser = auth()->user();
-
-        $query = Sale::forDomain($domain->name_slug)
-            ->pending()
-            ->orderBy('created_at', 'desc');
-
-        // Apply location-based filtering based on user role (same as updateUserCartQuantity)
-        if ($this->worksInSwitchedStore()) {
-            // Not tied to one store: the store picked in the header
-            $location = Helpers::getActiveLocation($domain);
-            if ($location) {
-                $query->where('location_id', $location->id);
-            }
-            // Always scope to target user, or this would edit whichever pending sale is newest
-            $query->where('user_id', $userId);
-        } else {
-            // Regular users: Filter by their assigned location and user ID
-            $query->where('location_id', $currentUser->location_id)
-                ->where('user_id', $userId);
-        }
-
-        // Get user's latest pending sale
-        $sale = $query->first();
+        // Get user's latest pending sale (or the till's open tab)
+        $sale = $this->cartQuery($domain, $userId)->first();
 
         if (! $sale) {
             return response()->json(['success' => false, 'message' => 'No pending sale found'], 404);
@@ -1483,27 +1422,10 @@ class SaleController extends Controller
     {
         // Explicitly get the 'user' parameter from the route
         $userId = $request->route('user');
-        $currentUser = auth()->user();
 
-        $query = Sale::forDomain($domain->name_slug)
-            ->pending()
-            ->where('user_id', $userId)
-            ->orderBy('created_at', 'desc')
-            ->with(['saleItems.product', 'saleItems.modifiers', 'saleItems.discounts', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount']);
-
-        // Apply location-based filtering based on user role
-        if ($this->worksInSwitchedStore()) {
-            // Not tied to one store: the store picked in the header
-            $location = Helpers::getActiveLocation($domain);
-            if ($location) {
-                $query->where('location_id', $location->id);
-            }
-        } else {
-            // Regular users: Filter by their assigned location
-            $query->where('location_id', $currentUser->location_id);
-        }
-
-        $sale = $query->first();
+        $sale = $this->cartQuery($domain, $userId)
+            ->with(['saleItems.product', 'saleItems.modifiers', 'saleItems.discounts', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount'])
+            ->first();
 
         if (! $sale) {
             return response()->json([

@@ -13,9 +13,9 @@ class ServiceTierSeeder extends Seeder
             ['slug' => 'basic', 'name' => 'Basic servicing', 'amount' => '499.00', 'sort_order' => 10, 'max_products' => null, 'max_users' => 5, 'ai_monthly_credits' => 500,
                 'features' => ['sales_history_unlimited']],
             ['slug' => 'standard', 'name' => 'Standard servicing', 'amount' => '999.00', 'sort_order' => 20, 'max_products' => null, 'max_users' => null, 'ai_monthly_credits' => 1000,
-                'features' => ['sales_history_unlimited', 'multi_location', 'advanced_inventory', 'expenses']],
+                'features' => ['sales_history_unlimited', 'multi_location', 'advanced_inventory', 'expenses', 'dine_in']],
             ['slug' => 'premium', 'name' => 'Premium servicing', 'amount' => '1999.00', 'sort_order' => 30, 'max_products' => null, 'max_users' => null, 'ai_monthly_credits' => 2000,
-                'features' => ['sales_history_unlimited', 'multi_location', 'advanced_inventory', 'expenses', 'finance']],
+                'features' => ['sales_history_unlimited', 'multi_location', 'advanced_inventory', 'expenses', 'finance', 'dine_in']],
         ];
 
         foreach ($tiers as $tier) {

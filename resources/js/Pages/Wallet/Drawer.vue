@@ -72,7 +72,6 @@ async function endShift(payload) {
 
 const reopenReason = ref("");
 async function reopen() {
-    if (!reopenReason.value.trim()) return;
     if (await actions.reopenShift(reopenReason.value.trim())) {
         modal.value = null;
         reopenReason.value = "";
@@ -169,7 +168,7 @@ async function reopen() {
                     <span v-else class="text-xs text-gray-500">Ask a manager or admin to reopen this shift.</span>
                 </div>
                 <p v-if="cashControl.last_reopen" class="mb-0 mt-3 text-xs text-gray-600" data-testid="last-reopen">
-                    Reopened by {{ cashControl.last_reopen.by }} at {{ dayjs(cashControl.last_reopen.at).format("h:mm A") }}: {{ cashControl.last_reopen.reason }}
+                    Reopened by {{ cashControl.last_reopen.by }} at {{ dayjs(cashControl.last_reopen.at).format("h:mm A") }}<template v-if="cashControl.last_reopen.reason">: {{ cashControl.last_reopen.reason }}</template>
                 </p>
                 <p v-if="canSeeCountResult" class="mb-0 mt-3 text-xs text-gray-500">
                     Counts, opening changes and past shifts are in
@@ -182,18 +181,18 @@ async function reopen() {
             :visible="modal === 'reopen'"
             title="Reopen this shift"
             ok-text="Reopen shift"
-            :ok-button-props="{ disabled: !reopenReason.trim(), 'data-testid': 'reopen-confirm' }"
+            :ok-button-props="{ 'data-testid': 'reopen-confirm' }"
             :confirm-loading="actions.busy.value === 'reopen'"
             @ok="reopen"
             @cancel="modal = null"
         >
             <p class="text-sm text-gray-600">
                 <template v-if="cashControl.closed_by_name">{{ cashControl.closed_by_name }} ended this shift. </template>
-                Reopening lets payments, counts and changes happen again. Your name and reason are kept in the log.
+                Reopening lets payments, counts and changes happen again. Your name and the time are kept in the log.
             </p>
             <a-input
                 v-model:value="reopenReason"
-                placeholder="Why are you reopening it? e.g. counted wrong"
+                placeholder="Reason (optional), e.g. counted wrong"
                 :maxlength="255"
                 data-testid="reopen-reason"
                 @press-enter="reopen"

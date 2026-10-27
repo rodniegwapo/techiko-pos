@@ -25,6 +25,7 @@ import {
     IconSparkles,
     IconTruck,
     IconClock,
+    IconArmchair,
 } from "@tabler/icons-vue";
 import { router, usePage } from "@inertiajs/vue3";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
@@ -416,6 +417,18 @@ const menuItems = [
         domainOnly: true,
         hideForSuperOutsideDomain: true,
         keywords: "timeclock clock in out hours attendance payroll",
+    },
+    {
+        key: "dining-tables",
+        title: "Tables",
+        icon: IconArmchair,
+        routeName: "dining-tables.index",
+        path: "/dining-tables",
+        section: "team",
+        domainOnly: true,
+        hideForSuperOutsideDomain: true,
+        feature: "dine_in",
+        keywords: "dine-in restaurant tables floor plan tabs kitchen",
     },
     {
         key: "roles",

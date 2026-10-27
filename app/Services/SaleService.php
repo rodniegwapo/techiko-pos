@@ -11,6 +11,7 @@ use App\Models\InventoryMovement;
 use App\Models\Product\Discount;
 use App\Models\ProductInventory;
 use App\Models\Sale;
+use App\Models\SaleItem;
 use App\Models\StockAdjustment;
 use App\Models\User;
 use App\Models\UserPin;
@@ -466,7 +467,14 @@ class SaleService
             return;
         }
 
-        $aggregated = $sale->saleItems()->get()
+        // Open dine-in tabs at the store have their food on its way already: what they hold
+        // counts against the stock too, so the last portion can't be sold twice.
+        $otherTabs = SaleItem::query()
+            ->whereHas('sale', fn ($q) => $q->openTabs()->where('location_id', $location->id)->whereKeyNot($sale->id))
+            ->whereIn('product_id', $sale->saleItems()->pluck('product_id'))
+            ->get();
+
+        $aggregated = $sale->saleItems()->get()->concat($otherTabs)
             ->groupBy('product_id')
             ->map(fn ($rows) => [
                 'product_id' => (int) $rows->first()->product_id,

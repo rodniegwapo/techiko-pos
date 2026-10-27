@@ -4,11 +4,13 @@ namespace Tests\Feature;
 
 use App\Models\Permission;
 use Database\Seeders\AssistantPermissionSeeder;
+use Database\Seeders\DineInPermissionSeeder;
 use Database\Seeders\FinancePermissionSeeder;
 use Database\Seeders\ProductModifierPermissionSeeder;
 use Database\Seeders\PurchasingPermissionSeeder;
 use Database\Seeders\SalesHistoryPermissionSeeder;
 use Database\Seeders\SalesImportPermissionSeeder;
+use Database\Seeders\ShiftReopenPermissionSeeder;
 use Database\Seeders\TimeclockPermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -125,6 +127,21 @@ class FeaturePermissionSeedersTest extends TestCase
             count(SalesHistoryPermissionSeeder::ROUTES) + count(ProductModifierPermissionSeeder::ROUTES),
             Permission::query()->whereIn('route_name', [...SalesHistoryPermissionSeeder::ROUTES, ...ProductModifierPermissionSeeder::ROUTES])->count(),
         );
+    }
+
+    public function test_everyone_on_the_till_can_reopen_a_shift(): void
+    {
+        $cashier = $this->role('cashier');
+        $supervisor = $this->role('supervisor');
+        $manager = $this->role('manager');
+
+        $this->seed(ShiftReopenPermissionSeeder::class);
+        $this->seed(ShiftReopenPermissionSeeder::class);
+
+        foreach ([$cashier, $supervisor, $manager] as $role) {
+            $this->assertContains('wallet-cash-ledger.reopen-shift', $this->routesOf($role));
+        }
+        $this->assertSame(1, Permission::query()->where('route_name', 'wallet-cash-ledger.reopen-shift')->count());
     }
 
     public function test_the_sales_import_seeder_covers_every_sales_import_route(): void
@@ -268,5 +285,23 @@ class FeaturePermissionSeedersTest extends TestCase
         $this->assertSame(['timesheets.punch'], $this->routesOf($cashier));
         $this->assertSame(['timesheets.punch'], $this->routesOf($supervisor));
         $this->assertSame(count(TimeclockPermissionSeeder::ROUTES), Permission::query()->whereIn('route_name', TimeclockPermissionSeeder::ROUTES)->count());
+    }
+
+    public function test_the_dine_in_seeder_covers_every_route_and_gives_the_till_staff_only_the_tabs(): void
+    {
+        $this->assertSame($this->routesBehind('dine_in'), $this->sorted([...DineInPermissionSeeder::TAB_ROUTES, ...DineInPermissionSeeder::TABLE_ROUTES]));
+
+        $manager = $this->role('manager');
+        $cashier = $this->role('cashier');
+
+        $this->seed(DineInPermissionSeeder::class);
+        $this->seed(DineInPermissionSeeder::class);
+
+        $this->assertSame($this->sorted([...DineInPermissionSeeder::TAB_ROUTES, ...DineInPermissionSeeder::TABLE_ROUTES]), $this->routesOf($manager));
+        $this->assertSame($this->sorted(DineInPermissionSeeder::TAB_ROUTES), $this->routesOf($cashier));
+        $this->assertSame(
+            DB::table('permission_modules')->where('name', 'dining-tables')->value('id'),
+            Permission::query()->where('route_name', 'dining-tables.layout')->value('module_id'),
+        );
     }
 }

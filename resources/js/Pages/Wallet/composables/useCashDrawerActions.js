@@ -52,8 +52,8 @@ export function useCashDrawerActions(locationId, businessDate) {
         endShift: (payload) =>
             post("end", "wallet-cash-ledger.close-shift", payload,
                 "Shift ended.", "Could not end the shift."),
-        /** Anyone with the permission may reopen; the reason is kept in the reopen log. */
+        /** Anyone with the permission may reopen; who and when (and an optional reason) are kept in the reopen log. */
         reopenShift: (reason) =>
-            post("reopen", "wallet-cash-ledger.reopen-shift", { reason }, "Shift reopened.", "Could not reopen the shift."),
+            post("reopen", "wallet-cash-ledger.reopen-shift", { reason: reason || null }, "Shift reopened.", "Could not reopen the shift."),
     };
 }

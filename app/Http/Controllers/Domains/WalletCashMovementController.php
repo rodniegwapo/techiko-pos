@@ -519,9 +519,7 @@ class WalletCashMovementController extends Controller
         $location = WalletLocationResolver::resolve($request, $domain);
         $validated = $request->validate([
             'business_date' => ['required', 'date', 'before_or_equal:today'],
-            'reason' => ['required', 'string', 'max:255'],
-        ], [
-            'reason.required' => 'Say why the shift is being reopened.',
+            'reason' => ['nullable', 'string', 'max:255'],
         ]);
 
         $recon = WalletCashReconciliation::query()
@@ -543,7 +541,7 @@ class WalletCashMovementController extends Controller
                 'reopened_by' => $request->user()->id,
                 'closed_by' => $recon->closed_by,
                 'closed_at' => $recon->closed_at,
-                'reason' => $validated['reason'],
+                'reason' => filled($validated['reason'] ?? null) ? trim($validated['reason']) : null,
             ]);
 
             $recon->is_closed = false;
