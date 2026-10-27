@@ -11,4 +11,4 @@ keywords: card, credit card, debit card, gcash, maya, paymaya, e-wallet, ewallet
 4. For e-wallet or bank, type the **Reference no.** from the customer's receipt (optional).
 5. Click **Proceed Payment** (or **Checkout** on the Modern screen).
 
-The money received through each channel is tracked under **Cash & wallet → Payment channels**.
+The money received through each channel is tracked under **Cash & wallet → Where money is**.

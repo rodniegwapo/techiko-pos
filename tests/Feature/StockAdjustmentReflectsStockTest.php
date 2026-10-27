@@ -17,6 +17,7 @@ use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 /**
@@ -161,8 +162,8 @@ class StockAdjustmentReflectsStockTest extends TestCase
         $adjustment->refresh();
         $this->assertSame('Recounted', $adjustment->description);
         $this->assertCount(2, $adjustment->items);
-        $this->assertSame(7, $adjustment->items->firstWhere('product_id', $ctx['product']->id)->actual_quantity);
-        $this->assertSame(5, $adjustment->items->firstWhere('product_id', $ctx['other']->id)->system_quantity);
+        $this->assertSame(7.0, $adjustment->items->firstWhere('product_id', $ctx['product']->id)->actual_quantity);
+        $this->assertSame(5.0, $adjustment->items->firstWhere('product_id', $ctx['other']->id)->system_quantity);
 
         $adjustment->approve($ctx['user']);
 
@@ -275,7 +276,7 @@ class StockAdjustmentReflectsStockTest extends TestCase
     public function test_a_staff_members_adjustment_still_waits_for_approval(): void
     {
         $ctx = $this->seedContext();
-        $role = \Spatie\Permission\Models\Role::query()->firstOrCreate(['name' => 'manager', 'guard_name' => 'web']);
+        $role = Role::query()->firstOrCreate(['name' => 'manager', 'guard_name' => 'web']);
         $role->forceFill(['level' => 3])->save();
         $manager = User::factory()->create([
             'domain' => $ctx['domain']->name_slug, 'is_super_user' => false, 'location_id' => $ctx['locA']->id,
@@ -325,7 +326,7 @@ class StockAdjustmentReflectsStockTest extends TestCase
 
         $this->assertSame(10, $this->quantityAt($ctx['product'], $ctx['locA']));
         $item = $adjustment->items()->first();
-        $this->assertSame(9, $item->system_quantity);
-        $this->assertSame(1, $item->adjustment_quantity);
+        $this->assertSame(9.0, $item->system_quantity);
+        $this->assertSame(1.0, $item->adjustment_quantity);
     }
 }

@@ -220,7 +220,7 @@ class SaleController extends Controller
 
         $validated = $request->validate([
             'product_id' => 'required|exists:products,id',
-            'quantity' => 'required|integer|min:1',
+            'quantity' => 'required|numeric|min:0.001|max:99999',
             'unit_price' => 'required|numeric|min:0',
         ]);
 
@@ -317,7 +317,7 @@ class SaleController extends Controller
 
         $validated = $request->validate([
             'product_id' => 'required|exists:products,id',
-            'quantity' => 'required|integer|min:1',
+            'quantity' => 'required|numeric|min:0.001|max:99999',
         ]);
 
         $saleItem = $sale->saleItems()
@@ -574,7 +574,7 @@ class SaleController extends Controller
                 'name' => $customer->name,
                 'phone' => $customer->phone,
                 'loyalty_points' => $customer->loyalty_points,
-                'tier_info' => $customer->tier_info,
+                'tier_info' => $customer->getTierInfo(),
                 'loyalty_id' => $customer->loyalty_id,
                 'membership_number' => $customer->membership_number,
             ];
@@ -826,7 +826,7 @@ class SaleController extends Controller
         // Now add item to the sale
         $validated = $request->validate([
             'product_id' => 'required|exists:products,id',
-            'quantity' => 'required|integer|min:1',
+            'quantity' => 'required|numeric|min:0.001|max:99999',
             'unit_price' => 'required|numeric|min:0',
         ]);
 
@@ -946,7 +946,7 @@ class SaleController extends Controller
 
         $validated = $request->validate([
             'product_id' => 'required|exists:products,id',
-            'quantity' => 'required|integer|min:1',
+            'quantity' => 'required|numeric|min:0.001|max:99999',
         ]);
 
         $saleItem = $sale->saleItems()

@@ -11,12 +11,14 @@ use App\Models\InventoryMovement;
 use App\Models\Product\Discount;
 use App\Models\ProductInventory;
 use App\Models\Sale;
+use App\Models\SaleItem;
 use App\Models\StockAdjustment;
 use App\Models\User;
 use App\Models\UserPin;
 use App\Models\VoidLog;
 use App\Services\Wallet\SalePaymentWalletPosting;
 use App\Support\ManagerApproval;
+use App\Support\Quantity;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -75,7 +77,7 @@ class SaleService
         $inventoryItems = collect($items)->map(function ($item) {
             return [
                 'product_id' => $item['id'],
-                'quantity' => max(1, (int) $item['quantity']),
+                'quantity' => max(Quantity::MIN, Quantity::round($item['quantity'])),
             ];
         })->toArray();
 
@@ -107,7 +109,7 @@ class SaleService
                 $saleItem = $sale->saleItems()->updateOrCreate(
                     ['product_id' => $item['id']],
                     [
-                        'quantity' => max(1, (int) $item['quantity']),
+                        'quantity' => max(Quantity::MIN, Quantity::round($item['quantity'])),
                         'unit_price' => max(0, (float) $item['price']),
                     ]
                 );
@@ -465,11 +467,18 @@ class SaleService
             return;
         }
 
-        $aggregated = $sale->saleItems()->get()
+        // Open dine-in tabs at the store have their food on its way already: what they hold
+        // counts against the stock too, so the last portion can't be sold twice.
+        $otherTabs = SaleItem::query()
+            ->whereHas('sale', fn ($q) => $q->openTabs()->where('location_id', $location->id)->whereKeyNot($sale->id))
+            ->whereIn('product_id', $sale->saleItems()->pluck('product_id'))
+            ->get();
+
+        $aggregated = $sale->saleItems()->get()->concat($otherTabs)
             ->groupBy('product_id')
             ->map(fn ($rows) => [
                 'product_id' => (int) $rows->first()->product_id,
-                'quantity' => (int) $rows->sum('quantity'),
+                'quantity' => Quantity::round($rows->sum('quantity')),
             ])
             ->values()
             ->all();

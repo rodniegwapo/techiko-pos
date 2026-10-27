@@ -7,15 +7,18 @@ use App\Http\Middleware\UserPermissionCheckMiddleware;
 use App\Models\Domain;
 use App\Models\InventoryLocation;
 use App\Models\PaymentCardType;
+use App\Models\Permission;
 use App\Models\Sale;
 use App\Models\User;
 use App\Models\WalletCashCountSubmission;
 use App\Models\WalletCashMovement;
 use App\Models\WalletCashOpeningAudit;
 use App\Models\WalletCashReconciliation;
+use App\Models\WalletShiftReopenLog;
 use App\Support\Wallet\WalletCashBridgeExpected;
 use App\Support\Wallet\WalletLedgerViewData;
 use Carbon\Carbon;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Inertia;
@@ -31,6 +34,7 @@ class WalletCashControlTest extends TestCase
         $this->withoutMiddleware([
             UserPermissionCheckMiddleware::class,
             RoleBasedAccessControl::class,
+            ValidateCsrfToken::class,
         ]);
     }
 
@@ -80,7 +84,8 @@ class WalletCashControlTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Inertia $page) => $page
                 ->component('Wallet/CardTerminals')
-                ->where('walletPageMode', 'card-types')
+                // The drawer has its own page now; the channels page doesn't carry it.
+                ->missing('cashControl')
             );
     }
 
@@ -219,17 +224,16 @@ class WalletCashControlTest extends TestCase
             WalletCashMovement::query()->where('notes', 'AUTO_CC_COUNTED_VARIANCE')->count()
         );
 
-        $indexUrl = route('domains.payment-card-types.index', [
+        $indexUrl = route('domains.wallet.drawer', [
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
-            'tab' => 'card-types',
         ]);
 
         $this->actingAs($ctx['user'])->get($indexUrl)
             ->assertOk()
             ->assertInertia(fn (Inertia $page) => $page
-                ->component('Wallet/CardTerminals')
+                ->component('Wallet/Drawer')
                 ->where('cashControl.counted_by', $ctx['user']->id)
                 ->where('cashControl.counted_by_user.id', $ctx['user']->id)
                 ->where('cashControl.counted_by_user.name', $ctx['user']->name)
@@ -305,17 +309,16 @@ class WalletCashControlTest extends TestCase
 
         $this->assertSame(2, WalletCashCountSubmission::query()->count());
 
-        $indexUrl = route('domains.payment-card-types.index', [
+        $indexUrl = route('domains.wallet.drawer', [
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
-            'tab' => 'card-types',
         ]);
 
         $this->actingAs($ctx['user'])->get($indexUrl)
             ->assertOk()
             ->assertInertia(fn (Inertia $page) => $page
-                ->component('Wallet/CardTerminals')
+                ->component('Wallet/Drawer')
                 ->where('cashControl.count_submission_history.0.counted_cash', 90)
                 ->where('cashControl.count_submission_history.1.counted_cash', 95)
             );
@@ -453,17 +456,16 @@ class WalletCashControlTest extends TestCase
             'user_id' => $ctx['user']->id,
         ]);
 
-        $url = route('domains.payment-card-types.index', [
+        $url = route('domains.wallet.drawer', [
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
-            'tab' => 'card-types',
         ]);
 
         $this->actingAs($ctx['user'])->get($url)
             ->assertOk()
             ->assertInertia(fn (Inertia $page) => $page
-                ->component('Wallet/CardTerminals')
+                ->component('Wallet/Drawer')
                 ->where('cashControl.business_date', $date)
                 ->where('cashControl.opening_cash', 1000)
                 ->where('cashControl.paid_cash_sales', 200)
@@ -498,17 +500,16 @@ class WalletCashControlTest extends TestCase
             'counted_at' => now(),
         ]);
 
-        $url = route('domains.payment-card-types.index', [
+        $url = route('domains.wallet.drawer', [
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
             'business_date' => $selectedDate,
-            'tab' => 'card-types',
         ]);
 
         $this->actingAs($ctx['user'])->get($url)
             ->assertOk()
             ->assertInertia(fn (Inertia $page) => $page
-                ->component('Wallet/CardTerminals')
+                ->component('Wallet/Drawer')
                 ->where('cashControl.business_date', $selectedDate)
                 ->where('cashControl.opening_is_saved', false)
                 ->where('cashControl.opening_suggestion', 900)
@@ -538,7 +539,7 @@ class WalletCashControlTest extends TestCase
         ])->assertSessionHasErrors(['counted_cash']);
     }
 
-    public function test_end_shift_closes_shift_with_cashout_action_and_reopen_is_same_user_only(): void
+    public function test_end_shift_closes_shift_with_cashout_action_and_reopen_by_anyone_is_logged(): void
     {
         $ctx = $this->seedContext();
         $date = now()->subDays(2)->toDateString();
@@ -601,11 +602,10 @@ class WalletCashControlTest extends TestCase
         $this->assertNotNull($reconRow);
         $this->assertNull($reconRow->counted_at);
 
-        $walletUrl = route('domains.payment-card-types.index', [
+        $walletUrl = route('domains.wallet.drawer', [
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
-            'tab' => 'card-types',
         ]);
         $this->actingAs($ctx['user'])->get($walletUrl)
             ->assertOk()
@@ -616,22 +616,34 @@ class WalletCashControlTest extends TestCase
                 ->where('cashControl.counted_at', null)
             );
 
+        // A reopen needs a reason.
         $this->actingAs($otherUser)->post($reopenUrl, [
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
-        ])->assertForbidden();
+        ])->assertSessionHasErrors('reason');
 
-        $this->actingAs($ctx['user'])->post($reopenUrl, [
+        // Someone other than the closer can reopen it with one, and it is logged with what the day showed.
+        $this->actingAs($otherUser)->post($reopenUrl, [
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
-        ])->assertRedirect();
+            'reason' => 'Counted wrong',
+        ])->assertRedirect()->assertSessionHasNoErrors();
 
         $this->assertDatabaseHas('wallet_cash_reconciliations', [
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
             'is_closed' => 0,
+            'reopened_by' => $otherUser->id,
         ]);
+        $this->assertDatabaseHas('wallet_shift_reopen_logs', [
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'reopened_by' => $otherUser->id,
+            'closed_by' => $ctx['user']->id,
+            'reason' => 'Counted wrong',
+        ]);
+        $this->assertNotNull(WalletShiftReopenLog::query()->latest('id')->value('before'));
     }
 
     public function test_end_shift_save_as_opening_cash_updates_opening_and_audits(): void
@@ -735,6 +747,7 @@ class WalletCashControlTest extends TestCase
         $this->actingAs($ctx['user'])->post($reopenUrl, [
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
+            'reason' => 'Counted wrong',
         ])->assertRedirect();
 
         $this->actingAs($ctx['user'])->post($countedUrl, [
@@ -798,6 +811,7 @@ class WalletCashControlTest extends TestCase
         $this->actingAs($ctx['user'])->post($reopenUrl, [
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
+            'reason' => 'Counted wrong',
         ])->assertRedirect();
 
         Sale::query()->create([
@@ -814,11 +828,10 @@ class WalletCashControlTest extends TestCase
             'transaction_date' => $date.' 13:00:00',
         ]);
 
-        $walletUrl = route('domains.payment-card-types.index', [
+        $walletUrl = route('domains.wallet.drawer', [
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
-            'tab' => 'card-types',
         ]);
 
         $this->actingAs($ctx['user'])->get($walletUrl)
@@ -927,9 +940,17 @@ class WalletCashControlTest extends TestCase
         ])->assertSessionHasErrors(['business_date']);
     }
 
-    public function test_wallet_index_exposes_shift_closed_flags_and_can_reopen_for_closer(): void
+    public function test_wallet_index_exposes_shift_closed_flags_and_can_reopen_for_anyone_with_the_permission(): void
     {
         $ctx = $this->seedContext();
+        $other = User::factory()->create(['domain' => $ctx['domain']->name_slug, 'location_id' => $ctx['location']->id]);
+        $permission = Permission::query()->firstOrCreate(
+            ['route_name' => 'wallet-cash-ledger.reopen-shift', 'guard_name' => 'web'],
+            ['name' => 'Reopen shift', 'action' => 'reopen-shift'],
+        );
+        $ctx['user']->givePermissionTo($permission);
+        $other->givePermissionTo($permission);
+        $noPermission = User::factory()->create(['domain' => $ctx['domain']->name_slug, 'location_id' => $ctx['location']->id]);
         $date = now()->subDays(6)->toDateString();
 
         WalletCashReconciliation::query()->create([
@@ -945,11 +966,10 @@ class WalletCashControlTest extends TestCase
             'closed_at' => now(),
         ]);
 
-        $url = route('domains.payment-card-types.index', [
+        $url = route('domains.wallet.drawer', [
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
             'business_date' => $date,
-            'tab' => 'card-types',
         ]);
 
         $this->actingAs($ctx['user'])->get($url)
@@ -959,6 +979,10 @@ class WalletCashControlTest extends TestCase
                 ->where('cashControl.closed_by', $ctx['user']->id)
                 ->where('cashControl.can_reopen', true)
             );
+
+        // Not only the closer: any other user with the permission, and nobody without it.
+        $this->actingAs($other)->get($url)->assertInertia(fn (Inertia $page) => $page->where('cashControl.can_reopen', true));
+        $this->actingAs($noPermission)->get($url)->assertInertia(fn (Inertia $page) => $page->where('cashControl.can_reopen', false));
     }
 
     public function test_wallet_index_rejects_future_business_date(): void
@@ -966,11 +990,10 @@ class WalletCashControlTest extends TestCase
         $ctx = $this->seedContext();
         $futureDate = now()->addDay()->toDateString();
 
-        $url = route('domains.payment-card-types.index', [
+        $url = route('domains.wallet.drawer', [
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
             'business_date' => $futureDate,
-            'tab' => 'card-types',
         ]);
 
         $this->actingAs($ctx['user'])->get($url)
@@ -1094,17 +1117,16 @@ class WalletCashControlTest extends TestCase
             'notes' => 'AUTO_CC_ENDSHIFT_CASHOUT',
         ]);
 
-        $walletUrl = route('domains.payment-card-types.index', [
+        $walletUrl = route('domains.wallet.drawer', [
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
             'business_date' => $targetDate,
-            'tab' => 'card-types',
         ]);
 
         $this->actingAs($ctx['user'])->get($walletUrl)
             ->assertOk()
             ->assertInertia(fn (Inertia $page) => $page
-                ->component('Wallet/CardTerminals')
+                ->component('Wallet/Drawer')
                 ->where('cashControl.bridge_anchor_business_date', $anchorDate)
                 ->where('cashControl.bridge_expected_cash', 250)
             );

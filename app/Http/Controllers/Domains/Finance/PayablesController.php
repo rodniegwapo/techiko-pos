@@ -14,7 +14,7 @@ use App\Models\InventoryLocation;
 use App\Services\Ai\FinancialAssistant;
 use App\Services\Finance\CashRegisterPosting;
 use App\Services\Finance\FinancialReportService;
-use App\Support\PaidFromAccount;
+use App\Services\Finance\SupplierPaymentService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -33,6 +33,7 @@ class PayablesController extends Controller
     public function __construct(
         private readonly FinancialReportService $reports,
         private readonly CashRegisterPosting $cashRegister,
+        private readonly SupplierPaymentService $payments,
     ) {}
 
     public function index(Request $request, Domain $domain)
@@ -91,7 +92,7 @@ class PayablesController extends Controller
             'bills' => $bills,
             'suppliers' => $suppliers,
             'categories' => ExpenseCategory::query()->forDomain($slug)->where('is_active', true)->orderBy('name')->get(['id', 'name', 'type']),
-            'locations' => InventoryLocation::query()->forDomain($slug)->active()->orderBy('name')->get(['id', 'name']),
+            'locations' => InventoryLocation::query()->forDomain($slug)->active()->orderBy('name')->get(['id', 'name', 'type']),
             'paymentMethods' => Expense::PAYMENT_METHODS,
             'accounts' => FinancialAccount::query()->forDomain($slug)->where('is_active', true)->orderBy('name')->get(['id', 'name', 'type']),
             'defaultLocationId' => $request->user()->location_id,
@@ -164,54 +165,9 @@ class PayablesController extends Controller
     {
         abort_unless($bill->domain === $domain->name_slug, 404);
 
-        $validated = $request->validate([
-            'payment_date' => ['required', 'date', 'before_or_equal:today'],
-            'amount' => ['required', 'numeric', 'min:0.01', 'max:99999999.99'],
-            'payment_method' => ['required', Rule::in(Expense::PAYMENT_METHODS)],
-            // Paid from the cash register: whose drawer the cash came out of.
-            'location_id' => [
-                'nullable',
-                'required_if:payment_method,cash_register',
-                'integer',
-                Rule::exists('inventory_locations', 'id')->where('domain', $domain->name_slug),
-            ],
-            'financial_account_id' => PaidFromAccount::rules($domain->name_slug),
-            'reference_no' => ['nullable', 'string', 'max:80'],
-            'notes' => ['nullable', 'string', 'max:255'],
-        ]);
+        $validated = $request->validate(SupplierPaymentService::rules($domain->name_slug), SupplierPaymentService::messages());
 
-        DB::transaction(function () use ($request, $domain, $bill, $validated) {
-            $bill = SupplierBill::query()->with('supplier:id,name')->lockForUpdate()->findOrFail($bill->id);
-            if (round((float) $validated['amount'], 2) > $bill->remaining) {
-                throw ValidationException::withMessages([
-                    'amount' => 'Only ₱'.number_format($bill->remaining, 2).' is left to pay on this bill.',
-                ]);
-            }
-
-            $record = new SupplierPayment([
-                'domain' => $domain->name_slug,
-                'supplier_bill_id' => $bill->id,
-                'location_id' => $validated['location_id'] ?? null,
-                'payment_date' => $validated['payment_date'],
-                'amount' => $validated['amount'],
-                'payment_method' => $validated['payment_method'],
-                'financial_account_id' => PaidFromAccount::keep($validated['payment_method'], $validated['financial_account_id'] ?? null),
-                'reference_no' => $validated['reference_no'] ?? null,
-                'notes' => $validated['notes'] ?? null,
-                'user_id' => $request->user()->id,
-            ]);
-            $this->cashRegister->sync(
-                $record,
-                'supplier_payment',
-                'out',
-                $record->payment_date->toDateString(),
-                'Supplier payment: '.$bill->supplier->name.($bill->bill_number ? ' (bill '.$bill->bill_number.')' : ''),
-                'payment_date',
-            );
-            $record->save();
-
-            $bill->refreshPaid();
-        });
+        DB::transaction(fn () => $this->payments->record($bill, $validated, $request->user()));
 
         return back()->with('success', 'Payment recorded.');
     }

@@ -10,6 +10,10 @@ export function useCustomerOrder() {
     const orderId = ref(null);
     const loading = ref(true);
     const paymentSuccessMessage = ref(null);
+    // The store this display belongs to: the secret in its link (?display=…), given on the Sales screen.
+    const displayToken = new URLSearchParams(window.location.search).get("display") || "";
+    const channelName = `customer-display.${displayToken}`;
+    const missingDisplay = ref(!displayToken);
 
     // Computed properties - Use actual sale data from backend
     const subtotal = computed(() => {
@@ -85,7 +89,12 @@ export function useCustomerOrder() {
 
     const fetchInitialOrder = async () => {
         try {
-            const response = await fetch("/api/orders/recent-pending");
+            if (!displayToken) {
+                loading.value = false;
+                return;
+            }
+            const response = await fetch(`/api/orders/recent-pending?display=${encodeURIComponent(displayToken)}`);
+            if (response.status === 404) missingDisplay.value = true;
             if (response.ok) {
                 const data = await response.json();
                 if (data.order) {
@@ -106,6 +115,7 @@ export function useCustomerOrder() {
     onMounted(() => {
         fetchInitialOrder();
 
+        if (!displayToken) return;
         if (!window.Echo) {
             console.error("Echo is not initialized!");
             return;
@@ -114,19 +124,19 @@ export function useCustomerOrder() {
         console.log("Setting up Echo listeners for customer order view");
 
         // Listen to order updates
-        window.Echo.channel("order").listen(".OrderUpdated", (event) => {
+        window.Echo.channel(channelName).listen(".OrderUpdated", (event) => {
             console.log("🔄 OrderUpdated event received:", event);
             handleOrderUpdate(event);
         });
 
         // Listen to customer updates
-        window.Echo.channel("order").listen(".CustomerUpdated", (event) => {
+        window.Echo.channel(channelName).listen(".CustomerUpdated", (event) => {
             console.log("👤 CustomerUpdated event received:", event);
             handleOrderUpdate(event);
         });
 
         // Listen to payment completion
-        window.Echo.channel("order").listen(".PaymentCompleted", (event) => {
+        window.Echo.channel(channelName).listen(".PaymentCompleted", (event) => {
             console.log("💳 PaymentCompleted event received:", event);
             handlePaymentCompleted(event);
         });
@@ -134,13 +144,14 @@ export function useCustomerOrder() {
 
     onBeforeUnmount(() => {
         if (window.Echo) {
-            window.Echo.leaveChannel("order");
+            window.Echo.leaveChannel(channelName);
         }
     });
 
     return {
         // State
         order,
+        missingDisplay,
         orderItems,
         customer,
         lastUpdated,

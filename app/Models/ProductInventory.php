@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Product\Product;
+use App\Support\CostVisibility;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -14,17 +15,23 @@ class ProductInventory extends Model
 
     protected $guarded = [];
 
+    /** What the stock cost stays with those who keep the books (CostVisibility). */
+    public function toArray()
+    {
+        return CostVisibility::strip(parent::toArray(), ['average_cost', 'last_cost', 'total_value', 'cost']);
+    }
+
     protected $casts = [
-        'quantity_on_hand' => 'integer',
-        'quantity_reserved' => 'integer',
-        'quantity_available' => 'integer',
+        'quantity_on_hand' => 'float',
+        'quantity_reserved' => 'float',
+        'quantity_available' => 'float',
         'average_cost' => 'decimal:4',
         'last_cost' => 'decimal:4',
         'total_value' => 'decimal:4',
         'last_movement_at' => 'datetime',
         'last_restock_at' => 'datetime',
         'last_sale_at' => 'datetime',
-        'location_reorder_level' => 'integer',
+        'location_reorder_level' => 'float',
         'location_max_stock' => 'integer',
         'location_markup_percentage' => 'decimal:2',
         'auto_reorder_enabled' => 'boolean',
@@ -84,6 +91,7 @@ class ProductInventory extends Model
     public function isLowStock()
     {
         $reorderLevel = $this->location_reorder_level ?? $this->product->reorder_level;
+
         return $this->quantity_available <= $reorderLevel;
     }
 
@@ -113,6 +121,7 @@ class ProductInventory extends Model
         }
 
         $this->increment('quantity_reserved', $quantity);
+
         return $this;
     }
 
@@ -123,6 +132,7 @@ class ProductInventory extends Model
     {
         $releaseAmount = min($quantity, $this->quantity_reserved);
         $this->decrement('quantity_reserved', $releaseAmount);
+
         return $this;
     }
 
@@ -144,12 +154,26 @@ class ProductInventory extends Model
         }
 
         $this->last_cost = $newCost;
+
         return $this;
     }
 
     /**
      * Scope for products that are in stock
      */
+    /**
+     * Stock of products the location still carries (location_product). A product taken off a
+     * store keeps its empty stock row, which isn't shown.
+     */
+    public function scopeCarriedAtLocation($query)
+    {
+        return $query->whereExists(fn ($q) => $q->selectRaw('1')
+            ->from('location_product')
+            ->whereColumn('location_product.product_id', 'product_inventory.product_id')
+            ->whereColumn('location_product.location_id', 'product_inventory.location_id')
+            ->where('location_product.is_active', true));
+    }
+
     public function scopeInStock($query)
     {
         return $query->where('quantity_available', '>', 0);
@@ -216,7 +240,7 @@ class ProductInventory extends Model
     public function calculateDaysOfStockRemaining()
     {
         $velocity = $this->calculateDemandVelocity();
-        
+
         if ($velocity <= 0) {
             return 999; // Infinite if no sales
         }
@@ -238,6 +262,7 @@ class ProductInventory extends Model
         ];
 
         $this->update(['demand_pattern' => $pattern]);
+
         return $pattern;
     }
 
@@ -246,11 +271,12 @@ class ProductInventory extends Model
      */
     public function needsReorder()
     {
-        if (!$this->auto_reorder_enabled) {
+        if (! $this->auto_reorder_enabled) {
             return false;
         }
 
         $reorderLevel = $this->getEffectiveReorderLevel();
+
         return $this->quantity_available <= $reorderLevel;
     }
 
@@ -260,10 +286,11 @@ class ProductInventory extends Model
     public function getRecommendedOrderQuantity()
     {
         $maxStock = $this->getEffectiveMaxStock();
-        
-        if (!$maxStock) {
+
+        if (! $maxStock) {
             // If no max stock defined, order enough for 30 days
             $velocity = $this->calculateDemandVelocity();
+
             return max(1, ceil($velocity * 30));
         }
 
@@ -276,7 +303,7 @@ class ProductInventory extends Model
     public function getLocationPrice()
     {
         $basePrice = $this->product->price;
-        
+
         if ($this->location_markup_percentage) {
             return $basePrice * (1 + ($this->location_markup_percentage / 100));
         }

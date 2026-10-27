@@ -5,7 +5,7 @@ import { router, usePage } from "@inertiajs/vue3";
 import axios from "axios";
 import { notification } from "ant-design-vue";
 
-import WalletShell from "@/Pages/Wallet/WalletShell.vue";
+import WalletLayout from "@/Pages/Wallet/components/WalletLayout.vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useHelpers } from "@/Composables/useHelpers";
 
@@ -292,8 +292,7 @@ onMounted(() => {
 </script>
 
 <template>
-    <WalletShell v-bind="props" :is-money-movement-page="false">
-        <template #primary>
+    <WalletLayout :title="moneyDetailsCardType ? `${moneyDetailsCardType.name}: money received` : 'Payment channel'" active="balances" :active-location="activeLocation">
             <div class="mt-6 w-full min-w-0 max-w-7xl space-y-4">
                 <a-breadcrumb>
                     <a-breadcrumb-item>
@@ -521,6 +520,5 @@ onMounted(() => {
                     </div>
                 </a-spin>
             </div>
-        </template>
-    </WalletShell>
+    </WalletLayout>
 </template>

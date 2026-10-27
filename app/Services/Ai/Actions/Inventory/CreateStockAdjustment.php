@@ -11,6 +11,7 @@ use App\Services\Ai\Actions\ActionResult;
 use App\Services\Ai\Actions\AssistantAction;
 use App\Services\Ai\Actions\ControllerCall;
 use App\Services\Ai\Actions\PreparedAction;
+use App\Support\Quantity;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 
 /**
@@ -45,7 +46,7 @@ class CreateStockAdjustment implements AssistantAction
             'reason' => $schema->string()->enum(array_keys(StockAdjustmentController::adjustmentReasons()))->description('Why the stock is wrong')->required(),
             'items' => $schema->array()->items($schema->object([
                 'product_id' => $schema->integer()->description('Product id')->required(),
-                'actual_quantity' => $schema->integer()->description('How many are actually there now (0 or more)')->required(),
+                'actual_quantity' => $schema->number()->description('How many are actually there now (0 or more; parts for things sold by weight or volume)')->required(),
             ]))->description('The products and their actual quantities')->required(),
             'description' => $schema->string()->description('Notes about the adjustment (optional)'),
         ];
@@ -85,13 +86,14 @@ class CreateStockAdjustment implements AssistantAction
             if (! $product) {
                 throw new ActionInputException('One of the products is not in this business. Use stock_levels or find_products to get the ids.');
             }
-            if (! is_numeric($actual) || (int) $actual < 0) {
-                throw new ActionInputException('The actual quantity of '.$product->name.' must be 0 or more.');
+            if (! is_numeric($actual) || $actual < 0 || ! Quantity::fits($product, $actual)) {
+                throw new ActionInputException('The actual quantity of '.$product->name.' must be 0 or more'.($product->allowsDecimal() ? '.' : ', a whole number.'));
             }
-            $system = (int) ($onHand[$product->id] ?? 0);
-            $lines[] = ['product_id' => $product->id, 'actual_quantity' => (int) $actual];
-            $difference = (int) $actual - $system;
-            $fields[] = ['label' => $product->name, 'value' => $system.' → '.(int) $actual.' ('.($difference >= 0 ? '+' : '').$difference.')'];
+            $actual = Quantity::round($actual);
+            $system = Quantity::round($onHand[$product->id] ?? 0);
+            $lines[] = ['product_id' => $product->id, 'actual_quantity' => $actual];
+            $difference = Quantity::round($actual - $system);
+            $fields[] = ['label' => $product->name, 'value' => $system.' → '.$actual.' '.$product->quantityUnit().' ('.($difference >= 0 ? '+' : '').$difference.')'];
         }
 
         $description = trim((string) ($input['description'] ?? ''));

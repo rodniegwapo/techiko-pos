@@ -3,10 +3,10 @@
 namespace App\Models;
 
 use App\Traits\Searchable;
-use App\Models\LocationProduct;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class InventoryLocation extends Model
 {
@@ -21,6 +21,7 @@ class InventoryLocation extends Model
     protected $casts = [
         'is_active' => 'boolean',
         'is_default' => 'boolean',
+        'dine_in' => 'boolean',
     ];
 
     protected $searchable = [
@@ -43,7 +44,8 @@ class InventoryLocation extends Model
     // }
 
     // Add scope for easy domain filtering
-    public function scopeForDomain($query, $domain) {
+    public function scopeForDomain($query, $domain)
+    {
         return $query->where('domain', $domain);
     }
 
@@ -85,9 +87,9 @@ class InventoryLocation extends Model
     public function products()
     {
         return $this->belongsToMany(Product\Product::class, 'location_product', 'location_id', 'product_id')
-                    ->using(LocationProduct::class)
-                    ->withPivot('is_active')
-                    ->withTimestamps();
+            ->using(LocationProduct::class)
+            ->withPivot('is_active')
+            ->withTimestamps();
     }
 
     /**
@@ -96,10 +98,10 @@ class InventoryLocation extends Model
     public function activeProducts()
     {
         return $this->belongsToMany(Product\Product::class, 'location_product', 'location_id', 'product_id')
-                    ->using(LocationProduct::class)
-                    ->wherePivot('is_active', true)
-                    ->withPivot('is_active')
-                    ->withTimestamps();
+            ->using(LocationProduct::class)
+            ->wherePivot('is_active', true)
+            ->withPivot('is_active')
+            ->withTimestamps();
     }
 
     /**
@@ -116,30 +118,79 @@ class InventoryLocation extends Model
         return $this->type === 'warehouse';
     }
 
+    protected static function booted(): void
+    {
+        // Every store gets its customer-display secret when it is made.
+        static::creating(function (InventoryLocation $location) {
+            $location->display_token ??= Str::random(40);
+        });
+    }
+
+    /** The secret in this store's customer-display link; made the first time it is needed. */
+    public function displayToken(): string
+    {
+        if (! $this->display_token) {
+            $this->forceFill(['display_token' => Str::random(40)])->save();
+        }
+
+        return $this->display_token;
+    }
+
+    /** The store a customer-display link belongs to, or null for an unknown or missing token. */
+    public static function forDisplayToken(?string $token): ?self
+    {
+        return $token && strlen($token) >= 32
+            ? static::query()->where('display_token', $token)->where('is_active', true)->first()
+            : null;
+    }
+
+    /** The broadcast channel a store's customer display listens on (named by its secret token). */
+    public function displayChannel(): string
+    {
+        return 'customer-display.'.$this->displayToken();
+    }
+
+    /**
+     * The store a report is limited to: the given location when it is one of the organization's
+     * stores, else null (every store). A warehouse sells nothing, so asking from one means the
+     * whole business.
+     */
+    public static function reportScope(?int $locationId, string $domain): ?int
+    {
+        if (! $locationId) {
+            return null;
+        }
+
+        $location = static::query()->forDomain($domain)->whereKey($locationId)->first(['id', 'type']);
+
+        return $location && ! $location->isWarehouse() ? (int) $location->id : null;
+    }
+
     /**
      * Get the default location for a specific domain
      */
     public static function getDefault($domain = null)
     {
         $query = static::where('is_default', true);
-        
+
         if ($domain) {
-            $domainSlug = $domain instanceof \App\Models\Domain ? $domain->name_slug : $domain;
+            $domainSlug = $domain instanceof Domain ? $domain->name_slug : $domain;
             $query->where('domain', $domainSlug);
         }
-        
+
         return $query->first() ?? static::active()->where('domain', $domainSlug ?? null)->first();
     }
-    
+
     /**
      * Get the default location for a specific domain (scope)
      */
     public function scopeDefaultForDomain($query, $domain)
     {
-        $domainSlug = $domain instanceof \App\Models\Domain ? $domain->name_slug : $domain;
+        $domainSlug = $domain instanceof Domain ? $domain->name_slug : $domain;
+
         return $query->where('domain', $domainSlug)->where('is_default', true);
     }
-    
+
     /**
      * Set as default location for its domain
      */

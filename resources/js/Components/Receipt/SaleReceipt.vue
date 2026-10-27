@@ -6,6 +6,7 @@
  */
 import { computed } from "vue";
 import { useHelpers } from "@/Composables/useHelpers";
+import { formatQuantity } from "@/Utils/quantity";
 
 const props = defineProps({
     sale: { type: Object, required: true },
@@ -61,7 +62,7 @@ const paymentLabel = computed(() => {
             </div>
             <div v-if="item.notes" class="muted">  * {{ item.notes }}</div>
             <div class="row">
-                <span>{{ item.quantity }} x {{ formattedTotal(item.unit_price) }}</span>
+                <span>{{ formatQuantity(item.quantity, item) }} x {{ formattedTotal(item.unit_price) }}</span>
                 <span>{{ formattedTotal(item.subtotal) }}</span>
             </div>
             <div v-if="item.discount > 0" class="row muted">

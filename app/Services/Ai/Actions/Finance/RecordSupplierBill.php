@@ -15,7 +15,7 @@ use Carbon\Carbon;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Collection;
 
-/** Records a bill from a supplier (money owed to them), like Finance → Supplier bills → add bill. */
+/** Records a bill from a supplier (money owed to them), like Finance → Bills to pay → add bill. */
 class RecordSupplierBill implements AssistantAction, HasInputTemplate
 {
     use DescribesValues;

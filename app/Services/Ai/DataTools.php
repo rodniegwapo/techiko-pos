@@ -418,7 +418,7 @@ class DataTools
             'expected_cash' => $cash['amount'],
             'stores_with_a_shift_today' => $cash['locations_counted'],
             'note' => $cash['locations_counted'] === 0
-                ? 'No cash shift was opened today, so there is no expected amount yet (open one under Cash & wallet → Money movement).'
+                ? 'No cash shift was opened today, so there is no expected amount yet (start it under Cash & wallet → Today\'s drawer).'
                 : 'Opening cash plus cash sales and cash moved in, minus cash moved out, for today.',
         ];
     }

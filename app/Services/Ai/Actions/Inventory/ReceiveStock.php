@@ -10,6 +10,7 @@ use App\Services\Ai\Actions\AssistantAction;
 use App\Services\Ai\Actions\ControllerCall;
 use App\Services\Ai\Actions\DescribesValues;
 use App\Services\Ai\Actions\PreparedAction;
+use App\Support\Quantity;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 
 /**
@@ -45,7 +46,7 @@ class ReceiveStock implements AssistantAction
             'items' => $schema->array()->items($schema->object([
                 'product_id' => $schema->integer()->description('Product id (or give product)'),
                 'product' => $schema->string()->description('Exact product name, SKU or barcode (used when there is no product_id)'),
-                'quantity' => $schema->integer()->description('How many arrived (1 or more)')->required(),
+                'quantity' => $schema->number()->description('How many arrived: a whole number, or parts for things sold by weight or volume (e.g. 2.5 kg)')->required(),
                 'unit_cost' => $schema->number()->description('What each one cost, in pesos (default: the product\'s cost)'),
             ]))->description('The products delivered')->required(),
         ];
@@ -67,15 +68,17 @@ class ReceiveStock implements AssistantAction
         foreach ($items as $item) {
             $product = $this->product($item, $context);
             $quantity = $item['quantity'] ?? null;
-            if (! is_numeric($quantity) || (int) $quantity != $quantity || (int) $quantity < 1) {
-                throw new ActionInputException('How many '.$product->name.' arrived? It must be a whole number, 1 or more.');
+            if (! is_numeric($quantity) || $quantity < Quantity::MIN || ! Quantity::fits($product, $quantity)) {
+                throw new ActionInputException('How many '.$product->name.' arrived? '.($product->allowsDecimal()
+                    ? 'More than 0 '.$product->quantityUnit().'.'
+                    : 'It must be a whole number, 1 or more.'));
             }
             $cost = $item['unit_cost'] ?? $product->cost;
             if (! is_numeric($cost) || $cost < 0) {
                 throw new ActionInputException('What did each '.$product->name.' cost? It has no cost saved.');
             }
 
-            $quantity = (int) $quantity;
+            $quantity = Quantity::round($quantity);
             $cost = round((float) $cost, 2);
             $lines[] = ['product_id' => $product->id, 'quantity' => $quantity, 'unit_cost' => $cost];
             $total += $quantity * $cost;

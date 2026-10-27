@@ -16,6 +16,10 @@ import { answerBlocks, suggestionsFor } from "./assistantAnswer";
  * Chats are saved to the user's account for 90 days; History reopens or deletes them.
  */
 const emit = defineEmits(["ask-human", "navigate"]);
+const props = defineProps({
+    /** A question sent from elsewhere (a page's "?" help): { id, text }, asked once it arrives. */
+    question: { type: Object, default: null },
+});
 
 const page = usePage();
 const { getRoute } = useDomainRoutes();
@@ -47,7 +51,15 @@ const chats = ref([]); // { id, title, last_message_at }
 const loadingChats = ref(false);
 const loadingChat = ref(false);
 
-onMounted(() => {
+const askedQuestionId = ref(null);
+function askSentQuestion() {
+    if (props.question?.text && props.question.id !== askedQuestionId.value) {
+        askedQuestionId.value = props.question.id;
+        ask(props.question.text);
+    }
+}
+
+onMounted(async () => {
     let saved = null;
     try {
         saved = JSON.parse(sessionStorage.getItem(storageKey.value) || "null");
@@ -56,8 +68,11 @@ onMounted(() => {
     }
     language.value = saved?.language || "en";
     if (saved?.conversationId) {
-        openChat(saved.conversationId);
+        await openChat(saved.conversationId);
     }
+    // Asked after the saved chat is back, so the question joins it instead of being replaced.
+    askSentQuestion();
+    watch(() => props.question?.id, askSentQuestion);
 });
 
 watch([conversationId, language], () => {
@@ -212,16 +227,27 @@ function onKeydown(e) {
                     <a-radio-button value="en">EN</a-radio-button>
                     <a-radio-button value="taglish">Taglish</a-radio-button>
                 </a-radio-group>
-                <a-tooltip v-if="view === 'chat'" title="Past chats">
-                    <a-button size="small" type="text" aria-label="Past chats" data-testid="assistant-history" @click="showHistory">
-                        <IconHistory :size="16" />
-                    </a-button>
-                </a-tooltip>
-                <a-tooltip v-if="turns.length || view === 'history'" title="New chat">
-                    <a-button size="small" type="text" aria-label="New chat" data-testid="assistant-new-chat" @click="newChat">
-                        <IconMessagePlus :size="16" />
-                    </a-button>
-                </a-tooltip>
+                <!-- Labelled, so past chats are easy to find. -->
+                <a-button
+                    v-if="view === 'chat'"
+                    size="small"
+                    class="!flex items-center gap-1"
+                    aria-label="Past chats"
+                    data-testid="assistant-history"
+                    @click="showHistory"
+                >
+                    <IconHistory :size="16" /> Past chats
+                </a-button>
+                <a-button
+                    v-if="turns.length || view === 'history'"
+                    size="small"
+                    class="!flex items-center gap-1"
+                    aria-label="New chat"
+                    data-testid="assistant-new-chat"
+                    @click="newChat"
+                >
+                    <IconMessagePlus :size="16" /> New chat
+                </a-button>
             </div>
         </div>
 

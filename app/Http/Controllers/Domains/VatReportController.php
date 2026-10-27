@@ -286,16 +286,8 @@ class VatReportController extends Controller
 
     private function resolveEffectiveLocationId(Domain $domain, ?int $locationId): ?int
     {
-        if (! $locationId) {
-            return null;
-        }
-
-        $inDomain = InventoryLocation::query()
-            ->forDomain($domain->name_slug)
-            ->whereKey($locationId)
-            ->exists();
-
-        return $inDomain ? $locationId : null;
+        // A store of this organization; a warehouse (which sells nothing) means every store.
+        return InventoryLocation::reportScope($locationId, $domain->name_slug);
     }
 
     /**

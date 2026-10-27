@@ -4,8 +4,15 @@ namespace Tests\Feature;
 
 use App\Models\Permission;
 use Database\Seeders\AssistantPermissionSeeder;
+use Database\Seeders\DineInPermissionSeeder;
 use Database\Seeders\FinancePermissionSeeder;
+use Database\Seeders\ProductModifierPermissionSeeder;
 use Database\Seeders\PurchasingPermissionSeeder;
+use Database\Seeders\RegisterShiftPermissionSeeder;
+use Database\Seeders\SalesHistoryPermissionSeeder;
+use Database\Seeders\SalesImportPermissionSeeder;
+use Database\Seeders\ShiftReopenPermissionSeeder;
+use Database\Seeders\TimeclockPermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -77,6 +84,130 @@ class FeaturePermissionSeedersTest extends TestCase
         }
 
         $this->assertSame($this->sorted($routes), $this->sorted(PurchasingPermissionSeeder::ROUTES));
+    }
+
+    public function test_the_sales_history_and_modifier_seeders_cover_their_routes(): void
+    {
+        $named = function (string $prefix): array {
+            $names = [];
+            foreach (Route::getRoutes() as $route) {
+                if (str_starts_with((string) $route->getName(), 'domains.'.$prefix)) {
+                    $names[] = preg_replace('/^domains\./', '', $route->getName());
+                }
+            }
+
+            return $this->sorted(array_unique($names));
+        };
+
+        $this->assertSame($named('sales-history.'), $this->sorted(SalesHistoryPermissionSeeder::ROUTES));
+        $this->assertSame($named('products.modifier-groups.'), $this->sorted(ProductModifierPermissionSeeder::ROUTES));
+    }
+
+    public function test_sales_history_and_modifier_permissions_go_to_the_right_default_roles(): void
+    {
+        $admin = $this->role('admin');
+        $supervisor = $this->role('supervisor');
+        $cashier = $this->role('cashier');
+
+        $this->seed(SalesHistoryPermissionSeeder::class);
+        $this->seed(ProductModifierPermissionSeeder::class);
+        $this->seed(SalesHistoryPermissionSeeder::class);
+
+        $this->assertSame($this->sorted(SalesHistoryPermissionSeeder::ROUTES), array_values(array_intersect($this->sorted(SalesHistoryPermissionSeeder::ROUTES), $this->routesOf($admin))));
+        // Cashiers and supervisors list, open and void, but cannot export.
+        foreach ([$supervisor, $cashier] as $role) {
+            $held = $this->routesOf($role);
+            $this->assertContains('sales-history.index', $held);
+            $this->assertNotContains('sales-history.export', $held);
+        }
+        // Cashiers can view modifiers, not change them; supervisors can change them.
+        $this->assertContains('products.modifier-groups.index', $this->routesOf($cashier));
+        $this->assertNotContains('products.modifier-groups.store', $this->routesOf($cashier));
+        $this->assertContains('products.modifier-groups.store', $this->routesOf($supervisor));
+        $this->assertSame(
+            count(SalesHistoryPermissionSeeder::ROUTES) + count(ProductModifierPermissionSeeder::ROUTES),
+            Permission::query()->whereIn('route_name', [...SalesHistoryPermissionSeeder::ROUTES, ...ProductModifierPermissionSeeder::ROUTES])->count(),
+        );
+    }
+
+    public function test_everyone_on_the_till_can_reopen_a_shift(): void
+    {
+        $cashier = $this->role('cashier');
+        $supervisor = $this->role('supervisor');
+        $manager = $this->role('manager');
+
+        $this->seed(ShiftReopenPermissionSeeder::class);
+        $this->seed(ShiftReopenPermissionSeeder::class);
+
+        foreach ([$cashier, $supervisor, $manager] as $role) {
+            $this->assertContains('wallet-cash-ledger.reopen-shift', $this->routesOf($role));
+        }
+        $this->assertSame(1, Permission::query()->where('route_name', 'wallet-cash-ledger.reopen-shift')->count());
+    }
+
+    public function test_the_register_shift_seeder_covers_every_shift_route(): void
+    {
+        $routes = [];
+        foreach (Route::getRoutes() as $route) {
+            if (str_starts_with((string) $route->getName(), 'domains.register-shifts.')) {
+                $routes[] = preg_replace('/^domains\./', '', $route->getName());
+            }
+        }
+
+        // register-shifts.show opens with register-shifts.index (RoutePermission::ALIASES).
+        $this->assertSame(
+            $this->sorted(array_values(array_diff($routes, ['register-shifts.show']))),
+            $this->sorted([...RegisterShiftPermissionSeeder::TILL_ROUTES, ...RegisterShiftPermissionSeeder::REVIEW_ROUTES]),
+        );
+    }
+
+    public function test_cashiers_run_their_own_shift_and_supervisors_and_up_approve_counts(): void
+    {
+        $cashier = $this->role('cashier');
+        $supervisor = $this->role('supervisor');
+        $manager = $this->role('manager');
+
+        $this->seed(RegisterShiftPermissionSeeder::class);
+        $this->seed(RegisterShiftPermissionSeeder::class);
+
+        $all = $this->sorted([...RegisterShiftPermissionSeeder::TILL_ROUTES, ...RegisterShiftPermissionSeeder::REVIEW_ROUTES]);
+        $this->assertSame($this->sorted(RegisterShiftPermissionSeeder::TILL_ROUTES), $this->routesOf($cashier));
+        // Supervisors also get Today's drawer, where a shift is run (they didn't have it before).
+        $this->assertSame($this->sorted([...$all, ...RegisterShiftPermissionSeeder::DRAWER_ROUTES]), $this->routesOf($supervisor));
+        $this->assertSame($all, $this->routesOf($manager));
+        $this->assertSame(count($all), Permission::query()->whereIn('route_name', $all)->count());
+        $this->assertSame(
+            DB::table('permission_modules')->where('name', 'register-shifts')->value('id'),
+            Permission::query()->where('route_name', 'register-shifts.approve')->value('module_id'),
+        );
+    }
+
+    public function test_the_sales_import_seeder_covers_every_sales_import_route(): void
+    {
+        $routes = [];
+        foreach (Route::getRoutes() as $route) {
+            if (str_starts_with((string) $route->getName(), 'domains.sales-import.')) {
+                $routes[] = preg_replace('/^domains\./', '', $route->getName());
+            }
+        }
+
+        $this->assertSame($this->sorted($routes), $this->sorted(SalesImportPermissionSeeder::ROUTES));
+    }
+
+    public function test_sales_import_permissions_are_added_for_the_default_roles_only(): void
+    {
+        $admin = $this->role('admin');
+        $manager = $this->role('manager');
+        $cashier = $this->role('cashier');
+
+        $this->seed(SalesImportPermissionSeeder::class);
+        $this->seed(SalesImportPermissionSeeder::class);
+
+        $routes = $this->sorted(SalesImportPermissionSeeder::ROUTES);
+        $this->assertSame($routes, $this->routesOf($admin));
+        $this->assertSame($routes, $this->routesOf($manager));
+        $this->assertSame([], $this->routesOf($cashier));
+        $this->assertSame(count($routes), Permission::query()->whereIn('route_name', $routes)->count());
     }
 
     public function test_purchasing_permissions_are_added_for_the_default_roles_only(): void
@@ -168,6 +299,47 @@ class FeaturePermissionSeedersTest extends TestCase
         $this->assertSame(
             DB::table('permission_modules')->where('name', 'assistant')->value('id'),
             Permission::query()->where('route_name', 'assistant.ask')->value('module_id'),
+        );
+    }
+
+    public function test_the_timeclock_seeder_covers_every_timesheet_route_and_gives_the_till_staff_only_the_punch(): void
+    {
+        $routes = [];
+        foreach (Route::getRoutes() as $route) {
+            if (str_starts_with((string) $route->getName(), 'domains.timesheets.')) {
+                $routes[] = preg_replace('/^domains\./', '', $route->getName());
+            }
+        }
+        $this->assertSame($this->sorted($routes), $this->sorted(TimeclockPermissionSeeder::ROUTES));
+
+        $manager = $this->role('manager');
+        $cashier = $this->role('cashier');
+        $supervisor = $this->role('supervisor');
+
+        $this->seed(TimeclockPermissionSeeder::class);
+        $this->seed(TimeclockPermissionSeeder::class);
+
+        $this->assertSame($this->sorted(TimeclockPermissionSeeder::ROUTES), $this->routesOf($manager));
+        $this->assertSame(['timesheets.punch'], $this->routesOf($cashier));
+        $this->assertSame(['timesheets.punch'], $this->routesOf($supervisor));
+        $this->assertSame(count(TimeclockPermissionSeeder::ROUTES), Permission::query()->whereIn('route_name', TimeclockPermissionSeeder::ROUTES)->count());
+    }
+
+    public function test_the_dine_in_seeder_covers_every_route_and_gives_the_till_staff_only_the_tabs(): void
+    {
+        $this->assertSame($this->routesBehind('dine_in'), $this->sorted([...DineInPermissionSeeder::TAB_ROUTES, ...DineInPermissionSeeder::TABLE_ROUTES]));
+
+        $manager = $this->role('manager');
+        $cashier = $this->role('cashier');
+
+        $this->seed(DineInPermissionSeeder::class);
+        $this->seed(DineInPermissionSeeder::class);
+
+        $this->assertSame($this->sorted([...DineInPermissionSeeder::TAB_ROUTES, ...DineInPermissionSeeder::TABLE_ROUTES]), $this->routesOf($manager));
+        $this->assertSame($this->sorted(DineInPermissionSeeder::TAB_ROUTES), $this->routesOf($cashier));
+        $this->assertSame(
+            DB::table('permission_modules')->where('name', 'dining-tables')->value('id'),
+            Permission::query()->where('route_name', 'dining-tables.layout')->value('module_id'),
         );
     }
 }

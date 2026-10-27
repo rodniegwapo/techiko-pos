@@ -246,8 +246,8 @@ const smallBillColumns = [
 
 <template>
     <AuthenticatedLayout>
-        <Head title="Supplier bills" />
-        <ContentHeader class="mb-4 md:mb-6" title="Supplier bills" />
+        <Head title="Bills to pay" />
+        <ContentHeader class="mb-4 md:mb-6" title="Bills to pay" />
         <ContentLayout title="Who do I owe?" filter-class="flex flex-wrap items-center justify-end gap-2 w-full min-w-0">
             <template #filters>
                 <RefreshButton :loading="spinning" @click="load()" />

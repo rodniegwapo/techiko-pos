@@ -60,6 +60,12 @@ import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { notifyInsufficientStock } from "@/Composables/useCartStockNotification";
 import { hasModifiers } from "@/Composables/useProductModifiers";
 import ModifierPickerModal from "./components/ModifierPickerModal.vue";
+import QuantityPromptModal from "./components/QuantityPromptModal.vue";
+import TimeclockButton from "./components/TimeclockButton.vue";
+import TablesScreen from "./components/DineIn/TablesScreen.vue";
+import TabBar from "./components/DineIn/TabBar.vue";
+import { usePermissionsV2 } from "@/Composables/usePermissionV2";
+import { allowsDecimal, toQuantity } from "@/Utils/quantity";
 import StartShiftModal from "./components/StartShiftModal.vue";
 
 const page = usePage();
@@ -167,6 +173,9 @@ const loyaltyRedemptionSettings = computed(
         },
 );
 const activeLocationId = computed(() => page.props.currentLocation?.id);
+// Clock in / out with your own PIN, on the till everyone shares.
+const { hasPermission } = usePermissionsV2();
+const canPunch = computed(() => hasPermission("timesheets.punch"));
 const cashierUserId = computed(() => page.props.auth?.user?.data?.id);
 
 const shiftIsOpen = computed(() => page.props.shiftStatus?.is_open ?? true);
@@ -195,6 +204,20 @@ async function refreshPaymentCardTypesCache() {
 const orderId = ref(null);
 const orders = ref([]);
 const currentSale = ref(null);
+
+// Dine-in (stores that serve it): the tables screen, and the open tab the cart is working on.
+// Online only: the offline cart stays one cart per cashier.
+const tablesOpen = ref(false);
+const dineInEnabled = computed(() => !!page.props.dineIn?.enabled && salesCartIsOnline.value);
+const isTab = computed(() => !!currentSale.value?.is_tab);
+// A tab that was paid or cancelled: back to the tables for the next one.
+watch(isTab, (now, before) => {
+    if (before && !now && dineInEnabled.value) tablesOpen.value = true;
+});
+async function onTabLeft() {
+    await loadCurrentPendingSale();
+    if (dineInEnabled.value) tablesOpen.value = true;
+}
 const orderDiscountAmount = ref(0);
 const orderDiscountId = ref("");
 const selectedCustomer = ref(null);
@@ -393,6 +416,8 @@ function mergeProductLookup(entries) {
             price: parseFloat(p.price) || 0,
             barcode: p.barcode ?? "",
             code: p.code ?? "",
+            allows_decimal: allowsDecimal(p),
+            quantity_unit: p.quantity_unit ?? null,
         });
     }
     const arr = [...byId.values()];
@@ -402,9 +427,11 @@ function mergeProductLookup(entries) {
 function ordersToLineItems(ordersList) {
     return (ordersList || []).map((o) => ({
         product_id: o.id,
-        quantity: parseInt(o.quantity, 10) || 0,
+        quantity: toQuantity(o.quantity),
         unit_price: parseFloat(o.price) || 0,
         name: o.name,
+        allows_decimal: allowsDecimal(o),
+        quantity_unit: o.quantity_unit ?? null,
         representation_type: o.representation_type ?? null,
         representation: o.representation ?? null,
         modifier_ids: o.modifier_ids ?? [],
@@ -419,8 +446,10 @@ function lineItemsToOrders(lines) {
         id: li.product_id,
         name: li.name || "Unknown Product",
         price: li.unit_price,
-        quantity: li.quantity,
-        subtotal: li.unit_price * li.quantity,
+        quantity: toQuantity(li.quantity),
+        subtotal: li.unit_price * toQuantity(li.quantity),
+        allows_decimal: !!li.allows_decimal,
+        quantity_unit: li.quantity_unit ?? null,
         discount_id: null,
         discount_type: null,
         discount: null,
@@ -698,6 +727,13 @@ const handleScanAndAdd = async (scannedCode) => {
 // A scanned product with options (Size, Add-ons…) asks for them before it goes into the cart.
 const pickerProduct = ref(null);
 const pickerOpen = ref(false);
+/** A weighed product waiting for its amount: { product, options } */
+const quantityPrompt = ref(null);
+function confirmQuantityPrompt(quantity) {
+    const { product, options } = quantityPrompt.value;
+    quantityPrompt.value = null;
+    addToCart(product, { ...options, quantity });
+}
 
 /**
  * @param {object} product
@@ -713,6 +749,13 @@ const addToCart = async (product, options = {}) => {
         pickerOpen.value = true;
         return false;
     }
+
+    // Sold by weight or volume: ask how much (1.5 kg) before it goes in the order.
+    if (options.quantity === undefined && allowsDecimal(product)) {
+        quantityPrompt.value = { product, options };
+        return false;
+    }
+    const qty = options.quantity ?? 1;
 
     try {
         if (!suppressPageLoading) {
@@ -735,8 +778,10 @@ const addToCart = async (product, options = {}) => {
                     line_key: `${product.id}|${line?.modifier_key ?? ""}|${line?.notes ?? ""}`,
                     name: product.name,
                     price,
-                    quantity: 1,
-                    subtotal: price,
+                    quantity: qty,
+                    subtotal: price * qty,
+                    allows_decimal: allowsDecimal(product),
+                    quantity_unit: product.quantity_unit ?? null,
                     discount_id: null,
                     discount_type: null,
                     discount: null,
@@ -751,7 +796,7 @@ const addToCart = async (product, options = {}) => {
                 });
             } else {
                 const o = orders.value[idx];
-                o.quantity = (parseInt(o.quantity, 10) || 0) + 1;
+                o.quantity = toQuantity(toQuantity(o.quantity) + qty);
                 o.subtotal = (parseFloat(o.price) || 0) * o.quantity;
             }
             await persistOfflineCartToDexie();
@@ -763,7 +808,7 @@ const addToCart = async (product, options = {}) => {
 
         await axios.post(route, {
             product_id: product.id,
-            quantity: 1,
+            quantity: qty,
             ...(line ? { modifier_ids: line.modifier_ids, notes: line.notes } : {}),
         });
 
@@ -904,8 +949,10 @@ const transformCartItems = (items) => {
             notes: item.notes ?? null,
             name: productName,
             price: item.unit_price,
-            quantity: item.quantity,
-            subtotal: item.unit_price * item.quantity,
+            quantity: toQuantity(item.quantity),
+            subtotal: item.unit_price * toQuantity(item.quantity),
+            allows_decimal: allowsDecimal(item.product),
+            quantity_unit: item.product?.quantity_unit ?? null,
             discount_id: item.discount_id,
             discount_type: item.discount_type,
             discount: item.discount,
@@ -961,14 +1008,17 @@ function findOfflineLine(line) {
 
 function onOfflineCartAdd(product) {
     const idx = findOfflineLine(product);
+    const step = allowsDecimal(product) ? 0.25 : 1;
     if (idx === -1) {
         const price = parseFloat(product.price) || 0;
         orders.value.push({
             id: product.id,
             name: product.name,
             price,
-            quantity: 1,
-            subtotal: price,
+            quantity: step,
+            subtotal: price * step,
+            allows_decimal: allowsDecimal(product),
+            quantity_unit: product.quantity_unit ?? null,
             discount_id: null,
             discount_type: null,
             discount: null,
@@ -979,7 +1029,7 @@ function onOfflineCartAdd(product) {
         });
     } else {
         const o = orders.value[idx];
-        o.quantity = (parseInt(o.quantity, 10) || 0) + 1;
+        o.quantity = toQuantity(toQuantity(o.quantity) + step);
         o.subtotal = (parseFloat(o.price) || 0) * o.quantity;
     }
     persistOfflineCartToDexie();
@@ -989,7 +1039,7 @@ function onOfflineCartSubtract(product) {
     const idx = findOfflineLine(product);
     if (idx === -1) return;
     const o = orders.value[idx];
-    const next = Math.max(0, (parseInt(o.quantity, 10) || 0) - 1);
+    const next = Math.max(0, toQuantity(toQuantity(o.quantity) - (allowsDecimal(o) ? 0.25 : 1)));
     if (next === 0) {
         orders.value.splice(idx, 1);
     } else {
@@ -1002,7 +1052,7 @@ function onOfflineCartSubtract(product) {
 function onOfflineCartSetQty(product, quantity) {
     const idx = findOfflineLine(product);
     if (idx === -1) return;
-    const q = parseInt(quantity, 10);
+    const q = toQuantity(quantity);
     if (isNaN(q) || q < 0) return;
     if (q === 0) {
         orders.value.splice(idx, 1);
@@ -1563,15 +1613,22 @@ watch(
                     <!-- Room on the right for the pinned store switcher -->
                     <div class="flex flex-wrap items-center justify-between gap-2 md:pr-64">
                         <span>
-                            No shift is open for this location today. Start
-                            the shift before taking payments.
+                            <template v-if="$page.props.shiftStatus?.is_closed">
+                                A manager ended this store's day. It is
+                                reopened before taking payments.
+                            </template>
+                            <template v-else>
+                                You have no shift open at this store. Start
+                                your shift before taking payments.
+                            </template>
                         </span>
                         <a-button
                             type="primary"
                             size="small"
+                            data-testid="shift-banner-action"
                             @click="shiftBannerModalOpen = true"
                         >
-                            Start shift
+                            {{ $page.props.shiftStatus?.is_closed ? "Reopen the day" : "Start my shift" }}
                         </a-button>
                     </div>
                 </template>
@@ -1583,8 +1640,18 @@ watch(
                 title="Sales"
                 class="shrink-0 md:pr-44"
             >
-                <template v-if="!isMdUp" #actions>
-                    <div class="flex items-center gap-2">
+                <template v-if="!isMdUp || canPunch || dineInEnabled" #actions>
+                    <a-button
+                        v-if="dineInEnabled"
+                        size="small"
+                        type="primary"
+                        data-testid="tables-open"
+                        @click="tablesOpen = true"
+                    >
+                        Tables
+                    </a-button>
+                    <TimeclockButton v-if="canPunch" :location-id="activeLocationId" />
+                    <div v-if="!isMdUp" class="flex items-center gap-2">
                         <span class="text-xs font-medium text-gray-800">
                             Classic
                         </span>
@@ -1598,10 +1665,34 @@ watch(
                         </span>
                     </div>
                 </template>
-                <template v-if="lastOfflineSyncLabel" #meta>
-                    Last offline sync: {{ lastOfflineSyncLabel }}
+                <template v-if="lastOfflineSyncLabel || $page.props.customerDisplayUrl" #meta>
+                    <template v-if="lastOfflineSyncLabel">Last offline sync: {{ lastOfflineSyncLabel }}</template>
+                    <template v-if="lastOfflineSyncLabel && $page.props.customerDisplayUrl"> · </template>
+                    <!-- This store's customer-facing screen: open it on the screen facing the customer. -->
+                    <a
+                        v-if="$page.props.customerDisplayUrl"
+                        :href="$page.props.customerDisplayUrl"
+                        target="_blank"
+                        rel="noopener"
+                        class="text-teal-700 hover:underline"
+                        data-testid="customer-display-link"
+                    >Customer display</a>
                 </template>
             </ContentHeader>
+
+            <TabBar
+                v-if="isTab && salesCartIsOnline"
+                :sale="currentSale"
+                :orders="orders"
+                class="shrink-0"
+                @changed="loadCurrentPendingSale"
+                @left="onTabLeft"
+            />
+            <TablesScreen
+                v-if="dineInEnabled"
+                v-model:open="tablesOpen"
+                @picked="loadCurrentPendingSale"
+            />
 
             <component :is="salesLayoutComponent" title="Create Transaction">
                 <template v-if="isCoffeeshopLayout" #hero>
@@ -1625,6 +1716,26 @@ watch(
                         >
                             Last offline sync: {{ lastOfflineSyncLabel }}
                         </p>
+                        <a
+                            v-if="$page.props.customerDisplayUrl"
+                            :href="$page.props.customerDisplayUrl"
+                            target="_blank"
+                            rel="noopener"
+                            class="mt-1 inline-block text-xs text-[var(--cs-muted)] underline"
+                            data-testid="customer-display-link"
+                        >Customer display</a>
+                        <div v-if="canPunch || dineInEnabled" class="flex flex-wrap items-center gap-2">
+                            <button
+                                v-if="dineInEnabled"
+                                type="button"
+                                class="mt-2 inline-flex items-center gap-1 rounded-full bg-[var(--cs-ink,#111827)] px-3 py-1 text-xs font-medium text-white"
+                                data-testid="tables-open"
+                                @click="tablesOpen = true"
+                            >
+                                Tables
+                            </button>
+                            <TimeclockButton v-if="canPunch" variant="coffeeshop" :location-id="activeLocationId" />
+                        </div>
                     </div>
                 </template>
                 <template v-if="!isCoffeeshopLayout" #titleMeta>
@@ -1785,7 +1896,7 @@ watch(
                         :variant="productTableVariant"
                         :group-by-category="groupByCategory"
                         @cart-updated="loadCurrentPendingSale"
-                        @offline-add-product="(p, line) => addToCart(p, { line })"
+                        @offline-add-product="(p, line, quantity) => addToCart(p, { line, quantity })"
                         @load-more="loadMoreProducts"
                     />
                 </template>
@@ -2190,6 +2301,11 @@ watch(
             />
         </template>
 
+        <QuantityPromptModal
+            :product="quantityPrompt?.product ?? null"
+            @close="quantityPrompt = null"
+            @confirm="confirmQuantityPrompt"
+        />
         <ModifierPickerModal
             v-model:open="pickerOpen"
             :product="pickerProduct"

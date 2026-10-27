@@ -5,12 +5,21 @@ const DOMAIN = USERS.admin.domain;
 const url = (path) => `/domains/${DOMAIN}${path}`;
 
 async function pickOption(page, label) {
-    await page.locator(".ant-select-dropdown:visible .ant-select-item-option", { hasText: label }).first().click();
+    // The list is virtual: an option far down (e.g. after many test runs' accounts) isn't in the
+    // page until scrolled to.
+    const dropdown = page.locator(".ant-select-dropdown:visible").last();
+    const option = dropdown.locator(".ant-select-item-option", { hasText: label }).first();
+    const holder = dropdown.locator(".rc-virtual-list-holder");
+    for (let i = 0; i < 200 && !(await option.isVisible()); i++) {
+        await holder.evaluate((el) => (el.scrollTop += 120));
+        await page.waitForTimeout(40);
+    }
+    await option.click();
 }
 const input = (scope, testId) => scope.getByTestId(testId).locator("input").or(scope.getByTestId(testId)).first();
 
-// Money movement's "All money" view lists money recorded outside the drawer too, read-only.
-test.describe("All money on Money movement as admin", () => {
+// Where money is → "All money" lists money recorded outside the drawer too, read-only.
+test.describe("All money on Where money is as admin", () => {
     test.use({ account: "admin" });
 
     test("a bank expense shows under All money with its account, and the drawer view stays as it was", async ({ page }) => {
@@ -39,9 +48,9 @@ test.describe("All money on Money movement as admin", () => {
         await page.getByTestId("expense-submit").click();
         await expect(page.getByTestId("expenses-table")).toContainText(description);
 
-        await page.goto(url("/wallet/money-movement"));
-        await expect(page.locator("#cash-ledger")).toBeVisible();
-        await page.getByTestId("money-view").getByText("All money").click();
+        await page.goto(url("/wallet/balances"));
+        await expect(page.getByTestId("channel-balances")).toBeVisible();
+        await page.getByTestId("balances-tab-all").click();
 
         const table = page.getByTestId("all-money-table");
         const row = table.locator("tr", { hasText: description });
@@ -63,20 +72,20 @@ test.describe("All money on Money movement as admin", () => {
         await table.getByRole("link", { name: description }).click();
         await expect(page).toHaveURL(/\/expenses/);
 
-        // Back on the drawer view the ledger is unchanged and editable as before.
-        await page.goto(url("/wallet/money-movement?view=all"));
-        await page.getByTestId("money-view").getByText("Drawer & channels").click();
-        await expect(page.locator("#cash-ledger")).toBeVisible();
+        // Back on Balances the drawer and channels show as before.
+        await page.goto(url("/wallet/balances?tab=all"));
+        await page.getByTestId("balances-tab-balances").click();
+        await expect(page.getByTestId("channel-balances")).toBeVisible();
         await expect(page.getByTestId("all-money")).toHaveCount(0);
     });
 });
 
-test.describe("All money on Money movement as cashier", () => {
+test.describe("All money on Where money is as cashier", () => {
     test.use({ account: "cashier" });
 
     test("has no All money switch", async ({ page }) => {
-        await page.goto(url("/wallet/money-movement?view=all"));
-        await expect(page.getByTestId("money-view")).toHaveCount(0);
+        await page.goto(url("/wallet/balances?tab=all"));
+        await expect(page.getByTestId("balances-tab-all")).toHaveCount(0);
         await expect(page.getByTestId("all-money")).toHaveCount(0);
     });
 });

@@ -17,8 +17,11 @@ use Illuminate\Http\Request;
  */
 class StoresCash
 {
-    /** @return array<string, mixed> */
-    public static function build(Request $request, Domain $domain): array
+    /**
+     * @param  int|null  $locationId  One store only (its Drawer history); all stores when null.
+     * @return array<string, mixed>
+     */
+    public static function build(Request $request, Domain $domain, ?int $locationId = null): array
     {
         $validated = $request->validate([
             'date_from' => ['nullable', 'date'],
@@ -29,6 +32,7 @@ class StoresCash
 
         $stores = InventoryLocation::query()->forDomain($domain->name_slug)
             ->where(fn ($q) => $q->whereNull('type')->orWhere('type', '!=', 'warehouse'))
+            ->when($locationId, fn ($q, $id) => $q->whereKey($id))
             ->orderBy('name')
             ->get(['id', 'name']);
 

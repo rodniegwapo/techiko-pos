@@ -89,9 +89,12 @@ export function workerCashier(parallelIndex) {
 /** Worker number (1..4) shared by the sales cashiers and wallet stores. */
 export const workerNumber = (parallelIndex) => (parallelIndex % WORKER_CASHIER_COUNT) + 1;
 
+/** Role of each wallet account kind (E2EWalletSeeder). */
+const WALLET_ROLES = { manager: "manager", partner: "manager", cashier: "cashier", supervisor: "supervisor" };
+
 /**
- * Wallet accounts from E2EWalletSeeder: each worker has its own store with a manager and a
- * second manager ("partner"), so wallet tests never share a store's cash data.
+ * Wallet accounts from E2EWalletSeeder: each worker has its own store with a manager, a second
+ * manager ("partner"), a cashier and a supervisor, so wallet tests never share a store's cash data.
  */
 export function walletUser(kind, parallelIndex) {
     const n = workerNumber(parallelIndex);
@@ -99,17 +102,18 @@ export function walletUser(kind, parallelIndex) {
         email: `e2e-wallet-${kind}-${n}@techiko.test`,
         password: "e2e-password",
         domain: "jollibee-corp",
-        role: "manager",
+        role: WALLET_ROLES[kind],
     };
 }
 
-/** Resolves an `account` option: a USERS key, "worker-cashier", "wallet-manager" or "wallet-partner". */
+/** Resolves an `account` option: a USERS key, "worker-cashier", or "wallet-manager|partner|cashier|supervisor". */
 export function resolveAccount(account, parallelIndex) {
     if (account === "worker-cashier") {
         return workerCashier(parallelIndex);
     }
-    if (account === "wallet-manager" || account === "wallet-partner") {
-        return walletUser(account.replace("wallet-", ""), parallelIndex);
+    const walletKind = account.startsWith("wallet-") ? account.slice("wallet-".length) : null;
+    if (walletKind && WALLET_ROLES[walletKind]) {
+        return walletUser(walletKind, parallelIndex);
     }
     const user = USERS[account];
     if (!user) {
@@ -130,6 +134,8 @@ export const E2E = {
         probe: { name: "E2E Security Probe", price: 10, stock: 1000 },
         // Only modifiers.spec.js uses this: it asks for its "E2E Size" (Regular, or Large +₱20) before adding.
         latte: { name: "E2E Latte", price: 100, stock: 1000 },
+        // Only weighed.spec.js uses this: ₱50 per kg, it asks "How much?" before adding.
+        rice: { name: "E2E Rice", price: 50, stock: 100 },
     },
     customers: {
         loyalty: { name: "E2E Loyalty Customer", points: 5000 },

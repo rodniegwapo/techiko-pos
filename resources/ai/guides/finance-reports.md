@@ -7,9 +7,9 @@ keywords: profit, kita, income statement, profit and loss, p&l, cash flow, balan
 ---
 1. In the sidebar, open **Finance → Overview** for the business at a glance: sales, profit, money in and out and what customers and suppliers owe.
 2. For details, open:
-   - **Finance → Income statement**: sales, cost of goods, gross profit, expenses and net profit for a period (can be exported).
-   - **Finance → Cash flow**: money that came in and went out, and why it differs from profit.
-   - **Finance → Balance sheet**: what the business owns and owes, and the owner's share.
+   - **Finance → Profit & loss**: sales, cost of goods, gross profit, expenses and net profit for a period (can be exported).
+   - **Finance → Money in & out**: money that came in and went out, and why it differs from profit.
+   - **Finance → What you own & owe**: what the business owns and owes, and the owner's share.
 3. Change the period at the top of each page.
 4. Click **Explain this** for a plain-words explanation (English or Taglish), or type your own question in **Ask about your business** on the Overview.
 

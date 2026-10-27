@@ -24,6 +24,8 @@ import {
     IconMail,
     IconSparkles,
     IconTruck,
+    IconClock,
+    IconArmchair,
 } from "@tabler/icons-vue";
 import { router, usePage } from "@inertiajs/vue3";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
@@ -82,6 +84,16 @@ const menuItems = [
         path: "/sales-history",
         section: "sell",
         keywords: "receipts transactions orders refund",
+        domainOnly: true,
+    },
+    {
+        key: "sales-import",
+        title: "Import Sales",
+        icon: IconReceipt2,
+        routeName: "sales-import.index",
+        path: "/sales-import",
+        section: "sell",
+        keywords: "import csv backdate past old sales upload template",
         domainOnly: true,
     },
     {
@@ -268,42 +280,44 @@ const menuItems = [
                 feature: "finance",
             },
             {
-                // The income statement is the Profit & Loss report.
+                // Menu labels are everyday words; the accounting names stay findable as keywords.
                 key: "profit-loss",
-                title: "Income statement",
+                title: "Profit & loss",
                 routeName: "profit-loss.index",
                 path: "/profit-loss",
-                keywords: "profit loss p&l pnl",
+                keywords: "income statement profit loss p&l pnl",
                 feature: "finance",
             },
             {
                 key: "finance-cash-flow",
-                title: "Cash flow",
+                title: "Money in & out",
                 routeName: "finance.cash-flow",
                 path: "/finance/cash-flow",
+                keywords: "cash flow",
                 feature: "finance",
             },
             {
                 key: "finance-balance-sheet",
-                title: "Balance sheet",
+                title: "What you own & owe",
                 routeName: "finance.balance-sheet",
                 path: "/finance/balance-sheet",
+                keywords: "balance sheet assets liabilities",
                 feature: "finance",
             },
             {
                 key: "finance-receivables",
-                title: "Customer credit",
+                title: "Customers' utang",
                 routeName: "finance.receivables",
                 path: "/finance/receivables",
-                keywords: "receivables utang",
+                keywords: "customer credit receivables utang",
                 feature: "finance",
             },
             {
                 key: "finance-payables",
-                title: "Supplier bills",
+                title: "Bills to pay",
                 routeName: "finance.payables.index",
                 path: "/finance/payables",
-                keywords: "payables suppliers",
+                keywords: "supplier bills payables suppliers",
                 feature: "finance",
             },
             {
@@ -323,15 +337,15 @@ const menuItems = [
             },
             {
                 key: "finance-balance-items",
-                title: "Accounts, loans & assets",
+                title: "Bank, loans & equipment",
                 routeName: "finance.balance-items.index",
                 path: "/finance/assets-and-loans",
-                keywords: "bank equipment",
+                keywords: "accounts loans assets bank equipment",
                 feature: "finance",
             },
             {
                 key: "finance-reviews",
-                title: "Monthly reviews",
+                title: "Monthly review",
                 routeName: "finance.reviews.index",
                 path: "/finance/reviews",
                 keywords: "close month",
@@ -355,18 +369,39 @@ const menuItems = [
         domainOnly: true,
         children: [
             {
-                key: "wallet-money-movement",
-                title: "Money movement",
-                routeName: "wallet.money-movement",
-                path: "/wallet/money-movement",
-                keywords: "cash drawer gcash",
+                key: "wallet-drawer",
+                title: "Today's drawer",
+                routeName: "wallet.drawer",
+                path: "/wallet/drawer",
+                keywords: "cash drawer shift opening count end shift money movement",
             },
             {
-                key: "wallet-card-terminals",
-                title: "Payment channels",
-                routeName: "payment-card-types.index",
-                path: "/payment-card-types",
-                keywords: "card terminals",
+                key: "wallet-cash-in-out",
+                title: "Cash in & out",
+                routeName: "wallet.cash-in-out",
+                path: "/wallet/cash-in-out",
+                keywords: "owner draw float gcash transfer ledger",
+            },
+            {
+                key: "wallet-balances",
+                title: "Where money is",
+                routeName: "wallet.balances",
+                path: "/wallet/balances",
+                keywords: "gcash bank card terminals payment channels balance",
+            },
+            {
+                key: "wallet-history",
+                title: "Drawer history",
+                routeName: "wallet.history",
+                path: "/wallet/history",
+                keywords: "counts opening changes closed shifts",
+            },
+            {
+                key: "wallet-counts",
+                title: "Counted money",
+                routeName: "register-shifts.index",
+                path: "/wallet/shifts",
+                keywords: "cashier shift count approve review short over variance",
             },
         ],
     },
@@ -378,6 +413,29 @@ const menuItems = [
         path: "/users",
         section: "team",
         keywords: "staff employees cashiers",
+    },
+    {
+        key: "timesheets",
+        title: "Timesheets",
+        icon: IconClock,
+        routeName: "timesheets.index",
+        path: "/timesheets",
+        section: "team",
+        domainOnly: true,
+        hideForSuperOutsideDomain: true,
+        keywords: "timeclock clock in out hours attendance payroll",
+    },
+    {
+        key: "dining-tables",
+        title: "Tables",
+        icon: IconArmchair,
+        routeName: "dining-tables.index",
+        path: "/dining-tables",
+        section: "team",
+        domainOnly: true,
+        hideForSuperOutsideDomain: true,
+        feature: "dine_in",
+        keywords: "dine-in restaurant tables floor plan tabs kitchen",
     },
     {
         key: "roles",
@@ -664,7 +722,7 @@ export function useNavMenu() {
                 return null;
             }
 
-            if (menu.key === "wallet-money-movement" || menu.key === "wallet-card-terminals") {
+            if (menu.key.startsWith("wallet-") && menu.key !== "wallet-group") {
                 router.get(routePath, { ...getLocationQueryFromPage(), ...walletMenuQuery() });
             } else if (getCurrentDomainFromUrl()) {
                 router.get(routePath, getLocationQueryFromPage());

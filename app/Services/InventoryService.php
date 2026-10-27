@@ -10,6 +10,7 @@ use App\Models\ProductInventory;
 use App\Models\StockAdjustment;
 use App\Models\StockAdjustmentItem;
 use App\Models\User;
+use App\Support\Quantity;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -83,9 +84,10 @@ class InventoryService
         $aggregated = [];
         foreach ($items as $item) {
             $pid = (int) $item['product_id'];
-            $qty = (int) ($item['quantity'] ?? 1);
-            if ($qty < 1) {
-                $qty = 1;
+            // Parts are allowed for things sold by weight or volume (1.5 kg).
+            $qty = Quantity::round($item['quantity'] ?? 1);
+            if ($qty < Quantity::MIN) {
+                $qty = Quantity::MIN;
             }
             $aggregated[$pid] = ($aggregated[$pid] ?? 0) + $qty;
         }
@@ -122,7 +124,7 @@ class InventoryService
                 ->where('location_id', $location->id)
                 ->first();
 
-            $available = $inventory ? (int) $inventory->quantity_available : 0;
+            $available = $inventory ? Quantity::round($inventory->quantity_available) : 0;
 
             if ($available < $requestedQuantity) {
                 $unavailableItems[] = [
@@ -203,11 +205,11 @@ class InventoryService
     /**
      * Process inventory for completed sale
      */
-    public function processSaleInventory(array $items, $saleId, User $user, ?InventoryLocation $location = null): bool
+    public function processSaleInventory(array $items, $saleId, User $user, ?InventoryLocation $location = null, $movementDate = null): bool
     {
         $location = $location ?? InventoryLocation::getDefault();
 
-        return DB::transaction(function () use ($items, $saleId, $user, $location) {
+        return DB::transaction(function () use ($items, $saleId, $user, $location, $movementDate) {
             foreach ($items as $item) {
                 $product = Product::find($item['product_id']);
 
@@ -229,6 +231,8 @@ class InventoryService
                     'reference_id' => $saleId,
                     'user_id' => $user->id,
                     'notes' => "Sale - Unit Price: {$unitPrice}",
+                    // Backdated (imported) sales stamp the movement on the day the sale happened.
+                    ...($movementDate ? ['created_at' => $movementDate, 'updated_at' => $movementDate] : []),
                 ]);
             }
 
@@ -298,6 +302,30 @@ class InventoryService
         }
 
         $inventory->save();
+
+        if ($movement->movement_type === 'purchase' && $movement->unit_cost) {
+            $this->averageProductCost($inventory->product_id);
+        }
+    }
+
+    /**
+     * After stock is bought, the product's cost (what each sale records as its cost) becomes the
+     * average of what the stock on hand cost, across every store: old stock at its old cost, new
+     * stock at what it was bought for.
+     */
+    protected function averageProductCost(int $productId): void
+    {
+        $totals = ProductInventory::query()
+            ->where('product_id', $productId)
+            ->where('quantity_on_hand', '>', 0)
+            ->selectRaw('SUM(quantity_on_hand * average_cost) AS value, SUM(quantity_on_hand) AS quantity')
+            ->first();
+
+        if ($totals && (float) $totals->quantity > 0) {
+            Product::query()->whereKey($productId)->update([
+                'cost' => round((float) $totals->value / (float) $totals->quantity, 2),
+            ]);
+        }
     }
 
     /**
@@ -627,6 +655,7 @@ class InventoryService
 
         // Count products directly from product_inventory table for this location
         $totalProducts = ProductInventory::where('location_id', $location->id)
+            ->carriedAtLocation()
             ->whereHas('product', function ($query) use ($domain) {
                 if ($domain) {
                     $query->forDomain($domain);
@@ -735,7 +764,7 @@ class InventoryService
 
                 $inventory = $this->getOrCreateInventory($product, $fromLocation);
                 if (! $inventory->isInStock($wanted)) {
-                    $available = max(0, (int) $inventory->quantity_available);
+                    $available = max(0, Quantity::round($inventory->quantity_available));
                     $short[] = [
                         'product_id' => $product->id,
                         'product_name' => $product->name,
@@ -766,15 +795,15 @@ class InventoryService
             $fromInventory = $this->getOrCreateInventory($product, $fromLocation);
 
             if (! $fromInventory->isInStock($quantity)) {
-                $available = max(0, (int) $fromInventory->quantity_available);
+                $available = max(0, Quantity::round($fromInventory->quantity_available));
 
                 throw new InsufficientStockException([
                     [
                         'product_id' => $product->id,
                         'product_name' => $product->name,
-                        'requested_quantity' => (int) $quantity,
+                        'requested_quantity' => Quantity::round($quantity),
                         'available_quantity' => $available,
-                        'shortage' => (int) $quantity - $available,
+                        'shortage' => Quantity::round($quantity - $available),
                     ],
                 ]);
             }

@@ -195,8 +195,9 @@ class ProfitLossController extends Controller
             ],
         };
 
+        // A manager's own store; otherwise the store asked for, or every store at a warehouse.
         $locationId = FinanceAccess::restrictedLocationId($user)
-            ?? (isset($validated['location_id']) ? (int) $validated['location_id'] : null);
+            ?? InventoryLocation::reportScope($validated['location_id'] ?? null, $domain->name_slug);
         if ($locationId !== null && ! InventoryLocation::query()->forDomain($domain->name_slug)->whereKey($locationId)->exists()) {
             $locationId = null;
         }

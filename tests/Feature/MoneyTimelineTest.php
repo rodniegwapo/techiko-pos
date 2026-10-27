@@ -184,24 +184,24 @@ class MoneyTimelineTest extends TestCase
 
     public function test_only_finance_users_for_their_store_get_the_view(): void
     {
-        $url = fn (InventoryLocation $l, array $q = []) => route('domains.wallet.money-movement', ['domain' => $this->domain->name_slug, 'location_id' => $l->id] + $q);
+        $url = fn (InventoryLocation $l, array $q = []) => route('domains.wallet.balances', ['domain' => $this->domain->name_slug, 'location_id' => $l->id] + $q);
 
-        $this->actingAs($this->admin)->get($url($this->store, ['view' => 'all']))
+        $this->actingAs($this->admin)->get($url($this->store, ['tab' => 'all']))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page->where('canViewAllMoney', true)->has('allMoney.rows')->has('allMoney.totals'));
 
-        // Without view=all nothing extra is built.
+        // Without tab=all nothing extra is built.
         $this->actingAs($this->admin)->get($url($this->store))
             ->assertInertia(fn (Assert $page) => $page->where('allMoney', null));
 
         $manager = $this->user('manager', 3, $this->store);
-        $this->actingAs($manager)->get($url($this->store, ['view' => 'all']))
+        $this->actingAs($manager)->get($url($this->store, ['tab' => 'all']))
             ->assertInertia(fn (Assert $page) => $page->where('canViewAllMoney', true)->has('allMoney.rows'));
-        $this->actingAs($manager)->get($url($this->otherStore, ['view' => 'all']))
+        $this->actingAs($manager)->get($url($this->otherStore, ['tab' => 'all']))
             ->assertInertia(fn (Assert $page) => $page->where('canViewAllMoney', false)->where('allMoney', null));
 
         $cashier = $this->user('cashier', 4);
-        $this->actingAs($cashier)->get($url($this->store, ['view' => 'all']))
+        $this->actingAs($cashier)->get($url($this->store, ['tab' => 'all']))
             ->assertInertia(fn (Assert $page) => $page->where('canViewAllMoney', false)->where('allMoney', null));
     }
 }

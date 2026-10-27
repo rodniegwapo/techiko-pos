@@ -19,14 +19,19 @@ use App\Models\OfflineSaleSync;
 use App\Models\PaymentCardType;
 use App\Models\Product\Discount;
 use App\Models\Product\Product;
+use App\Models\RegisterShift;
 use App\Models\Sale;
 use App\Models\User;
+use App\Models\WalletCashReconciliation;
 use App\Services\CreditService;
 use App\Services\InventoryService;
 use App\Services\LoyaltyRedemptionService;
 use App\Services\ProductModifierService;
 use App\Services\SaleService;
+use App\Services\TabService;
 use App\Services\Wallet\SalePaymentWalletPosting;
+use App\Support\Quantity;
+use App\Support\RoutePermission;
 use App\Support\Wallet\WalletShiftGuard;
 use App\Traits\LocationCategoryScoping;
 use Carbon\Carbon;
@@ -77,13 +82,19 @@ class SaleController extends Controller
 
         return Inertia::render('Sales/Index', [
             'domain' => $domain,
+            // The customer-facing screen for this store: its link carries the store's secret.
+            'customerDisplayUrl' => $location && ! $location->isWarehouse()
+                ? route('customer-order', ['display' => $location->displayToken()])
+                : null,
             'categories' => $location
                 ? $this->getCategoriesForLocation($domain->name_slug, $location)->get()
                 : Category::where('domain', $domain->name_slug)->get(),
-            'shiftStatus' => $location ? [
-                'is_open' => WalletShiftGuard::isOpenForSale($domain->name_slug, (int) $location->id, $businessDate),
-                'business_date' => $businessDate,
-            ] : null,
+            'shiftStatus' => $location ? $this->shiftStatus($request, $domain, (int) $location->id, $businessDate) : null,
+            // Dine-in at this store: the Tables screen and tabs (Tables setup turns it on).
+            'dineIn' => [
+                'enabled' => (bool) ($location?->dine_in && $domain->hasFeature('dine_in')),
+                'activeTabId' => $location?->dine_in ? app(TabService::class)->activeTab($domain, $location)?->id : null,
+            ],
             'salesSettings' => [
                 'apply_vat_automatically' => $vat['apply_vat_automatically'],
                 'vat_rate_percent' => $vat['vat_rate_percent'],
@@ -97,6 +108,44 @@ class SaleController extends Controller
                 'min_points_redemption' => (int) config('loyalty.min_points_redemption', 1),
             ],
         ]);
+    }
+
+    /**
+     * The cashier's own shift (is_open: theirs is open, so they can take payment), and whether the
+     * store's whole day was ended (is_closed: then a manager reopens it, and no shift can start).
+     */
+    private function shiftStatus(Request $request, Domain $domain, int $locationId, string $businessDate): array
+    {
+        $domainSlug = $domain->name_slug;
+        $user = $request->user();
+        $recon = WalletCashReconciliation::query()
+            ->forWalletContext($domainSlug, $locationId)
+            ->whereDate('business_date', $businessDate)
+            ->first();
+        $isClosed = (bool) ($recon?->is_closed);
+        $mine = RegisterShift::openFor($domainSlug, $locationId, (int) $user->id);
+        $inReview = RegisterShift::query()->forWalletContext($domainSlug, $locationId)
+            ->where('user_id', $user->id)->where('status', RegisterShift::NEEDS_REVIEW)
+            ->latest('closed_at')->first();
+
+        return [
+            'is_open' => $mine !== null && ! $isClosed,
+            'is_closed' => $isClosed,
+            'shift_id' => $mine?->id,
+            'opened_at' => $mine?->opened_at?->toIso8601String(),
+            // Their last shift's count is off and a manager hasn't looked yet.
+            'review_pending_since' => $inReview?->closed_at?->toIso8601String(),
+            'can_start' => ! $isClosed && $mine === null && RoutePermission::allows($user, 'register-shifts.start')
+                && ($inReview === null || $domain->allowsNewShiftWhileReview()),
+            // The first shift of the day suggests the store's opening; later ones start from zero.
+            'suggested_opening' => $recon && ! RegisterShift::query()->forWalletContext($domainSlug, $locationId)->whereDate('business_date', $businessDate)->exists()
+                ? (float) $recon->opening_cash : 0.0,
+            // Reopening the store's ended day: anyone whose role holds the permission; logged with a reason.
+            'can_reopen' => $isClosed && WalletShiftGuard::canReopen($user),
+            'closed_by_name' => $isClosed ? $recon->closedBy?->name : null,
+            'closed_at' => $isClosed ? $recon->closed_at?->toIso8601String() : null,
+            'business_date' => $businessDate,
+        ];
     }
 
     public function products(Request $request, Domain $domain)
@@ -324,11 +373,12 @@ class SaleController extends Controller
             ]);
         }
 
+        $registerShift = null;
         if ($location) {
-            // Today's sales need today's shift open; an earlier day only must not be closed.
+            // Today's sales need the cashier's own shift open; an earlier day only must not be closed.
             $backDated
                 ? WalletShiftGuard::ensureDateNotClosed($domain->name_slug, (int) $location->id, $saleDay, 'transaction_date')
-                : WalletShiftGuard::ensureShiftOpenForSale($domain->name_slug, (int) $location->id, $saleDay);
+                : $registerShift = WalletShiftGuard::ensureShiftOpenForSale($domain->name_slug, (int) $location->id, $saleDay, $request->user());
         }
         $transactionDate = $backDated ? Carbon::parse($saleDay)->setTimeFrom(now()) : null;
 
@@ -363,9 +413,9 @@ class SaleController extends Controller
                 &$loyaltyResults,
                 &$creditResults,
                 $location,
-                $domain,
                 $redemptionService,
                 $transactionDate,
+                $registerShift,
             ) {
                 $sale->refresh();
 
@@ -410,7 +460,10 @@ class SaleController extends Controller
                     ? $this->settleSplitPayments($validated['payments'], (float) $sale->fresh()->grand_total)
                     : [];
 
-                // 1. Complete sale and process inventory
+                // 1. Complete sale and process inventory; the payment belongs to this cashier's shift.
+                if ($registerShift) {
+                    $sale->update(['register_shift_id' => $registerShift->id]);
+                }
                 $sale->refresh();
                 $this->saleService->completeSale($sale, auth()->user(), transactionDate: $transactionDate);
 
@@ -716,6 +769,35 @@ class SaleController extends Controller
         return $user;
     }
 
+    /**
+     * The sale the cart endpoints work on, newest first: the dine-in tab this till has open, or
+     * else the cashier's own cart at their store (never a tab, so a tab someone opened doesn't
+     * turn into their cart).
+     */
+    protected function cartQuery(Domain $domain, $userId)
+    {
+        $query = Sale::forDomain($domain->name_slug)->pending()->orderBy('created_at', 'desc');
+
+        $location = Helpers::getActiveLocation($domain);
+        if ($tab = app(TabService::class)->activeTab($domain, $location)) {
+            return $query->whereKey($tab->id);
+        }
+
+        $query->notTab()->where('user_id', $userId);
+
+        if ($this->worksInSwitchedStore()) {
+            // Not tied to one store: the store picked in the header
+            if ($location) {
+                $query->where('location_id', $location->id);
+            }
+        } else {
+            // Regular users: their assigned store
+            $query->where('location_id', auth()->user()->location_id);
+        }
+
+        return $query;
+    }
+
     public function storeDraft(Request $request, Domain $domain)
     {
         $user = $request->user();
@@ -741,7 +823,7 @@ class SaleController extends Controller
     {
         $validated = $request->validate([
             'product_id' => ['required', $this->productInDomainRule($domain)],
-            'quantity' => 'required|integer|min:1',
+            'quantity' => ['required', 'numeric', 'min:0.001', 'max:99999', Quantity::rule(fn () => Product::find($request->input('product_id')))],
             ...self::LINE_OPTION_RULES,
         ]);
 
@@ -759,7 +841,7 @@ class SaleController extends Controller
             $saleItemId = app(ProductModifierService::class)->addToSale(
                 $sale,
                 Product::findOrFail($validated['product_id']),
-                (int) $validated['quantity'],
+                Quantity::round($validated['quantity']),
                 $validated['modifier_ids'] ?? [],
                 $validated['notes'] ?? null,
             )->id;
@@ -787,6 +869,8 @@ class SaleController extends Controller
      */
     public function removeItemFromCart(Request $request, Domain $domain, Sale $sale)
     {
+        $this->ensureSaleBelongsToDomain($sale, $domain);
+
         $validated = $request->validate([
             'product_id' => ['required', $this->productInDomainRule($domain)],
             ...self::LINE_TARGET_RULES,
@@ -814,7 +898,7 @@ class SaleController extends Controller
     {
         $validated = $request->validate([
             'product_id' => ['required', $this->productInDomainRule($domain)],
-            'quantity' => 'required|integer|min:1',
+            'quantity' => ['required', 'numeric', 'min:0.001', 'max:99999', Quantity::rule(fn () => Product::find($request->input('product_id')))],
             ...self::LINE_TARGET_RULES,
         ]);
 
@@ -852,6 +936,8 @@ class SaleController extends Controller
      */
     public function getCartState(Request $request, Domain $domain, Sale $sale)
     {
+        $this->ensureSaleBelongsToDomain($sale, $domain);
+
         $sale->load(['saleItems.product', 'saleItems.modifiers', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount']);
 
         return response()->json([
@@ -991,7 +1077,7 @@ class SaleController extends Controller
                 'name' => $customer->name,
                 'phone' => $customer->phone,
                 'loyalty_points' => $customer->loyalty_points,
-                'tier_info' => $customer->tier_info,
+                'tier_info' => $customer->getTierInfo(),
                 'loyalty_id' => $customer->loyalty_id,
                 'membership_number' => $customer->membership_number,
             ];
@@ -1075,28 +1161,9 @@ class SaleController extends Controller
      */
     public function getCurrentPendingSale(Request $request, Domain $domain)
     {
-        $userId = auth()->id();
-        $currentUser = auth()->user();
-
-        $query = Sale::forDomain($domain->name_slug)
-            ->pending()
-            ->where('user_id', $userId)
-            ->orderBy('created_at', 'desc')
-            ->with(['saleItems.product', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount', 'saleItems.discounts']);
-
-        // Apply location-based filtering based on user role
-        if ($this->worksInSwitchedStore()) {
-            // Not tied to one store: the store picked in the header
-            $location = Helpers::getActiveLocation($domain);
-            if ($location) {
-                $query->where('location_id', $location->id);
-            }
-        } else {
-            // Regular users: Filter by their assigned location
-            $query->where('location_id', $currentUser->location_id);
-        }
-
-        $sale = $query->first();
+        $sale = $this->cartQuery($domain, auth()->id())
+            ->with(['saleItems.product', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount', 'saleItems.discounts'])
+            ->first();
 
         // Always return success, even if no sale found
         return response()->json([
@@ -1156,27 +1223,8 @@ class SaleController extends Controller
 
         $user = $this->cartUserInDomain($request, $domain);
 
-        $currentUser = auth()->user();
-
-        $query = Sale::forDomain($domain->name_slug)
-            ->pending()
-            ->where('user_id', $userId)
-            ->orderBy('created_at', 'desc');
-
-        // Apply location-based filtering based on user role
-        if ($this->worksInSwitchedStore()) {
-            // Not tied to one store: the store picked in the header
-            $location = Helpers::getActiveLocation($domain);
-            if ($location) {
-                $query->where('location_id', $location->id);
-            }
-        } else {
-            // Regular users: Filter by their assigned location
-            $query->where('location_id', $currentUser->location_id);
-        }
-
-        // Get or create latest pending sale for this user
-        $sale = $query->first();
+        // Get or create latest pending sale for this user (or the till's open tab)
+        $sale = $this->cartQuery($domain, $userId)->first();
 
         // If no pending sale exists, create one with location
         if (! $sale) {
@@ -1197,7 +1245,7 @@ class SaleController extends Controller
         // Now add item to the sale
         $validated = $request->validate([
             'product_id' => ['required', $this->productInDomainRule($domain)],
-            'quantity' => 'required|integer|min:1',
+            'quantity' => ['required', 'numeric', 'min:0.001', 'max:99999', Quantity::rule(fn () => Product::find($request->input('product_id')))],
             ...self::LINE_OPTION_RULES,
         ]);
 
@@ -1210,7 +1258,7 @@ class SaleController extends Controller
             app(ProductModifierService::class)->addToSale(
                 $saleLocked,
                 Product::findOrFail($validated['product_id']),
-                (int) $validated['quantity'],
+                Quantity::round($validated['quantity']),
                 $validated['modifier_ids'] ?? [],
                 $validated['notes'] ?? null,
             );
@@ -1242,29 +1290,9 @@ class SaleController extends Controller
         // Explicitly get the 'user' parameter from the route
         $userId = $request->route('user');
 
-        $currentUser = auth()->user();
-
-        $query = Sale::forDomain($domain->name_slug)
-            ->pending()
-            ->orderBy('created_at', 'desc')
-            ->with(['saleItems.product', 'saleItems.modifiers', 'saleItems.discounts', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount']);
-
-        // Apply location-based filtering based on user role
-        if ($this->worksInSwitchedStore()) {
-            // Not tied to one store: the store picked in the header
-            $location = Helpers::getActiveLocation($domain);
-            if ($location) {
-                $query->where('location_id', $location->id);
-            }
-            // Always scope to target user
-            $query->where('user_id', $userId);
-        } else {
-            // Regular users: Filter by their assigned location and user ID
-            $query->where('location_id', $currentUser->location_id)
-                ->where('user_id', $userId);
-        }
-
-        $sale = $query->first();
+        $sale = $this->cartQuery($domain, $userId)
+            ->with(['saleItems.product', 'saleItems.modifiers', 'saleItems.discounts', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount', 'diningTable:id,name,area'])
+            ->first();
 
         // Get all available discount options
         // Handle NULL start_date - if start_date is NULL, treat as "always active"
@@ -1338,29 +1366,8 @@ class SaleController extends Controller
         // Explicitly get the 'user' parameter from the route
         $userId = $request->route('user');
 
-        $currentUser = auth()->user();
-
-        $query = Sale::forDomain($domain->name_slug)
-            ->pending()
-            ->orderBy('created_at', 'desc');
-
-        // Apply location-based filtering based on user role
-        if ($this->worksInSwitchedStore()) {
-            // Not tied to one store: the store picked in the header
-            $location = Helpers::getActiveLocation($domain);
-            if ($location) {
-                $query->where('location_id', $location->id);
-            }
-            // Always scope to target user
-            $query->where('user_id', $userId);
-        } else {
-            // Regular users: Filter by their assigned location and user ID
-            $query->where('location_id', $currentUser->location_id)
-                ->where('user_id', $userId);
-        }
-
-        // Get user's latest pending sale
-        $sale = $query->first();
+        // Get user's latest pending sale (or the till's open tab)
+        $sale = $this->cartQuery($domain, $userId)->first();
 
         if (! $sale) {
             return response()->json(['success' => false, 'message' => 'No pending sale found'], 404);
@@ -1368,7 +1375,7 @@ class SaleController extends Controller
 
         $validated = $request->validate([
             'product_id' => ['required', $this->productInDomainRule($domain)],
-            'quantity' => 'required|integer|min:1',
+            'quantity' => ['required', 'numeric', 'min:0.001', 'max:99999', Quantity::rule(fn () => Product::find($request->input('product_id')))],
             ...self::LINE_TARGET_RULES,
         ]);
 
@@ -1404,29 +1411,8 @@ class SaleController extends Controller
         // Explicitly get the 'user' parameter from the route
         $userId = $request->route('user');
 
-        $currentUser = auth()->user();
-
-        $query = Sale::forDomain($domain->name_slug)
-            ->pending()
-            ->orderBy('created_at', 'desc');
-
-        // Apply location-based filtering based on user role (same as updateUserCartQuantity)
-        if ($this->worksInSwitchedStore()) {
-            // Not tied to one store: the store picked in the header
-            $location = Helpers::getActiveLocation($domain);
-            if ($location) {
-                $query->where('location_id', $location->id);
-            }
-            // Always scope to target user, or this would edit whichever pending sale is newest
-            $query->where('user_id', $userId);
-        } else {
-            // Regular users: Filter by their assigned location and user ID
-            $query->where('location_id', $currentUser->location_id)
-                ->where('user_id', $userId);
-        }
-
-        // Get user's latest pending sale
-        $sale = $query->first();
+        // Get user's latest pending sale (or the till's open tab)
+        $sale = $this->cartQuery($domain, $userId)->first();
 
         if (! $sale) {
             return response()->json(['success' => false, 'message' => 'No pending sale found'], 404);
@@ -1458,27 +1444,10 @@ class SaleController extends Controller
     {
         // Explicitly get the 'user' parameter from the route
         $userId = $request->route('user');
-        $currentUser = auth()->user();
 
-        $query = Sale::forDomain($domain->name_slug)
-            ->pending()
-            ->where('user_id', $userId)
-            ->orderBy('created_at', 'desc')
-            ->with(['saleItems.product', 'saleItems.modifiers', 'saleItems.discounts', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount']);
-
-        // Apply location-based filtering based on user role
-        if ($this->worksInSwitchedStore()) {
-            // Not tied to one store: the store picked in the header
-            $location = Helpers::getActiveLocation($domain);
-            if ($location) {
-                $query->where('location_id', $location->id);
-            }
-        } else {
-            // Regular users: Filter by their assigned location
-            $query->where('location_id', $currentUser->location_id);
-        }
-
-        $sale = $query->first();
+        $sale = $this->cartQuery($domain, $userId)
+            ->with(['saleItems.product', 'saleItems.modifiers', 'saleItems.discounts', 'saleDiscounts.discount', 'saleDiscounts.mandatoryDiscount'])
+            ->first();
 
         if (! $sale) {
             return response()->json([
@@ -1529,7 +1498,7 @@ class SaleController extends Controller
             'sales.*.payload' => ['required', 'array'],
             'sales.*.payload.items' => ['required', 'array', 'min:1'],
             'sales.*.payload.items.*.product_id' => ['required', 'integer', 'exists:products,id'],
-            'sales.*.payload.items.*.quantity' => ['required', 'integer', 'min:1'],
+            'sales.*.payload.items.*.quantity' => ['required', 'numeric', 'min:0.001', 'max:99999'],
             'sales.*.payload.items.*.unit_price' => ['required', 'numeric', 'min:0'],
             'sales.*.payload.items.*.modifier_ids' => ['nullable', 'array', 'max:30'],
             'sales.*.payload.items.*.modifier_ids.*' => ['integer'],
@@ -1641,7 +1610,7 @@ class SaleController extends Controller
             $stockItems = collect($payload['items'])->map(function (array $row) {
                 return [
                     'product_id' => (int) $row['product_id'],
-                    'quantity' => (int) $row['quantity'],
+                    'quantity' => Quantity::round($row['quantity']),
                 ];
             })->all();
 
@@ -1696,6 +1665,8 @@ class SaleController extends Controller
 
                 $sale = Sale::query()->create([
                     'user_id' => $cashier->id,
+                    // Rung up offline: it counts toward the cashier's shift if one is open now.
+                    'register_shift_id' => RegisterShift::openFor($domain->name_slug, (int) $location->id, (int) $cashier->id)?->id,
                     'location_id' => $location->id,
                     'domain' => $domain->name_slug,
                     'payment_status' => 'pending',
@@ -1715,7 +1686,7 @@ class SaleController extends Controller
                         app(ProductModifierService::class)->addToSale(
                             $sale,
                             Product::findOrFail((int) $row['product_id']),
-                            (int) $row['quantity'],
+                            Quantity::round($row['quantity']),
                             $row['modifier_ids'] ?? [],
                             $row['notes'] ?? null,
                         );
@@ -1727,7 +1698,7 @@ class SaleController extends Controller
                     $product = Product::query()->where('domain', $domain->name_slug)->findOrFail((int) $row['product_id']);
                     $sale->saleItems()->create([
                         'product_id' => $product->id,
-                        'quantity' => (int) $row['quantity'],
+                        'quantity' => Quantity::round($row['quantity']),
                         'unit_price' => round($product->priceAt($location->id), 2),
                     ]);
                 }

@@ -12,7 +12,8 @@ import {
     postReopen,
     walletFixture,
     walletState,
-    walletUrl,
+    ledgerState,
+    cashInOutUrl,
 } from "../support/wallet.js";
 
 /** Wallet endpoints over HTTP as this worker's store manager. Each row asserts 422 and the field. */
@@ -81,7 +82,7 @@ test.describe("Wallet API validation", () => {
         test("accepts a valid entry and it appears in the ledger", async () => {
             expectSaved(await postLedger(api, { ...valid(), amount: 12.34, notes: "API valid" }), "valid entry");
 
-            const state = await walletState(api, day(0), { date_from: day(0), date_to: day(0) });
+            const state = await ledgerState(api, { date_from: day(0), date_to: day(0) });
             expect(state.ledger.movements.data.map((m) => m.notes)).toContain("API valid");
             expect(state.ledger.ledgerBalance).toBe(12.34);
         });
@@ -91,7 +92,7 @@ test.describe("Wallet API validation", () => {
 
             expectSaved(await postLedger(api, { ...valid(), notes: "Wrong-store attempt", location_id: other.locationId }), "entry");
 
-            const own = await walletState(api, day(0), { date_from: day(0), date_to: day(0) });
+            const own = await ledgerState(api, { date_from: day(0), date_to: day(0) });
             expect(own.activeLocation.id).toBe(walletFixture(testInfo).locationId);
             expect(own.ledger.movements.data.map((m) => m.notes)).toContain("Wrong-store attempt");
         });
@@ -156,8 +157,12 @@ test.describe("Wallet API validation", () => {
             expectSaved(await postOpening(api, { business_date: day(1), opening_cash: 5 }), "opening next day");
         });
 
+        test("reopening needs a reason", async () => {
+            expect422(await postReopen(api, { business_date: day(0) }), "reason");
+        });
+
         test("reopening a date that was never closed is harmless", async () => {
-            const res = await postReopen(api, { business_date: day(0) });
+            const res = await postReopen(api, { business_date: day(0), reason: "Counted wrong" });
 
             expect(res.status, "no reconciliation yet").toBe(404);
         });
@@ -176,14 +181,14 @@ test.describe("Wallet API validation", () => {
             test(`rejects ${name}`, async () => {
                 const params = new URLSearchParams({ business_date: day(0), ...query() });
 
-                expect422(await apiJson(api, "GET", `${walletUrl}?${params}`), field);
+                expect422(await apiJson(api, "GET", `${cashInOutUrl}?${params}`), field);
             });
         }
 
         test("filtering by another store's card type is denied", async () => {
             const params = new URLSearchParams({ business_date: day(0), payment_card_type_id: fixtureIds().wallet.mainCardTypeId });
 
-            const res = await apiJson(api, "GET", `${walletUrl}?${params}`);
+            const res = await apiJson(api, "GET", `${cashInOutUrl}?${params}`);
 
             expect(res.status).toBe(403);
         });

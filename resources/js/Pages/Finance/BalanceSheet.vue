@@ -54,8 +54,8 @@ const sections = computed(() => [
 
 <template>
     <AuthenticatedLayout>
-        <Head title="Balance sheet" />
-        <ContentHeader class="mb-4 md:mb-6" title="Balance sheet" />
+        <Head title="What you own & owe" />
+        <ContentHeader class="mb-4 md:mb-6" title="What you own & owe" />
         <ContentLayout title="What is my business worth?" filter-class="flex flex-wrap items-center justify-end gap-2 w-full min-w-0">
             <template #filters>
                 <RefreshButton :loading="spinning" @click="load()" />

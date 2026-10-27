@@ -1,179 +1,164 @@
 import { test, expect } from "../support/fixtures.js";
 import {
-    MoneyMovementPage,
+    CashInOutPage,
+    DrawerPage,
     dateWindow,
     expectSaved,
     futureYmd,
+    ledgerState,
     money,
     postCounted,
     postEndShift,
     postLedger,
+    todayYmd,
     walletFixture,
-    walletState,
 } from "../support/wallet.js";
 
-test.describe("Ledger movements", () => {
+test.describe("Cash in & out", () => {
     test.use({ account: "wallet-manager" });
 
-    test("a new day's filter shows no entries and a zero ledger net", async ({ page }) => {
+    test("a day with nothing recorded says so", async ({ page }) => {
         const { day } = dateWindow();
-        const wallet = await MoneyMovementPage.open(page, day(0));
+        const cash = await CashInOutPage.open(page);
 
-        await wallet.filter({ from: day(0), to: day(0) });
+        await cash.filter({ from: day(0), to: day(0) });
 
-        await expect(page.getByText("No ledger entries yet.")).toBeVisible();
-        await expect(wallet.headline("Ledger net")).toHaveText(money(0));
+        await expect(page.getByText("Nothing recorded for these dates.")).toBeVisible();
     });
 
-    test.describe("adding entries", () => {
-        test("cash in records a top-up with the manager as author", async ({ page }, testInfo) => {
+    test.describe("adding lines", () => {
+        test("cash in records added float with the manager as author", async ({ page }, testInfo) => {
             const { day } = dateWindow();
-            const wallet = await MoneyMovementPage.open(page, day(0));
+            const cash = await CashInOutPage.open(page);
 
-            const { res, dialog } = await wallet.addEntry("Cash in", { amount: 150, date: day(0), notes: "Float top-up" });
+            const { res, dialog } = await cash.add("in", { amount: 150, date: day(0), notes: "Float top-up" });
 
-            expect(res?.status(), "ledger entry saved").toBeLessThan(400);
+            expect(res?.status(), "line saved").toBeLessThan(400);
             await expect(dialog).toBeHidden();
-            await expect(wallet.toast("Ledger entry saved.")).toBeVisible();
+            await expect(cash.toast("Saved.")).toBeVisible();
 
-            await wallet.filter({ from: day(0), to: day(0) });
-            const row = wallet.row("Cash / float top-up");
+            await cash.filter({ from: day(0), to: day(0) });
+            const row = cash.row("Added float");
             await expect(row).toHaveCount(1);
-            await expect(row).toContainText(`+${money(150)}`);
+            await expect(row).toContainText(`+ ${money(150)}`);
             await expect(row).toContainText("Float top-up");
-            await expect(row).toContainText("Cash register");
+            await expect(row).toContainText("Cash drawer");
             await expect(row).toContainText(walletFixture(testInfo).managerName);
-            await expect(wallet.headline("Ledger net")).toHaveText(money(150));
         });
 
-        test("the Cash in dialog starts as a cash-in top-up", async ({ page }) => {
-            const { day } = dateWindow();
-            const wallet = await MoneyMovementPage.open(page, day(0));
+        test("the Cash in dialog starts as added float, dated today", async ({ page }) => {
+            const cash = await CashInOutPage.open(page);
 
-            const dialog = await wallet.openEntryDialog("Cash in");
+            const dialog = await cash.openDialog("in");
 
-            await expect(dialog).toContainText("Add cash in entry");
-            await expect(dialog.locator(".ant-radio-button-wrapper-checked")).toHaveText("Cash in");
-            await expect(dialog).toContainText("Cash / float top-up");
+            await expect(dialog).toContainText("Cash in");
+            await expect(dialog.locator(".ant-radio-button-wrapper-checked")).toHaveText("Added float");
+            await expect(dialog.locator(".ant-picker input")).toHaveValue(todayYmd());
         });
 
-        test("the entry date defaults to the business date being viewed", async ({ page }) => {
+        test("cash out is the owner taking cash from the drawer", async ({ page }) => {
             const { day } = dateWindow();
-            const wallet = await MoneyMovementPage.open(page, day(0));
+            const cash = await CashInOutPage.open(page);
 
-            const dialog = await wallet.openEntryDialog("Cash in");
+            const dialog = await cash.openDialog("out");
+            await expect(dialog.locator(".ant-radio-button-wrapper-checked")).toHaveText("Owner took cash");
 
-            await expect(dialog.locator('input[type="date"]')).toHaveValue(day(0));
-        });
-
-        test("cash out is an owner withdrawal from the cash register", async ({ page }) => {
-            const { day } = dateWindow();
-            const wallet = await MoneyMovementPage.open(page, day(0));
-
-            const dialog = await wallet.openEntryDialog("Cash out");
-            await expect(dialog).toContainText("Owner withdrawal");
-            // Owner withdrawals can only take cash out.
-            await expect(dialog.locator(".ant-radio-button-wrapper").filter({ hasText: "Cash in" })).toHaveClass(/disabled/);
-
-            await wallet.fillEntry(dialog, { amount: 80, date: day(0) });
-            const res = await wallet.saveEntry(dialog);
+            await cash.fill(dialog, { amount: 80, date: day(0) });
+            const res = await cash.save(dialog);
 
             expect(res?.status()).toBeLessThan(400);
-            await wallet.filter({ from: day(0), to: day(0) });
-            await expect(wallet.row("Owner withdrawal")).toContainText(`−${money(80)}`);
-            await expect(wallet.row("Owner withdrawal")).toContainText("Cash register");
-            await expect(wallet.headline("Ledger net")).toHaveText(money(-80));
+            await cash.filter({ from: day(0), to: day(0) });
+            await expect(cash.row("Owner took cash")).toContainText(`− ${money(80)}`);
+            await expect(cash.row("Owner took cash")).toContainText("Cash drawer");
         });
 
-        test("an owner withdrawal from a card rail requires choosing the rail", async ({ page }) => {
+        test("the owner taking from a payment channel needs the channel", async ({ page }) => {
             const { day } = dateWindow();
-            const wallet = await MoneyMovementPage.open(page, day(0));
-            const dialog = await wallet.openEntryDialog("Cash out");
-            await wallet.fillEntry(dialog, { amount: 60, date: day(0), withdrawFrom: "Terminal / card rail" });
+            const cash = await CashInOutPage.open(page);
+            const dialog = await cash.openDialog("out");
+            await cash.fill(dialog, { amount: 60, date: day(0), from: "A payment channel" });
 
-            const blocked = await wallet.saveEntry(dialog);
+            const blocked = await cash.save(dialog);
 
-            expect(blocked, "no request without a rail").toBeNull();
-            await expect(wallet.toast("Choose a terminal / card rail.")).toBeVisible();
+            expect(blocked, "no request without a channel").toBeNull();
+            await expect(cash.toast("Choose the payment channel.")).toBeVisible();
 
-            await wallet.fillEntry(dialog, { rail: "E2E Wallet Visa" });
-            const res = await wallet.saveEntry(dialog);
+            await cash.fill(dialog, { channel: "E2E Wallet Visa" });
+            const res = await cash.save(dialog);
 
             expect(res?.status()).toBeLessThan(400);
-            await wallet.filter({ from: day(0), to: day(0) });
-            await expect(wallet.row("Owner withdrawal")).toContainText("E2E Wallet Visa");
+            await cash.filter({ from: day(0), to: day(0) });
+            await expect(cash.row("Owner took cash")).toContainText("E2E Wallet Visa");
         });
 
-        test("other entry records an adjustment on a card rail", async ({ page }) => {
+        test("a correction takes cash out of the drawer", async ({ page }) => {
             const { day } = dateWindow();
-            const wallet = await MoneyMovementPage.open(page, day(0));
+            const cash = await CashInOutPage.open(page);
 
-            const { res } = await wallet.addEntry("Other entry", {
-                kind: "Adjustment",
-                direction: "Cash out",
-                amount: 25.5,
-                rail: "E2E Wallet Visa",
-                date: day(0),
-                notes: "Terminal fee",
-            });
+            const { res } = await cash.add("out", { type: "Correction", amount: 25.5, date: day(0), notes: "Miscount" });
 
             expect(res?.status()).toBeLessThan(400);
-            await wallet.filter({ from: day(0), to: day(0) });
-            const row = wallet.row("Adjustment");
-            await expect(row).toContainText(`−${money(25.5)}`);
+            await cash.filter({ from: day(0), to: day(0) });
+            const row = cash.row("Correction");
+            await expect(row).toContainText(`− ${money(25.5)}`);
+            await expect(row).toContainText("Cash drawer");
+            await expect(row).toContainText("Miscount");
+        });
+
+        test("moving money into a channel is recorded on the channel", async ({ page }) => {
+            const { day } = dateWindow();
+            const cash = await CashInOutPage.open(page);
+
+            const { res } = await cash.add("move", { direction: "Into the channel", channel: "E2E Wallet Visa", amount: 70, date: day(0) });
+
+            expect(res?.status()).toBeLessThan(400);
+            await cash.filter({ from: day(0), to: day(0) });
+            const row = cash.row("Moved into E2E Wallet Visa");
+            await expect(row).toContainText(`+ ${money(70)}`);
             await expect(row).toContainText("E2E Wallet Visa");
-            await expect(row).toContainText("Terminal fee");
         });
 
-        test("an empty amount is rejected before saving", async ({ page }) => {
-            const { day } = dateWindow();
-            const wallet = await MoneyMovementPage.open(page, day(0));
-            const dialog = await wallet.openEntryDialog("Cash in");
+        test("an empty amount is stopped before saving", async ({ page }) => {
+            const cash = await CashInOutPage.open(page);
+            const dialog = await cash.openDialog("in");
 
-            const res = await wallet.saveEntry(dialog);
+            const res = await cash.save(dialog);
 
             expect(res).toBeNull();
-            await expect(wallet.toast("Enter a valid amount.")).toBeVisible();
+            await expect(cash.toast("Enter the amount.")).toBeVisible();
             await expect(dialog).toBeVisible();
+        });
+
+        test("a future date can't be picked", async ({ page }) => {
+            const cash = await CashInOutPage.open(page);
+            const dialog = await cash.openDialog("in");
+
+            await cash.fill(dialog, { date: futureYmd() });
+
+            await expect(dialog.locator(".ant-picker input"), "the picker keeps today").toHaveValue(todayYmd());
         });
 
         test("a server-side rejection is shown to the manager", async ({ page, serverAs }) => {
             const { day } = dateWindow();
-            const wallet = await MoneyMovementPage.open(page, day(0));
-            const dialog = await wallet.openEntryDialog("Cash in");
-            // The date input has max=today, but typing a future date is still possible.
-            await wallet.fillEntry(dialog, { amount: 10, date: futureYmd(), notes: "Rejected future entry" });
-
-            const res = await wallet.saveEntry(dialog);
-
-            expect(res, "the entry was sent").not.toBeNull();
-            const state = await walletState(await serverAs("wallet-manager"), day(0));
-            expect(state.ledger.movements.data.map((m) => m.notes), "nothing was saved").not.toContain("Rejected future entry");
-            await expect(
-                page.getByText(/movement date .*before or equal to today/i),
-                "the manager should be told why the entry wasn't saved",
-            ).toBeVisible();
-            await expect(dialog, "the dialog stays open to correct the entry").toBeVisible();
-        });
-
-        test("running cash is the all-time total and grows with each entry", async ({ page, serverAs }, testInfo) => {
-            const { day } = dateWindow();
             const api = await serverAs("wallet-manager");
-            const before = (await walletState(api, day(0))).runningCashBalance;
-            const wallet = await MoneyMovementPage.open(page, day(0));
+            expectSaved(await postCounted(api, { business_date: day(0), counted_cash: 10 }), "count");
+            expectSaved(await postEndShift(api, { business_date: day(0), end_shift_action: "save_as_opening_cash" }), "close");
+            const cash = await CashInOutPage.open(page);
+            const dialog = await cash.openDialog("in");
+            await cash.fill(dialog, { amount: 10, date: day(0), notes: "Rejected closed day" });
 
-            await wallet.addEntry("Cash in", { amount: 40, date: day(0) });
+            const res = await cash.save(dialog);
 
-            const after = Math.round((before + 40) * 100) / 100;
-            await expect.poll(async () => (await walletState(api, day(0))).runningCashBalance).toBe(after);
-            await page.reload();
-            await expect(wallet.headline("Running cash")).toHaveText(money(after));
-            expect(walletFixture(testInfo).locationId).toBeTruthy();
+            expect(res, "the line was sent").not.toBeNull();
+            const state = await ledgerState(api);
+            expect(state.ledger.movements.data.map((m) => m.notes), "nothing was saved").not.toContain("Rejected closed day");
+            await expect(page.getByText(/Shift is closed/i)).toBeVisible();
+            await expect(dialog, "the dialog stays open to correct it").toBeVisible();
         });
     });
 
     test.describe("filters", () => {
-        /** Seeds three entries across two days of this test's window; the e-wallet transfer is on the card rail. */
+        /** Three lines across two days of this test's window; the transfer is on the channel. */
         async function seedEntries(api, day, cardTypeId) {
             expectSaved(await postLedger(api, { direction: "in", amount: 100, kind: "cash_sale_topup", movement_date: day(0), notes: "F-topup" }), "topup");
             expectSaved(
@@ -182,101 +167,87 @@ test.describe("Ledger movements", () => {
             );
             expectSaved(
                 await postLedger(api, {
-                    direction: "in",
-                    amount: 70,
-                    kind: "ewallet_transfer_in",
-                    payment_card_type_id: cardTypeId,
-                    movement_date: day(1),
-                    notes: "F-ewallet",
+                    direction: "in", amount: 70, kind: "ewallet_transfer_in", payment_card_type_id: cardTypeId, movement_date: day(1), notes: "F-ewallet",
                 }),
                 "ewallet",
             );
         }
 
-        test("the date range limits rows and the ledger net", async ({ page, serverAs }, testInfo) => {
+        test("the date range limits the lines", async ({ page, serverAs }, testInfo) => {
             const { day } = dateWindow();
             await seedEntries(await serverAs("wallet-manager"), day, walletFixture(testInfo).cardTypeId);
-            const wallet = await MoneyMovementPage.open(page, day(0));
+            const cash = await CashInOutPage.open(page);
 
-            await wallet.filter({ from: day(0), to: day(0) });
-            await expect(wallet.rows).toHaveCount(2);
-            await expect(wallet.headline("Ledger net")).toHaveText(money(70));
+            await cash.filter({ from: day(0), to: day(0) });
+            await expect(cash.rows).toHaveCount(2);
 
-            await wallet.filter({ from: day(0), to: day(1) });
-            await expect(wallet.rows).toHaveCount(3);
-            await expect(wallet.headline("Ledger net")).toHaveText(money(140));
+            await cash.filter({ from: day(0), to: day(1) });
+            await expect(cash.rows).toHaveCount(3);
         });
 
-        test("the kind filter shows only that kind", async ({ page, serverAs }, testInfo) => {
+        test("the type filter shows only that type", async ({ page, serverAs }, testInfo) => {
             const { day } = dateWindow();
             await seedEntries(await serverAs("wallet-manager"), day, walletFixture(testInfo).cardTypeId);
-            const wallet = await MoneyMovementPage.open(page, day(0));
+            const cash = await CashInOutPage.open(page);
 
-            await wallet.filter({ from: day(0), to: day(1), kind: "Transfer in (e-wallet)" });
+            await cash.filter({ from: day(0), to: day(1), type: "Added float" });
 
-            await expect(wallet.rows).toHaveCount(1);
-            await expect(wallet.rows.first()).toContainText("F-ewallet");
-            await expect(page).toHaveURL(/kind=ewallet_transfer_in/);
+            await expect(cash.rows).toHaveCount(1);
+            await expect(cash.rows.first()).toContainText("F-topup");
+            await expect(page).toHaveURL(/kind=cash_sale_topup/);
         });
 
-        test("the rail filter separates cash register and card rail entries", async ({ page, serverAs }, testInfo) => {
+        test("twenty lines to a page, keeping the filters", async ({ page, serverAs }) => {
             const { day } = dateWindow();
             const api = await serverAs("wallet-manager");
-            await seedEntries(api, day, walletFixture(testInfo).cardTypeId);
-            expectSaved(
-                await postLedger(api, {
-                    direction: "out",
-                    amount: 15,
-                    kind: "adjustment",
-                    payment_card_type_id: walletFixture(testInfo).cardTypeId,
-                    movement_date: day(0),
-                    notes: "F-card",
-                }),
-                "card adjustment",
-            );
-            const wallet = await MoneyMovementPage.open(page, day(0));
+            for (let n = 1; n <= 21; n++) {
+                expectSaved(await postLedger(api, { direction: "in", amount: n, kind: "adjustment", movement_date: day(0), notes: `E2E paging ${n}` }), `line ${n}`);
+            }
+            const cash = await CashInOutPage.open(page);
+            await cash.filter({ from: day(0), to: day(0) });
+            await expect(cash.rows).toHaveCount(20);
 
-            await wallet.filter({ from: day(0), to: day(1), rail: "E2E Wallet Visa" });
-            await expect(wallet.rows).toHaveCount(2);
-            await expect(wallet.row("F-card")).toHaveCount(1);
-            await expect(wallet.row("F-ewallet")).toHaveCount(1);
+            const loaded = page.waitForResponse((r) => r.request().method() === "GET" && new URL(r.url()).searchParams.get("page") === "2");
+            await page.locator(".ant-pagination-item-2").click();
+            await loaded;
 
-            await wallet.filter({ rail: "Cash register (no card rail)" });
-            await expect(wallet.rows).toHaveCount(2);
-            await expect(wallet.row("F-card")).toHaveCount(0);
+            await expect(cash.rows).toHaveCount(1);
+            await expect(cash.rows.first()).toContainText(money(1));
+            await expect(page).toHaveURL(new RegExp(`date_from=${day(0)}`));
+            await expect(page).toHaveURL(new RegExp(`date_to=${day(0)}`));
         });
     });
 
-    test.describe("automatic entries", () => {
-        test("opening cash, count variance and end-shift cash out are labelled", async ({ page, serverAs }) => {
+    test.describe("lines Today's drawer writes", () => {
+        test("opening cash, the count difference and the end-of-shift cash out are labelled", async ({ page, serverAs }) => {
             const { day } = dateWindow();
             const api = await serverAs("wallet-manager");
             expectSaved(await postLedger(api, { direction: "in", amount: 1, kind: "adjustment", movement_date: day(0) }), "marker");
-            const wallet = await MoneyMovementPage.open(page, day(0));
-            await wallet.saveOpening(100);
-            await wallet.saveCounted(90);
-            await wallet.endShift("Cash out now");
+            const drawer = await DrawerPage.open(page, day(0));
+            await drawer.setOpening(100);
+            await drawer.countCash(90);
+            await drawer.endShift("Take the cash out");
 
-            await wallet.filter({ from: day(0), to: day(0) });
+            const cash = await CashInOutPage.open(page, { date_from: day(0), date_to: day(0) });
 
-            await expect(wallet.row("Opening cash (saved)")).toContainText(`+${money(100)}`);
-            await expect(wallet.row("Counted cash variance")).toContainText(`−${money(11)}`);
-            await expect(wallet.row("End shift cash out")).toContainText(`−${money(90)}`);
+            await expect(cash.row("Opening cash")).toContainText(`+ ${money(100)}`);
+            await expect(cash.row("Count difference")).toContainText(`− ${money(11)}`);
+            await expect(cash.row("Cash taken out at end of shift")).toContainText(`− ${money(90)}`);
             // System tokens are shown as labels, never as raw notes.
             await expect(page.getByText(/AUTO_CC_/)).toHaveCount(0);
         });
     });
 
-    test.describe("closed shift", () => {
-        test("Add entry is disabled for a closed date", async ({ page, serverAs }) => {
+    test.describe("an ended shift", () => {
+        test("refuses lines for that day", async ({ serverAs }) => {
             const { day } = dateWindow();
             const api = await serverAs("wallet-manager");
             expectSaved(await postCounted(api, { business_date: day(0), counted_cash: 50 }), "count");
             expectSaved(await postEndShift(api, { business_date: day(0), end_shift_action: "save_as_opening_cash" }), "close");
 
-            await MoneyMovementPage.open(page, day(0));
+            const res = await postLedger(api, { direction: "in", amount: 5, kind: "cash_sale_topup", movement_date: day(0) });
 
-            await expect(page.getByRole("button", { name: /Add entry/ })).toBeDisabled();
+            expect(res.status).toBe(422);
         });
     });
 });

@@ -15,6 +15,8 @@ use App\Models\InventoryMovement;
 use App\Models\Product\Product;
 use App\Models\ProductInventory;
 use App\Services\InventoryService;
+use App\Support\CostVisibility;
+use App\Support\Quantity;
 use App\Traits\HandlesStockTransfers;
 use App\Traits\LocationCategoryScoping;
 use Illuminate\Http\Request;
@@ -35,6 +37,10 @@ class InventoryController extends Controller
         $location = Helpers::getActiveLocation($domain, $request->input('location_id'));
 
         $report = $this->inventoryService->getInventoryReport($location, $slug);
+        // Stock value and profit are figures at cost: for those who keep the books.
+        if (! CostVisibility::allowed()) {
+            $report['summary'] = CostVisibility::strip($report['summary'], ['total_inventory_value', 'total_retail_value', 'potential_profit']);
+        }
 
         return Inertia::render('Inventory/Index', [
             'report' => $report,
@@ -60,8 +66,9 @@ class InventoryController extends Controller
             ]);
         }
 
-        $query = ProductInventory::with(['product', 'location'])
+        $query = ProductInventory::with(['product.category', 'location'])
             ->where('location_id', $location->id)
+            ->carriedAtLocation()
             ->whereHas('product', function ($q) use ($slug) {
                 $q->where('domain', $slug);
             });
@@ -361,14 +368,20 @@ class InventoryController extends Controller
             'location_id' => 'required|exists:inventory_locations,id',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
-            'items.*.quantity' => 'required|integer|min:1',
-            'items.*.unit_cost' => 'required|numeric|min:0',
+            'items.*.quantity' => 'required|numeric|min:0.001|max:99999',
+            'items.*.unit_cost' => 'nullable|numeric|min:0',
             'items.*.batch_number' => 'nullable|string|max:255',
             'items.*.expiry_date' => 'nullable|date',
             'items.*.notes' => 'nullable|string|max:500',
             'reference_type' => ['nullable', 'string', Rule::in($validReferenceTypes)],
             'reference_id' => 'nullable|integer',
         ]);
+        // Parts of a unit only for things sold by weight or volume.
+        Quantity::assertRowsFit($validated['items']);
+        // Someone who doesn't see cost receives at the product's own cost (InventoryService falls back to it).
+        if (! CostVisibility::allowed()) {
+            $validated['items'] = array_map(fn ($item) => [...$item, 'unit_cost' => null], $validated['items']);
+        }
 
         $location = InventoryLocation::forDomain($domain->name_slug)->findOrFail($validated['location_id']);
 

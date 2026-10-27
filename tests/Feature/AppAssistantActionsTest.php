@@ -174,7 +174,7 @@ class AppAssistantActionsTest extends TestCase
         ProductInventory::query()->create(['product_id' => $burger->id, 'location_id' => $this->store->id, 'quantity_on_hand' => 10, 'quantity_reserved' => 0, 'quantity_available' => 10]);
 
         $card = $this->propose($user, 'create_stock_adjustment', ['reason' => 'damaged_goods', 'items' => [['product_id' => $burger->id, 'actual_quantity' => 7]]]);
-        $this->assertContains(['label' => 'Burger', 'value' => '10 → 7 (-3)'], $card['fields']);
+        $this->assertContains(['label' => 'Burger', 'value' => '10 → 7 pc (-3)'], $card['fields']);
         $this->confirm($user, $card)->assertOk();
 
         $adjustment = StockAdjustment::query()->where('domain', $this->domain->name_slug)->sole();
@@ -242,6 +242,25 @@ class AppAssistantActionsTest extends TestCase
         // Paying the rest by bill id clears the bill.
         $this->confirm($user, $this->propose($user, 'pay_supplier_bill', ['bill_id' => $first->id, 'payment_method' => 'bank']))->assertOk();
         $this->assertSame(0.0, $first->fresh()->remaining);
+    }
+
+    public function test_a_bill_is_not_paid_in_cash_from_a_warehouse(): void
+    {
+        $user = $this->user(['finance.payables.index', 'finance.bill-payments.store']);
+        $warehouse = InventoryLocation::query()->create([
+            'domain' => $this->domain->name_slug, 'name' => 'Depot', 'code' => Str::upper(Str::random(8)),
+            'type' => 'warehouse', 'is_active' => true,
+        ]);
+        $supplier = Supplier::query()->create(['domain' => $this->domain->name_slug, 'name' => 'Magnolia', 'payment_terms_days' => 15, 'is_active' => true]);
+        SupplierBill::query()->create([
+            'domain' => $this->domain->name_slug, 'supplier_id' => $supplier->id, 'bill_type' => 'inventory', 'user_id' => $user->id,
+            'bill_date' => today()->toDateString(), 'due_date' => today()->addDays(15)->toDateString(), 'amount' => 500,
+        ]);
+
+        $tools = new AssistantTools(app(GuideLibrary::class), $user, $this->domain->fresh(), $warehouse);
+        $result = json_decode($tools->run('propose_pay_supplier_bill', ['supplier' => 'Magnolia', 'payment_method' => 'cash_register']), true);
+
+        $this->assertSame('Cash from the register needs a store. The user should pick a store first.', $result['error']);
     }
 
     public function test_bill_payments_need_the_finance_feature_and_permission(): void

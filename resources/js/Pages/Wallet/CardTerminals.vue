@@ -13,7 +13,7 @@ import { Modal, notification } from "ant-design-vue";
 
 import ContentLayout from "@/Components/ContentLayout.vue";
 import IconTooltipButton from "@/Components/buttons/IconTooltip.vue";
-import WalletShell from "@/Pages/Wallet/WalletShell.vue";
+import WalletLayout from "@/Pages/Wallet/components/WalletLayout.vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 import { useHelpers } from "@/Composables/useHelpers";
@@ -311,8 +311,7 @@ const showMobileSecondaryActions = computed(
 </script>
 
 <template>
-    <WalletShell v-bind="props" :is-money-movement-page="false">
-        <template #primary>
+    <WalletLayout :title="'Payment channels'" active="balances" :active-location="activeLocation">
             <div class="mt-6 w-full min-w-0 max-w-7xl">
                 <div class="space-y-4">
                     <div class="mb-4 grid min-w-0 max-w-full grid-cols-1 gap-3 md:max-w-7xl md:grid-cols-3">
@@ -614,8 +613,6 @@ const showMobileSecondaryActions = computed(
                     </ContentLayout>
                 </div>
             </div>
-        </template>
-        <template #after>
             <a-modal
                 v-model:visible="modalOpen"
                 :title="editing ? 'Edit payment channel' : 'Add payment channel'"
@@ -663,6 +660,5 @@ const showMobileSecondaryActions = computed(
                     </div>
                 </div>
             </a-modal>
-        </template>
-    </WalletShell>
+    </WalletLayout>
 </template>

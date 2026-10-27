@@ -1,5 +1,6 @@
 <script setup>
 import { ref, reactive, computed, watch, toRefs } from "vue";
+import { allowsDecimal } from "@/Utils/quantity";
 import { useMediaQuery } from "@vueuse/core";
 import {
   SearchOutlined,
@@ -87,7 +88,8 @@ const rowFor = (product, available) => ({
   product_id: product.id,
   name: product.name,
   sku: product.SKU,
-  unit: product.unit_of_measure || "pcs",
+  unit: product.quantity_unit || "pc",
+  allows_decimal: allowsDecimal(product),
   available: Math.max(0, Number(available) || 0),
   // What the destination store has of it already; null until a destination is picked.
   atDestination: null,
@@ -398,17 +400,17 @@ watch(
             class="w-full"
             :disabled="loading"
             :loading="storeLoading"
+            option-label-prop="label"
           >
             <a-select-option
               v-for="location in locations"
               :key="location.id"
               :value="location.id"
+              :label="location.name"
             >
-              <div class="flex justify-between items-center">
-                <span>{{ location.name }}</span>
-                <span class="text-gray-500 text-xs">
-                  {{ location.address }}
-                </span>
+              <div class="min-w-0">
+                <div class="truncate">{{ location.name }}</div>
+                <div v-if="location.address" class="truncate text-xs text-gray-500">{{ location.address }}</div>
               </div>
             </a-select-option>
           </a-select>
@@ -441,17 +443,17 @@ watch(
             class="w-full"
             :disabled="loading"
             :loading="storeLoading"
+            option-label-prop="label"
           >
             <a-select-option
               v-for="location in availableToLocations"
               :key="location.id"
               :value="location.id"
+              :label="location.name"
             >
-              <div class="flex justify-between items-center">
-                <span>{{ location.name }}</span>
-                <span class="text-gray-500 text-xs">
-                  {{ location.address }}
-                </span>
+              <div class="min-w-0">
+                <div class="truncate">{{ location.name }}</div>
+                <div v-if="location.address" class="truncate text-xs text-gray-500">{{ location.address }}</div>
               </div>
             </a-select-option>
           </a-select>
@@ -586,9 +588,10 @@ watch(
             <div class="col-span-6 md:col-span-3">
               <a-input-number
                 v-model:value="item.quantity"
-                :min="1"
+                :min="allowsDecimal(item) ? 0.001 : 1"
                 :max="item.available > 0 ? item.available : undefined"
-                :precision="0"
+                :step="allowsDecimal(item) ? 0.25 : 1"
+                :precision="allowsDecimal(item) ? 3 : 0"
                 :disabled="loading || item.available <= 0"
                 :aria-label="`Quantity of ${item.name}`"
                 class="w-full"

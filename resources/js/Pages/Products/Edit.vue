@@ -438,6 +438,9 @@ useBarcodeScanner((code) => {
                                         :precision="2"
                                         size="large"
                                     />
+                                    <p class="mb-0 mt-1 text-xs text-gray-500">
+                                        Updated to the average cost each time stock is received.
+                                    </p>
                                 </a-form-item>
 
                                 <a-form-item
@@ -609,6 +612,14 @@ useBarcodeScanner((code) => {
                                         {{ option }}
                                     </a-radio>
                                 </a-radio-group>
+                                <p
+                                    v-if="$page.props.sold_by_types?.find((t) => t.name === form.sold_type)?.allows_decimal"
+                                    class="mt-2 mb-0 text-xs text-gray-500"
+                                    data-testid="sold-type-decimal-hint"
+                                >
+                                    Sold by {{ $page.props.sold_by_types.find((t) => t.name === form.sold_type).unit === "L" ? "volume" : "weight" }}:
+                                    at the till you type how much, e.g. 1.5 {{ $page.props.sold_by_types.find((t) => t.name === form.sold_type).unit }}. Price is per {{ $page.props.sold_by_types.find((t) => t.name === form.sold_type).unit }}.
+                                </p>
                             </a-form-item>
 
                             <a-form-item

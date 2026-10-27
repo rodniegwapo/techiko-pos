@@ -3,6 +3,7 @@ import { ref } from "vue";
 import { router, useForm, Head } from "@inertiajs/vue3";
 import { IconArrowLeft, IconWorld, IconMapPin, IconCurrencyDollar, IconClock } from "@tabler/icons-vue";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
+import PageHelp from "@/Components/help/PageHelp.vue";
 import { notification } from "ant-design-vue";
 
 const props = defineProps({
@@ -95,7 +96,10 @@ const handleCancel = () => {
                                     <IconWorld class="h-5 w-5 text-blue-600" />
                                 </div>
                                 <div>
-                                    <h1 class="text-2xl font-bold text-gray-900">Create New Domain</h1>
+                                    <div class="flex items-center gap-1">
+                                        <h1 class="text-2xl font-bold text-gray-900">Create New Domain</h1>
+                                        <PageHelp />
+                                    </div>
                                     <p class="text-gray-600">Set up a new business domain</p>
                                 </div>
                             </div>

@@ -2,17 +2,23 @@
 
 namespace App\Models;
 
+use App\Models\Product\Discount;
+use App\Models\Product\Product;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class SaleItem extends Model
 {
     use SoftDeletes;
-    
+
     protected $guarded = [];
 
     protected $casts = [
         'unit_cost' => 'decimal:4',
+        // Whole for things sold by the piece; parts for things sold by weight or volume (1.5 kg).
+        'quantity' => 'float',
+        // Dine-in: how much of the line is already on a kitchen ticket.
+        'sent_quantity' => 'float',
     ];
 
     protected static function booted()
@@ -21,7 +27,7 @@ class SaleItem extends Model
         // don't rewrite the profit of sales already made.
         static::creating(function (SaleItem $item) {
             if ($item->unit_cost === null && $item->product_id) {
-                $item->unit_cost = \App\Models\Product\Product::whereKey($item->product_id)->value('cost');
+                $item->unit_cost = Product::whereKey($item->product_id)->value('cost');
             }
         });
 
@@ -39,12 +45,12 @@ class SaleItem extends Model
 
     public function product()
     {
-        return $this->belongsTo(\App\Models\Product\Product::class);
+        return $this->belongsTo(Product::class);
     }
 
     public function discounts()
     {
-        return $this->belongsToMany(\App\Models\Product\Discount::class);
+        return $this->belongsToMany(Discount::class);
     }
 
     /** The options picked on this line (Large, Extra shot…), as they were priced when rung up. */

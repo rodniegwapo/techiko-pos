@@ -1,12 +1,12 @@
 <script setup>
 import { ref, reactive, computed, watch,toRefs } from "vue";
+import { allowsDecimal } from "@/Utils/quantity";
 import { useMediaQuery } from "@vueuse/core";
 import { router } from "@inertiajs/vue3";
 import { IconPlus, IconTrash, IconSearch, IconShoppingCart, IconAlertTriangle, IconX } from "@tabler/icons-vue";
 import { notification } from "ant-design-vue";
 import axios from "axios";
 import { usePage } from "@inertiajs/vue3";
-import { useHelpers } from "@/Composables/useHelpers";
 
 const page = usePage();
 const isMdUp = useMediaQuery("(min-width: 768px)");
@@ -25,22 +25,13 @@ const inventoryApi = {
 };
 
 // Must match App\Models\InventoryMovement::getValidReferenceTypes()
-const REFERENCE_TYPES = [
-  "Sale",
-  "Purchase",
-  "StockAdjustment",
-  "InventoryTransfer",
-  "CustomerReturn",
-  "DamagedGoods",
-  "Theft",
-  "ExpiredProducts",
-  "PromotionalGiveaway",
+// Why stock is coming in. Damaged, expired or stolen stock goes out, so it belongs to Stock
+// Adjustments, not here.
+const referenceTypeSelectOptions = [
+  { label: "Purchase (bought from a supplier)", value: "Purchase" },
+  { label: "Customer return", value: "CustomerReturn" },
+  { label: "Free / promo stock", value: "PromotionalGiveaway" },
 ];
-
-const { humanize } = useHelpers();
-
-// Show "Stock Adjustment", but send the stored value "StockAdjustment".
-const referenceTypeSelectOptions = REFERENCE_TYPES.map((t) => ({ label: humanize(t), value: t }));
 
 const emit = defineEmits(["success", "update:visible"]);
 
@@ -56,7 +47,7 @@ const { visible } = toRefs(props);
 const form = reactive({
   location_id: null,
   items: [],
-  reference_type: null,
+  reference_type: "Purchase",
   reference_id: null,
   domain: page.props.isGlobalView ? null : (page.props.currentDomain?.name_slug || null),
 });
@@ -101,7 +92,7 @@ const loadStoreItemCount = async (locationId) => {
 const initializeForm = () => {
   form.location_id = props.currentLocation?.id || null;
   form.items = [];
-  form.reference_type = null;
+  form.reference_type = "Purchase";
   form.reference_id = null;
   productSearch.value = "";
   searchResults.value = [];
@@ -173,7 +164,8 @@ const addProduct = (product) => {
     product_id: product.id,
     product: product,
     quantity: 1,
-    unit_cost: product.cost || 0,
+    // Hidden from those who don't see cost: the server then uses the product's own cost.
+    unit_cost: product.cost ?? null,
     batch_number: "",
     expiry_date: null,
     notes: "",
@@ -315,17 +307,17 @@ watch(
           class="w-full"
           :disabled="loading"
           :loading="storeLoading"
+          option-label-prop="label"
         >
           <a-select-option
             v-for="location in locations"
             :key="location.id"
             :value="location.id"
+            :label="location.name"
           >
-            <div class="flex justify-between items-center">
-              <span>{{ location.name }}</span>
-              <span class="text-gray-500 text-sm">
-                {{ location.address }}
-              </span>
+            <div class="min-w-0">
+              <div class="truncate">{{ location.name }}</div>
+              <div v-if="location.address" class="truncate text-xs text-gray-500">{{ location.address }}</div>
             </div>
           </a-select-option>
         </a-select>
@@ -382,12 +374,14 @@ watch(
           </label>
           <a-select
             v-model:value="form.reference_type"
-            placeholder="Leave empty for Purchase"
             class="w-full"
-            allow-clear
+            data-testid="receive-reference-type"
             :disabled="loading"
             :options="referenceTypeSelectOptions"
           />
+          <p class="mb-0 mt-1 text-xs text-gray-500">
+            Ordering from a supplier? Use Purchasing, so the supplier bill and payment follow.
+          </p>
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -442,7 +436,7 @@ watch(
                   </p>
                 </div>
                 <div class="text-right">
-                  <p class="text-sm font-medium">
+                  <p v-if="$page.props.canSeeCost" class="text-sm font-medium">
                     ₱{{ product.cost?.toFixed(2) || "0.00" }}
                   </p>
                   <p class="text-xs text-gray-500">
@@ -488,9 +482,10 @@ watch(
             <div class="col-span-2">
               <a-input-number
                 v-model:value="item.quantity"
-                :min="1"
-                :step="1"
-                :precision="0"
+                :min="allowsDecimal(item.product) ? 0.001 : 1"
+                :step="allowsDecimal(item.product) ? 0.25 : 1"
+                :precision="allowsDecimal(item.product) ? 3 : 0"
+                :addon-after="allowsDecimal(item.product) ? item.product.quantity_unit : undefined"
                 class="w-full"
                 :disabled="loading"
               />
@@ -498,7 +493,9 @@ watch(
 
             <!-- Unit Cost -->
             <div class="col-span-2">
+              <span v-if="!$page.props.canSeeCost" class="text-xs text-gray-400">—</span>
               <a-input-number
+                v-else
                 v-model:value="item.unit_cost"
                 :min="0"
                 :step="0.01"
@@ -562,9 +559,9 @@ watch(
       <div class="modal-footer-actions flex w-full flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <span class="text-sm text-gray-500">
-            {{ form.items.length }} item(s) • Total: ₱{{
+            {{ form.items.length }} item(s)<template v-if="$page.props.canSeeCost"> • Total: ₱{{
               totalValue.toFixed(2)
-            }}
+            }}</template>
           </span>
         </div>
         <div class="flex w-full flex-col gap-2 md:w-auto md:flex-row">

@@ -3,8 +3,8 @@
 namespace Database\Seeders;
 
 use App\Models\Category;
-use App\Models\Customer;
 use App\Models\CreditTransaction;
+use App\Models\Customer;
 use App\Models\InventoryLocation;
 use App\Models\MandatoryDiscount;
 use App\Models\ModifierGroup;
@@ -12,9 +12,12 @@ use App\Models\PaymentCardType;
 use App\Models\Product\Discount;
 use App\Models\Product\Product;
 use App\Models\ProductInventory;
+use App\Models\RegisterShift;
 use App\Models\Sale;
+use App\Models\TimeEntry;
 use App\Models\User;
 use App\Models\UserPin;
+use App\Models\WalletCashReconciliation;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -52,6 +55,7 @@ class E2ESalesSeeder extends Seeder
             $this->seedDiscounts();
             $this->seedPins();
             $this->clearPendingCarts($cashiers);
+            $this->openTodaysShifts($location, [...$cashiers, 'admin@jollibee-corp.com', 'manager@jollibee-corp.com', 'cashier1@jollibee-corp.com']);
         });
 
         $this->writeFixtureIds();
@@ -90,6 +94,28 @@ class E2ESalesSeeder extends Seeder
 
         $path = env('E2E_FIXTURES_FILE', base_path('tests/e2e/.fixtures.json'));
         file_put_contents($path, json_encode($fixtures, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    }
+
+    /**
+     * Taking payment needs the store's day open and the cashier's own shift: every account the
+     * Sales suite sells as gets one open today.
+     *
+     * @param  list<string>  $emails
+     */
+    private function openTodaysShifts(InventoryLocation $location, array $emails): void
+    {
+        $today = now()->toDateString();
+        WalletCashReconciliation::query()->updateOrCreate(
+            ['domain' => self::DOMAIN, 'location_id' => $location->id, 'business_date' => $today],
+            ['is_closed' => false, 'closed_at' => null, 'closed_by' => null],
+        );
+
+        foreach (User::whereIn('email', $emails)->pluck('id') as $userId) {
+            RegisterShift::query()->firstOrCreate(
+                ['domain' => self::DOMAIN, 'location_id' => $location->id, 'user_id' => $userId, 'status' => RegisterShift::OPEN],
+                ['business_date' => $today, 'opening_cash' => 0, 'opened_at' => now()],
+            );
+        }
     }
 
     /** One cashier per Playwright worker: each user has their own pending cart. */
@@ -134,13 +160,15 @@ class E2ESalesSeeder extends Seeder
             ['name' => 'E2E Security Probe', 'price' => 10, 'stock' => 1000, 'barcode' => 'E2E000005'],
             // Only sales/modifiers.spec.js uses this: it has the "E2E Size" options, which ask before adding.
             ['name' => 'E2E Latte', 'price' => 100, 'stock' => 1000, 'barcode' => 'E2E000006'],
+            // Only sales/weighed.spec.js uses this: sold by the kilo, it asks "How much?" before adding.
+            ['name' => 'E2E Rice', 'price' => 50, 'stock' => 100, 'barcode' => 'E2E000007', 'sold_type' => 'Kilo'],
         ];
 
         foreach ($products as $row) {
             $product = Product::updateOrCreate(
                 ['domain' => self::DOMAIN, 'name' => $row['name']],
                 [
-                    'sold_type' => 'piece',
+                    'sold_type' => $row['sold_type'] ?? 'piece',
                     'price' => $row['price'],
                     'cost' => $row['price'] / 2,
                     'SKU' => str_replace(' ', '-', strtoupper($row['name'])),
@@ -333,6 +361,9 @@ class E2ESalesSeeder extends Seeder
             $userPin->pin_code = Hash::make($pin);
             $userPin->active = true;
             $userPin->save();
+
+            // timeclock.spec.js clocks these PINs in and out: each run starts with no shifts.
+            TimeEntry::query()->where('user_id', $user->id)->delete();
         }
     }
 

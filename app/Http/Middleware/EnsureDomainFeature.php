@@ -22,6 +22,7 @@ class EnsureDomainFeature
         'sales_history_unlimited' => "Full sales history and CSV export aren't part of this organization's plan.",
         'advanced_inventory' => "Stock movements, valuation and transfers aren't part of this organization's plan.",
         'multi_location' => "More than one location isn't part of this organization's plan.",
+        'dine_in' => "Dine-in tables and tabs aren't part of this organization's plan.",
     ];
 
     public function handle(Request $request, Closure $next, string $feature): Response

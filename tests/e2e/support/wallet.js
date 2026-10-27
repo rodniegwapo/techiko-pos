@@ -9,7 +9,12 @@ import { money, fixtureIds } from "./sales.js";
 import { workerNumber } from "./users.js";
 
 export const WALLET_DOMAIN = "jollibee-corp";
+/** The old all-in-one page; it now sends you on to the page below that does that job. */
 export const walletUrl = `/domains/${WALLET_DOMAIN}/wallet/money-movement`;
+export const drawerUrl = `/domains/${WALLET_DOMAIN}/wallet/drawer`;
+export const cashInOutUrl = `/domains/${WALLET_DOMAIN}/wallet/cash-in-out`;
+export const balancesUrl = `/domains/${WALLET_DOMAIN}/wallet/balances`;
+export const historyUrl = `/domains/${WALLET_DOMAIN}/wallet/history`;
 export const ledgerUrl = (path = "") => `/domains/${WALLET_DOMAIN}/wallet/cash-ledger${path}`;
 export const cardTypesUrl = (path = "") => `/domains/${WALLET_DOMAIN}/payment-card-types${path}`;
 export const cardTypeUrl = (id, path = "") => cardTypesUrl(`/${id}${path}`);
@@ -61,11 +66,19 @@ export const futureYmd = () => new Date(Date.now() + 2 * 86_400_000).toISOString
 /* API helpers                                                         */
 /* ------------------------------------------------------------------ */
 
-/** Page props for a business date (and optional ledger filters), read over HTTP. */
+/** Today's drawer props (cashControl) for a business date, read over HTTP. */
 export async function walletState(api, businessDate, query = {}) {
     const params = new URLSearchParams({ business_date: businessDate, ...query });
-    const res = await api.get(`${walletUrl}?${params}`);
-    expect(res.status(), "money movement page").toBe(200);
+    const res = await api.get(`${drawerUrl}?${params}`);
+    expect(res.status(), "today's drawer page").toBe(200);
+    return responseProps(res);
+}
+
+/** Cash in & out props (ledger) for the given filters, read over HTTP. */
+export async function ledgerState(api, query = {}) {
+    const params = new URLSearchParams(query);
+    const res = await api.get(`${cashInOutUrl}?${params}`);
+    expect(res.status(), "cash in & out page").toBe(200);
     return responseProps(res);
 }
 
@@ -87,143 +100,160 @@ export function expectSaved(res, what) {
 }
 
 /* ------------------------------------------------------------------ */
-/* UI page object                                                      */
+/* UI page objects                                                     */
 /* ------------------------------------------------------------------ */
 
-export class MoneyMovementPage {
+/** An antd number input by test id (the id lands on the <input> itself). */
+export const numberInput = (scope, testId) => scope.getByTestId(testId).locator("input").or(scope.getByTestId(testId)).first();
+
+/** Types into an antd date picker inside `scope` (the nth one) and confirms. */
+export async function fillDatePicker(scope, value, nth = 0) {
+    const input = scope.locator(".ant-picker input").nth(nth);
+    await input.click();
+    await input.fill(value);
+    await input.press("Enter");
+}
+
+/** Today's drawer: Expected / Counted / Short-Over, and the shift actions. */
+export class DrawerPage {
     constructor(page) {
         this.page = page;
     }
 
     static async open(page, businessDate, query = {}) {
         const params = new URLSearchParams(businessDate ? { business_date: businessDate, ...query } : query);
-        const wallet = new MoneyMovementPage(page);
-        await page.goto(`${walletUrl}${params.size ? `?${params}` : ""}`);
-        await expect(page.getByText("Cash control", { exact: true })).toBeVisible();
-        return wallet;
+        await page.goto(`${drawerUrl}${params.size ? `?${params}` : ""}`);
+        await expect(page.getByTestId("drawer-expected")).toBeVisible();
+        return new DrawerPage(page);
     }
 
-    /** Waits for the Inertia reload the page does after a save. */
+    /** Waits for the reload the page does after a save. */
     waitForReload() {
         return this.page.waitForResponse(
-            (r) => r.request().method() === "GET" && new URL(r.url()).pathname === walletUrl && r.request().headers()["x-inertia"],
+            (r) => r.request().method() === "GET" && new URL(r.url()).pathname === drawerUrl && r.request().headers()["x-inertia"],
         );
     }
 
-    async expandCashControl() {
-        // The page collapses the panel again whenever it reloads, so retry until it stays open.
-        await expect(async () => {
-            const toggle = this.page.getByRole("button", { name: "Full cash control" });
-            if (await toggle.isVisible()) {
-                await toggle.click();
-            }
-            await expect(this.page.getByText("Set opening cash", { exact: true })).toBeVisible({ timeout: 1000 });
-        }).toPass({ timeout: 10_000 });
+    get expected() {
+        return this.page.getByTestId("drawer-expected");
     }
 
-    /** Expected / Counted / Variance value in the summary strip. */
-    summary(label) {
-        return this.page.locator(`div:has(> div:text-is("${label}"))`).locator("> div").nth(1);
+    get counted() {
+        return this.page.getByTestId("drawer-counted");
     }
 
-    card(title) {
-        return this.page.locator("div.rounded.border").filter({ has: this.page.getByText(title, { exact: true }) }).last();
+    /** "Short ₱50.00", "Over ₱60.00", "Balanced" or "Not counted". */
+    get result() {
+        return this.page.getByTestId("drawer-result");
     }
 
-    get openingCard() {
-        return this.card("Set opening cash");
+    /** opening | sales | in | out */
+    step(key) {
+        return this.page.getByTestId(`step-${key}`);
     }
 
-    get countedCard() {
-        return this.card("Submit counted cash");
+    dialog(title) {
+        return this.page.getByRole("dialog").filter({ hasText: title });
     }
 
-    async saveOpening(amount, reason = "") {
-        await this.expandCashControl();
-        await this.openingCard.getByRole("spinbutton").fill(String(amount));
-        if (reason) await this.openingCard.getByPlaceholder("Optional reason for override/change").fill(reason);
-
-        const saved = this.page.waitForResponse((r) => r.request().method() === "POST" && r.url().includes("/cash-ledger/opening-cash"));
+    async save(path, act) {
+        const saved = this.page.waitForResponse((r) => r.request().method() === "POST" && r.url().includes(path));
         const reloaded = this.waitForReload();
-        await this.openingCard.getByRole("button", { name: "Save opening" }).click();
+        await act();
         const res = await saved;
         if (succeeded(res)) await reloaded;
         return res;
     }
 
-    async saveCounted(amount, notes = "") {
-        await this.expandCashControl();
-        await this.countedCard.getByRole("spinbutton").fill(String(amount));
-        if (notes) await this.countedCard.getByPlaceholder("Optional reconciliation notes").fill(notes);
-
-        const saved = this.page.waitForResponse((r) => r.request().method() === "POST" && r.url().includes("/cash-ledger/counted-cash"));
-        const reloaded = this.waitForReload();
-        await this.countedCard.getByRole("button", { name: "Save counted cash" }).click();
-        const res = await saved;
-        if (succeeded(res)) await reloaded;
-        return res;
-    }
-
-    /** @param {"Cash out now"|"Save as opening cash"} action */
-    async endShift(action) {
-        await this.page.getByRole("button", { name: "End Shift" }).click();
-        const dialog = this.page.getByRole("dialog").filter({ hasText: "End Shift action" });
+    async openSetOpening() {
+        await this.page.getByTestId("open-set-opening").click();
+        const dialog = this.dialog("Set opening cash");
         await expect(dialog).toBeVisible();
-        await dialog.getByText(action, { exact: true }).click();
-
-        const closed = this.page.waitForResponse((r) => r.request().method() === "POST" && r.url().includes("/cash-ledger/end-shift"));
-        const reloaded = this.waitForReload();
-        await dialog.getByRole("button", { name: "Confirm End Shift" }).click();
-        const res = await closed;
-        if (succeeded(res)) await reloaded;
-        return res;
+        return dialog;
     }
 
-    async reopenShift() {
-        const reopened = this.page.waitForResponse((r) => r.request().method() === "POST" && r.url().includes("/cash-ledger/reopen-shift"));
-        const reloaded = this.waitForReload();
-        await this.page.getByRole("button", { name: "Reopen Shift" }).click();
-        const res = await reopened;
-        if (succeeded(res)) await reloaded;
-        return res;
+    async setOpening(amount, reason = "") {
+        const dialog = await this.openSetOpening();
+        await numberInput(dialog, "opening-amount").fill(String(amount));
+        if (reason) await dialog.getByPlaceholder("Why it changed (optional)").fill(reason);
+        return this.save("/cash-ledger/opening-cash", () => dialog.getByRole("button", { name: "Save opening" }).click());
     }
 
-    /* Ledger */
+    async openCountCash() {
+        await this.page.getByTestId("open-count-cash").click();
+        const dialog = this.dialog("Count cash");
+        await expect(dialog).toBeVisible();
+        return dialog;
+    }
 
-    /** Opens "Add entry" → Cash in / Cash out / Other entry and returns the dialog. */
-    async openEntryDialog(menuItem) {
-        // The menu opens on hover, which occasionally doesn't register under load; retry until it shows.
-        const item = this.page.getByRole("menuitem", { name: menuItem });
-        await expect(async () => {
-            await this.page.mouse.move(0, 0);
-            await this.page.getByRole("button", { name: /Add entry/ }).hover();
-            await expect(item).toBeVisible({ timeout: 1500 });
-        }).toPass({ timeout: 15_000 });
-        await item.click();
+    async countCash(amount, notes = "") {
+        const dialog = await this.openCountCash();
+        await numberInput(dialog, "count-amount").fill(String(amount));
+        if (notes) await dialog.getByPlaceholder("Notes (optional)").fill(notes);
+        return this.save("/cash-ledger/counted-cash", () => dialog.getByRole("button", { name: "Save count" }).click());
+    }
+
+    /**
+     * Ends the store's day (a manager's, once no cashier is still on shift).
+     * @param {"Take the cash out"|"Leave it as the next shift's opening"} choice
+     */
+    async endShift(choice) {
+        await this.page.getByTestId("open-end-shift").click();
+        const dialog = this.dialog("End the store's day");
+        await expect(dialog).toBeVisible();
+        await dialog.getByTestId(choice === "Take the cash out" ? "end-shift-cashout" : "end-shift-keep").click();
+        return this.save("/cash-ledger/close-shift", () => dialog.getByTestId("confirm-end-shift").click());
+    }
+
+    /** Reopening asks why; the reason is kept in the reopen log. */
+    async reopenShift(reason = "Counted wrong") {
+        await this.page.getByTestId("reopen-shift").click();
+        await this.page.getByTestId("reopen-reason").fill(reason);
+        return this.save("/cash-ledger/reopen-shift", () => this.page.getByTestId("reopen-confirm").click());
+    }
+
+    notice(title) {
+        return notice(this.page, title);
+    }
+}
+
+/** Cash in & out: the drawer's lines, adding cash in / cash out / moving money on a channel. */
+export class CashInOutPage {
+    constructor(page) {
+        this.page = page;
+    }
+
+    static async open(page, query = {}) {
+        const params = new URLSearchParams(query);
+        await page.goto(`${cashInOutUrl}${params.size ? `?${params}` : ""}`);
+        await expect(page.getByTestId("cash-filter-type")).toBeVisible();
+        return new CashInOutPage(page);
+    }
+
+    /** Opens + Cash in / − Cash out / Move money and returns the dialog. */
+    async openDialog(mode) {
+        await this.page.getByTestId({ in: "add-cash-in", out: "add-cash-out", move: "move-money" }[mode]).click();
         const dialog = this.page.getByRole("dialog");
         await expect(dialog).toBeVisible();
         return dialog;
     }
 
     /**
-     * Fills the entry dialog. Fields: direction ("Cash in"/"Cash out"), kind (label), amount,
-     * withdrawFrom ("Cash register"/"Terminal / card rail"), rail (card name), date, notes.
+     * Fields: type ("Added float" | "Owner took cash" | "Correction"), from ("Cash drawer" |
+     * "A payment channel"), direction ("Into the channel" | "Out of the channel"), channel, amount, date, notes.
      */
-    async fillEntry(dialog, { direction, kind, amount, withdrawFrom, rail, date, notes } = {}) {
-        if (kind) await pickSelectOption(this.page, dialog, 0, kind);
-        if (direction) await dialog.locator(".ant-radio-button-wrapper").filter({ hasText: direction }).first().click();
-        if (amount !== undefined) await dialog.getByRole("spinbutton").fill(String(amount));
-        if (withdrawFrom) await dialog.locator(".ant-radio-button-wrapper").filter({ hasText: withdrawFrom }).click();
-        if (rail) await pickSelectOption(this.page, dialog, 1, rail);
-        if (date) await dialog.locator('input[type="date"]').fill(date);
-        if (notes) await dialog.getByPlaceholder("Optional memo").fill(notes);
+    async fill(dialog, { type, from, direction, channel, amount, date, notes } = {}) {
+        if (type) await dialog.locator(".ant-radio-button-wrapper").filter({ hasText: type }).click();
+        if (from) await dialog.locator(".ant-radio-wrapper").filter({ hasText: from }).click();
+        if (direction) await dialog.locator(".ant-radio-button-wrapper").filter({ hasText: direction }).click();
+        if (channel) await pickSelectOption(this.page, dialog, 0, channel);
+        if (amount !== undefined) await numberInput(dialog, "cash-amount").fill(String(amount));
+        if (date) await fillDatePicker(dialog, date);
+        if (notes) await dialog.getByTestId("cash-notes").fill(notes);
     }
 
-    /**
-     * Clicks Save. Returns the POST response (after the page reloads), or null when the dialog
-     * blocked it client-side. Returns quickly in the blocked case so short-lived toasts can be checked.
-     */
-    async saveEntry(dialog) {
+    /** Clicks Save. Returns the POST response, or null when the dialog stopped it client-side. */
+    async save(dialog) {
         let request = null;
         const onRequest = (r) => {
             if (r.method() === "POST" && new URL(r.url()).pathname === ledgerUrl()) request = r;
@@ -232,11 +262,9 @@ export class MoneyMovementPage {
         await dialog.getByRole("button", { name: "Save" }).click();
         await this.page.waitForTimeout(500);
         this.page.off("request", onRequest);
-
         if (!request) return null;
 
-        // Inertia form posts are answered with a redirect back (for successes and validation
-        // errors alike) that the browser follows in the same request; wait for the whole chain.
+        // Inertia posts are answered with a redirect back; wait for the whole chain.
         const res = await request.response();
         let hop = request;
         while (hop.redirectedTo()) {
@@ -247,55 +275,35 @@ export class MoneyMovementPage {
         return res;
     }
 
-    async addEntry(menuItem, fields) {
-        const dialog = await this.openEntryDialog(menuItem);
-        await this.fillEntry(dialog, fields);
-        const res = await this.saveEntry(dialog);
+    async add(mode, fields) {
+        const dialog = await this.openDialog(mode);
+        await this.fill(dialog, fields);
+        const res = await this.save(dialog);
         return { res, dialog };
     }
 
-    /** Sets ledger filters and applies them. */
-    async filter({ from, to, rail, kind } = {}) {
-        const panel = this.page.locator("#cash-ledger");
-        if (rail) await pickSelectOption(this.page, panel, 0, rail);
-        if (kind) await pickSelectOption(this.page, panel, 1, kind);
-
-        // A reload still finishing from an earlier save can reset the filter inputs, so re-apply
-        // until the page URL actually carries the requested dates.
+    /** Sets the filters; the page applies them by itself shortly after they change. */
+    async filter({ from, to, type } = {}) {
+        const main = this.page.getByRole("main");
+        if (type) await pickSelectOption(this.page, main, 0, type);
+        if (from !== undefined) await fillDatePicker(main, from, 0);
+        if (to !== undefined) await fillDatePicker(main, to, 1);
         await expect(async () => {
-            if (from !== undefined) await panel.locator('input[type="date"]').nth(0).fill(from);
-            if (to !== undefined) await panel.locator('input[type="date"]').nth(1).fill(to);
-            const reloaded = this.page.waitForResponse((r) => {
-                const url = new URL(r.url());
-                return (
-                    r.request().method() === "GET" &&
-                    url.pathname === walletUrl &&
-                    (from === undefined || url.searchParams.get("date_from") === from) &&
-                    (to === undefined || url.searchParams.get("date_to") === to)
-                );
-            }, { timeout: 5000 });
-            await panel.getByRole("button", { name: "Apply" }).click();
-            await reloaded;
-            await this.page.waitForTimeout(300);
-            if (from !== undefined) await expect(this.page).toHaveURL(new RegExp(`date_from=${from}`), { timeout: 1000 });
-            if (to !== undefined) await expect(this.page).toHaveURL(new RegExp(`date_to=${to}`), { timeout: 1000 });
-        }).toPass({ timeout: 20_000 });
+            const url = new URL(this.page.url());
+            expect(url.pathname).toBe(cashInOutUrl);
+            if (from !== undefined) expect(url.searchParams.get("date_from")).toBe(from);
+            if (to !== undefined) expect(url.searchParams.get("date_to")).toBe(to);
+        }).toPass({ timeout: 10_000 });
+        await this.page.waitForLoadState("networkidle");
+        await this.page.waitForTimeout(300);
     }
 
     get rows() {
-        return this.page.locator("#cash-ledger .ant-table-tbody tr.ant-table-row");
+        return this.page.locator("[data-testid=cash-lines] .ant-table-tbody tr.ant-table-row");
     }
 
     row(text) {
         return this.rows.filter({ hasText: text });
-    }
-
-    headline(label) {
-        return this.page.locator("#cash-ledger").locator(`div:has(> div:text-is("${label}"))`).locator("> div").nth(1);
-    }
-
-    notice(title) {
-        return notice(this.page, title);
     }
 
     toast(text) {

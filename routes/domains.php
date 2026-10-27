@@ -7,6 +7,7 @@ use App\Http\Controllers\Domains\CategoryController;
 use App\Http\Controllers\Domains\CreditController;
 use App\Http\Controllers\Domains\CustomerController;
 use App\Http\Controllers\Domains\DashboardController;
+use App\Http\Controllers\Domains\DiningTableController;
 use App\Http\Controllers\Domains\DomainSettingsController;
 use App\Http\Controllers\Domains\ExpenseCategoryController;
 use App\Http\Controllers\Domains\ExpenseController;
@@ -28,16 +29,22 @@ use App\Http\Controllers\Domains\ProductController;
 use App\Http\Controllers\Domains\ProfitLossController;
 use App\Http\Controllers\Domains\PurchaseOrderController;
 use App\Http\Controllers\Domains\RecurringExpenseController;
+use App\Http\Controllers\Domains\RegisterShiftController;
 use App\Http\Controllers\Domains\SaleController;
 use App\Http\Controllers\Domains\SaleDiscountController;
+use App\Http\Controllers\Domains\SaleImportController;
 use App\Http\Controllers\Domains\SalesHistoryController;
 use App\Http\Controllers\Domains\SharedCatalogLookupController;
 use App\Http\Controllers\Domains\SubscriptionOnHoldController;
 use App\Http\Controllers\Domains\SubscriptionRenewalController;
+use App\Http\Controllers\Domains\TabController;
+use App\Http\Controllers\Domains\TimeclockController;
+use App\Http\Controllers\Domains\TimesheetController;
 use App\Http\Controllers\Domains\UserController;
 use App\Http\Controllers\Domains\UserPinController;
 use App\Http\Controllers\Domains\VatReportController;
 use App\Http\Controllers\Domains\WalletCashMovementController;
+use App\Http\Controllers\Domains\WalletPagesController;
 use App\Http\Controllers\MandatoryDiscountController;
 use App\Http\Controllers\Products\DiscountController;
 use App\Http\Controllers\TerminalController;
@@ -237,6 +244,12 @@ Route::prefix('domains/{domain:name_slug}')
         Route::get('/sales-history/{sale}', [SalesHistoryController::class, 'show'])->whereNumber('sale')->name('sales-history.show');
         Route::post('/sales-history/{sale}/void', [SalesHistoryController::class, 'void'])->whereNumber('sale')->name('sales-history.void');
 
+        // Import past (backdated) sales from a CSV: template, check, then confirm
+        Route::get('/sales-import', [SaleImportController::class, 'index'])->name('sales-import.index');
+        Route::get('/sales-import/template', [SaleImportController::class, 'template'])->name('sales-import.template');
+        Route::post('/sales-import/preview', [SaleImportController::class, 'preview'])->name('sales-import.preview');
+        Route::post('/sales-import', [SaleImportController::class, 'store'])->name('sales-import.store');
+
         // Expenses (feed the Profit & Loss report; cash-register expenses also post to the wallet ledger)
         Route::middleware('domain.feature:expenses')->group(function () {
             Route::get('/expenses/export', [ExpenseController::class, 'export'])->name('expenses.export');
@@ -306,8 +319,15 @@ Route::prefix('domains/{domain:name_slug}')
             });
         });
 
-        // Wallet — money movement (cash control + ledger); distinct URL from card-type setup
-        Route::get('/wallet/money-movement', [PaymentCardTypeController::class, 'moneyMovement'])->name('wallet.money-movement');
+        // Cash & wallet: Today's drawer, Cash in & out, Where money is, Drawer history
+        Route::prefix('wallet')->name('wallet.')->group(function () {
+            Route::get('/drawer', [WalletPagesController::class, 'drawer'])->name('drawer');
+            Route::get('/cash-in-out', [WalletPagesController::class, 'cashInOut'])->name('cash-in-out');
+            Route::get('/balances', [WalletPagesController::class, 'balances'])->name('balances');
+            Route::get('/history', [WalletPagesController::class, 'history'])->name('history');
+            // The old all-in-one page: sends old links to the right page above.
+            Route::get('/money-movement', [PaymentCardTypeController::class, 'moneyMovement'])->name('money-movement');
+        });
 
         // Payment card types (Wallet) — domain-scoped
         Route::prefix('payment-card-types')->name('payment-card-types.')->group(function () {
@@ -326,7 +346,20 @@ Route::prefix('domains/{domain:name_slug}')
             Route::post('/opening-cash', [WalletCashMovementController::class, 'setOpeningCash'])->name('opening-cash.store');
             Route::post('/counted-cash', [WalletCashMovementController::class, 'submitCountedCash'])->name('counted-cash.store');
             Route::post('/end-shift', [WalletCashMovementController::class, 'endShift'])->name('end-shift');
+            // End the shift in one step: cash expenses, the count (a cashier's approved with a manager's PIN), then close.
+            Route::post('/close-shift', [WalletCashMovementController::class, 'closeShiftWithCount'])->name('close-shift');
             Route::post('/reopen-shift', [WalletCashMovementController::class, 'reopenShift'])->name('reopen-shift');
+        });
+
+        // Each cashier's own shift; Counted money, where managers approve the counts.
+        Route::prefix('wallet/shifts')->name('register-shifts.')->group(function () {
+            Route::get('/', [WalletPagesController::class, 'counts'])->name('index');
+            Route::get('/money-by-user', [RegisterShiftController::class, 'moneyByUser'])->name('money-by-user');
+            Route::post('/start', [RegisterShiftController::class, 'start'])->name('start');
+            Route::get('/{registerShift}', [RegisterShiftController::class, 'show'])->whereNumber('registerShift')->name('show');
+            Route::post('/{registerShift}/end', [RegisterShiftController::class, 'end'])->whereNumber('registerShift')->name('end');
+            Route::post('/{registerShift}/reopen', [RegisterShiftController::class, 'reopen'])->whereNumber('registerShift')->name('reopen');
+            Route::post('/{registerShift}/approve', [RegisterShiftController::class, 'approve'])->whereNumber('registerShift')->name('approve');
         });
 
         // Credit Management (Organization-specific)
@@ -403,6 +436,41 @@ Route::prefix('domains/{domain:name_slug}')
             Route::post('/{purchaseOrder}/order', [PurchaseOrderController::class, 'order'])->whereNumber('purchaseOrder')->name('order');
             Route::post('/{purchaseOrder}/receive', [PurchaseOrderController::class, 'receive'])->whereNumber('purchaseOrder')->name('receive');
             Route::post('/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel'])->whereNumber('purchaseOrder')->name('cancel');
+        });
+
+        // Dine-in: tabs on the POS (by table or name, sent to the kitchen) and the stores' tables
+        Route::middleware('domain.feature:dine_in')->group(function () {
+            Route::middleware('location.sellable')->prefix('tabs')->name('tabs.')->group(function () {
+                Route::get('/', [TabController::class, 'index'])->name('index');
+                Route::post('/', [TabController::class, 'store'])->name('store');
+                Route::post('/leave', [TabController::class, 'leave'])->name('leave');
+                Route::patch('/{tab}', [TabController::class, 'update'])->whereNumber('tab')->name('update');
+                Route::post('/{tab}/select', [TabController::class, 'select'])->whereNumber('tab')->name('select');
+                Route::post('/{tab}/move', [TabController::class, 'move'])->whereNumber('tab')->name('move');
+                Route::post('/{tab}/merge', [TabController::class, 'merge'])->whereNumber('tab')->name('merge');
+                Route::post('/{tab}/split', [TabController::class, 'split'])->whereNumber('tab')->name('split');
+                Route::post('/{tab}/cancel', [TabController::class, 'cancel'])->whereNumber('tab')->name('cancel');
+                Route::post('/{tab}/send', [TabController::class, 'send'])->whereNumber('tab')->name('send');
+                Route::get('/{tab}/tickets', [TabController::class, 'tickets'])->whereNumber('tab')->name('tickets');
+            });
+
+            Route::prefix('dining-tables')->name('dining-tables.')->group(function () {
+                Route::get('/', [DiningTableController::class, 'index'])->name('index');
+                Route::post('/', [DiningTableController::class, 'store'])->name('store');
+                Route::put('/settings', [DiningTableController::class, 'settings'])->name('settings');
+                Route::put('/layout', [DiningTableController::class, 'layout'])->name('layout');
+                Route::put('/{diningTable}', [DiningTableController::class, 'update'])->whereNumber('diningTable')->name('update');
+                Route::delete('/{diningTable}', [DiningTableController::class, 'destroy'])->whereNumber('diningTable')->name('destroy');
+            });
+        });
+
+        // Timeclock: staff clock in and out on the POS with their own PIN; managers keep the timesheets
+        Route::post('/timeclock/punch', [TimeclockController::class, 'punch'])->name('timesheets.punch');
+        Route::prefix('timesheets')->name('timesheets.')->group(function () {
+            Route::get('/', [TimesheetController::class, 'index'])->name('index');
+            Route::get('/export', [TimesheetController::class, 'export'])->name('export');
+            Route::post('/', [TimesheetController::class, 'store'])->name('store');
+            Route::put('/{timeEntry}', [TimesheetController::class, 'update'])->whereNumber('timeEntry')->name('update');
         });
 
         // Terminal Setup (Organization-specific)

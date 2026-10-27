@@ -37,4 +37,9 @@ class WalletCashReconciliation extends Model
     {
         return $this->belongsTo(User::class, 'counted_by');
     }
+
+    public function closedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'closed_by');
+    }
 }

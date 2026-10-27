@@ -57,7 +57,7 @@ class OtherIncomeController extends Controller
                 ->paginate(25)
                 ->withQueryString(),
             'total' => round((float) (clone $query)->sum('amount'), 2),
-            'locations' => InventoryLocation::query()->forDomain($slug)->active()->orderBy('name')->get(['id', 'name']),
+            'locations' => InventoryLocation::query()->forDomain($slug)->active()->orderBy('name')->get(['id', 'name', 'type']),
             'paymentMethods' => Expense::PAYMENT_METHODS,
             'defaultLocationId' => $request->user()->location_id,
             'domainName' => $domain->name,

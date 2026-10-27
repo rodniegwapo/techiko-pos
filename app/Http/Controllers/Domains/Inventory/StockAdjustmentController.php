@@ -12,6 +12,7 @@ use App\Models\Product\Product;
 use App\Models\StockAdjustment;
 use App\Services\InventoryService;
 use App\Support\FinanceAccess;
+use App\Support\Quantity;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Arr;
@@ -138,12 +139,14 @@ class StockAdjustmentController extends Controller
                 'required',
                 Rule::exists('products', 'id')->where('domain', $domain->name_slug),
             ],
-            'items.*.actual_quantity' => 'required|integer|min:0',
+            'items.*.actual_quantity' => 'required|numeric|min:0|max:99999',
             'items.*.unit_cost' => 'nullable|numeric|min:0',
             'items.*.batch_number' => 'nullable|string|max:255',
             'items.*.expiry_date' => 'nullable|date',
             'items.*.notes' => 'nullable|string|max:500',
         ]);
+        // Counted in parts only for things sold by weight or volume.
+        Quantity::assertRowsFit($validated['items'] ?? [], 'items', 'actual_quantity');
 
         // Domain guard on location
         $location = InventoryLocation::forDomain($domain->name_slug)->findOrFail($validated['location_id']);
@@ -214,12 +217,14 @@ class StockAdjustmentController extends Controller
                 'required',
                 Rule::exists('products', 'id')->where('domain', $domain->name_slug),
             ],
-            'items.*.actual_quantity' => 'required|integer|min:0',
+            'items.*.actual_quantity' => 'required|numeric|min:0|max:99999',
             'items.*.unit_cost' => 'nullable|numeric|min:0',
             'items.*.batch_number' => 'nullable|string|max:255',
             'items.*.expiry_date' => 'nullable|date',
             'items.*.notes' => 'nullable|string|max:500',
         ]);
+        // Counted in parts only for things sold by weight or volume.
+        Quantity::assertRowsFit($validated['items'] ?? [], 'items', 'actual_quantity');
 
         $this->inventoryService->updateStockAdjustment(
             $adjustment,
@@ -332,6 +337,8 @@ class StockAdjustmentController extends Controller
                 'current_stock' => $inventory ? $inventory->quantity_on_hand : 0,
                 'unit_cost' => $inventory ? $inventory->average_cost : ($product->cost ?? 0),
                 'unit_of_measure' => $product->unit_of_measure ?? 'piece',
+                'quantity_unit' => $product->quantityUnit(),
+                'allows_decimal' => $product->allowsDecimal(),
             ];
         });
 

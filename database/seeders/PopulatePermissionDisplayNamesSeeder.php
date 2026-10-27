@@ -159,6 +159,12 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
             'wallet-cash-ledger.counted-cash.store' => 'Submit counted cash',
             'wallet-cash-ledger.end-shift' => 'End shift',
             'wallet-cash-ledger.reopen-shift' => 'Reopen shift',
+            'register-shifts.start' => 'Start own shift',
+            'register-shifts.end' => 'End own shift',
+            'register-shifts.reopen' => 'Reopen own shift',
+            'register-shifts.index' => 'View counted money',
+            'register-shifts.approve' => 'Approve counted money',
+            'register-shifts.money-by-user' => 'View money per user',
 
             'vat-report.index' => 'View VAT Report',
 

@@ -118,7 +118,7 @@ test.describe("plans", () => {
                 await expectLock("Movements", "advanced_inventory");
                 await expectLock("Valuation Report", "advanced_inventory");
                 await expectLock("Expenses", "expenses");
-                await expectLock("Balance sheet", "finance");
+                await expectLock("What you own & owe", "finance");
                 // Every plan has the AI assistant.
                 await expect(locked("AI usage"), `AI usage on ${plan}`).toHaveCount(0);
 

@@ -7,6 +7,8 @@ import { usePage } from "@inertiajs/vue3";
 import axios from "axios";
 import ProductMedia from "@/Components/ProductMedia.vue";
 import ModifierPickerModal from "./ModifierPickerModal.vue";
+import QuantityPromptModal from "./QuantityPromptModal.vue";
+import { allowsDecimal } from "@/Utils/quantity";
 import { hasModifiers } from "@/Composables/useProductModifiers";
 
 const props = defineProps({
@@ -107,7 +109,10 @@ const addingItem = ref(false);
 const pickerProduct = ref(null);
 const pickerOpen = ref(false);
 
-const addToCart = async (product, line = null) => {
+// Sold by weight or volume: "How much?" first. { product, line }
+const quantityPrompt = ref(null);
+
+const addToCart = async (product, line = null, quantity = undefined) => {
     if (isOutOfStock(product)) return;
 
     if (!line && hasModifiers(product)) {
@@ -116,10 +121,15 @@ const addToCart = async (product, line = null) => {
         return;
     }
 
+    if (quantity === undefined && allowsDecimal(product)) {
+        quantityPrompt.value = { product, line };
+        return;
+    }
+
     try {
         addingItem.value = true;
         if (!online.value) {
-            emit("offline-add-product", product, line);
+            emit("offline-add-product", product, line, quantity ?? 1);
             return;
         }
 
@@ -128,7 +138,7 @@ const addToCart = async (product, line = null) => {
 
         await axios.post(route, {
             product_id: product.id,
-            quantity: 1,
+            quantity: quantity ?? 1,
             ...(line
                 ? { modifier_ids: line.modifier_ids, notes: line.notes }
                 : {}),
@@ -337,6 +347,11 @@ const formattedTotal = (price) => {
             v-model:open="pickerOpen"
             :product="pickerProduct"
             @confirm="(line) => addToCart(pickerProduct, line)"
+        />
+        <QuantityPromptModal
+            :product="quantityPrompt?.product ?? null"
+            @close="quantityPrompt = null"
+            @confirm="(q) => { const { product, line } = quantityPrompt; quantityPrompt = null; addToCart(product, line, q); }"
         />
     </div>
 </template>

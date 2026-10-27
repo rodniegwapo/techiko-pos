@@ -263,6 +263,14 @@ const handleUpdate = () => {
             {{ option }}
           </a-radio>
         </a-radio-group>
+        <p
+            v-if="$page.props.sold_by_types?.find((t) => t.name === formData.sold_type)?.allows_decimal"
+            class="mt-2 mb-0 text-xs text-gray-500"
+            data-testid="sold-type-decimal-hint"
+        >
+            Sold by {{ $page.props.sold_by_types.find((t) => t.name === formData.sold_type).unit === "L" ? "volume" : "weight" }}:
+            at the till you type how much, e.g. 1.5 {{ $page.props.sold_by_types.find((t) => t.name === formData.sold_type).unit }}. Price is per {{ $page.props.sold_by_types.find((t) => t.name === formData.sold_type).unit }}.
+        </p>
       </a-form-item>
 
       <!-- Representation Type (edit only; create uses server default color) -->

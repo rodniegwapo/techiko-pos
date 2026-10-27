@@ -12,13 +12,13 @@ class RoleBasedAccessControl
     /**
      * Handle an incoming request.
      *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
+     * @param  Closure(Request): (Response)  $next
      */
     public function handle(Request $request, Closure $next): Response
     {
         $user = Auth::user();
 
-        if (!$user) {
+        if (! $user) {
             return redirect()->route('login');
         }
 
@@ -34,7 +34,7 @@ class RoleBasedAccessControl
     protected function applyRoleBasedRestrictions(Request $request, $user): void
     {
         // Skip domain restriction for domain routes (they already have proper model binding)
-        if (!$request->route('domain')) {
+        if (! $request->route('domain')) {
             if ($user->hasDomainRestriction()) {
                 $this->applyDomainRestriction($request, $user);
             }
@@ -54,9 +54,9 @@ class RoleBasedAccessControl
         // Admin and below are restricted to their domain
         if ($user->role_level > 1) {
             $effectiveDomain = $user->getEffectiveDomain($request->route('domain'));
-            
+
             // Only override if we're not in a domain route and the domain is different
-            if (!$request->route('domain') && $request->route('domain') !== $effectiveDomain) {
+            if (! $request->route('domain') && $request->route('domain') !== $effectiveDomain) {
                 $request->route()->setParameter('domain', $effectiveDomain);
             }
         }
@@ -67,10 +67,12 @@ class RoleBasedAccessControl
      */
     protected function applyLocationRestriction(Request $request, $user): void
     {
-        // Manager and below are restricted to their assigned location
-        if ($user->role_level >= 3) {
+        // Manager and below are restricted to their assigned location. Someone with no location
+        // (an owner whose role_level was left at the default) keeps the one they chose; pages
+        // that limit managers to their own store check that themselves (FinanceAccess).
+        if ($user->role_level >= 3 && $user->location_id) {
             $effectiveLocationId = $user->getEffectiveLocationId($request->input('location_id'));
-            
+
             // Override the location_id parameter
             $request->merge(['location_id' => $effectiveLocationId]);
         }

@@ -26,6 +26,7 @@ class ServiceTierController extends Controller
         'advanced_inventory' => 'Stock movements, valuation and transfers',
         'expenses' => 'Expenses',
         'finance' => 'Finance (statements, P&L, VAT report)',
+        'dine_in' => 'Dine-in: tables, open tabs and kitchen tickets',
     ];
 
     public function index(Request $request): Response

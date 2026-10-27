@@ -122,7 +122,7 @@
                                             >Qty:</span
                                         >
                                         <span class="font-medium text-gray-900">
-                                            {{ item.quantity }}
+                                            {{ formatQuantity(item.quantity, item) }}
                                         </span>
                                     </div>
                                 </div>
@@ -193,6 +193,7 @@
 
 <script setup>
 import { ShoppingCartOutlined, BoxPlotOutlined } from "@ant-design/icons-vue";
+import { formatQuantity } from "@/Utils/quantity";
 
 defineProps({
     orderItems: {

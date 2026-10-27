@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from "vue";
-import { Head, router } from "@inertiajs/vue3";
+import { Head, Link, router } from "@inertiajs/vue3";
 import { watchDebounced } from "@vueuse/core";
 import dayjs from "dayjs";
 import {
@@ -277,6 +277,9 @@ const summaryCards = computed(() => {
                     style="width: 260px; max-width: 100%"
                 />
                 <FilterDropdown v-model="filters" :filters="filtersConfig" />
+                <Link v-if="hasPermission('sales-import.index')" :href="getRoute('sales-import.index')" data-testid="sales-history-import">
+                    <a-button>Import past sales</a-button>
+                </Link>
                 <a
                     v-if="!historyLimit && $page.props.domainFeatures?.sales_history_unlimited && hasPermission('sales-history.export')"
                     :href="exportUrl"

@@ -71,7 +71,7 @@ class ProductModifierService
      *
      * @param  array<int, int|string>  $modifierIds
      */
-    public function addToSale(Sale $sale, Product $product, int $quantity, array $modifierIds = [], ?string $notes = null): SaleItem
+    public function addToSale(Sale $sale, Product $product, float $quantity, array $modifierIds = [], ?string $notes = null): SaleItem
     {
         $resolved = $this->resolve($product, $modifierIds);
         $notes = trim((string) $notes) !== '' ? trim((string) $notes) : null;

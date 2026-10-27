@@ -388,7 +388,8 @@ onMounted(() => setTimeout(() => (chartLoaded.value = true), 400));
                             </div>
                         </div>
 
-                        <div class="mt-8">
+                        <!-- Figures at cost: hidden from those who don't see cost (the server leaves them out). -->
+                        <div v-if="summary.total_inventory_value !== undefined" class="mt-8">
                             <p>Total Inventory Value (at cost)</p>
                             <p
                                 class="text-3xl font-bold text-green-700 md:text-4xl"
@@ -403,7 +404,7 @@ onMounted(() => setTimeout(() => (chartLoaded.value = true), 400));
 
                         <!-- Same figures as the Valuation report; they reveal margins, so the same permission. -->
                         <div
-                            v-if="canViewValuation"
+                            v-if="canViewValuation && summary.potential_profit !== undefined"
                             class="mt-4 grid grid-cols-2 gap-3"
                             data-testid="inventory-retail-summary"
                         >

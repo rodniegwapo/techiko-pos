@@ -251,10 +251,10 @@ class Domain extends Model
      * includes some of them (ServiceTier::features; the free plan none), and a super admin can
      * still give Finance to one organization.
      */
-    public const FEATURES = ['sales_history_unlimited', 'multi_location', 'advanced_inventory', 'expenses', 'finance', 'ai'];
+    public const FEATURES = ['sales_history_unlimited', 'multi_location', 'advanced_inventory', 'expenses', 'finance', 'ai', 'dine_in'];
 
     /** Features a plan can include (ServiceTier::features). */
-    public const PLAN_FEATURES = ['sales_history_unlimited', 'multi_location', 'advanced_inventory', 'expenses', 'finance'];
+    public const PLAN_FEATURES = ['sales_history_unlimited', 'multi_location', 'advanced_inventory', 'expenses', 'finance', 'dine_in'];
 
     /** Features a super admin can turn on for one organization outside its plan. */
     public const OVERRIDABLE_FEATURES = ['finance'];
@@ -309,5 +309,13 @@ class Domain extends Model
         $s = $this->settings['sales'] ?? [];
 
         return (bool) ($s['hide_out_of_stock'] ?? false);
+    }
+
+    /** A cashier may start a new shift while their last one waits for a manager's review (on unless the store turns it off). */
+    public function allowsNewShiftWhileReview(): bool
+    {
+        $s = $this->settings['sales'] ?? [];
+
+        return (bool) ($s['allow_new_shift_while_review'] ?? true);
     }
 }

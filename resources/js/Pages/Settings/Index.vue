@@ -17,6 +17,7 @@ const props = defineProps({
             vat_pricing_mode: "exclusive",
             allow_overselling: false,
             hide_out_of_stock: false,
+            allow_new_shift_while_review: true,
         }),
     },
     /** { name, plan, subscription_ends_at, locations, users, created_at } */
@@ -51,6 +52,7 @@ const form = useForm({
             : "exclusive",
     allow_overselling: props.salesSettings?.allow_overselling === true,
     hide_out_of_stock: props.salesSettings?.hide_out_of_stock === true,
+    allow_new_shift_while_review: props.salesSettings?.allow_new_shift_while_review !== false,
     currency_code: props.currency?.code ?? "PHP",
 });
 
@@ -202,6 +204,20 @@ const domainName =
                                 When on, products with nothing left at the
                                 store are left out of the sales screen.
                                 Scanning a barcode still finds them.
+                            </span>
+                        </a-form-item>
+                        <a-form-item
+                            label="New shift while the last one is in review"
+                        >
+                            <a-switch
+                                v-model:checked="form.allow_new_shift_while_review"
+                                aria-label="New shift while the last one is in review"
+                                data-testid="setting-new-shift-while-review"
+                            />
+                            <span class="ml-2 text-sm text-gray-600">
+                                On by default: a cashier whose count came out
+                                short or over can start a new shift while a
+                                manager reviews it. Turn off to make them wait.
                             </span>
                         </a-form-item>
                         <a-form-item>

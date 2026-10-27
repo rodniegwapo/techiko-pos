@@ -610,10 +610,10 @@ class AppAssistantTest extends TestCase
         // The owner can open Finance pages, but only once the business has Finance.
         $owner = $this->staff(['inventory.movements', 'finance.balance-sheet']);
         $this->assertStringContainsString('Inventory → Movements', $map->forUser($owner['user'], $owner['domain']));
-        $this->assertStringNotContainsString('Balance sheet', $map->forUser($owner['user'], $owner['domain']));
+        $this->assertStringNotContainsString('What you own & owe', $map->forUser($owner['user'], $owner['domain']));
 
         $owner['domain']->update(['settings' => ['features' => ['finance' => true, 'ai' => true]]]);
-        $this->assertStringContainsString('Finance → Balance sheet', $map->forUser($owner['user'], $owner['domain']->fresh()));
+        $this->assertStringContainsString('Finance → What you own & owe', $map->forUser($owner['user'], $owner['domain']->fresh()));
 
         $this->assertSame('Inventory → Movements', $map->pathOf('domains.inventory.movements'));
     }

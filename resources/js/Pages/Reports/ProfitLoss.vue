@@ -197,8 +197,8 @@ const printColumns = [
 
 <template>
     <AuthenticatedLayout>
-        <Head title="Profit & Loss" />
-        <ContentHeader class="mb-4 md:mb-6" title="Income statement" />
+        <Head title="Profit & loss" />
+        <ContentHeader class="mb-4 md:mb-6" title="Profit & loss" />
         <ContentLayout title="Profit & Loss" filter-class="flex flex-wrap items-center justify-end gap-2 w-full min-w-0">
             <template #filters>
                 <RefreshButton :loading="spinning" @click="load()" />
