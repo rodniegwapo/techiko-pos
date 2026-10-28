@@ -82,7 +82,7 @@ class PurchaseOrderController extends Controller
             'canPayNow' => $canPayNow,
             'paymentMethods' => $canPayNow ? Expense::PAYMENT_METHODS : [],
             'accounts' => $canPayNow
-                ? FinancialAccount::query()->forDomain($slug)->where('is_active', true)->orderBy('name')->get(['id', 'name', 'type'])
+                ? FinancialAccount::query()->forDomain($slug)->where('is_active', true)->orderBy('name')->get(['id', 'name', 'type', 'payment_card_type_id'])
                 : [],
             'drawerLocations' => $canPayNow
                 ? InventoryLocation::query()->forDomain($slug)->active()

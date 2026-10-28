@@ -39,6 +39,14 @@ class WalletCashMovement extends Model
     /** Cash the owner took from another store's drawer and put in this one (paired by transfer_group). */
     public const KIND_OWNER_TRANSFER_IN = 'owner_transfer_in';
 
+    /**
+     * Money moved between the drawer and a payment channel, two channels, or two stores: an out
+     * line where it left and an in line where it arrived, paired by transfer_group.
+     */
+    public const KIND_TRANSFER_OUT = 'transfer_out';
+
+    public const KIND_TRANSFER_IN = 'transfer_in';
+
     public const SYSTEM_KINDS = [
         self::KIND_EXPENSE,
         'supplier_payment',
@@ -51,6 +59,8 @@ class WalletCashMovement extends Model
         self::KIND_SALE_VOID,
         self::KIND_CREDIT_PAYMENT,
         self::KIND_OWNER_TRANSFER_IN,
+        self::KIND_TRANSFER_OUT,
+        self::KIND_TRANSFER_IN,
     ];
 
     protected $casts = [

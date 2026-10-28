@@ -39,7 +39,7 @@ const handleDelete = (record) =>
         "expenses.destroy",
         { expense: record.id },
         record.in_wallet_ledger
-            ? "Delete this expense? Its cash-out entry in the Wallet ledger will be removed too."
+            ? "Delete this expense? Its money-out entry in the Wallet ledger will be removed too."
             : "Delete this expense?",
     ).catch(() => {});
 
@@ -79,7 +79,7 @@ const onMobilePaginationChange = (pageNum) =>
             </template>
             <template v-else-if="column.key === 'payment'">
                 {{ paidFromLabel(record.payment_method, record.account_name) }}
-                <a-tooltip v-if="record.in_wallet_ledger" title="Also recorded as cash out in the Wallet ledger">
+                <a-tooltip v-if="record.in_wallet_ledger" title="Also recorded as money out in the Wallet ledger (cash drawer or payment channel)">
                     <a-tag color="blue" class="ml-1">Wallet</a-tag>
                 </a-tooltip>
             </template>

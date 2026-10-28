@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Domain;
 use App\Models\ExpenseCategory;
 use App\Models\InventoryLocation;
+use App\Models\PaymentCardType;
 use App\Models\RegisterShift;
 use App\Support\FinanceAccess;
 use App\Support\RouteFeature;
@@ -91,15 +92,25 @@ class WalletPagesController extends Controller
     {
         $location = WalletLocationResolver::resolve($request, $domain);
         $ledger = WalletLedgerViewData::buildPaginated($request, $domain, $location);
+        $otherStores = InventoryLocation::query()->forDomain($domain->name_slug)->active()
+            ->where(fn ($q) => $q->whereNull('type')->orWhere('type', '!=', 'warehouse'))
+            ->whereKeyNot($location->id)->orderBy('name')->get(['id', 'name']);
 
         return Inertia::render('Wallet/CashInOut', [
             ...$this->pageProps($request, $domain, $location),
             'ledger' => $ledger,
             'channels' => $ledger['railCardTypes'],
             // Where an owner withdrawal can go instead of the owner's pocket: the other stores.
-            'otherStores' => InventoryLocation::query()->forDomain($domain->name_slug)->active()
-                ->where(fn ($q) => $q->whereNull('type')->orWhere('type', '!=', 'warehouse'))
-                ->whereKeyNot($location->id)->orderBy('name')->get(['id', 'name']),
+            'otherStores' => $otherStores,
+            // Where a transfer can go besides this store: other stores' drawers and channels (owners and admins).
+            'transferStores' => FinanceAccess::canSeeAllStores($request->user())
+                ? $otherStores->map(fn (InventoryLocation $store) => [
+                    'id' => (int) $store->id,
+                    'name' => (string) $store->name,
+                    'channels' => PaymentCardType::query()->forDomainLocation($domain->name_slug, (int) $store->id)->active()
+                        ->orderBy('sort_order')->orderBy('name')->get(['id', 'name']),
+                ])->values()
+                : [],
             'todayIsClosed' => WalletShiftGuard::isClosed($domain->name_slug, (int) $location->id, now()->toDateString()),
         ]);
     }

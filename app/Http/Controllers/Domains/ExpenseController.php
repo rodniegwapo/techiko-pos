@@ -96,7 +96,7 @@ class ExpenseController extends Controller
                     ->get(['id', 'name', 'type', 'is_active', 'is_default']),
                 'payment_methods' => Expense::PAYMENT_METHODS,
                 'accounts' => FinancialAccount::query()->forDomain($domain->name_slug)->where('is_active', true)
-                    ->orderBy('name')->get(['id', 'name', 'type']),
+                    ->orderBy('name')->get(['id', 'name', 'type', 'payment_card_type_id']),
             ],
             'canSeeAllStores' => FinanceAccess::canSeeAllStores($user),
             'restrictedLocationId' => FinanceAccess::restrictedLocationId($user),

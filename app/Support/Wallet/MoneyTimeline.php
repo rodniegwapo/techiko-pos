@@ -153,7 +153,8 @@ class MoneyTimeline
             ->leftJoin('financial_accounts as fa', 'fa.id', '=', 'e.financial_account_id')
             ->where('e.domain', $domain)
             ->whereNull('e.deleted_at')
-            ->where('e.payment_method', '!=', 'cash_register')
+            // Paid from the drawer or a linked channel: its ledger line is listed already.
+            ->whereNull('e.wallet_cash_movement_id')
             ->selectRaw("e.expense_date AS date, 'out' AS direction, e.amount, 'expense' AS source, 'expense' AS kind, e.description AS label,
                 {$whereType('e', true)} AS where_type, e.financial_account_id AS where_id, fa.name AS where_name, e.location_id, e.id AS record_id, e.created_at");
 
@@ -162,7 +163,7 @@ class MoneyTimeline
             ->join('suppliers as s', 's.id', '=', 'b.supplier_id')
             ->leftJoin('financial_accounts as fa', 'fa.id', '=', 'sp.financial_account_id')
             ->where('sp.domain', $domain)
-            ->where('sp.payment_method', '!=', 'cash_register')
+            ->whereNull('sp.wallet_cash_movement_id')
             ->selectRaw("sp.payment_date AS date, 'out' AS direction, sp.amount, 'supplier_payment' AS source, 'supplier_payment' AS kind,
                 CONCAT(s.name, CASE WHEN b.bill_number IS NULL THEN '' ELSE CONCAT(' (bill ', b.bill_number, ')') END) AS label,
                 {$whereType('sp', true)} AS where_type, sp.financial_account_id AS where_id, fa.name AS where_name, sp.location_id, sp.id AS record_id, sp.created_at");

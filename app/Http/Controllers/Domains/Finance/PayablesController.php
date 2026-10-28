@@ -94,7 +94,7 @@ class PayablesController extends Controller
             'categories' => ExpenseCategory::query()->forDomain($slug)->where('is_active', true)->orderBy('name')->get(['id', 'name', 'type']),
             'locations' => InventoryLocation::query()->forDomain($slug)->active()->orderBy('name')->get(['id', 'name', 'type']),
             'paymentMethods' => Expense::PAYMENT_METHODS,
-            'accounts' => FinancialAccount::query()->forDomain($slug)->where('is_active', true)->orderBy('name')->get(['id', 'name', 'type']),
+            'accounts' => FinancialAccount::query()->forDomain($slug)->where('is_active', true)->orderBy('name')->get(['id', 'name', 'type', 'payment_card_type_id']),
             'defaultLocationId' => $request->user()->location_id,
             'aiEnabled' => app(FinancialAssistant::class)->isConfigured(),
             'domainName' => $domain->name,

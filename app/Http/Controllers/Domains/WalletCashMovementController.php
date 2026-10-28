@@ -51,6 +51,10 @@ class WalletCashMovementController extends Controller
     {
         $location = WalletLocationResolver::resolve($request, $domain);
 
+        if ($request->input('kind') === 'transfer') {
+            return $this->storeTransfer($request, $domain, $location);
+        }
+
         $kind = (string) $request->input('kind');
         // A transfer moves money into or out of a payment channel, so it names the channel and its
         // direction is the transfer's own.
@@ -140,6 +144,77 @@ class WalletCashMovementController extends Controller
         });
 
         return redirect()->back()->with('success', $target ? "Moved to {$target->name}'s drawer." : 'Ledger entry saved.');
+    }
+
+    /**
+     * Money moved from this store's drawer or one of its channels to a drawer or channel of this
+     * store, or (owners and admins) of another store: an out line and an in line with one
+     * transfer_group, so both sides' balances follow and neither looks like income or spending.
+     */
+    private function storeTransfer(Request $request, Domain $domain, InventoryLocation $location)
+    {
+        $validated = $request->validate([
+            'amount' => ['required', 'numeric', 'min:0.01', 'max:99999999.99'],
+            'movement_date' => ['required', 'date', 'before_or_equal:today'],
+            'from_channel_id' => ['nullable', 'integer'],
+            'to_location_id' => ['nullable', 'integer'],
+            'to_channel_id' => ['nullable', 'integer'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+        $slug = $domain->name_slug;
+        $date = (string) $validated['movement_date'];
+
+        $toLocation = $location;
+        if (! empty($validated['to_location_id']) && (int) $validated['to_location_id'] !== (int) $location->id) {
+            if (! FinanceAccess::canSeeAllStores($request->user())) {
+                throw ValidationException::withMessages(['to_location_id' => 'Only an owner or admin can move money to another store.']);
+            }
+            $toLocation = InventoryLocation::query()->forDomain($slug)->active()->whereKey((int) $validated['to_location_id'])
+                ->where(fn ($q) => $q->whereNull('type')->orWhere('type', '!=', 'warehouse'))
+                ->first()
+                ?? throw ValidationException::withMessages(['to_location_id' => 'Pick another store of this business.']);
+        }
+
+        $channel = fn (?int $id, InventoryLocation $at, string $field) => $id
+            ? (PaymentCardType::query()->forDomainLocation($slug, (int) $at->id)->find($id)
+                ?? throw ValidationException::withMessages([$field => 'Pick one of '.$at->name.'\'s payment channels.']))
+            : null;
+        $from = $channel($validated['from_channel_id'] ?? null, $location, 'from_channel_id');
+        $to = $channel($validated['to_channel_id'] ?? null, $toLocation, 'to_channel_id');
+
+        if ((int) $toLocation->id === (int) $location->id && $from?->id === $to?->id) {
+            throw ValidationException::withMessages(['to_channel_id' => 'Pick a different place to move the money to.']);
+        }
+
+        WalletShiftGuard::ensureDateNotClosed($slug, (int) $location->id, $date, 'movement_date');
+        WalletShiftGuard::ensureDateNotClosed($slug, (int) $toLocation->id, $date, 'to_location_id');
+
+        $sameStore = (int) $toLocation->id === (int) $location->id;
+        $name = fn (?PaymentCardType $c, InventoryLocation $at) => ($c ? $c->name : 'Cash drawer').($sameStore ? '' : ' ('.$at->name.')');
+        $notes = fn (string $text) => Str::limit($text.(($validated['notes'] ?? null) ? ': '.$validated['notes'] : ''), 2000);
+        $group = (string) Str::uuid();
+
+        DB::transaction(function () use ($slug, $location, $toLocation, $from, $to, $validated, $date, $group, $name, $notes, $request) {
+            foreach ([
+                [$location, $from, 'out', WalletCashMovement::KIND_TRANSFER_OUT, 'To '.$name($to, $toLocation)],
+                [$toLocation, $to, 'in', WalletCashMovement::KIND_TRANSFER_IN, 'From '.$name($from, $location)],
+            ] as [$at, $chan, $direction, $kind, $text]) {
+                WalletCashMovement::query()->create([
+                    'domain' => $slug,
+                    'location_id' => $at->id,
+                    'payment_card_type_id' => $chan?->id,
+                    'direction' => $direction,
+                    'amount' => $validated['amount'],
+                    'kind' => $kind,
+                    'transfer_group' => $group,
+                    'notes' => $notes($text),
+                    'movement_date' => $date,
+                    'user_id' => $request->user()->id,
+                ]);
+            }
+        });
+
+        return redirect()->back()->with('success', 'Moved to '.$name($to, $toLocation).'.');
     }
 
     /**

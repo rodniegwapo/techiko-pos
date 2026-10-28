@@ -18,6 +18,7 @@ const props = defineProps({
     ledger: { type: Object, required: true },
     channels: { type: Array, default: () => [] },
     otherStores: { type: Array, default: () => [] },
+    transferStores: { type: Array, default: () => [] },
     activeLocation: { type: Object, default: null },
     todayIsClosed: { type: Boolean, default: false },
     canViewAllMoney: { type: Boolean, default: false },
@@ -112,6 +113,7 @@ const pagination = computed(() => ({
                 <a-button type="primary" :disabled="todayIsClosed" data-testid="add-cash-in" @click="mode = 'in'">+ Cash in</a-button>
                 <a-button danger :disabled="todayIsClosed" data-testid="add-cash-out" @click="mode = 'out'">− Cash out</a-button>
                 <a-button v-if="channels.length" :disabled="todayIsClosed" data-testid="move-money" @click="mode = 'move'">Move money</a-button>
+                <a-button v-if="channels.length || transferStores.length" :disabled="todayIsClosed" data-testid="transfer-money" @click="mode = 'transfer'">Transfer</a-button>
             </div>
         </div>
         <p v-if="canAdd && todayIsClosed" class="-mt-2 mb-3 text-xs text-amber-700">
@@ -161,6 +163,6 @@ const pagination = computed(() => ({
             </template>
         </div>
 
-        <CashMovementModal :mode="mode" :channels="channels" :other-stores="otherStores" :location-id="locationId" :today-ymd="todayYmd" @close="mode = null" />
+        <CashMovementModal :mode="mode" :channels="channels" :other-stores="otherStores" :transfer-stores="transferStores" :location-id="locationId" :today-ymd="todayYmd" @close="mode = null" />
     </WalletLayout>
 </template>

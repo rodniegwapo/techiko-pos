@@ -93,14 +93,15 @@ class RecurringExpenseService
         try {
             $this->expenses->create($data);
         } catch (ValidationException $e) {
-            // The cash drawer for that day is already closed. Still book the cost, as "other", so the
-            // P&L is complete without rewriting a counted drawer; staff can adjust it afterwards.
+            // The store's day it would post to (its drawer, or the store of the paying account's channel) is
+            // already closed. Still book the cost, as "other", so the P&L is complete without rewriting a
+            // counted day; staff can adjust it afterwards.
             Log::warning('Recurring expense booked outside the wallet ledger', [
                 'recurring_expense_id' => $template->id,
                 'expense_date' => $runDate->toDateString(),
                 'errors' => $e->errors(),
             ]);
-            $this->expenses->create(['payment_method' => 'other', 'notes' => 'Cash drawer was closed for this date; not recorded in the wallet ledger.'] + $data);
+            $this->expenses->create(['payment_method' => 'other', 'notes' => 'The store\'s day was closed for this date; not recorded in the wallet ledger.'] + $data);
         }
 
         return true;

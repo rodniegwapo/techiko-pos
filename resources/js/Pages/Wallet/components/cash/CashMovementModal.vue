@@ -9,6 +9,8 @@ import { useDomainRoutes } from "@/Composables/useDomainRoutes";
  *  - in:   cash put into the drawer (float, or a correction)
  *  - out:  cash taken out (the owner, or a correction); the owner can also take from a channel
  *  - move: money moved into or out of a payment channel (GCash, bank); the drawer doesn't change
+ *  - transfer: money moved from the drawer or a channel to another drawer or channel, at this store
+ *    or (owners and admins) another one; both sides change, nothing counts as income or spending
  */
 const props = defineProps({
     /** in | out | move, or null when closed */
@@ -16,6 +18,8 @@ const props = defineProps({
     channels: { type: Array, default: () => [] },
     /** Other stores an owner withdrawal can go to, instead of the owner keeping it. */
     otherStores: { type: Array, default: () => [] },
+    /** Other stores a transfer can go to, each with its channels: [{ id, name, channels: [{ id, name }] }]. */
+    transferStores: { type: Array, default: () => [] },
     locationId: { type: Number, default: null },
     todayYmd: { type: String, required: true },
 });
@@ -33,19 +37,22 @@ const TYPES = {
     ],
 };
 
-const form = reactive({ kind: null, amount: null, from: "drawer", channel: null, toStore: null, moveDirection: "in", date: props.todayYmd, notes: "", saving: false });
+const form = reactive({ kind: null, amount: null, from: "drawer", channel: null, toStore: null, moveDirection: "in", source: "drawer", destStore: null, dest: null, date: props.todayYmd, notes: "", saving: false });
 
 watch(
     () => props.mode,
     (mode) => {
         if (!mode) return;
         Object.assign(form, {
-            kind: mode === "move" ? null : TYPES[mode][0].value,
+            kind: TYPES[mode]?.[0].value ?? null,
             amount: null,
             from: "drawer",
             toStore: null,
             channel: props.channels.length === 1 ? props.channels[0].id : null,
             moveDirection: "in",
+            source: "drawer",
+            destStore: null,
+            dest: null,
             date: props.todayYmd,
             notes: "",
             saving: false,
@@ -54,14 +61,35 @@ watch(
     { immediate: true },
 );
 
-const title = computed(() => ({ in: "Cash in", out: "Cash out", move: "Move money to or from a channel" })[props.mode] ?? "");
+const title = computed(() => ({ in: "Cash in", out: "Cash out", move: "Move money to or from a channel", transfer: "Transfer money" })[props.mode] ?? "");
 const channelOptions = computed(() => props.channels.map((c) => ({ value: c.id, label: c.name })));
 const typeHint = computed(() => TYPES[props.mode]?.find((t) => t.value === form.kind)?.hint);
 const needsChannel = computed(() => props.mode === "move" || (form.kind === "owner_draw" && form.from === "channel"));
 const isFuture = (current) => !!current && current.format("YYYY-MM-DD") > props.todayYmd;
 
+// Transfer: "drawer" or a channel id, at this store (destStore null) or another one.
+const placeOptions = (channels) => [{ value: "drawer", label: "Cash drawer" }, ...channels.map((c) => ({ value: c.id, label: c.name }))];
+const sourceOptions = computed(() => placeOptions(props.channels));
+const storeOptions = computed(() => [{ value: null, label: "This store" }, ...props.transferStores.map((s) => ({ value: s.id, label: s.name }))]);
+const destOptions = computed(() => {
+    if (!form.destStore) return placeOptions(props.channels).filter((o) => o.value !== form.source);
+    return placeOptions(props.transferStores.find((s) => s.id === form.destStore)?.channels ?? []);
+});
+watch(destOptions, (list) => {
+    if (!list.some((o) => o.value === form.dest)) form.dest = null;
+});
+
 function payload() {
     const base = { amount: Number(form.amount), movement_date: form.date, notes: form.notes || null, location_id: props.locationId };
+    if (props.mode === "transfer") {
+        return {
+            ...base,
+            kind: "transfer",
+            from_channel_id: form.source === "drawer" ? null : form.source,
+            to_location_id: form.destStore || undefined,
+            to_channel_id: form.dest === "drawer" ? null : form.dest,
+        };
+    }
     if (props.mode === "move") {
         return { ...base, kind: form.moveDirection === "in" ? "ewallet_transfer_in" : "ewallet_transfer_out", direction: form.moveDirection, payment_card_type_id: form.channel };
     }
@@ -83,6 +111,7 @@ function payload() {
 function save() {
     if (!(Number(form.amount) >= 0.01)) return antMessage.warning("Enter the amount.");
     if (needsChannel.value && !form.channel) return antMessage.warning("Choose the payment channel.");
+    if (props.mode === "transfer" && !form.dest) return antMessage.warning("Choose where the money goes.");
     form.saving = true;
     router.post(getRoute("wallet-cash-ledger.store"), payload(), {
         preserveScroll: true,
@@ -103,7 +132,22 @@ function save() {
 <template>
     <a-modal :visible="!!mode" :title="title" ok-text="Save" :confirm-loading="form.saving" destroy-on-close @ok="save" @cancel="emit('close')">
         <a-form v-if="mode" layout="vertical" class="pt-1">
-            <a-form-item v-if="mode !== 'move'" label="What happened">
+            <template v-if="mode === 'transfer'">
+                <a-form-item label="From" required>
+                    <a-select v-model:value="form.source" :options="sourceOptions" data-testid="transfer-from" />
+                </a-form-item>
+                <a-form-item v-if="transferStores.length" label="To store">
+                    <a-select v-model:value="form.destStore" :options="storeOptions" data-testid="transfer-to-store" />
+                </a-form-item>
+                <a-form-item label="To" required>
+                    <a-select v-model:value="form.dest" :options="destOptions" placeholder="Drawer or payment channel" data-testid="transfer-to" />
+                    <div class="mt-1 text-xs text-gray-500">
+                        Taken out of one and added to the other, e.g. depositing drawer cash in the bank. It isn't income or spending.
+                    </div>
+                </a-form-item>
+            </template>
+
+            <a-form-item v-if="mode === 'in' || mode === 'out'" label="What happened">
                 <a-radio-group v-model:value="form.kind" button-style="solid" data-testid="cash-type">
                     <a-radio-button v-for="t in TYPES[mode]" :key="t.value" :value="t.value">{{ t.label }}</a-radio-button>
                 </a-radio-group>

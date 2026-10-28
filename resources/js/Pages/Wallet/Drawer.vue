@@ -66,6 +66,8 @@ function changeDate(value) {
 const isFuture = (current) => !!current && current.format("YYYY-MM-DD") > todayYmd;
 
 const modal = ref(null);
+// The cashier's guide: open until they've started a shift today.
+const showGuide = ref(!props.myShift);
 async function saveOpening(amount, reason) {
     if (await actions.saveOpening(amount, reason)) modal.value = null;
 }
@@ -170,6 +172,16 @@ const stillOnShift = computed(() => props.openShiftsAtStore.map((s) => s.user).f
                 <template v-if="myShift.status === 'needs_review'"> The count is off from Expected, so a manager will review it. You can start a new shift meanwhile.</template>
                 <template v-else-if="myShift.status === 'approved'"> Approved<template v-if="myShift.reviewed_by"> by {{ myShift.reviewed_by }}</template>.</template>
             </p>
+            <a-button type="link" size="small" class="mt-2 h-auto !px-0" data-testid="shift-guide-toggle" @click="showGuide = !showGuide">
+                {{ showGuide ? "Hide the steps" : "How a shift works" }}
+            </a-button>
+            <ol v-if="showGuide" class="mb-0 mt-1 list-decimal space-y-1 pl-5 text-sm text-gray-700" data-testid="shift-guide">
+                <li><b>Start my shift</b> and count the cash you start with (the opening).</li>
+                <li>Take payments. Cash sales add to your <b>Expected</b>; GCash, card and bank go to their channels, not your drawer.</li>
+                <li>Paid something from the drawer, or added change? A manager records it under <b>Cash in &amp; out</b>, or add it as an expense when you end.</li>
+                <li><b>End my shift</b>: count every bill and coin and enter the total. Don't count other people's cash.</li>
+                <li>If your count is off from Expected, a manager reviews it on <b>Counted money</b>. Made a mistake? <b>Reopen</b> and say why.</li>
+            </ol>
         </div>
 
         <div class="grid grid-cols-1 gap-4 lg:grid-cols-5">

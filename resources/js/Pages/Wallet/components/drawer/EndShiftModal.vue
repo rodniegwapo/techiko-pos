@@ -1,5 +1,6 @@
 <script setup>
-import { computed, reactive, watch } from "vue";
+import { computed, reactive, ref, watch } from "vue";
+import { usePage } from "@inertiajs/vue3";
 import { IconPlus, IconTrash } from "@tabler/icons-vue";
 import { useHelpers } from "@/Composables/useHelpers";
 
@@ -7,6 +8,7 @@ import { useHelpers } from "@/Composables/useHelpers";
  * End a shift in one step: count the cash and add any expenses paid from the drawer during it.
  * No manager's PIN: a count that is off goes to a manager on Counted money. Ending the store's
  * day also says where the cash goes: taken out, or left in the drawer as the next opening.
+ * In pesos the cash can be counted bill by bill; only the total is saved.
  */
 const props = defineProps({
     open: { type: Boolean, default: false },
@@ -25,6 +27,23 @@ const { formattedTotal } = useHelpers();
 
 const form = reactive({ counted: null, notes: "", expenses: [], action: "cashout_now" });
 
+const DENOMINATIONS = [1000, 500, 200, 100, 50, 20, 10, 5, 1, 0.25];
+const page = usePage();
+const canCountByBill = computed(() => (page.props.currentDomain?.currency_code || "PHP") === "PHP");
+const byBill = ref(false);
+const pieces = reactive({});
+const billTotal = computed(() =>
+    Math.round(DENOMINATIONS.reduce((sum, d) => sum + d * Number(pieces[d] || 0), 0) * 100) / 100,
+);
+watch(billTotal, (total) => {
+    if (byBill.value) form.counted = total;
+});
+function toggleByBill() {
+    byBill.value = !byBill.value;
+    if (byBill.value) form.counted = billTotal.value;
+}
+const denominationLabel = (d) => (d < 1 ? `${Math.round(d * 100)}¢` : `₱${d.toLocaleString()}`);
+
 watch(
     () => props.open,
     (open) => {
@@ -36,6 +55,8 @@ watch(
             expenses: [],
             action: "cashout_now",
         });
+        byBill.value = false;
+        DENOMINATIONS.forEach((d) => (pieces[d] = null));
     },
     { immediate: true },
 );
@@ -76,8 +97,25 @@ function submit() {
                     class="w-full"
                     addon-before="₱"
                     placeholder="Count the cash"
+                    :disabled="byBill"
                     data-testid="end-shift-counted"
                 />
+                <a-button v-if="canCountByBill" type="link" size="small" class="h-auto !px-0" data-testid="end-shift-by-bill" @click="toggleByBill">
+                    {{ byBill ? "Type the total instead" : "Count by bills and coins" }}
+                </a-button>
+                <div v-if="byBill" class="mt-1 grid grid-cols-2 gap-2 sm:grid-cols-3" data-testid="end-shift-bills">
+                    <a-input-number
+                        v-for="d in DENOMINATIONS"
+                        :key="d"
+                        v-model:value="pieces[d]"
+                        :min="0"
+                        :precision="0"
+                        :addon-before="denominationLabel(d)"
+                        placeholder="0"
+                        class="!w-full"
+                        :aria-label="`Number of ${denominationLabel(d)}`"
+                    />
+                </div>
                 <p v-if="showExpected" class="mb-0 mt-1 text-xs text-gray-500">
                     Expected: {{ formattedTotal(Number(cashControl.expected_cash) || 0) }}<template v-if="expenseTotal">
                         , less {{ formattedTotal(expenseTotal) }} in expenses below</template>.
