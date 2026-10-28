@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Customer;
 use App\Models\Sale;
+use App\Services\LoyaltyRedemptionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -15,6 +16,9 @@ class LoyaltyController extends Controller
         return Inertia::render('Loyalty/Index', [
             'currentDomain' => null,
             'isGlobalView' => true,
+            // Tiers are each organization's own, so there are none to show across all of them.
+            'rules' => LoyaltyRedemptionService::programRules(),
+            'tiers' => [],
         ]);
     }
 

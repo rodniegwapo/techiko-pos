@@ -10,6 +10,7 @@ use App\Models\LoyaltyTier;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 /**
@@ -66,6 +67,33 @@ class LoyaltyTierChangesReachCustomersTest extends TestCase
             'domain' => $this->domain->name_slug,
             'tier' => $tier->id,
         ]), array_merge($tier->only(['name', 'display_name', 'multiplier', 'spending_threshold', 'color', 'sort_order', 'is_active']), $changes));
+    }
+
+    public function test_program_rules_shows_the_tiers_and_rules_points_really_follow(): void
+    {
+        $this->tier('bronze', 0, 1);
+        $this->tier('diamond', 16000, 3)->update(['multiplier' => 2.5]);
+        $this->tier('retired', 500, 2)->update(['is_active' => false]);
+        $other = Domain::query()->create(['name' => 'Other', 'name_slug' => 'other-'.Str::lower(Str::random(8))]);
+        LoyaltyTier::query()->create([
+            'domain' => $other->name_slug, 'name' => 'gold', 'display_name' => 'Gold', 'multiplier' => 1.5,
+            'spending_threshold' => 50000, 'color' => '#FFD700', 'sort_order' => 1, 'is_active' => true,
+        ]);
+        config(['loyalty.points_per_currency_unit' => 100, 'loyalty.min_points_redemption' => 1]);
+
+        $this->actingAs($this->admin)->get(route('domains.loyalty.index', ['domain' => $this->domain->name_slug]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Loyalty/Index')
+                ->where('tiers.0.display_name', 'Bronze')
+                ->where('tiers.1.display_name', 'Diamond')
+                ->where('tiers.1.multiplier', '2.50')
+                ->where('tiers.1.spending_threshold', '16000.00')
+                ->count('tiers', 2)
+                ->where('rules.pesos_per_point', Customer::PESOS_PER_POINT)
+                ->where('rules.points_per_peso_redeemed', 100)
+                ->where('rules.min_points_redemption', 1)
+            );
     }
 
     public function test_lowering_a_threshold_moves_customers_up(): void

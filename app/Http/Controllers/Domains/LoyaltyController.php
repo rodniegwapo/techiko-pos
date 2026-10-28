@@ -7,6 +7,7 @@ use App\Models\Customer;
 use App\Models\Domain;
 use App\Models\LoyaltyTier;
 use App\Models\Sale;
+use App\Services\LoyaltyRedemptionService;
 use App\Support\ManagerApproval;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,6 +21,10 @@ class LoyaltyController extends Controller
         return Inertia::render('Loyalty/Index', [
             'currentDomain' => $domain->name_slug,
             'isGlobalView' => false,
+            // Program Rules shows the tiers set on Tier Management and the rules points really follow.
+            'rules' => LoyaltyRedemptionService::programRules(),
+            'tiers' => LoyaltyTier::query()->forDomain($domain->name_slug)->active()->ordered()
+                ->get(['id', 'name', 'display_name', 'multiplier', 'spending_threshold', 'color']),
         ]);
     }
 
