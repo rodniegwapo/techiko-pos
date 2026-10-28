@@ -258,6 +258,29 @@ const hasMultipleStores = computed(() => {
         >
             <!-- Filters -->
             <template #filters>
+                <div
+                    v-if="stockCounts.low > 0 || stockCounts.out > 0"
+                    class="flex shrink-0 items-center gap-2"
+                >
+                    <a-tag
+                        v-if="stockCounts.low > 0"
+                        color="orange"
+                        class="m-0 cursor-pointer whitespace-nowrap px-2 py-1"
+                        role="button"
+                        @click="showStockStatus('low')"
+                    >
+                        {{ stockCounts.low }} low stock
+                    </a-tag>
+                    <a-tag
+                        v-if="stockCounts.out > 0"
+                        color="red"
+                        class="m-0 cursor-pointer whitespace-nowrap px-2 py-1"
+                        role="button"
+                        @click="showStockStatus('out')"
+                    >
+                        {{ stockCounts.out }} out of stock
+                    </a-tag>
+                </div>
                 <RefreshButton :loading="spinning" @click="getItems" />
                 <a-input-search
                     v-model:value="search"
@@ -344,29 +367,6 @@ const hasMultipleStores = computed(() => {
 
             <template #activeStore>
                 <LocationInfoAlert />
-                <div
-                    v-if="stockCounts.low > 0 || stockCounts.out > 0"
-                    class="mt-2 flex flex-wrap gap-2"
-                >
-                    <a-tag
-                        v-if="stockCounts.low > 0"
-                        color="orange"
-                        class="cursor-pointer"
-                        role="button"
-                        @click="showStockStatus('low')"
-                    >
-                        {{ stockCounts.low }} low stock
-                    </a-tag>
-                    <a-tag
-                        v-if="stockCounts.out > 0"
-                        color="red"
-                        class="cursor-pointer"
-                        role="button"
-                        @click="showStockStatus('out')"
-                    >
-                        {{ stockCounts.out }} out of stock
-                    </a-tag>
-                </div>
             </template>
 
             <!-- Table -->
