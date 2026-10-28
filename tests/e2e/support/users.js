@@ -57,6 +57,13 @@ for (const plan of ["free", "basic", "standard", "premium"]) {
     USERS[`plan-${plan}`] = { email: `${domain}-admin@techiko.test`, password: "e2e-password", domain, role: "admin" };
 }
 
+/** Admins of the one-organization-per-business-type fixtures (database/seeders/BusinessTypeSeeder.php). */
+export const BUSINESS_TYPES = ["retail", "food", "grocery", "services", "other"];
+for (const type of BUSINESS_TYPES) {
+    const domain = `pos-${type}`;
+    USERS[domain] = { email: `${domain}-admin@techiko.test`, password: "e2e-password", domain, role: "admin" };
+}
+
 export const OTHER_DOMAIN = "mcdonalds-corp";
 
 /**

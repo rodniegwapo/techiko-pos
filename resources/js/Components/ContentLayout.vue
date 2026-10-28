@@ -23,12 +23,16 @@ const props = defineProps({
             class="bg-white rounded-lg px-6 py-6 w-full max-w-full min-w-0 overflow-x-auto lg:overflow-auto md:overflow-auto"
         >
             <div :class="filterMainClass">
-                <h1
-                    class="text-lg font-semibold text-nowrap"
-                    :class="{ visible: title, invisible: !title }"
-                >
-                    {{ title }}
-                </h1>
+                <div class="flex flex-wrap items-center gap-2">
+                    <h1
+                        class="text-lg font-semibold text-nowrap"
+                        :class="{ visible: title, invisible: !title }"
+                    >
+                        {{ title }}
+                    </h1>
+                    <!-- Small things that belong with the title, e.g. counts that filter the list. -->
+                    <slot name="titleExtra" />
+                </div>
                 <div :class="filterClass">
                     <slot name="filters" />
                 </div>

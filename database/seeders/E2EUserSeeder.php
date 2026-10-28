@@ -59,6 +59,16 @@ class E2EUserSeeder extends Seeder
             $jollibee->update(['settings' => $settings]);
         }
 
+        // The specs run as businesses that already picked their type (retail, as they behaved before
+        // there was one), so the "what do you sell?" banner doesn't sit among the alerts they check.
+        foreach (Domain::query()->whereIn('name_slug', ['jollibee-corp', 'mcdonalds-corp'])->get() as $domain) {
+            $settings = $domain->settings ?? [];
+            if (! $domain->hasChosenBusinessType()) {
+                $settings['sales'] = array_merge($settings['sales'] ?? [], ['business_type' => 'retail']);
+                $domain->update(['settings' => $settings]);
+            }
+        }
+
         User::updateOrCreate(
             ['email' => 'e2e-super@techiko.test'],
             [

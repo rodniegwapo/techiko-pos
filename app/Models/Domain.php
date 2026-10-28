@@ -311,6 +311,26 @@ class Domain extends Model
         return (bool) ($s['hide_out_of_stock'] ?? false);
     }
 
+    /**
+     * What the business sells. It only presets the product form (useBusinessType.js: track stock,
+     * sold type, which sections show); it never locks a feature or changes saved products.
+     */
+    public const BUSINESS_TYPES = ['retail', 'food', 'grocery', 'services', 'other'];
+
+    /** The business type (Settings → Business type); retail, today's form, when none was picked. */
+    public function businessType(): string
+    {
+        $type = $this->settings['sales']['business_type'] ?? null;
+
+        return in_array($type, self::BUSINESS_TYPES, true) ? $type : 'retail';
+    }
+
+    /** Someone picked the business type; until then it reads as retail and admins are asked to pick it. */
+    public function hasChosenBusinessType(): bool
+    {
+        return in_array($this->settings['sales']['business_type'] ?? null, self::BUSINESS_TYPES, true);
+    }
+
     /** A cashier may start a new shift while their last one waits for a manager's review (on unless the store turns it off). */
     public function allowsNewShiftWhileReview(): bool
     {

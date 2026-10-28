@@ -76,6 +76,10 @@ class HandleInertiaRequests extends Middleware
             ] : null,
             // Paid features this organization has (its plan, or given by a super admin); the menu locks what's off.
             'domainFeatures' => $currentDomain?->features() ?? array_fill_keys(Domain::FEATURES, false),
+            // What the business sells; presets the product form (useBusinessType.js).
+            'businessType' => $currentDomain?->businessType() ?? 'retail',
+            // Not picked yet: those who can change Settings see a banner asking what the business sells.
+            'businessTypeChosen' => $currentDomain ? $currentDomain->hasChosenBusinessType() : true,
             'currentLocation' => $currentLocation = $this->getCurrentLocation($request),
             // Parts of the app this location doesn't show (sidebar); EnsureLocationArea turns the pages away.
             'locationAreas' => [

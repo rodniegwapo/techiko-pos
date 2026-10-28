@@ -42,7 +42,10 @@ class DomainSettingsController extends Controller
                 'allow_overselling' => (bool) data_get($settings, 'sales.allow_overselling', false),
                 'hide_out_of_stock' => (bool) data_get($settings, 'sales.hide_out_of_stock', false),
                 'allow_new_shift_while_review' => $domain->allowsNewShiftWhileReview(),
+                'business_type' => $domain->businessType(),
             ],
+            // Dine-in suits food businesses; Settings points to it when the plan has it.
+            'hasDineIn' => $domain->hasFeature('dine_in'),
         ]);
     }
 
@@ -56,6 +59,7 @@ class DomainSettingsController extends Controller
             'hide_out_of_stock' => ['sometimes', 'boolean'],
             'allow_new_shift_while_review' => ['sometimes', 'boolean'],
             'currency_code' => ['sometimes', 'string', Rule::in(self::CURRENCIES)],
+            'business_type' => ['sometimes', 'string', Rule::in(Domain::BUSINESS_TYPES)],
         ]);
 
         if (array_key_exists('currency_code', $validated)) {
@@ -83,6 +87,9 @@ class DomainSettingsController extends Controller
         }
         if (array_key_exists('allow_new_shift_while_review', $validated)) {
             $sales['allow_new_shift_while_review'] = (bool) $validated['allow_new_shift_while_review'];
+        }
+        if (array_key_exists('business_type', $validated)) {
+            $sales['business_type'] = $validated['business_type'];
         }
 
         $current['sales'] = $sales;

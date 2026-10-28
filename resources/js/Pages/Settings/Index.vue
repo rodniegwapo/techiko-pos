@@ -4,6 +4,7 @@ import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
 import ContentLayout from "@/Components/ContentLayout.vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
+import { BUSINESS_TYPES } from "@/Composables/useBusinessType";
 
 const page = usePage();
 const { getRoute } = useDomainRoutes();
@@ -18,7 +19,13 @@ const props = defineProps({
             allow_overselling: false,
             hide_out_of_stock: false,
             allow_new_shift_while_review: true,
+            business_type: "retail",
         }),
+    },
+    /** The plan includes dine-in: food businesses are pointed to it. */
+    hasDineIn: {
+        type: Boolean,
+        default: false,
     },
     /** { name, plan, subscription_ends_at, locations, users, created_at } */
     account: {
@@ -54,6 +61,7 @@ const form = useForm({
     hide_out_of_stock: props.salesSettings?.hide_out_of_stock === true,
     allow_new_shift_while_review: props.salesSettings?.allow_new_shift_while_review !== false,
     currency_code: props.currency?.code ?? "PHP",
+    business_type: BUSINESS_TYPES[props.salesSettings?.business_type] ? props.salesSettings.business_type : "retail",
 });
 
 function submit() {
@@ -100,6 +108,38 @@ const domainName =
                             <dd class="mb-0 font-medium text-gray-900">{{ account.created_at }}</dd>
                         </div>
                     </dl>
+                </div>
+            </template>
+        </ContentLayout>
+        <ContentLayout title="Business type" class="mb-6">
+            <template #table>
+                <div class="px-6 pt-2 pb-6">
+                    <a-form layout="vertical" class="max-w-2xl" @submit.prevent="submit">
+                        <p class="mb-3 text-sm text-gray-600">
+                            What you sell. New products start with the fields that fit, and the rest stay one click away.
+                            Changing it never changes products you already have.
+                        </p>
+                        <a-radio-group v-model:value="form.business_type" class="grid w-full grid-cols-1 gap-2 sm:grid-cols-2" data-testid="business-type">
+                            <label
+                                v-for="(t, key) in BUSINESS_TYPES"
+                                :key="key"
+                                class="flex cursor-pointer items-start gap-2 rounded-lg border p-3"
+                                :class="form.business_type === key ? 'border-green-500 bg-green-50' : 'border-gray-200'"
+                            >
+                                <a-radio :value="key" :data-testid="`business-type-${key}`" />
+                                <span>
+                                    <span class="block text-sm font-medium text-gray-900">{{ t.label }}</span>
+                                    <span class="block text-xs text-gray-500">{{ t.description }}</span>
+                                </span>
+                            </label>
+                        </a-radio-group>
+                        <p v-if="form.business_type === 'food' && hasDineIn" class="mb-0 mt-3 text-xs text-gray-600">
+                            Serving at tables? Turn on dine-in for a store under <b>Tables</b>.
+                        </p>
+                        <a-form-item class="mb-0 mt-4" :help="form.errors.business_type">
+                            <a-button type="primary" html-type="submit" :loading="form.processing" data-testid="save-business-type">Save</a-button>
+                        </a-form-item>
+                    </a-form>
                 </div>
             </template>
         </ContentLayout>

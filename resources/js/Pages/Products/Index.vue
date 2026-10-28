@@ -256,17 +256,15 @@ const hasMultipleStores = computed(() => {
             title="Products"
             filter-class="flex flex-wrap items-center justify-end gap-2 w-full min-w-0"
         >
-            <!-- Filters -->
-            <template #filters>
-                <div
-                    v-if="stockCounts.low > 0 || stockCounts.out > 0"
-                    class="flex shrink-0 items-center gap-2"
-                >
+            <!-- Low / out of stock counts beside the title: they filter the list, and leave the toolbar room. -->
+            <template #titleExtra>
+                <template v-if="stockCounts.low > 0 || stockCounts.out > 0">
                     <a-tag
                         v-if="stockCounts.low > 0"
                         color="orange"
-                        class="m-0 cursor-pointer whitespace-nowrap px-2 py-1"
+                        class="m-0 cursor-pointer whitespace-nowrap"
                         role="button"
+                        data-testid="stock-count-low"
                         @click="showStockStatus('low')"
                     >
                         {{ stockCounts.low }} low stock
@@ -274,13 +272,18 @@ const hasMultipleStores = computed(() => {
                     <a-tag
                         v-if="stockCounts.out > 0"
                         color="red"
-                        class="m-0 cursor-pointer whitespace-nowrap px-2 py-1"
+                        class="m-0 cursor-pointer whitespace-nowrap"
                         role="button"
+                        data-testid="stock-count-out"
                         @click="showStockStatus('out')"
                     >
                         {{ stockCounts.out }} out of stock
                     </a-tag>
-                </div>
+                </template>
+            </template>
+
+            <!-- Filters -->
+            <template #filters>
                 <RefreshButton :loading="spinning" @click="getItems" />
                 <a-input-search
                     v-model:value="search"
