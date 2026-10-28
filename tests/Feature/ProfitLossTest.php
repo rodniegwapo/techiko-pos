@@ -205,6 +205,19 @@ class ProfitLossTest extends TestCase
             );
     }
 
+    public function test_says_when_the_sales_start_inside_the_period(): void
+    {
+        // The first paid sale is Sep 10: a year's statement only covers from then.
+        $this->actingAs($this->admin)
+            ->get($this->route('profit-loss.index', ['preset' => 'this_year']))
+            ->assertInertia(fn (Assert $page) => $page->where('dataStarts', '2026-09-10'));
+
+        // This month starts after it, so there is nothing to say.
+        $this->actingAs($this->admin)
+            ->get($this->route('profit-loss.index'))
+            ->assertInertia(fn (Assert $page) => $page->where('dataStarts', null));
+    }
+
     public function test_store_filter_keeps_business_wide_expenses_out_but_reports_them(): void
     {
         $this->actingAs($this->admin)

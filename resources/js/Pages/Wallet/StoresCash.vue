@@ -17,6 +17,8 @@ const props = defineProps({
     storesCash: { type: Object, required: true },
     /** Owners and admins: where each store's money is right now. */
     allStores: { type: Object, default: null },
+    /** May start a shift: shifts run at a store, so they're told to switch to one. */
+    canStartShift: { type: Boolean, default: false },
 });
 
 const { getRoute } = useDomainRoutes();
@@ -51,6 +53,15 @@ const totals = computed(() => props.storesCash.totals ?? {});
     <Head title="Stores' cash" />
     <AuthenticatedLayout>
         <ContentHeader class="mb-4" title="Stores' cash" />
+
+        <a-alert
+            v-if="canStartShift"
+            type="info"
+            show-icon
+            class="mb-4"
+            data-testid="warehouse-shift-hint"
+            message="You're viewing the warehouse, which has no cash drawer. To start your shift, switch to a store with the store picker at the top right."
+        />
 
         <div class="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4" data-testid="stores-cash-totals">
             <div class="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">

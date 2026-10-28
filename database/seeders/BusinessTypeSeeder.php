@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Category;
+use App\Models\DiningTable;
 use App\Models\Domain;
 use App\Models\InventoryLocation;
 use App\Models\ModifierGroup;
@@ -17,7 +18,7 @@ use RuntimeException;
 /**
  * One organization per business type (Settings → Business type), for trying each one and for
  * tests/e2e/business-types: pos-retail, pos-food, pos-grocery, pos-services and pos-other. Each has
- * one store, an admin ({slug}-admin@techiko.test, E2EUserSeeder::PASSWORD) and products that fit
+ * one store, an admin ({slug}-admin@techiko.test, E2EUserSeeder::PASSWORD; retail also a manager) and products that fit
  * it: food has Size and Sugar level modifiers and dine-in, grocery sells by the kilo and liter,
  * services track no stock. They are VIP, so every feature is open. Re-running puts each back;
  * products a test added are removed. Local and testing only.
@@ -56,7 +57,10 @@ class BusinessTypeSeeder extends Seeder
         $domain->name_slug = $slug;
         $domain->fill(['is_active' => true, 'locked_at' => null, 'vip_at' => $domain->vip_at ?? now()])->save();
         $settings = $domain->settings ?? [];
-        $settings['sales'] = array_merge($settings['sales'] ?? [], ['business_type' => $type]);
+        // Its type, as set at signup: menu switch off and no change recorded.
+        $sales = array_merge($settings['sales'] ?? [], ['business_type' => $type, 'show_all_menu' => false]);
+        unset($sales['business_type_changed_by'], $sales['business_type_changed_at'], $sales['business_type_previous']);
+        $settings['sales'] = $sales;
         $domain->update(['settings' => $settings]);
 
         // Codes hold 10 characters: POS-RETA, POS-FOOD, POS-GROC, POS-SERV, POS-OTHE.
@@ -81,8 +85,23 @@ class BusinessTypeSeeder extends Seeder
         ]);
         $admin->syncRoles(['admin']);
 
-        // Products a test created.
+        // A manager too, at the store: they see the business type but only an owner or admin changes it.
+        if ($type === 'retail') {
+            User::query()->updateOrCreate(['email' => "{$slug}-manager@techiko.test"], [
+                'name' => $name.' Manager',
+                'password' => Hash::make(E2EUserSeeder::PASSWORD),
+                'is_super_user' => false,
+                'domain' => $slug,
+                'role_level' => 3,
+                'location_id' => $store->id,
+                'can_switch_locations' => false,
+                'email_verified_at' => now(),
+            ])->syncRoles(['manager']);
+        }
+
+        // Products and tables a test created (a sale's table link is cleared with the table).
         Product::query()->where('domain', $slug)->where('name', 'like', 'E2E %')->get()->each->delete();
+        DiningTable::query()->where('location_id', $store->id)->delete();
 
         foreach ($this->catalog($type) as $categoryName => $products) {
             $category = Category::query()->updateOrCreate(['name' => $categoryName, 'domain' => $slug], ['description' => 'Demo']);
@@ -122,7 +141,8 @@ class BusinessTypeSeeder extends Seeder
             ],
             'services' => [
                 'Haircuts' => [['Haircut', 'Piece', 150, null, 0, false], ['Haircut + Shave', 'Piece', 220, null, 0, false]],
-                'Add-ons' => [['Hair Wax', 'Piece', 120, 80, 10, true]],
+                // Sold from the counter without counting stock, so the shop's menu stays a services one.
+                'Add-ons' => [['Hair Wax', 'Piece', 120, 80, 0, false]],
             ],
             default => [
                 'Store' => [['Coke Mismo', 'Piece', 20, 15, 48, true], ['Dinorado Rice', 'Kilo', 58, 48, 50, true]],

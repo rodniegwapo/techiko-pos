@@ -32,6 +32,7 @@ import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useSidebar } from "@/Composables/useSidebar";
 import { useSalesLayoutMode } from "@/Composables/useSalesLayoutMode";
+import { BUSINESS_TYPES } from "@/Composables/useBusinessType";
 
 // The sidebar's sections, in order. Top-level items without a section (Dashboard) come first.
 export const NAV_SECTIONS = [
@@ -577,7 +578,22 @@ export function useNavMenu() {
         );
     };
 
-    const menus = computed(() => {
+    // Pages this business type rarely needs (useBusinessType.js), tidied out of the menu unless the
+    // business uses them or turned on "Show all menu items". Page search still finds them.
+    const MENU_IN_USE = {
+        "dining-tables": "dining_tables",
+        "inventory-movements": "stock",
+        "inventory-adjustments": "stock",
+        "inventory-valuation": "stock",
+        purchasing: "stock",
+    };
+    const tidiedAway = (key) => {
+        if (!isInDomainContext.value || page.props.showAllMenu !== false) return false;
+        if (!(BUSINESS_TYPES[page.props.businessType]?.hiddenMenuKeys ?? []).includes(key)) return false;
+        return !page.props.menuInUse?.[MENU_IN_USE[key]];
+    };
+
+    const openableMenus = computed(() => {
         const filterMenuItems = (items) =>
             items
                 .filter((item) => {
@@ -646,6 +662,7 @@ export function useNavMenu() {
                     const filteredItem = {
                         ...item,
                         upgrade: !!item.feature && !page.props.domainFeatures?.[item.feature],
+                        tidied: tidiedAway(item.key),
                     };
 
                     if (item.children) {
@@ -665,6 +682,15 @@ export function useNavMenu() {
         return filterMenuItems(menuItems);
     });
 
+    // The sidebar: every page the user can open, less the ones this business type tidies away
+    // (a group left empty goes too). Page search keeps them all (searchEntries).
+    const menus = computed(() =>
+        openableMenus.value
+            .filter((item) => !item.tidied)
+            .map((item) => (item.children ? { ...item, children: item.children.filter((child) => !child.tidied) } : item))
+            .filter((item) => !item.children || item.children.length),
+    );
+
     // Items without a section (Dashboard) on top, then each section that has something in it.
     const topItems = computed(() => menus.value.filter((item) => !item.section));
     const sections = computed(() =>
@@ -676,7 +702,7 @@ export function useNavMenu() {
 
     // Every page the user can open, flat, for the quick search.
     const searchEntries = computed(() =>
-        menus.value.flatMap((item) =>
+        openableMenus.value.flatMap((item) =>
             item.children
                 ? item.children.map((child) => ({ ...child, parent: item.title, icon: item.icon }))
                 : [{ ...item, parent: null }],

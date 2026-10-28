@@ -43,6 +43,8 @@ class WalletPagesController extends Controller
                 'storesCash' => StoresCash::build($request, $domain),
                 // Where every store's money is right now (owners and admins).
                 'allStores' => FinanceAccess::canSeeAllStores($request->user()) ? AllStoresMoney::build($domain, (int) $request->user()->id) : null,
+                // Someone who runs a till here is told to switch to a store for their shift.
+                'canStartShift' => RoutePermission::allows($request->user(), 'register-shifts.start'),
             ]);
         }
 
@@ -112,6 +114,12 @@ class WalletPagesController extends Controller
                 ])->values()
                 : [],
             'todayIsClosed' => WalletShiftGuard::isClosed($domain->name_slug, (int) $location->id, now()->toDateString()),
+            // What there is to take out, shown under the amount: the drawer's Expected today and each
+            // channel's balance, the same figures as Where money is (for those who may see them).
+            'available' => RoutePermission::allows($request->user(), 'wallet-cash-ledger.index') ? [
+                'drawer' => CashControlSnapshot::build($domain, $location, now()->toDateString(), (int) $request->user()->id)['expected_cash'],
+                'channels' => ChannelBalances::forLocation($domain->name_slug, (int) $location->id)->pluck('balance', 'id'),
+            ] : null,
         ]);
     }
 

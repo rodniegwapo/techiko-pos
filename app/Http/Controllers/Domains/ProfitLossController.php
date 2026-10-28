@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Domains;
 use App\Http\Controllers\Controller;
 use App\Models\Domain;
 use App\Models\InventoryLocation;
+use App\Models\Sale;
 use App\Models\User;
 use App\Services\Ai\FinancialAssistant;
 use App\Services\RecurringExpenseService;
@@ -50,6 +51,7 @@ class ProfitLossController extends Controller
                 'current' => $this->periodLabel($period['start'], $period['end']),
                 'previous' => $this->periodLabel($period['prev_start'], $period['prev_end']),
             ],
+            'dataStarts' => $this->dataStartsWithin($domain, $period),
             'rows' => $this->rows($current, $previous),
             'current' => $current,
             'previous' => $previous,
@@ -224,6 +226,25 @@ class ProfitLossController extends Controller
         $days = (int) $start->diffInDays($end->copy()->startOfDay()) + 1;
 
         return [$start, $end, $start->copy()->subDays($days), $start->copy()->subDay()->endOfDay()];
+    }
+
+    /**
+     * The first paid sale (at the chosen store, if one is picked), when it falls inside the period
+     * after its first day: the statement only covers from then, so the page says so.
+     */
+    private function dataStartsWithin(Domain $domain, array $period): ?string
+    {
+        $first = Sale::query()
+            ->where('domain', $domain->name_slug)
+            ->where('payment_status', 'paid')
+            ->when($period['location_id'], fn ($q, $id) => $q->where('location_id', $id))
+            ->min('transaction_date');
+        if ($first === null) {
+            return null;
+        }
+        $first = Carbon::parse($first)->startOfDay();
+
+        return $first->gt($period['start']) && $first->lte($period['end']) ? $first->toDateString() : null;
     }
 
     private function periodLabel(Carbon $start, Carbon $end): string

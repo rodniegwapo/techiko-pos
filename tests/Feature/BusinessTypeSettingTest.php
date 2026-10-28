@@ -5,11 +5,13 @@ namespace Tests\Feature;
 use App\Http\Middleware\RoleBasedAccessControl;
 use App\Http\Middleware\UserPermissionCheckMiddleware;
 use App\Models\Domain;
+use App\Models\InventoryLocation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 /**
@@ -62,6 +64,83 @@ class BusinessTypeSettingTest extends TestCase
 
         $this->actingAs($user)->patch($url, ['business_type' => 'bakery'])->assertSessionHasErrors('business_type');
         $this->assertSame('grocery', $domain->fresh()->businessType());
+    }
+
+    private function staff(Domain $domain, string $roleName, int $level): User
+    {
+        $role = Role::query()->firstOrCreate(['name' => $roleName, 'guard_name' => 'web']);
+        $role->forceFill(['level' => $level])->save();
+        $user = User::factory()->create(['domain' => $domain->name_slug, 'is_super_user' => false, 'name' => ucfirst($roleName).' Cruz']);
+        $user->assignRole($role);
+
+        return $user->fresh();
+    }
+
+    public function test_only_an_owner_or_admin_changes_it_and_the_change_is_recorded(): void
+    {
+        [$domain] = $this->organization(['sales' => ['business_type' => 'retail']]);
+        $url = route('domains.settings.update', ['domain' => $domain->name_slug]);
+        $manager = $this->staff($domain, 'manager', 3);
+
+        $this->actingAs($manager)->patch($url, ['business_type' => 'food'])->assertSessionHasErrors('business_type');
+        $this->actingAs($manager)->patch($url, ['show_all_menu' => true])->assertSessionHasErrors('business_type');
+        $this->assertSame('retail', $domain->fresh()->businessType());
+        // The same type sent back with other settings is fine.
+        $this->actingAs($manager)->patch($url, ['business_type' => 'retail', 'allow_overselling' => true])->assertSessionHasNoErrors();
+        $this->assertNull($domain->fresh()->businessTypeChange(), 'nothing changed, nothing recorded');
+
+        $admin = $this->staff($domain, 'admin', 2);
+        $this->actingAs($admin)->patch($url, ['business_type' => 'food'])->assertSessionHasNoErrors();
+
+        $change = $domain->fresh()->businessTypeChange();
+        $this->assertSame('Admin Cruz', $change['by']);
+        $this->assertSame('retail', $change['from']);
+        $this->assertSame('food', $change['to']);
+        $this->actingAs($admin)->get(route('domains.settings.index', ['domain' => $domain->name_slug]))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('canChangeBusinessType', true)
+                ->where('salesSettings.business_type_change.by', 'Admin Cruz')
+            );
+        $this->actingAs($manager)->get(route('domains.settings.index', ['domain' => $domain->name_slug]))
+            ->assertInertia(fn (Assert $page) => $page->where('canChangeBusinessType', false));
+    }
+
+    public function test_saving_other_settings_doesnt_pick_the_type(): void
+    {
+        [$domain, $user] = $this->organization();
+
+        $this->actingAs($user)->patch(route('domains.settings.update', ['domain' => $domain->name_slug]), ['allow_overselling' => true])
+            ->assertSessionHasNoErrors();
+
+        $this->assertFalse($domain->fresh()->hasChosenBusinessType(), 'the "what do you sell?" banner stays');
+    }
+
+    public function test_show_all_menu_is_saved_and_shared_with_what_the_business_uses(): void
+    {
+        [$domain, $user] = $this->organization(['sales' => ['business_type' => 'retail']]);
+
+        $this->actingAs($user)->get(route('domains.settings.index', ['domain' => $domain->name_slug]))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('showAllMenu', false)
+                ->where('menuInUse.dining_tables', false)
+                ->where('menuInUse.stock', false)
+            );
+
+        // A store with dine-in on keeps Tables in a retail menu.
+        InventoryLocation::query()->create([
+            'domain' => $domain->name_slug, 'name' => 'Main', 'code' => Str::upper(Str::random(8)),
+            'type' => 'store', 'is_active' => true, 'is_default' => true, 'dine_in' => true,
+        ]);
+        $this->actingAs($user)->patch(route('domains.settings.update', ['domain' => $domain->name_slug]), ['show_all_menu' => true])
+            ->assertSessionHasNoErrors();
+
+        $this->actingAs($user)->get(route('domains.settings.index', ['domain' => $domain->name_slug]))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('showAllMenu', true)
+                ->where('salesSettings.show_all_menu', true)
+                ->where('menuInUse.dining_tables', true)
+            );
+        $this->assertSame('retail', $domain->fresh()->businessType(), 'the type is kept');
     }
 
     public function test_the_type_is_shared_with_the_pages(): void

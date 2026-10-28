@@ -325,6 +325,48 @@ class Domain extends Model
         return in_array($type, self::BUSINESS_TYPES, true) ? $type : 'retail';
     }
 
+    /**
+     * The last change to the business type or "Show all menu items" made on Settings: who, when, and
+     * the type before it. Null when it was only set at signup, or never.
+     *
+     * @return array{by: string, at: string, from: ?string, to: string}|null
+     */
+    public function businessTypeChange(): ?array
+    {
+        $sales = $this->settings['sales'] ?? [];
+        if (empty($sales['business_type_changed_at'])) {
+            return null;
+        }
+
+        return [
+            'by' => (string) ($sales['business_type_changed_by'] ?? ''),
+            'at' => (string) $sales['business_type_changed_at'],
+            'from' => in_array($sales['business_type_previous'] ?? null, self::BUSINESS_TYPES, true) ? $sales['business_type_previous'] : null,
+            'to' => $this->businessType(),
+        ];
+    }
+
+    /** "Show all menu items": the sidebar keeps the pages the business type would tidy away. */
+    public function showsAllMenu(): bool
+    {
+        return (bool) ($this->settings['sales']['show_all_menu'] ?? false);
+    }
+
+    /**
+     * Parts of the app the business already uses, so the sidebar keeps them whatever its type:
+     * tables (a store with dine-in on, or tables set up) and stock (a product that tracks it).
+     *
+     * @return array{dining_tables: bool, stock: bool}
+     */
+    public function menuInUse(): array
+    {
+        return [
+            'dining_tables' => InventoryLocation::query()->forDomain($this->name_slug)->where('dine_in', true)->exists()
+                || DiningTable::query()->whereIn('location_id', InventoryLocation::query()->forDomain($this->name_slug)->select('id'))->exists(),
+            'stock' => Product\Product::query()->where('domain', $this->name_slug)->where('track_inventory', true)->exists(),
+        ];
+    }
+
     /** Someone picked the business type; until then it reads as retail and admins are asked to pick it. */
     public function hasChosenBusinessType(): bool
     {

@@ -34,6 +34,9 @@ class ExpenseController extends Controller
     /** Filter value for expenses not tied to a store. */
     private const BUSINESS_WIDE = 'business';
 
+    /** Filter value for every store's expenses (the store filter cleared). */
+    private const ALL_STORES = 'all';
+
     public function __construct(
         private ExpenseService $expenses,
         private RecurringExpenseService $recurring,
@@ -331,7 +334,17 @@ class ExpenseController extends Controller
         $start = isset($validated['start_date']) ? Carbon::parse($validated['start_date'])->startOfDay() : now()->startOfMonth();
         $end = isset($validated['end_date']) ? Carbon::parse($validated['end_date'])->endOfDay() : now()->endOfMonth();
 
+        // No store picked on the page: the store chosen at the top of the screen (a warehouse looks at
+        // all of them). "all" is asked for when someone clears the store filter. Managers already see
+        // only their store plus business-wide expenses (baseQuery), so this is for those who see all.
         $location = $validated['location'] ?? null;
+        if (! $request->has('location') && FinanceAccess::canSeeAllStores($request->user())) {
+            $active = Helpers::getActiveLocation($domain);
+            $location = $active && ! $active->isWarehouse() ? (string) $active->id : null;
+        }
+        if ($location === self::ALL_STORES) {
+            $location = null;
+        }
         if ($location !== null && $location !== self::BUSINESS_WIDE) {
             $location = ctype_digit($location)
                 && InventoryLocation::query()->forDomain($domain->name_slug)->whereKey((int) $location)->exists()

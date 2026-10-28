@@ -141,3 +141,20 @@ test.describe("Ctrl+K page search", () => {
         });
     });
 });
+
+test.describe("menu scroll", () => {
+    test.use({ account: "plan-premium" });
+
+    test("picking an item low in the menu keeps the menu where it was", async ({ page }) => {
+        await page.setViewportSize({ width: 1280, height: 600 });
+        await page.goto("/domains/e2e-plan-premium/dashboard");
+        const menu = page.getByTestId("sidebar-menu").first();
+        await menu.evaluate((el) => el.scrollTo(0, el.scrollHeight));
+        const before = await menu.evaluate((el) => el.scrollTop);
+        expect(before, "the menu is long enough to scroll").toBeGreaterThan(0);
+
+        await menu.getByText("Settings", { exact: true }).click();
+        await expect(page).toHaveURL(/\/settings/);
+        await expect.poll(() => page.getByTestId("sidebar-menu").first().evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+    });
+});

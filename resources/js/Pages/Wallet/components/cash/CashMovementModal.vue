@@ -3,6 +3,7 @@ import { computed, reactive, watch } from "vue";
 import { router } from "@inertiajs/vue3";
 import { message as antMessage } from "ant-design-vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
+import { useHelpers } from "@/Composables/useHelpers";
 
 /**
  * Add a line by hand:
@@ -22,9 +23,12 @@ const props = defineProps({
     transferStores: { type: Array, default: () => [] },
     locationId: { type: Number, default: null },
     todayYmd: { type: String, required: true },
+    /** What there is to take out: { drawer, channels: { id: balance } }; null hides it. */
+    available: { type: Object, default: null },
 });
 const emit = defineEmits(["close"]);
 const { getRoute } = useDomainRoutes();
+const { formattedTotal } = useHelpers();
 
 const TYPES = {
     in: [
@@ -78,6 +82,20 @@ const destOptions = computed(() => {
 watch(destOptions, (list) => {
     if (!list.some((o) => o.value === form.dest)) form.dest = null;
 });
+
+// Where the money comes out of, and how much it holds: shown under the amount when money leaves.
+const source = computed(() => {
+    if (!props.available) return null;
+    const channel = (id) => (id ? { label: props.channels.find((c) => c.id === id)?.name ?? "the channel", amount: props.available.channels?.[id] } : null);
+    const drawer = { label: "the drawer (Expected today)", amount: props.available.drawer };
+    if (props.mode === "transfer") return form.source === "drawer" ? drawer : channel(form.source);
+    if (props.mode === "move") return form.moveDirection === "out" ? channel(form.channel) : null;
+    if (props.mode === "out") return form.kind === "owner_draw" && form.from === "channel" ? channel(form.channel) : drawer;
+    return null;
+});
+const overAvailable = computed(
+    () => source.value?.amount !== undefined && source.value?.amount !== null && Number(form.amount) > Number(source.value.amount),
+);
 
 function payload() {
     const base = { amount: Number(form.amount), movement_date: form.date, notes: form.notes || null, location_id: props.locationId };
@@ -189,6 +207,9 @@ function save() {
 
             <a-form-item label="Amount" required>
                 <a-input-number v-model:value="form.amount" :min="0.01" :step="0.01" :precision="2" class="w-full" addon-before="₱" data-testid="cash-amount" />
+                <div v-if="source && source.amount !== undefined && source.amount !== null" class="mt-1 text-xs" :class="overAvailable ? 'text-amber-700' : 'text-gray-500'" data-testid="cash-available">
+                    Available in {{ source.label }}: {{ formattedTotal(Number(source.amount)) }}<template v-if="overAvailable">. This is more than that.</template>
+                </div>
             </a-form-item>
             <a-form-item label="Date">
                 <a-date-picker v-model:value="form.date" value-format="YYYY-MM-DD" :allow-clear="false" :disabled-date="isFuture" class="w-full" />

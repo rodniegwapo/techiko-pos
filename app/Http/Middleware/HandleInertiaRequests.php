@@ -80,6 +80,10 @@ class HandleInertiaRequests extends Middleware
             'businessType' => $currentDomain?->businessType() ?? 'retail',
             // Not picked yet: those who can change Settings see a banner asking what the business sells.
             'businessTypeChosen' => $currentDomain ? $currentDomain->hasChosenBusinessType() : true,
+            // The sidebar tidies away pages the type rarely needs, unless they're in use or the business
+            // asked to see everything (useNavMenu.js).
+            'showAllMenu' => $currentDomain ? $currentDomain->showsAllMenu() : true,
+            'menuInUse' => fn () => $currentDomain ? $currentDomain->menuInUse() : ['dining_tables' => true, 'stock' => true],
             'currentLocation' => $currentLocation = $this->getCurrentLocation($request),
             // Parts of the app this location doesn't show (sidebar); EnsureLocationArea turns the pages away.
             'locationAreas' => [

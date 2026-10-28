@@ -94,7 +94,9 @@ class WalletPagesTest extends TestCase
 
         $ledger = $this->user(['wallet-cash-ledger.index']);
         $this->actingAs($ledger)->get($this->url('cash-in-out'))->assertOk()->assertInertia(fn (Assert $page) => $page
-            ->component('Wallet/CashInOut')->has('ledger.movements')->has('channels'));
+            ->component('Wallet/CashInOut')->has('ledger.movements')->has('channels')
+            // What there is to take out, shown under the amount.
+            ->where('available.drawer', 0)->has('available.channels'));
         $this->actingAs($ledger)->get($this->url('balances'))->assertOk()->assertInertia(fn (Assert $page) => $page
             ->component('Wallet/Balances')->where('canSeeBalances', true)->where('drawerExpected', 0));
         $this->actingAs($ledger)->get($this->url('drawer'))->assertForbidden();

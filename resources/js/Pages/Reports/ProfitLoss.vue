@@ -28,6 +28,8 @@ const props = defineProps({
     canSeeAllStores: { type: Boolean, default: false },
     aiEnabled: { type: Boolean, default: false },
     domainName: { type: String, default: "" },
+    /** First sale's date when it falls inside the period: the figures only cover from then. */
+    dataStarts: { type: String, default: null },
 });
 
 const { getRoute } = useDomainRoutes();
@@ -223,6 +225,13 @@ const printColumns = [
                         <div class="text-sm text-gray-600">
                             <strong>{{ periods.current }}</strong> compared with {{ periods.previous }} · {{ storeLabel }}
                         </div>
+                        <a-alert
+                            v-if="dataStarts"
+                            type="info"
+                            show-icon
+                            data-testid="pnl-data-starts"
+                            :message="`Your sales in Techiko start on ${dayjs(dataStarts).format('MMM D, YYYY')}, so this covers ${dayjs(dataStarts).format('MMM D')} onward, not the whole period.`"
+                        />
 
                         <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
                             <div

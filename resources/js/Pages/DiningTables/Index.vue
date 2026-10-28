@@ -57,14 +57,42 @@ function remove(table) {
 }
 
 // The floor plan: drag a table onto another cell, then save.
+// Adding, editing or removing a table reloads the list; tables moved but not saved yet keep their
+// new cells, and a new table placed on a cell one of them now takes goes to the first free cell.
 const positions = ref({});
+let saved = {};
 watch(
     () => props.tables,
     (tables) => {
-        positions.value = Object.fromEntries(tables.map((t) => [t.id, { x: t.pos_x, y: t.pos_y }]));
+        const moved = Object.fromEntries(
+            Object.entries(positions.value).filter(([id, p]) => saved[id] && (saved[id].x !== p.x || saved[id].y !== p.y)),
+        );
+        saved = Object.fromEntries(tables.map((t) => [t.id, { x: t.pos_x, y: t.pos_y }]));
+        const next = {};
+        for (const t of tables) {
+            if (moved[t.id]) next[t.id] = moved[t.id];
+        }
+        const taken = (x, y) => Object.values(next).some((p) => p.x === x && p.y === y);
+        for (const t of tables) {
+            if (next[t.id]) continue;
+            let spot = { x: t.pos_x, y: t.pos_y };
+            if (taken(spot.x, spot.y)) {
+                spot = freeCell(taken) ?? spot;
+            }
+            next[t.id] = spot;
+        }
+        positions.value = next;
     },
     { immediate: true },
 );
+function freeCell(taken) {
+    for (let y = 0; y < props.grid.rows; y++) {
+        for (let x = 0; x < props.grid.columns; x++) {
+            if (!taken(x, y)) return { x, y };
+        }
+    }
+    return null;
+}
 const dirty = computed(() => props.tables.some((t) => positions.value[t.id]?.x !== t.pos_x || positions.value[t.id]?.y !== t.pos_y));
 const cells = computed(() => {
     const list = [];
@@ -148,6 +176,7 @@ function saveLayout() {
                                     <div
                                         v-for="c in cells"
                                         :key="`${c.x}-${c.y}`"
+                                        :data-testid="`floor-cell-${c.x}-${c.y}`"
                                         class="flex h-16 items-center justify-center rounded border border-dashed border-gray-300 bg-white/50"
                                         @dragover.prevent
                                         @drop.prevent="drop(c.x, c.y)"

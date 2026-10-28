@@ -19,6 +19,8 @@ const props = defineProps({
     channels: { type: Array, default: () => [] },
     otherStores: { type: Array, default: () => [] },
     transferStores: { type: Array, default: () => [] },
+    /** { drawer, channels: { id: balance } }, or null when the user may not see balances. */
+    available: { type: Object, default: null },
     activeLocation: { type: Object, default: null },
     todayIsClosed: { type: Boolean, default: false },
     canViewAllMoney: { type: Boolean, default: false },
@@ -163,6 +165,6 @@ const pagination = computed(() => ({
             </template>
         </div>
 
-        <CashMovementModal :mode="mode" :channels="channels" :other-stores="otherStores" :transfer-stores="transferStores" :location-id="locationId" :today-ymd="todayYmd" @close="mode = null" />
+        <CashMovementModal :mode="mode" :channels="channels" :other-stores="otherStores" :transfer-stores="transferStores" :available="available" :location-id="locationId" :today-ymd="todayYmd" @close="mode = null" />
     </WalletLayout>
 </template>

@@ -43,6 +43,7 @@ const { hasPermission } = usePermissionsV2();
 // Keys differ from the query param names on purpose: useFilters seeds any key it finds in the URL
 // as a string, which would not match the numeric ids the selects use.
 const dateRange = ref([dayjs(props.filters.start_date), dayjs(props.filters.end_date)]);
+// Starts at the store picked at the top of the screen (the server resolves it).
 const location = ref(props.filters.location ?? null);
 const category = ref(props.filters.category_id ?? null);
 const payment = ref(props.filters.payment_method ?? null);
@@ -66,7 +67,9 @@ const paymentOptions = computed(() =>
 const queryParams = (extra = {}) => ({
     start_date: dateRange.value?.[0] ? dayjs(dateRange.value[0]).format("YYYY-MM-DD") : undefined,
     end_date: dateRange.value?.[1] ? dayjs(dateRange.value[1]).format("YYYY-MM-DD") : undefined,
-    location: location.value || undefined,
+    // Cleared: every store ("all"), not the store picked at the top of the screen, which the server
+    // uses when no store is given.
+    location: location.value || (props.canSeeAllStores ? "all" : undefined),
     category_id: category.value || undefined,
     payment_method: payment.value || undefined,
     account_id: account.value || undefined,

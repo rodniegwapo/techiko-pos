@@ -132,10 +132,23 @@ test.describe("other / mixed business", () => {
     test("switching to Retail on Settings changes new products, not existing ones", async ({ page }) => {
         await page.goto(url("other", "/settings"));
         await page.getByTestId("business-type-retail").click();
-        const saved = page.waitForResponse((r) => r.request().method() === "PATCH" && new URL(r.url()).pathname === url("other", "/settings"));
+
+        // A change is confirmed first; Cancel saves nothing.
         await page.getByTestId("save-business-type").click();
+        const confirm = page.locator(".ant-modal-confirm");
+        await expect(confirm).toContainText("Change the business type to Retail store?");
+        await expect(confirm).toContainText("Products and sales you already have don't change.");
+        await confirm.getByRole("button", { name: "Cancel" }).click();
+        await page.reload();
+        await expect(page.getByTestId("business-type-other"), "nothing was saved").toBeChecked();
+
+        await page.getByTestId("business-type-retail").click();
+        await page.getByTestId("save-business-type").click();
+        const saved = page.waitForResponse((r) => r.request().method() === "PATCH" && new URL(r.url()).pathname === url("other", "/settings"));
+        await page.locator(".ant-modal-confirm").getByRole("button", { name: "Change" }).click();
         expect((await saved).status()).toBeLessThan(400);
         await expect(page.getByTestId("business-type-retail")).toBeChecked();
+        await expect(page.getByTestId("business-type-changed")).toContainText("Changed from Other / mixed to Retail store by Demo Mixed Store Admin on");
 
         await expectPreset(page, "other", "retail");
 
@@ -181,5 +194,90 @@ test.describe("a business that picked its type", () => {
     test("sees no banner", async ({ page }) => {
         await page.goto("/domains/pos-retail/products");
         await expect(page.getByText("What does your business sell?")).toHaveCount(0);
+    });
+});
+
+/** The sidebar, less the pages each type tidies away (useBusinessType.js hiddenMenuKeys). */
+const sidebar = (page) => page.getByRole("complementary");
+const menuItem = (page, title) => sidebar(page).getByText(title, { exact: true });
+
+async function openInventory(page) {
+    await menuItem(page, "Inventory").click();
+}
+
+for (const [type, showsTables] of [["retail", false], ["grocery", false], ["food", true]]) {
+    test.describe(`${type} sidebar`, () => {
+        test.use({ account: `pos-${type}` });
+
+        test(`${showsTables ? "shows" : "leaves out"} Tables`, async ({ page }) => {
+            await page.goto(url(type, "/products"));
+            await expect(sidebar(page).getByTestId("nav-section-stock")).toBeVisible();
+            await expect(menuItem(page, "Tables")).toHaveCount(showsTables ? 1 : 0);
+        });
+    });
+}
+
+test.describe("services sidebar", () => {
+    // Turns "Show all menu items" on and off for pos-services, so these run in order.
+    test.describe.configure({ mode: "serial" });
+    test.use({ account: "pos-services" });
+
+    const setShowAll = async (serverAs, on) => {
+        const api = await serverAs("pos-services");
+        await apiJson(api, "PATCH", url("services", "/settings"), { show_all_menu: on });
+    };
+    test.beforeAll(async ({ serverAs }) => setShowAll(serverAs, false));
+    test.afterAll(async ({ serverAs }) => setShowAll(serverAs, false));
+
+    test("leaves out tables and the stock pages a services business doesn't use", async ({ page }) => {
+        await page.goto(url("services", "/products"));
+        await expect(sidebar(page).getByTestId("nav-section-stock")).toBeVisible();
+        await expect(menuItem(page, "Tables")).toHaveCount(0);
+        await expect(menuItem(page, "Purchasing")).toHaveCount(0);
+
+        await openInventory(page);
+        await expect(menuItem(page, "Stock Adjustments")).toHaveCount(0);
+        await expect(menuItem(page, "Movements")).toHaveCount(0);
+        await expect(menuItem(page, "Locations"), "the rest of Inventory stays").toBeVisible();
+    });
+
+    test("page search still finds a tidied page and opens it", async ({ page }) => {
+        await page.goto(url("services", "/products"));
+        await page.keyboard.press("Control+k");
+        await page.getByTestId("nav-search-input").fill("Purchasing");
+        const item = page.getByTestId("nav-search-item").filter({ hasText: "Purchasing" }).first();
+        await expect(item.getByTestId("nav-search-tidied")).toHaveText("Not in your menu");
+        await item.click();
+        await expect(page).toHaveURL(/\/domains\/pos-services\/purchasing/);
+    });
+
+    test("Show all menu items brings them back", async ({ page }) => {
+        await page.goto(url("services", "/settings"));
+        await expect(page.getByTestId("show-all-menu")).toHaveAttribute("aria-checked", "false");
+        // It uses none of the pages a services business leaves out, so there's nothing kept to explain.
+        await expect(page.getByTestId("menu-kept-in-use")).toHaveCount(0);
+        await page.getByTestId("show-all-menu").click();
+        await page.getByTestId("save-business-type").click();
+        const saved = page.waitForResponse((r) => r.request().method() === "PATCH" && new URL(r.url()).pathname === url("services", "/settings"));
+        await page.locator(".ant-modal-confirm").getByRole("button", { name: "Change" }).click();
+        expect((await saved).status()).toBeLessThan(400);
+
+        await page.goto(url("services", "/products"));
+        await expect(menuItem(page, "Purchasing")).toBeVisible();
+        await openInventory(page);
+        await expect(menuItem(page, "Stock Adjustments")).toBeVisible();
+    });
+});
+
+test.describe("a manager", () => {
+    test.use({ account: "pos-retail-manager" });
+
+    test("sees the business type but can't change it", async ({ page }) => {
+        await page.goto(url("retail", "/settings"));
+        await expect(page.getByTestId("business-type-retail")).toBeChecked();
+        await expect(page.getByTestId("business-type-food")).toBeDisabled();
+        await expect(page.getByTestId("show-all-menu")).toBeDisabled();
+        await expect(page.getByTestId("save-business-type")).toHaveCount(0);
+        await expect(page.getByTestId("business-type-read-only")).toContainText("Only an owner or admin can change this.");
     });
 });
