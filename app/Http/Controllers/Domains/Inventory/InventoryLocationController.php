@@ -9,6 +9,7 @@ use App\Http\Requests\InventoryLocationRequest;
 use App\Models\Domain;
 use App\Models\InventoryLocation;
 use App\Services\DomainSubscriptionService;
+use App\Support\FinanceAccess;
 use App\Traits\LocationTypes;
 use Illuminate\Http\Request;
 
@@ -122,6 +123,12 @@ class InventoryLocationController extends Controller
         $makeDefault = (bool) ($validated['is_default'] ?? false);
         // Unsetting the default happens by making another store the default.
         unset($validated['is_default']);
+        // Whether the store sends and receives money from other stores is the owner's call.
+        if (array_key_exists('allows_money_transfer', $validated)
+            && (bool) $validated['allows_money_transfer'] !== (bool) $location->allows_money_transfer
+            && ! FinanceAccess::canSeeAllStores($request->user())) {
+            return back()->withErrors(['allows_money_transfer' => 'Only an owner or admin changes Can transfer money.']);
+        }
 
         $location->update($validated);
         if ($makeDefault) {

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Domains\AiUsageController;
 use App\Http\Controllers\Domains\AssistantController;
 use App\Http\Controllers\Domains\AssistantConversationController;
+use App\Http\Controllers\Domains\CashOnHandController;
 use App\Http\Controllers\Domains\CategoryController;
 use App\Http\Controllers\Domains\CreditController;
 use App\Http\Controllers\Domains\CustomerController;
@@ -327,6 +328,13 @@ Route::prefix('domains/{domain:name_slug}')
             Route::get('/history', [WalletPagesController::class, 'history'])->name('history');
             // The old all-in-one page: sends old links to the right page above.
             Route::get('/money-movement', [PaymentCardTypeController::class, 'moneyMovement'])->name('money-movement');
+        });
+
+        // Cash on hand: the business's cash the owner holds; collecting approved shifts into it (owners and admins).
+        Route::prefix('wallet/cash-on-hand')->name('cash-on-hand.')->group(function () {
+            Route::get('/', [CashOnHandController::class, 'index'])->name('index');
+            Route::post('/', [CashOnHandController::class, 'store'])->name('store');
+            Route::post('/shifts/{registerShift}', [CashOnHandController::class, 'collect'])->whereNumber('registerShift')->name('collect');
         });
 
         // Payment card types (Wallet) — domain-scoped

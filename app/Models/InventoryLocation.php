@@ -23,6 +23,7 @@ class InventoryLocation extends Model
         'is_default' => 'boolean',
         'dine_in' => 'boolean',
         'table_cleaning' => 'boolean',
+        'allows_money_transfer' => 'boolean',
     ];
 
     protected $searchable = [

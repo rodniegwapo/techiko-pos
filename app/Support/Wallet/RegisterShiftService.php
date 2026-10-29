@@ -60,6 +60,22 @@ class RegisterShiftService
         ];
     }
 
+    /**
+     * What this person's drawer still holds from their last shift ended today: its count, less what
+     * the owner collected to Cash on hand. Null before their first shift of the day.
+     */
+    public function carriedOpening(string $domainSlug, int $locationId, int $userId): ?float
+    {
+        $last = RegisterShift::query()->forWalletContext($domainSlug, $locationId)
+            ->where('user_id', $userId)
+            ->whereDate('business_date', now()->toDateString())
+            ->where('status', '!=', RegisterShift::OPEN)
+            ->latest('closed_at')->latest('id')
+            ->first();
+
+        return $last ? round((float) $last->counted_cash - (float) $last->collected_amount, 2) : null;
+    }
+
     public function start(Domain $domain, InventoryLocation $location, User $user, float $openingCash, ?string $note = null): RegisterShift
     {
         $today = now()->toDateString();
@@ -76,6 +92,7 @@ class RegisterShiftService
         }
 
         return DB::transaction(function () use ($domain, $location, $user, $openingCash, $note, $today) {
+            $carried = $this->carriedOpening($domain->name_slug, (int) $location->id, (int) $user->id);
             $storeDay = WalletCashReconciliation::query()
                 ->forWalletContext($domain->name_slug, (int) $location->id)
                 ->whereDate('business_date', $today)
@@ -86,10 +103,26 @@ class RegisterShiftService
             if (! $storeDay) {
                 // The first shift of the day opens the store's day with the cash it starts with.
                 WalletOpeningCash::save($domain->name_slug, $location, $today, $openingCash, (int) $user->id, $note ?: 'Opened by '.$user->name.'\'s shift');
+            } elseif ($carried !== null) {
+                // A person's next shift reuses their drawer, already counted in. Cash put in or taken
+                // out between shifts is a line on the store's day (no shift yet, so not this one's:
+                // its opening already holds it).
+                $diff = round($openingCash - $carried, 2);
+                if (abs($diff) > self::TOLERANCE) {
+                    WalletCashMovement::query()->create([
+                        'domain' => $domain->name_slug,
+                        'location_id' => $location->id,
+                        'direction' => $diff > 0 ? 'in' : 'out',
+                        'amount' => abs($diff),
+                        'kind' => 'adjustment',
+                        'notes' => ($diff > 0 ? 'Cash added' : 'Cash taken out').' at the start of '.$user->name.'\'s shift',
+                        'movement_date' => $today,
+                        'user_id' => $user->id,
+                    ]);
+                }
             } elseif ($openingCash > 0 && (clone $todaysShifts)->exists() && ! (clone $todaysShifts)->where('user_id', $user->id)->exists()) {
                 // Each cashier has their own drawer: another person's opening is more cash at the store.
-                // (The day's first shift takes its float from the store's opening; a person's next
-                // shift reuses the drawer already counted in.)
+                // (The day's first shift takes its float from the store's opening.)
                 WalletOpeningCash::save(
                     $domain->name_slug, $location, $today,
                     round((float) $storeDay->opening_cash + $openingCash, 2),
@@ -156,6 +189,7 @@ class RegisterShiftService
             WalletCashCountSubmission::query()->create([
                 'domain' => $shift->domain,
                 'location_id' => $shift->location_id,
+                'kind' => WalletCashCountSubmission::SHIFT,
                 'reconciliation_id' => WalletCashReconciliation::query()
                     ->forWalletContext($shift->domain, (int) $shift->location_id)
                     ->whereDate('business_date', $shift->business_date)

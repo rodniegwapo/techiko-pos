@@ -209,6 +209,15 @@
             "Why is my drawer short?"
         ]
     },
+    "Wallet/CashOnHand": {
+        "title": "Cash on hand",
+        "en": "The business's cash the owner holds, out of every drawer. Collect approved shifts, move cash back to a store, or record what the owner used.",
+        "tl": "Ang pera ng negosyo na hawak ng may-ari, labas sa mga drawer. Kunin ang pera ng mga aprubadong shift, ibalik ang pera sa tindahan, o itala ang ginamit ng may-ari.",
+        "guides": [],
+        "ask": [
+            "Which shifts are waiting to be collected?"
+        ]
+    },
     "Wallet/CashInOut": {
         "title": "Cash in & out",
         "en": "Every peso put into or taken out of the cash drawer, like float added, the owner taking cash, or expenses paid in cash.",

@@ -226,13 +226,13 @@ test.describe("Cash in & out", () => {
             const drawer = await DrawerPage.open(page, day(0));
             await drawer.setOpening(100);
             await drawer.countCash(90);
-            await drawer.endShift("Take the cash out");
+            await drawer.endShift("Cash out to Cash on hand");
 
             const cash = await CashInOutPage.open(page, { date_from: day(0), date_to: day(0) });
 
             await expect(cash.row("Opening cash")).toContainText(`+ ${money(100)}`);
             await expect(cash.row("Count difference")).toContainText(`− ${money(11)}`);
-            await expect(cash.row("Cash taken out at end of shift")).toContainText(`− ${money(90)}`);
+            await expect(cash.row("Cash out to Cash on hand at end of day")).toContainText(`− ${money(90)}`);
             // System tokens are shown as labels, never as raw notes.
             await expect(page.getByText(/AUTO_CC_/)).toHaveCount(0);
         });

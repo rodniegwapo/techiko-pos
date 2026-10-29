@@ -25,7 +25,7 @@ import {
  *
  * - A cashier's own shift (register_shifts): every end adds a count, every reopen a log row, and
  *   Expected never moves on its own.
- * - The store's day (wallet_cash_reconciliations): closing with "Take the cash out" or "Leave it as
+ * - The store's day (wallet_cash_reconciliations): closing with "Cash out to Cash on hand" or "Leave it as
  *   the next shift's opening", reopening, and closing again must not lose or double the cash.
  * - Several people on shift at once: the store's Expected and the shifts' Expecteds tell the same story.
  *

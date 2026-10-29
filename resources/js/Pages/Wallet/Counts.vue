@@ -7,6 +7,7 @@ import { router } from "@inertiajs/vue3";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useHelpers } from "@/Composables/useHelpers";
 import WalletLayout from "./components/WalletLayout.vue";
+import CollectShiftModal from "./components/cash/CollectShiftModal.vue";
 import { shortOver, TONE_CLASSES, SHIFT_STATUS, movementLabel } from "./components/walletLabels";
 import { useWalletQuery } from "./composables/useWalletQuery";
 import { firstValidationMessage } from "./composables/useCashDrawerActions";
@@ -14,12 +15,15 @@ import { firstValidationMessage } from "./composables/useCashDrawerActions";
 /**
  * Counted money: each cashier's ended shift with its count and how far it was from Expected. The
  * ones that came out short or over wait here for a manager, who looks into them and approves.
+ * Once approved, the owner collects the shift's cash into Cash on hand.
  */
 const props = defineProps({
     status: { type: String, default: "needs_review" },
     shifts: { type: Object, required: true },
     statusCounts: { type: Object, default: () => ({}) },
     canApprove: { type: Boolean, default: false },
+    /** Owners and admins: collect approved shifts' cash into Cash on hand. */
+    canCollect: { type: Boolean, default: false },
     currentUserId: { type: Number, default: null },
     activeLocation: { type: Object, default: null },
 });
@@ -91,6 +95,8 @@ function approve() {
         },
     );
 }
+
+const collecting = ref(null);
 
 // View: the shift's sales, cash lines, every count and every reopen.
 const detail = ref(null);
@@ -168,6 +174,9 @@ async function openDetail(row) {
                         <a-tag :color="SHIFT_STATUS[record.status]?.color" class="m-0">{{ SHIFT_STATUS[record.status]?.label ?? record.status }}</a-tag>
                         <div v-if="record.reopen_count" class="text-xs text-gray-500">Reopened {{ record.reopen_count }}×</div>
                         <div v-if="record.status === 'approved' && record.reviewed_by" class="text-xs text-gray-500">by {{ record.reviewed_by }}</div>
+                        <div v-if="record.collected_at" class="text-xs text-teal-700" :data-testid="`count-collected-${record.id}`">
+                            Collected {{ money(record.collected_amount) }} by {{ record.collected_by }} on {{ dayjs(record.collected_at).format("MMM D") }}
+                        </div>
                     </template>
                     <template v-else-if="column.key === 'actions'">
                         <div class="flex justify-end gap-2">
@@ -180,6 +189,15 @@ async function openDetail(row) {
                                 @click="openApprove(record)"
                             >
                                 Approve
+                            </a-button>
+                            <a-button
+                                v-if="canCollect && record.collectable"
+                                size="small"
+                                type="primary"
+                                :data-testid="`count-collect-${record.id}`"
+                                @click="collecting = record"
+                            >
+                                Collect
                             </a-button>
                         </div>
                     </template>
@@ -205,6 +223,8 @@ async function openDetail(row) {
                 <a-input v-model:value="approveNote" placeholder="What you found (optional)" :maxlength="255" data-testid="approve-note" />
             </template>
         </a-modal>
+
+        <CollectShiftModal :shift="collecting" @close="collecting = null" />
 
         <a-modal :visible="!!detail" :title="detail?.shift?.user ? `${detail.shift.user.name}'s shift` : 'Shift'" :width="760" :footer="null" @cancel="detail = null">
             <a-spin :spinning="detailLoading">

@@ -80,6 +80,10 @@ class RolePermissionSeeder extends Seeder
             'register-shifts.index',
             'register-shifts.approve',
             'register-shifts.money-by-user',
+            // Cash on hand: owners and admins only
+            'cash-on-hand.index',
+            'cash-on-hand.store',
+            'cash-on-hand.collect',
             'vat-report.index',
             'vat-report.export',
             'vat-report.export-json',
@@ -497,6 +501,10 @@ class RolePermissionSeeder extends Seeder
             'register-shifts.index',
             'register-shifts.approve',
             'register-shifts.money-by-user',
+            // Cash on hand: owners and admins only
+            'cash-on-hand.index',
+            'cash-on-hand.store',
+            'cash-on-hand.collect',
             'vat-report.index',
             'vat-report.export',
             'vat-report.export-json',

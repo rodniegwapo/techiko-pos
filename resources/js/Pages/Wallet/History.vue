@@ -3,7 +3,7 @@ import { computed, reactive } from "vue";
 import dayjs from "dayjs";
 import { useHelpers } from "@/Composables/useHelpers";
 import WalletLayout from "./components/WalletLayout.vue";
-import { shortOver, TONE_CLASSES } from "./components/walletLabels";
+import { shortOver, TONE_CLASSES, COUNT_KIND_LABELS } from "./components/walletLabels";
 import { useWalletQuery } from "./composables/useWalletQuery";
 
 /**
@@ -69,7 +69,12 @@ const showShifts = () => visit("wallet.history", { ...shiftFilters }, {}, { pres
                 <ul v-else class="m-0 list-none divide-y divide-gray-100 p-0 text-sm">
                     <li v-for="c in counts" :key="c.id" class="py-2">
                         <div class="flex justify-between gap-2">
-                            <span class="font-medium">{{ money(c.counted_cash) }} counted</span>
+                            <span class="font-medium">
+                                {{ money(c.counted_cash) }} counted
+                                <a-tag v-if="COUNT_KIND_LABELS[c.kind]" class="ml-1" :color="c.kind === 'end_of_day' ? 'blue' : undefined" :data-testid="`count-kind-${c.kind}`">
+                                    {{ COUNT_KIND_LABELS[c.kind] }}
+                                </a-tag>
+                            </span>
                             <span v-if="shortOver(c.variance_snapshot)" :class="TONE_CLASSES[shortOver(c.variance_snapshot).tone]">
                                 {{ resultText(c.variance_snapshot) }}
                             </span>

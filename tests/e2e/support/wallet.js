@@ -181,7 +181,7 @@ export class DrawerPage {
 
     async openCountCash() {
         await this.page.getByTestId("open-count-cash").click();
-        const dialog = this.dialog("Count cash");
+        const dialog = this.dialog("Spot check");
         await expect(dialog).toBeVisible();
         return dialog;
     }
@@ -190,18 +190,18 @@ export class DrawerPage {
         const dialog = await this.openCountCash();
         await numberInput(dialog, "count-amount").fill(String(amount));
         if (notes) await dialog.getByPlaceholder("Notes (optional)").fill(notes);
-        return this.save("/cash-ledger/counted-cash", () => dialog.getByRole("button", { name: "Save count" }).click());
+        return this.save("/cash-ledger/counted-cash", () => dialog.getByRole("button", { name: "Save spot check" }).click());
     }
 
     /**
      * Ends the store's day (a manager's, once no cashier is still on shift).
-     * @param {"Take the cash out"|"Leave it as the next shift's opening"} choice
+     * @param {"Cash out to Cash on hand"|"Leave it as the next shift's opening"} choice
      */
     async endShift(choice) {
         await this.page.getByTestId("open-end-shift").click();
         const dialog = this.dialog("End the store's day");
         await expect(dialog).toBeVisible();
-        await dialog.getByTestId(choice === "Take the cash out" ? "end-shift-cashout" : "end-shift-keep").click();
+        await dialog.getByTestId(choice === "Cash out to Cash on hand" ? "end-shift-cashout" : "end-shift-keep").click();
         return this.save("/cash-ledger/close-shift", () => dialog.getByTestId("confirm-end-shift").click());
     }
 

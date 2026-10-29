@@ -47,6 +47,14 @@ class WalletCashMovement extends Model
 
     public const KIND_TRANSFER_IN = 'transfer_in';
 
+    /**
+     * Cash the owner collected from the drawer into Cash on hand, and Cash on hand put back into a
+     * store's drawer or channel: still the business's money, only somewhere else (CashOnHand).
+     */
+    public const KIND_TO_CASH_ON_HAND = 'to_cash_on_hand';
+
+    public const KIND_FROM_CASH_ON_HAND = 'from_cash_on_hand';
+
     public const SYSTEM_KINDS = [
         self::KIND_EXPENSE,
         'supplier_payment',
@@ -61,6 +69,8 @@ class WalletCashMovement extends Model
         self::KIND_OWNER_TRANSFER_IN,
         self::KIND_TRANSFER_OUT,
         self::KIND_TRANSFER_IN,
+        self::KIND_TO_CASH_ON_HAND,
+        self::KIND_FROM_CASH_ON_HAND,
     ];
 
     protected $casts = [

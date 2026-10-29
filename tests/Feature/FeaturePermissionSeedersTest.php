@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Permission;
 use Database\Seeders\AssistantPermissionSeeder;
+use Database\Seeders\CashOnHandPermissionSeeder;
 use Database\Seeders\DineInPermissionSeeder;
 use Database\Seeders\FinancePermissionSeeder;
 use Database\Seeders\ProductModifierPermissionSeeder;
@@ -208,6 +209,39 @@ class FeaturePermissionSeedersTest extends TestCase
         $this->assertSame($routes, $this->routesOf($manager));
         $this->assertSame([], $this->routesOf($cashier));
         $this->assertSame(count($routes), Permission::query()->whereIn('route_name', $routes)->count());
+    }
+
+    public function test_the_cash_on_hand_seeder_covers_every_cash_on_hand_route(): void
+    {
+        $routes = [];
+        foreach (Route::getRoutes() as $route) {
+            if (str_starts_with((string) $route->getName(), 'domains.cash-on-hand.')) {
+                $routes[] = preg_replace('/^domains\./', '', $route->getName());
+            }
+        }
+
+        $this->assertSame($this->sorted($routes), $this->sorted(CashOnHandPermissionSeeder::ROUTES));
+    }
+
+    public function test_cash_on_hand_is_for_owners_and_admins_only(): void
+    {
+        $admin = $this->role('admin');
+        $manager = $this->role('manager');
+        $cashier = $this->role('cashier');
+
+        $this->seed(CashOnHandPermissionSeeder::class);
+        $this->seed(CashOnHandPermissionSeeder::class);
+
+        $routes = $this->sorted(CashOnHandPermissionSeeder::ROUTES);
+        $this->assertSame($routes, $this->routesOf($admin));
+        // It moves money out of the stores' drawers: not for managers or cashiers.
+        $this->assertSame([], $this->routesOf($manager));
+        $this->assertSame([], $this->routesOf($cashier));
+        $this->assertSame(count($routes), Permission::query()->whereIn('route_name', $routes)->count());
+        $this->assertSame(
+            DB::table('permission_modules')->where('name', 'cash-on-hand')->value('id'),
+            Permission::query()->where('route_name', 'cash-on-hand.collect')->value('module_id'),
+        );
     }
 
     public function test_purchasing_permissions_are_added_for_the_default_roles_only(): void

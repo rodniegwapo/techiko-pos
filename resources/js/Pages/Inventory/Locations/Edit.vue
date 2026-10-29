@@ -10,8 +10,11 @@ import ContentHeader from "@/Components/ContentHeader.vue";
 import ContentLayout from "@/Components/ContentLayout.vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useHelpers } from "@/Composables/useHelpers";
+import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 
 const { confirmAction } = useHelpers();
+// Store-to-store money transfers are the owner's call (those who move Cash on hand).
+const { hasPermission } = usePermissionsV2();
 
 const props = defineProps({
   location: Object,
@@ -28,6 +31,7 @@ const form = reactive({
   email: "",
   is_active: true,
   is_default: false,
+  allows_money_transfer: false,
   notes: "",
 });
 
@@ -48,6 +52,7 @@ onMounted(() => {
       email: props.location.data.email || "",
       is_active: props.location.data.is_active ?? true,
       is_default: props.location.data.is_default ?? false,
+      allows_money_transfer: props.location.data.allows_money_transfer ?? false,
       notes: props.location.data.notes || "",
     });
   }
@@ -263,6 +268,27 @@ const getTypeIcon = (type) => {
                  The default location will be pre-selected in forms
                </span>
              </div>
+          </a-form-item>
+
+          <a-form-item
+            v-if="form.type === 'store'"
+            :validate-status="errors.allows_money_transfer ? 'error' : ''"
+            :help="errors.allows_money_transfer"
+          >
+            <div class="flex items-start gap-3">
+              <a-switch
+                v-model:checked="form.allows_money_transfer"
+                :disabled="!hasPermission('cash-on-hand.index')"
+                data-testid="location-allows-money-transfer"
+              />
+              <div>
+                <div class="font-medium">Can transfer money</div>
+                <div class="text-sm text-gray-600">
+                  Owners can move drawer cash between stores that have this on.
+                  <span v-if="!hasPermission('cash-on-hand.index')">Only an owner or admin changes this.</span>
+                </div>
+              </div>
+            </div>
           </a-form-item>
 
           <a-form-item

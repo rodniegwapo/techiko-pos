@@ -10,7 +10,7 @@ import { useWalletQuery } from "../composables/useWalletQuery";
 /** The wallet pages' frame: title and the four pages as tabs, keeping store and date. */
 const props = defineProps({
     title: { type: String, required: true },
-    /** drawer | cash-in-out | balances | history | counts */
+    /** drawer | cash-in-out | balances | history | counts | cash-on-hand */
     active: { type: String, required: true },
     activeLocation: { type: Object, default: null },
 });
@@ -25,6 +25,7 @@ const PAGES = [
     { key: "balances", route: "wallet.balances", label: "Where money is" },
     { key: "history", route: "wallet.history", label: "Drawer history" },
     { key: "counts", route: "register-shifts.index", label: "Counted money" },
+    { key: "cash-on-hand", route: "cash-on-hand.index", label: "Cash on hand" },
 ];
 
 const tabs = computed(() =>

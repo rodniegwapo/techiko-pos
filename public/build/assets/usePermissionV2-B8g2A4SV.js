@@ -1,0 +1,1 @@
+import{Q as p}from"./app-Bn2llewF.js";function f(){const r=p();return{hasPermission:e=>{var n,i,o,t;const s=(i=(n=r.props.auth)==null?void 0:n.user)==null?void 0:i.data;if(!s)return!1;if(s.is_super_user)return!0;const u=((o=r.props.routePermissionAliases)==null?void 0:o[e])??[e];return!!((t=s.permissions)!=null&&t.some(a=>u.includes(a.route_name)))}}}export{f as u};

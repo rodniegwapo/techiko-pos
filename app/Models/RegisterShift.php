@@ -38,6 +38,8 @@ class RegisterShift extends Model
         'opened_at' => 'datetime',
         'closed_at' => 'datetime',
         'reviewed_at' => 'datetime',
+        'collected_amount' => 'float',
+        'collected_at' => 'datetime',
     ];
 
     public function scopeForWalletContext(Builder $query, string $domainSlug, int $locationId): Builder
@@ -88,6 +90,10 @@ class RegisterShift extends Model
             'reviewed_by' => $this->reviewedBy?->name,
             'reviewed_at' => $this->reviewed_at?->toIso8601String(),
             'review_note' => $this->review_note,
+            // What the owner collected into Cash on hand (load collectedBy first).
+            'collected_amount' => $this->collected_amount,
+            'collected_by' => $this->collectedBy?->name,
+            'collected_at' => $this->collected_at?->toIso8601String(),
         ];
     }
 
@@ -99,6 +105,11 @@ class RegisterShift extends Model
     public function reviewedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    public function collectedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'collected_by');
     }
 
     public function location(): BelongsTo

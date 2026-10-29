@@ -33,6 +33,8 @@ class InventoryLocationRequest extends FormRequest
             'email' => 'nullable|email|max:255',
             'is_active' => 'boolean',
             'is_default' => 'boolean',
+            // Store-to-store money transfers (Wallet); only an owner or admin changes it.
+            'allows_money_transfer' => 'sometimes|boolean',
         ];
     }
 }

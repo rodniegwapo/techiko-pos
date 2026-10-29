@@ -404,6 +404,13 @@ const menuItems = [
                 path: "/wallet/shifts",
                 keywords: "cashier shift count approve review short over variance",
             },
+            {
+                key: "wallet-cash-on-hand",
+                title: "Cash on hand",
+                routeName: "cash-on-hand.index",
+                path: "/wallet/cash-on-hand",
+                keywords: "owner collect cash with owner safe deposit",
+            },
         ],
     },
     {

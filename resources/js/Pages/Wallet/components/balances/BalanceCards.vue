@@ -94,7 +94,7 @@ function saveAdjust() {
                         <div class="text-sm font-medium text-gray-700">Cash drawer</div>
                         <div class="text-xs text-gray-500">Expected today</div>
                     </div>
-                    <a-button size="small" type="link" class="!px-0" @click="emit('count')">Count cash</a-button>
+                    <a-button size="small" type="link" class="!px-0" @click="emit('count')">Spot check</a-button>
                 </div>
                 <div
                     class="mt-1 font-mono text-lg font-bold tabular-nums"

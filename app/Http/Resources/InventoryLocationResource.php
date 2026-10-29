@@ -27,6 +27,7 @@ class InventoryLocationResource extends JsonResource
             'email' => $this->email,
             'is_active' => $this->is_active,
             'is_default' => $this->is_default,
+            'allows_money_transfer' => (bool) $this->allows_money_transfer,
             'notes' => $this->notes,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,

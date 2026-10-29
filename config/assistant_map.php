@@ -41,6 +41,7 @@ return [
     ['route' => 'payment-card-types.index', 'path' => 'Cash & wallet → Where money is → Manage channels', 'about' => 'payment methods accepted besides cash (cards, GCash, Maya…) and the money received through each'],
     ['route' => 'wallet.history', 'path' => 'Cash & wallet → Drawer history', 'about' => "past counts, changes to opening cash, a check of the drawer since its last count, and the store's ended shifts"],
     ['route' => 'register-shifts.index', 'path' => 'Cash & wallet → Counted money', 'about' => "each cashier's ended shift with their count and short/over; shifts that need review, and approving them"],
+    ['route' => 'cash-on-hand.index', 'path' => 'Cash & wallet → Cash on hand', 'about' => "the business's cash the owner holds, out of every drawer: collecting approved shifts, moving it back to a store, and what the owner used (owners and admins)"],
 
     ['route' => 'products.index', 'path' => 'Products → Items', 'about' => 'the product list for the current store: create, edit, add an existing product to the store, modifiers; stock status shown'],
     ['route' => 'categories.index', 'path' => 'Products → Categories', 'about' => 'product categories used to group items on the POS and in reports'],

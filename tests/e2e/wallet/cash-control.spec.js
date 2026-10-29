@@ -116,16 +116,16 @@ test.describe("Today's drawer", () => {
     });
 
     test.describe("counting cash", () => {
-        test("Save count is disabled until an amount is entered, and previews short or over", async ({ page }) => {
+        test("Save spot check is disabled until an amount is entered, and previews short or over", async ({ page }) => {
             const { day } = dateWindow();
             const drawer = await DrawerPage.open(page, day(0));
             await drawer.setOpening(500);
             const dialog = await drawer.openCountCash();
 
-            await expect(dialog.getByRole("button", { name: "Save count" })).toBeDisabled();
+            await expect(dialog.getByRole("button", { name: "Save spot check" })).toBeDisabled();
             await numberInput(dialog, "count-amount").fill("450");
             await expect(dialog.getByTestId("count-preview")).toHaveText(`Short ${money(50)}`);
-            await expect(dialog.getByRole("button", { name: "Save count" })).toBeEnabled();
+            await expect(dialog.getByRole("button", { name: "Save spot check" })).toBeEnabled();
         });
 
         test("an empty drawer (zero) can be counted", async ({ page }) => {
@@ -237,13 +237,38 @@ test.describe("Today's drawer", () => {
             await expect(drawer.expected).toHaveText(money(470));
         });
 
+        test("a spot check is optional: End the day starts from it, and Drawer history tells the counts apart", async ({ page }) => {
+            const { day } = dateWindow();
+            const drawer = await DrawerPage.open(page, day(0));
+            await drawer.setOpening(500);
+            await expect(page.getByTestId("spot-check-hint")).toBeVisible();
+            await expect(page.getByTestId("drawer-counted-how")).toContainText("Not counted yet");
+
+            await drawer.countCash(480, "Mid-day check");
+            await expect(page.getByTestId("drawer-counted-how")).toContainText("Spot check");
+
+            await page.getByTestId("open-end-shift").click();
+            const dialog = drawer.dialog("End the store's day");
+            await expect(dialog.getByTestId("end-shift-from-spot-check")).toContainText(money(480));
+            await expect(numberInput(dialog, "end-shift-counted")).toHaveValue(/480/);
+            await numberInput(dialog, "end-shift-counted").fill("500");
+            await dialog.getByTestId("end-shift-keep").click();
+            const res = await drawer.save("/cash-ledger/close-shift", () => dialog.getByTestId("confirm-end-shift").click());
+            expect(res.status()).toBeLessThan(400);
+
+            await page.goto(`${historyUrl}?business_date=${day(0)}`);
+            const counts = page.getByTestId("history-counts");
+            await expect(counts.getByTestId("count-kind-spot_check")).toHaveText("Spot check");
+            await expect(counts.getByTestId("count-kind-end_of_day")).toHaveText("End of day");
+        });
+
         test("taking the cash out ends the shift and records it", async ({ page }) => {
             const { day } = dateWindow();
             const drawer = await DrawerPage.open(page, day(0));
             await drawer.setOpening(300);
             await drawer.countCash(300);
 
-            const res = await drawer.endShift("Take the cash out");
+            const res = await drawer.endShift("Cash out to Cash on hand");
 
             expect(res.status()).toBeLessThan(400);
             await expect(drawer.notice("Day ended.")).toBeVisible();
@@ -251,7 +276,7 @@ test.describe("Today's drawer", () => {
             await expect(page.getByTestId("reopen-shift")).toBeVisible();
 
             const cash = await CashInOutPage.open(page, { date_from: day(0), date_to: day(0) });
-            await expect(cash.row("Cash taken out at end of shift")).toContainText(`− ${money(300)}`);
+            await expect(cash.row("Cash out to Cash on hand at end of day")).toContainText(`− ${money(300)}`);
         });
 
         test("an ended shift hides the drawer actions", async ({ page }) => {

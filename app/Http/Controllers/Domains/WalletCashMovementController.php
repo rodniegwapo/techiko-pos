@@ -15,6 +15,7 @@ use App\Models\WalletShiftReopenLog;
 use App\Services\ExpenseService;
 use App\Support\FinanceAccess;
 use App\Support\RouteFeature;
+use App\Support\Wallet\CashOnHand;
 use App\Support\Wallet\WalletCashBridgeExpected;
 use App\Support\Wallet\WalletCashDailyExpected;
 use App\Support\Wallet\WalletLedgerViewData;
@@ -173,6 +174,7 @@ class WalletCashMovementController extends Controller
                 ->where(fn ($q) => $q->whereNull('type')->orWhere('type', '!=', 'warehouse'))
                 ->first()
                 ?? throw ValidationException::withMessages(['to_location_id' => 'Pick another store of this business.']);
+            self::ensureCanTransfer($location, $toLocation);
         }
 
         $channel = fn (?int $id, InventoryLocation $at, string $field) => $id
@@ -238,6 +240,7 @@ class WalletCashMovementController extends Controller
         if (! $target || (int) $target->id === (int) $from->id) {
             throw ValidationException::withMessages(['to_location_id' => 'Pick another store of this business.']);
         }
+        self::ensureCanTransfer($from, $target);
         WalletShiftGuard::ensureDateNotClosed($domain->name_slug, (int) $target->id, (string) $validated['movement_date'], 'to_location_id');
 
         return $target;
@@ -277,7 +280,8 @@ class WalletCashMovementController extends Controller
         ]);
         $this->ensureDateNotClosed($domain->name_slug, (int) $location->id, (string) $validated['business_date']);
 
-        DB::transaction(fn () => $this->recordCount($domain, $location, $validated, (int) $request->user()->id));
+        // An optional spot check: End the day still takes the final count (it starts from this one).
+        DB::transaction(fn () => $this->recordCount($domain, $location, $validated, (int) $request->user()->id, WalletCashCountSubmission::SPOT_CHECK));
 
         return redirect()->back()->with('success', 'Counted cash saved.');
     }
@@ -348,7 +352,7 @@ class WalletCashMovementController extends Controller
                 ]);
             }
 
-            $this->recordCount($domain, $location, $validated, (int) $user->id);
+            $this->recordCount($domain, $location, $validated, (int) $user->id, WalletCashCountSubmission::END_OF_DAY);
             $this->closeShift($domain, $location, $validated, (int) $user->id);
         });
 
@@ -373,7 +377,7 @@ class WalletCashMovementController extends Controller
      *
      * @param  array{business_date: string, counted_cash: float|string, notes?: ?string}  $validated
      */
-    private function recordCount(Domain $domain, InventoryLocation $location, array $validated, int $userId, ?int $approvedBy = null): void
+    private function recordCount(Domain $domain, InventoryLocation $location, array $validated, int $userId, string $kind, ?int $approvedBy = null): void
     {
         $countedAt = now();
 
@@ -449,6 +453,7 @@ class WalletCashMovementController extends Controller
             'counted_by' => $userId,
             'approved_by' => $approvedBy,
             'counted_at' => $countedAt,
+            'kind' => $kind,
         ]);
     }
 
@@ -458,6 +463,14 @@ class WalletCashMovementController extends Controller
      * @param  array{business_date: string, end_shift_action: string}  $validated
      * @return bool False when it was already closed.
      */
+    /** Money moves between two stores only when both have "Can transfer money" on (Locations). */
+    private static function ensureCanTransfer(InventoryLocation $from, InventoryLocation $to): void
+    {
+        if (! $from->allows_money_transfer || ! $to->allows_money_transfer) {
+            throw ValidationException::withMessages(['to_location_id' => 'Turn on Can transfer money for both stores first (Inventory → Locations).']);
+        }
+    }
+
     private function closeShift(Domain $domain, InventoryLocation $location, array $validated, int $userId): bool
     {
         $recon = WalletCashReconciliation::query()
@@ -496,17 +509,21 @@ class WalletCashMovementController extends Controller
             $recon->notes = null;
             $recon->save();
 
+            // The day's cash goes to the owner: it joins Cash on hand, still the business's money.
+            $group = (string) Str::uuid();
             WalletCashMovement::query()->create([
                 'domain' => $domain->name_slug,
                 'location_id' => $location->id,
                 'payment_card_type_id' => null,
                 'direction' => 'out',
                 'amount' => $countedCash,
-                'kind' => 'owner_draw',
+                'kind' => WalletCashMovement::KIND_TO_CASH_ON_HAND,
+                'transfer_group' => $group,
                 'notes' => self::AUTO_ENDSHIFT_CASHOUT_LEDGER_NOTE,
                 'movement_date' => $validated['business_date'],
                 'user_id' => $userId,
             ]);
+            app(CashOnHand::class)->recordEndOfDayCashOut($domain, $location, (string) $validated['business_date'], $countedCash, $userId, $group);
         }
 
         if ($action === 'save_as_opening_cash') {

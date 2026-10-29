@@ -46,6 +46,8 @@ const LEDGER_KIND_LABELS = {
     sale_payment: "Sale",
     sale_void: "Sale voided",
     credit_payment: "Credit payment",
+    to_cash_on_hand: "To Cash on hand",
+    from_cash_on_hand: "From Cash on hand",
 };
 
 const METHOD_WHERE_LABELS = {

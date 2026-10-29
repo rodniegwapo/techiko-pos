@@ -17,6 +17,8 @@ use App\Models\WalletCashCountSubmission;
 use App\Models\WalletCashMovement;
 use App\Models\WalletCashReconciliation;
 use App\Models\WalletShiftReopenLog;
+use App\Support\Wallet\RegisterShiftService;
+use App\Support\Wallet\WalletCashDailyExpected;
 use Database\Seeders\ProductSoldTypeSeeder;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -235,6 +237,55 @@ class RegisterShiftTest extends TestCase
         $this->end($ana, $this->shiftOf($ana), 1000);
         $this->start($ana, 1000)->assertSessionHasNoErrors();
         $this->assertEquals(1500, $storeOpening());
+        $this->assertSame(0, WalletCashMovement::query()->where('notes', 'like', '% at the start of %')->count());
+    }
+
+    public function test_cash_put_in_or_taken_out_between_shifts_is_a_line_on_the_store_day(): void
+    {
+        $ana = $this->user('cashier', 4);
+        $storeExpected = fn () => WalletCashDailyExpected::compute($this->domain->name_slug, $this->store->id, today()->toDateString(),
+            WalletCashReconciliation::query()->where('location_id', $this->store->id)->sole())['expected_cash'];
+
+        $this->start($ana, 300);
+        WalletCashMovement::query()->create([
+            'domain' => $this->domain->name_slug, 'location_id' => $this->store->id, 'direction' => 'out', 'amount' => 200,
+            'kind' => 'owner_draw', 'movement_date' => today()->toDateString(), 'user_id' => $ana->id,
+        ]);
+        $this->end($ana, $this->shiftOf($ana), 100)->assertSessionHasNoErrors();
+        $this->assertEquals(100, $storeExpected());
+
+        // The next shift starts with what the drawer kept.
+        $this->actingAs($ana)->get($this->url('wallet.drawer', ['location_id' => $this->store->id]))
+            ->assertInertia(fn (Assert $page) => $page->where('nextShiftOpening', 100));
+
+        // She put ₱200 back in: the store's day has it, and her shift isn't counting it twice.
+        $this->start($ana, 300)->assertSessionHasNoErrors();
+        $this->assertEquals(300, $storeExpected());
+        $this->assertDatabaseHas('wallet_cash_movements', [
+            'kind' => 'adjustment', 'direction' => 'in', 'amount' => 200, 'register_shift_id' => null,
+            'notes' => 'Cash added at the start of '.$ana->name.'\'s shift',
+        ]);
+        $this->assertEquals(300, app(RegisterShiftService::class)->figures($this->shiftOf($ana))['expected_cash']);
+        $this->actingAs($ana)->get($this->url('wallet.drawer', ['location_id' => $this->store->id]))
+            ->assertInertia(fn (Assert $page) => $page->where('nextShiftOpening', null));
+
+        // Starting with less takes the rest out.
+        $this->end($ana, $this->shiftOf($ana), 300);
+        $this->start($ana, 50)->assertSessionHasNoErrors();
+        $this->assertEquals(50, $storeExpected());
+        $this->assertDatabaseHas('wallet_cash_movements', ['kind' => 'adjustment', 'direction' => 'out', 'amount' => 250]);
+    }
+
+    public function test_cash_collected_from_a_shift_leaves_the_next_shift_drawer(): void
+    {
+        $ana = $this->user('cashier', 4);
+        $this->start($ana, 300);
+        $this->end($ana, $this->shiftOf($ana), 300);
+        $this->shiftOf($ana)->update(['status' => RegisterShift::APPROVED, 'collected_amount' => 300, 'collected_at' => now()]);
+
+        $this->assertEquals(0, app(RegisterShiftService::class)->carriedOpening($this->domain->name_slug, $this->store->id, $ana->id));
+        $this->start($ana, 0)->assertSessionHasNoErrors();
+        $this->assertSame(0, WalletCashMovement::query()->where('notes', 'like', '% at the start of %')->count());
     }
 
     public function test_a_shift_from_an_earlier_day_takes_no_new_money(): void

@@ -329,8 +329,10 @@ class BacklogFixesTest extends TestCase
         $admin = User::factory()->create(['domain' => $this->domain->name_slug, 'is_super_user' => true, 'location_id' => $this->store->id]);
         $branch = InventoryLocation::query()->create([
             'domain' => $this->domain->name_slug, 'name' => 'Cantilan Branch', 'code' => Str::upper(Str::random(8)),
-            'type' => 'store', 'is_active' => true,
+            'type' => 'store', 'is_active' => true, 'allows_money_transfer' => true,
         ]);
+        // Both stores send and receive money ("Can transfer money" on Locations).
+        $this->store->update(['allows_money_transfer' => true]);
         $today = today()->toDateString();
         $take = fn (array $more) => $this->actingAs($admin)->post($this->url('wallet-cash-ledger.store'), [
             'location_id' => $this->store->id, 'kind' => 'owner_draw', 'direction' => 'out', 'draw_source' => 'cash_register',

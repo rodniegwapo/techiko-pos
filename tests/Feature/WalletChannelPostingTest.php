@@ -220,6 +220,10 @@ class WalletChannelPostingTest extends TestCase
             'from_channel_id' => $this->gcash->id, 'to_location_id' => $this->branch->id, 'to_channel_id' => $this->branchBank->id,
         ];
 
+        // Both stores have "Can transfer money" on (CashOnHandTest covers it being off).
+        $this->store->update(['allows_money_transfer' => true]);
+        $this->branch->update(['allows_money_transfer' => true]);
+
         $this->actingAs($this->user(3))->post($this->ledgerUrl(), $payload)->assertSessionHasErrors('to_location_id');
         $this->assertSame(0, WalletCashMovement::query()->count());
 

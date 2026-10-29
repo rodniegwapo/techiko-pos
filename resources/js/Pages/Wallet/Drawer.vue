@@ -9,7 +9,7 @@ import SetOpeningModal from "./components/drawer/SetOpeningModal.vue";
 import CountCashModal from "./components/drawer/CountCashModal.vue";
 import EndShiftModal from "./components/drawer/EndShiftModal.vue";
 import MoneyByUserModal from "./components/drawer/MoneyByUserModal.vue";
-import { shortOver, TONE_CLASSES, SHIFT_STATUS } from "./components/walletLabels";
+import { shortOver, TONE_CLASSES, SHIFT_STATUS, COUNT_KIND_LABELS } from "./components/walletLabels";
 import { useWalletQuery } from "./composables/useWalletQuery";
 import { useCashDrawerActions } from "./composables/useCashDrawerActions";
 
@@ -25,6 +25,8 @@ const props = defineProps({
     canSeeCountResult: { type: Boolean, default: true },
     /** The user's own shift: open now (with figures), or the last one they ended today. */
     myShift: { type: Object, default: null },
+    /** What the user's drawer still holds from their last shift today (null before their first). */
+    nextShiftOpening: { type: Number, default: null },
     canStartShift: { type: Boolean, default: false },
     /** Cashiers still on shift here: the store's day ends after them. */
     openShiftsAtStore: { type: Array, default: () => [] },
@@ -97,11 +99,13 @@ const myOpen = computed(() => props.myShift?.status === "open");
 const myFigures = computed(() => props.myShift?.figures ?? null);
 const myResult = computed(() => (props.myShift && !myOpen.value ? shortOver(props.myShift.variance) : null));
 const startForm = ref({ opening: 0, notes: "" });
+// A next shift starts with the drawer the last one left; a different amount is recorded as cash in or out.
+function openStartMyShift() {
+    startForm.value = { opening: props.nextShiftOpening ?? 0, notes: "" };
+    modal.value = "my-start";
+}
 async function startMyShift() {
-    if (await actions.startMyShift(startForm.value.opening, startForm.value.notes)) {
-        modal.value = null;
-        startForm.value = { opening: 0, notes: "" };
-    }
+    if (await actions.startMyShift(startForm.value.opening, startForm.value.notes)) modal.value = null;
 }
 async function endMyShift(payload) {
     if (await actions.endMyShift(props.myShift.id, payload)) modal.value = null;
@@ -154,7 +158,7 @@ const stillOnShift = computed(() => props.openShiftsAtStore.map((s) => s.user).f
                 <div class="flex flex-wrap gap-2">
                     <a-button v-if="myOpen" type="primary" data-testid="open-end-my-shift" @click="modal = 'my-end'">End my shift</a-button>
                     <a-button v-if="myShift?.can_reopen" data-testid="reopen-my-shift" @click="modal = 'my-reopen'">Reopen</a-button>
-                    <a-button v-if="!myOpen && canStartShift && !isClosed" :type="myShift ? 'default' : 'primary'" data-testid="open-start-my-shift" @click="modal = 'my-start'">
+                    <a-button v-if="!myOpen && canStartShift && !isClosed" :type="myShift ? 'default' : 'primary'" data-testid="open-start-my-shift" @click="openStartMyShift">
                         {{ myShift ? "Start a new shift" : "Start my shift" }}
                     </a-button>
                 </div>
@@ -211,11 +215,17 @@ const stillOnShift = computed(() => props.openShiftsAtStore.map((s) => s.user).f
                         </div>
                     </div>
                     <div class="rounded-lg border border-gray-200 bg-white px-4 py-4 shadow-sm">
-                        <div class="text-xs font-medium uppercase text-gray-500">Counted</div>
+                        <div class="text-xs font-medium uppercase text-gray-500">Last count</div>
                         <div class="mt-1 font-mono text-2xl font-bold tabular-nums text-gray-900" data-testid="drawer-counted">
                             {{ counted ? money(cashControl.counted_cash) : "—" }}
                         </div>
-                        <div v-if="cashControl.counted_by_user" class="text-xs text-gray-500">by {{ cashControl.counted_by_user.name }}</div>
+                        <div class="text-xs text-gray-500" data-testid="drawer-counted-how">
+                            <template v-if="counted">
+                                {{ COUNT_KIND_LABELS[cashControl.counted_kind] ?? "Count" }} · {{ dayjs(cashControl.counted_at).format("h:mm A") }}<template v-if="cashControl.counted_by_user"> · {{ cashControl.counted_by_user.name }}</template>
+                            </template>
+                            <template v-else-if="isClosed">Day ended. Its counts are in Drawer history.</template>
+                            <template v-else>Not counted yet. End the day counts it.</template>
+                        </div>
                     </div>
                     <div v-if="canSeeCountResult" class="rounded-lg border border-gray-200 bg-white px-4 py-4 shadow-sm">
                         <div class="text-xs font-medium uppercase text-gray-500">Short / Over</div>
@@ -232,9 +242,7 @@ const stillOnShift = computed(() => props.openShiftsAtStore.map((s) => s.user).f
 
                 <div v-if="canManage" class="mt-4 flex flex-wrap gap-2">
                     <template v-if="!isClosed">
-                        <a-button v-if="canSetOpening" data-testid="open-set-opening" @click="modal = 'opening'">Set opening</a-button>
-                        <a-button v-if="canCount" data-testid="open-count-cash" @click="modal = 'count'">Count cash</a-button>
-                        <!-- The store's day is a manager's to end, after every cashier has ended their own shift. -->
+                        <!-- The store's day is a manager's to end, after every cashier has ended their own shift. It takes the final count. -->
                         <a-button
                             v-if="canSeeCountResult"
                             type="primary"
@@ -245,6 +253,9 @@ const stillOnShift = computed(() => props.openShiftsAtStore.map((s) => s.user).f
                         >
                             <IconLock class="h-4 w-4" /> End the day
                         </a-button>
+                        <!-- Optional: a count during the day to catch a mistake early. -->
+                        <a-button v-if="canCount" data-testid="open-count-cash" @click="modal = 'count'">Spot check</a-button>
+                        <a-button v-if="canSetOpening" data-testid="open-set-opening" @click="modal = 'opening'">Set opening</a-button>
                     </template>
                     <a-button
                         v-else-if="cashControl.can_reopen"
@@ -256,6 +267,9 @@ const stillOnShift = computed(() => props.openShiftsAtStore.map((s) => s.user).f
                     </a-button>
                     <span v-else class="text-xs text-gray-500">Ask a manager or admin to reopen the day.</span>
                 </div>
+                <p v-if="!isClosed && canCount && canSeeCountResult" class="mb-0 mt-2 text-xs text-gray-500" data-testid="spot-check-hint">
+                    Spot check is optional: count any time to catch a mistake early. End the day includes the final count.
+                </p>
                 <p v-if="!isClosed && canSeeCountResult && stillOnShift" class="mb-0 mt-2 text-xs text-gray-600" data-testid="still-on-shift">
                     Still on shift: {{ stillOnShift }}. The day ends after each of them ends their shift.
                 </p>
@@ -309,6 +323,9 @@ const stillOnShift = computed(() => props.openShiftsAtStore.map((s) => s.user).f
             <p class="text-sm text-gray-600">Count the cash you start with. Your sales and cash lines count toward your own drawer.</p>
             <label class="mb-1 block text-sm text-gray-700">Opening cash</label>
             <a-input-number v-model:value="startForm.opening" :min="0" :precision="2" class="mb-3 w-full" addon-before="₱" data-testid="my-shift-opening" />
+            <p v-if="nextShiftOpening !== null" class="-mt-2 mb-3 text-xs text-gray-500" data-testid="my-shift-carried">
+                Your drawer should have {{ money(nextShiftOpening) }} from your last shift. If you added or took out cash, enter what's in it now; the difference is recorded in Cash in &amp; out.
+            </p>
             <a-input v-model:value="startForm.notes" placeholder="Note (optional)" :maxlength="255" />
         </a-modal>
 

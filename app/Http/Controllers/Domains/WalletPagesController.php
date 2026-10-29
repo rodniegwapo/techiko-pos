@@ -13,6 +13,7 @@ use App\Support\RouteFeature;
 use App\Support\RoutePermission;
 use App\Support\Wallet\AllStoresMoney;
 use App\Support\Wallet\CashControlSnapshot;
+use App\Support\Wallet\CashOnHand;
 use App\Support\Wallet\ChannelBalances;
 use App\Support\Wallet\MoneyTimeline;
 use App\Support\Wallet\RegisterShiftService;
@@ -78,6 +79,8 @@ class WalletPagesController extends Controller
                 'can_reopen' => ! $mine->isOpen() && $mine->status !== RegisterShift::APPROVED
                     && RoutePermission::allows($user, 'register-shifts.reopen'),
             ] : null,
+            // What the user's drawer still holds from their last shift today, to start the next one with.
+            'nextShiftOpening' => $mine?->isOpen() ? null : $shifts->carriedOpening($domain->name_slug, (int) $location->id, (int) $user->id),
             'canStartShift' => RoutePermission::allows($user, 'register-shifts.start'),
             // Ending the store's day stays with managers, after every cashier has ended their shift.
             'openShiftsAtStore' => RegisterShift::query()->forWalletContext($domain->name_slug, (int) $location->id)
@@ -94,9 +97,13 @@ class WalletPagesController extends Controller
     {
         $location = WalletLocationResolver::resolve($request, $domain);
         $ledger = WalletLedgerViewData::buildPaginated($request, $domain, $location);
-        $otherStores = InventoryLocation::query()->forDomain($domain->name_slug)->active()
-            ->where(fn ($q) => $q->whereNull('type')->orWhere('type', '!=', 'warehouse'))
-            ->whereKeyNot($location->id)->orderBy('name')->get(['id', 'name']);
+        // Other stores money can move to: both this one and they have "Can transfer money" on.
+        $otherStores = $location->allows_money_transfer
+            ? InventoryLocation::query()->forDomain($domain->name_slug)->active()
+                ->where(fn ($q) => $q->whereNull('type')->orWhere('type', '!=', 'warehouse'))
+                ->where('allows_money_transfer', true)
+                ->whereKeyNot($location->id)->orderBy('name')->get(['id', 'name'])
+            : collect();
 
         return Inertia::render('Wallet/CashInOut', [
             ...$this->pageProps($request, $domain, $location),
@@ -180,14 +187,20 @@ class WalletPagesController extends Controller
         $base = RegisterShift::query()->forWalletContext($domain->name_slug, (int) $location->id);
         $shifts = (clone $base)
             ->when($status !== 'all', fn ($q) => $q->where('status', $status))
-            ->with(['user:id,name', 'reviewedBy:id,name'])
+            ->with(['user:id,name', 'reviewedBy:id,name', 'collectedBy:id,name'])
             ->withCount('reopenLogs')
             ->orderByDesc('business_date')
             ->orderByDesc('closed_at')
             ->orderByDesc('id')
             ->paginate(25)
             ->withQueryString()
-            ->through(fn (RegisterShift $s) => [...$s->toRow(), 'reopen_count' => (int) $s->reopen_logs_count]);
+            ->through(fn (RegisterShift $s) => [
+                ...$s->toRow(),
+                'reopen_count' => (int) $s->reopen_logs_count,
+                // Approved and not collected yet, and its day wasn't cashed out at end of day.
+                'collectable' => $s->status === RegisterShift::APPROVED && $s->collected_at === null && (float) $s->counted_cash > 0
+                    && ! CashOnHand::dayCashedOut($domain->name_slug, (int) $s->location_id, $s->business_date->toDateString()),
+            ]);
 
         return Inertia::render('Wallet/Counts', [
             ...$this->pageProps($request, $domain, $location),
@@ -195,6 +208,8 @@ class WalletPagesController extends Controller
             'shifts' => $shifts,
             'statusCounts' => (clone $base)->groupBy('status')->selectRaw('status, COUNT(*) AS n')->pluck('n', 'status'),
             'canApprove' => RoutePermission::allows($request->user(), 'register-shifts.approve'),
+            // Owners and admins collect approved shifts' cash into Cash on hand.
+            'canCollect' => RoutePermission::allows($request->user(), 'cash-on-hand.collect'),
             'currentUserId' => (int) $request->user()->id,
         ]);
     }

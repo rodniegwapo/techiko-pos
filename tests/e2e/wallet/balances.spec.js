@@ -29,7 +29,7 @@ test.describe("Where money is", () => {
         await page.goto(balancesUrl);
 
         await expect(page.getByTestId("drawer-balance-amount")).toHaveText(expected);
-        await page.getByTestId("drawer-balance").getByRole("button", { name: "Count cash" }).click();
+        await page.getByTestId("drawer-balance").getByRole("button", { name: "Spot check" }).click();
         await expect(page).toHaveURL(new RegExp("/wallet/drawer"));
     });
 
