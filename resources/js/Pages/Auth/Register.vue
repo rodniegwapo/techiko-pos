@@ -4,7 +4,7 @@ import InputLabel from "@/Components/unused/InputLabel.vue";
 import { Head, Link, useForm } from "@inertiajs/vue3";
 import { ref } from "vue";
 import ApplicationLogo from "@/Components/ApplicationLogo.vue";
-import { BUSINESS_TYPES } from "@/Composables/useBusinessType";
+import { BUSINESS_TYPES, isBusinessTypeAvailable } from "@/Composables/useBusinessType";
 
 const form = useForm({
     name: "",
@@ -95,8 +95,13 @@ const submit = () => {
                                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition bg-white"
                                 data-testid="register-business-type"
                             >
-                                <option v-for="(t, key) in BUSINESS_TYPES" :key="key" :value="key">
-                                    {{ t.label }}
+                                <option
+                                    v-for="(t, key) in BUSINESS_TYPES"
+                                    :key="key"
+                                    :value="key"
+                                    :disabled="!isBusinessTypeAvailable(key)"
+                                >
+                                    {{ t.label }}{{ isBusinessTypeAvailable(key) ? "" : " (coming soon)" }}
                                 </option>
                             </select>
                             <p class="mt-1 mb-0 text-xs text-gray-500">

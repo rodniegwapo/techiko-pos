@@ -78,10 +78,12 @@ class HandleInertiaRequests extends Middleware
             'domainFeatures' => $currentDomain?->features() ?? array_fill_keys(Domain::FEATURES, false),
             // What the business sells; presets the product form (useBusinessType.js).
             'businessType' => $currentDomain?->businessType() ?? 'retail',
+            // The types open for picking; Settings and signup show the rest as "Coming soon".
+            'availableBusinessTypes' => Domain::availableBusinessTypes(),
             // Not picked yet: those who can change Settings see a banner asking what the business sells.
             'businessTypeChosen' => $currentDomain ? $currentDomain->hasChosenBusinessType() : true,
-            // The sidebar tidies away pages the type rarely needs, unless they're in use or the business
-            // asked to see everything (useNavMenu.js).
+            // The sidebar leaves out pages the type rarely needs unless the business asked to see
+            // everything (useNavMenu.js); Settings says which of them hold its records.
             'showAllMenu' => $currentDomain ? $currentDomain->showsAllMenu() : true,
             'menuInUse' => fn () => $currentDomain ? $currentDomain->menuInUse() : ['dining_tables' => true, 'stock' => true],
             'currentLocation' => $currentLocation = $this->getCurrentLocation($request),

@@ -9,7 +9,10 @@ use App\Models\InventoryLocation;
 use App\Models\ModifierGroup;
 use App\Models\Product\Product;
 use App\Models\ProductInventory;
+use App\Models\RegisterShift;
+use App\Models\Sale;
 use App\Models\User;
+use App\Models\WalletCashReconciliation;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -99,9 +102,32 @@ class BusinessTypeSeeder extends Seeder
             ])->syncRoles(['manager']);
         }
 
-        // Products and tables a test created (a sale's table link is cleared with the table).
+        // Carts and tabs a test left open are voided (kept, not deleted); then products and tables a
+        // test created go (a sale's table link is cleared with the table).
+        Sale::query()->where('domain', $slug)->where('payment_status', 'pending')->update(['payment_status' => 'voided']);
         Product::query()->where('domain', $slug)->where('name', 'like', 'E2E %')->get()->each->delete();
         DiningTable::query()->where('location_id', $store->id)->delete();
+        if ($type === 'food') {
+            foreach ([['T1', 0], ['T2', 1]] as [$table, $x]) {
+                DiningTable::query()->create([
+                    'domain' => $slug, 'location_id' => $store->id, 'name' => $table, 'seats' => 4, 'pos_x' => $x, 'pos_y' => 0,
+                ]);
+            }
+        }
+
+        // The admin can take payment today: the store's day open, and their own shift (one left open
+        // on an earlier day is ended first, or it would refuse today's payments).
+        $today = now()->toDateString();
+        WalletCashReconciliation::query()->updateOrCreate(
+            ['domain' => $slug, 'location_id' => $store->id, 'business_date' => $today],
+            ['is_closed' => false, 'closed_at' => null, 'closed_by' => null],
+        );
+        RegisterShift::query()->where('domain', $slug)->where('user_id', $admin->id)->where('status', RegisterShift::OPEN)
+            ->whereDate('business_date', '<', $today)->update(['status' => RegisterShift::CLOSED, 'closed_at' => now()]);
+        RegisterShift::query()->firstOrCreate(
+            ['domain' => $slug, 'location_id' => $store->id, 'user_id' => $admin->id, 'status' => RegisterShift::OPEN],
+            ['business_date' => $today, 'opening_cash' => 0, 'opened_at' => now()],
+        );
 
         foreach ($this->catalog($type) as $categoryName => $products) {
             $category = Category::query()->updateOrCreate(['name' => $categoryName, 'domain' => $slug], ['description' => 'Demo']);

@@ -403,6 +403,7 @@ class SaleController extends Controller
 
         $loyaltyResults = null;
         $creditResults = null;
+        $kitchenTicket = null;
         $redemptionService = app(LoyaltyRedemptionService::class);
 
         try {
@@ -416,6 +417,8 @@ class SaleController extends Controller
                 $redemptionService,
                 $transactionDate,
                 $registerShift,
+                $request,
+                &$kitchenTicket,
             ) {
                 $sale->refresh();
 
@@ -567,6 +570,9 @@ class SaleController extends Controller
                         $loyaltyResults = $customer->processLoyaltyForSale($earnAmount);
                     }
                 }
+
+                // At a dine-in store: dine-in or take-out, the take-out kitchen ticket, the table to clear.
+                $kitchenTicket = app(TabService::class)->afterPaid($sale->fresh(), $location, $request->user());
             });
         } catch (InsufficientStockException $e) {
             $names = collect($e->getUnavailableItems())->pluck('product_name')->implode(', ');
@@ -598,6 +604,8 @@ class SaleController extends Controller
             'message' => 'Payment processed successfully',
             'loyalty_results' => $loyaltyResults,
             'credit_results' => $creditResults,
+            // A take-out order at a dine-in store: its kitchen ticket, to print.
+            'kitchen_ticket' => $kitchenTicket?->toPrint($domain->timezone ?: 'Asia/Manila'),
         ]);
     }
 

@@ -1,6 +1,7 @@
 import { test, expect, apiJson } from "../support/fixtures.js";
 import { pageProps } from "../support/inertia.js";
 import { newProductValues } from "../support/products.js";
+import { businessTypeOpen, dineInOpen } from "../support/comingSoon.js";
 
 /**
  * Settings → Business type presets the product form (useBusinessType.js), with one organization per
@@ -9,7 +10,14 @@ import { newProductValues } from "../support/products.js";
  *
  * Only the pos-other tests change a type, and they run one after another, so the other
  * organizations keep theirs while the suite runs in parallel.
+ *
+ * A type that is coming soon (FEATURE_BUSINESS_TYPES) reads as retail and can't be picked, so its
+ * tests skip until it opens; so do the dine-in ones (FEATURE_DINE_IN).
  */
+
+/** Skips the group while `type` is coming soon. */
+const skipUnlessOpen = (type) =>
+    test.beforeAll(async () => test.skip(!(await businessTypeOpen(type)), `${type} is coming soon`));
 
 const url = (type, path) => `/domains/pos-${type}${path}`;
 
@@ -44,6 +52,7 @@ async function expectPreset(page, org, type = org) {
 for (const type of ["retail", "food", "grocery", "services"]) {
     test.describe(`${type} business`, () => {
         test.use({ account: `pos-${type}` });
+        skipUnlessOpen(type);
 
         test("Create Product starts with the type's defaults", async ({ page }) => {
             await expectPreset(page, type);
@@ -69,8 +78,10 @@ test.describe("retail business", () => {
 
 test.describe("food business", () => {
     test.use({ account: "pos-food" });
+    skipUnlessOpen("food");
 
     test("points to dine-in tables on Settings", async ({ page }) => {
+        test.skip(!(await dineInOpen()), "dine-in is coming soon");
         await page.goto(url("food", "/settings"));
         await expect(page.getByText("Serving at tables?")).toBeVisible();
     });
@@ -90,6 +101,7 @@ test.describe("food business", () => {
 
 test.describe("grocery business", () => {
     test.use({ account: "pos-grocery" });
+    skipUnlessOpen("grocery");
 
     test("a product sold by the kilo saves with a part-kilo low stock level", async ({ page }) => {
         const values = newProductValues("Rice");
@@ -119,8 +131,10 @@ test.describe("other / mixed business", () => {
     // Changes this organization's type, so its tests run in order and nothing else uses it.
     test.describe.configure({ mode: "serial" });
     test.use({ account: "pos-other" });
+    skipUnlessOpen("other");
 
     test.afterAll(async ({ serverAs }) => {
+        if (!(await businessTypeOpen("other"))) return;
         const api = await serverAs("pos-other");
         await apiJson(api, "PATCH", url("other", "/settings"), { business_type: "other" });
     });
@@ -208,11 +222,14 @@ async function openInventory(page) {
 for (const [type, showsTables] of [["retail", false], ["grocery", false], ["food", true]]) {
     test.describe(`${type} sidebar`, () => {
         test.use({ account: `pos-${type}` });
+        skipUnlessOpen(type);
 
         test(`${showsTables ? "shows" : "leaves out"} Tables`, async ({ page }) => {
+            // Dine-in coming soon: Tables is out of every menu.
+            const tables = showsTables && (await dineInOpen());
             await page.goto(url(type, "/products"));
             await expect(sidebar(page).getByTestId("nav-section-stock")).toBeVisible();
-            await expect(menuItem(page, "Tables")).toHaveCount(showsTables ? 1 : 0);
+            await expect(menuItem(page, "Tables")).toHaveCount(tables ? 1 : 0);
         });
     });
 }
@@ -221,8 +238,10 @@ test.describe("services sidebar", () => {
     // Turns "Show all menu items" on and off for pos-services, so these run in order.
     test.describe.configure({ mode: "serial" });
     test.use({ account: "pos-services" });
+    skipUnlessOpen("services");
 
     const setShowAll = async (serverAs, on) => {
+        if (!(await businessTypeOpen("services"))) return;
         const api = await serverAs("pos-services");
         await apiJson(api, "PATCH", url("services", "/settings"), { show_all_menu: on });
     };
@@ -254,8 +273,8 @@ test.describe("services sidebar", () => {
     test("Show all menu items brings them back", async ({ page }) => {
         await page.goto(url("services", "/settings"));
         await expect(page.getByTestId("show-all-menu")).toHaveAttribute("aria-checked", "false");
-        // It uses none of the pages a services business leaves out, so there's nothing kept to explain.
-        await expect(page.getByTestId("menu-kept-in-use")).toHaveCount(0);
+        // It has no records in the pages a services business leaves out, so there is nothing to warn about.
+        await expect(page.getByTestId("menu-hidden-with-records")).toHaveCount(0);
         await page.getByTestId("show-all-menu").click();
         await page.getByTestId("save-business-type").click();
         const saved = page.waitForResponse((r) => r.request().method() === "PATCH" && new URL(r.url()).pathname === url("services", "/settings"));

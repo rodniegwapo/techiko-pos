@@ -30,6 +30,7 @@ class DineInPermissionSeeder extends Seeder
         'tabs.cancel',
         'tabs.send',
         'tabs.tickets',
+        'tabs.ready',
     ];
 
     public const TABLE_ROUTES = [

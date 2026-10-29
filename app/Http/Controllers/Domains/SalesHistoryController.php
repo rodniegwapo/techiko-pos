@@ -129,6 +129,12 @@ class SalesHistoryController extends Controller
             'transaction_date_display' => $date?->format('Y-m-d h:i A'),
             'cashier_name' => $sale->user?->name,
             'customer_name' => $sale->customer?->name ?? 'Walk-in',
+            // Dine-in stores: "Dine-in · T1" or "Take-out" (null elsewhere).
+            'order_type_label' => match ($sale->order_type) {
+                Sale::ORDER_DINE_IN => 'Dine-in · '.$sale->tabLabel(),
+                Sale::ORDER_TAKE_OUT => 'Take-out',
+                default => null,
+            },
             'location_name' => $sale->location?->name,
             'payment_method' => $sale->payment_method,
             'payment_card_type' => $sale->paymentCardType?->name,

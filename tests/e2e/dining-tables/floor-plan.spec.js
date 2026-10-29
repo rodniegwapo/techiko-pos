@@ -1,4 +1,5 @@
 import { test, expect } from "../support/fixtures.js";
+import { dineInOpen } from "../support/comingSoon.js";
 
 /**
  * Tables → floor plan, in the café of BusinessTypeSeeder (pos-food: dine-in on, no tables; the
@@ -6,6 +7,8 @@ import { test, expect } from "../support/fixtures.js";
  * added, until the floor plan is saved.
  */
 test.use({ account: "pos-food" });
+// Dine-in is coming soon (FEATURE_DINE_IN off): these skip until it opens.
+test.beforeAll(async () => test.skip(!(await dineInOpen()), "dine-in is coming soon"));
 
 const tablesUrl = "/domains/pos-food/dining-tables";
 

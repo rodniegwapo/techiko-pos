@@ -272,6 +272,11 @@ class Domain extends Model
             return true;
         }
 
+        // Dine-in is coming soon: off for everyone, VIP too, until config features.dine_in opens it.
+        if ($key === 'dine_in' && ! config('features.dine_in', false)) {
+            return false;
+        }
+
         if (! in_array($key, self::FEATURES, true)) {
             return false;
         }
@@ -317,12 +322,33 @@ class Domain extends Model
      */
     public const BUSINESS_TYPES = ['retail', 'food', 'grocery', 'services', 'other'];
 
-    /** The business type (Settings → Business type); retail, today's form, when none was picked. */
+    /**
+     * The business types open for picking (config features.business_types: "all" or a comma list);
+     * the rest show "Coming soon". Retail is always open.
+     *
+     * @return list<string>
+     */
+    public static function availableBusinessTypes(): array
+    {
+        $setting = config('features.business_types', 'retail');
+        if (trim((string) $setting) === 'all') {
+            return self::BUSINESS_TYPES;
+        }
+
+        $listed = is_array($setting) ? $setting : array_map('trim', explode(',', (string) $setting));
+
+        return array_values(array_filter(self::BUSINESS_TYPES, fn (string $t) => $t === 'retail' || in_array($t, $listed, true)));
+    }
+
+    /**
+     * The business type (Settings → Business type); retail, today's form, when none was picked. A
+     * type that isn't open yet reads as retail too; its saved value is kept for when it opens.
+     */
     public function businessType(): string
     {
         $type = $this->settings['sales']['business_type'] ?? null;
 
-        return in_array($type, self::BUSINESS_TYPES, true) ? $type : 'retail';
+        return in_array($type, self::availableBusinessTypes(), true) ? $type : 'retail';
     }
 
     /**
@@ -353,8 +379,8 @@ class Domain extends Model
     }
 
     /**
-     * Parts of the app the business already uses, so the sidebar keeps them whatever its type:
-     * tables (a store with dine-in on, or tables set up) and stock (a product that tracks it).
+     * Parts of the app the business has records in: tables (a store with dine-in on, or tables set
+     * up) and stock (a product that tracks it). Settings names them when its type hides those pages.
      *
      * @return array{dining_tables: bool, stock: bool}
      */

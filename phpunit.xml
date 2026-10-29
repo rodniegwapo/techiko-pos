@@ -23,6 +23,9 @@
         <env name="CACHE_DRIVER" value="array"/>
         <!-- Plans are enforced only where a test turns it on (config features.plan_gating), whatever .env says. -->
         <env name="FEATURE_PLAN_GATING" value="false" force="true"/>
+        <!-- Dine-in and every business type are open in tests; ComingSoonFeaturesTest turns them off. -->
+        <env name="FEATURE_DINE_IN" value="true" force="true"/>
+        <env name="FEATURE_BUSINESS_TYPES" value="all" force="true"/>
         <!-- <env name="DB_CONNECTION" value="sqlite"/> -->
         <!-- <env name="DB_DATABASE" value=":memory:"/> -->
         <env name="MAIL_MAILER" value="array"/>

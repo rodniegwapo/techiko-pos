@@ -2,7 +2,7 @@
 // product form: the defaults a new product starts with and which sections show at first. Nothing is
 // locked; "Show all fields" opens everything, and a product already using a section always shows it.
 // It also tidies the sidebar: pages the type rarely needs are hidden there (still found by page
-// search and their URL) unless the business uses them or turned on "Show all menu items".
+// search and their URL) unless the business turned on "Show all menu items".
 import { computed } from "vue";
 import { usePage } from "@inertiajs/vue3";
 
@@ -49,6 +49,11 @@ export const BUSINESS_TYPES = {
         hiddenMenuKeys: [],
     },
 };
+
+// Types open for picking (Domain::availableBusinessTypes); the rest show "Coming soon". Retail always is.
+export function isBusinessTypeAvailable(key, available = usePage().props.availableBusinessTypes) {
+    return key === "retail" || (available ?? []).includes(key);
+}
 
 export function useBusinessType() {
     const page = usePage();

@@ -79,8 +79,29 @@ async function pick(tabId) {
 // A table with more than one tab (a split check) asks which one.
 const choosing = ref(null);
 
+// A table waiting to be cleared after its guests paid: mark it ready, and maybe seat the next guests.
+const clearing = ref(null);
+
+async function markReady(table, seat) {
+    busy.value = true;
+    try {
+        await axios.post(getRoute("tabs.ready", { diningTable: table.id }));
+        clearing.value = null;
+        await load();
+        if (seat) onTable({ ...table, status: "free", tabs: [] });
+    } catch (e) {
+        message.error(e?.response?.data?.errors?.location_id?.[0] ?? "Could not mark the table ready.");
+    } finally {
+        busy.value = false;
+    }
+}
+
 function onTable(table) {
     if (busy.value) return;
+    if (table.status === "cleaning") {
+        clearing.value = table;
+        return;
+    }
     if (!table.tabs.length) {
         newTab.table = table;
         newTab.name = "";
@@ -139,9 +160,15 @@ const since = (minutes) => (minutes >= 60 ? `${Math.floor(minutes / 60)}h ${minu
     >
         <div class="flex flex-col gap-4" data-testid="tables-screen">
             <div class="flex flex-wrap items-center justify-between gap-2">
-                <div class="flex items-center gap-3 text-xs text-gray-600">
-                    <span class="flex items-center gap-1"><span class="h-3 w-3 rounded bg-emerald-500" /> Free</span>
-                    <span class="flex items-center gap-1"><span class="h-3 w-3 rounded bg-orange-500" /> Occupied</span>
+                <div class="flex flex-col gap-1">
+                    <div class="flex items-center gap-3 text-xs text-gray-600">
+                        <span class="flex items-center gap-1"><span class="h-3 w-3 rounded bg-emerald-500" /> Free</span>
+                        <span class="flex items-center gap-1"><span class="h-3 w-3 rounded bg-orange-500" /> Occupied</span>
+                        <span class="flex items-center gap-1"><span class="h-3 w-3 rounded bg-gray-400" /> Needs clearing</span>
+                    </div>
+                    <p class="mb-0 text-xs text-gray-500" data-testid="tables-hint">
+                        Tap a green table to seat guests, an orange one to add to their order, a grey one once it's cleared.
+                    </p>
                 </div>
                 <div class="flex gap-2">
                     <a-button :loading="loading" @click="load">Refresh</a-button>
@@ -168,7 +195,9 @@ const since = (minutes) => (minutes >= 60 ? `${Math.floor(minutes / 60)}h ${minu
                         class="flex flex-col items-center justify-center rounded-xl border-2 p-2 text-center transition hover:shadow-md disabled:opacity-60"
                         :class="t.tabs.length
                             ? 'border-orange-400 bg-orange-50 text-orange-900'
-                            : 'border-emerald-400 bg-emerald-50 text-emerald-900'"
+                            : t.status === 'cleaning'
+                              ? 'border-dashed border-gray-400 bg-gray-100 text-gray-600'
+                              : 'border-emerald-400 bg-emerald-50 text-emerald-900'"
                         :style="{ gridColumnStart: t.pos_x + 1, gridRowStart: t.pos_y + 1 }"
                         :disabled="busy"
                         :data-testid="`table-${t.name}`"
@@ -183,6 +212,10 @@ const since = (minutes) => (minutes >= 60 ? `${Math.floor(minutes / 60)}h ${minu
                                 <template v-if="t.tabs.length > 1"> · {{ t.tabs.length }} tabs</template>
                             </span>
                             <span v-if="t.tabs.some((x) => x.unsent)" class="mt-0.5 rounded bg-orange-200 px-1 text-[10px] font-semibold">Not sent</span>
+                        </template>
+                        <template v-else-if="t.status === 'cleaning'">
+                            <span class="mt-1 text-[11px] font-semibold" :data-testid="`table-cleaning-${t.name}`">Needs clearing</span>
+                            <span class="text-[10px]">paid {{ since(t.minutes_since_paid ?? 0) }} ago</span>
                         </template>
                         <span v-else class="mt-1 text-[11px]">{{ t.seats }} seats</span>
                     </button>
@@ -206,6 +239,26 @@ const since = (minutes) => (minutes >= 60 ? `${Math.floor(minutes / 60)}h ${minu
                 </div>
             </div>
         </div>
+
+        <a-modal
+            :visible="!!clearing"
+            :title="clearing ? `Is ${clearing.name} ready?` : ''"
+            :footer="null"
+            :width="360"
+            @cancel="clearing = null"
+        >
+            <div v-if="clearing" class="flex flex-col gap-2">
+                <p class="mb-1 text-sm text-gray-600">
+                    Its guests paid {{ since(clearing.minutes_since_paid ?? 0) }} ago. Once the table is cleared, it's free for the next guests.
+                </p>
+                <a-button block size="large" type="primary" :loading="busy" data-testid="table-ready-seat" @click="markReady(clearing, true)">
+                    Cleared, seat new guests
+                </a-button>
+                <a-button block :disabled="busy" data-testid="table-ready" @click="markReady(clearing, false)">
+                    Cleared, keep it free
+                </a-button>
+            </div>
+        </a-modal>
 
         <a-modal
             :visible="!!choosing"

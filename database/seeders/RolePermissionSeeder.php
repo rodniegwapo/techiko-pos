@@ -155,6 +155,7 @@ class RolePermissionSeeder extends Seeder
             'tabs.cancel',
             'tabs.send',
             'tabs.tickets',
+            'tabs.ready',
             'dining-tables.index',
             'dining-tables.store',
             'dining-tables.settings',
@@ -571,6 +572,7 @@ class RolePermissionSeeder extends Seeder
             'tabs.cancel',
             'tabs.send',
             'tabs.tickets',
+            'tabs.ready',
             'dining-tables.index',
             'dining-tables.store',
             'dining-tables.settings',
@@ -884,6 +886,7 @@ class RolePermissionSeeder extends Seeder
             'tabs.cancel',
             'tabs.send',
             'tabs.tickets',
+            'tabs.ready',
             'dining-tables.index',
             'dining-tables.store',
             'dining-tables.settings',
@@ -1059,6 +1062,7 @@ class RolePermissionSeeder extends Seeder
             'tabs.cancel',
             'tabs.send',
             'tabs.tickets',
+            'tabs.ready',
 
             // Reopen a shift from the POS (logged)
             'wallet-cash-ledger.reopen-shift',
@@ -1229,6 +1233,7 @@ class RolePermissionSeeder extends Seeder
             'tabs.cancel',
             'tabs.send',
             'tabs.tickets',
+            'tabs.ready',
 
             // Dashboard
             'dashboard',

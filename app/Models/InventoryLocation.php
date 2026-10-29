@@ -22,6 +22,7 @@ class InventoryLocation extends Model
         'is_active' => 'boolean',
         'is_default' => 'boolean',
         'dine_in' => 'boolean',
+        'table_cleaning' => 'boolean',
     ];
 
     protected $searchable = [

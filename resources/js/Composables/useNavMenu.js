@@ -578,19 +578,12 @@ export function useNavMenu() {
         );
     };
 
-    // Pages this business type rarely needs (useBusinessType.js), tidied out of the menu unless the
-    // business uses them or turned on "Show all menu items". Page search still finds them.
-    const MENU_IN_USE = {
-        "dining-tables": "dining_tables",
-        "inventory-movements": "stock",
-        "inventory-adjustments": "stock",
-        "inventory-valuation": "stock",
-        purchasing: "stock",
-    };
+    // Pages this business type rarely needs (useBusinessType.js) leave the menu, even when the business
+    // has records there, until it turns on "Show all menu items" (Settings says which have records).
+    // Page search still finds them.
     const tidiedAway = (key) => {
         if (!isInDomainContext.value || page.props.showAllMenu !== false) return false;
-        if (!(BUSINESS_TYPES[page.props.businessType]?.hiddenMenuKeys ?? []).includes(key)) return false;
-        return !page.props.menuInUse?.[MENU_IN_USE[key]];
+        return (BUSINESS_TYPES[page.props.businessType]?.hiddenMenuKeys ?? []).includes(key);
     };
 
     const openableMenus = computed(() => {
@@ -638,6 +631,12 @@ export function useNavMenu() {
                     // Parts this location doesn't show (config/location_areas.php): the books at a store,
                     // customers and card terminals at a warehouse. The server turns these pages away too.
                     if (item.routeName && inHiddenArea(item.routeName)) {
+                        return false;
+                    }
+
+                    // Dine-in is coming soon (config features.dine_in): no plan has it, so it's hidden from
+                    // everyone, not shown locked. The server turns its pages away too.
+                    if (item.feature === "dine_in" && !page.props.features?.dine_in) {
                         return false;
                     }
 

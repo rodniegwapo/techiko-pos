@@ -45,7 +45,7 @@ class RegisteredUserController extends Controller
             'organization' => 'nullable|string|max:255',
             'country_code' => 'nullable|string|size:2',
             'timezone' => 'nullable|string|max:64',
-            'business_type' => ['nullable', 'string', Rule::in(Domain::BUSINESS_TYPES)],
+            'business_type' => ['nullable', 'string', Rule::in(Domain::availableBusinessTypes())],
         ]);
 
         try {

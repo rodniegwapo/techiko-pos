@@ -111,6 +111,11 @@ class E2ESalesSeeder extends Seeder
         );
 
         foreach (User::whereIn('email', $emails)->pluck('id') as $userId) {
+            // A shift left open by a run on an earlier day would refuse today's payments: end it first.
+            RegisterShift::query()
+                ->where('domain', self::DOMAIN)->where('user_id', $userId)->where('status', RegisterShift::OPEN)
+                ->whereDate('business_date', '<', $today)
+                ->update(['status' => RegisterShift::CLOSED, 'closed_at' => now()]);
             RegisterShift::query()->firstOrCreate(
                 ['domain' => self::DOMAIN, 'location_id' => $location->id, 'user_id' => $userId, 'status' => RegisterShift::OPEN],
                 ['business_date' => $today, 'opening_cash' => 0, 'opened_at' => now()],

@@ -30,7 +30,8 @@ class TabService
     public function activeTab(Domain $domain, ?InventoryLocation $location): ?Sale
     {
         $id = session(self::SESSION_KEY.$domain->name_slug);
-        if (! $id) {
+        // Dine-in off (coming soon, or not in the plan): the till works on its own cart; open tabs stay as they are.
+        if (! $id || ! $domain->hasFeature('dine_in')) {
             return null;
         }
 
@@ -72,6 +73,8 @@ class TabService
         if (! $table && ! filled($name)) {
             throw ValidationException::withMessages(['tab_name' => ['Pick a table or type a name for the tab.']]);
         }
+        // Guests seated at a table waiting to be cleared: it's ready now.
+        $table?->update(['needs_cleaning_at' => null]);
 
         return Sale::query()->create([
             'user_id' => $user->id,
@@ -261,11 +264,12 @@ class TabService
 
     /**
      * Send what is new on the tab to the kitchen: per line, what was added since the last send.
-     * Returns null when there is nothing new.
+     * Returns null when there is nothing new. A take-out order (not a tab) is sent when it is paid,
+     * under its own label.
      */
-    public function sendToKitchen(Sale $tab, User $user): ?KitchenTicket
+    public function sendToKitchen(Sale $tab, User $user, ?string $label = null): ?KitchenTicket
     {
-        return DB::transaction(function () use ($tab, $user) {
+        return DB::transaction(function () use ($tab, $user, $label) {
             $tab = Sale::query()->whereKey($tab->id)->lockForUpdate()->firstOrFail();
             $tab->load('diningTable');
             $items = $tab->saleItems()->with(['product', 'modifiers'])->orderBy('id')->get()
@@ -281,7 +285,7 @@ class TabService
                 'sale_id' => $tab->id,
                 'location_id' => $tab->location_id,
                 'number' => $number,
-                'label' => $tab->tabLabel(),
+                'label' => $label ?? $tab->tabLabel(),
                 'is_addition' => $number > 1,
                 'sent_by' => $user->id,
             ]);
@@ -300,6 +304,44 @@ class TabService
 
             return $ticket->load(['items', 'sender']);
         });
+    }
+
+    /**
+     * A sale at a dine-in store was just paid: it gets its order type, a take-out order goes to the
+     * kitchen, and a table whose last tab this was waits to be cleared (when the store asks for that).
+     * Returns the take-out kitchen ticket, if one was printed.
+     */
+    public function afterPaid(Sale $sale, ?InventoryLocation $location, User $user): ?KitchenTicket
+    {
+        // Dine-in is coming soon (config features.dine_in): a till sale gets no order type and no
+        // kitchen ticket; a tab opened before it was switched off still closes as dine-in.
+        if (! $sale->is_tab && ! config('features.dine_in', false)) {
+            return null;
+        }
+        $type = $sale->orderTypeAt($location);
+        if ($type === null) {
+            return null;
+        }
+        $sale->forceFill(['order_type' => $type])->save();
+
+        if ($type === Sale::ORDER_TAKE_OUT) {
+            $name = $sale->customer?->name;
+
+            return $this->sendToKitchen($sale, $user, 'Take-out · '.($name ?: '#'.$sale->invoice_number));
+        }
+
+        $table = $sale->dining_table_id ? DiningTable::query()->find($sale->dining_table_id) : null;
+        if ($table && $location?->table_cleaning && ! $table->openTabs()->exists()) {
+            $table->update(['needs_cleaning_at' => now()]);
+        }
+
+        return null;
+    }
+
+    /** Staff cleared the table: free for the next guests. */
+    public function markReady(DiningTable $table): void
+    {
+        $table->update(['needs_cleaning_at' => null]);
     }
 
     /** Order discounts, a customer's points or a credit charge would not survive a merge. */

@@ -92,10 +92,10 @@ class DineInTabsTest extends TestCase
         return route('domains.'.$name, ['domain' => $this->domain->name_slug, ...$params]);
     }
 
-    /** The till has this tab open (what tabs.select remembers). */
+    /** The till has this tab open (what tabs.select remembers), or none: the cashier's own cart. */
     private function onTab(?Sale $tab)
     {
-        return $this->actingAs($this->cashier)->withSession($tab ? ['pos.tab.'.$this->domain->name_slug => $tab->id] : []);
+        return $this->actingAs($this->cashier)->withSession(['pos.tab.'.$this->domain->name_slug => $tab?->id]);
     }
 
     private function open(array $data): Sale
@@ -237,6 +237,91 @@ class DineInTabsTest extends TestCase
             ->assertJsonPath('active_tab_id', null);
     }
 
+    public function test_a_paid_table_is_dine_in_and_waits_to_be_marked_ready(): void
+    {
+        $tab = $this->open(['dining_table_id' => $this->t1->id]);
+        $this->add($tab, $this->adobo, 1);
+        $this->onTab($tab)->postJson($this->url('sales.payment.store', ['sale' => $tab->id]), ['payment_method' => 'cash'])
+            ->assertOk()->assertJsonPath('kitchen_ticket', null);
+
+        $this->assertSame(Sale::ORDER_DINE_IN, $tab->fresh()->order_type);
+        $this->assertNotNull($this->t1->fresh()->needs_cleaning_at);
+        $this->actingAs($this->cashier)->getJson($this->url('tabs.index'))
+            ->assertJsonPath('tables.0.name', 'T1')
+            ->assertJsonPath('tables.0.status', 'cleaning')
+            ->assertJsonPath('tables.1.status', 'free');
+
+        $this->actingAs($this->cashier)->postJson($this->url('tabs.ready', ['diningTable' => $this->t1->id]))->assertOk();
+        $this->assertNull($this->t1->fresh()->needs_cleaning_at);
+        $this->actingAs($this->cashier)->getJson($this->url('tabs.index'))->assertJsonPath('tables.0.status', 'free');
+    }
+
+    public function test_seating_guests_at_a_table_waiting_to_be_cleared_marks_it_ready(): void
+    {
+        $this->t1->update(['needs_cleaning_at' => now()]);
+
+        $this->open(['dining_table_id' => $this->t1->id]);
+
+        $this->assertNull($this->t1->fresh()->needs_cleaning_at);
+    }
+
+    public function test_a_store_that_skips_cleaning_frees_the_table_when_paid(): void
+    {
+        $this->actingAs($this->cashier)->put($this->url('dining-tables.settings'), ['location_id' => $this->store->id, 'table_cleaning' => false])
+            ->assertSessionHasNoErrors();
+        $this->assertFalse($this->store->fresh()->table_cleaning);
+        $this->assertTrue($this->store->fresh()->dine_in, 'dine-in is left as it was');
+
+        $tab = $this->open(['dining_table_id' => $this->t1->id]);
+        $this->add($tab, $this->adobo, 1);
+        $this->onTab($tab)->postJson($this->url('sales.payment.store', ['sale' => $tab->id]), ['payment_method' => 'cash'])->assertOk();
+
+        $this->assertNull($this->t1->fresh()->needs_cleaning_at);
+    }
+
+    public function test_take_out_is_paid_first_and_its_kitchen_ticket_comes_back_to_print(): void
+    {
+        // The cashier's own cart (no tab) at a dine-in store.
+        $sale = $this->onTab(null)->postJson($this->url('users.sales.cart.add', ['user' => $this->cashier->id]), [
+            'product_id' => $this->adobo->id, 'quantity' => 2,
+        ])->assertOk()->json('sale.id');
+
+        $ticket = $this->onTab(null)->postJson($this->url('sales.payment.store', ['sale' => $sale]), ['payment_method' => 'cash'])
+            ->assertOk()->json('kitchen_ticket');
+
+        $this->assertSame(Sale::ORDER_TAKE_OUT, Sale::query()->find($sale)->order_type);
+        $this->assertStringStartsWith('Take-out · #', $ticket['label']);
+        $this->assertSame('Adobo', $ticket['items'][0]['name']);
+        $this->assertEquals(2, $ticket['items'][0]['quantity']);
+        $this->assertSame(1, KitchenTicket::query()->where('sale_id', $sale)->count());
+    }
+
+    public function test_a_store_without_dine_in_has_no_order_type_or_kitchen_ticket(): void
+    {
+        $this->store->update(['dine_in' => false]);
+        $sale = $this->onTab(null)->postJson($this->url('users.sales.cart.add', ['user' => $this->cashier->id]), [
+            'product_id' => $this->rice->id, 'quantity' => 1,
+        ])->assertOk()->json('sale.id');
+
+        $this->onTab(null)->postJson($this->url('sales.payment.store', ['sale' => $sale]), ['payment_method' => 'cash'])
+            ->assertOk()->assertJsonPath('kitchen_ticket', null);
+
+        $this->assertNull(Sale::query()->find($sale)->order_type);
+        $this->assertSame(0, KitchenTicket::query()->where('sale_id', $sale)->count());
+    }
+
+    public function test_another_stores_table_cant_be_marked_ready(): void
+    {
+        $branch = InventoryLocation::query()->create([
+            'domain' => $this->domain->name_slug, 'name' => 'Branch', 'code' => Str::upper(Str::random(8)),
+            'type' => 'store', 'is_active' => true, 'dine_in' => true,
+        ]);
+        $theirs = DiningTable::query()->create(['domain' => $this->domain->name_slug, 'location_id' => $branch->id, 'name' => 'B1', 'seats' => 2, 'needs_cleaning_at' => now()]);
+
+        $this->actingAs($this->cashier)->postJson($this->url('tabs.ready', ['diningTable' => $theirs->id]))->assertNotFound();
+        $this->assertNotNull($theirs->fresh()->needs_cleaning_at);
+    }
+
     public function test_open_tabs_count_against_stock(): void
     {
         ProductInventory::query()->where('product_id', $this->adobo->id)->update(['quantity_on_hand' => 3, 'quantity_available' => 3]);
@@ -278,6 +363,7 @@ class DineInTabsTest extends TestCase
         $theirs = Sale::query()->create([
             'domain' => $other->name_slug, 'location_id' => $otherStore->id, 'user_id' => $this->cashier->id,
             'payment_status' => 'pending', 'is_tab' => true, 'tab_name' => 'Theirs', 'invoice_number' => Str::random(10),
+            'transaction_date' => now(),
         ]);
 
         $this->actingAs($this->cashier)->postJson($this->url('tabs.select', ['tab' => $theirs->id]))->assertNotFound();

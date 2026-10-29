@@ -3,7 +3,7 @@ import { computed, reactive, ref } from "vue";
 import axios from "axios";
 import { message } from "ant-design-vue";
 import { IconArmchair, IconChefHat, IconLayoutGrid } from "@tabler/icons-vue";
-import KitchenTicket from "@/Components/Receipt/KitchenTicket.vue";
+import KitchenTicketModal from "./KitchenTicketModal.vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useHelpers } from "@/Composables/useHelpers";
 import { allowsDecimal, formatQuantity, quantityStep, toQuantity } from "@/Utils/quantity";
@@ -46,7 +46,6 @@ async function run(fn, fallback) {
 
 // Send to kitchen: the ticket comes back to be printed.
 const ticket = ref(null);
-const printId = computed(() => `kitchen-ticket-${ticket.value?.id ?? "x"}`);
 async function send() {
     const data = await run(() => axios.post(getRoute("tabs.send", { tab: props.sale.id })).then((r) => r.data), "Could not send to the kitchen.");
     if (data) {
@@ -159,9 +158,10 @@ async function doCancel() {
     }
 }
 
+// The tab stays open; the till goes back to the tables to seat or serve someone else.
 async function backToTables() {
     const data = await run(() => axios.post(getRoute("tabs.leave")), "Could not leave the tab.");
-    if (data) emit("left");
+    if (data) emit("tables");
 }
 
 const onMenu = ({ key }) =>
@@ -175,10 +175,13 @@ const onMenu = ({ key }) =>
             <div class="truncate font-semibold text-orange-900" data-testid="tab-label">{{ label }}</div>
             <div v-if="sale.guests" class="text-xs text-orange-800">{{ sale.guests }} guest{{ sale.guests > 1 ? "s" : "" }}</div>
         </div>
-        <a-button type="primary" size="small" :loading="busy" :disabled="!hasItems" data-testid="tab-send" @click="send">
-            <template #icon><IconChefHat :size="16" class="mr-1 inline" /></template>
-            Send to kitchen
-        </a-button>
+        <!-- Nothing to send yet: a plain button, since the theme's green stays dark when disabled. -->
+        <a-tooltip :title="hasItems ? '' : 'Add food and drinks to the tab first'">
+            <a-button :type="hasItems ? 'primary' : 'default'" size="small" :loading="busy" :disabled="!hasItems" data-testid="tab-send" @click="send">
+                <template #icon><IconChefHat :size="16" class="mr-1 inline" /></template>
+                Send to kitchen
+            </a-button>
+        </a-tooltip>
         <a-dropdown :trigger="['click']">
             <a-button size="small" data-testid="tab-more">More</a-button>
             <template #overlay>
@@ -200,17 +203,7 @@ const onMenu = ({ key }) =>
     </div>
 
     <!-- Sent: print it for the kitchen -->
-    <a-modal :visible="!!ticket" title="Sent to the kitchen" :width="380" @cancel="ticket = null">
-        <div v-if="ticket" class="flex justify-center rounded border bg-white p-2" data-testid="kitchen-ticket">
-            <div :id="printId"><KitchenTicket :ticket="ticket" /></div>
-        </div>
-        <template #footer>
-            <a-button @click="ticket = null">Done</a-button>
-            <span v-print="{ id: printId, popTitle: ticket ? `Kitchen ${ticket.label}` : 'Kitchen' }">
-                <a-button type="primary" data-testid="kitchen-ticket-print">Print</a-button>
-            </span>
-        </template>
-    </a-modal>
+    <KitchenTicketModal :ticket="ticket" @close="ticket = null" />
 
     <a-modal :visible="!!tickets" title="Kitchen tickets" :footer="null" :width="420" @cancel="tickets = null">
         <p v-if="tickets && !tickets.length" class="text-gray-500">Nothing sent to the kitchen yet.</p>

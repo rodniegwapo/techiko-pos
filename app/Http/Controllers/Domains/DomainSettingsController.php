@@ -65,7 +65,7 @@ class DomainSettingsController extends Controller
             'hide_out_of_stock' => ['sometimes', 'boolean'],
             'allow_new_shift_while_review' => ['sometimes', 'boolean'],
             'currency_code' => ['sometimes', 'string', Rule::in(self::CURRENCIES)],
-            'business_type' => ['sometimes', 'string', Rule::in(Domain::BUSINESS_TYPES)],
+            'business_type' => ['sometimes', 'string', Rule::in(Domain::availableBusinessTypes())],
             'show_all_menu' => ['sometimes', 'boolean'],
         ]);
 
@@ -97,7 +97,9 @@ class DomainSettingsController extends Controller
         }
         // What the business sells changes the menu for everyone and how new products start, so only an
         // owner or admin changes it, and who did and when is kept. The same values sent back are fine.
-        $typeChanged = array_key_exists('business_type', $validated) && ($sales['business_type'] ?? null) !== $validated['business_type'];
+        // A saved type that's coming soon reads as retail, so retail sent back keeps it for when it opens.
+        $typeChanged = array_key_exists('business_type', $validated)
+            && ($domain->businessType() !== $validated['business_type'] || ! $domain->hasChosenBusinessType());
         $menuChanged = array_key_exists('show_all_menu', $validated) && $domain->showsAllMenu() !== (bool) $validated['show_all_menu'];
         if (($typeChanged || $menuChanged) && ! FinanceAccess::canSeeAllStores($request->user())) {
             throw ValidationException::withMessages(['business_type' => 'Only an owner or admin can change the business type.']);

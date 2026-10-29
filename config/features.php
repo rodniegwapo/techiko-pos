@@ -49,4 +49,27 @@ return [
         env('FEATURE_PLAN_GATING', false),
         FILTER_VALIDATE_BOOLEAN
     ),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Dine-in tables, tabs and kitchen tickets (coming soon)
+    |--------------------------------------------------------------------------
+    | When false, dine-in is off for every organization, VIP too (Domain::hasFeature):
+    | the till shows no tables, the menu no Tables page, and its routes say
+    | "coming soon". Stores' dine-in setting and their tables are kept.
+    */
+    'dine_in' => filter_var(
+        env('FEATURE_DINE_IN', false),
+        FILTER_VALIDATE_BOOLEAN
+    ),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Business types open for picking (the rest show "Coming soon")
+    |--------------------------------------------------------------------------
+    | A comma list of Domain::BUSINESS_TYPES, or "all". Retail is always open.
+    | An organization whose saved type isn't open reads as retail meanwhile;
+    | its saved type is kept and comes back when the type opens.
+    */
+    'business_types' => env('FEATURE_BUSINESS_TYPES', 'retail'),
 ];

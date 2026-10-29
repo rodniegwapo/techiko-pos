@@ -1,13 +1,13 @@
 <script setup>
-import { computed, h } from "vue";
+import { computed, defineComponent, h, ref } from "vue";
 import { Head, useForm, usePage } from "@inertiajs/vue3";
-import { Modal } from "ant-design-vue";
+import { Checkbox, Modal } from "ant-design-vue";
 import dayjs from "dayjs";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
 import ContentLayout from "@/Components/ContentLayout.vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
-import { BUSINESS_TYPES } from "@/Composables/useBusinessType";
+import { BUSINESS_TYPES, isBusinessTypeAvailable } from "@/Composables/useBusinessType";
 
 const page = usePage();
 const { getRoute } = useDomainRoutes();
@@ -80,10 +80,13 @@ const HIDDEN_PAGE_NAMES = {
     "inventory-valuation": "Valuation report",
     purchasing: "Purchasing",
 };
-const hiddenPages = computed(() => (BUSINESS_TYPES[form.business_type]?.hiddenMenuKeys ?? []).map((k) => HIDDEN_PAGE_NAMES[k] ?? k));
+// Tables are coming soon and out of every menu (config features.dine_in), so they aren't named.
+const hiddenMenuKeys = (type) =>
+    (BUSINESS_TYPES[type]?.hiddenMenuKeys ?? []).filter((k) => k !== "dining-tables" || page.props.features?.dine_in);
+const hiddenPages = computed(() => hiddenMenuKeys(form.business_type).map((k) => HIDDEN_PAGE_NAMES[k] ?? k));
 
-// Pages the type would leave out but the menu keeps because the business already uses them (same
-// rule as useNavMenu.js), so a change that seems to do nothing is explained.
+// Pages the type leaves out of the menu although the business has records there: named on the card
+// and in the confirmation, with "Show all menu items" to keep them (useNavMenu.js hides them anyway).
 const IN_USE = {
     "dining-tables": { use: "dining_tables", why: "a store has dine-in on or has tables set up" },
     "inventory-movements": { use: "stock", why: "some of your products have Track stock on" },
@@ -91,10 +94,10 @@ const IN_USE = {
     "inventory-valuation": { use: "stock", why: "some of your products have Track stock on" },
     purchasing: { use: "stock", why: "some of your products have Track stock on" },
 };
-const keptInUse = computed(() => {
+const hiddenWithRecords = computed(() => {
     const inUse = page.props.menuInUse ?? {};
     const groups = {};
-    for (const key of BUSINESS_TYPES[form.business_type]?.hiddenMenuKeys ?? []) {
+    for (const key of hiddenMenuKeys(form.business_type)) {
         const rule = IN_USE[key];
         if (rule && inUse[rule.use]) (groups[rule.why] ??= []).push(HIDDEN_PAGE_NAMES[key] ?? key);
     }
@@ -111,10 +114,13 @@ function submit() {
 
 // Changing what the business sells changes the menu for everyone and how new products start, so it
 // is confirmed first. Saving it as it was asks nothing.
-const savedType = props.salesSettings?.business_type ?? "retail";
-const savedShowAll = props.salesSettings?.show_all_menu === true;
+// Compared with what's saved now: the page stays open after a save and its props refresh, so a
+// second change in a row is still confirmed.
 const typeChanging = computed(
-    () => form.business_type !== savedType || form.show_all_menu !== savedShowAll || page.props.businessTypeChosen === false,
+    () =>
+        form.business_type !== (props.salesSettings?.business_type ?? "retail") ||
+        form.show_all_menu !== (props.salesSettings?.show_all_menu === true) ||
+        page.props.businessTypeChosen === false,
 );
 function presetSummary(type) {
     const p = BUSINESS_TYPES[type];
@@ -132,21 +138,40 @@ function saveBusinessType() {
     if (!typeChanging.value) return save();
 
     const label = BUSINESS_TYPES[form.business_type]?.label ?? form.business_type;
-    const hidden = form.show_all_menu ? [] : hiddenPages.value;
-    const kept = keptInUse.value.flatMap((k) => k.pages);
-    const leaving = hidden.filter((name) => !kept.includes(name));
+    const leaving = form.show_all_menu ? [] : hiddenPages.value;
+    const withRecords = form.show_all_menu ? [] : hiddenWithRecords.value.flatMap((k) => k.pages);
+    // "Keep these pages in my menu": off, so the type decides, unless the owner ticks it.
+    const keep = ref(false);
+    const Body = defineComponent({
+        setup: () => () =>
+            h("div", { class: "space-y-2 text-sm" }, [
+                h("p", { class: "mb-0" }, leaving.length
+                    ? `The menu changes for everyone in ${domainName}: ${leaving.join(", ")} leave it (page search still opens them).`
+                    : `The menu stays the same for everyone in ${domainName}.`),
+                withRecords.length
+                    ? h("div", { class: "rounded bg-amber-50 p-2 text-amber-900", "data-testid": "confirm-records" }, [
+                        h("p", { class: "mb-1" }, `You have records in ${withRecords.join(", ")}. They stay, and you can keep these pages in the menu with Show all menu items.`),
+                        h(Checkbox, {
+                            checked: keep.value,
+                            "onUpdate:checked": (v) => (keep.value = v),
+                            "data-testid": "confirm-keep-pages",
+                        }, () => "Keep these pages in my menu"),
+                    ])
+                    : null,
+                h("p", { class: "mb-0" }, `New products start with ${presetSummary(form.business_type)}.`),
+                h("p", { class: "mb-0 text-gray-500" }, "Products and sales you already have don't change."),
+            ]),
+    });
+    const typeIsNew = form.business_type !== (props.salesSettings?.business_type ?? "retail") || page.props.businessTypeChosen === false;
     Modal.confirm({
-        title: `Change the business type to ${label}?`,
+        title: typeIsNew ? `Change the business type to ${label}?` : "Change the menu for everyone?",
         okText: "Change",
         cancelText: "Cancel",
-        content: h("div", { class: "space-y-2 text-sm" }, [
-            h("p", { class: "mb-0" }, leaving.length
-                ? `The menu changes for everyone in ${domainName}: ${leaving.join(", ")} leave it (page search still opens them).`
-                : `The menu stays the same for everyone in ${domainName}.`),
-            h("p", { class: "mb-0" }, `New products start with ${presetSummary(form.business_type)}.`),
-            h("p", { class: "mb-0 text-gray-500" }, "Products and sales you already have don't change."),
-        ]),
-        onOk: save,
+        content: h(Body),
+        onOk: () => {
+            if (keep.value) form.show_all_menu = true;
+            return save();
+        },
     });
 }
 
@@ -205,15 +230,22 @@ const domainName =
                             class="grid w-full grid-cols-1 gap-2 sm:grid-cols-2"
                             data-testid="business-type"
                         >
+                            <!-- Types not open yet show "Coming soon" and can't be picked (Domain::availableBusinessTypes). -->
                             <label
                                 v-for="(t, key) in BUSINESS_TYPES"
                                 :key="key"
-                                class="flex cursor-pointer items-start gap-2 rounded-lg border p-3"
-                                :class="form.business_type === key ? 'border-green-500 bg-green-50' : 'border-gray-200'"
+                                class="flex items-start gap-2 rounded-lg border p-3"
+                                :class="[
+                                    form.business_type === key ? 'border-green-500 bg-green-50' : 'border-gray-200',
+                                    isBusinessTypeAvailable(key) ? 'cursor-pointer' : 'cursor-not-allowed opacity-60',
+                                ]"
                             >
-                                <a-radio :value="key" :data-testid="`business-type-${key}`" />
+                                <a-radio :value="key" :disabled="!isBusinessTypeAvailable(key)" :data-testid="`business-type-${key}`" />
                                 <span>
-                                    <span class="block text-sm font-medium text-gray-900">{{ t.label }}</span>
+                                    <span class="flex items-center gap-2 text-sm font-medium text-gray-900">
+                                        {{ t.label }}
+                                        <a-tag v-if="!isBusinessTypeAvailable(key)" class="m-0" :data-testid="`business-type-coming-soon-${key}`">Coming soon</a-tag>
+                                    </span>
                                     <span class="block text-xs text-gray-500">{{ t.description }}</span>
                                 </span>
                             </label>
@@ -226,28 +258,30 @@ const domainName =
                             <div class="text-sm">
                                 <div class="font-medium text-gray-900">Show all menu items</div>
                                 <div v-if="hiddenPages.length" class="text-xs text-gray-500">
-                                    Off: the menu leaves out {{ hiddenPages.join(", ") }}, which this kind of business rarely uses,
-                                    unless you already use them. They still open from page search (Ctrl+K).
+                                    Off: the menu leaves out {{ hiddenPages.join(", ") }}, which this kind of business rarely uses.
+                                    They still open from page search (Ctrl+K).
                                 </div>
                                 <div v-else class="text-xs text-gray-500">This kind of business sees every page already.</div>
                             </div>
                         </div>
                         <a-alert
-                            v-if="!form.show_all_menu && keptInUse.length"
-                            type="info"
+                            v-if="!form.show_all_menu && hiddenWithRecords.length"
+                            type="warning"
                             show-icon
                             class="mt-3"
-                            data-testid="menu-kept-in-use"
+                            data-testid="menu-hidden-with-records"
                         >
                             <template #message>
-                                <div class="text-sm">Some of these pages stay in your menu because you already use them:</div>
-                                <ul class="mb-0 mt-1 pl-4 text-xs">
-                                    <li v-for="k in keptInUse" :key="k.why">
-                                        <b>{{ k.pages.join(", ") }}</b>: {{ k.why }}.
+                                <div class="text-sm">You have records in pages this kind of business leaves out of the menu:</div>
+                                <ul class="mb-0 mt-1 list-disc pl-4 text-xs">
+                                    <li v-for="k in hiddenWithRecords" :key="k.why">
+                                        <b>{{ k.pages.join(", ") }}</b> ({{ k.why }})
                                     </li>
                                 </ul>
                                 <div class="mt-1 text-xs text-gray-600">
-                                    Nothing you use is taken out of the menu. They leave it once you stop using them.
+                                    Your records stay. To keep these pages in the menu, turn on <b>Show all menu items</b><template v-if="canChangeBusinessType">
+                                        (<a role="button" class="text-blue-600" data-testid="menu-show-them" @click="form.show_all_menu = true">show them</a>, then Save)</template>.
+                                    They still open from page search (Ctrl+K).
                                 </div>
                             </template>
                         </a-alert>

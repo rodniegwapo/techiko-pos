@@ -444,6 +444,8 @@ Route::prefix('domains/{domain:name_slug}')
                 Route::get('/', [TabController::class, 'index'])->name('index');
                 Route::post('/', [TabController::class, 'store'])->name('store');
                 Route::post('/leave', [TabController::class, 'leave'])->name('leave');
+                // A table cleared after its guests paid, ready for the next ones.
+                Route::post('/tables/{diningTable}/ready', [TabController::class, 'ready'])->whereNumber('diningTable')->name('ready');
                 Route::patch('/{tab}', [TabController::class, 'update'])->whereNumber('tab')->name('update');
                 Route::post('/{tab}/select', [TabController::class, 'select'])->whereNumber('tab')->name('select');
                 Route::post('/{tab}/move', [TabController::class, 'move'])->whereNumber('tab')->name('move');
