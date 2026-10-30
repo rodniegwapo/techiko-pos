@@ -312,6 +312,30 @@ class RegisterShiftTest extends TestCase
         $this->assertSame(RegisterShift::CLOSED, $shift->fresh()->status);
     }
 
+    public function test_a_manager_reopens_a_wrong_count_for_the_cashier_to_count_again(): void
+    {
+        $ana = $this->user('cashier', 4);
+        $boss = $this->user('manager', 3);
+        $this->start($ana, 100);
+        $this->end($ana, $this->shiftOf($ana), 90);
+        $this->assertSame(RegisterShift::NEEDS_REVIEW, $this->shiftOf($ana)->status);
+
+        // From Counted money: the manager sends it back, with a reason.
+        $this->actingAs($boss)->post($this->url('register-shifts.reopen', ['registerShift' => $this->shiftOf($ana)->id]), ['reason' => 'Count the coins again'])
+            ->assertSessionHasNoErrors();
+
+        $shift = $this->shiftOf($ana);
+        $this->assertTrue($shift->isOpen());
+        $this->assertNull($shift->counted_cash);
+        $log = WalletShiftReopenLog::query()->where('register_shift_id', $shift->id)->sole();
+        $this->assertSame($boss->id, (int) $log->reopened_by);
+        $this->assertEquals(90, $log->before['counted_cash']);
+
+        // Ana counts again; the new count replaces nothing, it's added.
+        $this->end($ana, $shift, 100)->assertSessionHasNoErrors();
+        $this->assertSame(2, WalletCashCountSubmission::query()->where('register_shift_id', $shift->id)->count());
+    }
+
     public function test_a_manager_approves_counts_but_not_their_own(): void
     {
         $ana = $this->user('cashier', 4);

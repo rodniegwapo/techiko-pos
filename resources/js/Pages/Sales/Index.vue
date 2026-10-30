@@ -213,6 +213,25 @@ const cashierUserId = computed(() => page.props.auth?.user?.data?.id);
 const shiftIsOpen = computed(() => page.props.shiftStatus?.is_open ?? true);
 const shiftBannerModalOpen = ref(false);
 
+// A manager (or the cashier on another device) can end the shift while this page stays open:
+// re-check it now and then, and when the cashier comes back to the tab.
+const SHIFT_STATUS_POLL_MS = 30000;
+let shiftStatusTimer = null;
+let inertiaVisitActive = false;
+const stopVisitStart = router.on("start", () => (inertiaVisitActive = true));
+const stopVisitFinish = router.on("finish", () => (inertiaVisitActive = false));
+
+function refreshShiftStatus() {
+    // A reload would cancel a visit in progress, and an open modal reads these props.
+    if (!salesCartIsOnline.value || inertiaVisitActive || shiftBannerModalOpen.value) return;
+    if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+    router.reload({ only: ["shiftStatus"] });
+}
+
+function onShiftTabVisible() {
+    if (document.visibilityState === "visible") refreshShiftStatus();
+}
+
 const offlinePaymentMethod = ref("cash");
 const offlinePaymentCardTypeId = ref(null);
 const offlinePaymentReference = ref("");
@@ -1415,6 +1434,8 @@ onMounted(async () => {
     if (typeof window !== "undefined") {
         window.addEventListener("online", onWindowOnline);
         window.addEventListener("offline", onWindowOffline);
+        document.addEventListener("visibilitychange", onShiftTabVisible);
+        shiftStatusTimer = window.setInterval(refreshShiftStatus, SHIFT_STATUS_POLL_MS);
     }
     try {
         if (salesCartIsOnline.value) {
@@ -1439,7 +1460,11 @@ onBeforeUnmount(() => {
     if (typeof window !== "undefined") {
         window.removeEventListener("online", onWindowOnline);
         window.removeEventListener("offline", onWindowOffline);
+        document.removeEventListener("visibilitychange", onShiftTabVisible);
+        window.clearInterval(shiftStatusTimer);
     }
+    stopVisitStart();
+    stopVisitFinish();
 });
 
 function displayCategoryNameForSales(product) {

@@ -129,6 +129,8 @@ class SaleController extends Controller
             ->latest('closed_at')->first();
 
         return [
+            // The store these answers are for: starting or reopening from this page acts on it too.
+            'location_id' => $locationId,
             'is_open' => $mine !== null && ! $isClosed,
             'is_closed' => $isClosed,
             'shift_id' => $mine?->id,

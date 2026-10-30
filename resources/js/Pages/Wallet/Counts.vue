@@ -96,6 +96,36 @@ function approve() {
     );
 }
 
+// The count looks wrong: reopen the shift so the cashier counts again. Only today's, before approval
+// (the server checks the rest: a shift the cashier has open now, an ended store day).
+const canReopenRow = (row) =>
+    canApproveRow(row) && dayjs(row.business_date).isSame(dayjs(), "day");
+const reopening = ref(null);
+const reopenReason = ref("");
+const reopenBusy = ref(false);
+const reopenReasonOk = computed(() => reopenReason.value.trim().length >= 3);
+function openReopen(row) {
+    reopening.value = row;
+    reopenReason.value = "";
+}
+function reopen() {
+    if (!reopenReasonOk.value) return;
+    reopenBusy.value = true;
+    router.post(
+        getRoute("register-shifts.reopen", { registerShift: reopening.value.id }),
+        { reason: reopenReason.value.trim() },
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                notification.success({ message: "Shift reopened for a recount." });
+                reopening.value = null;
+            },
+            onError: (errors) => notification.error({ message: Object.values(errors || {})[0] || "Could not reopen the shift." }),
+            onFinish: () => (reopenBusy.value = false),
+        },
+    );
+}
+
 const collecting = ref(null);
 
 // View: the shift's sales, cash lines, every count and every reopen.
@@ -191,6 +221,14 @@ async function openDetail(row) {
                                 Approve
                             </a-button>
                             <a-button
+                                v-if="canReopenRow(record)"
+                                size="small"
+                                :data-testid="`count-reopen-${record.id}`"
+                                @click="openReopen(record)"
+                            >
+                                Recount
+                            </a-button>
+                            <a-button
                                 v-if="canCollect && record.collectable"
                                 size="small"
                                 type="primary"
@@ -221,6 +259,31 @@ async function openDetail(row) {
                 </p>
                 <p v-if="approving.user?.id === currentUserId" class="text-xs text-amber-700">This is your own shift.</p>
                 <a-input v-model:value="approveNote" placeholder="What you found (optional)" :maxlength="255" data-testid="approve-note" />
+            </template>
+        </a-modal>
+
+        <a-modal
+            :visible="!!reopening"
+            title="Reopen for a recount"
+            ok-text="Reopen shift"
+            :ok-button-props="{ disabled: !reopenReasonOk, 'data-testid': 'reopen-confirm' }"
+            :confirm-loading="reopenBusy"
+            @ok="reopen"
+            @cancel="reopening = null"
+        >
+            <template v-if="reopening">
+                <p class="text-sm text-gray-600">
+                    {{ reopening.user?.name }}'s shift opens again so they can count the drawer and end it once more.
+                    This count ({{ money(reopening.counted_cash) }} against {{ money(reopening.expected_cash) }} expected)
+                    stays in the shift's history.
+                </p>
+                <a-input
+                    v-model:value="reopenReason"
+                    placeholder="Reason, e.g. counted wrong"
+                    :maxlength="255"
+                    data-testid="reopen-reason"
+                    @press-enter="reopen"
+                />
             </template>
         </a-modal>
 

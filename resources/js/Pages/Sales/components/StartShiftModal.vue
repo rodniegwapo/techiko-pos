@@ -30,7 +30,10 @@ const businessDate = computed(
         page.props.shiftStatus?.business_date ||
         new Date().toISOString().slice(0, 10),
 );
-const locationId = computed(() => page.props.currentLocation?.id ?? null);
+// The store the shift status was checked for, so the banner and the button never act on different stores.
+const locationId = computed(
+    () => page.props.shiftStatus?.location_id ?? page.props.currentLocation?.id ?? null,
+);
 
 const openingCash = ref(Number(page.props.shiftStatus?.suggested_opening || 0));
 const reason = ref("");
@@ -105,6 +108,11 @@ async function submit() {
         emit("started");
     } catch (e) {
         notification.error({ message: firstValidationMessage(e) });
+        // Refused for the shift's state (e.g. started in another tab): this page's status is stale, refresh it.
+        if (e?.response?.data?.errors?.shift) {
+            emit("update:visible", false);
+            router.reload({ only: ["shiftStatus"] });
+        }
     } finally {
         saving.value = false;
     }
