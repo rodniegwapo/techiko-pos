@@ -5,6 +5,8 @@ import { notification } from "ant-design-vue";
 import { router } from "@inertiajs/vue3";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useHelpers } from "@/Composables/useHelpers";
+import IconTooltip from "@/Components/buttons/IconTooltip.vue";
+import { IconCheck, IconRefresh } from "@tabler/icons-vue";
 
 /**
  * A manager's actions on an ended shift's count: Approve it (with an optional note of what was
@@ -17,8 +19,6 @@ const props = defineProps({
     shift: { type: Object, required: true },
     canApprove: { type: Boolean, default: false },
     currentUserId: { type: Number, default: null },
-    /** One above the other, for a narrow column. */
-    stacked: { type: Boolean, default: false },
 });
 
 const { getRoute } = useDomainRoutes();
@@ -62,13 +62,13 @@ function recount() {
 </script>
 
 <template>
-    <span class="inline-flex justify-end gap-2" :class="{ 'flex-col items-stretch gap-1': stacked }">
-        <a-button v-if="showApprove" size="small" type="primary" :data-testid="`count-approve-${shift.id}`" @click="open('approve')">
-            Approve
-        </a-button>
-        <a-button v-if="showRecount" size="small" :data-testid="`count-reopen-${shift.id}`" @click="open('recount')">
-            Recount
-        </a-button>
+    <span class="inline-flex justify-end gap-2">
+        <IconTooltip v-if="showApprove" name="Approve count" hover="hover:bg-green-600" :data-testid="`count-approve-${shift.id}`" @click="open('approve')">
+            <IconCheck size="18" class="mx-auto" />
+        </IconTooltip>
+        <IconTooltip v-if="showRecount" name="Send back for a recount" hover="hover:bg-amber-500" :data-testid="`count-reopen-${shift.id}`" @click="open('recount')">
+            <IconRefresh size="18" class="mx-auto" />
+        </IconTooltip>
 
         <a-modal
             :visible="modal === 'approve'"
@@ -80,7 +80,7 @@ function recount() {
             @cancel="modal = null"
         >
             <p class="text-sm text-gray-600">
-                {{ shift.user?.name }}'s shift on {{ dayjs(shift.business_date).format("MMM D") }}: counted
+                {{ shift.user?.name }}'s shift<template v-if="shift.store"> at <b data-testid="approve-store">{{ shift.store }}</b></template> on {{ dayjs(shift.business_date).format("MMM D") }}: counted
                 {{ money(shift.counted_cash) }} against {{ money(shift.expected_cash) }} expected.
             </p>
             <p v-if="shift.user?.id === currentUserId" class="text-xs text-amber-700">This is your own shift.</p>
@@ -97,7 +97,7 @@ function recount() {
             @cancel="modal = null"
         >
             <p class="text-sm text-gray-600">
-                {{ shift.user?.name }}'s shift opens again so they can count the drawer and end it once more.
+                {{ shift.user?.name }}'s shift<template v-if="shift.store"> at <b>{{ shift.store }}</b></template> opens again so they can count the drawer and end it once more.
                 This count ({{ money(shift.counted_cash) }} against {{ money(shift.expected_cash) }} expected)
                 stays in the shift's history.
             </p>

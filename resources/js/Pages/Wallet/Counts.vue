@@ -6,6 +6,8 @@ import WalletLayout from "./components/WalletLayout.vue";
 import StoreCountsByDay from "./components/history/StoreCountsByDay.vue";
 import ShiftReviewButtons from "./components/shifts/ShiftReviewButtons.vue";
 import ShiftDetailPanel from "./components/shifts/ShiftDetailPanel.vue";
+import IconTooltip from "@/Components/buttons/IconTooltip.vue";
+import { IconEye } from "@tabler/icons-vue";
 import { shortOver, TONE_CLASSES, SHIFT_STATUS } from "./components/walletLabels";
 import { useWalletQuery } from "./composables/useWalletQuery";
 
@@ -26,6 +28,8 @@ const props = defineProps({
     statusCounts: { type: Object, default: () => ({}) },
     canApprove: { type: Boolean, default: false },
     currentUserId: { type: Number, default: null },
+    /** Owners and admins: each shift's store, as they approve across stores. */
+    showStore: { type: Boolean, default: false },
     /** Store counts view. */
     cashControl: { type: Object, default: null },
     closedShifts: { type: Object, default: null },
@@ -49,9 +53,10 @@ const filterLabel = (f) => {
     return n ? `${f.label} (${n})` : f.label;
 };
 
-const columns = [
+const columns = computed(() => [
     { title: "Date", key: "date" },
     { title: "Cashier", key: "cashier" },
+    ...(props.showStore ? [{ title: "Store", key: "store" }] : []),
     { title: "Time", key: "time" },
     { title: "Opening", key: "opening", align: "right" },
     { title: "Expected", key: "expected", align: "right" },
@@ -59,7 +64,7 @@ const columns = [
     { title: "Short / Over", key: "result", align: "right" },
     { title: "Status", key: "status" },
     { title: "", key: "actions", align: "right" },
-];
+]);
 
 const pagination = computed(() => ({
     current: props.shifts?.current_page,
@@ -132,6 +137,7 @@ const viewing = ref(null);
                     <template #bodyCell="{ column, record }">
                         <template v-if="column.key === 'date'">{{ dayjs(record.business_date).format("MMM D, YYYY") }}</template>
                         <template v-else-if="column.key === 'cashier'">{{ record.user?.name ?? "—" }}</template>
+                        <template v-else-if="column.key === 'store'"><span :data-testid="`count-store-${record.id}`">{{ record.store ?? "—" }}</span></template>
                         <template v-else-if="column.key === 'time'">
                             <span class="whitespace-nowrap">{{ time(record.opened_at) }} – {{ record.closed_at ? time(record.closed_at) : "now" }}</span>
                         </template>
@@ -158,7 +164,9 @@ const viewing = ref(null);
                         </template>
                         <template v-else-if="column.key === 'actions'">
                             <div class="flex justify-end gap-2">
-                                <a-button size="small" :data-testid="`count-view-${record.id}`" @click="viewing = record">View</a-button>
+                                <IconTooltip name="View shift" hover="hover:bg-blue-500" :data-testid="`count-view-${record.id}`" @click="viewing = record">
+                                    <IconEye size="18" class="mx-auto" />
+                                </IconTooltip>
                                 <ShiftReviewButtons :shift="record" :can-approve="canApprove" :current-user-id="currentUserId" />
                             </div>
                         </template>

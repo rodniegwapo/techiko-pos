@@ -1,4 +1,9 @@
 <script setup>
+defineOptions({
+  // Click handlers, data-testid and the like go on the button itself, not the tooltip.
+  inheritAttrs: false,
+});
+
 defineProps({
   loading: {
     type: Boolean,
@@ -26,6 +31,7 @@ defineProps({
     </template>
 
     <a-button
+      v-bind="$attrs"
       class="rounded border-none text-white transition-colors duration-200"
       :class="['bg-gray-400', hover]"
       :loading="loading"

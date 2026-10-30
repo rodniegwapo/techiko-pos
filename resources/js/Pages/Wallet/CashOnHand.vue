@@ -7,6 +7,8 @@ import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useHelpers } from "@/Composables/useHelpers";
 import WalletLayout from "./components/WalletLayout.vue";
 import CollectShiftModal from "./components/cash/CollectShiftModal.vue";
+import IconTooltip from "@/Components/buttons/IconTooltip.vue";
+import { IconCash } from "@tabler/icons-vue";
 import { CASH_ON_HAND_KIND_LABELS } from "./components/walletLabels";
 
 /**
@@ -189,7 +191,9 @@ function changePage(p) {
                         </span>
                         <span class="flex items-center gap-3">
                             <span class="font-mono tabular-nums">{{ money(s.counted_cash) }}</span>
-                            <a-button size="small" type="primary" :data-testid="`collect-shift-${s.id}`" @click="collecting = s">Collect</a-button>
+                            <IconTooltip name="Collect into Cash on hand" hover="hover:bg-green-600" :data-testid="`collect-shift-${s.id}`" @click="collecting = s">
+                                <IconCash size="18" class="mx-auto" />
+                            </IconTooltip>
                         </span>
                     </div>
                 </div>

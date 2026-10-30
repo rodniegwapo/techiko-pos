@@ -3,6 +3,7 @@
 namespace App\Support\Wallet;
 
 use App\Models\RegisterShift;
+use App\Models\User;
 
 /**
  * Today's drawer for supervisors and up: every cashier's shift at the store on a day, each with how
@@ -16,9 +17,10 @@ use App\Models\RegisterShift;
 final class DrawerByShift
 {
     /**
+     * @param  User|null  $viewer  Whose view: a supervisor gets her team's shifts only (RegisterShift::scopeVisibleTo).
      * @return array{rows: list<array<string, mixed>>, store_rest: float|null, total: float}
      */
-    public static function build(string $domainSlug, int $locationId, string $businessDate, float $storeExpected): array
+    public static function build(string $domainSlug, int $locationId, string $businessDate, float $storeExpected, ?User $viewer = null): array
     {
         $service = app(RegisterShiftService::class);
         $isToday = $businessDate === now()->toDateString();
@@ -30,7 +32,8 @@ final class DrawerByShift
                 ->when($isToday, fn ($q) => $q->orWhere(fn ($q) => $q
                     ->whereDate('business_date', '<', $businessDate)
                     ->where(fn ($q) => $q->where('status', RegisterShift::OPEN)->orWhereDate('closed_at', $businessDate)))))
-            ->with(['user:id,name', 'reviewedBy:id,name', 'collectedBy:id,name'])
+            ->when($viewer, fn ($q) => $q->visibleTo($viewer))
+            ->with(['user:id,name', 'reviewedBy:id,name', 'collectedBy:id,name', 'location:id,name'])
             ->withCount('reopenLogs')
             ->orderBy('opened_at')->orderBy('id')
             ->get();

@@ -215,7 +215,10 @@ class RegisterShiftService
      */
     public function reopen(RegisterShift $shift, User $actor, string $reason): RegisterShift
     {
-        $this->ensureOwnerOrManager($shift, $actor);
+        // The cashier themselves, or whoever reviews their count (their supervisor, a manager).
+        if ((int) $shift->user_id !== (int) $actor->id) {
+            $this->ensureCanReview($shift, $actor);
+        }
         if ($shift->isOpen()) {
             throw ValidationException::withMessages(['shift' => 'This shift is already open.']);
         }
@@ -320,6 +323,9 @@ class RegisterShiftService
         if (! in_array($shift->status, [RegisterShift::CLOSED, RegisterShift::NEEDS_REVIEW], true)) {
             throw ValidationException::withMessages(['shift' => $shift->isOpen() ? 'The shift is still open.' : 'This shift was already approved.']);
         }
+        if ((int) $shift->user_id !== (int) $actor->id) {
+            $this->ensureCanReview($shift, $actor);
+        }
         // Someone else checks a manager's own count; admins and owners may sign off their own.
         if ((int) $shift->user_id === (int) $actor->id && ! $actor->isSuperUser() && ! FinanceAccess::canSeeAllStores($actor)) {
             throw ValidationException::withMessages(['shift' => 'Another manager approves your own shift.']);
@@ -395,6 +401,21 @@ class RegisterShiftService
     {
         return RegisterShift::query()->forWalletContext($domainSlug, $locationId)
             ->where('user_id', $userId)->where('status', RegisterShift::NEEDS_REVIEW)->exists();
+    }
+
+    /**
+     * Who reviews a cashier's count (approve, send back for a recount): a manager or above, or the
+     * supervisor the cashier is assigned to (users.supervisor_id). Other supervisors don't.
+     */
+    private function ensureCanReview(RegisterShift $shift, User $actor): void
+    {
+        if (FinanceAccess::canManage($actor)) {
+            return;
+        }
+        $cashierSupervisor = User::query()->whereKey($shift->user_id)->value('supervisor_id');
+        if ((int) $cashierSupervisor !== (int) $actor->id) {
+            throw ValidationException::withMessages(['shift' => 'Only this cashier\'s supervisor or a manager reviews this count.']);
+        }
     }
 
     private function ensureOwnerOrManager(RegisterShift $shift, User $actor): void

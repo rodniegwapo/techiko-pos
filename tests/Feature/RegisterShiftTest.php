@@ -738,13 +738,22 @@ class RegisterShiftTest extends TestCase
         $this->start($ben, 50);
         $this->end($ben, $this->shiftOf($ben), 40);
 
-        $this->actingAs($sue)->get($this->url('wallet.drawer'))->assertOk()->assertInertia(fn (Assert $page) => $page
-            // Whoever approves counts sees short or over here too.
+        // The store's summary is a manager's.
+        $boss = $this->grant($this->user('manager', 3), ['register-shifts.approve']);
+        $this->actingAs($boss)->get($this->url('wallet.drawer'))->assertOk()->assertInertia(fn (Assert $page) => $page
             ->where('canSeeCountResult', true)
             ->where('drawerSummary.cash_sales', fn ($v) => (float) $v === 200.0)
             ->where('drawerSummary.digital', fn ($v) => (float) $v === 100.0)
             ->where('drawerSummary.discrepancy', fn ($v) => (float) $v === -10.0)
             ->where('drawerSummary.needs_review', 1)
+            ->has('requiredActions', 1)
+            ->where('requiredActions.0.user.id', $ben->id));
+
+        // Ben's supervisor: short or over, and Ben's count to review; her team only, so no store summary.
+        $ben->forceFill(['supervisor_id' => $sue->id])->save();
+        $this->actingAs($sue)->get($this->url('wallet.drawer'))->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('canSeeCountResult', true)
+            ->where('drawerSummary', null)
             ->has('requiredActions', 1)
             ->where('requiredActions.0.user.id', $ben->id));
 

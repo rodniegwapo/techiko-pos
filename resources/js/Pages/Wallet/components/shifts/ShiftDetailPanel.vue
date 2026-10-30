@@ -105,6 +105,7 @@ const showSales = ref(false);
                     <a-tag :color="SHIFT_STATUS[row.status]?.color" class="m-0">
                         {{ row.status === "open" ? "On shift" : SHIFT_STATUS[row.status]?.label ?? row.status }}
                     </a-tag>
+                    <span v-if="row.store" class="font-medium text-gray-800" data-testid="shift-panel-store">{{ row.store }}</span>
                     <span>{{ dayjs(row.business_date).format("ddd, MMM D") }}</span>
                     <span>· {{ row.opened_at ? dayjs(row.opened_at).format("h:mm A") : "" }} – {{ row.closed_at ? dayjs(row.closed_at).format("h:mm A") : "now" }}</span>
                 </div>

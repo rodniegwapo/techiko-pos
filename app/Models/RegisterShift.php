@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\FinanceAccess;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -45,6 +46,20 @@ class RegisterShift extends Model
     public function scopeForWalletContext(Builder $query, string $domainSlug, int $locationId): Builder
     {
         return $query->where('domain', $domainSlug)->where('location_id', $locationId);
+    }
+
+    /**
+     * The shifts this person may see and act on: managers and up, everyone's at the store; a
+     * supervisor, her own and those of the cashiers assigned to her (users.supervisor_id).
+     */
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        if (FinanceAccess::canManage($user)) {
+            return $query;
+        }
+
+        return $query->where(fn (Builder $q) => $q->where('user_id', $user->id)
+            ->orWhereIn('user_id', User::query()->where('supervisor_id', $user->id)->select('id')));
     }
 
     public function scopeOpen(Builder $query): Builder
@@ -96,6 +111,8 @@ class RegisterShift extends Model
             'collected_amount' => $this->collected_amount,
             'collected_by' => $this->collectedBy?->name,
             'collected_at' => $this->collected_at?->toIso8601String(),
+            // The store the shift was at (load location first): owners approve across stores.
+            'store' => $this->relationLoaded('location') ? $this->location?->name : null,
         ];
     }
 

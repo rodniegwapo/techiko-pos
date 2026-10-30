@@ -4,6 +4,8 @@ import dayjs from "dayjs";
 import { useHelpers } from "@/Composables/useHelpers";
 import { CHANNEL_KIND_LABELS, SHIFT_STATUS, groupPlaces } from "../walletLabels";
 import { useWalletQuery } from "../../composables/useWalletQuery";
+import IconTooltip from "@/Components/buttons/IconTooltip.vue";
+import { IconAdjustments } from "@tabler/icons-vue";
 
 /**
  * Where money is, for supervisors and up. By place: the drawer and each payment channel with its
@@ -117,7 +119,9 @@ const cashierRows = computed(() => [
                             >{{ money(record.balance) }}</span>
                         </template>
                         <template v-else-if="column.key === 'actions'">
-                            <a-button v-if="record.key !== 'drawer' && canAdjust" size="small" type="link" class="!px-0" @click.stop="emit('adjust', record.channel)">Set actual</a-button>
+                            <IconTooltip v-if="record.key !== 'drawer' && canAdjust" name="Set actual" hover="hover:bg-blue-500" :data-testid="`channel-set-actual-${record.channel.id}`" @click.stop="emit('adjust', record.channel)">
+                                <IconAdjustments size="18" class="mx-auto" />
+                            </IconTooltip>
                         </template>
                     </template>
                     <template #expandedRowRender="{ record }">

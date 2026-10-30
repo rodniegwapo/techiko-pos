@@ -4,6 +4,8 @@ import dayjs from "dayjs";
 import { useHelpers } from "@/Composables/useHelpers";
 import { shortOver, TONE_CLASSES, SHIFT_STATUS } from "../walletLabels";
 import ShiftReviewButtons from "./ShiftReviewButtons.vue";
+import IconTooltip from "@/Components/buttons/IconTooltip.vue";
+import { IconEye, IconPlayerStop } from "@tabler/icons-vue";
 
 /**
  * Today's drawer for supervisors and up: each cashier's shift (opening, cash sales, cash in and
@@ -19,8 +21,12 @@ const props = defineProps({
     canSeeCountResult: { type: Boolean, default: false },
     canApprove: { type: Boolean, default: false },
     currentUserId: { type: Number, default: null },
+    /** Managers and up: the store's rows (outside any shift, whole store). A supervisor sees her team only. */
+    wholeStore: { type: Boolean, default: true },
+    /** Managers and up: end a forgotten shift for the cashier. */
+    canEndForOthers: { type: Boolean, default: false },
 });
-const emit = defineEmits(["view"]);
+const emit = defineEmits(["view", "end-for"]);
 
 const { formattedTotal } = useHelpers();
 const money = (v) => (v === null || v === undefined ? "—" : formattedTotal(Number(v) || 0));
@@ -53,10 +59,10 @@ const shownShifts = computed(() => props.drawerByShift.rows.filter(FILTERS.find(
 
 const rows = computed(() => [
     ...shownShifts.value.map((r) => ({ ...r, rowKey: `shift-${r.id}`, kind: "shift" })),
-    ...(isToday.value && props.drawerByShift.store_rest !== 0
+    ...(props.wholeStore && isToday.value && props.drawerByShift.store_rest !== 0
         ? [{ rowKey: "store", kind: "store", in_tray: props.drawerByShift.store_rest }]
         : []),
-    {
+    ...(props.wholeStore ? [{
         rowKey: "total",
         kind: "total",
         opening_cash: props.cashControl.opening_cash,
@@ -65,7 +71,7 @@ const rows = computed(() => [
         manual_out: props.cashControl.manual_out,
         expected_cash: props.cashControl.expected_cash,
         in_tray: props.drawerByShift.total,
-    },
+    }] : []),
 ]);
 
 const rowProps = (r) => ({
@@ -148,7 +154,21 @@ const totalId = { opening: "step-opening", sales: "step-sales", in: "step-in", o
                     <span class="font-mono tabular-nums" :data-testid="record.kind === 'shift' ? undefined : `drawer-tray-${record.kind}`">{{ money(record.in_tray) }}</span>
                 </template>
                 <template v-else-if="column.key === 'actions'">
-                    <ShiftReviewButtons v-if="record.kind === 'shift'" stacked :shift="record" :can-approve="canApprove" :current-user-id="currentUserId" />
+                    <span v-if="record.kind === 'shift'" class="inline-flex justify-end gap-2">
+                        <IconTooltip name="View shift" hover="hover:bg-blue-500" :data-testid="`drawer-shift-open-${record.id}`" @click="emit('view', record)">
+                            <IconEye size="18" class="mx-auto" />
+                        </IconTooltip>
+                        <IconTooltip
+                            v-if="record.overdue && canEndForOthers"
+                            name="End for them"
+                            hover="hover:bg-red-600"
+                            :data-testid="`drawer-shift-end-for-${record.id}`"
+                            @click="emit('end-for', record)"
+                        >
+                            <IconPlayerStop size="18" class="mx-auto" />
+                        </IconTooltip>
+                        <ShiftReviewButtons :shift="record" :can-approve="canApprove" :current-user-id="currentUserId" />
+                    </span>
                 </template>
             </template>
         </a-table>

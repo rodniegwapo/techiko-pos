@@ -56,6 +56,10 @@ const props = defineProps({
     overdueShifts: { type: Array, default: () => [] },
     /** Managers and up: end a forgotten shift for the cashier, counting the tray. */
     canEndForOthers: { type: Boolean, default: false },
+    /** Managers and up see the whole store; a supervisor, her team (cashiers assigned to her). */
+    seesWholeStore: { type: Boolean, default: true },
+    /** A supervisor's team, by name (null for managers and up). */
+    myTeam: { type: Array, default: null },
     /** Cash expenses can be added when ending the shift (empty without Expenses). */
     expenseCategories: { type: Array, default: () => [] },
 });
@@ -391,6 +395,10 @@ onBeforeUnmount(() => {
                 </p>
             </div>
 
+            <p v-if="myTeam" class="m-0 text-sm text-gray-600" data-testid="my-team">
+                <template v-if="myTeam.length">Showing your team: {{ myTeam.join(", ") }}.</template>
+                <template v-else>No cashiers are assigned to you yet. A manager assigns them on the Users page.</template>
+            </p>
             <div class="grid grid-cols-1 gap-4" :class="{ 'xl:grid-cols-4': requiredActions.length || overdueShifts.length }">
                 <!-- How Expected is reached: each cashier's shift, and the whole store's line -->
                 <DrawerShiftsTable
@@ -401,7 +409,10 @@ onBeforeUnmount(() => {
                     :can-see-count-result="canSeeCountResult"
                     :can-approve="canApprove"
                     :current-user-id="currentUserId"
+                    :whole-store="seesWholeStore"
+                    :can-end-for-others="canEndForOthers"
                     @view="(row) => (viewingShift = row)"
+                    @end-for="openEndFor"
                 />
 
                 <div v-if="requiredActions.length || overdueShifts.length" class="flex flex-col gap-4">

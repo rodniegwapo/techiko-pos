@@ -106,7 +106,9 @@ class RegisterShiftController extends Controller
     public function show(Request $request, Domain $domain, RegisterShift $registerShift)
     {
         $this->ensureInDomain($request, $domain, $registerShift);
-        $registerShift->load(['user:id,name', 'reviewedBy:id,name']);
+        // A supervisor opens her team's shifts only.
+        abort_unless(RegisterShift::query()->whereKey($registerShift->id)->visibleTo($request->user())->exists(), 404);
+        $registerShift->load(['user:id,name', 'reviewedBy:id,name', 'location:id,name']);
 
         return response()->json([
             'shift' => $registerShift->toRow(),

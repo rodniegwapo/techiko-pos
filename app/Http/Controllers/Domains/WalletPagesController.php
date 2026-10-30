@@ -8,6 +8,7 @@ use App\Models\ExpenseCategory;
 use App\Models\InventoryLocation;
 use App\Models\PaymentCardType;
 use App\Models\RegisterShift;
+use App\Models\User;
 use App\Support\FinanceAccess;
 use App\Support\RouteFeature;
 use App\Support\RoutePermission;
@@ -77,9 +78,11 @@ class WalletPagesController extends Controller
         $shifts = app(RegisterShiftService::class);
         $todayByUser = collect(MoneyByUser::build($domain->name_slug, (int) $location->id, now()->toDateString()));
         $needsReview = $canApprove
-            ? RegisterShift::query()->forWalletContext($domain->name_slug, (int) $location->id)
-                ->where('status', RegisterShift::NEEDS_REVIEW)->with('user:id,name')->orderBy('closed_at')->get()
+            ? RegisterShift::query()->forWalletContext($domain->name_slug, (int) $location->id)->visibleTo($user)
+                ->where('status', RegisterShift::NEEDS_REVIEW)->with(['user:id,name', 'location:id,name'])->orderBy('closed_at')->get()
             : collect();
+        // A supervisor sees her team's shifts, not the whole store: store-wide figures are a manager's.
+        $seesWholeStore = FinanceAccess::canManage($user);
         $mine = RegisterShift::openFor($domain->name_slug, (int) $location->id, (int) $user->id)
             ?? RegisterShift::query()->forWalletContext($domain->name_slug, (int) $location->id)
                 ->where('user_id', $user->id)->whereDate('business_date', now()->toDateString())
@@ -92,7 +95,7 @@ class WalletPagesController extends Controller
             'canSeeStoreDrawer' => $canSeeStoreDrawer,
             // Supervisors and up: every cashier's shift that day, adding up to the store's Expected.
             'drawerByShift' => $canSeeStoreDrawer
-                ? DrawerByShift::build($domain->name_slug, (int) $location->id, (string) $cashControl['business_date'], (float) $cashControl['expected_cash'])
+                ? DrawerByShift::build($domain->name_slug, (int) $location->id, (string) $cashControl['business_date'], (float) $cashControl['expected_cash'], $user)
                 : null,
             'canApprove' => $canApprove,
             'currentUserId' => (int) $request->user()->id,
@@ -100,7 +103,7 @@ class WalletPagesController extends Controller
             // own drawer comes first; the store's is the table below for supervisors and up.
             'myTakings' => $todayByUser->firstWhere('user.id', (int) $request->user()->id)['places'] ?? [],
             // The day at a glance, above the shift table (supervisors and up).
-            'drawerSummary' => $canSeeStoreDrawer ? [
+            'drawerSummary' => $canSeeStoreDrawer && $seesWholeStore ? [
                 'cash_in_drawers' => (float) ($cashControl['expected_cash'] ?? 0),
                 'cash_sales' => (float) ($cashControl['paid_cash_sales'] ?? 0),
                 // Card, e-wallet and bank takings today: money that went past the drawer.
@@ -137,12 +140,17 @@ class WalletPagesController extends Controller
                 ->open()->whereDate('business_date', '>=', (string) $cashControl['business_date'])
                 ->with('user:id,name')->get()->map(fn (RegisterShift $s) => ['id' => $s->id, 'user' => $s->user?->name])->values(),
             'overdueShifts' => $canSeeStoreDrawer
-                ? RegisterShift::query()->forWalletContext($domain->name_slug, (int) $location->id)
-                    ->open()->whereDate('business_date', '<', now()->toDateString())->with('user:id,name')->orderBy('business_date')->get()
+                ? RegisterShift::query()->forWalletContext($domain->name_slug, (int) $location->id)->visibleTo($user)
+                    ->open()->whereDate('business_date', '<', now()->toDateString())->with(['user:id,name', 'location:id,name'])->orderBy('business_date')->get()
                     ->map(fn (RegisterShift $s) => [...$s->toRow(), 'expected_cash' => $shifts->figures($s)['expected_cash']])->values()
                 : [],
             // Managers end a forgotten shift for the cashier, counting the tray themselves.
             'canEndForOthers' => FinanceAccess::canManage($user),
+            'seesWholeStore' => $seesWholeStore,
+            // A supervisor's team (cashiers assigned to her), named above the table.
+            'myTeam' => $canSeeStoreDrawer && ! $seesWholeStore
+                ? User::query()->where('supervisor_id', $user->id)->orderBy('name')->pluck('name')->values()
+                : null,
             // The badge that leads to Shifts & counts: ended shifts here a manager hasn't looked at yet.
             'needsReviewCount' => $canApprove ? $needsReview->count() : 0,
             // Cash expenses paid from the drawer can be added when ending the shift.
@@ -281,10 +289,11 @@ class WalletPagesController extends Controller
             ]);
         }
 
-        $base = RegisterShift::query()->forWalletContext($domain->name_slug, (int) $location->id);
+        // A supervisor reviews her team's shifts; managers and up, everyone's at the store.
+        $base = RegisterShift::query()->forWalletContext($domain->name_slug, (int) $location->id)->visibleTo($user);
         $shifts = (clone $base)
             ->when($status !== 'all', fn ($q) => $q->where('status', $status))
-            ->with(['user:id,name', 'reviewedBy:id,name', 'collectedBy:id,name'])
+            ->with(['user:id,name', 'reviewedBy:id,name', 'collectedBy:id,name', 'location:id,name'])
             ->withCount('reopenLogs')
             ->orderByDesc('business_date')
             ->orderByDesc('closed_at')
@@ -306,6 +315,8 @@ class WalletPagesController extends Controller
             'statusCounts' => (clone $base)->groupBy('status')->selectRaw('status, COUNT(*) AS n')->pluck('n', 'status'),
             'canApprove' => RoutePermission::allows($user, 'register-shifts.approve'),
             'currentUserId' => (int) $user->id,
+            // Owners and admins approve across stores: the list names each shift's store.
+            'showStore' => FinanceAccess::canSeeAllStores($user),
         ]);
     }
 
