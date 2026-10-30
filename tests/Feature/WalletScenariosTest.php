@@ -229,8 +229,6 @@ class WalletScenariosTest extends TestCase
 
     public function test_04_a_shift_started_at_6am_manila_belongs_to_that_manila_day(): void
     {
-        $this->markTestIncomplete('Open finding: the business day follows UTC, so it changes at 8 AM Manila. Needs the app-wide timezone fix.');
-
         $ana = $this->user('cashier', 5);
         $this->travelTo(Carbon::parse('2026-10-29 06:00', 'Asia/Manila'));
         $this->start($ana, 100)->assertSessionHasNoErrors();
@@ -240,8 +238,6 @@ class WalletScenariosTest extends TestCase
 
     public function test_05_a_cashier_who_opened_at_7_30am_manila_still_sells_at_10am(): void
     {
-        $this->markTestIncomplete('Open finding: the business day follows UTC, so it changes at 8 AM Manila. Needs the app-wide timezone fix.');
-
         $ana = $this->user('cashier', 5);
         $this->travelTo(Carbon::parse('2026-10-29 07:30', 'Asia/Manila'));
         $this->start($ana, 100)->assertSessionHasNoErrors();

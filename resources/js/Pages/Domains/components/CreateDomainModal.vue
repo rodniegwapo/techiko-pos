@@ -58,7 +58,7 @@ const populateForm = () => {
         form.description = props.domain.description || '';
         form.country_code = props.domain.country_code || props.domain.country || '';
         form.currency_code = props.domain.currency_code || props.domain.currency || '';
-        form.timezone = props.domain.timezone || '';
+        form.timezone = 'Asia/Manila';
         form.date_format = props.domain.date_format || 'Y-m-d';
         form.language_code = props.domain.language_code || 'en';
         form.time_format = props.domain.time_format || 'H:i:s';
@@ -70,7 +70,7 @@ const populateForm = () => {
         form.description = '';
         form.country_code = '';
         form.currency_code = '';
-        form.timezone = '';
+        form.timezone = 'Asia/Manila';
         form.date_format = 'Y-m-d';
         form.language_code = 'en';
         form.time_format = 'H:i:s';
@@ -122,21 +122,16 @@ const currencyOptions = computed(() => {
     }));
 });
 
+// The Philippines for now; the others show as coming soon and can't be picked.
 const timezoneOptions = computed(() => {
-    console.log('Timezones prop:', props.timezones);
-    if (!Array.isArray(props.timezones) || props.timezones.length === 0) {
-        // Provide some default timezones if none are available
-        return [
-            { label: 'America/New_York', value: 'America/New_York' },
-            { label: 'Asia/Manila', value: 'Asia/Manila' },
-            { label: 'Asia/Tokyo', value: 'Asia/Tokyo' },
-            { label: 'Asia/Singapore', value: 'Asia/Singapore' },
-            { label: 'Asia/Kuala_Lumpur', value: 'Asia/Kuala_Lumpur' },
-        ];
-    }
-    return props.timezones.map(timezone => ({
-        label: typeof timezone === 'string' ? timezone : (timezone.name || timezone.label || timezone),
-        value: typeof timezone === 'string' ? timezone : (timezone.value || timezone.name || timezone)
+    const list = props.timezones && !Array.isArray(props.timezones) && Object.keys(props.timezones).length
+        ? Object.entries(props.timezones).map(([value, label]) => ({ value, label }))
+        : (Array.isArray(props.timezones) && props.timezones.length ? props.timezones : ['Asia/Manila', 'Asia/Singapore', 'Asia/Tokyo', 'America/New_York'])
+            .map((tz) => (typeof tz === 'string' ? { value: tz, label: tz } : { value: tz.value || tz.name, label: tz.label || tz.name }));
+    return list.map((o) => ({
+        ...o,
+        label: o.value === 'Asia/Manila' ? o.label : `${o.label} (Coming soon)`,
+        disabled: o.value !== 'Asia/Manila',
     }));
 });
 

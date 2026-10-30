@@ -65,7 +65,8 @@ class RegisteredUserController extends Controller
 
                 $domain = Domain::create([
                     'name' => $domainName,
-                    'timezone' => $request->input('timezone') ?: 'Asia/Manila',
+                    // The Philippines for now; other timezones are coming soon.
+                    'timezone' => 'Asia/Manila',
                     'country_code' => strtoupper($request->input('country_code') ?: 'PH'),
                     'is_active' => true,
                     // What they sell presets the product form (Settings → Business type); none means retail.

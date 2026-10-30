@@ -194,13 +194,14 @@ const submit = () => {
                                 v-model="form.timezone"
                                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition bg-white"
                             >
+                                <!-- The Philippines for now; the others are coming soon. -->
                                 <option value="Asia/Manila">Asia/Manila</option>
-                                <option value="UTC">UTC</option>
-                                <option value="America/New_York">
-                                    America/New_York
+                                <option value="UTC" disabled>UTC (Coming soon)</option>
+                                <option value="America/New_York" disabled>
+                                    America/New_York (Coming soon)
                                 </option>
-                                <option value="Asia/Singapore">
-                                    Asia/Singapore
+                                <option value="Asia/Singapore" disabled>
+                                    Asia/Singapore (Coming soon)
                                 </option>
                             </select>
                             <InputError

@@ -73,7 +73,9 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
+    // Philippines for now: business days start at midnight Manila time. Saved times were moved
+    // from UTC by the 2026_10_30 migration. Other timezones are "coming soon".
+    'timezone' => env('APP_TIMEZONE', 'Asia/Manila'),
 
     /*
     |--------------------------------------------------------------------------

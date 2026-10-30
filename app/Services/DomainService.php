@@ -82,7 +82,7 @@ class DomainService
         return [
             'name' => 'required|string|max:255',
             'name_slug' => 'required|string|max:255|unique:domains,name_slug',
-            'timezone' => 'required|string|max:50',
+            'timezone' => 'required|string|in:'.implode(',', self::SUPPORTED_TIMEZONES),
             'country_code' => 'required|string|size:2',
             'currency_code' => 'required|string|size:3',
             'date_format' => 'required|string|max:20',
@@ -100,7 +100,7 @@ class DomainService
         return [
             'name' => 'required|string|max:255',
             'name_slug' => 'required|string|max:255|unique:domains,name_slug,' . $domain->id,
-            'timezone' => 'required|string|max:50',
+            'timezone' => 'required|string|in:'.implode(',', self::SUPPORTED_TIMEZONES),
             'country_code' => 'required|string|size:2',
             'currency_code' => 'required|string|size:3',
             'date_format' => 'required|string|max:20',
@@ -113,6 +113,9 @@ class DomainService
     /**
      * Get available timezones
      */
+    /** Timezones a business can use now: the Philippines. The others in the list are coming soon. */
+    public const SUPPORTED_TIMEZONES = ['Asia/Manila'];
+
     public function getAvailableTimezones(): array
     {
         return [
