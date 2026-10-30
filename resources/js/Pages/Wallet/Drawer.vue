@@ -424,10 +424,11 @@ onBeforeUnmount(() => {
                     </div>
                     <div class="flex flex-col gap-3">
                         <div v-for="shift in overdueShifts" :key="shift.id" class="rounded-lg border border-amber-200 bg-amber-50/50 p-3" :data-testid="`overdue-shift-${shift.id}`">
-                            <div class="flex items-start justify-between gap-2">
-                                <a-button type="link" class="h-auto !px-0 text-sm font-medium" @click="viewingShift = shift">{{ shift.user?.name ?? "—" }}</a-button>
-                                <a-tag color="orange" class="m-0">Overdue since {{ overdueDay(shift) }}</a-tag>
-                            </div>
+                            <!-- Stacked: a long name wraps in the narrow panel instead of running into the tag. -->
+                            <a-button type="link" class="block h-auto max-w-full whitespace-normal break-words !p-0 text-left text-sm font-medium" @click="viewingShift = shift">
+                                {{ shift.user?.name ?? "—" }}
+                            </a-button>
+                            <a-tag color="orange" class="m-0 mt-1">Overdue since {{ overdueDay(shift) }}</a-tag>
                             <div class="mt-1 text-xs text-gray-600">Still open. Expected in the tray: {{ money(shift.expected_cash) }}.</div>
                             <a-button
                                 v-if="canEndForOthers"
@@ -456,14 +457,13 @@ onBeforeUnmount(() => {
                             class="rounded-lg border border-red-100 bg-red-50/40 p-3"
                             :data-testid="`required-action-${shift.id}`"
                         >
-                            <div class="flex items-start justify-between gap-2">
-                                <div class="min-w-0">
-                                    <a-button type="link" class="h-auto !px-0 text-sm font-medium" @click="viewingShift = shift">{{ shift.user?.name ?? "—" }}</a-button>
-                                    <div class="text-xs text-gray-500">{{ dayjs(shift.business_date).format("MMM D") }} · ended {{ shift.closed_at ? dayjs(shift.closed_at).format("h:mm A") : "" }}</div>
-                                </div>
-                                <span v-if="shortOver(shift.variance)" class="shrink-0 font-mono text-sm font-semibold tabular-nums" :class="TONE_CLASSES[shortOver(shift.variance).tone]">
-                                    {{ shortOver(shift.variance).label }} {{ money(shortOver(shift.variance).amount) }}
-                                </span>
+                            <!-- Stacked: a long name wraps in the narrow panel instead of running into the amount. -->
+                            <a-button type="link" class="block h-auto max-w-full whitespace-normal break-words !p-0 text-left text-sm font-medium" @click="viewingShift = shift">
+                                {{ shift.user?.name ?? "—" }}
+                            </a-button>
+                            <div class="text-xs text-gray-500">{{ dayjs(shift.business_date).format("MMM D") }} · ended {{ shift.closed_at ? dayjs(shift.closed_at).format("h:mm A") : "" }}</div>
+                            <div v-if="shortOver(shift.variance)" class="mt-1 font-mono text-sm font-semibold tabular-nums" :class="TONE_CLASSES[shortOver(shift.variance).tone]">
+                                {{ shortOver(shift.variance).label }} {{ money(shortOver(shift.variance).amount) }}
                             </div>
                             <div class="mt-1 text-xs text-gray-600">Counted {{ money(shift.counted_cash) }} of {{ money(shift.expected_cash) }} expected.</div>
                             <div class="mt-2">

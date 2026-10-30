@@ -1,0 +1,7 @@
+.env
+node_modules/
+out/
+clips/*.webm
+audio/scene-*/
+audio/gap.wav
+audio/list.txt
