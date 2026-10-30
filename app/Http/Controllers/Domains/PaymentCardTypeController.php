@@ -26,10 +26,9 @@ class PaymentCardTypeController extends Controller
     {
         $query = $request->query();
 
+        // Every peso across the business: Cash in & out's All places.
         if (($query['view'] ?? null) === 'all') {
-            unset($query['view']);
-
-            return redirect()->route('domains.wallet.balances', ['domain' => $domain, ...$query, 'tab' => 'all']);
+            return redirect()->route('domains.wallet.cash-in-out', ['domain' => $domain, ...$query]);
         }
 
         $ledgerFilters = ['date_from', 'date_to', 'kind', 'rail', 'payment_card_type_id', 'page'];

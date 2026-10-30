@@ -7,7 +7,7 @@ import BillCounter from "./BillCounter.vue";
 
 /**
  * End a shift in one step: count the cash and add any expenses paid from the drawer during it.
- * No manager's PIN: a count that is off goes to a manager on Counted money. Ending the store's
+ * No manager's PIN: a count that is off goes to a manager on Shifts & counts. Ending the store's
  * day also says where the cash goes: taken out, or left in the drawer as the next opening.
  * In pesos the cash can be counted bill by bill (BillCounter); only the total is saved. A spot
  * check earlier in the day fills the count in.
@@ -23,6 +23,8 @@ const props = defineProps({
     showExpected: { type: Boolean, default: true },
     /** The cashier's own shift: no "where the cash goes" choice, that is the store's day. */
     ownShift: { type: Boolean, default: false },
+    /** Ending someone else's shift (a manager, for a forgotten one): their name for the title. */
+    forName: { type: String, default: null },
 });
 const emit = defineEmits(["close", "end"]);
 const { formattedTotal } = useHelpers();
@@ -71,7 +73,7 @@ function submit() {
 </script>
 
 <template>
-    <a-modal :visible="open" :title="ownShift ? 'End my shift' : 'End the store\'s day'" :width="560" destroy-on-close @cancel="emit('close')">
+    <a-modal :visible="open" :title="forName ? `End ${forName}'s shift` : ownShift ? 'End my shift' : 'End the store\'s day'" :width="560" destroy-on-close @cancel="emit('close')">
         <div class="flex flex-col gap-4 pt-1">
             <div>
                 <label class="mb-1 block text-sm font-medium text-gray-700">{{ ownShift ? "Cash in your drawer" : "Final count" }}</label>

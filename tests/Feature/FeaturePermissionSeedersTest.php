@@ -10,6 +10,7 @@ use Database\Seeders\FinancePermissionSeeder;
 use Database\Seeders\ProductModifierPermissionSeeder;
 use Database\Seeders\PurchasingPermissionSeeder;
 use Database\Seeders\RegisterShiftPermissionSeeder;
+use Database\Seeders\ShiftSpotCheckPermissionSeeder;
 use Database\Seeders\SalesHistoryPermissionSeeder;
 use Database\Seeders\SalesImportPermissionSeeder;
 use Database\Seeders\ShiftReopenPermissionSeeder;
@@ -158,7 +159,25 @@ class FeaturePermissionSeedersTest extends TestCase
         // register-shifts.show opens with register-shifts.index (RoutePermission::ALIASES).
         $this->assertSame(
             $this->sorted(array_values(array_diff($routes, ['register-shifts.show']))),
-            $this->sorted([...RegisterShiftPermissionSeeder::TILL_ROUTES, ...RegisterShiftPermissionSeeder::REVIEW_ROUTES]),
+            $this->sorted([...RegisterShiftPermissionSeeder::TILL_ROUTES, ...RegisterShiftPermissionSeeder::REVIEW_ROUTES, ...ShiftSpotCheckPermissionSeeder::ROUTES]),
+        );
+    }
+
+    public function test_everyone_on_the_till_can_spot_check_a_drawer(): void
+    {
+        $roles = array_map(fn ($name) => $this->role($name), ['cashier', 'supervisor', 'manager', 'admin']);
+
+        $this->seed(ShiftSpotCheckPermissionSeeder::class);
+        $this->seed(ShiftSpotCheckPermissionSeeder::class);
+
+        // Their own tray; whose else's they may check is the service's rule (supervisors and up).
+        foreach ($roles as $role) {
+            $this->assertContains('register-shifts.spot-check', $this->routesOf($role));
+        }
+        $this->assertSame(1, Permission::query()->where('route_name', 'register-shifts.spot-check')->count());
+        $this->assertSame(
+            DB::table('permission_modules')->where('name', 'register-shifts')->value('id'),
+            Permission::query()->where('route_name', 'register-shifts.spot-check')->value('module_id'),
         );
     }
 

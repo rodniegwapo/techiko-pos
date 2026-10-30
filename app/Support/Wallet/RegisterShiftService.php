@@ -15,6 +15,7 @@ use App\Models\WalletShiftReopenLog;
 use App\Services\ExpenseService;
 use App\Support\FinanceAccess;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -262,6 +263,57 @@ class RegisterShiftService
         });
     }
 
+    /**
+     * A spot check of your own tray during your shift: counted against the shift's Expected now, kept
+     * with the shift's counts. It doesn't end the shift or touch the store's count. Always your own
+     * drawer, owners and admins too: that is the cash that gets collected.
+     */
+    public function spotCheck(RegisterShift $shift, User $actor, float $counted, ?string $note = null): WalletCashCountSubmission
+    {
+        if (! $shift->isOpen()) {
+            throw ValidationException::withMessages(['shift' => 'Only a shift that is still open can be spot checked.']);
+        }
+        if ((int) $shift->user_id !== (int) $actor->id) {
+            throw ValidationException::withMessages(['shift' => 'You can only spot check your own drawer.']);
+        }
+
+        $expected = $this->figures($shift)['expected_cash'];
+        $counted = round($counted, 2);
+
+        return WalletCashCountSubmission::query()->create([
+            'domain' => $shift->domain,
+            'location_id' => $shift->location_id,
+            'kind' => WalletCashCountSubmission::SPOT_CHECK,
+            'reconciliation_id' => WalletCashReconciliation::query()
+                ->forWalletContext($shift->domain, (int) $shift->location_id)
+                ->whereDate('business_date', $shift->business_date)
+                ->value('id'),
+            'register_shift_id' => $shift->id,
+            'business_date' => $shift->business_date->toDateString(),
+            'counted_cash' => $counted,
+            'expected_cash_snapshot' => $expected,
+            'variance_snapshot' => round($counted - $expected, 2),
+            'notes' => filled($note) ? trim($note) : null,
+            'counted_by' => $actor->id,
+            'counted_at' => now(),
+        ]);
+    }
+
+    /** The shift's latest spot check, for the drawer page: null when it had none. */
+    public static function lastSpotCheck(RegisterShift $shift): ?array
+    {
+        $row = $shift->countSubmissions()->where('kind', WalletCashCountSubmission::SPOT_CHECK)
+            ->with('countedBy:id,name')->latest('counted_at')->latest('id')->first();
+
+        return $row ? [
+            'counted_cash' => (float) $row->counted_cash,
+            'expected_cash' => (float) $row->expected_cash_snapshot,
+            'variance' => (float) $row->variance_snapshot,
+            'at' => $row->counted_at?->toIso8601String(),
+            'by' => $row->countedBy?->name,
+        ] : null;
+    }
+
     /** A manager signs off an ended shift's count (and the count row it came from). */
     public function approve(RegisterShift $shift, User $actor, ?string $note = null): RegisterShift
     {
@@ -281,10 +333,62 @@ class RegisterShiftService
                 'reviewed_at' => $now,
                 'review_note' => filled($note) ? trim($note) : null,
             ]);
-            $shift->countSubmissions()->latest('id')->first()?->update(['approved_by' => $actor->id, 'approved_at' => $now]);
+            // The count the shift ended with, not a spot check during it (older counts have no kind).
+            $shift->countSubmissions()
+                ->where(fn ($q) => $q->whereNull('kind')->orWhere('kind', '!=', WalletCashCountSubmission::SPOT_CHECK))
+                ->latest('id')->first()?->update(['approved_by' => $actor->id, 'approved_at' => $now]);
+            $this->bookCountDifference($shift, $actor);
 
             return $shift->refresh();
         });
+    }
+
+    /**
+     * An approved count that came out short or over is what's really in the drawer: the difference
+     * goes into the store's drawer as a correction, so its Expected holds what was counted (and
+     * collecting the whole count can't take it below zero). It isn't stamped to the shift, whose
+     * own Expected stays what it was. Nothing for a balanced count; once per shift (the note names
+     * it, so the catch-up command can tell it's there).
+     */
+    public function bookCountDifference(RegisterShift $shift, User $actor): ?WalletCashMovement
+    {
+        $variance = round((float) $shift->variance, 2);
+        if (abs($variance) < self::TOLERANCE) {
+            return null;
+        }
+
+        $who = $shift->user?->name ?? 'a cashier';
+
+        return WalletCashMovement::withoutEvents(fn () => WalletCashMovement::query()->create([
+            'domain' => $shift->domain,
+            'location_id' => $shift->location_id,
+            'payment_card_type_id' => null,
+            'direction' => $variance > 0 ? 'in' : 'out',
+            'amount' => abs($variance),
+            'kind' => 'adjustment',
+            'transfer_group' => (string) Str::uuid(),
+            'notes' => self::countDifferenceNote($shift, $who),
+            'movement_date' => self::drawerDateFor($shift),
+            'user_id' => $actor->id,
+        ]));
+    }
+
+    /** The note on a shift's count difference line; "shift #{id}" finds it again. */
+    public static function countDifferenceNote(RegisterShift $shift, string $who): string
+    {
+        return "Count difference on {$who}'s shift #{$shift->id}";
+    }
+
+    /**
+     * The day whose drawer holds a shift's cash: its own business day while that store day is still
+     * open; today once that day was ended and its cash carried into the next opening.
+     */
+    public static function drawerDateFor(RegisterShift $shift): string
+    {
+        $today = now()->toDateString();
+        $day = $shift->business_date->toDateString();
+
+        return $day < $today && ! WalletShiftGuard::isClosed($shift->domain, (int) $shift->location_id, $day) ? $day : $today;
     }
 
     public function hasShiftInReview(string $domainSlug, int $locationId, int $userId): bool

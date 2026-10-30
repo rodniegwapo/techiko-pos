@@ -246,8 +246,15 @@ class WalletCashMovementController extends Controller
         return $target;
     }
 
+    /** Each cashier counts their own tray when ending their shift; the store's whole drawer is a supervisor's and up. */
+    private function ensureOverseesDrawer(Request $request): void
+    {
+        abort_unless(FinanceAccess::canOverseeDrawer($request->user()), 403, 'Supervisors and managers set the opening and count the store\'s drawer. End your shift to count yours.');
+    }
+
     public function setOpeningCash(Request $request, Domain $domain)
     {
+        $this->ensureOverseesDrawer($request);
         $location = WalletLocationResolver::resolve($request, $domain);
 
         $validated = $request->validate([
@@ -271,6 +278,7 @@ class WalletCashMovementController extends Controller
 
     public function submitCountedCash(Request $request, Domain $domain)
     {
+        $this->ensureOverseesDrawer($request);
         $location = WalletLocationResolver::resolve($request, $domain);
 
         $validated = $request->validate([
@@ -298,7 +306,7 @@ class WalletCashMovementController extends Controller
         if (! FinanceAccess::canManage($request->user())) {
             throw ValidationException::withMessages(['end_shift_action' => 'A manager ends the store\'s day. End your own shift under My shift.']);
         }
-        $this->ensureNoShiftOpen($domain, $location);
+        $this->ensureNoShiftOpen($domain, $location, (string) $validated['business_date']);
 
         $closed = $this->closeShift($domain, $location, $validated, (int) $request->user()->id);
 
@@ -308,7 +316,7 @@ class WalletCashMovementController extends Controller
     /**
      * End the store's day in one step, from Today's drawer: any cash expenses paid from the drawer,
      * the count, and closing. A manager's job, once every cashier has ended their own shift (a
-     * cashier ends theirs with no PIN; a count that is off waits for review on Counted money).
+     * cashier ends theirs with no PIN; a count that is off waits for review on Shifts & counts).
      */
     public function closeShiftWithCount(Request $request, Domain $domain, ExpenseService $expenses)
     {
@@ -332,7 +340,7 @@ class WalletCashMovementController extends Controller
         if (! FinanceAccess::canManage($user)) {
             throw ValidationException::withMessages(['end_shift_action' => 'A manager ends the store\'s day. End your own shift under My shift.']);
         }
-        $this->ensureNoShiftOpen($domain, $location);
+        $this->ensureNoShiftOpen($domain, $location, (string) $validated['business_date']);
         if (! empty($validated['expenses']) && ! RouteFeature::allows($domain, 'expenses.store')) {
             throw ValidationException::withMessages(['expenses' => 'Expenses aren\'t part of this plan.']);
         }
@@ -360,10 +368,14 @@ class WalletCashMovementController extends Controller
     }
 
     /** The store's day ends after the cashiers' shifts: each one is counted on its own first. */
-    private function ensureNoShiftOpen(Domain $domain, InventoryLocation $location): void
+    /**
+     * A store's day ends after every shift of that day has ended. A shift forgotten from an earlier
+     * day doesn't hold up later days: it shows as overdue on Today's drawer, to be ended there.
+     */
+    private function ensureNoShiftOpen(Domain $domain, InventoryLocation $location, string $businessDate): void
     {
         $open = RegisterShift::query()->forWalletContext($domain->name_slug, (int) $location->id)
-            ->open()->with('user:id,name')->get();
+            ->open()->whereDate('business_date', '>=', $businessDate)->with('user:id,name')->get();
         if ($open->isNotEmpty()) {
             throw ValidationException::withMessages([
                 'end_shift_action' => 'Still on shift: '.$open->map(fn ($s) => $s->user?->name ?? 'a cashier')->join(', ').'. Each ends their shift first.',

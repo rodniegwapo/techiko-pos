@@ -20,6 +20,7 @@ use App\Support\Wallet\CashControlSnapshot;
 use App\Support\Wallet\CashOnHand;
 use Database\Seeders\CashOnHandPermissionSeeder;
 use Database\Seeders\ProductSoldTypeSeeder;
+use Database\Seeders\RegisterShiftPermissionSeeder;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -169,6 +170,55 @@ class CashOnHandTest extends TestCase
             WalletCashMovement::query()->where('transfer_group', $line->transfer_group)->value('kind'));
     }
 
+    private function drawerOn(string $date): float
+    {
+        return (float) CashControlSnapshot::build($this->domain, $this->store, $date, (int) $this->owner->id)['expected_cash'];
+    }
+
+    private function collectedLine(RegisterShift $shift): WalletCashMovement
+    {
+        $group = CashOnHandMovement::query()->where('register_shift_id', $shift->id)->value('transfer_group');
+
+        return WalletCashMovement::query()->where('transfer_group', $group)->where('kind', WalletCashMovement::KIND_TO_CASH_ON_HAND)->sole();
+    }
+
+    public function test_an_earlier_days_shift_leaves_that_days_drawer_not_todays(): void
+    {
+        // Counted three days ago; that day was never ended, so its cash is still that day's.
+        $then = now()->subDays(3)->toDateString();
+        $this->travelTo(now()->subDays(3));
+        $shift = $this->approvedShift(3);
+        $this->travelBack();
+        $todayBefore = $this->drawer();
+        $thenBefore = $this->drawerOn($then);
+
+        $this->collect($this->owner, $shift, 500)->assertSessionHasNoErrors();
+
+        $this->assertSame($then, $this->collectedLine($shift)->movement_date->toDateString());
+        $this->assertEquals($todayBefore, $this->drawer(), 'today\'s drawer never held it');
+        $this->assertEquals(round($thenBefore - 500, 2), $this->drawerOn($then));
+        // Cash on hand receives it today.
+        $this->assertSame(now()->toDateString(), CashOnHandMovement::query()->where('register_shift_id', $shift->id)->sole()->movement_date->toDateString());
+    }
+
+    public function test_an_earlier_days_shift_whose_day_was_carried_forward_leaves_todays_drawer(): void
+    {
+        $then = now()->subDays(3)->toDateString();
+        $this->travelTo(now()->subDays(3));
+        $shift = $this->approvedShift(3);
+        // The store's day was ended, its cash left as the next shift's opening: it moved forward.
+        $this->actingAs($this->manager)->post($this->url('wallet-cash-ledger.close-shift'), [
+            'business_date' => $then, 'counted_cash' => 500, 'end_shift_action' => 'save_as_opening_cash', 'location_id' => $this->store->id,
+        ])->assertSessionHasNoErrors();
+        $this->travelBack();
+        $todayBefore = $this->drawer();
+
+        $this->collect($this->owner, $shift, 500)->assertSessionHasNoErrors();
+
+        $this->assertSame(now()->toDateString(), $this->collectedLine($shift)->movement_date->toDateString());
+        $this->assertEquals(round($todayBefore - 500, 2), $this->drawer());
+    }
+
     public function test_a_shift_is_collected_once_by_an_owner_and_never_more_than_counted(): void
     {
         $this->actingAs($this->cashier)->post($this->url('register-shifts.start'), ['location_id' => $this->store->id, 'opening_cash' => 100]);
@@ -261,14 +311,13 @@ class CashOnHandTest extends TestCase
                 ->where('lines.data.0.kind', CashOnHandMovement::COLLECTED)
                 ->where('lines.data.0.balance_after', 400));
 
-        // Counted money shows who collected it, and no Collect button any more (the admin role has
-        // Cash on hand's permissions once its seeder ran).
+        // Shifts & counts shows who collected it; collecting itself is on Cash on hand only.
         $this->seed(CashOnHandPermissionSeeder::class);
+        $this->seed(RegisterShiftPermissionSeeder::class);
         $this->actingAs($this->owner)->get($this->url('register-shifts.index', ['status' => 'approved', 'location_id' => $this->store->id]))
             ->assertInertia(fn (Assert $page) => $page
-                ->where('canCollect', true)
-                ->where('shifts.data.0.collected_by', $this->owner->name)
-                ->where('shifts.data.0.collectable', false));
+                ->missing('canCollect')
+                ->where('shifts.data.0.collected_by', $this->owner->name));
     }
 
     public function test_stores_transfer_money_only_when_both_have_the_switch_on(): void

@@ -17,7 +17,7 @@ use Inertia\Inertia;
 
 /**
  * Cash on hand: where the business's cash is once the owner has it. The owner collects approved
- * shifts here (or from Counted money), moves cash back to a store, and records what they kept for
+ * shifts here (the one place to collect), moves cash back to a store, and records what they kept for
  * themselves. Owners and admins only (the routes' permissions, and CashOnHand checks again).
  */
 class CashOnHandController extends Controller
@@ -73,6 +73,11 @@ class CashOnHandController extends Controller
         return Inertia::render('Wallet/CashOnHand', [
             'balance' => CashOnHand::balance($slug),
             'waiting' => CashOnHand::waitingToCollect($slug),
+            // Today at a glance: what came in from the drawers, and what went back out to the stores.
+            'today' => [
+                'collected' => CashOnHand::collectedOn($slug, now()->toDateString()),
+                'moved_to_stores' => CashOnHand::movedToStoresOn($slug, now()->toDateString()),
+            ],
             'lines' => $lines,
             // Where "Move to a store" can go: a store's drawer or one of its payment channels.
             'stores' => $stores->map(fn (InventoryLocation $s) => [

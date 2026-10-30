@@ -18,7 +18,7 @@ use Illuminate\Http\Request;
 class StoresCash
 {
     /**
-     * @param  int|null  $locationId  One store only (its Drawer history); all stores when null.
+     * @param  int|null  $locationId  One store only (its store counts on Shifts & counts); all stores when null.
      * @return array<string, mixed>
      */
     public static function build(Request $request, Domain $domain, ?int $locationId = null): array

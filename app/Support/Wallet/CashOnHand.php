@@ -31,6 +31,24 @@ class CashOnHand
         return round((float) $sum, 2);
     }
 
+    /** What the owner moved from Cash on hand back to the stores on a day (every store). */
+    public static function movedToStoresOn(string $domainSlug, string $date): float
+    {
+        return round((float) CashOnHandMovement::query()->forDomain($domainSlug)
+            ->where('kind', CashOnHandMovement::TO_STORE)
+            ->whereDate('movement_date', $date)
+            ->sum('amount'), 2);
+    }
+
+    /** What was collected into Cash on hand from the stores' drawers on a day (every store). */
+    public static function collectedOn(string $domainSlug, string $date): float
+    {
+        return round((float) CashOnHandMovement::query()->forDomain($domainSlug)
+            ->where('kind', CashOnHandMovement::COLLECTED)
+            ->whereDate('movement_date', $date)
+            ->sum('amount'), 2);
+    }
+
     /**
      * What the owner kept for themselves out of Cash on hand ("Owner used it"), between two dates
      * or ever: the owner withdrawals that don't come straight from a drawer.
@@ -62,8 +80,11 @@ class CashOnHand
     }
 
     /**
-     * The owner collects an approved shift's cash from the store's drawer: it leaves the drawer
-     * today and joins Cash on hand. Once per shift; up to what was counted.
+     * The owner collects an approved shift's cash from the store's drawer and it joins Cash on hand
+     * today. It leaves the drawer of the day it was counted on: a shift from an earlier day whose
+     * day is still open has its cash there, not in today's drawer. (When that day was ended and
+     * its cash carried into the next opening, it leaves today's.) Once per shift; up to what was
+     * counted.
      */
     public function collectShift(Domain $domain, RegisterShift $shift, User $actor, float $amount, ?string $note = null): CashOnHandMovement
     {
@@ -92,7 +113,7 @@ class CashOnHand
             $who = $shift->user?->name ?? 'a cashier';
             $text = fn (string $line) => Str::limit($line.(filled($note) ? ': '.trim($note) : ''), 2000);
 
-            $this->storeLine($domain, $store, null, 'out', $amount, WalletCashMovement::KIND_TO_CASH_ON_HAND, $group, $text("To Cash on hand ({$who}'s shift)"), $today, $actor);
+            $this->storeLine($domain, $store, null, 'out', $amount, WalletCashMovement::KIND_TO_CASH_ON_HAND, $group, $text("To Cash on hand ({$who}'s shift)"), RegisterShiftService::drawerDateFor($shift), $actor);
             $line = CashOnHandMovement::query()->create([
                 'domain' => $domain->name_slug,
                 'direction' => 'in',

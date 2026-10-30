@@ -119,10 +119,10 @@ watch(
 
 function visit(overrides = {}) {
     router.get(
-        getRoute("wallet.balances"),
+        getRoute("wallet.cash-in-out"),
         {
             ...props.keepQuery,
-            tab: "all",
+            view: "all",
             date_from: filterForm.date_from || undefined,
             date_to: filterForm.date_to || undefined,
             direction: filterForm.direction || undefined,

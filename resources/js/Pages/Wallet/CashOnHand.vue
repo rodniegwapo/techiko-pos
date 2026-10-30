@@ -18,6 +18,8 @@ const props = defineProps({
     balance: { type: Number, default: 0 },
     /** Approved shifts not collected yet (toRow, plus store and location_id). */
     waiting: { type: Array, default: () => [] },
+    /** { collected, moved_to_stores } today, every store. */
+    today: { type: Object, default: () => ({ collected: 0, moved_to_stores: 0 }) },
     lines: { type: Object, required: true },
     /** [{ id, name, channels: [{ id, name }] }]: where "Move to a store" can go. */
     stores: { type: Array, default: () => [] },
@@ -30,6 +32,24 @@ const money = (v) => formattedTotal(Number(v) || 0);
 
 const collecting = ref(null);
 const waitingTotal = computed(() => props.waiting.reduce((sum, s) => sum + (Number(s.counted_cash) || 0), 0));
+// Waiting to collect, by store: how many approved shifts and how much is ready; open a store for its shifts.
+const waitingByStore = computed(() => {
+    const stores = new Map();
+    for (const s of props.waiting) {
+        const key = s.location_id ?? s.store;
+        if (!stores.has(key)) stores.set(key, { key, name: s.store ?? "—", shifts: [], ready: 0 });
+        const row = stores.get(key);
+        row.shifts.push(s);
+        row.ready = Math.round((row.ready + (Number(s.counted_cash) || 0)) * 100) / 100;
+    }
+    return [...stores.values()].sort((a, b) => a.name.localeCompare(b.name));
+});
+// Every store starts open; collapse the ones you're done with.
+const closedStores = ref([]);
+const isOpenStore = (key) => !closedStores.value.includes(key);
+const toggleStore = (key) => {
+    closedStores.value = isOpenStore(key) ? [...closedStores.value, key] : closedStores.value.filter((k) => k !== key);
+};
 
 // Move to a store, Owner used it, or a correction.
 const ACTIONS = {
@@ -104,13 +124,12 @@ function changePage(p) {
 
 <template>
     <WalletLayout title="Cash on hand" active="cash-on-hand">
-        <div class="mb-5 grid gap-4 md:grid-cols-3">
-            <div class="rounded-lg border border-gray-200 bg-white p-4 md:col-span-1" data-testid="cash-on-hand-balance">
-                <div class="text-xs uppercase text-gray-500">Cash on hand</div>
+        <!-- Every store's, at a glance -->
+        <div class="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm" data-testid="cash-on-hand-balance">
+                <div class="text-xs font-medium uppercase text-gray-500">Cash on hand</div>
                 <div class="font-mono text-2xl font-semibold tabular-nums text-gray-900">{{ money(balance) }}</div>
-                <p class="mb-0 mt-1 text-xs text-gray-500">
-                    The business's cash the owner collected from the drawers. It's still the business's money, only somewhere else.
-                </p>
+                <p class="mb-0 mt-1 text-xs text-gray-500">All stores: the business's cash collected from the drawers.</p>
                 <div class="mt-3 flex flex-wrap gap-2">
                     <a-button type="primary" size="small" :disabled="balance <= 0" data-testid="cash-on-hand-to-store" @click="open('to_store')">
                         Move to a store
@@ -119,27 +138,60 @@ function changePage(p) {
                     <a-button size="small" data-testid="cash-on-hand-adjust" @click="open('adjustment')">Correction</a-button>
                 </div>
             </div>
+            <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm" data-testid="cash-on-hand-collected-today">
+                <div class="text-xs font-medium uppercase text-gray-500">Collected today</div>
+                <div class="font-mono text-2xl font-semibold tabular-nums text-gray-900">{{ money(today.collected) }}</div>
+                <p class="mb-0 mt-1 text-xs text-gray-500">From the stores' drawers</p>
+            </div>
+            <div class="rounded-lg border p-4 shadow-sm" :class="waiting.length ? 'border-amber-200 bg-amber-50' : 'border-gray-200 bg-white'" data-testid="cash-on-hand-waiting-total">
+                <div class="text-xs font-medium uppercase" :class="waiting.length ? 'text-amber-800' : 'text-gray-500'">Waiting to collect</div>
+                <div class="font-mono text-2xl font-semibold tabular-nums text-gray-900">{{ money(waitingTotal) }}</div>
+                <p class="mb-0 mt-1 text-xs text-gray-500">{{ waiting.length }} approved shift(s)</p>
+            </div>
+            <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm" data-testid="cash-on-hand-moved-today">
+                <div class="text-xs font-medium uppercase text-gray-500">Moved to stores today</div>
+                <div class="font-mono text-2xl font-semibold tabular-nums text-gray-900">{{ money(today.moved_to_stores) }}</div>
+                <p class="mb-0 mt-1 text-xs text-gray-500">Back into drawers or channels</p>
+            </div>
+        </div>
 
-            <div class="rounded-lg border border-gray-200 bg-white p-4 md:col-span-2" data-testid="cash-on-hand-waiting">
-                <div class="mb-2 flex items-baseline justify-between gap-2">
-                    <div class="text-sm font-semibold text-gray-800">Waiting to collect</div>
-                    <div v-if="waiting.length" class="text-xs text-gray-500">{{ waiting.length }} shift(s), {{ money(waitingTotal) }} counted</div>
-                </div>
-                <p v-if="!waiting.length" class="m-0 text-sm text-gray-500">Nothing to collect: approved shifts show here until you collect them.</p>
-                <div
-                    v-for="s in waiting"
-                    :key="s.id"
-                    class="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 py-2 text-sm"
-                    :data-testid="`waiting-shift-${s.id}`"
+        <!-- Waiting to collect, store by store -->
+        <div class="mb-5 rounded-lg border border-gray-200 bg-white shadow-sm" data-testid="cash-on-hand-waiting">
+            <div class="flex items-baseline justify-between gap-2 border-b border-gray-100 px-4 py-3">
+                <div class="text-sm font-semibold text-gray-800">Waiting to collect, by store</div>
+                <div v-if="waiting.length" class="text-xs text-gray-500">{{ waiting.length }} shift(s), {{ money(waitingTotal) }} counted</div>
+            </div>
+            <p v-if="!waiting.length" class="m-0 px-4 py-3 text-sm text-gray-500">Nothing to collect: approved shifts show here until you collect them.</p>
+            <div v-for="store in waitingByStore" :key="store.key" class="border-b border-gray-100 last:border-b-0" :data-testid="`waiting-store-${store.key}`">
+                <button
+                    type="button"
+                    class="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm hover:bg-gray-50"
+                    :data-testid="`waiting-store-toggle-${store.key}`"
+                    @click="toggleStore(store.key)"
                 >
-                    <span>
-                        <b>{{ s.store }}</b> · {{ s.user?.name }} · {{ dayjs(s.business_date).format("MMM D") }}
-                        <span class="text-xs text-gray-500">approved<template v-if="s.reviewed_by"> by {{ s.reviewed_by }}</template></span>
+                    <span class="flex items-center gap-2">
+                        <span class="text-gray-400">{{ isOpenStore(store.key) ? "▾" : "▸" }}</span>
+                        <b>{{ store.name }}</b>
+                        <span class="text-xs text-gray-500">{{ store.shifts.length }} approved shift(s)</span>
                     </span>
-                    <span class="flex items-center gap-3">
-                        <span class="font-mono tabular-nums">{{ money(s.counted_cash) }}</span>
-                        <a-button size="small" type="primary" :data-testid="`collect-shift-${s.id}`" @click="collecting = s">Collect</a-button>
-                    </span>
+                    <span class="font-mono font-semibold tabular-nums">{{ money(store.ready) }} ready</span>
+                </button>
+                <div v-if="isOpenStore(store.key)" class="bg-gray-50/60 px-4 pb-2">
+                    <div
+                        v-for="s in store.shifts"
+                        :key="s.id"
+                        class="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 py-2 text-sm"
+                        :data-testid="`waiting-shift-${s.id}`"
+                    >
+                        <span>
+                            {{ s.user?.name }} · {{ dayjs(s.business_date).format("MMM D") }}
+                            <span class="text-xs text-gray-500">approved<template v-if="s.reviewed_by"> by {{ s.reviewed_by }}</template></span>
+                        </span>
+                        <span class="flex items-center gap-3">
+                            <span class="font-mono tabular-nums">{{ money(s.counted_cash) }}</span>
+                            <a-button size="small" type="primary" :data-testid="`collect-shift-${s.id}`" @click="collecting = s">Collect</a-button>
+                        </span>
+                    </div>
                 </div>
             </div>
         </div>

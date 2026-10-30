@@ -18,7 +18,7 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * A cashier's own shift: start it, end it with a count (no manager's PIN; a count that is off waits
- * for review), reopen it with a reason. Managers approve counts on Counted money and see who holds
+ * for review), reopen it with a reason. Managers approve counts on Today's drawer or Shifts & counts and see who holds
  * what (View details).
  */
 class RegisterShiftController extends Controller
@@ -61,6 +61,19 @@ class RegisterShiftController extends Controller
         return redirect()->back()->with('success', $shift->status === RegisterShift::NEEDS_REVIEW
             ? 'Shift ended. The count is off from Expected, so a manager will review it.'
             : 'Shift ended.');
+    }
+
+    public function spotCheck(Request $request, Domain $domain, RegisterShift $registerShift)
+    {
+        $this->ensureInDomain($request, $domain, $registerShift);
+        $validated = $request->validate([
+            'counted_cash' => ['required', 'numeric', 'min:0', 'max:99999999.99'],
+            'notes' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $this->shifts->spotCheck($registerShift, $request->user(), (float) $validated['counted_cash'], $validated['notes'] ?? null);
+
+        return redirect()->back()->with('success', 'Spot check saved.');
     }
 
     public function reopen(Request $request, Domain $domain, RegisterShift $registerShift)
@@ -124,6 +137,8 @@ class RegisterShiftController extends Controller
                     'expected_cash' => $c->expected_cash_snapshot,
                     'variance' => $c->variance_snapshot,
                     'notes' => $c->notes,
+                    // spot_check during the shift, or shift: the count it ended with.
+                    'kind' => $c->kind,
                     'counted_by' => $c->countedBy?->name,
                     'counted_at' => $c->counted_at?->toIso8601String(),
                     'approved_at' => $c->approved_at?->toIso8601String(),

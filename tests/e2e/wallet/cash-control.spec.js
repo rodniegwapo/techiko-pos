@@ -116,16 +116,10 @@ test.describe("Today's drawer", () => {
     });
 
     test.describe("counting cash", () => {
-        test("Save spot check is disabled until an amount is entered, and previews short or over", async ({ page }) => {
+        test("there is no whole-store spot check: each person checks their own drawer", async ({ page }) => {
             const { day } = dateWindow();
-            const drawer = await DrawerPage.open(page, day(0));
-            await drawer.setOpening(500);
-            const dialog = await drawer.openCountCash();
-
-            await expect(dialog.getByRole("button", { name: "Save spot check" })).toBeDisabled();
-            await numberInput(dialog, "count-amount").fill("450");
-            await expect(dialog.getByTestId("count-preview")).toHaveText(`Short ${money(50)}`);
-            await expect(dialog.getByRole("button", { name: "Save spot check" })).toBeEnabled();
+            await DrawerPage.open(page, day(0));
+            await expect(page.getByTestId("open-count-cash")).toHaveCount(0);
         });
 
         test("an empty drawer (zero) can be counted", async ({ page }) => {
@@ -147,7 +141,6 @@ test.describe("Today's drawer", () => {
             const res = await drawer.countCash(450, "Short by 50");
 
             expect(res.status()).toBeLessThan(400);
-            await expect(drawer.notice("Count saved.")).toBeVisible();
             await expect(drawer.counted).toHaveText(money(450));
             await expect(drawer.result).toHaveText(`Short ${money(50)}`);
 
@@ -315,7 +308,7 @@ test.describe("Today's drawer", () => {
             expect(res.status()).toBeLessThan(400);
             await expect(drawer.notice("Day reopened.")).toBeVisible();
             await expect(page.getByTestId("shift-open")).toBeVisible();
-            await expect(page.getByTestId("open-count-cash")).toBeVisible();
+            await expect(page.getByTestId("open-end-shift")).toBeVisible();
         });
     });
 });

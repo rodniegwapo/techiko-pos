@@ -304,10 +304,9 @@ test.describe("Several people on shift at the same store", () => {
         expect(e2 - e1, "the partner's opening reaches the store's Expected").toBe(300);
         expect(e3 - e2, "the cash in reaches the store's Expected").toBe(100);
 
-        // View details lists both people with what should be in their drawer.
+        // Today's drawer lists both people's shifts with what should be in their drawer.
         await DrawerPage.open(page);
-        await page.getByTestId("open-money-by-user").click();
-        const list = page.getByTestId("money-by-user");
+        const list = page.getByTestId("drawer-steps");
         await expect(list).toContainText(walletFixture(testInfo).cashierName);
         await expect(list).toContainText(walletFixture(testInfo).partnerName);
     });

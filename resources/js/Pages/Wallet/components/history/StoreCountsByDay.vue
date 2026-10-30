@@ -2,19 +2,17 @@
 import { computed, reactive } from "vue";
 import dayjs from "dayjs";
 import { useHelpers } from "@/Composables/useHelpers";
-import WalletLayout from "./components/WalletLayout.vue";
-import { shortOver, TONE_CLASSES, COUNT_KIND_LABELS } from "./components/walletLabels";
-import { useWalletQuery } from "./composables/useWalletQuery";
+import { shortOver, TONE_CLASSES, COUNT_KIND_LABELS } from "../walletLabels";
+import { useWalletQuery } from "../../composables/useWalletQuery";
 
 /**
- * Drawer history, for checking back: each count and opening change on a day, a check of the
- * drawer since its last count (across days), and the store's ended shifts.
+ * Store counts, on Shifts & counts, for checking back: each count and opening change on a day, a
+ * check of the drawer since its last count (across days), and the days the store ended.
  */
 const props = defineProps({
     cashControl: { type: Object, required: true },
     closedShifts: { type: Object, required: true },
     activeLocation: { type: Object, default: null },
-    canViewAllMoney: { type: Boolean, default: false },
 });
 
 const { formattedTotal } = useHelpers();
@@ -45,11 +43,11 @@ const shiftFilters = reactive({
     date_to: props.closedShifts.filters?.date_to ?? "",
 });
 const shiftRows = computed(() => props.closedShifts.rows ?? []);
-const showShifts = () => visit("wallet.history", { ...shiftFilters }, {}, { preserveState: true });
+const showShifts = () => visit("register-shifts.index", { view: "store", ...shiftFilters }, {}, { preserveState: true });
 </script>
 
 <template>
-    <WalletLayout title="Drawer history" active="history" :active-location="activeLocation">
+    <div data-testid="store-counts">
         <div class="mb-4 flex flex-wrap items-center gap-2">
             <span class="text-sm text-gray-600">Day</span>
             <a-date-picker
@@ -58,7 +56,7 @@ const showShifts = () => visit("wallet.history", { ...shiftFilters }, {}, { pres
                 :allow-clear="false"
                 :disabled-date="isFuture"
                 data-testid="history-date"
-                @change="(v) => v && visit('wallet.history', { business_date: v })"
+                @change="(v) => v && visit('register-shifts.index', { view: 'store', business_date: v })"
             />
         </div>
 
@@ -126,14 +124,14 @@ const showShifts = () => visit("wallet.history", { ...shiftFilters }, {}, { pres
 
         <section class="mt-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm" data-testid="history-shifts">
             <div class="mb-3 flex flex-wrap items-end justify-between gap-2">
-                <h3 class="m-0 text-sm font-semibold text-gray-800">Ended shifts</h3>
+                <h3 class="m-0 text-sm font-semibold text-gray-800">Days the store ended</h3>
                 <div class="flex flex-wrap items-end gap-2">
                     <a-date-picker v-model:value="shiftFilters.date_from" value-format="YYYY-MM-DD" placeholder="From" />
                     <a-date-picker v-model:value="shiftFilters.date_to" value-format="YYYY-MM-DD" placeholder="To" />
                     <a-button @click="showShifts">Show</a-button>
                 </div>
             </div>
-            <p v-if="!shiftRows.length" class="m-0 text-sm text-gray-500">No shifts ended in this period.</p>
+            <p v-if="!shiftRows.length" class="m-0 text-sm text-gray-500">No days ended in this period.</p>
             <div v-else class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead class="text-left text-xs uppercase text-gray-500">
@@ -161,5 +159,5 @@ const showShifts = () => visit("wallet.history", { ...shiftFilters }, {}, { pres
                 </table>
             </div>
         </section>
-    </WalletLayout>
+    </div>
 </template>

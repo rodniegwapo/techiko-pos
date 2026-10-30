@@ -6,7 +6,9 @@ import { message as antMessage } from "ant-design-vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 import { useHelpers } from "@/Composables/useHelpers";
-import { CHANNEL_KIND_LABELS } from "../walletLabels";
+import { CHANNEL_KIND_LABELS, PLACE_GROUPS } from "../walletLabels";
+import BalanceTotals from "./BalanceTotals.vue";
+import MoneyByPlaceTables from "./MoneyByPlaceTables.vue";
 
 /**
  * What the drawer and each payment channel hold now. The drawer shows today's Expected, the same
@@ -18,14 +20,20 @@ const props = defineProps({
     channels: { type: Array, default: () => [] },
     /** Today's Expected in the drawer. */
     drawerExpected: { type: Number, default: null },
+    /** Supervisors and up: the places as a table, by cashier (MoneyByPlace). Shown instead of the cards. */
+    moneyByPlace: { type: Object, default: null },
     activeLocationId: { type: Number, default: null },
+    activeLocation: { type: Object, default: null },
     isShiftClosed: { type: Boolean, default: false },
 });
-const emit = defineEmits(["count"]);
 
 const { getRoute } = useDomainRoutes();
 const { hasPermission } = usePermissionsV2();
 const { formattedTotal } = useHelpers();
+
+// Cards in the same order as the groups: the drawer, e-wallets, then banks and card terminals.
+const groupOrder = (kind) => PLACE_GROUPS.findIndex((g) => g.kinds.includes(kind));
+const orderedChannels = computed(() => [...props.channels].sort((a, b) => groupOrder(a.kind) - groupOrder(b.kind)));
 
 const canAdjust = computed(() => hasPermission("wallet-cash-ledger.store") && !props.isShiftClosed);
 
@@ -87,14 +95,21 @@ function saveAdjust() {
 
 <template>
     <div data-testid="channel-balances">
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <BalanceTotals :channels="channels" :drawer-expected="drawerExpected" />
+        <MoneyByPlaceTables
+            v-if="moneyByPlace"
+            :money-by-place="moneyByPlace"
+            :can-adjust="canAdjust"
+            :active-location="activeLocation"
+            @adjust="openAdjust"
+        />
+        <div v-else class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div v-if="drawerExpected !== null" class="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm" data-testid="drawer-balance">
                 <div class="flex items-start justify-between gap-2">
                     <div>
                         <div class="text-sm font-medium text-gray-700">Cash drawer</div>
                         <div class="text-xs text-gray-500">Expected today</div>
                     </div>
-                    <a-button size="small" type="link" class="!px-0" @click="emit('count')">Spot check</a-button>
                 </div>
                 <div
                     class="mt-1 font-mono text-lg font-bold tabular-nums"
@@ -105,7 +120,7 @@ function saveAdjust() {
                 </div>
             </div>
             <div
-                v-for="channel in channels"
+                v-for="channel in orderedChannels"
                 :key="channel.id"
                 class="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm"
                 :class="{ 'opacity-60': !channel.is_active }"

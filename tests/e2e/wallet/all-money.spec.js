@@ -18,11 +18,11 @@ async function pickOption(page, label) {
 }
 const input = (scope, testId) => scope.getByTestId(testId).locator("input").or(scope.getByTestId(testId)).first();
 
-// Where money is → "All money" lists money recorded outside the drawer too, read-only.
-test.describe("All money on Where money is as admin", () => {
+// Cash in & out → "All places" lists money recorded outside the drawer too, read-only.
+test.describe("All places on Cash in & out as admin", () => {
     test.use({ account: "admin" });
 
-    test("a bank expense shows under All money with its account, and the drawer view stays as it was", async ({ page }) => {
+    test("a bank expense shows under All places with its account, and This store stays as it was", async ({ page }) => {
         const stamp = Date.now();
         const account = `E2E Timeline Bank ${stamp}`;
         const description = `E2E timeline expense ${stamp}`;
@@ -48,9 +48,9 @@ test.describe("All money on Where money is as admin", () => {
         await page.getByTestId("expense-submit").click();
         await expect(page.getByTestId("expenses-table")).toContainText(description);
 
-        await page.goto(url("/wallet/balances"));
-        await expect(page.getByTestId("channel-balances")).toBeVisible();
-        await page.getByTestId("balances-tab-all").click();
+        await page.goto(url("/wallet/cash-in-out"));
+        await expect(page.getByTestId("cash-lines")).toBeVisible();
+        await page.getByTestId("cash-view-all").click();
 
         const table = page.getByTestId("all-money-table");
         const row = table.locator("tr", { hasText: description });
@@ -72,20 +72,24 @@ test.describe("All money on Where money is as admin", () => {
         await table.getByRole("link", { name: description }).click();
         await expect(page).toHaveURL(/\/expenses/);
 
-        // Back on Balances the drawer and channels show as before.
+        // The old All money link lands here; This store shows the store's own lines as before.
         await page.goto(url("/wallet/balances?tab=all"));
-        await page.getByTestId("balances-tab-balances").click();
-        await expect(page.getByTestId("channel-balances")).toBeVisible();
+        await expect(page).toHaveURL(/\/wallet\/cash-in-out\?.*view=all/);
+        await page.getByTestId("cash-view-store").click();
+        await expect(page.getByTestId("cash-lines")).toBeVisible();
         await expect(page.getByTestId("all-money")).toHaveCount(0);
+        // Where money is has no All money tab any more.
+        await page.goto(url("/wallet/balances"));
+        await expect(page.getByTestId("balances-tab-all")).toHaveCount(0);
     });
 });
 
-test.describe("All money on Where money is as cashier", () => {
+test.describe("All places as cashier", () => {
     test.use({ account: "cashier" });
 
-    test("has no All money switch", async ({ page }) => {
-        await page.goto(url("/wallet/balances?tab=all"));
-        await expect(page.getByTestId("balances-tab-all")).toHaveCount(0);
+    test("has no All places switch", async ({ page }) => {
+        await page.goto(url("/wallet/cash-in-out?view=all"));
+        await expect(page.getByTestId("cash-view-all")).toHaveCount(0);
         await expect(page.getByTestId("all-money")).toHaveCount(0);
     });
 });

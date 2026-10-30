@@ -117,7 +117,8 @@ const initializeMenuState = () => {
                 }
             } else if (item.routeName) {
                 const routePath = getRoute(item.routeName);
-                if (routePath && routePath === currentPath) {
+                // A group shown as one entry stays selected on any of its pages.
+                if ((routePath && routePath === currentPath) || (item.activePathPrefix && currentPath.includes(item.activePathPrefix))) {
                     return { item, parentKey };
                 }
             }

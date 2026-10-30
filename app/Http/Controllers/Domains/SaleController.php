@@ -128,10 +128,14 @@ class SaleController extends Controller
             ->where('user_id', $user->id)->where('status', RegisterShift::NEEDS_REVIEW)
             ->latest('closed_at')->first();
 
+        // Left open from an earlier day: it takes no new money until it's counted and ended.
+        $overdue = $mine !== null && $mine->business_date->toDateString() < $businessDate;
+
         return [
             // The store these answers are for: starting or reopening from this page acts on it too.
             'location_id' => $locationId,
-            'is_open' => $mine !== null && ! $isClosed,
+            'is_open' => $mine !== null && ! $isClosed && ! $overdue,
+            'overdue_since' => $overdue ? $mine->business_date->toDateString() : null,
             'is_closed' => $isClosed,
             'shift_id' => $mine?->id,
             'opened_at' => $mine?->opened_at?->toIso8601String(),

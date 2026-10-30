@@ -220,7 +220,7 @@
     },
     "Wallet/CashInOut": {
         "title": "Cash in & out",
-        "en": "Every peso put into or taken out of the cash drawer, like float added, the owner taking cash, or expenses paid in cash.",
+        "en": "Every peso put into or taken out of the cash drawer, like float added, the owner taking cash, or expenses paid in cash. Managers can switch to All places for every peso across the business.",
         "tl": "Bawat pisong inilagay o kinuha sa cash drawer, gaya ng dagdag na barya, perang kinuha ng may-ari, o gastos na binayaran ng cash.",
         "guides": [
             "cash-in-out"
@@ -240,21 +240,10 @@
             "How much is in GCash?"
         ]
     },
-    "Wallet/History": {
-        "title": "Drawer history",
-        "en": "Past cash counts, changes to opening cash, and ended shifts, for checking back when the drawer did not match.",
-        "tl": "Mga nakaraang bilang ng pera, pagbabago sa panimulang pera, at mga isinarang shift, para masilip kapag hindi tugma ang drawer.",
-        "guides": [
-            "end-shift"
-        ],
-        "ask": [
-            "When was the drawer last short?"
-        ]
-    },
     "Wallet/Counts": {
-        "title": "Counted money",
-        "en": "Each cashier's ended shift with their count and how far it was from Expected. Shifts that came out short or over wait here for a manager to look into and approve; the cashier can keep working meanwhile.",
-        "tl": "Bawat natapos na shift ng cashier, kasama ang bilang nila at kung gaano kalayo sa Expected. Ang mga kulang o sobra ay naghihintay dito para silipin at aprubahan ng manager; puwedeng magpatuloy ang cashier habang hinihintay.",
+        "title": "Shifts & counts",
+        "en": "Past shifts and counts. Cashier shifts: each shift with its count and how far it was from Expected; ones that came out short or over wait here for a manager to approve or send back for a recount. Store counts: the store's counts and opening changes by day, and the days it ended.",
+        "tl": "Mga nakaraang shift at bilang. Cashier shifts: bawat shift kasama ang bilang at kung gaano kalayo sa Expected; ang kulang o sobra ay naghihintay dito para aprubahan ng manager o ipabilang ulit. Store counts: ang mga bilang at pagbabago sa panimulang pera ng tindahan bawat araw, at ang mga araw na isinara.",
         "guides": [
             "end-shift"
         ],

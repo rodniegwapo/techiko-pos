@@ -19,13 +19,16 @@ class RoutePermission
     public const ALIASES = [
         // The wallet pages, split out of the old Money movement page.
         'wallet.drawer' => ['wallet.money-movement'],
-        // Past counts and their short/over: for those who keep the books, not the cashier.
+        // Drawer history is now Shifts & counts' store counts (it redirects there).
         'wallet.history' => ['wallet-cash-ledger.index'],
+        // Shifts & counts: cashier shifts (register-shifts.index) and the store's counts by day
+        // (for those who keep the books); each part shows with its own permission.
+        'register-shifts.index' => ['register-shifts.index', 'wallet-cash-ledger.index'],
         'wallet.cash-in-out' => ['wallet-cash-ledger.index'],
         'wallet.balances' => ['wallet-cash-ledger.index', 'payment-card-types.index'],
         // Ending the shift in one step (count + cash expenses + close) is ending the shift.
         'wallet-cash-ledger.close-shift' => ['wallet-cash-ledger.end-shift'],
-        // A shift's sales, cash lines and counts open from Counted money.
+        // A shift's sales, cash lines and counts open from Shifts & counts.
         'register-shifts.show' => ['register-shifts.index'],
         'payment-card-types.details' => ['payment-card-types.money'],
         'billing.gcash.legacy' => ['billing.servicing.index'],

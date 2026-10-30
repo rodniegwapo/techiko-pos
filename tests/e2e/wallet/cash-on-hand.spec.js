@@ -64,7 +64,7 @@ test("the owner collects an approved shift into Cash on hand and moves some back
     expect(await balanceNow(page)).toBe(before + 250);
     await expect(page.getByTestId("cash-on-hand-lines")).toContainText("Collected");
 
-    // Counted money says who collected it, and offers no second Collect.
+    // Shifts & counts says who collected it; collecting is on Cash on hand only.
     await page.goto(url("/wallet/shifts?status=approved"));
     await expect(page.getByTestId(`count-collected-${shiftId}`)).toContainText("Collected");
     await expect(page.getByTestId(`count-collect-${shiftId}`)).toHaveCount(0);

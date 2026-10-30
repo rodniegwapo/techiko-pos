@@ -367,6 +367,8 @@ Route::prefix('domains/{domain:name_slug}')
             Route::get('/{registerShift}', [RegisterShiftController::class, 'show'])->whereNumber('registerShift')->name('show');
             Route::post('/{registerShift}/end', [RegisterShiftController::class, 'end'])->whereNumber('registerShift')->name('end');
             Route::post('/{registerShift}/reopen', [RegisterShiftController::class, 'reopen'])->whereNumber('registerShift')->name('reopen');
+            // Count your own tray during your shift.
+            Route::post('/{registerShift}/spot-check', [RegisterShiftController::class, 'spotCheck'])->whereNumber('registerShift')->name('spot-check');
             Route::post('/{registerShift}/approve', [RegisterShiftController::class, 'approve'])->whereNumber('registerShift')->name('approve');
         });
 

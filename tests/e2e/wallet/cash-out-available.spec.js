@@ -6,7 +6,8 @@ test.use({ account: "wallet-manager" });
 
 test("cash out shows what the drawer holds and warns when the amount is more", async ({ page }) => {
     await page.goto(cashInOutUrl);
-    await page.getByTestId("add-cash-out").click();
+    await page.getByTestId("cash-movement").click();
+    await page.getByRole("dialog").getByTestId("add-cash-out").click();
 
     const available = page.getByTestId("cash-available");
     await expect(available).toContainText("Available in the drawer");
@@ -17,7 +18,7 @@ test("cash out shows what the drawer holds and warns when the amount is more", a
 
 test("cash in has nothing to take from, so shows no balance", async ({ page }) => {
     await page.goto(cashInOutUrl);
-    await page.getByTestId("add-cash-in").click();
+    await page.getByTestId("cash-movement").click();
     await expect(page.getByTestId("cash-amount")).toBeVisible();
     await expect(page.getByTestId("cash-available")).toHaveCount(0);
 });

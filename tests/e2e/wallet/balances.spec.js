@@ -29,8 +29,8 @@ test.describe("Where money is", () => {
         await page.goto(balancesUrl);
 
         await expect(page.getByTestId("drawer-balance-amount")).toHaveText(expected);
-        await page.getByTestId("drawer-balance").getByRole("button", { name: "Spot check" }).click();
-        await expect(page).toHaveURL(new RegExp("/wallet/drawer"));
+        // Spot checks are each person's own, on Today's drawer: no shortcut here.
+        await expect(page.getByTestId("drawer-balance").getByRole("button", { name: "Spot check" })).toHaveCount(0);
     });
 
     test("setting a channel's actual balance records the difference", async ({ page }, testInfo) => {

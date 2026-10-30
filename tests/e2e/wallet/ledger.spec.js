@@ -52,7 +52,7 @@ test.describe("Cash in & out", () => {
             const dialog = await cash.openDialog("in");
 
             await expect(dialog).toContainText("Cash in");
-            await expect(dialog.locator(".ant-radio-button-wrapper-checked")).toHaveText("Added float");
+            await expect(dialog.getByTestId("cash-type").locator(".ant-radio-button-wrapper-checked")).toHaveText("Added float");
             await expect(dialog.locator(".ant-picker input")).toHaveValue(todayYmd());
         });
 
@@ -61,7 +61,7 @@ test.describe("Cash in & out", () => {
             const cash = await CashInOutPage.open(page);
 
             const dialog = await cash.openDialog("out");
-            await expect(dialog.locator(".ant-radio-button-wrapper-checked")).toHaveText("Owner took cash");
+            await expect(dialog.getByTestId("cash-type").locator(".ant-radio-button-wrapper-checked")).toHaveText("Owner took cash");
 
             await cash.fill(dialog, { amount: 80, date: day(0) });
             const res = await cash.save(dialog);

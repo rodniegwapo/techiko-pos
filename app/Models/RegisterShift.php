@@ -82,6 +82,8 @@ class RegisterShift extends Model
             'status' => $this->status,
             'opened_at' => $this->opened_at?->toIso8601String(),
             'closed_at' => $this->closed_at?->toIso8601String(),
+            // Still open from an earlier day: the cashier forgot to end it (it takes no new money).
+            'overdue' => $this->isOverdue(),
             'opening_cash' => $this->opening_cash,
             'expected_cash' => $this->expected_cash,
             'counted_cash' => $this->counted_cash,
@@ -95,6 +97,12 @@ class RegisterShift extends Model
             'collected_by' => $this->collectedBy?->name,
             'collected_at' => $this->collected_at?->toIso8601String(),
         ];
+    }
+
+    /** Open, and from a day before today: forgotten, to be counted and ended. */
+    public function isOverdue(): bool
+    {
+        return $this->isOpen() && $this->business_date !== null && $this->business_date->toDateString() < now()->toDateString();
     }
 
     public function user(): BelongsTo

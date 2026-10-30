@@ -1,6 +1,6 @@
 import { test, expect, apiJson } from "../support/fixtures.js";
 import { responseProps } from "../support/inertia.js";
-import { DrawerPage, drawerUrl, numberInput, walletFixture, WALLET_DOMAIN } from "../support/wallet.js";
+import { DrawerPage, drawerUrl, numberInput, postCounted, postOpening, todayYmd, walletFixture, WALLET_DOMAIN } from "../support/wallet.js";
 
 /**
  * Cashier shifts and Counted money, role by role, at this worker's own wallet store
@@ -79,12 +79,21 @@ test.describe("Cashier shifts as a cashier", () => {
         await expect(page.getByTestId("my-shift-status")).toHaveText("Open");
     });
 
-    test("sees no Counted money, View details or End the day", async ({ page }) => {
+    test("sees only their own shift: no store drawer, Counted money, View details or End the day", async ({ page, serverAs }) => {
         await DrawerPage.open(page);
 
         await expect(page.getByTestId("my-shift")).toBeVisible();
+        // Each cashier has their own tray: the store's total, spot checks and the opening aren't theirs.
+        await expect(page.getByTestId("drawer-expected")).toHaveCount(0);
+        await expect(page.getByTestId("drawer-steps")).toHaveCount(0);
+        await expect(page.getByTestId("open-count-cash")).toHaveCount(0);
+        await expect(page.getByTestId("open-set-opening")).toHaveCount(0);
+        const api = await serverAs("wallet-cashier");
+        expect((await drawerProps(api)).cashControl.expected_cash, "the store's Expected isn't sent").toBeUndefined();
+        expect((await postCounted(api, { business_date: todayYmd(), counted_cash: 10 })).status).toBe(403);
+        expect((await postOpening(api, { business_date: todayYmd(), opening_cash: 10 })).status).toBe(403);
+
         await expect(page.getByTestId("open-end-shift")).toHaveCount(0);
-        await expect(page.getByTestId("open-money-by-user")).toHaveCount(0);
         await expect(page.getByTestId("wallet-tab-counts")).toHaveCount(0);
     });
 
@@ -154,17 +163,16 @@ test.describe("Cashier shifts as a supervisor", () => {
         await expect(page.getByTestId(`count-view-${id}`)).toBeVisible();
     });
 
-    test("sees each person's money with View details, but doesn't end the store's day", async ({ page, serverAs }, testInfo) => {
+    test("sees each person's shift and tray on Today's drawer, but doesn't end the store's day", async ({ page, serverAs }, testInfo) => {
         const cashier = await serverAs("wallet-cashier");
         await endOpenShift(cashier);
         expect((await apiJson(cashier, "POST", shiftsUrl("/start"), { opening_cash: 75 })).status).toBe(302);
 
         await DrawerPage.open(page);
         await expect(page.getByTestId("open-end-shift")).toHaveCount(0);
-        await page.getByTestId("open-money-by-user").click();
-        const list = page.getByTestId("money-by-user");
-        await expect(list).toContainText(walletFixture(testInfo).cashierName);
-        await expect(list).toContainText("In their drawer now");
+        const table = page.getByTestId("drawer-steps");
+        await expect(table).toContainText(walletFixture(testInfo).cashierName);
+        await expect(table).toContainText("In tray now");
     });
 
     test("runs their own shift, but another person approves it", async ({ serverAs }) => {
@@ -199,11 +207,14 @@ test.describe("Cashier shifts as a manager", () => {
         await expect(page.getByTestId("still-on-shift")).toHaveCount(0);
     });
 
-    test("sees Counted money and View details", async ({ page }) => {
+    test("sees every shift on Today's drawer and reviews them on Shifts & counts", async ({ page }) => {
         await DrawerPage.open(page);
-        await expect(page.getByTestId("open-money-by-user")).toBeVisible();
+        await expect(page.getByTestId("drawer-steps")).toBeVisible();
         await page.getByTestId("wallet-tab-counts").click();
         await expect(page.getByTestId("counts-filter")).toBeVisible();
+        // The store's counts by day are the other half of the page.
+        await page.getByTestId("counts-view-store").click();
+        await expect(page.getByTestId("store-counts")).toBeVisible();
     });
 });
 
@@ -223,8 +234,7 @@ for (const account of ["admin", "super"]) {
             await expect(page.getByTestId(`count-approve-${id}`)).toHaveCount(0);
 
             await page.goto(`${drawerUrl}?location_id=${store}`);
-            await page.getByTestId("open-money-by-user").click();
-            await expect(page.getByTestId("money-by-user")).toContainText(walletFixture(testInfo).cashierName);
+            await expect(page.getByTestId("drawer-steps")).toContainText(walletFixture(testInfo).cashierName);
         });
     });
 }

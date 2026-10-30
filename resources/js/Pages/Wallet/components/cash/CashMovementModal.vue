@@ -6,7 +6,8 @@ import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useHelpers } from "@/Composables/useHelpers";
 
 /**
- * Add a line by hand:
+ * Cash movement: one dialog, with a switch between what's being recorded (the modes the page
+ * allows). Add a line by hand:
  *  - in:   cash put into the drawer (float, or a correction)
  *  - out:  cash taken out (the owner, or a correction); the owner can also take from a channel
  *  - move: money moved into or out of a payment channel (GCash, bank); the drawer doesn't change
@@ -25,8 +26,12 @@ const props = defineProps({
     todayYmd: { type: String, required: true },
     /** What there is to take out: { drawer, channels: { id: balance } }; null hides it. */
     available: { type: Object, default: null },
+    /** The modes to switch between at the top: in | out | move | transfer. */
+    modes: { type: Array, default: () => ["in", "out"] },
 });
-const emit = defineEmits(["close"]);
+const emit = defineEmits(["close", "switch"]);
+// The switch keeps the test ids the page's separate buttons had.
+const MODE_TABS = { in: ["Cash in", "add-cash-in"], out: ["Cash out", "add-cash-out"], move: ["Move", "move-money"], transfer: ["Transfer", "transfer-money"] };
 const { getRoute } = useDomainRoutes();
 const { formattedTotal } = useHelpers();
 
@@ -66,6 +71,12 @@ watch(
 );
 
 const title = computed(() => ({ in: "Cash in", out: "Cash out", move: "Move money to or from a channel", transfer: "Transfer money" })[props.mode] ?? "");
+const modeHint = computed(() => ({
+    in: "Cash put into the drawer: float, or a correction.",
+    out: "Cash taken out: the owner, or a correction.",
+    move: "Money into or out of a payment channel; the drawer doesn't change.",
+    transfer: "From the drawer or a channel to another one; not income or spending.",
+})[props.mode] ?? "");
 const channelOptions = computed(() => props.channels.map((c) => ({ value: c.id, label: c.name })));
 const typeHint = computed(() => TYPES[props.mode]?.find((t) => t.value === form.kind)?.hint);
 const needsChannel = computed(() => props.mode === "move" || (form.kind === "owner_draw" && form.from === "channel"));
@@ -93,6 +104,29 @@ const source = computed(() => {
     if (props.mode === "out") return form.kind === "owner_draw" && form.from === "channel" ? channel(form.channel) : drawer;
     return null;
 });
+// What the save will do to each place it touches: "Cash drawer ₱1,000 → ₱900".
+const impact = computed(() => {
+    const amount = Number(form.amount);
+    if (!props.available || !(amount > 0)) return [];
+    const drawer = Number(props.available.drawer ?? 0);
+    const chan = (id) => ({ label: props.channels.find((c) => c.id === id)?.name ?? "Channel", balance: Number(props.available.channels?.[id] ?? 0) });
+    const line = (label, before, delta) => ({ label, before, after: Math.round((before + delta) * 100) / 100 });
+    if (props.mode === "in") return [line("Cash drawer", drawer, amount)];
+    if (props.mode === "out") {
+        if (form.kind === "owner_draw" && form.from === "channel") return form.channel ? [line(chan(form.channel).label, chan(form.channel).balance, -amount)] : [];
+        return [line("Cash drawer", drawer, -amount)];
+    }
+    if (props.mode === "move") return form.channel ? [line(chan(form.channel).label, chan(form.channel).balance, form.moveDirection === "in" ? amount : -amount)] : [];
+    if (props.mode === "transfer") {
+        const from = form.source === "drawer" ? line("Cash drawer", drawer, -amount) : line(chan(form.source).label, chan(form.source).balance, -amount);
+        // Another store's places aren't on this page: only this store's side shows then.
+        if (form.destStore || !form.dest) return [from];
+        const to = form.dest === "drawer" ? line("Cash drawer", drawer, amount) : line(chan(form.dest).label, chan(form.dest).balance, amount);
+        return [from, to];
+    }
+    return [];
+});
+
 const overAvailable = computed(
     () => source.value?.amount !== undefined && source.value?.amount !== null && Number(form.amount) > Number(source.value.amount),
 );
@@ -148,7 +182,18 @@ function save() {
 </script>
 
 <template>
-    <a-modal :visible="!!mode" :title="title" ok-text="Save" :confirm-loading="form.saving" destroy-on-close @ok="save" @cancel="emit('close')">
+    <a-modal :visible="!!mode" title="Cash movement" ok-text="Save" :confirm-loading="form.saving" destroy-on-close @ok="save" @cancel="emit('close')">
+        <a-radio-group
+            v-if="modes.length > 1"
+            :value="mode"
+            button-style="solid"
+            class="mb-1 flex w-full"
+            data-testid="cash-mode"
+            @change="(e) => emit('switch', e.target.value)"
+        >
+            <a-radio-button v-for="m in modes" :key="m" :value="m" class="flex-1 text-center" :data-testid="MODE_TABS[m][1]">{{ MODE_TABS[m][0] }}</a-radio-button>
+        </a-radio-group>
+        <p class="mb-3 mt-1 text-xs text-gray-500" data-testid="cash-mode-hint">{{ title }}: {{ modeHint }}</p>
         <a-form v-if="mode" layout="vertical" class="pt-1">
             <template v-if="mode === 'transfer'">
                 <a-form-item label="From" required>
@@ -217,6 +262,13 @@ function save() {
             <a-form-item label="Notes (optional)" class="mb-0">
                 <a-input v-model:value="form.notes" :maxlength="2000" data-testid="cash-notes" />
             </a-form-item>
+            <div v-if="impact.length" class="mt-4 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm" data-testid="cash-impact">
+                <div class="mb-1 text-xs font-semibold uppercase text-gray-500">What this does</div>
+                <div v-for="row in impact" :key="row.label" class="flex justify-between gap-2">
+                    <span class="text-gray-700">{{ row.label }}</span>
+                    <span class="font-mono tabular-nums">{{ formattedTotal(row.before) }} → <span :class="row.after < 0 ? 'text-red-700' : 'text-gray-900'" class="font-semibold">{{ formattedTotal(row.after) }}</span></span>
+                </div>
+            </div>
         </a-form>
     </a-modal>
 </template>

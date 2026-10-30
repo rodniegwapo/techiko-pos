@@ -5,6 +5,21 @@
 
 export const CHANNEL_KIND_LABELS = { card: "Card terminal", ewallet: "E-wallet", bank: "Bank" };
 
+/** Where money is, grouped: the cash drawer, e-wallets, then banks and card terminals. */
+export const PLACE_GROUPS = [
+    { key: "cash", label: "Cash", kinds: ["drawer"] },
+    { key: "ewallet", label: "E-wallets", kinds: ["ewallet"] },
+    { key: "bank", label: "Banks & card terminals", kinds: ["bank", "card"] },
+];
+
+/** Places ({ kind, balance }) by group, each with its subtotal; empty groups left out. */
+export function groupPlaces(places) {
+    return PLACE_GROUPS.map((g) => {
+        const rows = places.filter((p) => g.kinds.includes(p.kind));
+        return { ...g, places: rows, subtotal: Math.round(rows.reduce((sum, p) => sum + (Number(p.balance) || 0), 0) * 100) / 100 };
+    }).filter((g) => g.places.length);
+}
+
 /** Lines staff add by hand on Cash in & out. */
 export const MANUAL_KIND_LABELS = {
     cash_sale_topup: "Added float",

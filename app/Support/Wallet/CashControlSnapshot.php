@@ -14,7 +14,7 @@ use App\Models\WalletShiftReopenLog;
 /**
  * A store's cash drawer on one business day: opening, cash sales, cash in and out, expected and
  * counted cash, whether the shift is closed, the check against the last count, and the day's
- * count and opening-change history. Today's drawer and Drawer history are built on it.
+ * count and opening-change history. Today's drawer and Shifts & counts' store counts are built on it.
  */
 class CashControlSnapshot
 {

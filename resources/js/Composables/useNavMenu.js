@@ -368,6 +368,9 @@ const menuItems = [
         icon: IconWallet,
         section: "money",
         domainOnly: true,
+        // One sidebar entry: its pages are tabs inside (WalletLayout). Page search still lists each.
+        singleEntry: true,
+        activePathPrefix: "/wallet/",
         children: [
             {
                 key: "wallet-drawer",
@@ -391,18 +394,11 @@ const menuItems = [
                 keywords: "gcash bank card terminals payment channels balance",
             },
             {
-                key: "wallet-history",
-                title: "Drawer history",
-                routeName: "wallet.history",
-                path: "/wallet/history",
-                keywords: "counts opening changes closed shifts",
-            },
-            {
                 key: "wallet-counts",
-                title: "Counted money",
+                title: "Shifts & counts",
                 routeName: "register-shifts.index",
                 path: "/wallet/shifts",
-                keywords: "cashier shift count approve review short over variance",
+                keywords: "cashier shift count approve review short over variance counted money drawer history opening changes closed shifts",
             },
             {
                 key: "wallet-cash-on-hand",
@@ -694,7 +690,13 @@ export function useNavMenu() {
         openableMenus.value
             .filter((item) => !item.tidied)
             .map((item) => (item.children ? { ...item, children: item.children.filter((child) => !child.tidied) } : item))
-            .filter((item) => !item.children || item.children.length),
+            .filter((item) => !item.children || item.children.length)
+            // A group shown as one entry opens its first page the user may open.
+            .map((item) => {
+                if (!item.singleEntry || !item.children) return item;
+                const { children, ...entry } = item;
+                return { ...entry, routeName: children[0].routeName, path: children[0].path };
+            }),
     );
 
     // Items without a section (Dashboard) on top, then each section that has something in it.

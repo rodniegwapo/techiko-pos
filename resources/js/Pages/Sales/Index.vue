@@ -9,6 +9,7 @@ import {
     h,
 } from "vue";
 import axios from "axios";
+import dayjs from "dayjs";
 import { v4 as uuidv4 } from "uuid";
 import { Modal, Button, notification } from "ant-design-vue";
 import {
@@ -1692,12 +1693,26 @@ watch(
                                 A manager ended this store's day. It is
                                 reopened before taking payments.
                             </template>
+                            <template v-else-if="$page.props.shiftStatus?.overdue_since">
+                                Your shift from {{ dayjs($page.props.shiftStatus.overdue_since).format("MMM D") }} is still open.
+                                Count your drawer and end it before taking payments.
+                            </template>
                             <template v-else>
                                 You have no shift open at this store. Start
                                 your shift before taking payments.
                             </template>
                         </span>
                         <a-button
+                            v-if="$page.props.shiftStatus?.overdue_since && !$page.props.shiftStatus?.is_closed"
+                            type="primary"
+                            size="small"
+                            data-testid="shift-banner-end-overdue"
+                            @click="router.visit(getRoute('wallet.drawer'))"
+                        >
+                            End it on Today's drawer
+                        </a-button>
+                        <a-button
+                            v-else
                             type="primary"
                             size="small"
                             data-testid="shift-banner-action"
