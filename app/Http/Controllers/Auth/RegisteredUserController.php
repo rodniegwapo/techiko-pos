@@ -11,6 +11,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -44,6 +45,7 @@ class RegisteredUserController extends Controller
             'organization' => 'nullable|string|max:255',
             'country_code' => 'nullable|string|size:2',
             'timezone' => 'nullable|string|max:64',
+            'business_type' => ['nullable', 'string', Rule::in(Domain::availableBusinessTypes())],
         ]);
 
         try {
@@ -63,9 +65,12 @@ class RegisteredUserController extends Controller
 
                 $domain = Domain::create([
                     'name' => $domainName,
-                    'timezone' => $request->input('timezone') ?: 'Asia/Manila',
+                    // The Philippines for now; other timezones are coming soon.
+                    'timezone' => 'Asia/Manila',
                     'country_code' => strtoupper($request->input('country_code') ?: 'PH'),
                     'is_active' => true,
+                    // What they sell presets the product form (Settings → Business type); none means retail.
+                    'settings' => ['sales' => ['business_type' => $request->input('business_type') ?: 'retail']],
                 ]);
 
                 // 3) Associate user with the new domain

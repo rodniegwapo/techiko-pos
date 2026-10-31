@@ -13,6 +13,7 @@ import {
   IconAlertOctagon,
 } from "@tabler/icons-vue";
 import { useHelpers } from "@/Composables/useHelpers";
+import { avatarStyle, initials } from "@/Composables/avatarColors";
 import axios from "axios";
 
 const { formatCurrency, formatDate, formatDateTime } = useHelpers();
@@ -46,6 +47,16 @@ const props = defineProps({
 const { visible } = toRefs(props);
 
 const emit = defineEmits(["update:visible"]);
+
+// Same avatar as the product list: its image, or (none, or the file is gone) its colour and initials.
+const imageFailed = ref(false);
+watch(() => props.product?.product?.id, () => (imageFailed.value = false));
+const showImage = computed(
+  () =>
+    props.product?.product?.representation_type === "image" &&
+    !!props.product.product.representation &&
+    !imageFailed.value,
+);
 
 // Store summary state
 const storeData = ref(null);
@@ -213,25 +224,20 @@ const allLocations = computed(() => props.product?.product?.locations || []);
           class="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-gray-200"
         >
           <img
-            v-if="
-              product.product?.representation_type === 'image' &&
-              product.product?.representation
-            "
+            v-if="showImage"
             :src="product.product.representation"
             :alt="product.product.name"
             class="w-full h-full object-cover rounded-lg"
+            @error="imageFailed = true"
           />
           <div
-            v-else-if="
-              product.product?.representation_type === 'color' &&
-              product.product?.representation
-            "
-            class="w-full h-full rounded-lg"
-            :style="{ backgroundColor: `#${product.product.representation}` }"
-          ></div>
-          <span v-else class="text-xl text-gray-500">
-            {{ product.product?.name?.charAt(0) || "P" }}
-          </span>
+            v-else
+            class="flex h-full w-full items-center justify-center rounded-lg text-xl font-semibold"
+            :style="avatarStyle(product.product?.name, product.product?.representation_type === 'color' ? product.product.representation : null)"
+            data-testid="product-details-avatar"
+          >
+            {{ initials(product.product?.name) }}
+          </div>
         </div>
 
         <!-- Product Info -->

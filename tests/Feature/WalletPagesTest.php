@@ -61,6 +61,11 @@ class WalletPagesTest extends TestCase
         return route('domains.wallet.'.$page, ['domain' => $this->domain->name_slug, ...$query]);
     }
 
+    private function shiftsUrl(array $query = []): string
+    {
+        return route('domains.register-shifts.index', ['domain' => $this->domain->name_slug, ...$query]);
+    }
+
     public function test_todays_drawer_shows_how_expected_is_reached(): void
     {
         $user = $this->user(['wallet.money-movement']);
@@ -87,19 +92,27 @@ class WalletPagesTest extends TestCase
     {
         $drawerOnly = $this->user(['wallet.money-movement']);
         $this->actingAs($drawerOnly)->get($this->url('drawer'))->assertOk();
-        // Drawer history (past counts, short/over) is for those who keep the books.
+        // Past counts and short/over (Shifts & counts) are for those who keep the books.
         $this->actingAs($drawerOnly)->get($this->url('history'))->assertForbidden();
+        $this->actingAs($drawerOnly)->get($this->shiftsUrl())->assertForbidden();
         $this->actingAs($drawerOnly)->get($this->url('cash-in-out'))->assertForbidden();
         $this->actingAs($drawerOnly)->get($this->url('balances'))->assertForbidden();
 
         $ledger = $this->user(['wallet-cash-ledger.index']);
         $this->actingAs($ledger)->get($this->url('cash-in-out'))->assertOk()->assertInertia(fn (Assert $page) => $page
-            ->component('Wallet/CashInOut')->has('ledger.movements')->has('channels'));
+            ->component('Wallet/CashInOut')->has('ledger.movements')->has('channels')
+            // What there is to take out, shown under the amount.
+            ->where('available.drawer', 0)->has('available.channels'));
         $this->actingAs($ledger)->get($this->url('balances'))->assertOk()->assertInertia(fn (Assert $page) => $page
             ->component('Wallet/Balances')->where('canSeeBalances', true)->where('drawerExpected', 0));
         $this->actingAs($ledger)->get($this->url('drawer'))->assertForbidden();
-        $this->actingAs($ledger)->get($this->url('history'))->assertOk()->assertInertia(fn (Assert $page) => $page
-            ->component('Wallet/History')->has('cashControl.count_submission_history')->has('closedShifts.rows'));
+        // Drawer history is Shifts & counts' store counts now: its link lands there.
+        $this->actingAs($ledger)->get($this->url('history', ['business_date' => today()->toDateString()]))
+            ->assertRedirect($this->shiftsUrl(['business_date' => today()->toDateString(), 'view' => 'store']));
+        // Without the cashier shifts permission, Shifts & counts opens on the store counts only.
+        $this->actingAs($ledger)->get($this->shiftsUrl())->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->component('Wallet/Counts')->where('view', 'store')->where('canSeeShifts', false)
+            ->has('cashControl.count_submission_history')->has('closedShifts.rows'));
 
         // Channels only: Where money is opens, without the balances.
         $channels = $this->user(['payment-card-types.index']);
@@ -126,7 +139,7 @@ class WalletPagesTest extends TestCase
         $this->actingAs($user)->get($old(['business_date' => $date, 'location_id' => $this->store->id]))
             ->assertRedirect($this->url('drawer', ['business_date' => $date, 'location_id' => $this->store->id]));
         $this->actingAs($user)->get($old(['view' => 'all']))
-            ->assertRedirect($this->url('balances', ['tab' => 'all']));
+            ->assertRedirect($this->url('cash-in-out', ['view' => 'all']));
         $this->actingAs($user)->get($old(['kind' => 'owner_draw', 'page' => 2]))
             ->assertRedirect($this->url('cash-in-out', ['kind' => 'owner_draw', 'page' => 2]));
     }
@@ -137,6 +150,35 @@ class WalletPagesTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->where('routePermissionAliases', fn ($aliases) => $aliases['wallet.drawer'] === ['wallet.money-movement']
                     && $aliases['wallet.balances'] === ['wallet-cash-ledger.index', 'payment-card-types.index']));
+    }
+
+    public function test_shifts_and_counts_shows_each_part_with_its_own_permission(): void
+    {
+        $reviewer = $this->user(['register-shifts.index']);
+        $both = $this->user(['register-shifts.index', 'wallet-cash-ledger.index']);
+
+        // Cashier shifts only: no switch to the store counts, and asking for them gives the shifts.
+        $this->actingAs($reviewer)->get($this->shiftsUrl(['view' => 'store']))->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('view', 'shifts')->where('canSeeStore', false)->has('shifts.data'));
+        // Both: the shifts by default, the store counts on asking.
+        $this->actingAs($both)->get($this->shiftsUrl())->assertInertia(fn (Assert $page) => $page->where('view', 'shifts')->where('canSeeStore', true));
+        $this->actingAs($both)->get($this->shiftsUrl(['view' => 'store']))->assertInertia(fn (Assert $page) => $page
+            ->where('view', 'store')->where('canSeeShifts', true)->has('cashControl'));
+    }
+
+    public function test_all_money_lives_on_cash_in_and_out(): void
+    {
+        $manager = $this->user(['wallet-cash-ledger.index']);
+        $manager->roles()->detach();
+        $manager->forceFill(['role_level' => 3])->save();
+
+        // The old tab lands on Cash in & out's All places, filters kept.
+        $this->actingAs($manager)->get($this->url('balances', ['tab' => 'all', 'direction' => 'in']))
+            ->assertRedirect($this->url('cash-in-out', ['direction' => 'in', 'view' => 'all']));
+        $this->actingAs($manager)->get($this->url('cash-in-out', ['view' => 'all']))->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('view', 'all')->has('allMoney'));
+        $this->actingAs($manager)->get($this->url('cash-in-out'))->assertInertia(fn (Assert $page) => $page
+            ->where('view', 'store')->where('allMoney', null));
     }
 
     public function test_route_permission_follows_the_aliases(): void

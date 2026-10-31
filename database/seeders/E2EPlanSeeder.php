@@ -56,6 +56,8 @@ class E2EPlanSeeder extends Seeder
         // Only what the plan gives: nothing turned on by a super admin.
         $settings = $domain->settings ?? [];
         unset($settings['features']);
+        // No business type picked, so their admins see the "what do you sell?" banner (business-types spec).
+        unset($settings['sales']['business_type']);
         $domain->update(['settings' => $settings]);
 
         $code = 'E2EP-'.strtoupper(substr($plan, 0, 4)); // codes hold 10 characters

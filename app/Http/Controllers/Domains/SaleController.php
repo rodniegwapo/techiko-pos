@@ -128,8 +128,14 @@ class SaleController extends Controller
             ->where('user_id', $user->id)->where('status', RegisterShift::NEEDS_REVIEW)
             ->latest('closed_at')->first();
 
+        // Left open from an earlier day: it takes no new money until it's counted and ended.
+        $overdue = $mine !== null && $mine->business_date->toDateString() < $businessDate;
+
         return [
-            'is_open' => $mine !== null && ! $isClosed,
+            // The store these answers are for: starting or reopening from this page acts on it too.
+            'location_id' => $locationId,
+            'is_open' => $mine !== null && ! $isClosed && ! $overdue,
+            'overdue_since' => $overdue ? $mine->business_date->toDateString() : null,
             'is_closed' => $isClosed,
             'shift_id' => $mine?->id,
             'opened_at' => $mine?->opened_at?->toIso8601String(),
@@ -403,6 +409,7 @@ class SaleController extends Controller
 
         $loyaltyResults = null;
         $creditResults = null;
+        $kitchenTicket = null;
         $redemptionService = app(LoyaltyRedemptionService::class);
 
         try {
@@ -416,6 +423,8 @@ class SaleController extends Controller
                 $redemptionService,
                 $transactionDate,
                 $registerShift,
+                $request,
+                &$kitchenTicket,
             ) {
                 $sale->refresh();
 
@@ -567,6 +576,9 @@ class SaleController extends Controller
                         $loyaltyResults = $customer->processLoyaltyForSale($earnAmount);
                     }
                 }
+
+                // At a dine-in store: dine-in or take-out, the take-out kitchen ticket, the table to clear.
+                $kitchenTicket = app(TabService::class)->afterPaid($sale->fresh(), $location, $request->user());
             });
         } catch (InsufficientStockException $e) {
             $names = collect($e->getUnavailableItems())->pluck('product_name')->implode(', ');
@@ -598,6 +610,8 @@ class SaleController extends Controller
             'message' => 'Payment processed successfully',
             'loyalty_results' => $loyaltyResults,
             'credit_results' => $creditResults,
+            // A take-out order at a dine-in store: its kitchen ticket, to print.
+            'kitchen_ticket' => $kitchenTicket?->toPrint($domain->timezone ?: 'Asia/Manila'),
         ]);
     }
 

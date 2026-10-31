@@ -32,6 +32,7 @@ import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useSidebar } from "@/Composables/useSidebar";
 import { useSalesLayoutMode } from "@/Composables/useSalesLayoutMode";
+import { BUSINESS_TYPES } from "@/Composables/useBusinessType";
 
 // The sidebar's sections, in order. Top-level items without a section (Dashboard) come first.
 export const NAV_SECTIONS = [
@@ -367,6 +368,9 @@ const menuItems = [
         icon: IconWallet,
         section: "money",
         domainOnly: true,
+        // One sidebar entry: its pages are tabs inside (WalletLayout). Page search still lists each.
+        singleEntry: true,
+        activePathPrefix: "/wallet/",
         children: [
             {
                 key: "wallet-drawer",
@@ -390,18 +394,18 @@ const menuItems = [
                 keywords: "gcash bank card terminals payment channels balance",
             },
             {
-                key: "wallet-history",
-                title: "Drawer history",
-                routeName: "wallet.history",
-                path: "/wallet/history",
-                keywords: "counts opening changes closed shifts",
-            },
-            {
                 key: "wallet-counts",
-                title: "Counted money",
+                title: "Shifts & counts",
                 routeName: "register-shifts.index",
                 path: "/wallet/shifts",
-                keywords: "cashier shift count approve review short over variance",
+                keywords: "cashier shift count approve review short over variance counted money drawer history opening changes closed shifts",
+            },
+            {
+                key: "wallet-cash-on-hand",
+                title: "Cash on hand",
+                routeName: "cash-on-hand.index",
+                path: "/wallet/cash-on-hand",
+                keywords: "owner collect cash with owner safe deposit",
             },
         ],
     },
@@ -577,7 +581,15 @@ export function useNavMenu() {
         );
     };
 
-    const menus = computed(() => {
+    // Pages this business type rarely needs (useBusinessType.js) leave the menu, even when the business
+    // has records there, until it turns on "Show all menu items" (Settings says which have records).
+    // Page search still finds them.
+    const tidiedAway = (key) => {
+        if (!isInDomainContext.value || page.props.showAllMenu !== false) return false;
+        return (BUSINESS_TYPES[page.props.businessType]?.hiddenMenuKeys ?? []).includes(key);
+    };
+
+    const openableMenus = computed(() => {
         const filterMenuItems = (items) =>
             items
                 .filter((item) => {
@@ -625,6 +637,12 @@ export function useNavMenu() {
                         return false;
                     }
 
+                    // Dine-in is coming soon (config features.dine_in): no plan has it, so it's hidden from
+                    // everyone, not shown locked. The server turns its pages away too.
+                    if (item.feature === "dine_in" && !page.props.features?.dine_in) {
+                        return false;
+                    }
+
                     // A feature the organization doesn't have (the server blocks it too): shown locked to
                     // whoever can upgrade the plan, hidden from everyone else.
                     if (item.feature && !page.props.domainFeatures?.[item.feature] && !canUpgrade.value) {
@@ -646,6 +664,7 @@ export function useNavMenu() {
                     const filteredItem = {
                         ...item,
                         upgrade: !!item.feature && !page.props.domainFeatures?.[item.feature],
+                        tidied: tidiedAway(item.key),
                     };
 
                     if (item.children) {
@@ -665,6 +684,21 @@ export function useNavMenu() {
         return filterMenuItems(menuItems);
     });
 
+    // The sidebar: every page the user can open, less the ones this business type tidies away
+    // (a group left empty goes too). Page search keeps them all (searchEntries).
+    const menus = computed(() =>
+        openableMenus.value
+            .filter((item) => !item.tidied)
+            .map((item) => (item.children ? { ...item, children: item.children.filter((child) => !child.tidied) } : item))
+            .filter((item) => !item.children || item.children.length)
+            // A group shown as one entry opens its first page the user may open.
+            .map((item) => {
+                if (!item.singleEntry || !item.children) return item;
+                const { children, ...entry } = item;
+                return { ...entry, routeName: children[0].routeName, path: children[0].path };
+            }),
+    );
+
     // Items without a section (Dashboard) on top, then each section that has something in it.
     const topItems = computed(() => menus.value.filter((item) => !item.section));
     const sections = computed(() =>
@@ -676,7 +710,7 @@ export function useNavMenu() {
 
     // Every page the user can open, flat, for the quick search.
     const searchEntries = computed(() =>
-        menus.value.flatMap((item) =>
+        openableMenus.value.flatMap((item) =>
             item.children
                 ? item.children.map((child) => ({ ...child, parent: item.title, icon: item.icon }))
                 : [{ ...item, parent: null }],

@@ -7,6 +7,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class WalletCashCountSubmission extends Model
 {
+    /** An optional count during the day, on Today's drawer. */
+    public const SPOT_CHECK = 'spot_check';
+
+    /** The store's final count, when a manager ends the day. */
+    public const END_OF_DAY = 'end_of_day';
+
+    /** A cashier's count when they end their own shift. */
+    public const SHIFT = 'shift';
+
     protected $guarded = [];
 
     protected $casts = [

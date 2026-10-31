@@ -1,5 +1,5 @@
 <script setup>
-import { computed, watch, onMounted, inject } from "vue";
+import { computed, watch, onMounted, inject, ref } from "vue";
 import { IconLock, IconSearch } from "@tabler/icons-vue";
 import { usePage } from "@inertiajs/vue3";
 import { useGlobalVariables } from "@/Composables/useGlobalVariable";
@@ -33,6 +33,26 @@ if (!Array.isArray(openKeys.value)) {
 }
 
 onMounted(() => initializeMenuState());
+
+// Every page draws the menu anew, so picking an item low in the list would scroll it back to the
+// top. Remember how far down it was and put it back.
+const SCROLL_KEY = "techiko.sidebar.scrollTop";
+const scroller = ref(null);
+onMounted(() => {
+    try {
+        const top = Number(sessionStorage.getItem(SCROLL_KEY));
+        if (scroller.value && top > 0) scroller.value.scrollTop = top;
+    } catch {
+        // Storage blocked: the menu starts at the top.
+    }
+});
+function rememberScroll() {
+    try {
+        sessionStorage.setItem(SCROLL_KEY, String(scroller.value?.scrollTop ?? 0));
+    } catch {
+        // Nothing to remember it in.
+    }
+}
 
 const inquiryUnreadCountInjected = inject("inquiryUnreadCount", null);
 const inquiryUnreadCount = computed(() => {
@@ -97,7 +117,8 @@ const initializeMenuState = () => {
                 }
             } else if (item.routeName) {
                 const routePath = getRoute(item.routeName);
-                if (routePath && routePath === currentPath) {
+                // A group shown as one entry stays selected on any of its pages.
+                if ((routePath && routePath === currentPath) || (item.activePathPrefix && currentPath.includes(item.activePathPrefix))) {
                     return { item, parentKey };
                 }
             }
@@ -125,7 +146,7 @@ const handleOpenChange = (keys) => {
 </script>
 
 <template>
-    <div class="overflow-auto">
+    <div ref="scroller" class="overflow-auto" data-testid="sidebar-menu" @scroll.passive="rememberScroll">
         <p
             v-if="menuLocked"
             class="mx-3 mb-2 flex items-center gap-1.5 rounded-md bg-red-50 px-2 py-1.5 text-xs text-red-700"

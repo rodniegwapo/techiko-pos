@@ -5,6 +5,21 @@
 
 export const CHANNEL_KIND_LABELS = { card: "Card terminal", ewallet: "E-wallet", bank: "Bank" };
 
+/** Where money is, grouped: the cash drawer, e-wallets, then banks and card terminals. */
+export const PLACE_GROUPS = [
+    { key: "cash", label: "Cash", kinds: ["drawer"] },
+    { key: "ewallet", label: "E-wallets", kinds: ["ewallet"] },
+    { key: "bank", label: "Banks & card terminals", kinds: ["bank", "card"] },
+];
+
+/** Places ({ kind, balance }) by group, each with its subtotal; empty groups left out. */
+export function groupPlaces(places) {
+    return PLACE_GROUPS.map((g) => {
+        const rows = places.filter((p) => g.kinds.includes(p.kind));
+        return { ...g, places: rows, subtotal: Math.round(rows.reduce((sum, p) => sum + (Number(p.balance) || 0), 0) * 100) / 100 };
+    }).filter((g) => g.places.length);
+}
+
 /** Lines staff add by hand on Cash in & out. */
 export const MANUAL_KIND_LABELS = {
     cash_sale_topup: "Added float",
@@ -27,13 +42,25 @@ export const SYSTEM_KIND_LABELS = {
     sale_void: "Sale voided",
     credit_payment: "Credit payment",
     owner_transfer_in: "Cash from another store",
+    transfer_out: "Transferred out",
+    transfer_in: "Transferred in",
+    to_cash_on_hand: "To Cash on hand",
+    from_cash_on_hand: "From Cash on hand",
+};
+
+/** Cash on hand's own lines: the business's cash the owner holds. */
+export const CASH_ON_HAND_KIND_LABELS = {
+    collected: "Collected",
+    to_store: "Moved to a store",
+    owner_use: "Owner used it",
+    adjustment: "Correction",
 };
 
 /** Lines Today's drawer writes itself; the server marks them in `notes`. */
 export const AUTO_NOTE_LABELS = {
     AUTO_CC_OPENING: "Opening cash",
     AUTO_CC_COUNTED_VARIANCE: "Count difference",
-    AUTO_CC_ENDSHIFT_CASHOUT: "Cash taken out at end of shift",
+    AUTO_CC_ENDSHIFT_CASHOUT: "Cash out to Cash on hand at end of day",
 };
 
 export function autoNoteLabel(notes) {
@@ -59,6 +86,13 @@ export function shortOver(variance) {
 }
 
 export const TONE_CLASSES = { ok: "text-green-700", short: "text-red-700", over: "text-amber-700" };
+
+/** Which count a count was: an optional spot check, the store's final count, or a cashier's own. */
+export const COUNT_KIND_LABELS = {
+    spot_check: "Spot check",
+    end_of_day: "End of day",
+    shift: "Cashier's shift",
+};
 
 /** A cashier's shift: open, ended (count matched), waiting for a manager, or approved. */
 export const SHIFT_STATUS = {

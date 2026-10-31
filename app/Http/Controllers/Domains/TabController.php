@@ -42,17 +42,36 @@ class TabController extends Controller
 
         $tables = DiningTable::query()->forLocation($location->id)->where('is_active', true)
             ->orderBy('area')->orderBy('name')
-            ->get(['id', 'name', 'area', 'seats', 'pos_x', 'pos_y'])
-            ->map(fn (DiningTable $t) => [
-                ...$t->only(['id', 'name', 'area', 'seats', 'pos_x', 'pos_y']),
-                'tabs' => $open->where('dining_table_id', $t->id)->values(),
-            ]);
+            ->get(['id', 'name', 'area', 'seats', 'pos_x', 'pos_y', 'needs_cleaning_at'])
+            ->map(function (DiningTable $t) use ($open) {
+                $tabs = $open->where('dining_table_id', $t->id)->values();
+
+                return [
+                    ...$t->only(['id', 'name', 'area', 'seats', 'pos_x', 'pos_y']),
+                    'tabs' => $tabs,
+                    // Free, occupied (a tab is open), or waiting to be cleared after its bill was paid.
+                    'status' => $tabs->isNotEmpty() ? 'occupied' : ($t->needs_cleaning_at ? 'cleaning' : 'free'),
+                    'minutes_since_paid' => $t->needs_cleaning_at ? (int) $t->needs_cleaning_at->diffInMinutes(now()) : null,
+                ];
+            });
 
         return response()->json([
             'tables' => $tables,
             'tabs' => $open->values(),
             'active_tab_id' => $this->tabs->activeTab($domain, $location)?->id,
         ]);
+    }
+
+    /** Staff cleared a table after its guests paid: it's free for the next ones. */
+    public function ready(Request $request, Domain $domain, DiningTable $diningTable): JsonResponse
+    {
+        $location = $this->diningStore($domain);
+        if ((int) $diningTable->location_id !== (int) $location->id) {
+            abort(404);
+        }
+        $this->tabs->markReady($diningTable);
+
+        return response()->json(['ok' => true]);
     }
 
     public function store(Request $request, Domain $domain): JsonResponse

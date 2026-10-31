@@ -46,9 +46,10 @@ export function useCashDrawerActions(locationId, businessDate) {
         saveOpening: (amount, reason) =>
             post("opening", "wallet-cash-ledger.opening-cash.store", { opening_cash: Number(amount || 0), reason: reason || null },
                 "Opening cash saved.", "Could not save opening cash."),
-        saveCount: (amount, notes) =>
-            post("count", "wallet-cash-ledger.counted-cash.store", { counted_cash: Number(amount || 0), notes: notes || null },
-                "Count saved.", "Could not save the count."),
+        /** Your own tray during your shift, against that shift's Expected. */
+        spotCheckShift: (shiftId, amount, notes) =>
+            post("spot", "register-shifts.spot-check", { counted_cash: Number(amount || 0), notes: notes || null },
+                "Spot check saved.", "Could not save the spot check.", { registerShift: shiftId }),
         /** The store's day: count, cash expenses and closing, all in one go (managers, after every cashier's shift). */
         endShift: (payload) =>
             post("end", "wallet-cash-ledger.close-shift", payload,
@@ -60,7 +61,7 @@ export function useCashDrawerActions(locationId, businessDate) {
         startMyShift: (openingCash, notes) =>
             post("my-start", "register-shifts.start", { opening_cash: Number(openingCash || 0), notes: notes || null },
                 "Shift started.", "Could not start your shift."),
-        /** No PIN: a count that is off goes to a manager on Counted money. */
+        /** No PIN: a count that is off goes to a manager on Shifts & counts. */
         endMyShift: (shiftId, payload) =>
             post("my-end", "register-shifts.end", payload, "Shift ended.", "Could not end your shift.", { registerShift: shiftId }),
         reopenMyShift: (shiftId, reason) =>

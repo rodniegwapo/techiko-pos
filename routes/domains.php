@@ -3,6 +3,7 @@
 use App\Http\Controllers\Domains\AiUsageController;
 use App\Http\Controllers\Domains\AssistantController;
 use App\Http\Controllers\Domains\AssistantConversationController;
+use App\Http\Controllers\Domains\CashOnHandController;
 use App\Http\Controllers\Domains\CategoryController;
 use App\Http\Controllers\Domains\CreditController;
 use App\Http\Controllers\Domains\CustomerController;
@@ -329,6 +330,13 @@ Route::prefix('domains/{domain:name_slug}')
             Route::get('/money-movement', [PaymentCardTypeController::class, 'moneyMovement'])->name('money-movement');
         });
 
+        // Cash on hand: the business's cash the owner holds; collecting approved shifts into it (owners and admins).
+        Route::prefix('wallet/cash-on-hand')->name('cash-on-hand.')->group(function () {
+            Route::get('/', [CashOnHandController::class, 'index'])->name('index');
+            Route::post('/', [CashOnHandController::class, 'store'])->name('store');
+            Route::post('/shifts/{registerShift}', [CashOnHandController::class, 'collect'])->whereNumber('registerShift')->name('collect');
+        });
+
         // Payment card types (Wallet) — domain-scoped
         Route::prefix('payment-card-types')->name('payment-card-types.')->group(function () {
             Route::get('/', [PaymentCardTypeController::class, 'index'])->name('index');
@@ -359,6 +367,8 @@ Route::prefix('domains/{domain:name_slug}')
             Route::get('/{registerShift}', [RegisterShiftController::class, 'show'])->whereNumber('registerShift')->name('show');
             Route::post('/{registerShift}/end', [RegisterShiftController::class, 'end'])->whereNumber('registerShift')->name('end');
             Route::post('/{registerShift}/reopen', [RegisterShiftController::class, 'reopen'])->whereNumber('registerShift')->name('reopen');
+            // Count your own tray during your shift.
+            Route::post('/{registerShift}/spot-check', [RegisterShiftController::class, 'spotCheck'])->whereNumber('registerShift')->name('spot-check');
             Route::post('/{registerShift}/approve', [RegisterShiftController::class, 'approve'])->whereNumber('registerShift')->name('approve');
         });
 
@@ -444,6 +454,8 @@ Route::prefix('domains/{domain:name_slug}')
                 Route::get('/', [TabController::class, 'index'])->name('index');
                 Route::post('/', [TabController::class, 'store'])->name('store');
                 Route::post('/leave', [TabController::class, 'leave'])->name('leave');
+                // A table cleared after its guests paid, ready for the next ones.
+                Route::post('/tables/{diningTable}/ready', [TabController::class, 'ready'])->whereNumber('diningTable')->name('ready');
                 Route::patch('/{tab}', [TabController::class, 'update'])->whereNumber('tab')->name('update');
                 Route::post('/{tab}/select', [TabController::class, 'select'])->whereNumber('tab')->name('select');
                 Route::post('/{tab}/move', [TabController::class, 'move'])->whereNumber('tab')->name('move');

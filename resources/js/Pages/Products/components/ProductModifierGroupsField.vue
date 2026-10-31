@@ -1,15 +1,22 @@
 <script setup>
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { Link } from "@inertiajs/vue3";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
+import { useBusinessType } from "@/Composables/useBusinessType";
 
-/** The product form's "Modifiers" field: which option groups (Size, Add-ons…) the cashier picks from. */
+/**
+ * The product form's "Modifiers" field: which option groups (Size, Add-ons…) the cashier picks from.
+ * Businesses that rarely use them (retail, grocery, services) see a link instead until they ask for
+ * it; a product that already has modifiers always shows them.
+ */
 const props = defineProps({
     form: { type: Object, required: true },
     groups: { type: Array, default: () => [] },
 });
 
 const { getRoute } = useDomainRoutes();
+const { preset } = useBusinessType();
+const expanded = ref(preset.value.showModifiers || (props.form.modifier_group_ids?.length ?? 0) > 0);
 
 const options = computed(() =>
     props.groups.map((g) => ({
@@ -20,8 +27,19 @@ const options = computed(() =>
 </script>
 
 <template>
+    <a-button
+        v-if="!expanded && !form.modifier_group_ids?.length"
+        type="link"
+        class="mb-4 h-auto !px-0"
+        data-testid="show-modifiers"
+        @click="expanded = true"
+    >
+        + Add modifiers (size, add-ons…)
+    </a-button>
     <a-form-item
+        v-else
         label="Modifiers"
+        data-testid="modifiers-field"
         :validate-status="form.errors?.modifier_group_ids ? 'error' : ''"
         :help="form.errors?.modifier_group_ids"
     >

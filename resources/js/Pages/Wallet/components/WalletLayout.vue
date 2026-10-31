@@ -7,10 +7,10 @@ import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 import { useWalletQuery } from "../composables/useWalletQuery";
 
-/** The wallet pages' frame: title and the four pages as tabs, keeping store and date. */
+/** Cash & wallet's frame: the title and its pages as tabs (one sidebar entry opens them), keeping store and date. */
 const props = defineProps({
     title: { type: String, required: true },
-    /** drawer | cash-in-out | balances | history | counts */
+    /** drawer | balances | cash-in-out | counts | cash-on-hand */
     active: { type: String, required: true },
     activeLocation: { type: Object, default: null },
 });
@@ -19,12 +19,14 @@ const { getRoute } = useDomainRoutes();
 const { hasPermission } = usePermissionsV2();
 const { keepQuery } = useWalletQuery(() => props.activeLocation);
 
+// One job each: run today, see where money is, every peso in and out, past shifts and counts,
+// and (owners) the cash collected from the drawers.
 const PAGES = [
     { key: "drawer", route: "wallet.drawer", label: "Today's drawer" },
-    { key: "cash-in-out", route: "wallet.cash-in-out", label: "Cash in & out" },
     { key: "balances", route: "wallet.balances", label: "Where money is" },
-    { key: "history", route: "wallet.history", label: "Drawer history" },
-    { key: "counts", route: "register-shifts.index", label: "Counted money" },
+    { key: "cash-in-out", route: "wallet.cash-in-out", label: "Cash in & out" },
+    { key: "counts", route: "register-shifts.index", label: "Shifts & counts" },
+    { key: "cash-on-hand", route: "cash-on-hand.index", label: "Cash on hand" },
 ];
 
 const tabs = computed(() =>

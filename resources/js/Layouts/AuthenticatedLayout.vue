@@ -6,6 +6,7 @@ import NavSearch from "@/Components/sidebar/NavSearch.vue";
 import Terminal from "@/Components/Terminal.vue";
 import ImpersonationBanner from "@/Components/ImpersonationBanner.vue";
 import SubscriptionEndBanner from "@/Components/SubscriptionEndBanner.vue";
+import BusinessTypeBanner from "@/Components/BusinessTypeBanner.vue";
 
 import { onMounted, onUnmounted, ref, watch, provide } from "vue";
 import { usePage, router } from "@inertiajs/vue3";
@@ -188,6 +189,8 @@ onMounted(() => {
                 <!-- Store switcher sits above the page so it never covers header actions -->
                 <LocationBadge v-else />
                 <SubscriptionEndBanner :class="{ 'shrink-0': props.fitViewport }" />
+                <!-- Not on full-height screens like the POS: no room, and the pinned store switcher covers it. -->
+                <BusinessTypeBanner v-if="!props.fitViewport" />
                 <!-- Why the user was sent here, e.g. away from a warehouse's sales screen -->
                 <a-alert
                     v-if="page.props.flash?.notice"

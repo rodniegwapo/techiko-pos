@@ -104,7 +104,7 @@ class ExpenseTest extends TestCase
         ]))->assertSessionHasNoErrors();
 
         $this->actingAs($admin)
-            ->get($this->route('expenses.index'))
+            ->get($this->route('expenses.index', ['location' => 'all']))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Expenses/Index', false)
@@ -119,6 +119,30 @@ class ExpenseTest extends TestCase
         $this->actingAs($admin)
             ->get($this->route('expenses.index', ['location' => 'business']))
             ->assertInertia(fn (Assert $page) => $page->has('items.data', 1)->where('items.data.0.location_name', null));
+    }
+
+    public function test_the_list_starts_at_the_store_picked_at_the_top_of_the_screen(): void
+    {
+        $admin = $this->makeUser('admin', 2);
+        $this->actingAs($admin)->post($this->route('expenses.store'), $this->payload())->assertSessionHasNoErrors();
+        $this->actingAs($admin)->post($this->route('expenses.store'), $this->payload([
+            'amount' => 300, 'location_id' => $this->storeB->id, 'description' => 'Store B ice',
+        ]))->assertSessionHasNoErrors();
+
+        // Working at Store B (the store picked at the top): only its expenses, and the filter says so.
+        $admin->update(['location_id' => $this->storeB->id]);
+        $this->actingAs($admin->fresh())
+            ->get($this->route('expenses.index'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('filters.location', $this->storeB->id)
+                ->has('items.data', 1)
+                ->where('items.data.0.description', 'Store B ice')
+            );
+
+        // Clearing the store filter shows every store.
+        $this->actingAs($admin)
+            ->get($this->route('expenses.index', ['location' => 'all']))
+            ->assertInertia(fn (Assert $page) => $page->where('filters.location', null)->has('items.data', 2));
     }
 
     public function test_cash_register_expense_is_kept_in_step_with_the_wallet_ledger(): void

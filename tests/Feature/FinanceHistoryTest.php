@@ -231,8 +231,8 @@ class FinanceHistoryTest extends TestCase
         $this->actingAs($ctx['user'])
             ->get($this->url($ctx, 'finance.balance-sheet'))
             ->assertInertia(fn (Assert $page) => $page
-                ->where('balanceSheet.assets.2.key', 'ewallet')
-                ->where('balanceSheet.assets.2.amount', 1400)
+                ->where('balanceSheet.assets.3.key', 'ewallet')
+                ->where('balanceSheet.assets.3.amount', 1400)
                 ->where('balanceSheet.accounts.0.received_since', 400)
                 ->where('balanceSheet.accounts.0.channel', 'GCash')
             );

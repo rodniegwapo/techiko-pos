@@ -123,9 +123,11 @@ class FinancePhase3Test extends TestCase
         $this->actingAs($ctx['user'])
             ->get($this->url($ctx, 'finance.balance-sheet'))
             ->assertInertia(fn (Assert $page) => $page
-                ->where('balanceSheet.assets.1.key', 'bank')
-                ->where('balanceSheet.assets.1.amount', 62000)
-                ->where('balanceSheet.assets.2.amount', 0)
+                // After the drawers and Cash on hand (the business's cash the owner holds).
+                ->where('balanceSheet.assets.1.key', 'cash_on_hand')
+                ->where('balanceSheet.assets.2.key', 'bank')
+                ->where('balanceSheet.assets.2.amount', 62000)
+                ->where('balanceSheet.assets.3.amount', 0)
                 ->where('balanceSheet.accounts_missing', ['GCash'])
             );
 

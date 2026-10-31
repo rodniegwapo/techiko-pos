@@ -22,6 +22,7 @@ use App\Models\SalePayment;
 use App\Models\WalletCashMovement;
 use App\Models\WalletCashReconciliation;
 use App\Services\Reports\ProfitAndLossService;
+use App\Support\Wallet\CashOnHand;
 use App\Support\Wallet\WalletCashBridgeExpected;
 use App\Support\Wallet\WalletCashDailyExpected;
 use Carbon\Carbon;
@@ -587,11 +588,14 @@ class FinancialReportService
         $assetsBought = round((float) $byStore(FixedAsset::query()->forDomain($domain)->whereBetween('purchase_date', $range))->sum('cost'), 2);
 
         $ledger = fn () => $byStore(WalletCashMovement::query()->forDomain($domain)->whereBetween('movement_date', $range));
-        // The end-of-shift cash-out moves the day's cash out of the drawer, not out of the business.
+        // The end-of-shift cash-out moves the day's cash out of the drawer, not out of the business;
+        // so does collecting into Cash on hand (to_cash_on_hand). What the owner kept out of Cash on
+        // hand is a withdrawal; it belongs to no store, so only the all-stores view has it.
         $ownerDraws = round((float) $ledger()
             ->where('kind', 'owner_draw')
             ->where(fn ($q) => $q->whereNull('notes')->orWhere('notes', '!=', WalletCashBridgeExpected::NOTE_ENDSHIFT_CASHOUT))
-            ->sum('amount'), 2);
+            ->sum('amount')
+            + ($locationId ? 0.0 : CashOnHand::ownerUseTotal($domain, $start->toDateString(), $end->toDateString())), 2);
         // Float top-ups and drawer adjustments (including counted-cash differences), but not the
         // book-only opening line.
         $otherMovements = round((float) $ledger()
@@ -679,6 +683,8 @@ class FinancialReportService
 
         $assets = [
             ['key' => 'cash_in_drawer', 'label' => 'Cash in drawers (today, expected)', 'amount' => $cash['amount']],
+            // Still the business's cash, only with the owner now (collected from the drawers).
+            ['key' => 'cash_on_hand', 'label' => 'Cash on hand (with the owner)', 'amount' => CashOnHand::balance($domain)],
             ['key' => 'bank', 'label' => 'Bank accounts', 'amount' => $bankTotal],
             ['key' => 'ewallet', 'label' => 'E-wallets (GCash, Maya…)', 'amount' => $ewalletTotal],
             ['key' => 'inventory', 'label' => 'Inventory (at cost)', 'amount' => $this->inventoryValue($domain, null)],
@@ -705,7 +711,7 @@ class FinancialReportService
             ->forDomain($domain)
             ->where('kind', 'owner_draw')
             ->where(fn ($q) => $q->whereNull('notes')->orWhere('notes', '!=', WalletCashBridgeExpected::NOTE_ENDSHIFT_CASHOUT))
-            ->sum('amount'), 2);
+            ->sum('amount') + CashOnHand::ownerUseTotal($domain), 2);
         $netContributed = round($invested - $withdrawn, 2);
         ['amount' => $accumulatedProfit, 'since' => $profitSince] = $this->accumulatedProfit($domain);
 

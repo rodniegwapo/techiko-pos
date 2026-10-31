@@ -44,10 +44,16 @@ class DiningTableController extends Controller
 
         return Inertia::render('DiningTables/Index', [
             'stores' => $stores->map(fn (InventoryLocation $l) => ['id' => $l->id, 'name' => $l->name, 'dine_in' => (bool) $l->dine_in])->values(),
-            'location' => $location ? ['id' => $location->id, 'name' => $location->name, 'dine_in' => (bool) $location->dine_in] : null,
+            'location' => $location ? [
+                'id' => $location->id,
+                'name' => $location->name,
+                'dine_in' => (bool) $location->dine_in,
+                'table_cleaning' => (bool) $location->table_cleaning,
+            ] : null,
             'tables' => $tables->map(fn (DiningTable $t) => [
                 ...$t->only(['id', 'name', 'area', 'seats', 'pos_x', 'pos_y', 'is_active']),
                 'busy' => $busy->contains($t->id),
+                'cleaning' => ! $busy->contains($t->id) && $t->needs_cleaning_at !== null,
             ])->values(),
             'grid' => ['columns' => self::GRID_COLUMNS, 'rows' => self::GRID_ROWS],
         ]);
@@ -58,9 +64,23 @@ class DiningTableController extends Controller
     {
         $data = $request->validate([
             'location_id' => ['required', 'integer'],
-            'dine_in' => ['required', 'boolean'],
+            'dine_in' => ['sometimes', 'boolean'],
+            // Paid tables wait for staff to mark them ready before the next guests.
+            'table_cleaning' => ['sometimes', 'boolean'],
         ]);
         $location = $this->ownStore($request, $domain, (int) $data['location_id']);
+
+        if (array_key_exists('table_cleaning', $data)) {
+            $location->update(['table_cleaning' => $data['table_cleaning']]);
+            if (! $data['table_cleaning']) {
+                DiningTable::query()->forLocation($location->id)->update(['needs_cleaning_at' => null]);
+            }
+        }
+        if (! array_key_exists('dine_in', $data)) {
+            return back()->with('success', $data['table_cleaning'] ?? false
+                ? "Paid tables at {$location->name} now wait to be marked ready."
+                : "Paid tables at {$location->name} are free straight away.");
+        }
 
         if (! $data['dine_in'] && Sale::query()->openTabs()->where('location_id', $location->id)->exists()) {
             throw ValidationException::withMessages(['dine_in' => ['Close the open tabs first (pay or cancel them).']]);

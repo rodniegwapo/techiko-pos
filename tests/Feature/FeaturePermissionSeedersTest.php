@@ -4,11 +4,13 @@ namespace Tests\Feature;
 
 use App\Models\Permission;
 use Database\Seeders\AssistantPermissionSeeder;
+use Database\Seeders\CashOnHandPermissionSeeder;
 use Database\Seeders\DineInPermissionSeeder;
 use Database\Seeders\FinancePermissionSeeder;
 use Database\Seeders\ProductModifierPermissionSeeder;
 use Database\Seeders\PurchasingPermissionSeeder;
 use Database\Seeders\RegisterShiftPermissionSeeder;
+use Database\Seeders\ShiftSpotCheckPermissionSeeder;
 use Database\Seeders\SalesHistoryPermissionSeeder;
 use Database\Seeders\SalesImportPermissionSeeder;
 use Database\Seeders\ShiftReopenPermissionSeeder;
@@ -157,7 +159,25 @@ class FeaturePermissionSeedersTest extends TestCase
         // register-shifts.show opens with register-shifts.index (RoutePermission::ALIASES).
         $this->assertSame(
             $this->sorted(array_values(array_diff($routes, ['register-shifts.show']))),
-            $this->sorted([...RegisterShiftPermissionSeeder::TILL_ROUTES, ...RegisterShiftPermissionSeeder::REVIEW_ROUTES]),
+            $this->sorted([...RegisterShiftPermissionSeeder::TILL_ROUTES, ...RegisterShiftPermissionSeeder::REVIEW_ROUTES, ...ShiftSpotCheckPermissionSeeder::ROUTES]),
+        );
+    }
+
+    public function test_everyone_on_the_till_can_spot_check_a_drawer(): void
+    {
+        $roles = array_map(fn ($name) => $this->role($name), ['cashier', 'supervisor', 'manager', 'admin']);
+
+        $this->seed(ShiftSpotCheckPermissionSeeder::class);
+        $this->seed(ShiftSpotCheckPermissionSeeder::class);
+
+        // Their own tray; whose else's they may check is the service's rule (supervisors and up).
+        foreach ($roles as $role) {
+            $this->assertContains('register-shifts.spot-check', $this->routesOf($role));
+        }
+        $this->assertSame(1, Permission::query()->where('route_name', 'register-shifts.spot-check')->count());
+        $this->assertSame(
+            DB::table('permission_modules')->where('name', 'register-shifts')->value('id'),
+            Permission::query()->where('route_name', 'register-shifts.spot-check')->value('module_id'),
         );
     }
 
@@ -208,6 +228,39 @@ class FeaturePermissionSeedersTest extends TestCase
         $this->assertSame($routes, $this->routesOf($manager));
         $this->assertSame([], $this->routesOf($cashier));
         $this->assertSame(count($routes), Permission::query()->whereIn('route_name', $routes)->count());
+    }
+
+    public function test_the_cash_on_hand_seeder_covers_every_cash_on_hand_route(): void
+    {
+        $routes = [];
+        foreach (Route::getRoutes() as $route) {
+            if (str_starts_with((string) $route->getName(), 'domains.cash-on-hand.')) {
+                $routes[] = preg_replace('/^domains\./', '', $route->getName());
+            }
+        }
+
+        $this->assertSame($this->sorted($routes), $this->sorted(CashOnHandPermissionSeeder::ROUTES));
+    }
+
+    public function test_cash_on_hand_is_for_owners_and_admins_only(): void
+    {
+        $admin = $this->role('admin');
+        $manager = $this->role('manager');
+        $cashier = $this->role('cashier');
+
+        $this->seed(CashOnHandPermissionSeeder::class);
+        $this->seed(CashOnHandPermissionSeeder::class);
+
+        $routes = $this->sorted(CashOnHandPermissionSeeder::ROUTES);
+        $this->assertSame($routes, $this->routesOf($admin));
+        // It moves money out of the stores' drawers: not for managers or cashiers.
+        $this->assertSame([], $this->routesOf($manager));
+        $this->assertSame([], $this->routesOf($cashier));
+        $this->assertSame(count($routes), Permission::query()->whereIn('route_name', $routes)->count());
+        $this->assertSame(
+            DB::table('permission_modules')->where('name', 'cash-on-hand')->value('id'),
+            Permission::query()->where('route_name', 'cash-on-hand.collect')->value('module_id'),
+        );
     }
 
     public function test_purchasing_permissions_are_added_for_the_default_roles_only(): void

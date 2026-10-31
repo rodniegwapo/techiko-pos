@@ -1,16 +1,20 @@
 <script setup>
 import { computed, reactive, watch } from "vue";
+import dayjs from "dayjs";
 import { IconPlus, IconTrash } from "@tabler/icons-vue";
 import { useHelpers } from "@/Composables/useHelpers";
+import BillCounter from "./BillCounter.vue";
 
 /**
  * End a shift in one step: count the cash and add any expenses paid from the drawer during it.
- * No manager's PIN: a count that is off goes to a manager on Counted money. Ending the store's
+ * No manager's PIN: a count that is off goes to a manager on Shifts & counts. Ending the store's
  * day also says where the cash goes: taken out, or left in the drawer as the next opening.
+ * In pesos the cash can be counted bill by bill (BillCounter); only the total is saved. A spot
+ * check earlier in the day fills the count in.
  */
 const props = defineProps({
     open: { type: Boolean, default: false },
-    /** expected_cash, and counted_cash / counted_at / notes when a count was already saved. */
+    /** expected_cash, and counted_cash / counted_at / counted_kind / notes when a count was already saved. */
     cashControl: { type: Object, required: true },
     saving: { type: Boolean, default: false },
     /** Empty when the plan has no Expenses. */
@@ -19,11 +23,16 @@ const props = defineProps({
     showExpected: { type: Boolean, default: true },
     /** The cashier's own shift: no "where the cash goes" choice, that is the store's day. */
     ownShift: { type: Boolean, default: false },
+    /** Ending someone else's shift (a manager, for a forgotten one): their name for the title. */
+    forName: { type: String, default: null },
 });
 const emit = defineEmits(["close", "end"]);
 const { formattedTotal } = useHelpers();
 
 const form = reactive({ counted: null, notes: "", expenses: [], action: "cashout_now" });
+
+// The store's day after a spot check: the count starts from it.
+const fromSpotCheck = computed(() => !props.ownShift && props.cashControl.counted_at != null && props.cashControl.counted_kind === "spot_check");
 
 watch(
     () => props.open,
@@ -64,20 +73,15 @@ function submit() {
 </script>
 
 <template>
-    <a-modal :visible="open" :title="ownShift ? 'End my shift' : 'End the store\'s day'" :width="560" destroy-on-close @cancel="emit('close')">
+    <a-modal :visible="open" :title="forName ? `End ${forName}'s shift` : ownShift ? 'End my shift' : 'End the store\'s day'" :width="560" destroy-on-close @cancel="emit('close')">
         <div class="flex flex-col gap-4 pt-1">
             <div>
-                <label class="mb-1 block text-sm font-medium text-gray-700">{{ ownShift ? "Cash in your drawer" : "Cash in the drawer" }}</label>
-                <a-input-number
-                    v-model:value="form.counted"
-                    :min="0"
-                    :step="0.01"
-                    :precision="2"
-                    class="w-full"
-                    addon-before="₱"
-                    placeholder="Count the cash"
-                    data-testid="end-shift-counted"
-                />
+                <label class="mb-1 block text-sm font-medium text-gray-700">{{ ownShift ? "Cash in your drawer" : "Final count" }}</label>
+                <p v-if="fromSpotCheck" class="mb-2 rounded bg-teal-50 px-2 py-1 text-xs text-teal-800" data-testid="end-shift-from-spot-check">
+                    Filled in from your spot check at {{ dayjs(cashControl.counted_at).format("h:mm A") }}
+                    ({{ formattedTotal(Number(cashControl.counted_cash) || 0) }}). Count again if cash came in or went out since.
+                </p>
+                <BillCounter v-model="form.counted" testid="end-shift-counted" prefix="end-shift" />
                 <p v-if="showExpected" class="mb-0 mt-1 text-xs text-gray-500">
                     Expected: {{ formattedTotal(Number(cashControl.expected_cash) || 0) }}<template v-if="expenseTotal">
                         , less {{ formattedTotal(expenseTotal) }} in expenses below</template>.
@@ -114,8 +118,8 @@ function submit() {
 
             <a-radio-group v-if="!ownShift" v-model:value="form.action" class="flex flex-col gap-2">
                 <a-radio value="cashout_now" :disabled="countedAmount <= 0" data-testid="end-shift-cashout">
-                    Take the cash out
-                    <div class="text-xs text-gray-500">The drawer starts the next shift empty.</div>
+                    Cash out to Cash on hand
+                    <div class="text-xs text-gray-500">The owner takes it (still the business's money); the drawer starts the next shift empty.</div>
                 </a-radio>
                 <a-radio value="save_as_opening_cash" data-testid="end-shift-keep">
                     Leave it as the next shift's opening

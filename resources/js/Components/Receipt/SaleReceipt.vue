@@ -53,6 +53,7 @@ const paymentLabel = computed(() => {
         <div class="row"><span>Date</span><span>{{ sale.transaction_date_display }}</span></div>
         <div class="row"><span>Cashier</span><span>{{ sale.cashier_name || "—" }}</span></div>
         <div class="row"><span>Customer</span><span>{{ sale.customer_name }}</span></div>
+        <div v-if="sale.order_type_label" class="row"><span>Order</span><span>{{ sale.order_type_label }}</span></div>
         <div class="rule" />
 
         <div v-for="item in items" :key="item.id" class="item">

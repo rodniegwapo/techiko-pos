@@ -15,6 +15,7 @@ use App\Models\WalletShiftReopenLog;
 use App\Services\ExpenseService;
 use App\Support\FinanceAccess;
 use App\Support\RouteFeature;
+use App\Support\Wallet\CashOnHand;
 use App\Support\Wallet\WalletCashBridgeExpected;
 use App\Support\Wallet\WalletCashDailyExpected;
 use App\Support\Wallet\WalletLedgerViewData;
@@ -50,6 +51,10 @@ class WalletCashMovementController extends Controller
     public function store(Request $request, Domain $domain)
     {
         $location = WalletLocationResolver::resolve($request, $domain);
+
+        if ($request->input('kind') === 'transfer') {
+            return $this->storeTransfer($request, $domain, $location);
+        }
 
         $kind = (string) $request->input('kind');
         // A transfer moves money into or out of a payment channel, so it names the channel and its
@@ -143,6 +148,78 @@ class WalletCashMovementController extends Controller
     }
 
     /**
+     * Money moved from this store's drawer or one of its channels to a drawer or channel of this
+     * store, or (owners and admins) of another store: an out line and an in line with one
+     * transfer_group, so both sides' balances follow and neither looks like income or spending.
+     */
+    private function storeTransfer(Request $request, Domain $domain, InventoryLocation $location)
+    {
+        $validated = $request->validate([
+            'amount' => ['required', 'numeric', 'min:0.01', 'max:99999999.99'],
+            'movement_date' => ['required', 'date', 'before_or_equal:today'],
+            'from_channel_id' => ['nullable', 'integer'],
+            'to_location_id' => ['nullable', 'integer'],
+            'to_channel_id' => ['nullable', 'integer'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+        $slug = $domain->name_slug;
+        $date = (string) $validated['movement_date'];
+
+        $toLocation = $location;
+        if (! empty($validated['to_location_id']) && (int) $validated['to_location_id'] !== (int) $location->id) {
+            if (! FinanceAccess::canSeeAllStores($request->user())) {
+                throw ValidationException::withMessages(['to_location_id' => 'Only an owner or admin can move money to another store.']);
+            }
+            $toLocation = InventoryLocation::query()->forDomain($slug)->active()->whereKey((int) $validated['to_location_id'])
+                ->where(fn ($q) => $q->whereNull('type')->orWhere('type', '!=', 'warehouse'))
+                ->first()
+                ?? throw ValidationException::withMessages(['to_location_id' => 'Pick another store of this business.']);
+            self::ensureCanTransfer($location, $toLocation);
+        }
+
+        $channel = fn (?int $id, InventoryLocation $at, string $field) => $id
+            ? (PaymentCardType::query()->forDomainLocation($slug, (int) $at->id)->find($id)
+                ?? throw ValidationException::withMessages([$field => 'Pick one of '.$at->name.'\'s payment channels.']))
+            : null;
+        $from = $channel($validated['from_channel_id'] ?? null, $location, 'from_channel_id');
+        $to = $channel($validated['to_channel_id'] ?? null, $toLocation, 'to_channel_id');
+
+        if ((int) $toLocation->id === (int) $location->id && $from?->id === $to?->id) {
+            throw ValidationException::withMessages(['to_channel_id' => 'Pick a different place to move the money to.']);
+        }
+
+        WalletShiftGuard::ensureDateNotClosed($slug, (int) $location->id, $date, 'movement_date');
+        WalletShiftGuard::ensureDateNotClosed($slug, (int) $toLocation->id, $date, 'to_location_id');
+
+        $sameStore = (int) $toLocation->id === (int) $location->id;
+        $name = fn (?PaymentCardType $c, InventoryLocation $at) => ($c ? $c->name : 'Cash drawer').($sameStore ? '' : ' ('.$at->name.')');
+        $notes = fn (string $text) => Str::limit($text.(($validated['notes'] ?? null) ? ': '.$validated['notes'] : ''), 2000);
+        $group = (string) Str::uuid();
+
+        DB::transaction(function () use ($slug, $location, $toLocation, $from, $to, $validated, $date, $group, $name, $notes, $request) {
+            foreach ([
+                [$location, $from, 'out', WalletCashMovement::KIND_TRANSFER_OUT, 'To '.$name($to, $toLocation)],
+                [$toLocation, $to, 'in', WalletCashMovement::KIND_TRANSFER_IN, 'From '.$name($from, $location)],
+            ] as [$at, $chan, $direction, $kind, $text]) {
+                WalletCashMovement::query()->create([
+                    'domain' => $slug,
+                    'location_id' => $at->id,
+                    'payment_card_type_id' => $chan?->id,
+                    'direction' => $direction,
+                    'amount' => $validated['amount'],
+                    'kind' => $kind,
+                    'transfer_group' => $group,
+                    'notes' => $notes($text),
+                    'movement_date' => $date,
+                    'user_id' => $request->user()->id,
+                ]);
+            }
+        });
+
+        return redirect()->back()->with('success', 'Moved to '.$name($to, $toLocation).'.');
+    }
+
+    /**
      * The store whose drawer an owner withdrawal goes into (to_location_id), or null when the owner
      * keeps the cash. Another store of this organization, with its day still open; only from the
      * cash drawer.
@@ -163,13 +240,21 @@ class WalletCashMovementController extends Controller
         if (! $target || (int) $target->id === (int) $from->id) {
             throw ValidationException::withMessages(['to_location_id' => 'Pick another store of this business.']);
         }
+        self::ensureCanTransfer($from, $target);
         WalletShiftGuard::ensureDateNotClosed($domain->name_slug, (int) $target->id, (string) $validated['movement_date'], 'to_location_id');
 
         return $target;
     }
 
+    /** Each cashier counts their own tray when ending their shift; the store's whole drawer is a supervisor's and up. */
+    private function ensureOverseesDrawer(Request $request): void
+    {
+        abort_unless(FinanceAccess::canOverseeDrawer($request->user()), 403, 'Supervisors and managers set the opening and count the store\'s drawer. End your shift to count yours.');
+    }
+
     public function setOpeningCash(Request $request, Domain $domain)
     {
+        $this->ensureOverseesDrawer($request);
         $location = WalletLocationResolver::resolve($request, $domain);
 
         $validated = $request->validate([
@@ -193,6 +278,7 @@ class WalletCashMovementController extends Controller
 
     public function submitCountedCash(Request $request, Domain $domain)
     {
+        $this->ensureOverseesDrawer($request);
         $location = WalletLocationResolver::resolve($request, $domain);
 
         $validated = $request->validate([
@@ -202,7 +288,8 @@ class WalletCashMovementController extends Controller
         ]);
         $this->ensureDateNotClosed($domain->name_slug, (int) $location->id, (string) $validated['business_date']);
 
-        DB::transaction(fn () => $this->recordCount($domain, $location, $validated, (int) $request->user()->id));
+        // An optional spot check: End the day still takes the final count (it starts from this one).
+        DB::transaction(fn () => $this->recordCount($domain, $location, $validated, (int) $request->user()->id, WalletCashCountSubmission::SPOT_CHECK));
 
         return redirect()->back()->with('success', 'Counted cash saved.');
     }
@@ -219,7 +306,7 @@ class WalletCashMovementController extends Controller
         if (! FinanceAccess::canManage($request->user())) {
             throw ValidationException::withMessages(['end_shift_action' => 'A manager ends the store\'s day. End your own shift under My shift.']);
         }
-        $this->ensureNoShiftOpen($domain, $location);
+        $this->ensureNoShiftOpen($domain, $location, (string) $validated['business_date']);
 
         $closed = $this->closeShift($domain, $location, $validated, (int) $request->user()->id);
 
@@ -229,7 +316,7 @@ class WalletCashMovementController extends Controller
     /**
      * End the store's day in one step, from Today's drawer: any cash expenses paid from the drawer,
      * the count, and closing. A manager's job, once every cashier has ended their own shift (a
-     * cashier ends theirs with no PIN; a count that is off waits for review on Counted money).
+     * cashier ends theirs with no PIN; a count that is off waits for review on Shifts & counts).
      */
     public function closeShiftWithCount(Request $request, Domain $domain, ExpenseService $expenses)
     {
@@ -253,7 +340,7 @@ class WalletCashMovementController extends Controller
         if (! FinanceAccess::canManage($user)) {
             throw ValidationException::withMessages(['end_shift_action' => 'A manager ends the store\'s day. End your own shift under My shift.']);
         }
-        $this->ensureNoShiftOpen($domain, $location);
+        $this->ensureNoShiftOpen($domain, $location, (string) $validated['business_date']);
         if (! empty($validated['expenses']) && ! RouteFeature::allows($domain, 'expenses.store')) {
             throw ValidationException::withMessages(['expenses' => 'Expenses aren\'t part of this plan.']);
         }
@@ -273,7 +360,7 @@ class WalletCashMovementController extends Controller
                 ]);
             }
 
-            $this->recordCount($domain, $location, $validated, (int) $user->id);
+            $this->recordCount($domain, $location, $validated, (int) $user->id, WalletCashCountSubmission::END_OF_DAY);
             $this->closeShift($domain, $location, $validated, (int) $user->id);
         });
 
@@ -281,10 +368,14 @@ class WalletCashMovementController extends Controller
     }
 
     /** The store's day ends after the cashiers' shifts: each one is counted on its own first. */
-    private function ensureNoShiftOpen(Domain $domain, InventoryLocation $location): void
+    /**
+     * A store's day ends after every shift of that day has ended. A shift forgotten from an earlier
+     * day doesn't hold up later days: it shows as overdue on Today's drawer, to be ended there.
+     */
+    private function ensureNoShiftOpen(Domain $domain, InventoryLocation $location, string $businessDate): void
     {
         $open = RegisterShift::query()->forWalletContext($domain->name_slug, (int) $location->id)
-            ->open()->with('user:id,name')->get();
+            ->open()->whereDate('business_date', '>=', $businessDate)->with('user:id,name')->get();
         if ($open->isNotEmpty()) {
             throw ValidationException::withMessages([
                 'end_shift_action' => 'Still on shift: '.$open->map(fn ($s) => $s->user?->name ?? 'a cashier')->join(', ').'. Each ends their shift first.',
@@ -298,7 +389,7 @@ class WalletCashMovementController extends Controller
      *
      * @param  array{business_date: string, counted_cash: float|string, notes?: ?string}  $validated
      */
-    private function recordCount(Domain $domain, InventoryLocation $location, array $validated, int $userId, ?int $approvedBy = null): void
+    private function recordCount(Domain $domain, InventoryLocation $location, array $validated, int $userId, string $kind, ?int $approvedBy = null): void
     {
         $countedAt = now();
 
@@ -374,6 +465,7 @@ class WalletCashMovementController extends Controller
             'counted_by' => $userId,
             'approved_by' => $approvedBy,
             'counted_at' => $countedAt,
+            'kind' => $kind,
         ]);
     }
 
@@ -383,6 +475,14 @@ class WalletCashMovementController extends Controller
      * @param  array{business_date: string, end_shift_action: string}  $validated
      * @return bool False when it was already closed.
      */
+    /** Money moves between two stores only when both have "Can transfer money" on (Locations). */
+    private static function ensureCanTransfer(InventoryLocation $from, InventoryLocation $to): void
+    {
+        if (! $from->allows_money_transfer || ! $to->allows_money_transfer) {
+            throw ValidationException::withMessages(['to_location_id' => 'Turn on Can transfer money for both stores first (Inventory → Locations).']);
+        }
+    }
+
     private function closeShift(Domain $domain, InventoryLocation $location, array $validated, int $userId): bool
     {
         $recon = WalletCashReconciliation::query()
@@ -421,17 +521,21 @@ class WalletCashMovementController extends Controller
             $recon->notes = null;
             $recon->save();
 
+            // The day's cash goes to the owner: it joins Cash on hand, still the business's money.
+            $group = (string) Str::uuid();
             WalletCashMovement::query()->create([
                 'domain' => $domain->name_slug,
                 'location_id' => $location->id,
                 'payment_card_type_id' => null,
                 'direction' => 'out',
                 'amount' => $countedCash,
-                'kind' => 'owner_draw',
+                'kind' => WalletCashMovement::KIND_TO_CASH_ON_HAND,
+                'transfer_group' => $group,
                 'notes' => self::AUTO_ENDSHIFT_CASHOUT_LEDGER_NOTE,
                 'movement_date' => $validated['business_date'],
                 'user_id' => $userId,
             ]);
+            app(CashOnHand::class)->recordEndOfDayCashOut($domain, $location, (string) $validated['business_date'], $countedCash, $userId, $group);
         }
 
         if ($action === 'save_as_opening_cash') {

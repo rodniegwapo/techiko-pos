@@ -4,18 +4,20 @@ namespace App\Services;
 
 use App\Models\Expense;
 use App\Models\WalletCashMovement;
+use App\Services\Finance\CashRegisterPosting;
 use App\Support\ExpenseReceiptStorage;
-use App\Support\Wallet\WalletShiftGuard;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 /**
  * Saving an expense paid from the cash register also posts a cash-out to that store's wallet
- * ledger, so the drawer's expected cash stays right. The two are kept in step on edit and delete.
+ * ledger, so the drawer's expected cash stays right; paid from a bank or e-wallet account linked
+ * to a payment channel, the cash-out goes on that channel. The two are kept in step on edit and delete.
  */
 class ExpenseService
 {
+    public function __construct(private readonly CashRegisterPosting $posting) {}
+
     /**
      * @param  array{domain: string, location_id: ?int, expense_category_id: int, amount: float|string,
      *     expense_date: string, description: string, payee?: ?string, payment_method: string,
@@ -82,51 +84,18 @@ class ExpenseService
     /** Create, move or remove the linked ledger cash-out to match the expense as it is now. */
     private function syncWalletMovement(Expense $expense): void
     {
-        $movement = $expense->wallet_cash_movement_id
-            ? WalletCashMovement::query()->find($expense->wallet_cash_movement_id)
-            : null;
-
-        if ($expense->payment_method !== 'cash_register') {
-            if ($movement) {
-                $movement->delete();
-            }
-            $expense->wallet_cash_movement_id = null;
-
-            return;
-        }
-
-        $date = $expense->expense_date->toDateString();
-        WalletShiftGuard::ensureDateNotClosed($expense->domain, (int) $expense->location_id, $date, 'expense_date');
-
-        $attributes = [
-            'domain' => $expense->domain,
-            'location_id' => $expense->location_id,
-            'payment_card_type_id' => null,
-            'direction' => 'out',
-            'amount' => $expense->amount,
-            'kind' => WalletCashMovement::KIND_EXPENSE,
-            'notes' => Str::limit('Expense: '.$expense->description, 250),
-            'movement_date' => $date,
-            'user_id' => $expense->user_id,
-        ];
-
-        if ($movement) {
-            $movement->update($attributes);
-        } else {
-            $expense->wallet_cash_movement_id = WalletCashMovement::query()->create($attributes)->id;
-        }
+        $this->posting->sync(
+            $expense,
+            WalletCashMovement::KIND_EXPENSE,
+            'out',
+            $expense->expense_date->toDateString(),
+            'Expense: '.$expense->description,
+            'expense_date',
+        );
     }
 
     private function guardExistingMovement(Expense $expense): void
     {
-        $original = $expense->getOriginal();
-        if (! empty($original['wallet_cash_movement_id']) && ! empty($original['location_id'])) {
-            WalletShiftGuard::ensureDateNotClosed(
-                $expense->domain,
-                (int) $original['location_id'],
-                $expense->getOriginal('expense_date')->toDateString(),
-                'expense_date',
-            );
-        }
+        $this->posting->guardExisting($expense, 'expense_date');
     }
 }

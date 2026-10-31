@@ -81,7 +81,7 @@ class TimeclockService
     {
         $tz = $domain->timezone ?: 'Asia/Manila';
         $now ??= now();
-        $start = $now->copy()->timezone($tz)->startOfDay()->utc();
+        $start = $now->copy()->timezone($tz)->startOfDay()->timezone(config('app.timezone'));
 
         return (int) TimeEntry::query()->forDomain($domain->name_slug)
             ->where('user_id', $user->id)

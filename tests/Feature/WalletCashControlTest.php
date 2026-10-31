@@ -168,6 +168,33 @@ class WalletCashControlTest extends TestCase
         ]);
     }
 
+    public function test_a_spot_check_and_the_end_of_day_count_are_told_apart(): void
+    {
+        $ctx = $this->seedContext();
+        $ctx['user']->update(['is_super_user' => true]);
+        $slug = $ctx['domain']->name_slug;
+        $today = now()->toDateString();
+        $body = ['location_id' => $ctx['location']->id, 'business_date' => $today];
+
+        // An optional count during the day: the drawer shows it as a spot check.
+        $this->actingAs($ctx['user'])->post(route('domains.wallet-cash-ledger.counted-cash.store', ['domain' => $slug]), [...$body, 'counted_cash' => 480])
+            ->assertSessionHasNoErrors();
+        $this->actingAs($ctx['user'])->get(route('domains.wallet.drawer', ['domain' => $slug, 'location_id' => $ctx['location']->id]))
+            ->assertInertia(fn ($page) => $page
+                ->where('cashControl.counted_kind', WalletCashCountSubmission::SPOT_CHECK)
+                ->where('cashControl.count_submission_history.0.kind', WalletCashCountSubmission::SPOT_CHECK));
+
+        // End the day takes the final count.
+        $this->actingAs($ctx['user'])->post(route('domains.wallet-cash-ledger.close-shift', ['domain' => $slug]), [
+            ...$body, 'counted_cash' => 500, 'end_shift_action' => 'save_as_opening_cash',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame(
+            [WalletCashCountSubmission::SPOT_CHECK, WalletCashCountSubmission::END_OF_DAY],
+            WalletCashCountSubmission::query()->orderBy('id')->pluck('kind')->all(),
+        );
+    }
+
     public function test_submit_counted_cash_records_user_and_timestamp(): void
     {
         $ctx = $this->seedContext();
@@ -582,10 +609,19 @@ class WalletCashControlTest extends TestCase
             'domain' => $ctx['domain']->name_slug,
             'location_id' => $ctx['location']->id,
             'direction' => 'out',
-            'kind' => 'owner_draw',
+            'kind' => 'to_cash_on_hand',
             'amount' => 250.00,
             'movement_date' => $date,
             'notes' => 'AUTO_CC_ENDSHIFT_CASHOUT',
+        ]);
+        // The cash went to the owner: Cash on hand, still the business's money.
+        $this->assertDatabaseHas('cash_on_hand_movements', [
+            'domain' => $ctx['domain']->name_slug,
+            'location_id' => $ctx['location']->id,
+            'direction' => 'in',
+            'kind' => 'collected',
+            'amount' => 250.00,
+            'source_date' => $date,
         ]);
         $this->assertDatabaseHas('wallet_cash_reconciliations', [
             'domain' => $ctx['domain']->name_slug,

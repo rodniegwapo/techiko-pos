@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from "vue";
+import { computed, reactive } from "vue";
 import { usePage } from "@inertiajs/vue3";
 import { useMediaQuery } from "@vueuse/core";
 import {
@@ -24,6 +24,12 @@ function productAvatarStyle(product) {
         product?.representation_type === "color" ? product.representation : null,
     );
 }
+
+// Images that failed to load (moved or deleted file): those products show their initials instead,
+// as the Products page's avatar does.
+const failedImages = reactive(new Set());
+const showsImage = (product) =>
+    product?.representation_type === "image" && !!product.representation && !failedImages.has(product.id);
 const page = usePage();
 const isMdUp = useMediaQuery("(min-width: 768px)");
 
@@ -207,13 +213,11 @@ function onMobilePaginationChange(pageNum) {
                         class="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center"
                     >
                         <img
-                            v-if="
-                                record.product?.representation_type ===
-                                    'image' && record.product?.representation
-                            "
+                            v-if="showsImage(record.product)"
                             :src="record.product.representation"
                             :alt="record.product.name"
                             class="w-full h-full object-cover rounded-lg"
+                            @error="failedImages.add(record.product.id)"
                         />
                         <div
                             v-else
@@ -363,14 +367,11 @@ function onMobilePaginationChange(pageNum) {
                             class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gray-200"
                         >
                             <img
-                                v-if="
-                                    record.product?.representation_type ===
-                                        'image' &&
-                                    record.product?.representation
-                                "
+                                v-if="showsImage(record.product)"
                                 :src="record.product.representation"
                                 :alt="record.product.name"
                                 class="h-full w-full rounded-lg object-cover"
+                                @error="failedImages.add(record.product.id)"
                             />
                             <div
                                 v-else

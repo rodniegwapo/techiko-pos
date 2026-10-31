@@ -139,6 +139,14 @@ onBeforeUnmount(() => {
                         <span v-if="entry.parent" class="text-gray-400">{{ entry.parent }} › </span>{{ entry.title }}
                     </span>
                     <span
+                        v-if="entry.tidied && !entry.upgrade"
+                        class="shrink-0 text-[11px] text-gray-400"
+                        data-testid="nav-search-tidied"
+                        title="Not in the menu for this kind of business. Settings → Business type → Show all menu items brings it back."
+                    >
+                        Not in your menu
+                    </span>
+                    <span
                         v-if="entry.upgrade"
                         class="flex items-center gap-0.5 text-[11px] text-amber-600"
                         data-testid="nav-search-upgrade"

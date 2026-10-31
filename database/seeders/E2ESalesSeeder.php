@@ -33,6 +33,9 @@ use RuntimeException;
  */
 class E2ESalesSeeder extends Seeder
 {
+    /** On the shifts this setup opens, so the teardown ends those and nothing else. */
+    public const SETUP_SHIFT_NOTE = 'Opened by the e2e test setup';
+
     public const DOMAIN = 'jollibee-corp';
 
     public const LOCATION_CODE = 'JB-MAIN';
@@ -111,9 +114,16 @@ class E2ESalesSeeder extends Seeder
         );
 
         foreach (User::whereIn('email', $emails)->pluck('id') as $userId) {
+            // A shift left open by a run on an earlier day would refuse today's payments: end it first.
+            RegisterShift::query()
+                ->where('domain', self::DOMAIN)->where('user_id', $userId)->where('status', RegisterShift::OPEN)
+                ->whereDate('business_date', '<', $today)
+                ->update(['status' => RegisterShift::CLOSED, 'closed_at' => now()]);
+            // Tagged, so the run's teardown ends the shifts it opened (E2EEndSetupShiftsSeeder). A
+            // shift someone opened themselves is reused as it is and left alone.
             RegisterShift::query()->firstOrCreate(
                 ['domain' => self::DOMAIN, 'location_id' => $location->id, 'user_id' => $userId, 'status' => RegisterShift::OPEN],
-                ['business_date' => $today, 'opening_cash' => 0, 'opened_at' => now()],
+                ['business_date' => $today, 'opening_cash' => 0, 'opened_at' => now(), 'notes' => self::SETUP_SHIFT_NOTE],
             );
         }
     }

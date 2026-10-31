@@ -12,6 +12,7 @@ import {
     generateSku,
 } from "@/Composables/useProductCodes";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
+import { useBusinessType } from "@/Composables/useBusinessType";
 import { useSharedCatalogLookup } from "@/Composables/useSharedCatalogLookup";
 import {
     validationHasError,
@@ -48,6 +49,12 @@ const props = defineProps({
     },
 });
 
+// A new product starts the way this kind of business usually sells (Settings → Business type).
+const { preset } = useBusinessType();
+const presetSoldType = (page.props.sold_by_types ?? []).some((t) => t.name === preset.value.soldType)
+    ? preset.value.soldType
+    : null;
+
 const form = useForm({
     name: "",
     domain: "",
@@ -56,11 +63,11 @@ const form = useForm({
     price: null,
     SKU: "",
     barcode: "",
-    sold_type: null,
+    sold_type: presetSoldType,
     representation_type: "color",
     representation: "",
     representation_image: null,
-    track_inventory: true,
+    track_inventory: preset.value.trackStock,
     reorder_level: 0,
     // The form always says it sent the modifier field, so clearing it clears them.
     modifier_groups_present: true,

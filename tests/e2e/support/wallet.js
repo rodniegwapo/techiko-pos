@@ -14,7 +14,10 @@ export const walletUrl = `/domains/${WALLET_DOMAIN}/wallet/money-movement`;
 export const drawerUrl = `/domains/${WALLET_DOMAIN}/wallet/drawer`;
 export const cashInOutUrl = `/domains/${WALLET_DOMAIN}/wallet/cash-in-out`;
 export const balancesUrl = `/domains/${WALLET_DOMAIN}/wallet/balances`;
+/** Drawer history's old address: it lands on Shifts & counts' store counts. */
 export const historyUrl = `/domains/${WALLET_DOMAIN}/wallet/history`;
+/** Shifts & counts: cashier shifts to review, and the store's counts by day. */
+export const shiftsUrl = `/domains/${WALLET_DOMAIN}/wallet/shifts`;
 export const ledgerUrl = (path = "") => `/domains/${WALLET_DOMAIN}/wallet/cash-ledger${path}`;
 export const cardTypesUrl = (path = "") => `/domains/${WALLET_DOMAIN}/payment-card-types${path}`;
 export const cardTypeUrl = (id, path = "") => cardTypesUrl(`/${id}${path}`);
@@ -123,7 +126,8 @@ export class DrawerPage {
     static async open(page, businessDate, query = {}) {
         const params = new URLSearchParams(businessDate ? { business_date: businessDate, ...query } : query);
         await page.goto(`${drawerUrl}${params.size ? `?${params}` : ""}`);
-        await expect(page.getByTestId("drawer-expected")).toBeVisible();
+        // Supervisors and up see the store's drawer; a cashier only their own shift.
+        await expect(page.getByTestId("drawer-expected").or(page.getByTestId("my-shift")).first()).toBeVisible();
         return new DrawerPage(page);
     }
 
@@ -179,29 +183,37 @@ export class DrawerPage {
         return this.save("/cash-ledger/opening-cash", () => dialog.getByRole("button", { name: "Save opening" }).click());
     }
 
-    async openCountCash() {
-        await this.page.getByTestId("open-count-cash").click();
-        const dialog = this.dialog("Count cash");
-        await expect(dialog).toBeVisible();
-        return dialog;
-    }
-
+    /**
+     * Records a count of the store's whole drawer for the day being viewed, then reloads. The page
+     * has no button for it (each person spot checks their own drawer); End the day starts from it.
+     */
     async countCash(amount, notes = "") {
-        const dialog = await this.openCountCash();
-        await numberInput(dialog, "count-amount").fill(String(amount));
-        if (notes) await dialog.getByPlaceholder("Notes (optional)").fill(notes);
-        return this.save("/cash-ledger/counted-cash", () => dialog.getByRole("button", { name: "Save count" }).click());
+        const url = new URL(this.page.url());
+        const xsrf = (await this.page.context().cookies()).find((c) => c.name === "XSRF-TOKEN");
+        const res = await this.page.request.post(ledgerUrl("/counted-cash"), {
+            data: {
+                business_date: url.searchParams.get("business_date") || todayYmd(),
+                ...(url.searchParams.get("location_id") ? { location_id: url.searchParams.get("location_id") } : {}),
+                counted_cash: amount,
+                notes: notes || null,
+            },
+            headers: { Accept: "application/json", "X-Requested-With": "XMLHttpRequest", ...(xsrf ? { "X-XSRF-TOKEN": decodeURIComponent(xsrf.value) } : {}) },
+            maxRedirects: 0,
+        });
+        await this.page.reload();
+        await expect(this.expected).toBeVisible();
+        return res;
     }
 
     /**
      * Ends the store's day (a manager's, once no cashier is still on shift).
-     * @param {"Take the cash out"|"Leave it as the next shift's opening"} choice
+     * @param {"Cash out to Cash on hand"|"Leave it as the next shift's opening"} choice
      */
     async endShift(choice) {
         await this.page.getByTestId("open-end-shift").click();
         const dialog = this.dialog("End the store's day");
         await expect(dialog).toBeVisible();
-        await dialog.getByTestId(choice === "Take the cash out" ? "end-shift-cashout" : "end-shift-keep").click();
+        await dialog.getByTestId(choice === "Cash out to Cash on hand" ? "end-shift-cashout" : "end-shift-keep").click();
         return this.save("/cash-ledger/close-shift", () => dialog.getByTestId("confirm-end-shift").click());
     }
 
@@ -230,11 +242,13 @@ export class CashInOutPage {
         return new CashInOutPage(page);
     }
 
-    /** Opens + Cash in / − Cash out / Move money and returns the dialog. */
+    /** Opens + Cash movement, switches it to Cash in / Cash out / Move / Transfer, and returns the dialog. */
     async openDialog(mode) {
-        await this.page.getByTestId({ in: "add-cash-in", out: "add-cash-out", move: "move-money" }[mode]).click();
+        await this.page.getByTestId("cash-movement").click();
         const dialog = this.page.getByRole("dialog");
         await expect(dialog).toBeVisible();
+        const tab = dialog.getByTestId({ in: "add-cash-in", out: "add-cash-out", move: "move-money", transfer: "transfer-money" }[mode]);
+        if (await tab.count()) await tab.click();
         return dialog;
     }
 

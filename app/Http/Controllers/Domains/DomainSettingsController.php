@@ -7,8 +7,10 @@ use App\Models\Domain;
 use App\Models\InventoryLocation;
 use App\Models\Sale;
 use App\Models\User;
+use App\Support\FinanceAccess;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class DomainSettingsController extends Controller
@@ -42,7 +44,14 @@ class DomainSettingsController extends Controller
                 'allow_overselling' => (bool) data_get($settings, 'sales.allow_overselling', false),
                 'hide_out_of_stock' => (bool) data_get($settings, 'sales.hide_out_of_stock', false),
                 'allow_new_shift_while_review' => $domain->allowsNewShiftWhileReview(),
+                'business_type' => $domain->businessType(),
+                'show_all_menu' => $domain->showsAllMenu(),
+                'business_type_change' => $domain->businessTypeChange(),
             ],
+            // Dine-in suits food businesses; Settings points to it when the plan has it.
+            'hasDineIn' => $domain->hasFeature('dine_in'),
+            // It changes the menu for everyone and how new products start: owners and admins only.
+            'canChangeBusinessType' => FinanceAccess::canSeeAllStores($request->user()),
         ]);
     }
 
@@ -56,6 +65,8 @@ class DomainSettingsController extends Controller
             'hide_out_of_stock' => ['sometimes', 'boolean'],
             'allow_new_shift_while_review' => ['sometimes', 'boolean'],
             'currency_code' => ['sometimes', 'string', Rule::in(self::CURRENCIES)],
+            'business_type' => ['sometimes', 'string', Rule::in(Domain::availableBusinessTypes())],
+            'show_all_menu' => ['sometimes', 'boolean'],
         ]);
 
         if (array_key_exists('currency_code', $validated)) {
@@ -83,6 +94,26 @@ class DomainSettingsController extends Controller
         }
         if (array_key_exists('allow_new_shift_while_review', $validated)) {
             $sales['allow_new_shift_while_review'] = (bool) $validated['allow_new_shift_while_review'];
+        }
+        // What the business sells changes the menu for everyone and how new products start, so only an
+        // owner or admin changes it, and who did and when is kept. The same values sent back are fine.
+        // A saved type that's coming soon reads as retail, so retail sent back keeps it for when it opens.
+        $typeChanged = array_key_exists('business_type', $validated)
+            && ($domain->businessType() !== $validated['business_type'] || ! $domain->hasChosenBusinessType());
+        $menuChanged = array_key_exists('show_all_menu', $validated) && $domain->showsAllMenu() !== (bool) $validated['show_all_menu'];
+        if (($typeChanged || $menuChanged) && ! FinanceAccess::canSeeAllStores($request->user())) {
+            throw ValidationException::withMessages(['business_type' => 'Only an owner or admin can change the business type.']);
+        }
+        if ($typeChanged) {
+            $sales['business_type_previous'] = $sales['business_type'] ?? null;
+            $sales['business_type'] = $validated['business_type'];
+        }
+        if ($menuChanged) {
+            $sales['show_all_menu'] = (bool) $validated['show_all_menu'];
+        }
+        if ($typeChanged || $menuChanged) {
+            $sales['business_type_changed_by'] = $request->user()->name;
+            $sales['business_type_changed_at'] = now()->toIso8601String();
         }
 
         $current['sales'] = $sales;

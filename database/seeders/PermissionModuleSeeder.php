@@ -230,6 +230,14 @@ class PermissionModuleSeeder extends Seeder
                 'is_active' => true,
             ],
             [
+                'name' => 'cash-on-hand',
+                'display_name' => 'Cash on hand',
+                'icon' => 'cash',
+                'description' => "The business's cash the owner holds, and collecting approved shifts into it",
+                'sort_order' => 19,
+                'is_active' => true,
+            ],
+            [
                 'name' => 'timesheets',
                 'display_name' => 'Timeclock',
                 'icon' => 'clock',

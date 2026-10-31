@@ -26,9 +26,9 @@ const inventoryApi = {
 
 // Must match App\Models\InventoryMovement::getValidReferenceTypes()
 // Why stock is coming in. Damaged, expired or stolen stock goes out, so it belongs to Stock
-// Adjustments, not here.
+// Adjustments, not here. Stock bought from a supplier is received on its purchase order in
+// Purchasing, so the bill and payment follow; it isn't offered here.
 const referenceTypeSelectOptions = [
-  { label: "Purchase (bought from a supplier)", value: "Purchase" },
   { label: "Customer return", value: "CustomerReturn" },
   { label: "Free / promo stock", value: "PromotionalGiveaway" },
 ];
@@ -47,7 +47,7 @@ const { visible } = toRefs(props);
 const form = reactive({
   location_id: null,
   items: [],
-  reference_type: "Purchase",
+  reference_type: null,
   reference_id: null,
   domain: page.props.isGlobalView ? null : (page.props.currentDomain?.name_slug || null),
 });
@@ -92,7 +92,7 @@ const loadStoreItemCount = async (locationId) => {
 const initializeForm = () => {
   form.location_id = props.currentLocation?.id || null;
   form.items = [];
-  form.reference_type = "Purchase";
+  form.reference_type = null;
   form.reference_id = null;
   productSearch.value = "";
   searchResults.value = [];
@@ -193,6 +193,14 @@ const handleSubmit = async () => {
     notification.warning({
       message: "No Items",
       description: "Please add at least one product to receive",
+    });
+    return;
+  }
+  // Left empty, the server would book it as a purchase, which belongs in Purchasing.
+  if (!form.reference_type) {
+    notification.warning({
+      message: "Choose a reason",
+      description: "Pick why this stock is coming in",
     });
     return;
   }
@@ -370,17 +378,18 @@ watch(
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">
-            Reference Type
+            Reference Type *
           </label>
           <a-select
             v-model:value="form.reference_type"
             class="w-full"
             data-testid="receive-reference-type"
+            placeholder="Why is this stock coming in?"
             :disabled="loading"
             :options="referenceTypeSelectOptions"
           />
           <p class="mb-0 mt-1 text-xs text-gray-500">
-            Ordering from a supplier? Use Purchasing, so the supplier bill and payment follow.
+            Bought from a supplier? Receive it on its purchase order in Purchasing, so the supplier bill and payment follow.
           </p>
         </div>
         <div>

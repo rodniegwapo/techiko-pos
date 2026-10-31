@@ -17,6 +17,7 @@ class DiningTable extends Model
         'seats' => 'integer',
         'pos_x' => 'integer',
         'pos_y' => 'integer',
+        'needs_cleaning_at' => 'datetime',
     ];
 
     public function location(): BelongsTo

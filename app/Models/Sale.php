@@ -18,6 +18,24 @@ class Sale extends Model
         'is_tab' => 'boolean',
     ];
 
+    /** Eaten at a table, or taken away: set when a sale at a dine-in store is paid. */
+    public const ORDER_DINE_IN = 'dine_in';
+
+    public const ORDER_TAKE_OUT = 'take_out';
+
+    /**
+     * What the sale is, at payment: a tab (on a table or under a name) is eaten in; anything else
+     * paid at a store that serves dine-in is take-out; a store without dine-in has no order type.
+     */
+    public function orderTypeAt(?InventoryLocation $location): ?string
+    {
+        if ($this->is_tab) {
+            return self::ORDER_DINE_IN;
+        }
+
+        return $location?->dine_in ? self::ORDER_TAKE_OUT : null;
+    }
+
     // Remove domain relationship - now using domain string column
     // public function domain()
     // {

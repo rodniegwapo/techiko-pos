@@ -4,10 +4,18 @@ import {
     validationMessage,
 } from "@/Composables/useValidationMessage.js";
 
+import { computed } from "vue";
+import { usePage } from "@inertiajs/vue3";
+
 /** "Track stock" switch and "Low stock level" for the product create/edit forms. */
-defineProps({
+const props = defineProps({
     form: { type: Object, required: true },
 });
+
+// Sold by the kilo or liter: the level can be part of a unit, e.g. 2.5 kg.
+const page = usePage();
+const soldType = computed(() => page.props.sold_by_types?.find((t) => t.name === props.form.sold_type));
+const levelPrecision = computed(() => (soldType.value?.allows_decimal ? 2 : 0));
 </script>
 
 <template>
@@ -43,7 +51,8 @@ defineProps({
             <a-input-number
                 v-model:value="form.reorder_level"
                 :min="0"
-                :precision="0"
+                :precision="levelPrecision"
+                :addon-after="soldType?.allows_decimal ? soldType.unit : undefined"
                 class="w-full"
                 placeholder="0"
                 aria-label="Low stock level"

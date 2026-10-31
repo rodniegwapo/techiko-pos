@@ -46,6 +46,8 @@ const LEDGER_KIND_LABELS = {
     sale_payment: "Sale",
     sale_void: "Sale voided",
     credit_payment: "Credit payment",
+    to_cash_on_hand: "To Cash on hand",
+    from_cash_on_hand: "From Cash on hand",
 };
 
 const METHOD_WHERE_LABELS = {
@@ -117,10 +119,10 @@ watch(
 
 function visit(overrides = {}) {
     router.get(
-        getRoute("wallet.balances"),
+        getRoute("wallet.cash-in-out"),
         {
             ...props.keepQuery,
-            tab: "all",
+            view: "all",
             date_from: filterForm.date_from || undefined,
             date_to: filterForm.date_to || undefined,
             direction: filterForm.direction || undefined,

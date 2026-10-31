@@ -7,7 +7,7 @@ import { useHelpers } from "@/Composables/useHelpers";
  * one row per store, for owners.
  */
 const props = defineProps({
-    /** { stores: [{ id, name, drawer, channels: [{ id, name, kind, balance }], total }], total } */
+    /** { stores: [{ id, name, drawer, channels: [{ id, name, kind, balance }], total }], cash_on_hand, total } */
     allStores: { type: Object, required: true },
 });
 
@@ -42,14 +42,21 @@ const drawerTotal = computed(() => props.allStores.stores.reduce((sum, s) => sum
                     </td>
                     <td class="px-4 py-2 text-right font-mono font-semibold">{{ formattedTotal(store.total) }}</td>
                 </tr>
+                <!-- The business's cash the owner holds: no store, but part of where the money is. -->
+                <tr v-if="allStores.cash_on_hand" class="border-t border-gray-100 bg-gray-50/50" data-testid="all-stores-cash-on-hand">
+                    <td class="px-4 py-2 font-medium text-gray-800">Cash on hand <span class="font-normal text-gray-500">(with the owner)</span></td>
+                    <td class="px-4 py-2 text-right font-mono">{{ formattedTotal(allStores.cash_on_hand) }}</td>
+                    <td v-for="name in channelNames" :key="name" class="px-4 py-2 text-right"><span class="text-gray-300">—</span></td>
+                    <td class="px-4 py-2 text-right font-mono font-semibold">{{ formattedTotal(allStores.cash_on_hand) }}</td>
+                </tr>
                 <tr v-if="!allStores.stores.length">
                     <td :colspan="channelNames.length + 3" class="px-4 py-6 text-center text-gray-500">No stores yet.</td>
                 </tr>
             </tbody>
-            <tfoot v-if="allStores.stores.length > 1" class="border-t-2 border-gray-200 font-semibold">
+            <tfoot v-if="allStores.stores.length > 1 || allStores.cash_on_hand" class="border-t-2 border-gray-200 font-semibold">
                 <tr>
                     <td class="px-4 py-2">All stores</td>
-                    <td class="px-4 py-2 text-right font-mono">{{ formattedTotal(drawerTotal) }}</td>
+                    <td class="px-4 py-2 text-right font-mono">{{ formattedTotal(drawerTotal + (allStores.cash_on_hand || 0)) }}</td>
                     <td v-for="name in channelNames" :key="name" class="px-4 py-2 text-right font-mono">{{ formattedTotal(columnTotal(name)) }}</td>
                     <td class="px-4 py-2 text-right font-mono" data-testid="all-stores-total">{{ formattedTotal(allStores.total) }}</td>
                 </tr>
@@ -57,6 +64,7 @@ const drawerTotal = computed(() => props.allStores.stores.reduce((sum, s) => sum
         </table>
         <p class="m-0 border-t border-gray-100 px-4 py-2 text-xs text-gray-500">
             Cash drawer is what should be in each drawer today; a channel is what its sales and transfers add up to.
+            Cash on hand is the business's cash the owner collected from the drawers.
         </p>
     </div>
 </template>

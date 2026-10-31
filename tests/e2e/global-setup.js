@@ -14,7 +14,9 @@ export default function globalSetup() {
 
     // Order matters: E2ESalesSeeder writes tests/e2e/.fixtures.json, the later ones add to it,
     // and E2EProductSeeder stocks the stores E2EWalletSeeder creates.
-    for (const seeder of ["E2EUserSeeder", "E2ESalesSeeder", "E2EWalletSeeder", "E2EProductSeeder", "E2ECategorySeeder", "E2EDiscountSeeder", "E2EMandatoryDiscountSeeder", "E2EInventorySeeder", "E2EStockAdjustmentSeeder", "E2ELoyaltySeeder", "E2ECreditSeeder", "E2EVoidLogSeeder", "E2EPlanSeeder"]) {
+    // DineInPermissionSeeder only adds what's missing; the floor plan spec needs Tables for admins.
+    // ShiftSpotCheckPermissionSeeder too: everyone on the till spot checks their own drawer.
+    for (const seeder of ["DineInPermissionSeeder", "ShiftSpotCheckPermissionSeeder", "E2EUserSeeder", "E2ESalesSeeder", "E2EWalletSeeder", "E2EProductSeeder", "E2ECategorySeeder", "E2EDiscountSeeder", "E2EMandatoryDiscountSeeder", "E2EInventorySeeder", "E2EStockAdjustmentSeeder", "E2ELoyaltySeeder", "E2ECreditSeeder", "E2EVoidLogSeeder", "E2EPlanSeeder", "BusinessTypeSeeder", "E2ESettingsSeeder"]) {
         execSync(`php artisan db:seed --class="Database\\Seeders\\${seeder}"`, { stdio: "inherit" });
     }
 

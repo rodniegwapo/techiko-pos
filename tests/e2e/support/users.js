@@ -57,6 +57,20 @@ for (const plan of ["free", "basic", "standard", "premium"]) {
     USERS[`plan-${plan}`] = { email: `${domain}-admin@techiko.test`, password: "e2e-password", domain, role: "admin" };
 }
 
+/** Admins of the one-organization-per-business-type fixtures (database/seeders/BusinessTypeSeeder.php). */
+export const BUSINESS_TYPES = ["retail", "food", "grocery", "services", "other"];
+for (const type of BUSINESS_TYPES) {
+    const domain = `pos-${type}`;
+    USERS[domain] = { email: `${domain}-admin@techiko.test`, password: "e2e-password", domain, role: "admin" };
+}
+// A manager at the retail one: sees the business type but can't change it.
+USERS["pos-retail-manager"] = { email: "pos-retail-manager@techiko.test", password: "e2e-password", domain: "pos-retail", role: "manager" };
+
+/** The organization tests/e2e/settings changes (database/seeders/E2ESettingsSeeder.php). */
+for (const role of ["admin", "manager"]) {
+    USERS[`settings-${role}`] = { email: `e2e-settings-${role}@techiko.test`, password: "e2e-password", domain: "e2e-settings", role };
+}
+
 export const OTHER_DOMAIN = "mcdonalds-corp";
 
 /**

@@ -636,7 +636,8 @@ const handleProceedPayment = async () => {
 
         // Refresh current pending sale data to show updated state
         emit("cart-updated");
-        emit("payment-success");
+        // A take-out order at a dine-in store comes back with its kitchen ticket, to print.
+        emit("payment-success", { kitchenTicket: response.data.kitchen_ticket ?? null });
 
         localStorage.setItem("order_discount_amount", 0);
         localStorage.setItem("order_discount_ids", "");

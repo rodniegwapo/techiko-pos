@@ -19,6 +19,17 @@ class FinanceAccess
         return $level !== null && $level <= 3;
     }
 
+    /**
+     * Supervisors and up: the store's whole drawer (its total, spot checks, the opening). Each
+     * cashier has their own tray, so a cashier sees only their own shift.
+     */
+    public static function canOverseeDrawer(?User $user): bool
+    {
+        $level = self::level($user);
+
+        return $level !== null && $level <= 4;
+    }
+
     /** Admins work across every store and business-wide; managers only their own store. */
     public static function canSeeAllStores(?User $user): bool
     {

@@ -189,9 +189,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted, computed, watch } from "vue";
 import { useMediaQuery } from "@vueuse/core";
-import { Head } from "@inertiajs/vue3";
+import { Head, router } from "@inertiajs/vue3";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import ContentHeader from "@/Components/ContentHeader.vue";
 import ContentLayout from "@/Components/ContentLayout.vue";
@@ -213,6 +213,10 @@ const tabSize = computed(() => (isMdUp.value ? "large" : "small"));
 
 // Reactive data
 const activeTab = ref("rules");
+// Back on Program Rules after changing tiers: show the tiers as they are now.
+watch(activeTab, (tab) => {
+  if (tab === "rules") router.reload({ only: ["tiers"] });
+});
 const stats = ref({});
 
 // Analytics state. Its own stats: points issued and redeemed, and the sales members brought in.

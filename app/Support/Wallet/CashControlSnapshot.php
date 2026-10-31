@@ -14,7 +14,7 @@ use App\Models\WalletShiftReopenLog;
 /**
  * A store's cash drawer on one business day: opening, cash sales, cash in and out, expected and
  * counted cash, whether the shift is closed, the check against the last count, and the day's
- * count and opening-change history. Today's drawer and Drawer history are built on it.
+ * count and opening-change history. Today's drawer and Shifts & counts' store counts are built on it.
  */
 class CashControlSnapshot
 {
@@ -161,6 +161,8 @@ class CashControlSnapshot
                     'expected_cash_snapshot' => $row->expected_cash_snapshot !== null ? (float) $row->expected_cash_snapshot : null,
                     'variance_snapshot' => $row->variance_snapshot !== null ? (float) $row->variance_snapshot : null,
                     'notes' => $row->notes,
+                    // spot_check, end_of_day or shift; older counts: a cashier's shift, or just a count.
+                    'kind' => $row->kind ?? ($row->register_shift_id ? WalletCashCountSubmission::SHIFT : null),
                     'counted_at' => $row->counted_at?->toIso8601String(),
                     'counted_by_user' => $row->countedBy !== null
                         ? [
@@ -204,6 +206,11 @@ class CashControlSnapshot
                 ? (int) $recon->counted_by
                 : null,
             'counted_by_user' => $countedByUser,
+            // Which count the drawer shows: a spot check during the day (End the day takes the final one).
+            'counted_kind' => $recon?->counted_at !== null
+                ? WalletCashCountSubmission::query()->where('reconciliation_id', $recon->id)->whereNull('register_shift_id')
+                    ->latest('counted_at')->latest('id')->value('kind')
+                : null,
             'opening_last_updated_by_user' => $openingLastUpdatedByUser,
             'opening_last_updated_at' => $openingLastUpdatedAt,
             'opening_is_saved' => $openingIsSaved,

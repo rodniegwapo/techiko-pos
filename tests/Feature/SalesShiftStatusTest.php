@@ -52,12 +52,14 @@ class SalesShiftStatusTest extends TestCase
 
     public function test_no_row_means_not_started_and_not_closed(): void
     {
-        [$domain, , $user] = $this->context();
+        [$domain, $location, $user] = $this->context();
 
         $status = $this->shiftStatus($domain, $user);
 
         $this->assertFalse($status['is_open']);
         $this->assertFalse($status['is_closed']);
+        // Starting a shift from the page acts on the store this status was checked for.
+        $this->assertSame($location->id, $status['location_id']);
     }
 
     public function test_an_ended_shift_is_reported_closed_and_anyone_with_the_permission_can_reopen(): void

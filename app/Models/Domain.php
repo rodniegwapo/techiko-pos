@@ -272,6 +272,11 @@ class Domain extends Model
             return true;
         }
 
+        // Dine-in is coming soon: off for everyone, VIP too, until config features.dine_in opens it.
+        if ($key === 'dine_in' && ! config('features.dine_in', false)) {
+            return false;
+        }
+
         if (! in_array($key, self::FEATURES, true)) {
             return false;
         }
@@ -309,6 +314,89 @@ class Domain extends Model
         $s = $this->settings['sales'] ?? [];
 
         return (bool) ($s['hide_out_of_stock'] ?? false);
+    }
+
+    /**
+     * What the business sells. It only presets the product form (useBusinessType.js: track stock,
+     * sold type, which sections show); it never locks a feature or changes saved products.
+     */
+    public const BUSINESS_TYPES = ['retail', 'food', 'grocery', 'services', 'other'];
+
+    /**
+     * The business types open for picking (config features.business_types: "all" or a comma list);
+     * the rest show "Coming soon". Retail is always open.
+     *
+     * @return list<string>
+     */
+    public static function availableBusinessTypes(): array
+    {
+        $setting = config('features.business_types', 'retail');
+        if (trim((string) $setting) === 'all') {
+            return self::BUSINESS_TYPES;
+        }
+
+        $listed = is_array($setting) ? $setting : array_map('trim', explode(',', (string) $setting));
+
+        return array_values(array_filter(self::BUSINESS_TYPES, fn (string $t) => $t === 'retail' || in_array($t, $listed, true)));
+    }
+
+    /**
+     * The business type (Settings → Business type); retail, today's form, when none was picked. A
+     * type that isn't open yet reads as retail too; its saved value is kept for when it opens.
+     */
+    public function businessType(): string
+    {
+        $type = $this->settings['sales']['business_type'] ?? null;
+
+        return in_array($type, self::availableBusinessTypes(), true) ? $type : 'retail';
+    }
+
+    /**
+     * The last change to the business type or "Show all menu items" made on Settings: who, when, and
+     * the type before it. Null when it was only set at signup, or never.
+     *
+     * @return array{by: string, at: string, from: ?string, to: string}|null
+     */
+    public function businessTypeChange(): ?array
+    {
+        $sales = $this->settings['sales'] ?? [];
+        if (empty($sales['business_type_changed_at'])) {
+            return null;
+        }
+
+        return [
+            'by' => (string) ($sales['business_type_changed_by'] ?? ''),
+            'at' => (string) $sales['business_type_changed_at'],
+            'from' => in_array($sales['business_type_previous'] ?? null, self::BUSINESS_TYPES, true) ? $sales['business_type_previous'] : null,
+            'to' => $this->businessType(),
+        ];
+    }
+
+    /** "Show all menu items": the sidebar keeps the pages the business type would tidy away. */
+    public function showsAllMenu(): bool
+    {
+        return (bool) ($this->settings['sales']['show_all_menu'] ?? false);
+    }
+
+    /**
+     * Parts of the app the business has records in: tables (a store with dine-in on, or tables set
+     * up) and stock (a product that tracks it). Settings names them when its type hides those pages.
+     *
+     * @return array{dining_tables: bool, stock: bool}
+     */
+    public function menuInUse(): array
+    {
+        return [
+            'dining_tables' => InventoryLocation::query()->forDomain($this->name_slug)->where('dine_in', true)->exists()
+                || DiningTable::query()->whereIn('location_id', InventoryLocation::query()->forDomain($this->name_slug)->select('id'))->exists(),
+            'stock' => Product\Product::query()->where('domain', $this->name_slug)->where('track_inventory', true)->exists(),
+        ];
+    }
+
+    /** Someone picked the business type; until then it reads as retail and admins are asked to pick it. */
+    public function hasChosenBusinessType(): bool
+    {
+        return in_array($this->settings['sales']['business_type'] ?? null, self::BUSINESS_TYPES, true);
     }
 
     /** A cashier may start a new shift while their last one waits for a manager's review (on unless the store turns it off). */

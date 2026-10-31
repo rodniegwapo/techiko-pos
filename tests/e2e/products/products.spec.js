@@ -147,7 +147,8 @@ test.describe("Create product", () => {
         await expect(toast(page, "Please fix")).toBeVisible();
         await expect(form.error("Product Name")).toContainText("product name field is required", { timeout: 15_000 });
         await expect(form.error("Price")).toContainText("price field is required");
-        await expect(form.error("Sold Type")).toContainText("sold type field is required");
+        // A retail business (Settings → Business type) starts new products as Piece, so it's never missing.
+        await expect(form.error("Sold Type")).toHaveCount(0);
     });
 
     test("Generate fills a SKU from the name and a scannable in-store barcode", async ({ page }) => {

@@ -124,6 +124,7 @@ const itemColumns = [
                     <a-descriptions-item label="Date" :span="2">{{ sale.transaction_date_display }}</a-descriptions-item>
                     <a-descriptions-item label="Cashier">{{ sale.cashier_name || "—" }}</a-descriptions-item>
                     <a-descriptions-item label="Customer">{{ sale.customer_name }}</a-descriptions-item>
+                    <a-descriptions-item v-if="sale.order_type_label" label="Order">{{ sale.order_type_label }}</a-descriptions-item>
                     <a-descriptions-item label="Location">{{ sale.location_name || "—" }}</a-descriptions-item>
                     <a-descriptions-item label="Status">
                         <a-tag :color="statusColor(sale.payment_status)">{{ sale.payment_status }}</a-tag>

@@ -25,6 +25,15 @@ function pickStore() {
     router.get(getRoute("dining-tables.index"), { location_id: storeId.value }, { preserveState: false });
 }
 
+const togglingCleaning = ref(false);
+function setCleaning(on) {
+    togglingCleaning.value = true;
+    router.put(getRoute("dining-tables.settings"), { location_id: props.location.id, table_cleaning: on }, {
+        ...opts,
+        onFinish: () => (togglingCleaning.value = false),
+    });
+}
+
 const togglingDineIn = ref(false);
 function setDineIn(on) {
     togglingDineIn.value = true;
@@ -57,14 +66,42 @@ function remove(table) {
 }
 
 // The floor plan: drag a table onto another cell, then save.
+// Adding, editing or removing a table reloads the list; tables moved but not saved yet keep their
+// new cells, and a new table placed on a cell one of them now takes goes to the first free cell.
 const positions = ref({});
+let saved = {};
 watch(
     () => props.tables,
     (tables) => {
-        positions.value = Object.fromEntries(tables.map((t) => [t.id, { x: t.pos_x, y: t.pos_y }]));
+        const moved = Object.fromEntries(
+            Object.entries(positions.value).filter(([id, p]) => saved[id] && (saved[id].x !== p.x || saved[id].y !== p.y)),
+        );
+        saved = Object.fromEntries(tables.map((t) => [t.id, { x: t.pos_x, y: t.pos_y }]));
+        const next = {};
+        for (const t of tables) {
+            if (moved[t.id]) next[t.id] = moved[t.id];
+        }
+        const taken = (x, y) => Object.values(next).some((p) => p.x === x && p.y === y);
+        for (const t of tables) {
+            if (next[t.id]) continue;
+            let spot = { x: t.pos_x, y: t.pos_y };
+            if (taken(spot.x, spot.y)) {
+                spot = freeCell(taken) ?? spot;
+            }
+            next[t.id] = spot;
+        }
+        positions.value = next;
     },
     { immediate: true },
 );
+function freeCell(taken) {
+    for (let y = 0; y < props.grid.rows; y++) {
+        for (let x = 0; x < props.grid.columns; x++) {
+            if (!taken(x, y)) return { x, y };
+        }
+    }
+    return null;
+}
 const dirty = computed(() => props.tables.some((t) => positions.value[t.id]?.x !== t.pos_x || positions.value[t.id]?.y !== t.pos_y));
 const cells = computed(() => {
     const list = [];
@@ -124,6 +161,20 @@ function saveLayout() {
                         </div>
                     </div>
                 </div>
+                <div v-if="location.dine_in" class="flex items-center gap-3">
+                    <a-switch
+                        :checked="location.table_cleaning"
+                        :loading="togglingCleaning"
+                        data-testid="table-cleaning-switch"
+                        @change="setCleaning"
+                    />
+                    <div>
+                        <div class="font-medium">Mark tables ready after paying</div>
+                        <div class="text-xs text-gray-500">
+                            A paid table shows "Needs clearing" until staff tap it ready, so no one is seated at a dirty table.
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <ContentLayout title="Tables">
@@ -148,6 +199,7 @@ function saveLayout() {
                                     <div
                                         v-for="c in cells"
                                         :key="`${c.x}-${c.y}`"
+                                        :data-testid="`floor-cell-${c.x}-${c.y}`"
                                         class="flex h-16 items-center justify-center rounded border border-dashed border-gray-300 bg-white/50"
                                         @dragover.prevent
                                         @drop.prevent="drop(c.x, c.y)"
@@ -184,6 +236,7 @@ function saveLayout() {
                                 <template v-if="column.key === 'name'">
                                     <span class="font-medium">{{ record.name }}</span>
                                     <a-tag v-if="record.busy" color="orange" class="ml-2">Open tab</a-tag>
+                                    <a-tag v-else-if="record.cleaning" class="ml-2">Needs clearing</a-tag>
                                     <a-tag v-if="!record.is_active" class="ml-2">Hidden</a-tag>
                                 </template>
                                 <template v-else-if="column.key === 'area'">{{ record.area || "—" }}</template>

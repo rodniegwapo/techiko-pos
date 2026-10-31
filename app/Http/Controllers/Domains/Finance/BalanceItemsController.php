@@ -18,6 +18,7 @@ use App\Models\PaymentCardType;
 use App\Models\WalletCashMovement;
 use App\Services\ExpenseService;
 use App\Services\Finance\CashRegisterPosting;
+use App\Support\Wallet\CashOnHand;
 use App\Support\Wallet\WalletCashBridgeExpected;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -80,9 +81,10 @@ class BalanceItemsController extends Controller
             ]);
 
         $investments = OwnerInvestment::query()->forDomain($slug)->with('location:id,name')->orderByDesc('investment_date')->limit(100)->get();
+        // Owner withdrawals: from a drawer, and what the owner kept out of Cash on hand.
         $withdrawn = (float) WalletCashMovement::query()->forDomain($slug)->where('kind', 'owner_draw')
             ->where(fn ($q) => $q->whereNull('notes')->orWhere('notes', '!=', WalletCashBridgeExpected::NOTE_ENDSHIFT_CASHOUT))
-            ->sum('amount');
+            ->sum('amount') + CashOnHand::ownerUseTotal($slug);
 
         return Inertia::render('Finance/AssetsAndLoans', [
             'accounts' => $accounts,

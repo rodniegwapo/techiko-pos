@@ -84,6 +84,10 @@ const props = defineProps({
     },
     /** Server sale row (VAT / grand_total) when cart is online — used by drawer order summary */
     currentSale: { type: Object, default: null },
+    /** The store serves dine-in: the panel offers Dine-in / Take-out and says what comes next. */
+    dineInEnabled: { type: Boolean, default: false },
+    /** The cart is a table's (or a named) tab: Dine-in. Otherwise the till's own cart: Take-out. */
+    isTab: { type: Boolean, default: false },
     salesSettings: {
         type: Object,
         default: () => ({}),
@@ -796,6 +800,8 @@ const handleAddCustomer = async () => {
 
 // Emit customer changes to parent
 const emit = defineEmits([
+    // "dine_in" (pick a table) or "take_out" (the till's own cart)
+    "order-type",
     "customerChanged",
     "discount-applied",
     "cart-updated",
@@ -855,6 +861,31 @@ defineExpose({
                 !isCoffeeshopLayout && !isDrawerLayout ? 'contents' : ''
             "
         >
+            <!-- Dine-in stores: for here (a table's tab) or to go (the till's own cart). -->
+            <div
+                v-if="dineInEnabled"
+                class="mb-3 flex w-full shrink-0 gap-1 rounded-xl bg-gray-100 p-1"
+                role="group"
+                aria-label="Order type"
+                data-testid="order-type"
+            >
+                <button
+                    v-for="t in [
+                        { key: 'dine_in', label: 'Dine-in', hint: 'Pick a table' },
+                        { key: 'take_out', label: 'Take-out', hint: 'Pay now, to go' },
+                    ]"
+                    :key="t.key"
+                    type="button"
+                    class="flex flex-1 flex-col items-center rounded-lg px-3 py-2 text-sm font-semibold transition"
+                    :class="(t.key === 'dine_in') === isTab ? 'bg-white text-gray-900 shadow-sm ring-1 ring-gray-200' : 'text-gray-500 hover:text-gray-800'"
+                    :aria-pressed="(t.key === 'dine_in') === isTab"
+                    :data-testid="`order-type-${t.key}`"
+                    @click="emit('order-type', t.key)"
+                >
+                    {{ t.label }}
+                    <span class="text-[11px] font-normal text-gray-400">{{ t.hint }}</span>
+                </button>
+            </div>
             <div
                 class="flex shrink-0 items-start justify-between gap-2"
                 :class="
@@ -1325,8 +1356,23 @@ defineExpose({
                                             },
                                     ]"
                                 >
+                                    <!-- Dine-in stores: what to do next, instead of the empty placeholder. -->
                                     <div
-                                        v-if="orders.length == 0"
+                                        v-if="orders.length == 0 && dineInEnabled"
+                                        class="mx-auto mt-6 max-w-xs rounded-lg border border-dashed border-gray-300 p-4 text-center text-sm text-gray-600"
+                                        data-testid="order-next-step"
+                                    >
+                                        <template v-if="isTab">
+                                            Add the guests' food and drinks, then <b>Send to kitchen</b>.
+                                            Take payment when they're ready to leave.
+                                        </template>
+                                        <template v-else>
+                                            <b>Take-out:</b> add the order, then take payment. The kitchen
+                                            ticket prints when it's paid. Eating here? Tap <b>Dine-in</b>.
+                                        </template>
+                                    </div>
+                                    <div
+                                        v-else-if="orders.length == 0"
                                         class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center"
                                         :class="
                                             isCoffeeshopLayout

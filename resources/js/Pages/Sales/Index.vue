@@ -9,6 +9,7 @@ import {
     h,
 } from "vue";
 import axios from "axios";
+import dayjs from "dayjs";
 import { v4 as uuidv4 } from "uuid";
 import { Modal, Button, notification } from "ant-design-vue";
 import {
@@ -63,6 +64,7 @@ import ModifierPickerModal from "./components/ModifierPickerModal.vue";
 import QuantityPromptModal from "./components/QuantityPromptModal.vue";
 import TimeclockButton from "./components/TimeclockButton.vue";
 import TablesScreen from "./components/DineIn/TablesScreen.vue";
+import KitchenTicketModal from "./components/DineIn/KitchenTicketModal.vue";
 import TabBar from "./components/DineIn/TabBar.vue";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 import { allowsDecimal, toQuantity } from "@/Utils/quantity";
@@ -107,8 +109,15 @@ const productTableLayout = computed(() =>
     isMdUp.value ? "desktop" : "mobile",
 );
 
-function onCoffeeshopPaymentSuccess() {
+function onCoffeeshopPaymentSuccess(result) {
+    onPaid(result);
     goToOrderStep();
+}
+
+// Paid: a take-out order's kitchen ticket (dine-in stores) is shown to print.
+const paidKitchenTicket = ref(null);
+function onPaid(result) {
+    if (result?.kitchenTicket) paidKitchenTicket.value = result.kitchenTicket;
 }
 
 // The footer button moves to the payment step, then on that step it takes the payment
@@ -176,10 +185,53 @@ const activeLocationId = computed(() => page.props.currentLocation?.id);
 // Clock in / out with your own PIN, on the till everyone shares.
 const { hasPermission } = usePermissionsV2();
 const canPunch = computed(() => hasPermission("timesheets.punch"));
+// A food business whose store doesn't serve dine-in yet: those who set up tables are pointed there.
+const DINE_IN_TIP_KEY = "techiko.sales.dineInTip.closed";
+const dineInTipClosed = ref(false);
+try {
+    dineInTipClosed.value = sessionStorage.getItem(DINE_IN_TIP_KEY) === "1";
+} catch {
+    // Storage blocked: the tip shows again.
+}
+const showDineInTip = computed(
+    () =>
+        !dineInTipClosed.value &&
+        page.props.businessType === "food" &&
+        !!page.props.domainFeatures?.dine_in &&
+        !page.props.dineIn?.enabled &&
+        hasPermission("dining-tables.index"),
+);
+function closeDineInTip() {
+    dineInTipClosed.value = true;
+    try {
+        sessionStorage.setItem(DINE_IN_TIP_KEY, "1");
+    } catch {
+        // Nothing to remember it in.
+    }
+}
 const cashierUserId = computed(() => page.props.auth?.user?.data?.id);
 
 const shiftIsOpen = computed(() => page.props.shiftStatus?.is_open ?? true);
 const shiftBannerModalOpen = ref(false);
+
+// A manager (or the cashier on another device) can end the shift while this page stays open:
+// re-check it now and then, and when the cashier comes back to the tab.
+const SHIFT_STATUS_POLL_MS = 30000;
+let shiftStatusTimer = null;
+let inertiaVisitActive = false;
+const stopVisitStart = router.on("start", () => (inertiaVisitActive = true));
+const stopVisitFinish = router.on("finish", () => (inertiaVisitActive = false));
+
+function refreshShiftStatus() {
+    // A reload would cancel a visit in progress, and an open modal reads these props.
+    if (!salesCartIsOnline.value || inertiaVisitActive || shiftBannerModalOpen.value) return;
+    if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+    router.reload({ only: ["shiftStatus"] });
+}
+
+function onShiftTabVisible() {
+    if (document.visibilityState === "visible") refreshShiftStatus();
+}
 
 const offlinePaymentMethod = ref("cash");
 const offlinePaymentCardTypeId = ref(null);
@@ -210,13 +262,31 @@ const currentSale = ref(null);
 const tablesOpen = ref(false);
 const dineInEnabled = computed(() => !!page.props.dineIn?.enabled && salesCartIsOnline.value);
 const isTab = computed(() => !!currentSale.value?.is_tab);
-// A tab that was paid or cancelled: back to the tables for the next one.
-watch(isTab, (now, before) => {
-    if (before && !now && dineInEnabled.value) tablesOpen.value = true;
-});
+// A tab paid or cancelled leaves the till on its own (take-out) cart: nothing pops up, the
+// Dine-in / Take-out buttons say where it is. The tab bar's Tables button opens the tables.
 async function onTabLeft() {
     await loadCurrentPendingSale();
+}
+async function onTabTables() {
+    await loadCurrentPendingSale();
     if (dineInEnabled.value) tablesOpen.value = true;
+}
+// Dine-in / Take-out on the order panel: Dine-in picks a table; Take-out goes back to the till's own
+// cart (the tab stays open for its table).
+async function chooseOrderType(type) {
+    if (type === "dine_in") {
+        tablesOpen.value = true;
+        return;
+    }
+    if (isTab.value) {
+        try {
+            await axios.post(getRoute("tabs.leave"));
+        } catch (e) {
+            message.error("Could not switch to take-out.");
+            return;
+        }
+        await loadCurrentPendingSale();
+    }
 }
 const orderDiscountAmount = ref(0);
 const orderDiscountId = ref("");
@@ -1365,6 +1435,8 @@ onMounted(async () => {
     if (typeof window !== "undefined") {
         window.addEventListener("online", onWindowOnline);
         window.addEventListener("offline", onWindowOffline);
+        document.addEventListener("visibilitychange", onShiftTabVisible);
+        shiftStatusTimer = window.setInterval(refreshShiftStatus, SHIFT_STATUS_POLL_MS);
     }
     try {
         if (salesCartIsOnline.value) {
@@ -1389,7 +1461,11 @@ onBeforeUnmount(() => {
     if (typeof window !== "undefined") {
         window.removeEventListener("online", onWindowOnline);
         window.removeEventListener("offline", onWindowOffline);
+        document.removeEventListener("visibilitychange", onShiftTabVisible);
+        window.clearInterval(shiftStatusTimer);
     }
+    stopVisitStart();
+    stopVisitFinish();
 });
 
 function displayCategoryNameForSales(product) {
@@ -1617,12 +1693,26 @@ watch(
                                 A manager ended this store's day. It is
                                 reopened before taking payments.
                             </template>
+                            <template v-else-if="$page.props.shiftStatus?.overdue_since">
+                                Your shift from {{ dayjs($page.props.shiftStatus.overdue_since).format("MMM D") }} is still open.
+                                Count your drawer and end it before taking payments.
+                            </template>
                             <template v-else>
                                 You have no shift open at this store. Start
                                 your shift before taking payments.
                             </template>
                         </span>
                         <a-button
+                            v-if="$page.props.shiftStatus?.overdue_since && !$page.props.shiftStatus?.is_closed"
+                            type="primary"
+                            size="small"
+                            data-testid="shift-banner-end-overdue"
+                            @click="router.visit(getRoute('wallet.drawer'))"
+                        >
+                            End it on Today's drawer
+                        </a-button>
+                        <a-button
+                            v-else
                             type="primary"
                             size="small"
                             data-testid="shift-banner-action"
@@ -1634,11 +1724,27 @@ watch(
                 </template>
             </a-alert>
 
+            <a-alert
+                v-if="showDineInTip"
+                type="info"
+                show-icon
+                closable
+                class="mb-2 shrink-0 md:mr-64"
+                data-testid="dine-in-tip"
+                @close="closeDineInTip"
+            >
+                <template #message>
+                    Serving at tables? Turn on dine-in for this store under
+                    <Link :href="getRoute('dining-tables.index')" class="font-medium">Tables</Link>,
+                    then tap <b>Dine-in</b> here to seat guests.
+                </template>
+            </a-alert>
+
             <!-- Room on the right for the pinned store switcher -->
             <ContentHeader
                 v-if="!isCoffeeshopLayout"
                 title="Sales"
-                class="shrink-0 md:pr-44"
+                class="shrink-0 md:pr-64"
             >
                 <template v-if="!isMdUp || canPunch || dineInEnabled" #actions>
                     <a-button
@@ -1680,19 +1786,27 @@ watch(
                 </template>
             </ContentHeader>
 
-            <TabBar
+            <!-- In the modern layout it's the top row: room on the right for the pinned store switcher.
+                 (A wrapper, since TabBar has several root elements and doesn't take a class.) -->
+            <div
                 v-if="isTab && salesCartIsOnline"
-                :sale="currentSale"
-                :orders="orders"
                 class="shrink-0"
-                @changed="loadCurrentPendingSale"
-                @left="onTabLeft"
-            />
+                :class="{ 'md:mr-64': isCoffeeshopLayout && shiftIsOpen }"
+            >
+                <TabBar
+                    :sale="currentSale"
+                    :orders="orders"
+                    @changed="loadCurrentPendingSale"
+                    @left="onTabLeft"
+                    @tables="onTabTables"
+                />
+            </div>
             <TablesScreen
                 v-if="dineInEnabled"
                 v-model:open="tablesOpen"
                 @picked="loadCurrentPendingSale"
             />
+            <KitchenTicketModal :ticket="paidKitchenTicket" @close="paidKitchenTicket = null" />
 
             <component :is="salesLayoutComponent" title="Create Transaction">
                 <template v-if="isCoffeeshopLayout" #hero>
@@ -1998,6 +2112,9 @@ watch(
                                         class="flex min-h-0 flex-1 flex-col overflow-hidden"
                                     >
                                         <customer-order
+                                            :dine-in-enabled="dineInEnabled"
+                                            :is-tab="isTab"
+                                            @order-type="chooseOrderType"
                                             layout="coffeeshop"
                                             @customer-changed="
                                                 handleCustomerChanged
@@ -2154,6 +2271,9 @@ watch(
 
                         <!-- Classic desktop: single cart sidebar -->
                         <customer-order
+                            :dine-in-enabled="dineInEnabled"
+                            :is-tab="isTab"
+                            @order-type="chooseOrderType"
                             v-else
                             layout="sidebar"
                             @customer-changed="handleCustomerChanged"
@@ -2190,6 +2310,9 @@ watch(
             <SalesCartDrawer v-if="!isMdUp">
                 <template #cart>
                     <customer-order
+                        :dine-in-enabled="dineInEnabled"
+                        :is-tab="isTab"
+                        @order-type="chooseOrderType"
                         layout="drawer"
                         :current-sale="currentSale"
                         :sales-settings="salesSettings"
@@ -2228,7 +2351,7 @@ watch(
                         :offline-payment-card-type-id="offlinePaymentCardTypeId"
                         @discount-applied="loadCurrentPendingSale"
                         @cart-updated="loadCurrentPendingSale"
-                        @payment-success="closeCartDrawer"
+                        @payment-success="(r) => { onPaid(r); closeCartDrawer(); }"
                         @update:offline-payment-method="
                             syncOfflinePaymentMethod
                         "
@@ -2298,6 +2421,7 @@ watch(
                 @update:offline-payment-reference="syncOfflinePaymentReference"
                 @update:offline-payments="(v) => (offlinePayments = v)"
                 @save-offline-sale="completeOfflineSale"
+                @payment-success="onPaid"
             />
         </template>
 

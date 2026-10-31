@@ -256,6 +256,32 @@ const hasMultipleStores = computed(() => {
             title="Products"
             filter-class="flex flex-wrap items-center justify-end gap-2 w-full min-w-0"
         >
+            <!-- Low / out of stock counts beside the title: they filter the list, and leave the toolbar room. -->
+            <template #titleExtra>
+                <template v-if="stockCounts.low > 0 || stockCounts.out > 0">
+                    <a-tag
+                        v-if="stockCounts.low > 0"
+                        color="orange"
+                        class="m-0 cursor-pointer whitespace-nowrap"
+                        role="button"
+                        data-testid="stock-count-low"
+                        @click="showStockStatus('low')"
+                    >
+                        {{ stockCounts.low }} low stock
+                    </a-tag>
+                    <a-tag
+                        v-if="stockCounts.out > 0"
+                        color="red"
+                        class="m-0 cursor-pointer whitespace-nowrap"
+                        role="button"
+                        data-testid="stock-count-out"
+                        @click="showStockStatus('out')"
+                    >
+                        {{ stockCounts.out }} out of stock
+                    </a-tag>
+                </template>
+            </template>
+
             <!-- Filters -->
             <template #filters>
                 <RefreshButton :loading="spinning" @click="getItems" />
@@ -344,29 +370,6 @@ const hasMultipleStores = computed(() => {
 
             <template #activeStore>
                 <LocationInfoAlert />
-                <div
-                    v-if="stockCounts.low > 0 || stockCounts.out > 0"
-                    class="mt-2 flex flex-wrap gap-2"
-                >
-                    <a-tag
-                        v-if="stockCounts.low > 0"
-                        color="orange"
-                        class="cursor-pointer"
-                        role="button"
-                        @click="showStockStatus('low')"
-                    >
-                        {{ stockCounts.low }} low stock
-                    </a-tag>
-                    <a-tag
-                        v-if="stockCounts.out > 0"
-                        color="red"
-                        class="cursor-pointer"
-                        role="button"
-                        @click="showStockStatus('out')"
-                    >
-                        {{ stockCounts.out }} out of stock
-                    </a-tag>
-                </div>
             </template>
 
             <!-- Table -->

@@ -60,6 +60,8 @@ class E2EWalletSeeder extends Seeder
                 // Each role's own shift at this store (tests/e2e/wallet/register-shift-roles.spec.js).
                 $cashier = $this->manager("e2e-wallet-cashier-{$i}@techiko.test", "E2E Wallet Cashier {$i}", $location, 'cashier', 5);
                 $supervisor = $this->manager("e2e-wallet-supervisor-{$i}@techiko.test", "E2E Wallet Supervisor {$i}", $location, 'supervisor', 4);
+                // The cashier is on the supervisor's team: she sees and reviews their shifts.
+                $cashier->forceFill(['supervisor_id' => $supervisor->id])->save();
 
                 $card = PaymentCardType::updateOrCreate(
                     ['domain' => self::DOMAIN, 'location_id' => $location->id, 'name' => 'E2E Wallet Visa'],

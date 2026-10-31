@@ -7,6 +7,7 @@ import {
     drawerUrl,
     futureYmd,
     historyUrl,
+    shiftsUrl,
     ledgerUrl,
     walletFixture,
     walletUrl,
@@ -35,27 +36,39 @@ test.describe("Cash & wallet access", () => {
             expect(props.activeLocation.id).toBe(walletFixture(testInfo).locationId);
         });
 
-        test("the four pages are tabs that keep the day being looked at", async ({ page }) => {
+        test("the pages are tabs that keep the day being looked at", async ({ page }) => {
             const { day } = dateWindow();
             await DrawerPage.open(page, day(0));
 
             const tabs = page.getByTestId("wallet-tabs");
-            for (const key of ["drawer", "cash-in-out", "balances", "history"]) {
+            for (const key of ["drawer", "balances", "cash-in-out", "counts"]) {
                 await expect(tabs.getByTestId(`wallet-tab-${key}`)).toBeVisible();
             }
-            await tabs.getByTestId("wallet-tab-history").click();
-            await expect(page).toHaveURL(new RegExp(`${historyUrl}\\?.*business_date=${day(0)}`));
+            // Drawer history and Counted money are one page now.
+            await expect(tabs.getByTestId("wallet-tab-history")).toHaveCount(0);
+            await tabs.getByTestId("wallet-tab-counts").click();
+            await expect(page).toHaveURL(new RegExp(`${shiftsUrl}\\?.*business_date=${day(0)}`));
+            await page.getByTestId("counts-view-store").click();
             await expect(page.getByTestId("history-counts")).toContainText(day(0));
         });
 
-        test("the sidebar lists the four pages", async ({ page }) => {
-            await DrawerPage.open(page);
+        test("the sidebar has one Cash & wallet entry that opens Today's drawer", async ({ page }) => {
+            await page.goto(`/domains/jollibee-corp/customers`);
 
             const sidebar = page.getByRole("complementary");
             await sidebar.getByText("Cash & wallet", { exact: true }).click();
-            for (const title of ["Today's drawer", "Cash in & out", "Where money is", "Drawer history"]) {
-                await expect(sidebar.getByText(title, { exact: true })).toBeVisible();
+            await expect(page).toHaveURL(new RegExp(drawerUrl));
+            // Its pages are the tabs, not sidebar items.
+            for (const title of ["Cash in & out", "Where money is", "Drawer history", "Counted money", "Shifts & counts"]) {
+                await expect(sidebar.getByText(title, { exact: true }), title).toHaveCount(0);
             }
+        });
+
+        test("Drawer history's old links land on Shifts & counts' store counts", async ({ page }) => {
+            const { day } = dateWindow();
+            await page.goto(`${historyUrl}?business_date=${day(0)}`);
+            await expect(page).toHaveURL(new RegExp(`${shiftsUrl}\\?.*view=store`));
+            await expect(page.getByTestId("history-counts")).toContainText(day(0));
         });
 
         test("defaults the business date to today", async ({ page }) => {
@@ -98,13 +111,13 @@ test.describe("Cash & wallet access", () => {
             await expect(page).toHaveURL(new RegExp(cashInOutUrl));
 
             await page.goto(`${walletUrl}?view=all`);
-            await expect(page).toHaveURL(new RegExp(`${balancesUrl}\\?.*tab=all`));
+            await expect(page).toHaveURL(new RegExp(`${cashInOutUrl}\\?.*view=all`));
         });
     });
 
     test("an admin can open every page", async ({ serverAs }) => {
         const api = await serverAs("admin");
-        for (const url of [drawerUrl, cashInOutUrl, balancesUrl, historyUrl]) {
+        for (const url of [drawerUrl, cashInOutUrl, balancesUrl, shiftsUrl]) {
             const res = await api.get(url);
             expect(res.status(), url).toBe(200);
             expect(new URL(res.url()).pathname).toBe(url);
@@ -119,7 +132,7 @@ test.describe("Cash & wallet access", () => {
             const referer = new URL(`/domains/jollibee-corp/sales`, "http://techiko-pos.test").href;
             const drawer = await api.get(drawerUrl, { headers: { Referer: referer } });
             expect(new URL(drawer.url()).pathname).toBe(drawerUrl);
-            for (const url of [cashInOutUrl, balancesUrl, historyUrl]) {
+            for (const url of [cashInOutUrl, balancesUrl, shiftsUrl]) {
                 const res = await api.get(url, { headers: { Referer: referer } });
                 expect(new URL(res.url()).pathname, url).not.toBe(url);
             }
@@ -139,22 +152,23 @@ test.describe("Cash & wallet access", () => {
             expect(res.status).toBe(403);
         });
 
-        test("sees only Today's drawer under Cash & wallet", async ({ page }) => {
+        test("Cash & wallet opens Today's drawer, with no other tabs", async ({ page }) => {
             await page.goto(`/domains/jollibee-corp/customers`);
             await expect(sidebarItem(page, "Customers")).toBeVisible();
 
             const sidebar = page.getByRole("complementary");
             await sidebar.getByText("Cash & wallet", { exact: true }).click();
-            await expect(sidebar.getByText("Today's drawer", { exact: true })).toBeVisible();
-            for (const title of ["Cash in & out", "Where money is", "Drawer history"]) {
-                await expect(sidebar.getByText(title, { exact: true }), title).toHaveCount(0);
-            }
+            await expect(page).toHaveURL(new RegExp(drawerUrl));
+            // Today's drawer is their only page, so there are no tabs to pick from.
+            await expect(page.getByTestId("wallet-tabs")).toHaveCount(0);
         });
 
-        test("counts the cash but doesn't see short or over", async ({ page }) => {
+        test("sees their own shift, not the store's drawer or whether it came out short or over", async ({ page }) => {
             await page.goto(drawerUrl);
-            await expect(page.getByTestId("drawer-expected")).toBeVisible();
-            await expect(page.getByTestId("open-count-cash")).toBeVisible();
+            await expect(page.getByTestId("my-shift")).toBeVisible();
+            // Each cashier has their own tray: they count it when ending their shift.
+            await expect(page.getByTestId("drawer-expected")).toHaveCount(0);
+            await expect(page.getByTestId("open-count-cash")).toHaveCount(0);
             await expect(page.getByTestId("drawer-result")).toHaveCount(0);
         });
     });

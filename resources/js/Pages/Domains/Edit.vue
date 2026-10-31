@@ -198,9 +198,9 @@ const handleCancel = () => {
                                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     :class="{ 'border-red-500': form.errors.timezone }"
                                 >
-                                    <option value="">Select Timezone</option>
-                                    <option v-for="(label, tz) in timezones" :key="tz" :value="tz">
-                                        {{ label }}
+                                    <!-- The Philippines for now; the others are coming soon. -->
+                                    <option v-for="(label, tz) in timezones" :key="tz" :value="tz" :disabled="tz !== 'Asia/Manila'">
+                                        {{ label }}{{ tz !== 'Asia/Manila' ? ' (Coming soon)' : '' }}
                                     </option>
                                 </select>
                                 <p v-if="form.errors.timezone" class="mt-1 text-sm text-red-600">

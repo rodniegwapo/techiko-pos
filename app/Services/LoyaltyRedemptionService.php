@@ -10,6 +10,22 @@ use Illuminate\Validation\ValidationException;
 class LoyaltyRedemptionService
 {
     /**
+     * The earn and redeem rules, as Program Rules shows them: the same numbers
+     * Customer::calculatePointsForPurchase() and computeRedemption() use.
+     *
+     * @return array{pesos_per_point: int, points_per_peso_redeemed: float, max_redemption_percent: float, min_points_redemption: int}
+     */
+    public static function programRules(): array
+    {
+        return [
+            'pesos_per_point' => Customer::PESOS_PER_POINT,
+            'points_per_peso_redeemed' => max(1.0, (float) config('loyalty.points_per_currency_unit', 100)),
+            'max_redemption_percent' => max(0.0, min(100.0, (float) config('loyalty.max_redemption_percent_of_eligible_net', 50))),
+            'min_points_redemption' => max(1, (int) config('loyalty.min_points_redemption', 1)),
+        ];
+    }
+
+    /**
      * Net subtotal after order-level discounts only (before loyalty redemption and VAT).
      */
     public function eligibleNetBeforeLoyalty(Sale $sale): float
@@ -26,9 +42,10 @@ class LoyaltyRedemptionService
             return ['points' => 0, 'peso_discount' => 0.0];
         }
 
-        $pointsPerCurrency = max(1.0, (float) config('loyalty.points_per_currency_unit', 100));
-        $maxPercent = max(0.0, min(100.0, (float) config('loyalty.max_redemption_percent_of_eligible_net', 50)));
-        $minPoints = max(1, (int) config('loyalty.min_points_redemption', 1));
+        $rules = self::programRules();
+        $pointsPerCurrency = $rules['points_per_peso_redeemed'];
+        $maxPercent = $rules['max_redemption_percent'];
+        $minPoints = $rules['min_points_redemption'];
 
         if ($requestedPoints < $minPoints) {
             throw ValidationException::withMessages([

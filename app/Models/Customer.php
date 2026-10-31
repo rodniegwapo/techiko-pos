@@ -10,6 +10,9 @@ class Customer extends Model
 {
     use HasFactory, Searchable;
 
+    /** A customer earns 1 loyalty point for every this many pesos spent, before the tier multiplier. */
+    public const PESOS_PER_POINT = 10;
+
     protected static function booted(): void
     {
         // A new customer starts on their organization's lowest tier from Tier Management, not a
@@ -118,7 +121,7 @@ class Customer extends Model
 
     public function calculatePointsForPurchase(float $amount): int
     {
-        $basePoints = floor($amount / 10); // 1 point per ₱10
+        $basePoints = floor($amount / self::PESOS_PER_POINT);
         $tierInfo = $this->getTierInfo();
 
         return (int) ($basePoints * $tierInfo['multiplier']);

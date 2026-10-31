@@ -222,7 +222,8 @@ class TimesheetController extends Controller
     private function entries(Domain $domain, array $filters)
     {
         return TimeEntry::query()->forDomain($domain->name_slug)
-            ->whereBetween('clock_in_at', [$filters['from']->copy()->utc(), $filters['to']->copy()->utc()])
+            // Saved times are on the app's clock (Asia/Manila); the filter's bounds are moved onto it.
+            ->whereBetween('clock_in_at', [$filters['from']->copy()->timezone(config('app.timezone')), $filters['to']->copy()->timezone(config('app.timezone'))])
             ->when($filters['location_id'], fn ($q, $id) => $q->where('location_id', $id))
             ->with(['user:id,name', 'location:id,name'])
             ->orderBy('clock_in_at');
@@ -249,12 +250,12 @@ class TimesheetController extends Controller
         ];
     }
 
-    /** @return array{0: Carbon, 1: ?Carbon} The typed times as UTC moments, checked. */
+    /** @return array{0: Carbon, 1: ?Carbon} The typed times on the app's clock, checked. */
     private function times(Domain $domain, array $data): array
     {
         $tz = $this->timezone($domain);
-        $in = Carbon::createFromFormat('Y-m-d H:i', $data['clock_in_at'], $tz)->utc();
-        $out = ! empty($data['clock_out_at']) ? Carbon::createFromFormat('Y-m-d H:i', $data['clock_out_at'], $tz)->utc() : null;
+        $in = Carbon::createFromFormat('Y-m-d H:i', $data['clock_in_at'], $tz)->timezone(config('app.timezone'));
+        $out = ! empty($data['clock_out_at']) ? Carbon::createFromFormat('Y-m-d H:i', $data['clock_out_at'], $tz)->timezone(config('app.timezone')) : null;
 
         if ($in->gt(now()->addMinute())) {
             throw ValidationException::withMessages(['clock_in_at' => ['A shift cannot start in the future.']]);

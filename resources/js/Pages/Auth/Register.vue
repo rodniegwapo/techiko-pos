@@ -4,6 +4,7 @@ import InputLabel from "@/Components/unused/InputLabel.vue";
 import { Head, Link, useForm } from "@inertiajs/vue3";
 import { ref } from "vue";
 import ApplicationLogo from "@/Components/ApplicationLogo.vue";
+import { BUSINESS_TYPES, isBusinessTypeAvailable } from "@/Composables/useBusinessType";
 
 const form = useForm({
     name: "",
@@ -13,6 +14,7 @@ const form = useForm({
     organization: "",
     country_code: "PH",
     timezone: "Asia/Manila",
+    business_type: "retail",
 });
 
 const spinning = ref(false);
@@ -79,6 +81,35 @@ const submit = () => {
                             <InputError
                                 class="mt-2"
                                 :message="form.errors.organization"
+                            />
+                        </div>
+                        <div>
+                            <label
+                                for="business_type"
+                                class="block text-sm font-medium text-gray-700 mb-1"
+                                >What do you sell?</label
+                            >
+                            <select
+                                id="business_type"
+                                v-model="form.business_type"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition bg-white"
+                                data-testid="register-business-type"
+                            >
+                                <option
+                                    v-for="(t, key) in BUSINESS_TYPES"
+                                    :key="key"
+                                    :value="key"
+                                    :disabled="!isBusinessTypeAvailable(key)"
+                                >
+                                    {{ t.label }}{{ isBusinessTypeAvailable(key) ? "" : " (coming soon)" }}
+                                </option>
+                            </select>
+                            <p class="mt-1 mb-0 text-xs text-gray-500">
+                                Sets up the product form to fit. You can change it later in Settings.
+                            </p>
+                            <InputError
+                                class="mt-2"
+                                :message="form.errors.business_type"
                             />
                         </div>
                     </div>
@@ -163,13 +194,14 @@ const submit = () => {
                                 v-model="form.timezone"
                                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition bg-white"
                             >
+                                <!-- The Philippines for now; the others are coming soon. -->
                                 <option value="Asia/Manila">Asia/Manila</option>
-                                <option value="UTC">UTC</option>
-                                <option value="America/New_York">
-                                    America/New_York
+                                <option value="UTC" disabled>UTC (Coming soon)</option>
+                                <option value="America/New_York" disabled>
+                                    America/New_York (Coming soon)
                                 </option>
-                                <option value="Asia/Singapore">
-                                    Asia/Singapore
+                                <option value="Asia/Singapore" disabled>
+                                    Asia/Singapore (Coming soon)
                                 </option>
                             </select>
                             <InputError

@@ -2,11 +2,17 @@
 import { computed, ref, watch } from "vue";
 import { useHelpers } from "@/Composables/useHelpers";
 import { shortOver, TONE_CLASSES } from "../walletLabels";
+import BillCounter from "./BillCounter.vue";
 
-/** Count the cash in the drawer; shows short or over against Expected as you type. */
+/**
+ * Spot check my drawer: an optional count of your own tray during your shift, to see it's on
+ * track (short or over against your shift's Expected as you type). It doesn't end the shift; it's
+ * kept with the shift's counts.
+ */
 const props = defineProps({
     open: { type: Boolean, default: false },
-    cashControl: { type: Object, required: true },
+    /** Your shift's Expected now. */
+    expected: { type: Number, required: true },
     saving: { type: Boolean, default: false },
     /** Off for cashiers: they count, a manager sees short or over. */
     showResult: { type: Boolean, default: true },
@@ -21,23 +27,21 @@ watch(
     () => props.open,
     (open) => {
         if (!open) return;
-        amount.value = props.cashControl.counted_cash != null ? Number(props.cashControl.counted_cash) : null;
-        notes.value = props.cashControl.notes || "";
+        amount.value = null;
+        notes.value = "";
     },
     { immediate: true },
 );
 
 const missing = computed(() => amount.value === null || amount.value === "" || !Number.isFinite(Number(amount.value)));
-const preview = computed(() =>
-    missing.value ? null : shortOver(Number(amount.value) - Number(props.cashControl.expected_cash || 0)),
-);
+const preview = computed(() => (missing.value ? null : shortOver(Number(amount.value) - Number(props.expected || 0))));
 </script>
 
 <template>
     <a-modal
         :visible="open"
-        title="Count cash"
-        ok-text="Save count"
+        title="Spot check my drawer"
+        ok-text="Save spot check"
         :confirm-loading="saving"
         :ok-button-props="{ disabled: missing, 'data-testid': 'save-count' }"
         destroy-on-close
@@ -46,9 +50,12 @@ const preview = computed(() =>
     >
         <div class="flex flex-col gap-3 pt-1">
             <p class="m-0 text-sm text-gray-600">
-                Count the cash in the drawer. Expected: <span class="font-semibold">{{ formattedTotal(Number(cashControl.expected_cash) || 0) }}</span>
+                Count your own tray now to see if it's on track. It doesn't end your shift; it's kept with your shift's counts.
             </p>
-            <a-input-number v-model:value="amount" :min="0" :step="0.01" :precision="2" class="w-full" addon-before="₱" data-testid="count-amount" />
+            <p class="m-0 text-sm text-gray-600">
+                Expected now: <span class="font-semibold" data-testid="count-expected">{{ formattedTotal(Number(expected) || 0) }}</span>
+            </p>
+            <BillCounter v-model="amount" testid="count-amount" prefix="count" />
             <p v-if="preview && showResult" class="m-0 text-sm font-medium" :class="TONE_CLASSES[preview.tone]" data-testid="count-preview">
                 {{ preview.amount ? `${preview.label} ${formattedTotal(preview.amount)}` : preview.label }}
             </p>

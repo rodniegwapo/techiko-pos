@@ -162,6 +162,7 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
             'register-shifts.start' => 'Start own shift',
             'register-shifts.end' => 'End own shift',
             'register-shifts.reopen' => 'Reopen own shift',
+            'register-shifts.spot-check' => 'Spot check own drawer',
             'register-shifts.index' => 'View counted money',
             'register-shifts.approve' => 'Approve counted money',
             'register-shifts.money-by-user' => 'View money per user',

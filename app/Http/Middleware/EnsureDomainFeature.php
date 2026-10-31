@@ -36,8 +36,13 @@ class EnsureDomainFeature
             return $next($request);
         }
 
-        $message = self::MESSAGES[$feature] ?? "This feature isn't turned on for this organization.";
-        if ($plan = self::cheapestPlanWith($feature)) {
+        // Dine-in is coming soon for everyone (config features.dine_in): no plan has it yet.
+        $comingSoon = $feature === 'dine_in' && ! config('features.dine_in', false);
+        $message = $comingSoon
+            ? 'Dine-in tables are coming soon.'
+            : (self::MESSAGES[$feature] ?? "This feature isn't turned on for this organization.");
+        $plan = $comingSoon ? null : self::cheapestPlanWith($feature);
+        if ($plan) {
             $message .= " It comes with the {$plan->name} plan.";
         }
 
