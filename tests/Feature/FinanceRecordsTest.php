@@ -20,6 +20,7 @@ use App\Models\User;
 use App\Models\WalletCashMovement;
 use App\Models\WalletCashReconciliation;
 use App\Support\Wallet\WalletCashDailyExpected;
+use App\Support\Wallet\WarehouseFund;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -258,7 +259,7 @@ class FinanceRecordsTest extends TestCase
         $this->assertSame(0, WalletCashMovement::query()->count());
     }
 
-    public function test_a_warehouse_has_no_cash_drawer_to_pay_from(): void
+    public function test_a_warehouse_pays_in_cash_from_its_cash_fund(): void
     {
         $ctx = $this->seedDomainContext();
         $warehouse = InventoryLocation::query()->create([
@@ -277,9 +278,11 @@ class FinanceRecordsTest extends TestCase
                 'payment_method' => 'cash_register',
                 'location_id' => $warehouse->id,
             ])
-            ->assertSessionHasErrors('location_id');
+            ->assertSessionHasNoErrors();
 
-        $this->assertSame(0, SupplierPayment::query()->count());
+        // The cash left the warehouse's cash fund.
+        $this->assertSame(1, SupplierPayment::query()->count());
+        $this->assertSame(-100.0, WarehouseFund::balance($ctx['domain']->name_slug, (int) $warehouse->id));
     }
 
     public function test_income_statement_reaches_net_profit(): void

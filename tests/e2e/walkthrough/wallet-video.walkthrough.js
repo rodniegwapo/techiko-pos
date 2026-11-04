@@ -98,6 +98,7 @@ test.describe("Cash & wallet video", () => {
             await clip.click(page.getByTestId("open-start-my-shift"));
             const start = drawer.dialog("Open my drawer");
             await clip.type(numberInput(start, "my-shift-opening"), "500");
+            await drawer.skipClockIn(start);
             await drawer.save("/wallet/shifts/start", () => clip.click(start.getByTestId("confirm-start-my-shift")));
             await expect(page.getByTestId("my-shift-status")).toHaveText("Open");
             await clip.point(page.getByTestId("my-shift-figures"), 1800);

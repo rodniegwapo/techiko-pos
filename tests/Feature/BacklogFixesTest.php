@@ -26,7 +26,6 @@ use App\Support\Wallet\WalletCashDailyExpected;
 use Database\Seeders\ProductSoldTypeSeeder;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\Models\Role;
@@ -80,7 +79,7 @@ class BacklogFixesTest extends TestCase
             'payment_date' => today()->toDateString(), 'amount' => 200, 'payment_method' => 'cash_register', ...$more,
         ]);
 
-        $pay([])->assertSessionHasErrors(['location_id' => 'Pick which store\'s cash drawer paid this.']);
+        $pay([])->assertSessionHasErrors(['location_id' => 'Pick which store\'s cash drawer or warehouse\'s cash fund paid this.']);
 
         $pay(['location_id' => $this->store->id])->assertSessionHasNoErrors();
         $this->assertSame($this->store->id, (int) SupplierPayment::query()->sole()->location_id);

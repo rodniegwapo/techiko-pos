@@ -7,7 +7,7 @@ import { useHelpers } from "@/Composables/useHelpers";
  * one row per store, for owners.
  */
 const props = defineProps({
-    /** { stores: [{ id, name, drawer, channels: [{ id, name, kind, balance }], total }], cash_on_hand, total } */
+    /** { stores: [{ id, name, drawer, channels: [{ id, name, kind, balance }], total }], warehouses: [{ id, name, balance }], cash_on_hand, total } */
     allStores: { type: Object, required: true },
 });
 
@@ -18,7 +18,11 @@ const channelNames = computed(() => [...new Set(props.allStores.stores.flatMap((
 const channelAt = (store, name) => store.channels.filter((c) => c.name === name).reduce((sum, c) => sum + c.balance, 0);
 const hasChannel = (store, name) => store.channels.some((c) => c.name === name);
 const columnTotal = (name) => props.allStores.stores.reduce((sum, s) => sum + channelAt(s, name), 0);
-const drawerTotal = computed(() => props.allStores.stores.reduce((sum, s) => sum + s.drawer, 0));
+const warehouses = computed(() => props.allStores.warehouses ?? []);
+// Cash column: the drawers, plus the warehouses' cash funds.
+const drawerTotal = computed(
+    () => props.allStores.stores.reduce((sum, s) => sum + s.drawer, 0) + warehouses.value.reduce((sum, w) => sum + w.balance, 0),
+);
 </script>
 
 <template>
@@ -42,6 +46,13 @@ const drawerTotal = computed(() => props.allStores.stores.reduce((sum, s) => sum
                     </td>
                     <td class="px-4 py-2 text-right font-mono font-semibold">{{ formattedTotal(store.total) }}</td>
                 </tr>
+                <!-- A warehouse's cash fund: cash the owner moved there, to pay suppliers and expenses. -->
+                <tr v-for="w in warehouses" :key="`w-${w.id}`" class="border-t border-gray-100" data-testid="all-stores-warehouse">
+                    <td class="px-4 py-2 font-medium text-gray-800">{{ w.name }} <span class="font-normal text-gray-500">(warehouse cash fund)</span></td>
+                    <td class="px-4 py-2 text-right font-mono" :class="{ 'text-red-700': w.balance < 0 }">{{ formattedTotal(w.balance) }}</td>
+                    <td v-for="name in channelNames" :key="name" class="px-4 py-2 text-right"><span class="text-gray-300">—</span></td>
+                    <td class="px-4 py-2 text-right font-mono font-semibold">{{ formattedTotal(w.balance) }}</td>
+                </tr>
                 <!-- The business's cash the owner holds: no store, but part of where the money is. -->
                 <tr v-if="allStores.cash_on_hand" class="border-t border-gray-100 bg-gray-50/50" data-testid="all-stores-cash-on-hand">
                     <td class="px-4 py-2 font-medium text-gray-800">Cash on hand <span class="font-normal text-gray-500">(with the owner)</span></td>
@@ -53,7 +64,7 @@ const drawerTotal = computed(() => props.allStores.stores.reduce((sum, s) => sum
                     <td :colspan="channelNames.length + 3" class="px-4 py-6 text-center text-gray-500">No stores yet.</td>
                 </tr>
             </tbody>
-            <tfoot v-if="allStores.stores.length > 1 || allStores.cash_on_hand" class="border-t-2 border-gray-200 font-semibold">
+            <tfoot v-if="allStores.stores.length > 1 || allStores.cash_on_hand || warehouses.length" class="border-t-2 border-gray-200 font-semibold">
                 <tr>
                     <td class="px-4 py-2">All stores</td>
                     <td class="px-4 py-2 text-right font-mono">{{ formattedTotal(drawerTotal + (allStores.cash_on_hand || 0)) }}</td>
@@ -64,7 +75,7 @@ const drawerTotal = computed(() => props.allStores.stores.reduce((sum, s) => sum
         </table>
         <p class="m-0 border-t border-gray-100 px-4 py-2 text-xs text-gray-500">
             Cash drawer is what should be in each drawer today; a channel is what its sales and transfers add up to.
-            Cash on hand is the business's cash the owner collected from the drawers.
+            Cash on hand is the business's cash the owner collected from the drawers; a warehouse cash fund is cash moved there to pay suppliers and expenses.
         </p>
     </div>
 </template>

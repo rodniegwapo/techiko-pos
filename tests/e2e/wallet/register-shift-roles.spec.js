@@ -44,6 +44,7 @@ async function openStartAndEnd(page, drawer, { opening, counted }) {
     await page.getByTestId("open-start-my-shift").click();
     const start = drawer.dialog("Open my drawer");
     await numberInput(start, "my-shift-opening").fill(String(opening));
+    await drawer.skipClockIn(start);
     expect((await drawer.save("/wallet/shifts/start", () => start.getByTestId("confirm-start-my-shift").click())).status()).toBeLessThan(400);
     await expect(page.getByTestId("my-shift-status")).toHaveText("Open");
 
@@ -75,6 +76,7 @@ test.describe("Cashier shifts as a cashier", () => {
         // Not stopped: a new shift starts straight away.
         await page.getByTestId("open-start-my-shift").click();
         const again = drawer.dialog("Open my drawer");
+        await drawer.skipClockIn(again);
         expect((await drawer.save("/wallet/shifts/start", () => again.getByTestId("confirm-start-my-shift").click())).status()).toBeLessThan(400);
         await expect(page.getByTestId("my-shift-status")).toHaveText("Open");
     });

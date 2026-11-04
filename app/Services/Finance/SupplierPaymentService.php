@@ -30,14 +30,13 @@ class SupplierPaymentService
             $prefix.'payment_date' => ['required', 'date', 'before_or_equal:today'],
             $prefix.'amount' => ['required', 'numeric', 'min:0.01', 'max:99999999.99'],
             $prefix.'payment_method' => ['required', Rule::in(Expense::PAYMENT_METHODS)],
-            // Paid from the cash drawer: which store's drawer the cash came out of. Warehouses have none.
+            // Paid in cash: which store's drawer, or which warehouse's cash fund, the cash came out of.
             $prefix.'location_id' => [
                 'nullable',
                 'required_if:'.$prefix.'payment_method,cash_register',
                 'integer',
                 Rule::exists('inventory_locations', 'id')
-                    ->where('domain', $domainSlug)
-                    ->where(fn ($q) => $q->whereNull('type')->orWhere('type', '!=', 'warehouse')),
+                    ->where('domain', $domainSlug),
             ],
             $prefix.'financial_account_id' => PaidFromAccount::rules($domainSlug),
             $prefix.'reference_no' => ['nullable', 'string', 'max:80'],
@@ -49,8 +48,8 @@ class SupplierPaymentService
     public static function messages(string $prefix = ''): array
     {
         return [
-            $prefix.'location_id.required_if' => 'Pick which store\'s cash drawer paid this.',
-            $prefix.'location_id.exists' => 'Pick a store\'s cash drawer; a warehouse has none.',
+            $prefix.'location_id.required_if' => 'Pick which store\'s cash drawer or warehouse\'s cash fund paid this.',
+            $prefix.'location_id.exists' => 'Pick a store\'s cash drawer or a warehouse\'s cash fund from this business.',
             $prefix.'payment_date.before_or_equal' => 'A payment can\'t be dated in the future.',
             $prefix.'amount.min' => 'Enter how much was paid.',
         ];

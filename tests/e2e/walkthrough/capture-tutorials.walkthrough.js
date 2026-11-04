@@ -76,6 +76,7 @@ test.describe("Tutorial screens", () => {
             const start = drawer.dialog("Open my drawer");
             await numberInput(start, "my-shift-opening").fill("500");
             await snap(page, R, "c03-start", numberInput(start, "my-shift-opening"));
+            await drawer.skipClockIn(start);
             await drawer.save("/wallet/shifts/start", () => start.getByTestId("confirm-start-my-shift").click());
             await expect(page.getByTestId("my-shift-status")).toHaveText("Open");
             await snap(page, R, "c04-open", [page.getByTestId("my-shift-status"), page.getByTestId("my-shift-figures").getByText("Opening")]);
@@ -129,6 +130,7 @@ test.describe("Tutorial screens", () => {
             const start = drawer.dialog("Open my drawer");
             await numberInput(start, "my-shift-opening").fill("300");
             await snap(page, R, "s01-own-shift", numberInput(start, "my-shift-opening"));
+            await drawer.skipClockIn(start);
             await drawer.save("/wallet/shifts/start", () => start.getByTestId("confirm-start-my-shift").click());
             await snap(page, R, "s02-store-expected", page.getByTestId("drawer-expected"));
 

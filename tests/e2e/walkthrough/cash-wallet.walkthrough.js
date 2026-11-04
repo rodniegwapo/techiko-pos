@@ -39,6 +39,7 @@ test.describe("Cash and wallet walkthrough", () => {
             const start = drawer.dialog("Open my drawer");
             await tour.type(numberInput(start, "my-shift-opening"), "500");
             await tour.say("I type the change I start with: ₱500.");
+            await drawer.skipClockIn(start);
             await drawer.save("/wallet/shifts/start", () => tour.click(start.getByTestId("confirm-start-my-shift")));
             await expect(page.getByTestId("my-shift-status")).toHaveText("Open");
             await tour.say("My shift is open. Expected is what should be in my drawer right now.");
@@ -107,6 +108,7 @@ test.describe("Cash and wallet walkthrough", () => {
             await tour.click(page.getByTestId("open-start-my-shift"));
             const start = drawer.dialog("Open my drawer");
             await tour.type(numberInput(start, "my-shift-opening"), "300");
+            await drawer.skipClockIn(start);
             await drawer.save("/wallet/shifts/start", () => tour.click(start.getByTestId("confirm-start-my-shift")));
             await expect(page.getByTestId("my-shift-status")).toHaveText("Open");
             await tour.say("Because each cashier has their own drawer, the store's Expected went up by my ₱300.", 3200);

@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Models\WalletCashMovement;
 use App\Models\WalletCashReconciliation;
 use App\Support\Wallet\WalletCashDailyExpected;
+use App\Support\Wallet\WarehouseFund;
 use Database\Seeders\ProductSoldTypeSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -154,14 +155,16 @@ class PurchaseOrderPayNowTest extends TestCase
         $this->assertNothingReceived($order);
     }
 
-    public function test_a_warehouse_has_no_cash_drawer(): void
+    public function test_a_warehouse_pays_from_its_cash_fund(): void
     {
-        $order = $this->sendOrder();
+        $order = $this->sendOrder($this->warehouse);
 
         $this->receive($order, 10, ['amount' => 100, 'payment_method' => 'cash_register', 'location_id' => $this->warehouse->id])
-            ->assertSessionHasErrors('pay_now.location_id');
+            ->assertSessionHasNoErrors();
 
-        $this->assertNothingReceived($order);
+        // Received, paid, and the cash left the warehouse's cash fund.
+        $this->assertSame(1, SupplierPayment::query()->count());
+        $this->assertSame(-100.0, WarehouseFund::balance($this->warehouse->domain, (int) $this->warehouse->id));
     }
 
     public function test_a_closed_shift_refuses_the_payment_and_the_delivery(): void
@@ -235,7 +238,7 @@ class PurchaseOrderPayNowTest extends TestCase
         $this->assertSame(0, SupplierPayment::query()->count());
     }
 
-    public function test_pay_from_needs_a_store_drawer_and_the_right_to_pay(): void
+    public function test_pay_from_needs_a_drawer_or_cash_fund_and_the_right_to_pay(): void
     {
         $order = fn (array $more, ?User $as = null) => $this->actingAs($as ?? $this->admin)->post($this->route('domains.purchase-orders.store'), [
             'supplier_name' => 'Golden Grains',
@@ -245,23 +248,27 @@ class PurchaseOrderPayNowTest extends TestCase
         ]);
 
         $order(['pay_method' => 'cash_register'])->assertSessionHasErrors('pay_location_id');
-        $order(['pay_method' => 'cash_register', 'pay_location_id' => $this->warehouse->id])->assertSessionHasErrors('pay_location_id');
         $this->assertSame(0, PurchaseOrder::query()->count());
+        // A warehouse's cash fund can pay too.
+        $order(['pay_method' => 'cash_register', 'pay_location_id' => $this->warehouse->id])->assertSessionHasNoErrors();
+        $this->assertSame($this->warehouse->id, (int) PurchaseOrder::query()->sole()->pay_location_id);
 
         // Someone who can't pay bills still orders; the choice is left for whoever pays.
         $clerk = User::factory()->create(['domain' => $this->domain->name_slug]);
         $order(['pay_method' => 'bank'], $clerk)->assertSessionHasNoErrors();
-        $this->assertNull(PurchaseOrder::query()->sole()->pay_method);
+        $this->assertNull(PurchaseOrder::query()->latest('id')->first()->pay_method);
     }
 
-    public function test_the_page_offers_only_store_drawers(): void
+    public function test_the_page_offers_store_drawers_then_warehouse_cash_funds(): void
     {
         $this->actingAs($this->admin)->get($this->route('domains.purchase-orders.index'))
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Purchasing/Index')
                 ->where('canPayNow', true)
-                ->has('drawerLocations', 1)
+                ->has('drawerLocations', 2)
                 ->where('drawerLocations.0.id', $this->store->id)
+                ->where('drawerLocations.1.id', $this->warehouse->id)
+                ->where('drawerLocations.1.type', 'warehouse')
                 ->has('paymentMethods'));
     }
 }

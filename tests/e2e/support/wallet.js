@@ -160,6 +160,15 @@ export class DrawerPage {
         return this.page.getByRole("dialog").filter({ hasText: title });
     }
 
+    /**
+     * Opening the drawer offers "Clock me in too" (ticked) to anyone with a PIN who is off the
+     * clock; tests that only open the drawer untick it, so it doesn't wait for a PIN.
+     */
+    async skipClockIn(dialog) {
+        const toggle = dialog.getByTestId("clock-along-toggle");
+        if (await toggle.isVisible()) await toggle.uncheck();
+    }
+
     async save(path, act) {
         const saved = this.page.waitForResponse((r) => r.request().method() === "POST" && r.url().includes(path));
         const reloaded = this.waitForReload();

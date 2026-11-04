@@ -19,7 +19,10 @@ test.describe("Receiving a purchase order with Pay now as admin", () => {
         expect(props.canPayNow, "admin may pay bills").toBe(true);
         const store = props.drawerLocations[0];
         expect(store, "a store with a drawer").toBeTruthy();
-        expect(props.drawerLocations.every((l) => l.type !== "warehouse"), "warehouses have no drawer").toBe(true);
+        // Stores' drawers come first; warehouses' cash funds after them.
+        expect(store.type, "a store's drawer first").not.toBe("warehouse");
+        const firstFund = props.drawerLocations.findIndex((l) => l.type === "warehouse");
+        expect(firstFund === -1 || props.drawerLocations.slice(firstFund).every((l) => l.type === "warehouse"), "warehouse cash funds after the stores").toBe(true);
 
         // The order form asks how it will be paid; cash asks which store's drawer.
         await page.getByTestId("new-po").click();

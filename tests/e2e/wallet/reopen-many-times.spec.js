@@ -91,6 +91,7 @@ for (const account of ["wallet-cashier", "wallet-supervisor", "wallet-manager", 
             await page.getByTestId("open-start-my-shift").click();
             const start = drawer.dialog("Open my drawer");
             await numberInput(start, "my-shift-opening").fill("500");
+            await drawer.skipClockIn(start);
             expect((await drawer.save("/wallet/shifts/start", () => start.getByTestId("confirm-start-my-shift").click())).status()).toBeLessThan(400);
             await expect(page.getByTestId("my-shift-status")).toHaveText("Open");
 

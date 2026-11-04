@@ -1,6 +1,10 @@
-import { test, expect } from "../support/fixtures.js";
+import { test, expect as baseExpect } from "../support/fixtures.js";
 import { USERS } from "../support/users.js";
 import { pageProps } from "../support/inertia.js";
+
+// Finance pages save and then reload their numbers; with every worker on the same dev server that
+// can take longer than the default 5 seconds.
+const expect = baseExpect.configure({ timeout: 15_000 });
 
 const DOMAIN = USERS.admin.domain;
 const url = (path) => `/domains/${DOMAIN}${path}`;
@@ -44,7 +48,7 @@ test.describe("Paying from a bank account as admin", () => {
         await asOf.fill(yesterday);
         await asOf.press("Enter");
         await modal(page, "Add bank or e-wallet account").getByRole("button", { name: "Save" }).click();
-        await expect(page.locator(".ant-message")).toContainText("Account saved");
+        await expect(page.locator(".ant-message")).toContainText("Account saved", { timeout: 15_000 });
 
         // A supplier bill paid from it.
         await page.goto(url("/finance/payables?status=all"));
@@ -58,7 +62,7 @@ test.describe("Paying from a bank account as admin", () => {
         await pickOption(page, supplier);
         await input(billForm, "bill-amount").fill("1200");
         await modal(page, "Record supplier bill").getByRole("button", { name: "Save" }).click();
-        await expect(page.locator(".ant-message")).toContainText("Bill recorded");
+        await expect(page.locator(".ant-message")).toContainText("Bill recorded", { timeout: 15_000 });
 
         await page.getByTestId("bill-table").locator("tr", { hasText: supplier }).getByTestId("pay-bill").click();
         const payment = page.getByTestId("payment-form");
@@ -69,7 +73,7 @@ test.describe("Paying from a bank account as admin", () => {
         await payment.getByTestId("paid-from-account").click();
         await pickOption(page, account);
         await modal(page, "Record payment").getByRole("button", { name: "Save payment" }).click();
-        await expect(page.locator(".ant-message")).toContainText("Payment recorded");
+        await expect(page.locator(".ant-message")).toContainText("Payment recorded", { timeout: 15_000 });
 
         // data-page holds the props of the first load only.
         await page.reload();

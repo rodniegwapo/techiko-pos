@@ -27,6 +27,7 @@ test.describe("My shift and Counted money", () => {
         await page.getByTestId("open-start-my-shift").click();
         const start = drawer.dialog("Open my drawer");
         await numberInput(start, "my-shift-opening").fill("500");
+        await drawer.skipClockIn(start);
         const started = await drawer.save("/wallet/shifts/start", () => start.getByTestId("confirm-start-my-shift").click());
         expect(started.status()).toBeLessThan(400);
         await expect(page.getByTestId("my-shift-status")).toHaveText("Open");
