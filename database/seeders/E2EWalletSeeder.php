@@ -9,6 +9,7 @@ use App\Models\WalletCashCountSubmission;
 use App\Models\WalletCashMovement;
 use App\Models\WalletCashOpeningAudit;
 use App\Models\RegisterShift;
+use App\Models\TimeEntry;
 use App\Models\WalletCashReconciliation;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -193,6 +194,8 @@ class E2EWalletSeeder extends Seeder
         WalletCashMovement::where('location_id', $location->id)->delete();
         WalletCashReconciliation::where('location_id', $location->id)->delete();
         RegisterShift::where('location_id', $location->id)->delete();
+        // drawer-clock.spec.js clocks the cashier in and out with their drawer: each run starts with no shifts.
+        TimeEntry::where('location_id', $location->id)->delete();
     }
 
     /** Adds a `wallet` section to tests/e2e/.fixtures.json (written by E2ESalesSeeder). */

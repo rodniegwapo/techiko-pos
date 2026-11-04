@@ -180,12 +180,17 @@ onMounted(() => {
                         : 'lg:overflow-auto md:overflow-auto sm:overflow-scroll'
                 "
             >
-                <!-- Fitted pages: the store switcher is pinned in the corner (beside the page title) so it takes no room. -->
-                <LocationBadge
+                <!-- Fitted pages: the store switcher is pinned in the corner (beside the page title) so it takes no room.
+                     The page can put its own buttons in the corner too (#corner): below the switcher for admins,
+                     in the corner itself for everyone else (LocationBadge shows nothing for them). -->
+                <div
                     v-if="props.fitViewport"
-                    pinned
-                    class="absolute right-3 top-3 z-50 hidden sm:right-4 sm:top-4 md:right-6 md:top-6 md:block"
-                />
+                    class="absolute right-3 top-3 z-50 hidden flex-col items-end gap-2 sm:right-4 sm:top-4 md:right-6 md:top-6 md:flex"
+                    data-testid="layout-corner"
+                >
+                    <LocationBadge pinned />
+                    <slot name="corner" />
+                </div>
                 <!-- Store switcher sits above the page so it never covers header actions -->
                 <LocationBadge v-else />
                 <SubscriptionEndBanner :class="{ 'shrink-0': props.fitViewport }" />

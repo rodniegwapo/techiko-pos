@@ -1,6 +1,7 @@
 import { test, expect } from "../support/fixtures.js";
 import { workerNumber } from "../support/users.js";
 import { DrawerPage, numberInput } from "../support/wallet.js";
+import { SalesPage } from "../support/sales.js";
 
 /**
  * Opening your drawer can clock you in, and closing it can clock you out, with your own PIN. The
@@ -59,6 +60,13 @@ test.describe("Clock in / out with the drawer", () => {
         await expect(page.getByText("Drawer opened. You're clocked in.")).toBeVisible();
         await expect(page.getByTestId("my-shift-status")).toHaveText("Open");
 
+        // On Sales, the corner says I'm in and when, and that my drawer is open.
+        await SalesPage.open(page);
+        const corner = page.getByTestId("till-corner");
+        await expect(corner.getByTestId("timeclock-status")).toHaveText(/^In since \d{1,2}:\d{2} [AP]M$/);
+        await expect(corner.getByTestId("till-drawer-action")).toHaveText(/^Drawer open · \d{1,2}:\d{2} [AP]M$/);
+        await DrawerPage.open(page);
+
         // Close my drawer: "Clock me out too" is offered, unticked.
         await page.getByTestId("open-end-my-shift").click();
         const end = drawer.dialog("Close my drawer");
@@ -70,6 +78,12 @@ test.describe("Clock in / out with the drawer", () => {
         const ended = await drawer.save("/wallet/shifts/", () => end.getByTestId("confirm-end-shift").click());
         expect(ended.status()).toBeLessThan(400);
         await expect(page.getByText("Drawer closed. You're clocked out.")).toBeVisible();
+
+        // On Sales: off the clock, drawer closed.
+        await SalesPage.open(page);
+        await expect(corner.getByTestId("timeclock-status")).toHaveText("Clock in");
+        await expect(corner.getByTestId("till-drawer-action")).toHaveText("Open my drawer");
+        await DrawerPage.open(page);
 
         // Off the clock now: opening again offers to clock in again.
         await page.getByTestId("open-start-my-shift").click();

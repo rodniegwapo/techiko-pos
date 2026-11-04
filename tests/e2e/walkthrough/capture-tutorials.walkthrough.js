@@ -69,7 +69,7 @@ test.describe("Tutorial screens", () => {
 
             // No shift, no payment.
             await SalesPage.open(page);
-            await snap(page, R, "c02-no-shift", [page.getByText(/You have no shift open/), page.getByTestId("shift-banner-action")]);
+            await snap(page, R, "c02-no-shift", [page.getByText(/Your drawer isn't open/), page.getByTestId("till-drawer-action")]);
 
             await DrawerPage.open(page);
             await page.getByTestId("open-start-my-shift").click();

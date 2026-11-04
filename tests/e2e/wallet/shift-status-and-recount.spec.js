@@ -48,9 +48,9 @@ test.describe("Shift status on Sales and recounts on Counted money", () => {
         try {
             await login(page, resolveAccount("wallet-cashier", testInfo.parallelIndex));
             await page.goto(salesUrl);
-            const banner = page.getByTestId("shift-banner-action");
+            const drawerButton = page.getByTestId("till-drawer-action");
             await expect(page.getByText(/Showing \d+ of \d+/)).toBeVisible();
-            await expect(banner).toHaveCount(0);
+            await expect(drawerButton).toHaveText(/Drawer open/);
 
             // Lost on a full page load; Inertia's own reloads keep it.
             await page.evaluate(() => (window.__samePage = true));
@@ -58,8 +58,7 @@ test.describe("Shift status on Sales and recounts on Counted money", () => {
             const ended = await apiJson(elsewhere, "POST", shiftsUrl(`/${shiftId}/end`), { counted_cash: 0 });
             expect(ended.status, "end the shift elsewhere").toBe(302);
 
-            await expect(banner).toBeVisible({ timeout: 45_000 });
-            await expect(banner).toHaveText(/Open my drawer/);
+            await expect(drawerButton).toHaveText(/Open my drawer/, { timeout: 45_000 });
             expect(await page.evaluate(() => window.__samePage), "the page was not reloaded").toBe(true);
         } finally {
             await endOpenShift(elsewhere);
