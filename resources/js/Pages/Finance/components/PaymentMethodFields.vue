@@ -14,17 +14,27 @@ const props = defineProps({
     locations: { type: Array, default: () => [] },
     /** Bank and e-wallet accounts to pick from; leave empty where the account isn't recorded. */
     accounts: { type: Array, default: () => [] },
-    /** Only stores have a cash drawer; warehouses are left out. */
+    /** Only stores' cash drawers. Off where a warehouse's cash fund can pay too (supplier payments, purchasing). */
     storesOnly: { type: Boolean, default: true },
     /** Choosing is optional (e.g. a purchase order's "Pay from"); a label in place of "Paid by". */
     optional: { type: Boolean, default: false },
     label: { type: String, default: null },
 });
 
-const drawerOptions = computed(() =>
-    props.locations
-        .filter((l) => !props.storesOnly || l.type !== "warehouse")
-        .map((l) => ({ value: l.id, label: l.name })),
+// Stores' drawers first, then warehouses' cash funds (when allowed).
+const drawerOptions = computed(() => {
+    const places = props.locations.filter((l) => !props.storesOnly || l.type !== "warehouse");
+    const stores = places.filter((l) => l.type !== "warehouse").map((l) => ({ value: l.id, label: l.name }));
+    const funds = places.filter((l) => l.type === "warehouse").map((l) => ({ value: l.id, label: `${l.name} · cash fund` }));
+    if (!funds.length) return stores;
+    return [
+        ...(stores.length ? [{ label: "Store drawers", options: stores }] : []),
+        { label: "Warehouse cash funds", options: funds },
+    ];
+});
+const fundsToo = computed(() => !props.storesOnly && props.locations.some((l) => l.type === "warehouse"));
+const drawerPlaceholder = computed(() =>
+    fundsToo.value ? "Which store's drawer or warehouse's cash fund?" : "Which store's cash drawer?",
 );
 </script>
 
@@ -39,18 +49,18 @@ const drawerOptions = computed(() =>
             :allow-clear="optional" :placeholder="optional ? 'Decide when it arrives' : undefined"
             :options="methods.map((m) => ({ value: m, label: paymentMethodLabel(m) }))" />
         <p v-if="form.payment_method === 'cash_register' && !optional" class="mt-1 text-xs text-gray-500">
-            Also recorded in that store's Cash in &amp; out, so the expected drawer cash stays right.
+            Also recorded in that store's Cash in &amp; out<template v-if="fundsToo"> (or the warehouse's cash fund)</template>, so the cash stays right.
         </p>
     </a-form-item>
 
     <a-form-item
         v-if="form.payment_method === 'cash_register'"
-        label="Cash drawer"
+        :label="fundsToo ? 'Cash from' : 'Cash drawer'"
         :validate-status="form.errors.location_id ? 'error' : ''"
         :help="form.errors.location_id"
         required
     >
-        <a-select v-model:value="form.location_id" placeholder="Which store's cash drawer?"
+        <a-select v-model:value="form.location_id" :placeholder="drawerPlaceholder"
             data-testid="cash-drawer" :options="drawerOptions" />
     </a-form-item>
 

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Domain;
 use App\Models\RegisterShift;
 use App\Models\WalletCashMovement;
+use App\Services\TimeclockService;
 use App\Support\FinanceAccess;
 use App\Support\RouteFeature;
 use App\Support\Wallet\MoneyByUser;
@@ -13,6 +14,7 @@ use App\Support\Wallet\RegisterShiftService;
 use App\Support\Wallet\WalletLocationResolver;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -23,7 +25,10 @@ use Illuminate\Validation\ValidationException;
  */
 class RegisterShiftController extends Controller
 {
-    public function __construct(private RegisterShiftService $shifts) {}
+    public function __construct(
+        private RegisterShiftService $shifts,
+        private TimeclockService $timeclock,
+    ) {}
 
     public function start(Request $request, Domain $domain)
     {
@@ -31,11 +36,26 @@ class RegisterShiftController extends Controller
         $validated = $request->validate([
             'opening_cash' => ['required', 'numeric', 'min:0', 'max:99999999.99'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            // "Clock me in too": their own PIN, checked before anything is saved.
+            'clock_in_pin' => ['nullable', 'string', 'max:20'],
         ]);
+        $user = $request->user();
 
-        $this->shifts->start($domain, $location, $request->user(), (float) $validated['opening_cash'], $validated['notes'] ?? null);
+        // Already on the clock: the PIN isn't needed, so it's ignored.
+        $clockIn = filled($validated['clock_in_pin'] ?? null) && ! $this->timeclock->statusFor($domain, $user)['on_the_clock'];
+        if ($clockIn) {
+            $this->timeclock->verifyOwnPin($domain, $user, $validated['clock_in_pin'], $this->deviceKey($request), 'clock_in_pin');
+        }
 
-        return redirect()->back()->with('success', 'Shift started.');
+        $punch = DB::transaction(function () use ($domain, $location, $user, $validated, $clockIn) {
+            $this->shifts->start($domain, $location, $user, (float) $validated['opening_cash'], $validated['notes'] ?? null);
+
+            return $clockIn ? $this->timeclock->clockIn($domain, $location, $user) : null;
+        });
+
+        return redirect()->back()->with('success', $punch
+            ? "Drawer opened. You're clocked in at {$this->time($domain, $punch['at'])}."
+            : 'Drawer opened.');
     }
 
     public function end(Request $request, Domain $domain, RegisterShift $registerShift)
@@ -48,6 +68,8 @@ class RegisterShiftController extends Controller
             'expenses.*.expense_category_id' => ['required', 'integer', Rule::exists('expense_categories', 'id')->where('domain', $domain->name_slug)],
             'expenses.*.amount' => ['required', 'numeric', 'min:0.01', 'max:99999999.99'],
             'expenses.*.description' => ['required', 'string', 'max:255'],
+            // "Clock me out too": their own PIN, checked before anything is saved.
+            'clock_out_pin' => ['nullable', 'string', 'max:20'],
         ], [
             'expenses.*.expense_category_id.required' => 'Pick what each expense was for.',
             'expenses.*.description.required' => 'Say what each expense was.',
@@ -56,11 +78,40 @@ class RegisterShiftController extends Controller
             throw ValidationException::withMessages(['expenses' => 'Expenses aren\'t part of this plan.']);
         }
 
-        $shift = $this->shifts->end($registerShift, $request->user(), $validated);
+        $user = $request->user();
+        $pin = $validated['clock_out_pin'] ?? null;
+        unset($validated['clock_out_pin']);
 
-        return redirect()->back()->with('success', $shift->status === RegisterShift::NEEDS_REVIEW
-            ? 'Shift ended. The count is off from Expected, so a manager will review it.'
-            : 'Shift ended.');
+        // "Clock me out too" is only for your own drawer: a manager closing someone else's never clocks them out.
+        $clockOut = filled($pin) && (int) $registerShift->user_id === (int) $user->id
+            && $this->timeclock->statusFor($domain, $user)['on_the_clock'];
+        if ($clockOut) {
+            $this->timeclock->verifyOwnPin($domain, $user, $pin, $this->deviceKey($request), 'clock_out_pin');
+        }
+
+        [$shift, $punch] = DB::transaction(fn () => [
+            $this->shifts->end($registerShift, $user, $validated),
+            $clockOut ? $this->timeclock->clockOut($domain, $user) : null,
+        ]);
+
+        $message = $shift->status === RegisterShift::NEEDS_REVIEW
+            ? 'Drawer closed. The count is off from Expected, so a manager will review it.'
+            : 'Drawer closed.';
+
+        return redirect()->back()->with('success', $punch
+            ? "{$message} You're clocked out at {$this->time($domain, $punch['at'])}."
+            : $message);
+    }
+
+    /** The same device key the Clock in / out keypad uses, so wrong PINs share one limit. */
+    private function deviceKey(Request $request): string
+    {
+        return $request->user()->id.'|'.$request->ip();
+    }
+
+    private function time(Domain $domain, string $at): string
+    {
+        return Carbon::parse($at)->timezone($domain->timezone ?: 'Asia/Manila')->format('g:i A');
     }
 
     public function spotCheck(Request $request, Domain $domain, RegisterShift $registerShift)

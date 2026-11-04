@@ -9,6 +9,7 @@ use App\Models\InventoryLocation;
 use App\Models\PaymentCardType;
 use App\Models\RegisterShift;
 use App\Models\User;
+use App\Services\TimeclockService;
 use App\Support\FinanceAccess;
 use App\Support\RouteFeature;
 use App\Support\RoutePermission;
@@ -25,6 +26,7 @@ use App\Support\Wallet\StoresCash;
 use App\Support\Wallet\WalletLedgerViewData;
 use App\Support\Wallet\WalletLocationResolver;
 use App\Support\Wallet\WalletShiftGuard;
+use App\Support\Wallet\WarehouseFund;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
@@ -42,11 +44,20 @@ class WalletPagesController extends Controller
 {
     public function drawer(Request $request, Domain $domain)
     {
-        // A warehouse has no drawer of its own: it sees what the stores have already closed.
+        // A warehouse has no drawer of its own: it sees what the stores have already closed, and its
+        // cash fund (cash the owner moved there to pay suppliers and expenses).
         $location = WalletLocationResolver::resolve($request, $domain);
         if ($location->isWarehouse()) {
+            $seesMoney = FinanceAccess::canManage($request->user()) || FinanceAccess::canSeeAllStores($request->user());
+
             return Inertia::render('Wallet/StoresCash', [
                 'storesCash' => StoresCash::build($request, $domain),
+                'warehouseFund' => $seesMoney ? [
+                    'id' => (int) $location->id,
+                    'name' => (string) $location->name,
+                    'balance' => WarehouseFund::balance($domain->name_slug, (int) $location->id),
+                    'lines' => WarehouseFund::recent($domain->name_slug, (int) $location->id),
+                ] : null,
                 // Where every store's money is right now (owners and admins).
                 'allStores' => FinanceAccess::canSeeAllStores($request->user()) ? AllStoresMoney::build($domain, (int) $request->user()->id) : null,
                 // Someone who runs a till here is told to switch to a store for their shift.
@@ -131,6 +142,8 @@ class WalletPagesController extends Controller
                 'last_spot_check' => RegisterShiftService::lastSpotCheck($mine),
             ] : null,
             'canSpotCheck' => RoutePermission::allows($user, 'register-shifts.spot-check'),
+            // Their time clock, so opening or closing the drawer can clock them in or out too.
+            'myClock' => app(TimeclockService::class)->statusFor($domain, $user),
             // What the user's drawer still holds from their last shift today, to start the next one with.
             'nextShiftOpening' => $mine?->isOpen() ? null : $shifts->carriedOpening($domain->name_slug, (int) $location->id, (int) $user->id),
             'canStartShift' => RoutePermission::allows($user, 'register-shifts.start'),

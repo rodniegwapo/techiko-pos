@@ -1,0 +1,55 @@
+<template>
+  <style>
+      #root { position: absolute; inset: 0; font-family: "Inter", sans-serif; color: #10231a; overflow: hidden; }
+      .bg { position: absolute; inset: 0; background: linear-gradient(180deg, #f6f8f5 0%, #edf2ec 100%); }
+      .hdr { position: absolute; left: 72px; top: 44px; right: 72px; height: 72px; display: flex; align-items: center; gap: 20px; }
+      .hdr .num { font-weight: 900; font-size: 26px; color: #ffffff; background: #1f7a3f; border-radius: 12px; padding: 10px 16px; letter-spacing: 0.02em; }
+      .hdr .ttl { font-weight: 700; font-size: 44px; letter-spacing: -0.02em; white-space: nowrap; }
+      .hdr .role { margin-left: auto; font-weight: 700; font-size: 28px; letter-spacing: 0.08em; text-transform: uppercase; border-radius: 999px; padding: 12px 26px; white-space: nowrap; }
+      .chrome { position: absolute; left: 72px; top: 150px; width: 1240px; height: 734px; background: #ffffff; border-radius: 16px; border: 1px solid #d3dbd2; box-shadow: 0 24px 60px rgba(16, 35, 26, 0.14); }
+      .chrome .bar { height: 36px; display: flex; align-items: center; gap: 8px; padding: 0 16px; border-bottom: 1px solid #e3e8e2; }
+      .chrome .dot { width: 11px; height: 11px; border-radius: 50%; background: #cfd8ce; }
+      .chrome .url { margin: 0 auto; font-size: 16px; color: #5b6b62; background: #f1f4f0; border-radius: 8px; padding: 4px 18px; }
+      .shot { position: absolute; left: 72px; top: 186px; width: 1240px; height: 698px; object-fit: cover; border-radius: 0 0 16px 16px; }
+      .panel { position: absolute; left: 1352px; top: 150px; width: 496px; height: 734px; display: flex; flex-direction: column; gap: 14px; }
+      .card { position: relative; width: 100%; background: #ffffff; border-radius: 16px; border: 1px solid #dbe3da; padding: 18px 22px 18px 26px; box-shadow: 0 10px 28px rgba(16, 35, 26, 0.08); }
+      .card .bar2 { position: absolute; left: 0; top: 16px; bottom: 16px; width: 6px; border-radius: 0 6px 6px 0; }
+      .card .t1 { font-weight: 700; font-size: 31px; line-height: 1.2; letter-spacing: -0.01em; }
+      .card .t2 { font-size: 28px; line-height: 1.3; color: #4a5a51; margin-top: 6px; }
+      .icon { display: inline-flex; width: 56px; height: 56px; }
+      .icon svg { width: 100%; height: 100%; }
+      .node { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: #ffffff; border: 2px solid #d3dbd2; border-radius: 22px; box-shadow: 0 12px 30px rgba(16, 35, 26, 0.08); text-align: center; }
+      .node .lbl { font-weight: 700; font-size: 30px; letter-spacing: -0.01em; line-height: 1.15; }
+      .node .sub { font-size: 26px; color: #4a5a51; line-height: 1.3; padding: 0 18px; }
+      .arrow { position: absolute; height: 6px; background: #6b8574; border-radius: 3px; }
+      .arrow::after { content: ""; position: absolute; right: -4px; top: -9px; border-left: 18px solid #6b8574; border-top: 12px solid transparent; border-bottom: 12px solid transparent; }
+      .chip { display: inline-block; font-weight: 600; font-size: 24px; border-radius: 999px; padding: 8px 18px; background: #eef3ee; color: #1f3a2b; }
+  </style>
+  <div data-hf-id="hf-5it4" id="root" data-composition-id="scene-13" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-m7dd" class="bg"></div>
+    <div data-hf-id="hf-skzk" id="scene-13-hdr" class="hdr">
+      <span data-hf-id="hf-p8h6" class="num" data-layout-ignore>13</span>
+      <span data-hf-id="hf-ovp3" class="ttl">Cash flow: money in &amp; out of the business</span>
+      <span data-hf-id="hf-r1w9" class="role" style="color: #b45309; background: #fef3c7">Owner / Admin</span>
+    </div>
+    <div data-hf-id="hf-ytph" id="scene-13-frame" class="chrome"><div data-hf-id="hf-ufsv" class="bar"><span data-hf-id="hf-9gry" class="dot"></span><span data-hf-id="hf-zcc2" class="dot"></span><span data-hf-id="hf-zqn3" class="dot"></span><span data-hf-id="hf-9qq2" class="url" data-layout-ignore>techiko-pos · Cash &amp; wallet</span></div></div>
+    <video data-hf-id="hf-lpir" id="scene-13-v0" class="clip shot" data-start="0" data-duration="34.28" data-track-index="2" src="assets/footage/scene-13.mp4" muted playsinline></video>
+    <div data-hf-id="hf-owjm" class="panel">
+    <div data-hf-id="hf-buim" id="scene-13-p0" class="card"><span data-hf-id="hf-n71o" class="bar2" style="background: #b45309"></span><div data-hf-id="hf-9192" class="t1">Money in</div><div data-hf-id="hf-r6n6" class="t2">Sales, credit payments, loans, owner's money</div></div>
+    <div data-hf-id="hf-i08f" id="scene-13-p1" class="card"><span data-hf-id="hf-ughw" class="bar2" style="background: #b45309"></span><div data-hf-id="hf-889j" class="t1">Money out</div><div data-hf-id="hf-ce28" class="t2">Expenses, suppliers, loans, equipment, draws</div></div>
+    <div data-hf-id="hf-74qs" id="scene-13-p2" class="card"><span data-hf-id="hf-t9kt" class="bar2" style="background: #b45309"></span><div data-hf-id="hf-y5rk" class="t1">Moves between your own places</div><div data-hf-id="hf-erbh" class="t2">Not on the list: it never left</div></div>
+    <div data-hf-id="hf-7wel" id="scene-13-p3" class="card"><span data-hf-id="hf-tnvu" class="bar2" style="background: #b45309"></span><div data-hf-id="hf-ri16" class="t1">Profit ≠ cash</div><div data-hf-id="hf-rvc2" class="t2">Tied up in stock or customer credit</div></div>
+    </div>
+  </div>
+  <script>
+    (() => {
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo("#scene-13-hdr", { opacity: 0, y: -16 }, { opacity: 1, y: 0, duration: 0.45, ease: "power3.out" }, 0.05);
+      tl.fromTo("#scene-13-p0", { opacity: 0, x: 40 }, { opacity: 1, x: 0, duration: 0.5, ease: "power3.out" }, 6.34);
+      tl.fromTo("#scene-13-p1", { opacity: 0, x: 40 }, { opacity: 1, x: 0, duration: 0.5, ease: "power3.out" }, 11.08);
+      tl.fromTo("#scene-13-p2", { opacity: 0, x: 40 }, { opacity: 1, x: 0, duration: 0.5, ease: "power3.out" }, 16.44);
+      tl.fromTo("#scene-13-p3", { opacity: 0, x: 40 }, { opacity: 1, x: 0, duration: 0.5, ease: "power3.out" }, 27.08);
+      window.__timelines["scene-13"] = tl;
+    })();
+  </script>
+</template>

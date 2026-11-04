@@ -453,7 +453,7 @@ const smallBillColumns = [
                             @change="(d) => (paymentForm.payment_date = d ? d.format('YYYY-MM-DD') : null)" />
                     </a-form-item>
                 </div>
-                <PaymentMethodFields :form="paymentForm" :methods="paymentMethods" :locations="locations" :accounts="accounts" />
+                <PaymentMethodFields :form="paymentForm" :methods="paymentMethods" :locations="locations" :accounts="accounts" :stores-only="false" />
                 <a-form-item label="Reference (optional)">
                     <a-input v-model:value="paymentForm.reference_no" placeholder="Check no., transfer reference…" />
                 </a-form-item>

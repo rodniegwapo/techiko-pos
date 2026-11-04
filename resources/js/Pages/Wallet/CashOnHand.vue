@@ -23,8 +23,10 @@ const props = defineProps({
     /** { collected, moved_to_stores } today, every store. */
     today: { type: Object, default: () => ({ collected: 0, moved_to_stores: 0 }) },
     lines: { type: Object, required: true },
-    /** [{ id, name, channels: [{ id, name }] }]: where "Move to a store" can go. */
+    /** [{ id, name, is_warehouse, channels: [{ id, name }] }]: where "Move to a store or warehouse" can go. */
     stores: { type: Array, default: () => [] },
+    /** [{ id, name, balance }]: each warehouse's cash fund, for "Back to Cash on hand". */
+    warehouses: { type: Array, default: () => [] },
     filters: { type: Object, default: () => ({}) },
 });
 
@@ -53,23 +55,48 @@ const toggleStore = (key) => {
     closedStores.value = isOpenStore(key) ? [...closedStores.value, key] : closedStores.value.filter((k) => k !== key);
 };
 
-// Move to a store, Owner used it, or a correction.
+// Move to a store or warehouse, back from a warehouse, Owner used it, or a correction.
 const ACTIONS = {
-    to_store: { title: "Move to a store", ok: "Move" },
+    to_store: { title: "Move to a store or warehouse", ok: "Move" },
+    from_warehouse: { title: "Back to Cash on hand", ok: "Move" },
     owner_use: { title: "Owner used it", ok: "Save" },
     adjustment: { title: "Correction", ok: "Save" },
 };
 const mode = ref(null);
 const form = reactive({ amount: null, store: null, place: "drawer", direction: "in", notes: "", saving: false });
 function open(action) {
-    Object.assign(form, { amount: null, store: props.stores[0]?.id ?? null, place: "drawer", direction: "in", notes: "", saving: false });
+    const first = action === "from_warehouse" ? fundWarehouses.value[0]?.id : props.stores[0]?.id;
+    Object.assign(form, { amount: null, store: first ?? null, place: "drawer", direction: "in", notes: "", saving: false });
     mode.value = action;
 }
+// Warehouses that hold cash in their fund, and the one picked.
+const fundWarehouses = computed(() => props.warehouses.filter((w) => Number(w.balance) > 0));
+const warehouseFunds = computed(() => props.warehouses.filter((w) => Number(w.balance) !== 0));
+const picked = computed(() => props.stores.find((s) => s.id === form.store));
+const pickedFund = computed(() => props.warehouses.find((w) => w.id === form.store));
+// Stores, then warehouses (their cash fund), in two groups.
+const storeOptions = computed(() => {
+    const opt = (s) => ({ value: s.id, label: s.is_warehouse ? `${s.name} · cash fund` : s.name });
+    const stores = props.stores.filter((s) => !s.is_warehouse).map(opt);
+    const warehouses = props.stores.filter((s) => s.is_warehouse).map(opt);
+    return [
+        ...(stores.length ? [{ label: "Stores", options: stores }] : []),
+        ...(warehouses.length ? [{ label: "Warehouses", options: warehouses }] : []),
+    ];
+});
 const placeOptions = computed(() => [
     { value: "drawer", label: "Cash drawer" },
     ...(props.stores.find((s) => s.id === form.store)?.channels ?? []).map((c) => ({ value: c.id, label: c.name })),
 ]);
-const overBalance = computed(() => (mode.value !== "adjustment" || form.direction === "out") && Number(form.amount) > props.balance);
+const limit = computed(() => (mode.value === "from_warehouse" ? Number(pickedFund.value?.balance ?? 0) : props.balance));
+const overBalance = computed(
+    () => (mode.value !== "adjustment" || form.direction === "out") && Number(form.amount) > limit.value,
+);
+const overBalanceHelp = computed(() =>
+    mode.value === "from_warehouse"
+        ? `${pickedFund.value?.name ?? "The warehouse"}'s cash fund has ${money(limit.value)}.`
+        : `Cash on hand has ${money(props.balance)}.`,
+);
 
 function save() {
     if (!(Number(form.amount) >= 0.01)) return antMessage.warning("Enter the amount.");
@@ -80,8 +107,8 @@ function save() {
         {
             action: mode.value,
             amount: Number(form.amount),
-            location_id: mode.value === "to_store" ? form.store : null,
-            payment_card_type_id: mode.value === "to_store" && form.place !== "drawer" ? form.place : null,
+            location_id: ["to_store", "from_warehouse"].includes(mode.value) ? form.store : null,
+            payment_card_type_id: mode.value === "to_store" && !picked.value?.is_warehouse && form.place !== "drawer" ? form.place : null,
             direction: mode.value === "adjustment" ? form.direction : null,
             notes: form.notes.trim() || null,
         },
@@ -134,7 +161,10 @@ function changePage(p) {
                 <p class="mb-0 mt-1 text-xs text-gray-500">All stores: the business's cash collected from the drawers.</p>
                 <div class="mt-3 flex flex-wrap gap-2">
                     <a-button type="primary" size="small" :disabled="balance <= 0" data-testid="cash-on-hand-to-store" @click="open('to_store')">
-                        Move to a store
+                        Move to a store or warehouse
+                    </a-button>
+                    <a-button v-if="fundWarehouses.length" size="small" data-testid="cash-on-hand-from-warehouse" @click="open('from_warehouse')">
+                        Back from a warehouse
                     </a-button>
                     <a-button size="small" :disabled="balance <= 0" data-testid="cash-on-hand-owner-use" @click="open('owner_use')">Owner used it</a-button>
                     <a-button size="small" data-testid="cash-on-hand-adjust" @click="open('adjustment')">Correction</a-button>
@@ -154,6 +184,17 @@ function changePage(p) {
                 <div class="text-xs font-medium uppercase text-gray-500">Moved to stores today</div>
                 <div class="font-mono text-2xl font-semibold tabular-nums text-gray-900">{{ money(today.moved_to_stores) }}</div>
                 <p class="mb-0 mt-1 text-xs text-gray-500">Back into drawers or channels</p>
+            </div>
+        </div>
+
+        <!-- Cash the owner moved to the warehouses, to pay suppliers and expenses there -->
+        <div v-if="warehouseFunds.length" class="mb-4 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm" data-testid="cash-on-hand-warehouse-funds">
+            <div class="mb-1 text-xs font-medium uppercase text-gray-500">Warehouse cash funds</div>
+            <div class="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+                <span v-for="w in warehouseFunds" :key="w.id" :data-testid="`warehouse-fund-${w.id}`">
+                    {{ w.name }}
+                    <b class="ml-1 font-mono tabular-nums" :class="Number(w.balance) < 0 ? 'text-red-700' : 'text-gray-900'">{{ money(w.balance) }}</b>
+                </span>
             </div>
         </div>
 
@@ -252,19 +293,29 @@ function changePage(p) {
         >
             <a-form v-if="mode" layout="vertical" class="pt-1">
                 <template v-if="mode === 'to_store'">
-                    <a-form-item label="Store" required>
+                    <a-form-item label="To" required>
                         <a-select
                             v-model:value="form.store"
-                            :options="stores.map((s) => ({ value: s.id, label: s.name }))"
+                            :options="storeOptions"
                             data-testid="cash-on-hand-store"
                             @change="form.place = 'drawer'"
                         />
                     </a-form-item>
-                    <a-form-item label="Into">
+                    <p v-if="picked?.is_warehouse" class="-mt-2 mb-4 text-xs text-gray-500" data-testid="cash-on-hand-warehouse-hint">
+                        Goes to the warehouse's cash fund, to pay suppliers and expenses there.
+                    </p>
+                    <a-form-item v-else label="Into">
                         <a-select v-model:value="form.place" :options="placeOptions" data-testid="cash-on-hand-place" />
                         <div class="mt-1 text-xs text-gray-500">The drawer (e.g. change for tomorrow) or a payment channel (e.g. a bank deposit).</div>
                     </a-form-item>
                 </template>
+                <a-form-item v-if="mode === 'from_warehouse'" label="From" required>
+                    <a-select
+                        v-model:value="form.store"
+                        :options="fundWarehouses.map((w) => ({ value: w.id, label: `${w.name} · ${money(w.balance)}` }))"
+                        data-testid="cash-on-hand-warehouse"
+                    />
+                </a-form-item>
                 <a-form-item v-if="mode === 'adjustment'" label="Direction">
                     <a-radio-group v-model:value="form.direction" button-style="solid">
                         <a-radio-button value="in">Add (e.g. cash you already held)</a-radio-button>
@@ -274,7 +325,7 @@ function changePage(p) {
                 <p v-if="mode === 'owner_use'" class="text-sm text-gray-600">
                     The owner kept this for themselves. It's the one Cash on hand line that counts as an owner withdrawal in the statements.
                 </p>
-                <a-form-item label="Amount" required :validate-status="overBalance ? 'warning' : ''" :help="overBalance ? `Cash on hand has ${money(balance)}.` : null">
+                <a-form-item label="Amount" required :validate-status="overBalance ? 'warning' : ''" :help="overBalance ? overBalanceHelp : null">
                     <a-input-number v-model:value="form.amount" :min="0.01" :precision="2" prefix="₱" class="w-full" data-testid="cash-on-hand-amount" />
                 </a-form-item>
                 <a-form-item :label="mode === 'adjustment' ? 'Why' : 'Note (optional)'" :required="mode === 'adjustment'" class="mb-0">

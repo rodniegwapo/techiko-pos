@@ -84,13 +84,14 @@ class PurchaseOrderController extends Controller
             'accounts' => $canPayNow
                 ? FinancialAccount::query()->forDomain($slug)->where('is_active', true)->orderBy('name')->get(['id', 'name', 'type', 'payment_card_type_id'])
                 : [],
+            // Cash comes out of a store's drawer or a warehouse's cash fund (stores first).
             'drawerLocations' => $canPayNow
                 ? InventoryLocation::query()->forDomain($slug)->active()
-                    ->where(fn ($q) => $q->whereNull('type')->orWhere('type', '!=', 'warehouse'))
                     ->when($restrictedTo, fn ($q, $id) => $q->whereKey($id))
+                    ->orderByRaw("CASE WHEN type = 'warehouse' THEN 1 ELSE 0 END")
                     ->orderBy('name')->get(['id', 'name', 'type'])
                 : [],
-            'activeStoreId' => $activeLocation && ! $activeLocation->isWarehouse() ? $activeLocation->id : null,
+            'activeStoreId' => $activeLocation?->id,
         ]);
     }
 
@@ -304,12 +305,12 @@ class PurchaseOrderController extends Controller
                 'nullable',
                 'required_if:pay_method,cash_register',
                 'integer',
-                Rule::exists('inventory_locations', 'id')->where('domain', $slug)
-                    ->where(fn ($q) => $q->whereNull('type')->orWhere('type', '!=', 'warehouse')),
+                // A store's drawer or a warehouse's cash fund.
+                Rule::exists('inventory_locations', 'id')->where('domain', $slug),
             ],
             'pay_account_id' => PaidFromAccount::rules($slug),
         ], [
-            'pay_location_id.required_if' => 'Choose which store\'s cash drawer will pay.',
+            'pay_location_id.required_if' => 'Choose which store\'s cash drawer or warehouse\'s cash fund will pay.',
             'lines.required' => 'Add at least one product.',
             'lines.*.product_id.distinct' => 'Each product goes on the order once.',
         ]) + ['send' => $request->boolean('send')];

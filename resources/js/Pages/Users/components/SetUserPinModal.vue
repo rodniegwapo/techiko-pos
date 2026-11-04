@@ -126,7 +126,10 @@ async function handleSubmit() {
         <p v-if="userData" class="text-sm text-gray-600 mb-4">
             Set a 4–6 digit PIN for
             <strong>{{ userData.name }}</strong>
-            (POS void and approvals).
+            (clock in / out, POS void and approvals).
+        </p>
+        <p v-if="userData" class="-mt-2 mb-4 text-xs text-gray-500" data-testid="set-pin-change-hint">
+            They can change it later on their Profile, so only they know it.
         </p>
         <a-form layout="vertical" @submit.prevent="handleSubmit">
             <a-form-item

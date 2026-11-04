@@ -22,9 +22,9 @@ export default defineConfig({
     use: {
         ...base.use,
         headless: false,
-        viewport: { width: 1280, height: 720 },
-        video: { mode: "on", size: { width: 1280, height: 720 } },
+        viewport: { width: Number(process.env.E2E_VIDEO_W) || 1280, height: Number(process.env.E2E_VIDEO_H) || 720 },
+        video: { mode: "on", size: { width: Number(process.env.E2E_VIDEO_W) || 1280, height: Number(process.env.E2E_VIDEO_H) || 720 } },
         launchOptions: { slowMo: Number(process.env.E2E_SLOWMO) || 250 },
     },
-    projects: [{ name: "walkthrough", use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 720 } } }],
+    projects: [{ name: "walkthrough", use: { ...devices["Desktop Chrome"], viewport: { width: Number(process.env.E2E_VIDEO_W) || 1280, height: Number(process.env.E2E_VIDEO_H) || 720 } } }],
 });

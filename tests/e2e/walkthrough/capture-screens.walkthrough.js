@@ -45,9 +45,10 @@ test.describe("Screens", () => {
             await snap(page, "01-my-shift", page.getByTestId("my-shift"));
 
             await page.getByTestId("open-start-my-shift").click();
-            const start = drawer.dialog("Start my shift");
+            const start = drawer.dialog("Open my drawer");
             await numberInput(start, "my-shift-opening").fill("500");
             await snap(page, "02-start-shift", numberInput(start, "my-shift-opening"));
+            await drawer.skipClockIn(start);
             await drawer.save("/wallet/shifts/start", () => start.getByTestId("confirm-start-my-shift").click());
             await expect(page.getByTestId("my-shift-status")).toHaveText("Open");
             await snap(page, "03-shift-open", page.getByTestId("my-shift-figures"));
@@ -62,7 +63,7 @@ test.describe("Screens", () => {
             await snap(page, "05-expected", page.getByTestId("my-shift-figures"));
 
             await page.getByTestId("open-end-my-shift").click();
-            const end = drawer.dialog("End my shift");
+            const end = drawer.dialog("Close my drawer");
             await numberInput(end, "end-shift-counted").fill("680");
             await snap(page, "06-end-shift", numberInput(end, "end-shift-counted"));
             await drawer.save("/wallet/shifts/", () => end.getByTestId("confirm-end-shift").click());
@@ -75,7 +76,7 @@ test.describe("Screens", () => {
             await drawer.save("/reopen", () => page.getByTestId("reopen-confirm").click());
 
             await page.getByTestId("open-end-my-shift").click();
-            const again = drawer.dialog("End my shift");
+            const again = drawer.dialog("Close my drawer");
             await numberInput(again, "end-shift-counted").fill("690");
             await drawer.save("/wallet/shifts/", () => again.getByTestId("confirm-end-shift").click());
             await expect(page.getByTestId("my-shift-status")).toHaveText("Needs review");
@@ -88,8 +89,9 @@ test.describe("Screens", () => {
         test("supervisor", async ({ page }) => {
             const drawer = await DrawerPage.open(page);
             await page.getByTestId("open-start-my-shift").click();
-            const start = drawer.dialog("Start my shift");
+            const start = drawer.dialog("Open my drawer");
             await numberInput(start, "my-shift-opening").fill("300");
+            await drawer.skipClockIn(start);
             await drawer.save("/wallet/shifts/start", () => start.getByTestId("confirm-start-my-shift").click());
             await snap(page, "09-store-expected", page.getByTestId("drawer-expected"));
 
@@ -114,7 +116,7 @@ test.describe("Screens", () => {
 
             await DrawerPage.open(page);
             await page.getByTestId("open-end-my-shift").click();
-            const end = drawer.dialog("End my shift");
+            const end = drawer.dialog("Close my drawer");
             await numberInput(end, "end-shift-counted").fill("300");
             await drawer.save("/wallet/shifts/", () => end.getByTestId("confirm-end-shift").click());
         });

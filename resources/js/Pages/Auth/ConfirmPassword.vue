@@ -41,7 +41,7 @@ const submit = () => {
             </div>
 
             <div class="flex justify-end mt-4">
-                <PrimaryButton class="ms-4" :class="{ 'opacity-25': form.processing }" :disabled="form.processing">
+                <PrimaryButton html-type="submit" class="ms-4" :loading="form.processing" data-testid="confirm-password-submit">
                     Confirm
                 </PrimaryButton>
             </div>

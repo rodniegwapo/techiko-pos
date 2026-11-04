@@ -63,6 +63,7 @@ import { hasModifiers } from "@/Composables/useProductModifiers";
 import ModifierPickerModal from "./components/ModifierPickerModal.vue";
 import QuantityPromptModal from "./components/QuantityPromptModal.vue";
 import TimeclockButton from "./components/TimeclockButton.vue";
+import TillCorner from "./components/TillCorner.vue";
 import TablesScreen from "./components/DineIn/TablesScreen.vue";
 import KitchenTicketModal from "./components/DineIn/KitchenTicketModal.vue";
 import TabBar from "./components/DineIn/TabBar.vue";
@@ -185,6 +186,13 @@ const activeLocationId = computed(() => page.props.currentLocation?.id);
 // Clock in / out with your own PIN, on the till everyone shares.
 const { hasPermission } = usePermissionsV2();
 const canPunch = computed(() => hasPermission("timesheets.punch"));
+// After a punch the signed-in cashier's clock may have changed: "Open my drawer" shows it right.
+const onPunched = () => router.reload({ only: ["shiftStatus"] });
+// Admins have the store switcher pinned in the corner (same rule as LocationBadge), with the till
+// buttons below it: the modern layout leaves room for both rows.
+const cornerHasSwitcher = computed(
+    () => hasPermission("inventory.locations.switch") && (page.props.availableLocations?.length ?? 0) > 0,
+);
 // A food business whose store doesn't serve dine-in yet: those who set up tables are pointed there.
 const DINE_IN_TIP_KEY = "techiko.sales.dineInTip.closed";
 const dineInTipClosed = ref(false);
@@ -1670,6 +1678,16 @@ watch(
 <template>
     <AuthenticatedLayout fit-viewport>
         <Head title="Sales" />
+        <!-- Top-right corner (below the store switcher for admins): my clock and my drawer. md and up. -->
+        <template #corner>
+            <TillCorner
+                :shift-status="$page.props.shiftStatus"
+                :location-id="activeLocationId"
+                :can-punch="canPunch"
+                @open-drawer="shiftBannerModalOpen = true"
+                @punched="onPunched"
+            />
+        </template>
         <!-- Fills the screen; the product list and cart scroll inside their own panels. -->
         <div
             class="flex min-h-0 flex-1 flex-col"
@@ -1698,12 +1716,12 @@ watch(
                                 Count your drawer and end it before taking payments.
                             </template>
                             <template v-else>
-                                You have no shift open at this store. Start
-                                your shift before taking payments.
+                                Your drawer isn't open at this store. Open it
+                                before taking payments.
                             </template>
                         </span>
                         <a-button
-                            v-if="$page.props.shiftStatus?.overdue_since && !$page.props.shiftStatus?.is_closed"
+                            v-if="!isMdUp && $page.props.shiftStatus?.overdue_since && !$page.props.shiftStatus?.is_closed"
                             type="primary"
                             size="small"
                             data-testid="shift-banner-end-overdue"
@@ -1712,13 +1730,13 @@ watch(
                             End it on Today's drawer
                         </a-button>
                         <a-button
-                            v-else
+                            v-else-if="!isMdUp"
                             type="primary"
                             size="small"
                             data-testid="shift-banner-action"
                             @click="shiftBannerModalOpen = true"
                         >
-                            {{ $page.props.shiftStatus?.is_closed ? "Reopen the day" : "Start my shift" }}
+                            {{ $page.props.shiftStatus?.is_closed ? "Reopen the day" : "Open my drawer" }}
                         </a-button>
                     </div>
                 </template>
@@ -1746,7 +1764,7 @@ watch(
                 title="Sales"
                 class="shrink-0 md:pr-64"
             >
-                <template v-if="!isMdUp || canPunch || dineInEnabled" #actions>
+                <template v-if="!isMdUp || dineInEnabled" #actions>
                     <a-button
                         v-if="dineInEnabled"
                         size="small"
@@ -1756,7 +1774,7 @@ watch(
                     >
                         Tables
                     </a-button>
-                    <TimeclockButton v-if="canPunch" :location-id="activeLocationId" />
+                    <TimeclockButton v-if="canPunch && !isMdUp" :location-id="activeLocationId" :status="$page.props.shiftStatus?.clock" @punched="onPunched" />
                     <div v-if="!isMdUp" class="flex items-center gap-2">
                         <span class="text-xs font-medium text-gray-800">
                             Classic
@@ -1808,7 +1826,7 @@ watch(
             />
             <KitchenTicketModal :ticket="paidKitchenTicket" @close="paidKitchenTicket = null" />
 
-            <component :is="salesLayoutComponent" title="Create Transaction">
+            <component :is="salesLayoutComponent" title="Create Transaction" v-bind="isCoffeeshopLayout ? { tallCorner: cornerHasSwitcher } : {}">
                 <template v-if="isCoffeeshopLayout" #hero>
                     <div class="min-w-0">
                         <p
@@ -1838,7 +1856,7 @@ watch(
                             class="mt-1 inline-block text-xs text-[var(--cs-muted)] underline"
                             data-testid="customer-display-link"
                         >Customer display</a>
-                        <div v-if="canPunch || dineInEnabled" class="flex flex-wrap items-center gap-2">
+                        <div v-if="(canPunch && !isMdUp) || dineInEnabled" class="flex flex-wrap items-center gap-2">
                             <button
                                 v-if="dineInEnabled"
                                 type="button"
@@ -1848,7 +1866,7 @@ watch(
                             >
                                 Tables
                             </button>
-                            <TimeclockButton v-if="canPunch" variant="coffeeshop" :location-id="activeLocationId" />
+                            <TimeclockButton v-if="canPunch && !isMdUp" variant="coffeeshop" :location-id="activeLocationId" :status="$page.props.shiftStatus?.clock" @punched="onPunched" />
                         </div>
                     </div>
                 </template>

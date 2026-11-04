@@ -16,8 +16,11 @@ class CashOnHandMovement extends Model
     /** From a shift a manager approved, or a store's end-of-day cash-out. */
     public const COLLECTED = 'collected';
 
-    /** Back to a store's drawer or one of its payment channels. */
+    /** Back to a store's drawer or one of its payment channels, or to a warehouse's cash fund. */
     public const TO_STORE = 'to_store';
+
+    /** Back from a warehouse's cash fund. */
+    public const FROM_WAREHOUSE = 'from_warehouse';
 
     /** The owner kept it for themselves. */
     public const OWNER_USE = 'owner_use';
@@ -25,7 +28,7 @@ class CashOnHandMovement extends Model
     /** A starting balance or a correction, in or out. */
     public const ADJUSTMENT = 'adjustment';
 
-    public const KINDS = [self::COLLECTED, self::TO_STORE, self::OWNER_USE, self::ADJUSTMENT];
+    public const KINDS = [self::COLLECTED, self::TO_STORE, self::FROM_WAREHOUSE, self::OWNER_USE, self::ADJUSTMENT];
 
     protected $guarded = [];
 

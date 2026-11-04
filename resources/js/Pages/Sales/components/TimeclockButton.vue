@@ -13,8 +13,20 @@ const props = defineProps({
     locationId: { type: [Number, String], default: null },
     /** "classic" (gray header button) or "coffeeshop" (the modern layout's hero). */
     variant: { type: String, default: "classic" },
+    /** The signed-in user's clock { on_the_clock, since }: the label says whether they're in. */
+    status: { type: Object, default: null },
 });
 
+const emit = defineEmits(["punched"]);
+
+// "In since 8:02 AM" when the signed-in user is on the clock, "Clock in" when not. Anyone can still
+// punch with their own PIN; the label is about whoever is signed in.
+const isIn = computed(() => !!props.status?.on_the_clock);
+const label = computed(() => {
+    if (!props.status) return "Clock in / out";
+    if (!isIn.value) return "Clock in";
+    return props.status.since ? `In since ${dayjs(props.status.since).format("h:mm A")}` : "Clocked in";
+});
 const { getRoute } = useDomainRoutes();
 
 const open = ref(false);
@@ -55,6 +67,7 @@ async function submit() {
             location_id: props.locationId ?? undefined,
         });
         result.value = data;
+        emit("punched", data);
         pin.value = "";
         // Back to the till on its own; the next person can open it again.
         clearTimeout(closeTimer);
@@ -93,11 +106,13 @@ onBeforeUnmount(() => clearTimeout(closeTimer));
         v-if="variant === 'classic'"
         size="small"
         class="flex items-center gap-1"
+        :class="{ '!border-emerald-300 !bg-emerald-50 !text-emerald-800': isIn }"
         data-testid="timeclock-open"
         @click="show"
     >
-        <IconClock :size="16" />
-        Clock in / out
+        <span v-if="isIn" class="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" />
+        <IconClock v-else :size="16" />
+        <span data-testid="timeclock-status">{{ label }}</span>
     </a-button>
     <button
         v-else
@@ -106,8 +121,9 @@ onBeforeUnmount(() => clearTimeout(closeTimer));
         data-testid="timeclock-open"
         @click="show"
     >
-        <IconClock :size="14" />
-        Clock in / out
+        <span v-if="isIn" class="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" />
+        <IconClock v-else :size="14" />
+        <span data-testid="timeclock-status">{{ label }}</span>
     </button>
 
     <a-modal
@@ -138,6 +154,7 @@ onBeforeUnmount(() => clearTimeout(closeTimer));
 
         <form v-else class="flex flex-col gap-3" @submit.prevent="submit">
             <p class="m-0 text-sm text-gray-600">Type your own PIN.</p>
+            <p class="m-0 text-xs text-gray-500" data-testid="timeclock-drawer-note">This records your hours. Cashiers also open their drawer before taking payments.</p>
             <input
                 ref="pinInput"
                 v-model="pin"

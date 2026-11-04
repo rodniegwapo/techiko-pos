@@ -11,7 +11,6 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeployController;
 use App\Http\Controllers\DomainController;
 use App\Http\Controllers\DomainPaymentController;
-use App\Http\Controllers\ServiceTierController;
 use App\Http\Controllers\ImpersonationController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryLocationController;
@@ -23,9 +22,11 @@ use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\Products\DiscountController;
 use App\Http\Controllers\Products\ProductController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ProfilePinController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SaleController;
 use App\Http\Controllers\SeoController;
+use App\Http\Controllers\ServiceTierController;
 use App\Http\Controllers\StockAdjustmentController;
 use App\Http\Controllers\SupervisorAssignmentController;
 use App\Http\Controllers\UserController;
@@ -72,6 +73,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    // Change my PIN: everyone sets their own POS PIN; admins can still reset it on Users.
+    Route::put('/profile/pin', [ProfilePinController::class, 'update'])->name('profile.pin.update');
 
     // User Impersonation (Super Users Only)
     Route::post('/impersonate/{user}', [ImpersonationController::class, 'impersonate'])

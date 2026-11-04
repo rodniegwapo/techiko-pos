@@ -1,8 +1,9 @@
 <script setup>
-import { computed, reactive, watch } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import dayjs from "dayjs";
 import { IconPlus, IconTrash } from "@tabler/icons-vue";
 import { useHelpers } from "@/Composables/useHelpers";
+import ClockAlongField from "@/Pages/Sales/components/ClockAlongField.vue";
 import BillCounter from "./BillCounter.vue";
 
 /**
@@ -25,6 +26,9 @@ const props = defineProps({
     ownShift: { type: Boolean, default: false },
     /** Ending someone else's shift (a manager, for a forgotten one): their name for the title. */
     forName: { type: String, default: null },
+    /** Your own drawer only: your time clock, to offer "Clock me out too". */
+    clock: { type: Object, default: null },
+    clockError: { type: String, default: "" },
 });
 const emit = defineEmits(["close", "end"]);
 const { formattedTotal } = useHelpers();
@@ -58,6 +62,15 @@ watch(countedAmount, (amount) => {
     if (amount <= 0 && form.action === "cashout_now") form.action = "save_as_opening_cash";
 });
 
+// "Clock me out too": only on your own drawer, never when a manager closes someone else's.
+const offerClockOut = computed(() => props.ownShift && !props.forName && !!props.clock);
+const clockOut = ref({ enabled: false, pin: "" });
+const clockPinMissing = computed(() => offerClockOut.value && clockOut.value.enabled && !clockOut.value.pin);
+// A wrong PIN clears it so it's typed again.
+watch(() => props.clockError, (err) => {
+    if (err) clockOut.value = { ...clockOut.value, pin: "" };
+});
+
 const addExpense = () => form.expenses.push({ expense_category_id: null, amount: null, description: "" });
 
 function submit() {
@@ -68,12 +81,13 @@ function submit() {
         expenses: form.expenses
             .filter((e) => Number(e.amount) > 0)
             .map((e) => ({ expense_category_id: e.expense_category_id, amount: Number(e.amount), description: e.description })),
+        ...(offerClockOut.value && clockOut.value.enabled && clockOut.value.pin ? { clock_out_pin: clockOut.value.pin } : {}),
     });
 }
 </script>
 
 <template>
-    <a-modal :visible="open" :title="forName ? `End ${forName}'s shift` : ownShift ? 'End my shift' : 'End the store\'s day'" :width="560" destroy-on-close @cancel="emit('close')">
+    <a-modal :visible="open" :title="forName ? `Close ${forName}'s drawer` : ownShift ? 'Close my drawer' : 'End the store\'s day'" :width="560" destroy-on-close @cancel="emit('close')">
         <div class="flex flex-col gap-4 pt-1">
             <div>
                 <label class="mb-1 block text-sm font-medium text-gray-700">{{ ownShift ? "Cash in your drawer" : "Final count" }}</label>
@@ -128,17 +142,19 @@ function submit() {
             </a-radio-group>
 
             <a-textarea v-model:value="form.notes" :rows="2" placeholder="Notes (optional)" />
+
+            <ClockAlongField v-if="offerClockOut" v-model="clockOut" mode="out" :status="clock" :error="clockError" />
         </div>
         <template #footer>
             <a-button @click="emit('close')">Cancel</a-button>
             <a-button
                 type="primary"
                 :loading="saving"
-                :disabled="missingCount"
+                :disabled="missingCount || clockPinMissing"
                 data-testid="confirm-end-shift"
                 @click="submit"
             >
-                {{ ownShift ? "End my shift" : "End the day" }}
+                {{ ownShift ? "Close my drawer" : "End the day" }}
             </a-button>
         </template>
     </a-modal>

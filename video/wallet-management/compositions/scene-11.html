@@ -1,0 +1,92 @@
+<template>
+  <style>
+      #root { position: absolute; inset: 0; font-family: "Inter", sans-serif; color: #10231a; overflow: hidden; }
+      .bg { position: absolute; inset: 0; background: linear-gradient(180deg, #f6f8f5 0%, #edf2ec 100%); }
+      .hdr { position: absolute; left: 72px; top: 44px; right: 72px; height: 72px; display: flex; align-items: center; gap: 20px; }
+      .hdr .num { font-weight: 900; font-size: 26px; color: #ffffff; background: #1f7a3f; border-radius: 12px; padding: 10px 16px; letter-spacing: 0.02em; }
+      .hdr .ttl { font-weight: 700; font-size: 44px; letter-spacing: -0.02em; white-space: nowrap; }
+      .hdr .role { margin-left: auto; font-weight: 700; font-size: 28px; letter-spacing: 0.08em; text-transform: uppercase; border-radius: 999px; padding: 12px 26px; white-space: nowrap; }
+      .chrome { position: absolute; left: 72px; top: 150px; width: 1240px; height: 734px; background: #ffffff; border-radius: 16px; border: 1px solid #d3dbd2; box-shadow: 0 24px 60px rgba(16, 35, 26, 0.14); }
+      .chrome .bar { height: 36px; display: flex; align-items: center; gap: 8px; padding: 0 16px; border-bottom: 1px solid #e3e8e2; }
+      .chrome .dot { width: 11px; height: 11px; border-radius: 50%; background: #cfd8ce; }
+      .chrome .url { margin: 0 auto; font-size: 16px; color: #5b6b62; background: #f1f4f0; border-radius: 8px; padding: 4px 18px; }
+      .shot { position: absolute; left: 72px; top: 186px; width: 1240px; height: 698px; object-fit: cover; border-radius: 0 0 16px 16px; }
+      .panel { position: absolute; left: 1352px; top: 150px; width: 496px; height: 734px; display: flex; flex-direction: column; gap: 14px; }
+      .card { position: relative; width: 100%; background: #ffffff; border-radius: 16px; border: 1px solid #dbe3da; padding: 18px 22px 18px 26px; box-shadow: 0 10px 28px rgba(16, 35, 26, 0.08); }
+      .card .bar2 { position: absolute; left: 0; top: 16px; bottom: 16px; width: 6px; border-radius: 0 6px 6px 0; }
+      .card .t1 { font-weight: 700; font-size: 31px; line-height: 1.2; letter-spacing: -0.01em; }
+      .card .t2 { font-size: 28px; line-height: 1.3; color: #4a5a51; margin-top: 6px; }
+      .icon { display: inline-flex; width: 56px; height: 56px; }
+      .icon svg { width: 100%; height: 100%; }
+      .node { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: #ffffff; border: 2px solid #d3dbd2; border-radius: 22px; box-shadow: 0 12px 30px rgba(16, 35, 26, 0.08); text-align: center; }
+      .node .lbl { font-weight: 700; font-size: 30px; letter-spacing: -0.01em; line-height: 1.15; }
+      .node .sub { font-size: 26px; color: #4a5a51; line-height: 1.3; padding: 0 18px; }
+      .arrow { position: absolute; height: 6px; background: #6b8574; border-radius: 3px; }
+      .arrow::after { content: ""; position: absolute; right: -4px; top: -9px; border-left: 18px solid #6b8574; border-top: 12px solid transparent; border-bottom: 12px solid transparent; }
+      .chip { display: inline-block; font-weight: 600; font-size: 24px; border-radius: 999px; padding: 8px 18px; background: #eef3ee; color: #1f3a2b; }
+  </style>
+  <div data-hf-id="hf-gntm" id="root" data-composition-id="scene-11" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-m7dd" class="bg"></div>
+    <div data-hf-id="hf-r8na" id="scene-11-hdr" class="hdr">
+      <span data-hf-id="hf-q138" class="num" data-layout-ignore>11</span>
+      <span data-hf-id="hf-4jro" class="ttl">Three ways to move money to another store</span>
+      <span data-hf-id="hf-r1w9" class="role" style="color: #b45309; background: #fef3c7">Owner / Admin</span>
+    </div>
+    <div data-hf-id="hf-fibf" id="scene-11-dia" style="position: absolute; inset: 0">
+      <div data-hf-id="hf-6gjd" id="scene-11-row0" style="position: absolute; left: 72px; top: 160px; width: 1776px; height: 220px; background: #ffffff; border-radius: 22px; border: 2px solid #d3dbd2">
+        <div data-hf-id="hf-kbkh" style="position: absolute; left: 32px; top: 34px; width: 64px; height: 64px; border-radius: 50%; background: #1f7a3f; color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 34px">1</div>
+        <div data-hf-id="hf-k29m" style="position: absolute; left: 120px; top: 30px; width: 520px; font-weight: 800; font-size: 38px; letter-spacing: -0.02em">Transfer</div>
+        <div data-hf-id="hf-fdv0" style="position: absolute; left: 120px; top: 84px; width: 520px; font-size: 24px; line-height: 1.35; color: #4a5a51">Straight to the other store's drawer or channel</div>
+        <div data-hf-id="hf-7gg0" class="node" style="left: 680px; top: 26px; width: 260px; height: 168px; color: #1f7a3f"><span data-hf-id="hf-i0lu" class="icon"><svg data-hf-id="hf-e7ft" viewBox="0 0 48 48"><path data-hf-id="hf-rfmg" d="M8 20 11 8h26l3 12M8 20h32M10 20v20h28V20M20 40V29h8v11" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round"/></svg></span><div data-hf-id="hf-lae7" class="lbl" style="font-size: 25px; color: #10231a">Store A</div></div>
+        <div data-hf-id="hf-10ln" class="node" style="left: 1480px; top: 26px; width: 260px; height: 168px; color: #1f7a3f"><span data-hf-id="hf-9jva" class="icon"><svg data-hf-id="hf-7bj1" viewBox="0 0 48 48"><path data-hf-id="hf-6xps" d="M8 20 11 8h26l3 12M8 20h32M10 20v20h28V20M20 40V29h8v11" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round"/></svg></span><div data-hf-id="hf-kw36" class="lbl" style="font-size: 25px; color: #10231a">Store B</div></div>
+        <div data-hf-id="hf-ae5y" class="arrow" style="left: 958px; top: 107px; width: 500px"></div>
+      </div>
+      <div data-hf-id="hf-osmg" id="scene-11-row1" style="position: absolute; left: 72px; top: 410px; width: 1776px; height: 220px; background: #ffffff; border-radius: 22px; border: 2px solid #d3dbd2">
+        <div data-hf-id="hf-lihk" style="position: absolute; left: 32px; top: 34px; width: 64px; height: 64px; border-radius: 50%; background: #1f7a3f; color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 34px">2</div>
+        <div data-hf-id="hf-vvim" style="position: absolute; left: 120px; top: 30px; width: 520px; font-weight: 800; font-size: 38px; letter-spacing: -0.02em">Owner took cash</div>
+        <div data-hf-id="hf-bumf" style="position: absolute; left: 120px; top: 84px; width: 520px; font-size: 24px; line-height: 1.35; color: #4a5a51">Into the other store's drawer · from the cash drawer only</div>
+        <div data-hf-id="hf-vf20" class="node" style="left: 680px; top: 26px; width: 260px; height: 168px; color: #1f7a3f"><span data-hf-id="hf-9y6b" class="icon"><svg data-hf-id="hf-8ig4" viewBox="0 0 48 48"><rect data-hf-id="hf-x4wq" x="6" y="12" width="36" height="26" rx="4" fill="none" stroke="currentColor" stroke-width="3.5"/><path data-hf-id="hf-rckp" d="M6 22h36M20 30h8" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/></svg></span><div data-hf-id="hf-xqhk" class="lbl" style="font-size: 25px; color: #10231a">Store A drawer</div></div>
+        <div data-hf-id="hf-3viv" class="node" style="left: 1080px; top: 26px; width: 260px; height: 168px; color: #1f7a3f"><span data-hf-id="hf-achc" class="icon"><svg data-hf-id="hf-8453" viewBox="0 0 48 48"><circle data-hf-id="hf-cmdk" cx="24" cy="16" r="8" fill="none" stroke="currentColor" stroke-width="3.5"/><path data-hf-id="hf-7rgv" d="M8 42c2-9 8-13 16-13s14 4 16 13" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/></svg></span><div data-hf-id="hf-mbvm" class="lbl" style="font-size: 25px; color: #10231a">Owner carries it</div></div>
+        <div data-hf-id="hf-donm" class="arrow" style="left: 958px; top: 107px; width: 100px"></div>
+        <div data-hf-id="hf-17e3" class="node" style="left: 1480px; top: 26px; width: 260px; height: 168px; color: #1f7a3f"><span data-hf-id="hf-7kc5" class="icon"><svg data-hf-id="hf-9b26" viewBox="0 0 48 48"><rect data-hf-id="hf-oaim" x="6" y="12" width="36" height="26" rx="4" fill="none" stroke="currentColor" stroke-width="3.5"/><path data-hf-id="hf-70bh" d="M6 22h36M20 30h8" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/></svg></span><div data-hf-id="hf-n74n" class="lbl" style="font-size: 25px; color: #10231a">Store B drawer</div></div>
+        <div data-hf-id="hf-eq7j" class="arrow" style="left: 1358px; top: 107px; width: 100px"></div>
+      </div>
+      <div data-hf-id="hf-3yof" id="scene-11-row2" style="position: absolute; left: 72px; top: 660px; width: 1776px; height: 220px; background: #ffffff; border-radius: 22px; border: 2px solid #fcd34d">
+        <div data-hf-id="hf-l46j" style="position: absolute; left: 32px; top: 34px; width: 64px; height: 64px; border-radius: 50%; background: #1f7a3f; color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 34px">3</div>
+        <div data-hf-id="hf-6dgz" style="position: absolute; left: 120px; top: 30px; width: 520px; font-weight: 800; font-size: 38px; letter-spacing: -0.02em">Through Cash on hand</div>
+        <div data-hf-id="hf-yh2a" style="position: absolute; left: 120px; top: 84px; width: 520px; font-size: 24px; line-height: 1.35; color: #4a5a51">Collected first · later Move to a store</div>
+        <div data-hf-id="hf-u84x" class="node" style="left: 680px; top: 26px; width: 260px; height: 168px; color: #1f7a3f"><span data-hf-id="hf-7yn6" class="icon"><svg data-hf-id="hf-8wr5" viewBox="0 0 48 48"><path data-hf-id="hf-5qsp" d="M8 20 11 8h26l3 12M8 20h32M10 20v20h28V20M20 40V29h8v11" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round"/></svg></span><div data-hf-id="hf-jbdr" class="lbl" style="font-size: 25px; color: #10231a">Store A</div></div>
+        <div data-hf-id="hf-pgda" class="node" style="left: 1080px; top: 26px; width: 260px; height: 168px; color: #b45309"><span data-hf-id="hf-8cy7" class="icon"><svg data-hf-id="hf-a3o8" viewBox="0 0 48 48"><rect data-hf-id="hf-obls" x="6" y="8" width="36" height="32" rx="4" fill="none" stroke="currentColor" stroke-width="3.5"/><circle data-hf-id="hf-4isw" cx="24" cy="24" r="7" fill="none" stroke="currentColor" stroke-width="3.5"/><path data-hf-id="hf-3b27" d="M24 17v3M24 28v3M10 40v4M38 40v4" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/></svg></span><div data-hf-id="hf-o5oq" class="lbl" style="font-size: 25px; color: #10231a">Cash on hand</div></div>
+        <div data-hf-id="hf-9h06" class="arrow" style="left: 958px; top: 107px; width: 100px"></div>
+        <div data-hf-id="hf-0t32" class="node" style="left: 1480px; top: 26px; width: 260px; height: 168px; color: #1f7a3f"><span data-hf-id="hf-8r98" class="icon"><svg data-hf-id="hf-9pd7" viewBox="0 0 48 48"><path data-hf-id="hf-653q" d="M8 20 11 8h26l3 12M8 20h32M10 20v20h28V20M20 40V29h8v11" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round"/></svg></span><div data-hf-id="hf-a2wm" class="lbl" style="font-size: 25px; color: #10231a">Store B</div></div>
+        <div data-hf-id="hf-xw0f" class="arrow" style="left: 1358px; top: 107px; width: 100px"></div>
+      </div>
+    </div>
+    <div data-hf-id="hf-heun" id="scene-11-frame" class="chrome"><div data-hf-id="hf-ufsv" class="bar"><span data-hf-id="hf-9gry" class="dot"></span><span data-hf-id="hf-zcc2" class="dot"></span><span data-hf-id="hf-zqn3" class="dot"></span><span data-hf-id="hf-9qq2" class="url" data-layout-ignore>techiko-pos · Cash &amp; wallet</span></div></div>
+    <video data-hf-id="hf-e0of" id="scene-11-v0" class="clip shot" data-start="10.737" data-duration="5.298" data-track-index="2" src="assets/footage/scene-11a.mp4" muted playsinline></video>
+    <video data-hf-id="hf-uic8" id="scene-11-v1" class="clip shot" data-start="21.214" data-duration="5.128" data-track-index="3" src="assets/footage/scene-11b.mp4" muted playsinline></video>
+    <video data-hf-id="hf-0cl4" id="scene-11-v2" class="clip shot" data-start="29.716" data-duration="7.528" data-track-index="4" src="assets/footage/scene-11c.mp4" muted playsinline></video>
+  </div>
+  <script>
+    (() => {
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo("#scene-11-hdr", { opacity: 0, y: -16 }, { opacity: 1, y: 0, duration: 0.45, ease: "power3.out" }, 0.05);
+      tl.fromTo("#scene-11-row0", { opacity: 0, x: -40 }, { opacity: 1, x: 0, duration: 0.55, ease: "power3.out" }, 6.23);
+      tl.fromTo("#scene-11-row1", { opacity: 0, x: -40 }, { opacity: 1, x: 0, duration: 0.55, ease: "power3.out" }, 15.88);
+      tl.fromTo("#scene-11-row2", { opacity: 0, x: -40 }, { opacity: 1, x: 0, duration: 0.55, ease: "power3.out" }, 26.19);
+      tl.to("#scene-11-dia", { opacity: 0, duration: 0.3 }, 10.44);
+      tl.to("#scene-11-dia", { opacity: 1, duration: 0.3 }, 15.94);
+      tl.to("#scene-11-dia", { opacity: 0, duration: 0.3 }, 20.91);
+      tl.to("#scene-11-dia", { opacity: 1, duration: 0.3 }, 26.24);
+      tl.to("#scene-11-dia", { opacity: 0, duration: 0.3 }, 29.42);
+      tl.set("#scene-11-frame", { opacity: 0 }, 0);
+      tl.fromTo("#scene-11-frame", { opacity: 0 }, { opacity: 1, duration: 0.3 }, 10.69);
+      tl.to("#scene-11-frame", { opacity: 0, duration: 0.25 }, 15.94);
+      tl.fromTo("#scene-11-frame", { opacity: 0 }, { opacity: 1, duration: 0.3 }, 21.16);
+      tl.to("#scene-11-frame", { opacity: 0, duration: 0.25 }, 26.24);
+      tl.fromTo("#scene-11-frame", { opacity: 0 }, { opacity: 1, duration: 0.3 }, 29.67);
+      tl.to("#scene-11-frame", { opacity: 0, duration: 0.25 }, 37.14);
+      window.__timelines["scene-11"] = tl;
+    })();
+  </script>
+</template>

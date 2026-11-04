@@ -253,7 +253,7 @@ const submit = () => {
                 type="info"
                 show-icon
                 class="mb-4"
-                message="This will also be recorded as cash out in the store's Wallet cash ledger, so the drawer count stays correct."
+                message="This will also be recorded as cash out of the store's drawer (or the warehouse's cash fund), so the cash stays correct."
             />
 
             <div class="grid grid-cols-1 gap-x-4 md:grid-cols-2">

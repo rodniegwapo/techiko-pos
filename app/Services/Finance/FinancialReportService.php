@@ -25,6 +25,7 @@ use App\Services\Reports\ProfitAndLossService;
 use App\Support\Wallet\CashOnHand;
 use App\Support\Wallet\WalletCashBridgeExpected;
 use App\Support\Wallet\WalletCashDailyExpected;
+use App\Support\Wallet\WarehouseFund;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -681,10 +682,14 @@ class FinancialReportService
         $bankTotal = round(collect($accounts)->whereIn('type', ['bank', 'other'])->sum('balance'), 2);
         $ewalletTotal = round(collect($accounts)->where('type', 'ewallet')->sum('balance'), 2);
 
+        // Cash the owner moved to the warehouses, to pay suppliers and expenses there (shown when there is some).
+        $warehouseFunds = WarehouseFund::total($domain);
+
         $assets = [
             ['key' => 'cash_in_drawer', 'label' => 'Cash in drawers (today, expected)', 'amount' => $cash['amount']],
             // Still the business's cash, only with the owner now (collected from the drawers).
             ['key' => 'cash_on_hand', 'label' => 'Cash on hand (with the owner)', 'amount' => CashOnHand::balance($domain)],
+            ...($warehouseFunds != 0 ? [['key' => 'warehouse_funds', 'label' => 'Warehouse cash funds', 'amount' => $warehouseFunds]] : []),
             ['key' => 'bank', 'label' => 'Bank accounts', 'amount' => $bankTotal],
             ['key' => 'ewallet', 'label' => 'E-wallets (GCash, Maya…)', 'amount' => $ewalletTotal],
             ['key' => 'inventory', 'label' => 'Inventory (at cost)', 'amount' => $this->inventoryValue($domain, null)],

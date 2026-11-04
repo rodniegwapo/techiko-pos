@@ -8,10 +8,13 @@ import ContentLayout from "@/Components/ContentLayout.vue";
 import AllStoresTable from "@/Pages/Wallet/components/balances/AllStoresTable.vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { useHelpers } from "@/Composables/useHelpers";
+import dayjs from "dayjs";
+import { MANUAL_KIND_LABELS, SYSTEM_KIND_LABELS } from "@/Pages/Wallet/components/walletLabels";
 
 /**
  * The warehouse's Cash & Wallet: each store's closed shifts with their last count and the cash
  * taken out at end of shift. Read-only; stores record these on their own Today's drawer page.
+ * Above them, the warehouse's cash fund: cash the owner moved here to pay suppliers and expenses.
  */
 const props = defineProps({
     storesCash: { type: Object, required: true },
@@ -19,7 +22,10 @@ const props = defineProps({
     allStores: { type: Object, default: null },
     /** May start a shift: shifts run at a store, so they're told to switch to one. */
     canStartShift: { type: Boolean, default: false },
+    /** { id, name, balance, lines: [{ id, date, direction, amount, kind, notes, by, balance_after }] }, for those who see money. */
+    warehouseFund: { type: Object, default: null },
 });
+const fundLabel = (kind) => SYSTEM_KIND_LABELS[kind] ?? MANUAL_KIND_LABELS[kind] ?? kind;
 
 const { getRoute } = useDomainRoutes();
 const { formattedTotal } = useHelpers();
@@ -60,8 +66,40 @@ const totals = computed(() => props.storesCash.totals ?? {});
             show-icon
             class="mb-4"
             data-testid="warehouse-shift-hint"
-            message="You're viewing the warehouse, which has no cash drawer. To start your shift, switch to a store with the store picker at the top right."
+            message="You're viewing the warehouse, which has no cash drawer or shifts. To start your shift, switch to a store with the store picker at the top right."
         />
+
+        <!-- The warehouse's cash fund: moved here from Cash on hand, paid out to suppliers and expenses. -->
+        <div v-if="warehouseFund" class="mb-6 rounded-lg border border-teal-200 bg-white shadow-sm" data-testid="warehouse-fund">
+            <div class="flex flex-wrap items-end justify-between gap-2 border-b border-gray-100 px-4 py-3">
+                <div>
+                    <div class="text-xs font-medium uppercase text-gray-500">{{ warehouseFund.name }} · cash fund</div>
+                    <div class="font-mono text-2xl font-semibold tabular-nums" :class="warehouseFund.balance < 0 ? 'text-red-700' : 'text-gray-900'" data-testid="warehouse-fund-balance">
+                        {{ money(warehouseFund.balance) }}
+                    </div>
+                </div>
+                <p class="m-0 max-w-md text-xs text-gray-500">
+                    Cash the owner moved here from Cash on hand. Pay suppliers and expenses from it: pick this warehouse's cash fund when paying in cash.
+                </p>
+            </div>
+            <p v-if="!warehouseFund.lines.length" class="m-0 px-4 py-3 text-sm text-gray-500">No cash here yet. The owner moves it from Cash on hand.</p>
+            <table v-else class="w-full text-sm" data-testid="warehouse-fund-lines">
+                <tbody>
+                    <tr v-for="l in warehouseFund.lines" :key="l.id" class="border-t border-gray-100 first:border-t-0">
+                        <td class="whitespace-nowrap px-4 py-2 text-gray-500">{{ dayjs(l.date).format("MMM D") }}</td>
+                        <td class="px-4 py-2">
+                            <div class="font-medium text-gray-800">{{ fundLabel(l.kind) }}</div>
+                            <div v-if="l.notes" class="text-xs text-gray-500">{{ l.notes }}</div>
+                        </td>
+                        <td class="hidden px-4 py-2 text-gray-500 md:table-cell">{{ l.by ?? "—" }}</td>
+                        <td class="whitespace-nowrap px-4 py-2 text-right font-mono tabular-nums" :class="l.direction === 'in' ? 'text-green-700' : 'text-red-700'">
+                            {{ l.direction === "in" ? "+" : "−" }} {{ money(l.amount) }}
+                        </td>
+                        <td class="whitespace-nowrap px-4 py-2 text-right font-mono tabular-nums text-gray-700">{{ money(l.balance_after) }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
 
         <div class="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4" data-testid="stores-cash-totals">
             <div class="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">

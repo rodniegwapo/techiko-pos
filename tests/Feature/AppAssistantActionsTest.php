@@ -244,7 +244,7 @@ class AppAssistantActionsTest extends TestCase
         $this->assertSame(0.0, $first->fresh()->remaining);
     }
 
-    public function test_a_bill_is_not_paid_in_cash_from_a_warehouse(): void
+    public function test_a_bill_paid_in_cash_at_a_warehouse_comes_from_its_cash_fund(): void
     {
         $user = $this->user(['finance.payables.index', 'finance.bill-payments.store']);
         $warehouse = InventoryLocation::query()->create([
@@ -260,7 +260,8 @@ class AppAssistantActionsTest extends TestCase
         $tools = new AssistantTools(app(GuideLibrary::class), $user, $this->domain->fresh(), $warehouse);
         $result = json_decode($tools->run('propose_pay_supplier_bill', ['supplier' => 'Magnolia', 'payment_method' => 'cash_register']), true);
 
-        $this->assertSame('Cash from the register needs a store. The user should pick a store first.', $result['error']);
+        $this->assertArrayNotHasKey('error', $result);
+        $this->assertStringContainsString('Depot (cash fund)', json_encode($result));
     }
 
     public function test_bill_payments_need_the_finance_feature_and_permission(): void

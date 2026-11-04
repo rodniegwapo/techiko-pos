@@ -21,9 +21,12 @@ export function firstValidationMessage(err) {
 export function useCashDrawerActions(locationId, businessDate) {
     const { getRoute } = useDomainRoutes();
     const busy = ref(null);
+    // A wrong PIN for "Clock me in / out too": shown under the PIN, not as a toast. Nothing was saved.
+    const pinError = ref("");
 
     async function post(name, routeName, payload, done, failed, params = {}) {
         busy.value = name;
+        pinError.value = "";
         try {
             await axios.post(getRoute(routeName, params), {
                 location_id: locationId.value,
@@ -34,6 +37,12 @@ export function useCashDrawerActions(locationId, businessDate) {
             router.reload({ preserveScroll: true });
             return true;
         } catch (e) {
+            const errors = e?.response?.data?.errors ?? {};
+            const pin = errors.clock_in_pin?.[0] ?? errors.clock_out_pin?.[0];
+            if (pin) {
+                pinError.value = pin;
+                return false;
+            }
             notification.error({ message: firstValidationMessage(e) || failed });
             return false;
         } finally {
@@ -43,6 +52,7 @@ export function useCashDrawerActions(locationId, businessDate) {
 
     return {
         busy,
+        pinError,
         saveOpening: (amount, reason) =>
             post("opening", "wallet-cash-ledger.opening-cash.store", { opening_cash: Number(amount || 0), reason: reason || null },
                 "Opening cash saved.", "Could not save opening cash."),
@@ -58,12 +68,13 @@ export function useCashDrawerActions(locationId, businessDate) {
         reopenShift: (reason) =>
             post("reopen", "wallet-cash-ledger.reopen-shift", { reason }, "Day reopened.", "Could not reopen the day."),
 
-        startMyShift: (openingCash, notes) =>
-            post("my-start", "register-shifts.start", { opening_cash: Number(openingCash || 0), notes: notes || null },
-                "Shift started.", "Could not start your shift."),
+        /** With clockInPin, it clocks them in too (their own PIN), or neither happens. */
+        startMyShift: (openingCash, notes, clockInPin = null) =>
+            post("my-start", "register-shifts.start", { opening_cash: Number(openingCash || 0), notes: notes || null, clock_in_pin: clockInPin || null },
+                clockInPin ? "Drawer opened. You're clocked in." : "Drawer opened.", "Could not open your drawer."),
         /** No PIN: a count that is off goes to a manager on Shifts & counts. */
         endMyShift: (shiftId, payload) =>
-            post("my-end", "register-shifts.end", payload, "Shift ended.", "Could not end your shift.", { registerShift: shiftId }),
+            post("my-end", "register-shifts.end", payload, payload?.clock_out_pin ? "Drawer closed. You're clocked out." : "Drawer closed.", "Could not close your drawer.", { registerShift: shiftId }),
         reopenMyShift: (shiftId, reason) =>
             post("my-reopen", "register-shifts.reopen", { reason }, "Shift reopened.", "Could not reopen the shift.", { registerShift: shiftId }),
     };

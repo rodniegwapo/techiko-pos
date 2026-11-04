@@ -99,8 +99,9 @@ class PaySupplierBill implements AssistantAction, HasInputTemplate
         if (! isset(RecordExpense::METHODS[$method])) {
             throw new ActionInputException('Say how it was paid: '.implode(', ', array_keys(RecordExpense::METHODS)).'.');
         }
-        if ($method === 'cash_register' && (! $context->location || $context->location->isWarehouse())) {
-            throw new ActionInputException('Cash from the register needs a store. The user should pick a store first.');
+        // Cash comes out of the store's drawer, or the warehouse's cash fund.
+        if ($method === 'cash_register' && ! $context->location) {
+            throw new ActionInputException('Cash from the register needs a store or warehouse. The user should pick one first.');
         }
         try {
             $date = Carbon::parse($input['payment_date'] ?? today()->toDateString())->toDateString();
@@ -123,7 +124,9 @@ class PaySupplierBill implements AssistantAction, HasInputTemplate
             $fields[] = ['label' => 'Reference', 'value' => $reference];
         }
         if ($method === 'cash_register') {
-            $fields[] = ['label' => 'Cash from', 'value' => $context->location->name];
+            $fields[] = ['label' => 'Cash from', 'value' => $context->location->isWarehouse()
+                ? $context->location->name.' (cash fund)'
+                : $context->location->name];
         }
 
         return new PreparedAction('Pay supplier bill', array_filter([
@@ -170,9 +173,6 @@ class PaySupplierBill implements AssistantAction, HasInputTemplate
         }
         if ($input['payment_method'] === 'cash_register' && ! $context->location) {
             return ActionResult::failed('The store this was meant for no longer exists.');
-        }
-        if ($input['payment_method'] === 'cash_register' && $context->location->isWarehouse()) {
-            return ActionResult::failed('Cash from the register needs a store, not a warehouse.');
         }
 
         return $this->call->run(

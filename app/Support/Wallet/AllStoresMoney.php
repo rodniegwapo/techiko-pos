@@ -8,12 +8,12 @@ use App\Models\InventoryLocation;
 /**
  * Where the money is in every store at once, for owners: each store's cash drawer (today's
  * Expected, as on Today's drawer) and its payment channels (as on Where money is), and the cash
- * the owner holds (Cash on hand), which is still the business's.
+ * the owner holds (Cash on hand), which is still the business's, and each warehouse's cash fund.
  */
 class AllStoresMoney
 {
     /**
-     * @return array{stores: list<array{id: int, name: string, drawer: float, channels: list<array>, total: float}>, cash_on_hand: float, total: float}
+     * @return array{stores: list<array{id: int, name: string, drawer: float, channels: list<array>, total: float}>, warehouses: list<array{id: int, name: string, balance: float}>, cash_on_hand: float, total: float}
      */
     public static function build(Domain $domain, int $viewerId): array
     {
@@ -38,11 +38,14 @@ class AllStoresMoney
         })->values()->all();
 
         $cashOnHand = CashOnHand::balance($domain->name_slug);
+        // Cash the owner moved to a warehouse, to pay suppliers and expenses there.
+        $warehouses = WarehouseFund::all($domain->name_slug)->filter(fn ($w) => $w['balance'] != 0)->values()->all();
 
         return [
             'stores' => $rows,
+            'warehouses' => $warehouses,
             'cash_on_hand' => $cashOnHand,
-            'total' => round(array_sum(array_column($rows, 'total')) + $cashOnHand, 2),
+            'total' => round(array_sum(array_column($rows, 'total')) + array_sum(array_column($warehouses, 'balance')) + $cashOnHand, 2),
         ];
     }
 }

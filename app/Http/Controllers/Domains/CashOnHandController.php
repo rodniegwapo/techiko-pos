@@ -9,6 +9,7 @@ use App\Models\InventoryLocation;
 use App\Models\PaymentCardType;
 use App\Models\RegisterShift;
 use App\Support\Wallet\CashOnHand;
+use App\Support\Wallet\WarehouseFund;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -66,9 +67,10 @@ class CashOnHandController extends Controller
             return $row;
         });
 
+        // Stores first, then warehouses (their cash fund).
         $stores = InventoryLocation::query()->forDomain($slug)->active()
-            ->where(fn ($q) => $q->whereNull('type')->orWhere('type', '!=', 'warehouse'))
-            ->orderBy('name')->get(['id', 'name']);
+            ->orderByRaw("CASE WHEN type = 'warehouse' THEN 1 ELSE 0 END")
+            ->orderBy('name')->get(['id', 'name', 'type']);
 
         return Inertia::render('Wallet/CashOnHand', [
             'balance' => CashOnHand::balance($slug),
@@ -79,13 +81,17 @@ class CashOnHandController extends Controller
                 'moved_to_stores' => CashOnHand::movedToStoresOn($slug, now()->toDateString()),
             ],
             'lines' => $lines,
-            // Where "Move to a store" can go: a store's drawer or one of its payment channels.
+            // Where "Move to a store or warehouse" can go: a store's drawer or one of its payment
+            // channels, or a warehouse's cash fund (no channels).
             'stores' => $stores->map(fn (InventoryLocation $s) => [
                 'id' => (int) $s->id,
                 'name' => (string) $s->name,
-                'channels' => PaymentCardType::query()->forDomainLocation($slug, (int) $s->id)->active()
+                'is_warehouse' => $s->isWarehouse(),
+                'channels' => $s->isWarehouse() ? [] : PaymentCardType::query()->forDomainLocation($slug, (int) $s->id)->active()
                     ->orderBy('sort_order')->orderBy('name')->get(['id', 'name']),
             ])->values(),
+            // Each warehouse's cash fund, for "Back to Cash on hand".
+            'warehouses' => WarehouseFund::all($slug),
             'filters' => ['date_from' => $from, 'date_to' => $to],
         ]);
     }
@@ -94,9 +100,9 @@ class CashOnHandController extends Controller
     public function store(Request $request, Domain $domain)
     {
         $validated = $request->validate([
-            'action' => ['required', Rule::in(['to_store', 'owner_use', 'adjustment'])],
+            'action' => ['required', Rule::in(['to_store', 'from_warehouse', 'owner_use', 'adjustment'])],
             'amount' => ['required', 'numeric', 'min:0.01', 'max:99999999.99'],
-            'location_id' => ['required_if:action,to_store', 'nullable', 'integer'],
+            'location_id' => ['required_if:action,to_store', 'required_if:action,from_warehouse', 'nullable', 'integer'],
             'payment_card_type_id' => ['nullable', 'integer'],
             'direction' => ['required_if:action,adjustment', 'nullable', Rule::in(['in', 'out'])],
             'notes' => ['required_if:action,adjustment', 'nullable', 'string', 'max:2000'],
@@ -109,6 +115,14 @@ class CashOnHandController extends Controller
 
         if ($validated['action'] === 'to_store') {
             return redirect()->back()->with('success', $this->toStore($domain, $request, $validated, $amount));
+        }
+        if ($validated['action'] === 'from_warehouse') {
+            $warehouse = InventoryLocation::query()->forDomain($domain->name_slug)->active()->where('type', 'warehouse')
+                ->whereKey((int) $validated['location_id'])->first()
+                ?? throw ValidationException::withMessages(['location_id' => 'Pick a warehouse of this business.']);
+            $this->cash->fromWarehouse($domain, $user, $warehouse, $amount, $validated['notes'] ?? null);
+
+            return redirect()->back()->with('success', "Moved from {$warehouse->name}'s cash fund to Cash on hand.");
         }
         if ($validated['action'] === 'owner_use') {
             $this->cash->ownerUse($domain, $user, $amount, $validated['notes'] ?? null);
@@ -134,13 +148,12 @@ class CashOnHandController extends Controller
         return redirect()->back()->with('success', 'Collected ₱'.number_format((float) $validated['amount'], 2).' into Cash on hand.');
     }
 
-    /** Cash on hand into a store's drawer, or one of its payment channels. */
+    /** Cash on hand into a store's drawer or one of its payment channels, or a warehouse's cash fund. */
     private function toStore(Domain $domain, Request $request, array $validated, float $amount): string
     {
         $store = InventoryLocation::query()->forDomain($domain->name_slug)->active()->whereKey((int) $validated['location_id'])
-            ->where(fn ($q) => $q->whereNull('type')->orWhere('type', '!=', 'warehouse'))
             ->first()
-            ?? throw ValidationException::withMessages(['location_id' => 'Pick a store of this business.']);
+            ?? throw ValidationException::withMessages(['location_id' => 'Pick a store or warehouse of this business.']);
         $channel = ! empty($validated['payment_card_type_id'])
             ? (PaymentCardType::query()->forDomainLocation($domain->name_slug, (int) $store->id)->find((int) $validated['payment_card_type_id'])
                 ?? throw ValidationException::withMessages(['payment_card_type_id' => 'Pick one of '.$store->name."'s payment channels."]))
@@ -148,6 +161,10 @@ class CashOnHandController extends Controller
 
         $this->cash->toStore($domain, $request->user(), $store, $channel, $amount, $validated['notes'] ?? null);
 
-        return 'Moved to '.($channel ? $channel->name.' ('.$store->name.')' : $store->name."'s drawer").'.';
+        return 'Moved to '.match (true) {
+            $channel !== null => $channel->name.' ('.$store->name.')',
+            $store->isWarehouse() => $store->name."'s cash fund",
+            default => $store->name."'s drawer",
+        }.'.';
     }
 }

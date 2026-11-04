@@ -1,0 +1,995 @@
+1
+00:00:00,000 --> 00:00:01,356
+At the end of a busy
+
+2
+00:00:01,381 --> 00:00:03,304
+day, every store owner asks the
+
+3
+00:00:03,325 --> 00:00:04,149
+same question.
+
+4
+00:00:04,444 --> 00:00:06,376
+Where is my money right now?
+
+5
+00:00:06,653 --> 00:00:08,841
+Cash and wallet answers that.
+
+6
+00:00:09,127 --> 00:00:11,204
+It follows every peso, from the
+
+7
+00:00:11,226 --> 00:00:13,248
+moment a customer pays, to the
+
+8
+00:00:13,270 --> 00:00:15,131
+drawer, to the bank, and to
+
+9
+00:00:15,149 --> 00:00:15,832
+the owner.
+
+10
+00:00:16,117 --> 00:00:18,210
+It lives under five tabs.
+
+11
+00:00:18,498 --> 00:00:19,918
+Today's drawer.
+
+12
+00:00:20,227 --> 00:00:21,725
+Where money is.
+
+13
+00:00:22,007 --> 00:00:23,540
+Cash in and out.
+
+14
+00:00:23,826 --> 00:00:25,552
+Shifts and counts.
+
+15
+00:00:25,860 --> 00:00:27,536
+And Cash on hand.
+
+16
+00:00:27,830 --> 00:00:30,021
+Let's walk through them, one role
+
+17
+00:00:30,048 --> 00:00:30,793
+at a time.
+
+18
+00:00:31,674 --> 00:00:34,016
+First, three words you will hear
+
+19
+00:00:34,046 --> 00:00:34,564
+a lot.
+
+20
+00:00:34,843 --> 00:00:36,627
+The cash drawer is the physical
+
+21
+00:00:36,666 --> 00:00:37,738
+cash in the store.
+
+22
+00:00:38,019 --> 00:00:39,865
+Each cashier has their own tray,
+
+23
+00:00:39,892 --> 00:00:41,826
+and together they make the store's
+
+24
+00:00:41,861 --> 00:00:42,258
+drawer.
+
+25
+00:00:42,543 --> 00:00:44,813
+Payment channels are where non cash
+
+26
+00:00:44,839 --> 00:00:47,142
+payments land, like a card terminal,
+
+27
+00:00:47,190 --> 00:00:48,362
+GCash, or a bank.
+
+28
+00:00:48,643 --> 00:00:50,124
+And Cash on hand is the
+
+29
+00:00:50,144 --> 00:00:52,314
+business's cash that the owner holds,
+
+30
+00:00:52,346 --> 00:00:53,715
+outside of every store.
+
+31
+00:00:53,997 --> 00:00:55,522
+One more idea.
+
+32
+00:00:55,821 --> 00:00:57,382
+Expected is what the app says
+
+33
+00:00:57,403 --> 00:00:58,690
+should be in the drawer.
+
+34
+00:00:58,972 --> 00:01:01,344
+Counted is what you actually count.
+
+35
+00:01:01,631 --> 00:01:03,854
+If counted is less, you are
+
+36
+00:01:03,881 --> 00:01:04,368
+short.
+
+37
+00:01:04,660 --> 00:01:06,514
+If it is more, you are
+
+38
+00:01:06,540 --> 00:01:06,958
+over.
+
+39
+00:01:07,844 --> 00:01:09,800
+Four roles use this, and each
+
+40
+00:01:09,826 --> 00:01:11,557
+one sees a different part.
+
+41
+00:01:11,838 --> 00:01:14,093
+A cashier handles only their own
+
+42
+00:01:14,117 --> 00:01:14,547
+shift.
+
+43
+00:01:14,834 --> 00:01:17,092
+A supervisor watches the whole store
+
+44
+00:01:17,122 --> 00:01:19,584
+drawer, and checks the cashiers' counts.
+
+45
+00:01:19,872 --> 00:01:21,659
+A manager does that too, and
+
+46
+00:01:21,680 --> 00:01:23,571
+also ends the store's day, and
+
+47
+00:01:23,592 --> 00:01:25,168
+records money in and out.
+
+48
+00:01:25,443 --> 00:01:27,383
+The owner, or an admin, sees
+
+49
+00:01:27,410 --> 00:01:29,570
+every store, holds Cash on hand,
+
+50
+00:01:29,602 --> 00:01:31,265
+and is the only one who
+
+51
+00:01:31,288 --> 00:01:33,046
+moves money between stores.
+
+52
+00:01:33,936 --> 00:01:35,805
+Here is a cashier's day.
+
+53
+00:01:36,085 --> 00:01:38,460
+Open Today's drawer, and under My
+
+54
+00:01:38,479 --> 00:01:40,536
+shift, choose Start my shift.
+
+55
+00:01:40,824 --> 00:01:43,387
+Enter your opening cash, here five
+
+56
+00:01:43,418 --> 00:01:44,453
+hundred pesos.
+
+57
+00:01:44,743 --> 00:01:46,616
+You can also start from the
+
+58
+00:01:46,639 --> 00:01:47,388
+Sales page.
+
+59
+00:01:47,669 --> 00:01:49,467
+Now sell as usual.
+
+60
+00:01:49,768 --> 00:01:51,660
+Every cash sale adds to your
+
+61
+00:01:51,686 --> 00:01:52,679
+tray's Expected.
+
+62
+00:01:52,977 --> 00:01:54,858
+When you are done, choose End
+
+63
+00:01:54,879 --> 00:01:56,703
+my shift, and count the cash
+
+64
+00:01:56,728 --> 00:01:57,596
+in your tray.
+
+65
+00:01:57,876 --> 00:01:59,525
+You don't need a PIN.
+
+66
+00:01:59,805 --> 00:02:02,079
+If your count matches, you are
+
+67
+00:02:02,104 --> 00:02:02,504
+done.
+
+68
+00:02:02,789 --> 00:02:04,327
+If it is short or over,
+
+69
+00:02:04,356 --> 00:02:06,425
+the shift shows Needs review, and
+
+70
+00:02:06,445 --> 00:02:07,887
+a supervisor checks it.
+
+71
+00:02:08,158 --> 00:02:10,188
+You can keep working meanwhile.
+
+72
+00:02:11,092 --> 00:02:13,512
+Every shift follows the same path.
+
+73
+00:02:13,796 --> 00:02:15,333
+It starts Open.
+
+74
+00:02:15,630 --> 00:02:18,197
+When the cashier counts, it becomes
+
+75
+00:02:18,242 --> 00:02:18,699
+Ended.
+
+76
+00:02:18,989 --> 00:02:20,647
+If the count is off, it
+
+77
+00:02:20,665 --> 00:02:22,078
+goes to Needs review.
+
+78
+00:02:22,368 --> 00:02:24,523
+A supervisor then approves it, or
+
+79
+00:02:24,541 --> 00:02:26,399
+sends it back for a recount.
+
+80
+00:02:26,692 --> 00:02:28,305
+When it is sent back, the
+
+81
+00:02:28,326 --> 00:02:30,442
+cashier counts again, and the shift
+
+82
+00:02:30,470 --> 00:02:32,173
+goes through the same steps.
+
+83
+00:02:32,456 --> 00:02:34,168
+If a cashier forgets to end
+
+84
+00:02:34,188 --> 00:02:36,385
+their shift, it shows under Forgotten
+
+85
+00:02:36,430 --> 00:02:38,248
+shifts, so someone can end it
+
+86
+00:02:38,265 --> 00:02:38,847
+for them.
+
+87
+00:02:39,126 --> 00:02:40,584
+And if a shift was ended
+
+88
+00:02:40,611 --> 00:02:42,503
+on another device, the Sales page
+
+89
+00:02:42,526 --> 00:02:44,423
+tells you, instead of letting you
+
+90
+00:02:44,442 --> 00:02:45,800
+sell on a closed shift.
+
+91
+00:02:46,681 --> 00:02:48,951
+A supervisor opens Today's drawer and
+
+92
+00:02:48,972 --> 00:02:50,292
+sees the whole store.
+
+93
+00:02:50,575 --> 00:02:52,557
+Cash in drawers is every tray
+
+94
+00:02:52,584 --> 00:02:53,232
+added up.
+
+95
+00:02:53,504 --> 00:02:55,364
+Cash sales today is what went
+
+96
+00:02:55,389 --> 00:02:56,446
+into the drawers.
+
+97
+00:02:56,738 --> 00:02:58,763
+Card, e-wallet and bank is money
+
+98
+00:02:58,793 --> 00:03:00,964
+that went past the drawer, straight
+
+99
+00:03:01,006 --> 00:03:01,965
+into a channel.
+
+100
+00:03:02,257 --> 00:03:04,227
+Counts off shows how many counts
+
+101
+00:03:04,260 --> 00:03:05,148
+need a review.
+
+102
+00:03:05,435 --> 00:03:07,558
+A supervisor can set the opening
+
+103
+00:03:07,598 --> 00:03:09,342
+cash, and do a spot check
+
+104
+00:03:09,373 --> 00:03:10,008
+any time.
+
+105
+00:03:10,289 --> 00:03:12,038
+A spot check counts the drawer
+
+106
+00:03:12,068 --> 00:03:13,373
+without ending anything.
+
+107
+00:03:13,665 --> 00:03:15,982
+Then, on Shifts and counts, open
+
+108
+00:03:16,010 --> 00:03:17,892
+a count that needs review.
+
+109
+00:03:18,185 --> 00:03:20,429
+Look at Expected, Counted, and the
+
+110
+00:03:20,451 --> 00:03:21,112
+Difference.
+
+111
+00:03:21,419 --> 00:03:23,148
+Approve it with a note, or
+
+112
+00:03:23,165 --> 00:03:24,921
+send it back for a recount.
+
+113
+00:03:25,213 --> 00:03:27,532
+A supervisor only sees their own
+
+114
+00:03:27,556 --> 00:03:27,943
+team.
+
+115
+00:03:28,828 --> 00:03:30,841
+When every cashier has ended their
+
+116
+00:03:30,869 --> 00:03:32,924
+shift, the manager ends the store's
+
+117
+00:03:32,959 --> 00:03:33,234
+day.
+
+118
+00:03:33,508 --> 00:03:35,538
+Choose End the store's day, and
+
+119
+00:03:35,559 --> 00:03:36,982
+enter the final count.
+
+120
+00:03:37,267 --> 00:03:39,509
+Then decide where the cash goes.
+
+121
+00:03:39,792 --> 00:03:41,561
+Cash out sends it to Cash
+
+122
+00:03:41,588 --> 00:03:43,180
+on hand, for the owner.
+
+123
+00:03:43,466 --> 00:03:45,673
+The drawer starts tomorrow empty.
+
+124
+00:03:45,960 --> 00:03:47,730
+Keep as opening leaves it in
+
+125
+00:03:47,746 --> 00:03:50,064
+the drawer, as tomorrow's opening cash.
+
+126
+00:03:50,343 --> 00:03:52,336
+Once the day is closed, nothing
+
+127
+00:03:52,375 --> 00:03:54,011
+more can be added to it.
+
+128
+00:03:54,282 --> 00:03:55,869
+If you made a mistake, a
+
+129
+00:03:55,882 --> 00:03:57,822
+manager or admin can reopen the
+
+130
+00:03:57,843 --> 00:03:59,044
+day, with a reason.
+
+131
+00:03:59,931 --> 00:04:02,334
+Not all money comes from sales.
+
+132
+00:04:02,625 --> 00:04:04,245
+On Cash in and out, a
+
+133
+00:04:04,259 --> 00:04:05,976
+manager records the rest.
+
+134
+00:04:06,259 --> 00:04:08,584
+Cash in, for example Added float,
+
+135
+00:04:08,621 --> 00:04:10,492
+when you put in change or
+
+136
+00:04:10,511 --> 00:04:11,359
+small bills.
+
+137
+00:04:11,647 --> 00:04:14,276
+Cash out, for example Owner took
+
+138
+00:04:14,309 --> 00:04:14,749
+cash.
+
+139
+00:04:15,037 --> 00:04:16,916
+Move, to send money between the
+
+140
+00:04:16,936 --> 00:04:19,042
+drawer and the store's own channels,
+
+141
+00:04:19,086 --> 00:04:21,157
+like depositing cash into the bank.
+
+142
+00:04:21,435 --> 00:04:23,386
+Before you save, the app shows
+
+143
+00:04:23,416 --> 00:04:25,487
+the balance before and after, so
+
+144
+00:04:25,504 --> 00:04:27,335
+you see exactly what changes.
+
+145
+00:04:27,628 --> 00:04:29,868
+Other pages add lines here too.
+
+146
+00:04:30,147 --> 00:04:32,293
+An expense, a supplier payment, or
+
+147
+00:04:32,310 --> 00:04:34,083
+a loan payment all show up,
+
+148
+00:04:34,104 --> 00:04:36,189
+because they also took money from
+
+149
+00:04:36,214 --> 00:04:36,915
+the drawer.
+
+150
+00:04:37,803 --> 00:04:39,554
+Where money is puts it all
+
+151
+00:04:39,575 --> 00:04:40,503
+on one screen.
+
+152
+00:04:40,792 --> 00:04:42,587
+For each store, you see the
+
+153
+00:04:42,608 --> 00:04:44,981
+cash drawer, every e-wallet, and every
+
+154
+00:04:45,011 --> 00:04:47,122
+bank and card terminal, each with
+
+155
+00:04:47,148 --> 00:04:48,863
+its balance and a subtotal.
+
+156
+00:04:49,160 --> 00:04:51,398
+The owner sees every store side
+
+157
+00:04:51,426 --> 00:04:53,421
+by side, plus Cash on hand.
+
+158
+00:04:53,704 --> 00:04:55,217
+This is the answer to the
+
+159
+00:04:55,236 --> 00:04:56,646
+question we started with.
+
+160
+00:04:56,923 --> 00:04:58,855
+Where is my money right now?
+
+161
+00:04:59,732 --> 00:05:01,487
+Now the owner's part.
+
+162
+00:05:01,776 --> 00:05:04,017
+Money only moves between stores that
+
+163
+00:05:04,042 --> 00:05:04,654
+allow it.
+
+164
+00:05:04,925 --> 00:05:07,751
+Go to Inventory, then Locations.
+
+165
+00:05:08,074 --> 00:05:10,115
+Edit each store, and turn on
+
+166
+00:05:10,134 --> 00:05:11,450
+Can transfer money.
+
+167
+00:05:11,738 --> 00:05:13,675
+Do this for both stores.
+
+168
+00:05:13,973 --> 00:05:15,406
+One more rule.
+
+169
+00:05:15,702 --> 00:05:17,212
+You can't move money into or
+
+170
+00:05:17,226 --> 00:05:18,427
+out of a day that has
+
+171
+00:05:18,445 --> 00:05:19,418
+already been ended.
+
+172
+00:05:20,296 --> 00:05:21,937
+There are three ways to move
+
+173
+00:05:21,959 --> 00:05:23,260
+money to another store.
+
+174
+00:05:23,540 --> 00:05:25,495
+Only one of them passes through
+
+175
+00:05:25,533 --> 00:05:26,395
+Cash on hand.
+
+176
+00:05:26,674 --> 00:05:27,695
+One.
+
+177
+00:05:28,034 --> 00:05:30,746
+Transfer, on Cash in and out.
+
+178
+00:05:31,033 --> 00:05:32,681
+Pick the other store and the
+
+179
+00:05:32,700 --> 00:05:34,586
+place, drawer or channel, and the
+
+180
+00:05:34,605 --> 00:05:36,051
+money goes straight there.
+
+181
+00:05:36,331 --> 00:05:37,246
+Two.
+
+182
+00:05:37,576 --> 00:05:39,633
+Owner took cash, and choose Into
+
+183
+00:05:39,658 --> 00:05:41,222
+the other store's drawer.
+
+184
+00:05:41,510 --> 00:05:43,702
+The owner carries the cash over.
+
+185
+00:05:43,984 --> 00:05:45,882
+This only works from the cash
+
+186
+00:05:45,907 --> 00:05:46,350
+drawer.
+
+187
+00:05:46,638 --> 00:05:47,649
+Three.
+
+188
+00:05:47,987 --> 00:05:49,724
+Through Cash on hand.
+
+189
+00:05:50,012 --> 00:05:51,686
+The cash comes in first, and
+
+190
+00:05:51,706 --> 00:05:53,529
+later the owner chooses Move to
+
+191
+00:05:53,545 --> 00:05:55,256
+a store, and picks its drawer
+
+192
+00:05:55,287 --> 00:05:56,647
+or one of its channels.
+
+193
+00:05:57,540 --> 00:05:59,451
+Cash on hand is the owner's
+
+194
+00:05:59,492 --> 00:05:59,862
+safe.
+
+195
+00:06:00,144 --> 00:06:02,104
+Money gets in two ways.
+
+196
+00:06:02,393 --> 00:06:04,104
+When a manager chooses Cash out
+
+197
+00:06:04,122 --> 00:06:05,420
+at the end of the day.
+
+198
+00:06:05,692 --> 00:06:07,409
+Or when the owner collects an
+
+199
+00:06:07,424 --> 00:06:09,648
+approved shift, from Waiting to collect.
+
+200
+00:06:09,936 --> 00:06:12,028
+Money goes out three ways.
+
+201
+00:06:12,315 --> 00:06:13,791
+Move to a store sends it
+
+202
+00:06:13,807 --> 00:06:15,453
+back to a drawer or channel.
+
+203
+00:06:15,741 --> 00:06:17,778
+Correction fixes a mistake.
+
+204
+00:06:18,080 --> 00:06:19,659
+And Owner used it means the
+
+205
+00:06:19,678 --> 00:06:21,658
+owner spent it outside the business.
+
+206
+00:06:21,949 --> 00:06:23,345
+Remember this.
+
+207
+00:06:23,643 --> 00:06:25,900
+Collecting cash, and moving it back
+
+208
+00:06:25,927 --> 00:06:27,740
+to a store, does not change
+
+209
+00:06:27,775 --> 00:06:28,447
+the books.
+
+210
+00:06:28,732 --> 00:06:30,812
+It is still the business's money.
+
+211
+00:06:31,096 --> 00:06:32,897
+Only Owner used it takes money
+
+212
+00:06:32,925 --> 00:06:34,117
+out of the business.
+
+213
+00:06:35,010 --> 00:06:37,287
+Finally, the big picture.
+
+214
+00:06:37,599 --> 00:06:39,744
+Under Finance, Money in and out
+
+215
+00:06:39,767 --> 00:06:41,218
+shows your cash flow.
+
+216
+00:06:41,500 --> 00:06:43,697
+Money in is sales, credit payments,
+
+217
+00:06:43,744 --> 00:06:45,700
+loans, and money the owner put
+
+218
+00:06:45,722 --> 00:06:45,968
+in.
+
+219
+00:06:46,239 --> 00:06:48,827
+Money out is expenses, suppliers, loan
+
+220
+00:06:48,855 --> 00:06:51,317
+payments, equipment, and owner draws.
+
+221
+00:06:51,604 --> 00:06:53,626
+Moving money between your own drawers,
+
+222
+00:06:53,663 --> 00:06:55,295
+channels, and Cash on hand is
+
+223
+00:06:55,309 --> 00:06:56,896
+not on this list, because it
+
+224
+00:06:56,910 --> 00:06:58,197
+never left the business.
+
+225
+00:06:58,487 --> 00:07:00,075
+And there is a section called
+
+226
+00:07:00,104 --> 00:07:01,948
+Why profit and money are different.
+
+227
+00:07:02,241 --> 00:07:03,897
+You can make a profit, and
+
+228
+00:07:03,918 --> 00:07:05,578
+still be short on cash, if
+
+229
+00:07:05,594 --> 00:07:07,039
+it is tied up in stock
+
+230
+00:07:07,067 --> 00:07:08,402
+or in customer credit.
+
+231
+00:07:09,290 --> 00:07:11,645
+So, which way to move money?
+
+232
+00:07:11,939 --> 00:07:13,878
+If the other store needs it
+
+233
+00:07:13,896 --> 00:07:15,112
+now, use Transfer.
+
+234
+00:07:15,413 --> 00:07:17,217
+If you are carrying cash from
+
+235
+00:07:17,241 --> 00:07:19,193
+one drawer to another, use Owner
+
+236
+00:07:19,222 --> 00:07:19,854
+took cash.
+
+237
+00:07:20,132 --> 00:07:22,246
+If you collect first and decide
+
+238
+00:07:22,282 --> 00:07:23,948
+later, use Cash on hand.
+
+239
+00:07:24,230 --> 00:07:25,475
+To recap.
+
+240
+00:07:25,795 --> 00:07:28,416
+Cashiers start, sell, and count their
+
+241
+00:07:28,450 --> 00:07:29,140
+own tray.
+
+242
+00:07:29,424 --> 00:07:31,776
+Supervisors check the drawer and the
+
+243
+00:07:31,798 --> 00:07:32,255
+counts.
+
+244
+00:07:32,545 --> 00:07:34,427
+Managers end the store's day and
+
+245
+00:07:34,446 --> 00:07:35,886
+record money in and out.
+
+246
+00:07:36,159 --> 00:07:38,209
+And the owner sees every store,
+
+247
+00:07:38,244 --> 00:07:40,189
+keeps Cash on hand, and moves
+
+248
+00:07:40,220 --> 00:07:41,552
+money between stores.
+
+249
+00:07:41,842 --> 00:07:43,674
+That's Cash and wallet.

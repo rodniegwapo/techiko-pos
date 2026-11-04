@@ -20,13 +20,14 @@ test.describe("My shift and Counted money", () => {
 
         if (await page.getByTestId("open-end-my-shift").isVisible()) {
             await page.getByTestId("open-end-my-shift").click();
-            await numberInput(drawer.dialog("End my shift"), "end-shift-counted").fill("0");
-            await drawer.save("/wallet/shifts/", () => drawer.dialog("End my shift").getByTestId("confirm-end-shift").click());
+            await numberInput(drawer.dialog("Close my drawer"), "end-shift-counted").fill("0");
+            await drawer.save("/wallet/shifts/", () => drawer.dialog("Close my drawer").getByTestId("confirm-end-shift").click());
         }
 
         await page.getByTestId("open-start-my-shift").click();
-        const start = drawer.dialog("Start my shift");
+        const start = drawer.dialog("Open my drawer");
         await numberInput(start, "my-shift-opening").fill("500");
+        await drawer.skipClockIn(start);
         const started = await drawer.save("/wallet/shifts/start", () => start.getByTestId("confirm-start-my-shift").click());
         expect(started.status()).toBeLessThan(400);
         await expect(page.getByTestId("my-shift-status")).toHaveText("Open");
@@ -34,7 +35,7 @@ test.describe("My shift and Counted money", () => {
 
         // ₱20 short, and no PIN is asked for.
         await page.getByTestId("open-end-my-shift").click();
-        const end = drawer.dialog("End my shift");
+        const end = drawer.dialog("Close my drawer");
         await expect(end.getByTestId("end-shift-pin")).toHaveCount(0);
         await numberInput(end, "end-shift-counted").fill("480");
         const ended = await drawer.save("/wallet/shifts/", () => end.getByTestId("confirm-end-shift").click());

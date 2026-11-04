@@ -51,7 +51,8 @@ export const SYSTEM_KIND_LABELS = {
 /** Cash on hand's own lines: the business's cash the owner holds. */
 export const CASH_ON_HAND_KIND_LABELS = {
     collected: "Collected",
-    to_store: "Moved to a store",
+    to_store: "Moved to a store or warehouse",
+    from_warehouse: "Back from a warehouse",
     owner_use: "Owner used it",
     adjustment: "Correction",
 };

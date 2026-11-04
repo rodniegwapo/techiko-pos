@@ -23,7 +23,8 @@ const props = defineProps({
             class="bg-white rounded-lg px-6 py-6 w-full max-w-full min-w-0 overflow-x-auto lg:overflow-auto md:overflow-auto"
         >
             <div :class="filterMainClass">
-                <div class="flex flex-wrap items-center gap-2">
+                <!-- On wide screens the title and its counts keep one line: the toolbar beside it wraps instead. -->
+                <div class="flex flex-wrap items-center gap-2 lg:mr-4 lg:shrink-0 lg:flex-nowrap">
                     <h1
                         class="text-lg font-semibold text-nowrap"
                         :class="{ visible: title, invisible: !title }"

@@ -29,6 +29,7 @@ use App\Services\LoyaltyRedemptionService;
 use App\Services\ProductModifierService;
 use App\Services\SaleService;
 use App\Services\TabService;
+use App\Services\TimeclockService;
 use App\Services\Wallet\SalePaymentWalletPosting;
 use App\Support\Quantity;
 use App\Support\RoutePermission;
@@ -151,6 +152,8 @@ class SaleController extends Controller
             'closed_by_name' => $isClosed ? $recon->closedBy?->name : null,
             'closed_at' => $isClosed ? $recon->closed_at?->toIso8601String() : null,
             'business_date' => $businessDate,
+            // Their time clock, so opening the drawer can offer "Clock me in too".
+            'clock' => app(TimeclockService::class)->statusFor($domain, $user),
         ];
     }
 

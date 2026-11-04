@@ -1,6 +1,12 @@
-import { test, expect } from "../support/fixtures.js";
+import { test, expect as baseExpect } from "../support/fixtures.js";
 import { USERS } from "../support/users.js";
 import { pageComponent, pageProps, postJson } from "../support/inertia.js";
+
+// Finance pages save and then reload their numbers; with every worker on the same dev server that
+// can take longer than the default 5 seconds.
+const expect = baseExpect.configure({ timeout: 15_000 });
+// Some tests walk every Finance page; give them room for the same reason.
+test.describe.configure({ timeout: 120_000 });
 
 const DOMAIN = USERS.admin.domain;
 const url = (path) => `/domains/${DOMAIN}${path}`;
@@ -119,7 +125,7 @@ test.describe("Supplier bills and other income as admin", () => {
         await pickOption(page, supplier);
         await billForm.getByTestId("bill-amount").locator("input").or(billForm.getByTestId("bill-amount")).first().fill("1500");
         await page.locator(".ant-modal:visible", { hasText: "Record supplier bill" }).getByRole("button", { name: "Save" }).click();
-        await expect(page.locator(".ant-message")).toContainText("Bill recorded");
+        await expect(page.locator(".ant-message")).toContainText("Bill recorded", { timeout: 15_000 });
 
         const row = page.getByTestId("bill-table").locator("tr", { hasText: supplier });
         await expect(row).toContainText("Unpaid");
@@ -130,7 +136,7 @@ test.describe("Supplier bills and other income as admin", () => {
         await payment.getByTestId("payment-method").click();
         await pickOption(page, "Bank transfer");
         await page.locator(".ant-modal:visible", { hasText: "Record payment" }).getByRole("button", { name: "Save payment" }).click();
-        await expect(page.locator(".ant-message")).toContainText("Payment recorded");
+        await expect(page.locator(".ant-message")).toContainText("Payment recorded", { timeout: 15_000 });
         await expect(page.getByTestId("bill-table").locator("tr", { hasText: supplier })).toContainText("Paid");
     });
 
@@ -146,7 +152,7 @@ test.describe("Supplier bills and other income as admin", () => {
         await pickOption(page, "Bank transfer");
         await page.locator(".ant-modal:visible", { hasText: "Record other income" }).getByRole("button", { name: "Save" }).click();
 
-        await expect(page.locator(".ant-message")).toContainText("Income recorded");
+        await expect(page.locator(".ant-message")).toContainText("Income recorded", { timeout: 15_000 });
         await expect(page.getByTestId("income-table")).toContainText(description);
     });
 });
@@ -155,8 +161,13 @@ test.describe("Accounts, loans, assets and reviews as admin", () => {
     test.use({ account: "admin" });
 
     /** Saves the open modal whose title contains `title`. */
-    const save = (page, title, button = "Save") =>
-        page.locator(".ant-modal:visible", { hasText: title }).getByRole("button", { name: button }).click();
+    // Saves and waits for the server to finish: with every worker on the same dev server a save
+    // can take longer than an assertion's 5 seconds.
+    const save = async (page, title, button = "Save") => {
+        const written = page.waitForResponse((r) => r.request().method() !== "GET" && new URL(r.url()).pathname.includes("/finance/"), { timeout: 30_000 });
+        await page.locator(".ant-modal:visible", { hasText: title }).getByRole("button", { name: button }).click();
+        await written;
+    };
     const input = (scope, testId) => scope.getByTestId(testId).locator("input").or(scope.getByTestId(testId)).first();
 
     test("records a bank balance, a loan with repayment, equipment and an owner investment", async ({ page }) => {
@@ -168,7 +179,7 @@ test.describe("Accounts, loans, assets and reviews as admin", () => {
         await input(page.getByTestId("account-form"), "account-name").fill(`E2E Bank ${stamp}`);
         await input(page.getByTestId("account-form"), "account-balance").fill("15000");
         await save(page, "Add bank or e-wallet account");
-        await expect(page.locator(".ant-message")).toContainText("Account saved");
+        await expect(page.locator(".ant-message")).toContainText("Account saved", { timeout: 15_000 });
         const accountRow = page.getByTestId("account-table").locator("tr", { hasText: `E2E Bank ${stamp}` });
         await expect(accountRow).toContainText("₱15,000.00");
         await accountRow.getByTestId("update-balance").click();
@@ -192,7 +203,7 @@ test.describe("Accounts, loans, assets and reviews as admin", () => {
         await page.getByTestId("repay-form").getByTestId("payment-method").click();
         await pickOption(page, "Bank transfer");
         await save(page, "Repay:");
-        await expect(page.locator(".ant-message")).toContainText("Repayment recorded");
+        await expect(page.locator(".ant-message")).toContainText("Repayment recorded", { timeout: 15_000 });
         await expect(page.getByTestId("loan-table").locator("tr", { hasText: `E2E Lender ${stamp}` })).toContainText("₱15,000.00");
 
         // Equipment.
@@ -212,7 +223,7 @@ test.describe("Accounts, loans, assets and reviews as admin", () => {
         await page.getByTestId("investment-form").getByTestId("payment-method").click();
         await pickOption(page, "Bank transfer");
         await save(page, "Record owner investment");
-        await expect(page.locator(".ant-message")).toContainText("Investment saved");
+        await expect(page.locator(".ant-message")).toContainText("Investment saved", { timeout: 15_000 });
 
         // They all reach the balance sheet.
         await page.goto(url("/finance/balance-sheet"));
@@ -231,7 +242,7 @@ test.describe("Accounts, loans, assets and reviews as admin", () => {
         await input(page.getByTestId("liability-form"), "liability-name").fill(`E2E VAT due ${stamp}`);
         await input(page.getByTestId("liability-form"), "liability-amount").fill("3200");
         await save(page, "Record amount owed");
-        await expect(page.locator(".ant-message")).toContainText("Liability saved");
+        await expect(page.locator(".ant-message")).toContainText("Liability saved", { timeout: 15_000 });
         await expect(page.getByTestId("liability-table")).toContainText(`E2E VAT due ${stamp}`);
 
         await page.goto(url("/finance/balance-sheet"));
@@ -250,7 +261,7 @@ test.describe("Accounts, loans, assets and reviews as admin", () => {
         const generate = page.getByTestId("generate-review");
         if (await generate.count()) {
             await generate.click();
-            await expect(page.locator(".ant-message")).toContainText("Review ready");
+            await expect(page.locator(".ant-message")).toContainText("Review ready", { timeout: 15_000 });
         }
         await expect(page.getByTestId("review")).toBeVisible();
         for (const id of ["went-well", "needs-attention", "actions"]) {

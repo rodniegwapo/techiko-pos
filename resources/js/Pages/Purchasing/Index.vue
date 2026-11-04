@@ -193,7 +193,7 @@ const payAmountShown = computed({
     },
 });
 
-/** The order's store if it has a drawer, else the store being worked in. */
+/** The order's place (a store's drawer or a warehouse's cash fund), else the one being worked in. */
 function defaultDrawer(order) {
     const ids = props.drawerLocations.map((l) => l.id);
     if (ids.includes(order.location_id)) return order.location_id;
@@ -391,6 +391,7 @@ const columns = [
                         :methods="paymentMethods"
                         :locations="drawerLocations"
                         :accounts="accounts"
+                        :stores-only="false"
                         optional
                         label="Pay from (optional)"
                     />
@@ -495,7 +496,7 @@ const columns = [
                                 data-testid="receive-pay-amount"
                             />
                         </a-form-item>
-                        <PaymentMethodFields :form="payForm" :methods="paymentMethods" :locations="drawerLocations" :accounts="accounts" />
+                        <PaymentMethodFields :form="payForm" :methods="paymentMethods" :locations="drawerLocations" :accounts="accounts" :stores-only="false" />
                         <p class="text-xs text-gray-500">The rest stays on the supplier bill as unpaid.</p>
                     </a-form>
                 </div>

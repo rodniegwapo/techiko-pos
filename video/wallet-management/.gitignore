@@ -5,3 +5,9 @@ clips/*.webm
 audio/scene-*/
 audio/gap.wav
 audio/list.txt
+clips/*.json
+assets/footage/
+assets/audio/
+audio/*.wav
+audio/scenes.json
+.hyperframes/

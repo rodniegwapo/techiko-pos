@@ -89,8 +89,9 @@ for (const account of ["wallet-cashier", "wallet-supervisor", "wallet-manager", 
 
             const drawer = await DrawerPage.open(page, undefined, query);
             await page.getByTestId("open-start-my-shift").click();
-            const start = drawer.dialog("Start my shift");
+            const start = drawer.dialog("Open my drawer");
             await numberInput(start, "my-shift-opening").fill("500");
+            await drawer.skipClockIn(start);
             expect((await drawer.save("/wallet/shifts/start", () => start.getByTestId("confirm-start-my-shift").click())).status()).toBeLessThan(400);
             await expect(page.getByTestId("my-shift-status")).toHaveText("Open");
 
@@ -113,7 +114,7 @@ for (const account of ["wallet-cashier", "wallet-supervisor", "wallet-manager", 
                 }
 
                 await page.getByTestId("open-end-my-shift").click();
-                const end = drawer.dialog("End my shift");
+                const end = drawer.dialog("Close my drawer");
                 await numberInput(end, "end-shift-counted").fill(String(round.counted));
                 expect((await drawer.save("/wallet/shifts/", () => end.getByTestId("confirm-end-shift").click())).status(), `end ${i + 1}`).toBeLessThan(400);
 

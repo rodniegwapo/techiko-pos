@@ -154,10 +154,16 @@ class CashOnHand
         ]);
     }
 
-    /** Cash on hand back into a store's drawer, or one of its payment channels (a deposit). */
+    /**
+     * Cash on hand back into a store's drawer, or one of its payment channels (a deposit), or into
+     * a warehouse's cash fund (to pay suppliers and expenses there; warehouses have no channels).
+     */
     public function toStore(Domain $domain, User $actor, InventoryLocation $store, ?PaymentCardType $channel, float $amount, ?string $note = null): CashOnHandMovement
     {
         $this->ensureOwner($actor);
+        if ($channel && $store->isWarehouse()) {
+            throw ValidationException::withMessages(['payment_card_type_id' => 'A warehouse has no payment channels: the cash goes to its cash fund.']);
+        }
         $amount = round($amount, 2);
         $today = now()->toDateString();
         WalletShiftGuard::ensureDateNotClosed($domain->name_slug, (int) $store->id, $today, 'location_id');
@@ -165,7 +171,11 @@ class CashOnHand
         return DB::transaction(function () use ($domain, $actor, $store, $channel, $amount, $note, $today) {
             $this->ensureEnough($domain, $amount);
             $group = (string) Str::uuid();
-            $where = $channel ? "{$channel->name} ({$store->name})" : "{$store->name}'s drawer";
+            $where = match (true) {
+                $channel !== null => "{$channel->name} ({$store->name})",
+                $store->isWarehouse() => "{$store->name}'s cash fund",
+                default => "{$store->name}'s drawer",
+            };
             $text = fn (string $line) => Str::limit($line.(filled($note) ? ': '.trim($note) : ''), 2000);
 
             $this->storeLine($domain, $store, $channel, 'in', $amount, WalletCashMovement::KIND_FROM_CASH_ON_HAND, $group, $text('From Cash on hand'), $today, $actor);
@@ -180,6 +190,39 @@ class CashOnHand
                 'transfer_group' => $group,
                 'movement_date' => $today,
                 'notes' => $text("To {$where}"),
+                'user_id' => $actor->id,
+            ]);
+        });
+    }
+
+    /** Cash from a warehouse's cash fund back into Cash on hand: up to what the fund holds. */
+    public function fromWarehouse(Domain $domain, User $actor, InventoryLocation $warehouse, float $amount, ?string $note = null): CashOnHandMovement
+    {
+        $this->ensureOwner($actor);
+        $amount = round($amount, 2);
+        $today = now()->toDateString();
+
+        return DB::transaction(function () use ($domain, $actor, $warehouse, $amount, $note, $today) {
+            // Locked so two quick moves can't both take the same cash out of the fund.
+            WalletCashMovement::query()->forWalletContext($domain->name_slug, (int) $warehouse->id)->inDrawer()->lockForUpdate()->get(['id']);
+            $fund = WarehouseFund::balance($domain->name_slug, (int) $warehouse->id);
+            if ($amount <= 0 || $amount > $fund) {
+                throw ValidationException::withMessages(['amount' => "{$warehouse->name}'s cash fund has ₱".number_format($fund, 2).'.']);
+            }
+            $group = (string) Str::uuid();
+            $text = fn (string $line) => Str::limit($line.(filled($note) ? ': '.trim($note) : ''), 2000);
+
+            $this->storeLine($domain, $warehouse, null, 'out', $amount, WalletCashMovement::KIND_TO_CASH_ON_HAND, $group, $text('To Cash on hand'), $today, $actor);
+
+            return CashOnHandMovement::query()->create([
+                'domain' => $domain->name_slug,
+                'direction' => 'in',
+                'amount' => $amount,
+                'kind' => CashOnHandMovement::FROM_WAREHOUSE,
+                'location_id' => $warehouse->id,
+                'transfer_group' => $group,
+                'movement_date' => $today,
+                'notes' => $text("From {$warehouse->name}'s cash fund"),
                 'user_id' => $actor->id,
             ]);
         });
