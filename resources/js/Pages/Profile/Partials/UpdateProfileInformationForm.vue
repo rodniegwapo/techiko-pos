@@ -14,7 +14,8 @@ defineProps({
     },
 });
 
-const user = usePage().props.auth.user;
+// The signed-in user comes as a resource: its fields are under `data`.
+const user = usePage().props.auth.user?.data ?? {};
 
 const form = useForm({
     name: user.name,
@@ -86,7 +87,7 @@ const form = useForm({
             </div>
 
             <div class="flex items-center gap-4">
-                <PrimaryButton :disabled="form.processing">Save</PrimaryButton>
+                <PrimaryButton html-type="submit" :loading="form.processing" data-testid="profile-info-save">Save</PrimaryButton>
 
                 <Transition
                     enter-active-class="transition ease-in-out"

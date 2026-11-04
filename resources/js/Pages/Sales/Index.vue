@@ -185,6 +185,8 @@ const activeLocationId = computed(() => page.props.currentLocation?.id);
 // Clock in / out with your own PIN, on the till everyone shares.
 const { hasPermission } = usePermissionsV2();
 const canPunch = computed(() => hasPermission("timesheets.punch"));
+// After a punch the signed-in cashier's clock may have changed: "Open my drawer" shows it right.
+const onPunched = () => router.reload({ only: ["shiftStatus"] });
 // A food business whose store doesn't serve dine-in yet: those who set up tables are pointed there.
 const DINE_IN_TIP_KEY = "techiko.sales.dineInTip.closed";
 const dineInTipClosed = ref(false);
@@ -1698,8 +1700,8 @@ watch(
                                 Count your drawer and end it before taking payments.
                             </template>
                             <template v-else>
-                                You have no shift open at this store. Start
-                                your shift before taking payments.
+                                Your drawer isn't open at this store. Open it
+                                before taking payments.
                             </template>
                         </span>
                         <a-button
@@ -1718,7 +1720,7 @@ watch(
                             data-testid="shift-banner-action"
                             @click="shiftBannerModalOpen = true"
                         >
-                            {{ $page.props.shiftStatus?.is_closed ? "Reopen the day" : "Start my shift" }}
+                            {{ $page.props.shiftStatus?.is_closed ? "Reopen the day" : "Open my drawer" }}
                         </a-button>
                     </div>
                 </template>
@@ -1756,7 +1758,7 @@ watch(
                     >
                         Tables
                     </a-button>
-                    <TimeclockButton v-if="canPunch" :location-id="activeLocationId" />
+                    <TimeclockButton v-if="canPunch" :location-id="activeLocationId" @punched="onPunched" />
                     <div v-if="!isMdUp" class="flex items-center gap-2">
                         <span class="text-xs font-medium text-gray-800">
                             Classic
@@ -1848,7 +1850,7 @@ watch(
                             >
                                 Tables
                             </button>
-                            <TimeclockButton v-if="canPunch" variant="coffeeshop" :location-id="activeLocationId" />
+                            <TimeclockButton v-if="canPunch" variant="coffeeshop" :location-id="activeLocationId" @punched="onPunched" />
                         </div>
                     </div>
                 </template>

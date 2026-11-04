@@ -6,6 +6,7 @@ import { notification } from "ant-design-vue";
 import { useDomainRoutes } from "@/Composables/useDomainRoutes";
 import { usePermissionsV2 } from "@/Composables/usePermissionV2";
 import { numberKeysOnly, numberPasteOnly } from "@/Composables/numericInput";
+import ClockAlongField from "./ClockAlongField.vue";
 
 const { getRoute } = useDomainRoutes();
 const { hasPermission } = usePermissionsV2();
@@ -39,13 +40,18 @@ const openingCash = ref(Number(page.props.shiftStatus?.suggested_opening || 0));
 const reason = ref("");
 const saving = ref(false);
 
+// "Clock me in too": sent with the opening, checked before anything is saved.
+const clock = ref({ enabled: false, pin: "" });
+const clockError = ref("");
+const clockPinMissing = computed(() => clock.value.enabled && !clock.value.pin);
+
 function firstValidationMessage(err) {
     const errors = err?.response?.data?.errors;
     if (errors && typeof errors === "object") {
         const first = Object.values(errors)[0];
         if (Array.isArray(first) && first.length) return first[0];
     }
-    return err?.response?.data?.message || err?.message || "Could not start the shift.";
+    return err?.response?.data?.message || err?.message || "Could not open your drawer.";
 }
 
 function close() {
@@ -96,17 +102,28 @@ async function submit() {
     }
     saving.value = true;
     try {
+        clockError.value = "";
+        const clockingIn = clock.value.enabled && !!clock.value.pin;
         await axios.post(getRoute("register-shifts.start"), {
             location_id: locationId.value,
             opening_cash: Number(openingCash.value || 0),
             notes: reason.value || null,
+            clock_in_pin: clockingIn ? clock.value.pin : null,
         });
-        notification.success({ message: "Shift started." });
+        notification.success({ message: clockingIn ? "Drawer opened. You're clocked in." : "Drawer opened." });
+        clock.value = { enabled: false, pin: "" };
         openingCash.value = 0;
         reason.value = "";
         emit("update:visible", false);
         emit("started");
     } catch (e) {
+        // A wrong PIN: nothing was saved; say so under the PIN and keep the dialog open.
+        const pinError = e?.response?.data?.errors?.clock_in_pin?.[0];
+        if (pinError) {
+            clockError.value = pinError;
+            clock.value = { ...clock.value, pin: "" };
+            return;
+        }
         notification.error({ message: firstValidationMessage(e) });
         // Refused for the shift's state (e.g. started in another tab): this page's status is stale, refresh it.
         if (e?.response?.data?.errors?.shift) {
@@ -122,7 +139,7 @@ async function submit() {
 <template>
     <a-modal
         :visible="visible"
-        :title="isClosed ? 'The store\'s day was ended' : 'Start my shift'"
+        :title="isClosed ? 'The store\'s day was ended' : 'Open my drawer'"
         width="420px"
         :mask-closable="false"
         :footer="null"
@@ -156,8 +173,8 @@ async function submit() {
         </div>
         <div v-else-if="canStartShift" class="space-y-4 py-2">
             <p class="text-sm text-gray-600">
-                You have no shift open at this store. Count the cash you
-                start with to open yours; other cashiers' shifts are their own.
+                Your drawer isn't open at this store. Count the cash you
+                start with to open it; other cashiers' drawers are their own.
             </p>
             <a-alert
                 v-if="reviewPendingSince"
@@ -180,10 +197,11 @@ async function submit() {
                 <span class="text-sm text-gray-700">Note (optional)</span>
                 <a-input v-model:value="reason" placeholder="e.g. Starting float" />
             </div>
+            <ClockAlongField v-model="clock" mode="in" :status="page.props.shiftStatus?.clock" :error="clockError" />
             <div class="flex justify-end gap-2 pt-2">
                 <a-button @click="close">Cancel</a-button>
-                <a-button type="primary" :loading="saving" @click="submit">
-                    Start shift
+                <a-button type="primary" :loading="saving" :disabled="clockPinMissing" data-testid="start-shift-submit" @click="submit">
+                    Open drawer
                 </a-button>
             </div>
         </div>
@@ -194,8 +212,8 @@ async function submit() {
                 for that before starting another.
             </p>
             <p v-else class="text-sm text-gray-600">
-                You have no shift open at this store, and your role can't
-                start one. Ask a manager or admin to give you the Start own
+                Your drawer isn't open at this store, and your role can't
+                open one. Ask a manager or admin to give you the Start own
                 shift permission.
             </p>
             <div class="flex justify-end">

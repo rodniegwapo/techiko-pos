@@ -2,6 +2,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import DeleteUserForm from './Partials/DeleteUserForm.vue';
 import UpdatePasswordForm from './Partials/UpdatePasswordForm.vue';
+import UpdatePinForm from './Partials/UpdatePinForm.vue';
 import UpdateProfileInformationForm from './Partials/UpdateProfileInformationForm.vue';
 import { Head } from '@inertiajs/vue3';
 import PageHelp from '@/Components/help/PageHelp.vue';
@@ -13,6 +14,8 @@ defineProps({
     status: {
         type: String,
     },
+    canSetPin: { type: Boolean, default: false },
+    hasPin: { type: Boolean, default: false },
 });
 </script>
 
@@ -39,6 +42,10 @@ defineProps({
 
                 <div class="p-4 sm:p-8 bg-white shadow sm:rounded-lg">
                     <UpdatePasswordForm class="max-w-xl" />
+                </div>
+
+                <div v-if="canSetPin" class="p-4 sm:p-8 bg-white shadow sm:rounded-lg">
+                    <UpdatePinForm :has-pin="hasPin" class="max-w-xl" />
                 </div>
 
                 <div class="p-4 sm:p-8 bg-white shadow sm:rounded-lg">

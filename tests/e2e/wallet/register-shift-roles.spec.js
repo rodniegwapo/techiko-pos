@@ -42,13 +42,13 @@ async function shiftNeedingReview(api) {
 
 async function openStartAndEnd(page, drawer, { opening, counted }) {
     await page.getByTestId("open-start-my-shift").click();
-    const start = drawer.dialog("Start my shift");
+    const start = drawer.dialog("Open my drawer");
     await numberInput(start, "my-shift-opening").fill(String(opening));
     expect((await drawer.save("/wallet/shifts/start", () => start.getByTestId("confirm-start-my-shift").click())).status()).toBeLessThan(400);
     await expect(page.getByTestId("my-shift-status")).toHaveText("Open");
 
     await page.getByTestId("open-end-my-shift").click();
-    const end = drawer.dialog("End my shift");
+    const end = drawer.dialog("Close my drawer");
     // No manager's PIN anywhere.
     await expect(end.getByTestId("end-shift-pin")).toHaveCount(0);
     await expect(end.getByPlaceholder("A manager approves the cash")).toHaveCount(0);
@@ -74,7 +74,7 @@ test.describe("Cashier shifts as a cashier", () => {
 
         // Not stopped: a new shift starts straight away.
         await page.getByTestId("open-start-my-shift").click();
-        const again = drawer.dialog("Start my shift");
+        const again = drawer.dialog("Open my drawer");
         expect((await drawer.save("/wallet/shifts/start", () => again.getByTestId("confirm-start-my-shift").click())).status()).toBeLessThan(400);
         await expect(page.getByTestId("my-shift-status")).toHaveText("Open");
     });

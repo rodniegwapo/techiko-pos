@@ -73,7 +73,7 @@ test.describe("Tutorial screens", () => {
 
             await DrawerPage.open(page);
             await page.getByTestId("open-start-my-shift").click();
-            const start = drawer.dialog("Start my shift");
+            const start = drawer.dialog("Open my drawer");
             await numberInput(start, "my-shift-opening").fill("500");
             await snap(page, R, "c03-start", numberInput(start, "my-shift-opening"));
             await drawer.save("/wallet/shifts/start", () => start.getByTestId("confirm-start-my-shift").click());
@@ -91,7 +91,7 @@ test.describe("Tutorial screens", () => {
 
             // Ending: a cash expense, then the count.
             await page.getByTestId("open-end-my-shift").click();
-            const end = drawer.dialog("End my shift");
+            const end = drawer.dialog("Close my drawer");
             await end.getByTestId("end-shift-add-expense").click();
             const row = end.getByTestId("end-shift-expense").first();
             await row.locator(".ant-select").first().click();
@@ -111,7 +111,7 @@ test.describe("Tutorial screens", () => {
             await drawer.save("/reopen", () => page.getByTestId("reopen-confirm").click());
 
             await page.getByTestId("open-end-my-shift").click();
-            const again = drawer.dialog("End my shift");
+            const again = drawer.dialog("Close my drawer");
             await numberInput(again, "end-shift-counted").fill("640");
             await drawer.save("/wallet/shifts/", () => again.getByTestId("confirm-end-shift").click());
             await expect(page.getByTestId("my-shift-status")).toHaveText("Needs review");
@@ -126,7 +126,7 @@ test.describe("Tutorial screens", () => {
             const R = "supervisor";
             const drawer = await DrawerPage.open(page);
             await page.getByTestId("open-start-my-shift").click();
-            const start = drawer.dialog("Start my shift");
+            const start = drawer.dialog("Open my drawer");
             await numberInput(start, "my-shift-opening").fill("300");
             await snap(page, R, "s01-own-shift", numberInput(start, "my-shift-opening"));
             await drawer.save("/wallet/shifts/start", () => start.getByTestId("confirm-start-my-shift").click());
@@ -155,7 +155,7 @@ test.describe("Tutorial screens", () => {
             // Their own shift ends ₱10 short: someone else must approve it.
             await DrawerPage.open(page);
             await page.getByTestId("open-end-my-shift").click();
-            const end = drawer.dialog("End my shift");
+            const end = drawer.dialog("Close my drawer");
             await numberInput(end, "end-shift-counted").fill("290");
             await drawer.save("/wallet/shifts/", () => end.getByTestId("confirm-end-shift").click());
             await page.getByTestId("wallet-tab-counts").click();

@@ -15,6 +15,7 @@ const props = defineProps({
     variant: { type: String, default: "classic" },
 });
 
+const emit = defineEmits(["punched"]);
 const { getRoute } = useDomainRoutes();
 
 const open = ref(false);
@@ -55,6 +56,7 @@ async function submit() {
             location_id: props.locationId ?? undefined,
         });
         result.value = data;
+        emit("punched", data);
         pin.value = "";
         // Back to the till on its own; the next person can open it again.
         clearTimeout(closeTimer);
@@ -138,6 +140,7 @@ onBeforeUnmount(() => clearTimeout(closeTimer));
 
         <form v-else class="flex flex-col gap-3" @submit.prevent="submit">
             <p class="m-0 text-sm text-gray-600">Type your own PIN.</p>
+            <p class="m-0 text-xs text-gray-500" data-testid="timeclock-drawer-note">This records your hours. Cashiers also open their drawer before taking payments.</p>
             <input
                 ref="pinInput"
                 v-model="pin"

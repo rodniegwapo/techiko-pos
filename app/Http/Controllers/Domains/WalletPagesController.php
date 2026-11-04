@@ -9,6 +9,7 @@ use App\Models\InventoryLocation;
 use App\Models\PaymentCardType;
 use App\Models\RegisterShift;
 use App\Models\User;
+use App\Services\TimeclockService;
 use App\Support\FinanceAccess;
 use App\Support\RouteFeature;
 use App\Support\RoutePermission;
@@ -131,6 +132,8 @@ class WalletPagesController extends Controller
                 'last_spot_check' => RegisterShiftService::lastSpotCheck($mine),
             ] : null,
             'canSpotCheck' => RoutePermission::allows($user, 'register-shifts.spot-check'),
+            // Their time clock, so opening or closing the drawer can clock them in or out too.
+            'myClock' => app(TimeclockService::class)->statusFor($domain, $user),
             // What the user's drawer still holds from their last shift today, to start the next one with.
             'nextShiftOpening' => $mine?->isOpen() ? null : $shifts->carriedOpening($domain->name_slug, (int) $location->id, (int) $user->id),
             'canStartShift' => RoutePermission::allows($user, 'register-shifts.start'),

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
+use App\Models\UserPin;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -21,6 +22,9 @@ class ProfileController extends Controller
         return Inertia::render('Profile/Edit', [
             'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
             'status' => session('status'),
+            // Change my PIN: only for people in an organization (the PIN is unique within it).
+            'canSetPin' => (bool) $request->user()->domain,
+            'hasPin' => UserPin::query()->where('user_id', $request->user()->id)->where('active', true)->exists(),
         ]);
     }
 

@@ -59,7 +59,7 @@ test.describe("Shift status on Sales and recounts on Counted money", () => {
             expect(ended.status, "end the shift elsewhere").toBe(302);
 
             await expect(banner).toBeVisible({ timeout: 45_000 });
-            await expect(banner).toHaveText(/Start my shift/);
+            await expect(banner).toHaveText(/Open my drawer/);
             expect(await page.evaluate(() => window.__samePage), "the page was not reloaded").toBe(true);
         } finally {
             await endOpenShift(elsewhere);

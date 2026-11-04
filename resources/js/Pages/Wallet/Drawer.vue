@@ -13,6 +13,7 @@ import DrawerSummaryCards from "./components/drawer/DrawerSummaryCards.vue";
 import SetOpeningModal from "./components/drawer/SetOpeningModal.vue";
 import CountCashModal from "./components/drawer/CountCashModal.vue";
 import EndShiftModal from "./components/drawer/EndShiftModal.vue";
+import ClockAlongField from "@/Pages/Sales/components/ClockAlongField.vue";
 import { shortOver, TONE_CLASSES, SHIFT_STATUS, COUNT_KIND_LABELS } from "./components/walletLabels";
 import { useWalletQuery } from "./composables/useWalletQuery";
 import { useCashDrawerActions } from "./composables/useCashDrawerActions";
@@ -43,6 +44,8 @@ const props = defineProps({
     myShift: { type: Object, default: null },
     /** What the user's drawer still holds from their last shift today (null before their first). */
     nextShiftOpening: { type: Number, default: null },
+    /** The user's time clock: { on_the_clock, since, has_pin }, to clock in or out with the drawer. */
+    myClock: { type: Object, default: null },
     canStartShift: { type: Boolean, default: false },
     /** Cashiers still on shift here: the store's day ends after them. */
     openShiftsAtStore: { type: Array, default: () => [] },
@@ -134,13 +137,20 @@ const myCards = computed(() => {
     ];
 });
 const startForm = ref({ opening: 0, notes: "" });
+// "Clock me in too" when opening the drawer: their own PIN, or neither happens.
+const startClock = ref({ enabled: false, pin: "" });
+const startPinMissing = computed(() => startClock.value.enabled && !startClock.value.pin);
 // A next shift starts with the drawer the last one left; a different amount is recorded as cash in or out.
 function openStartMyShift() {
     startForm.value = { opening: props.nextShiftOpening ?? 0, notes: "" };
+    actions.pinError.value = "";
     modal.value = "my-start";
 }
 async function startMyShift() {
-    if (await actions.startMyShift(startForm.value.opening, startForm.value.notes)) modal.value = null;
+    if (startPinMissing.value) return;
+    const pin = startClock.value.enabled ? startClock.value.pin : null;
+    if (await actions.startMyShift(startForm.value.opening, startForm.value.notes, pin)) modal.value = null;
+    else if (actions.pinError.value) startClock.value = { ...startClock.value, pin: "" };
 }
 async function endMyShift(payload) {
     if (await actions.endMyShift(props.myShift.id, payload)) modal.value = null;
@@ -240,7 +250,7 @@ onBeforeUnmount(() => {
             <template #message>
                 <div class="flex flex-wrap items-center justify-between gap-2">
                     <span>Your shift from {{ overdueDay(myShift) }} is still open. Count your drawer and end it before taking payments.</span>
-                    <a-button size="small" type="primary" data-testid="overdue-end-my-shift" @click="modal = 'my-end'">End my shift</a-button>
+                    <a-button size="small" type="primary" data-testid="overdue-end-my-shift" @click="modal = 'my-end'">Close my drawer</a-button>
                 </div>
             </template>
         </a-alert>
@@ -258,10 +268,10 @@ onBeforeUnmount(() => {
                 </div>
                 <div class="flex flex-wrap gap-2">
                     <a-button v-if="myOpen && canSpotCheck" data-testid="spot-check-my-drawer" @click="modal = 'spot'">Spot check my drawer</a-button>
-                    <a-button v-if="myOpen" type="primary" data-testid="open-end-my-shift" @click="modal = 'my-end'">End my shift</a-button>
+                    <a-button v-if="myOpen" type="primary" data-testid="open-end-my-shift" @click="modal = 'my-end'">Close my drawer</a-button>
                     <a-button v-if="myShift?.can_reopen" data-testid="reopen-my-shift" @click="modal = 'my-reopen'">Reopen</a-button>
                     <a-button v-if="!myOpen && canStartShift && !isClosed" :type="myShift ? 'default' : 'primary'" data-testid="open-start-my-shift" @click="openStartMyShift">
-                        {{ myShift ? "Start a new shift" : "Start my shift" }}
+                        {{ myShift ? "Open my drawer again" : "Open my drawer" }}
                     </a-button>
                 </div>
             </div>
@@ -308,10 +318,10 @@ onBeforeUnmount(() => {
                 {{ showGuide ? "Hide the steps" : "How a shift works" }}
             </a-button>
             <ol v-if="showGuide && (myShift || canStartShift)" class="mb-0 mt-1 list-decimal space-y-1 pl-5 text-sm text-gray-700" data-testid="shift-guide">
-                <li><b>Start my shift</b> and count the cash you start with (the opening).</li>
+                <li><b>Open my drawer</b> and count the cash you start with (the opening).</li>
                 <li>Take payments. Cash sales add to your <b>Expected</b>; GCash, card and bank go to their channels, not your drawer.</li>
                 <li>Paid something from the drawer, or added change? A manager records it under <b>Cash in &amp; out</b>, or add it as an expense when you end.</li>
-                <li><b>End my shift</b>: count every bill and coin and enter the total. Don't count other people's cash.</li>
+                <li><b>Close my drawer</b>: count every bill and coin and enter the total. Don't count other people's cash.</li>
                 <li>If your count is off from Expected, a manager reviews it on <b>Shifts &amp; counts</b>. Made a mistake? <b>Reopen</b> and say why.</li>
             </ol>
         </div>
@@ -514,9 +524,9 @@ onBeforeUnmount(() => {
 
         <a-modal
             :visible="modal === 'my-start'"
-            title="Start my shift"
-            ok-text="Start shift"
-            :ok-button-props="{ 'data-testid': 'confirm-start-my-shift' }"
+            title="Open my drawer"
+            ok-text="Open drawer"
+            :ok-button-props="{ 'data-testid': 'confirm-start-my-shift', disabled: startPinMissing }"
             :confirm-loading="actions.busy.value === 'my-start'"
             @ok="startMyShift"
             @cancel="modal = null"
@@ -528,6 +538,7 @@ onBeforeUnmount(() => {
                 Your drawer should have {{ money(nextShiftOpening) }} from your last shift. If you added or took out cash, enter what's in it now; the difference is recorded in Cash in &amp; out.
             </p>
             <a-input v-model:value="startForm.notes" placeholder="Note (optional)" :maxlength="255" />
+            <ClockAlongField v-model="startClock" mode="in" :status="myClock" :error="actions.pinError.value" class="mt-3" />
         </a-modal>
 
         <EndShiftModal
@@ -538,6 +549,8 @@ onBeforeUnmount(() => {
             :expense-categories="expenseCategories"
             :show-expected="canSeeCountResult"
             own-shift
+            :clock="myClock"
+            :clock-error="actions.pinError.value"
             @close="modal = null"
             @end="endMyShift"
         />

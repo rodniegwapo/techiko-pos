@@ -36,7 +36,7 @@ test.describe("Cash and wallet walkthrough", () => {
             await tour.say("\"My shift\" is my own drawer. Nothing is open yet, so I start my shift.");
 
             await tour.click(page.getByTestId("open-start-my-shift"));
-            const start = drawer.dialog("Start my shift");
+            const start = drawer.dialog("Open my drawer");
             await tour.type(numberInput(start, "my-shift-opening"), "500");
             await tour.say("I type the change I start with: ₱500.");
             await drawer.save("/wallet/shifts/start", () => tour.click(start.getByTestId("confirm-start-my-shift")));
@@ -60,7 +60,7 @@ test.describe("Cash and wallet walkthrough", () => {
             // End with a count that is off.
             await tour.say("Time to go home. I end my shift and count the cash in my drawer.");
             await tour.click(page.getByTestId("open-end-my-shift"));
-            const end = drawer.dialog("End my shift");
+            const end = drawer.dialog("Close my drawer");
             await tour.type(numberInput(end, "end-shift-counted"), "680");
             await tour.say("I count ₱680. No manager's PIN is needed.");
             await drawer.save("/wallet/shifts/", () => tour.click(end.getByTestId("confirm-end-shift")));
@@ -77,7 +77,7 @@ test.describe("Cash and wallet walkthrough", () => {
             await expect(page.getByTestId("my-shift-status")).toHaveText("Open");
 
             await tour.click(page.getByTestId("open-end-my-shift"));
-            const again = drawer.dialog("End my shift");
+            const again = drawer.dialog("Close my drawer");
             await tour.type(numberInput(again, "end-shift-counted"), "690");
             await tour.say("I count again: ₱690. Every count is kept; the first one isn't replaced.");
             await drawer.save("/wallet/shifts/", () => tour.click(again.getByTestId("confirm-end-shift")));
@@ -105,7 +105,7 @@ test.describe("Cash and wallet walkthrough", () => {
 
             await tour.say("I start my own shift with ₱300 in my own drawer.");
             await tour.click(page.getByTestId("open-start-my-shift"));
-            const start = drawer.dialog("Start my shift");
+            const start = drawer.dialog("Open my drawer");
             await tour.type(numberInput(start, "my-shift-opening"), "300");
             await drawer.save("/wallet/shifts/start", () => tour.click(start.getByTestId("confirm-start-my-shift")));
             await expect(page.getByTestId("my-shift-status")).toHaveText("Open");
@@ -141,7 +141,7 @@ test.describe("Cash and wallet walkthrough", () => {
             await DrawerPage.open(page);
             await tour.say("At the end I count my own drawer too. My count isn't approved by me but by someone else.");
             await tour.click(page.getByTestId("open-end-my-shift"));
-            const end = drawer.dialog("End my shift");
+            const end = drawer.dialog("Close my drawer");
             await tour.type(numberInput(end, "end-shift-counted"), "300");
             await drawer.save("/wallet/shifts/", () => tour.click(end.getByTestId("confirm-end-shift")));
             await tour.say("₱300, exactly as expected: my shift is ended with nothing to review.", 3000);
