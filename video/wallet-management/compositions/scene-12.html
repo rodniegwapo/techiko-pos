@@ -1,0 +1,57 @@
+<template>
+  <style>
+      #root { position: absolute; inset: 0; font-family: "Inter", sans-serif; color: #10231a; overflow: hidden; }
+      .bg { position: absolute; inset: 0; background: linear-gradient(180deg, #f6f8f5 0%, #edf2ec 100%); }
+      .hdr { position: absolute; left: 72px; top: 44px; right: 72px; height: 72px; display: flex; align-items: center; gap: 20px; }
+      .hdr .num { font-weight: 900; font-size: 26px; color: #ffffff; background: #1f7a3f; border-radius: 12px; padding: 10px 16px; letter-spacing: 0.02em; }
+      .hdr .ttl { font-weight: 700; font-size: 44px; letter-spacing: -0.02em; white-space: nowrap; }
+      .hdr .role { margin-left: auto; font-weight: 700; font-size: 28px; letter-spacing: 0.08em; text-transform: uppercase; border-radius: 999px; padding: 12px 26px; white-space: nowrap; }
+      .chrome { position: absolute; left: 72px; top: 150px; width: 1240px; height: 734px; background: #ffffff; border-radius: 16px; border: 1px solid #d3dbd2; box-shadow: 0 24px 60px rgba(16, 35, 26, 0.14); }
+      .chrome .bar { height: 36px; display: flex; align-items: center; gap: 8px; padding: 0 16px; border-bottom: 1px solid #e3e8e2; }
+      .chrome .dot { width: 11px; height: 11px; border-radius: 50%; background: #cfd8ce; }
+      .chrome .url { margin: 0 auto; font-size: 16px; color: #5b6b62; background: #f1f4f0; border-radius: 8px; padding: 4px 18px; }
+      .shot { position: absolute; left: 72px; top: 186px; width: 1240px; height: 698px; object-fit: cover; border-radius: 0 0 16px 16px; }
+      .panel { position: absolute; left: 1352px; top: 150px; width: 496px; height: 734px; display: flex; flex-direction: column; gap: 14px; }
+      .card { position: relative; width: 100%; background: #ffffff; border-radius: 16px; border: 1px solid #dbe3da; padding: 18px 22px 18px 26px; box-shadow: 0 10px 28px rgba(16, 35, 26, 0.08); }
+      .card .bar2 { position: absolute; left: 0; top: 16px; bottom: 16px; width: 6px; border-radius: 0 6px 6px 0; }
+      .card .t1 { font-weight: 700; font-size: 31px; line-height: 1.2; letter-spacing: -0.01em; }
+      .card .t2 { font-size: 28px; line-height: 1.3; color: #4a5a51; margin-top: 6px; }
+      .icon { display: inline-flex; width: 56px; height: 56px; }
+      .icon svg { width: 100%; height: 100%; }
+      .node { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: #ffffff; border: 2px solid #d3dbd2; border-radius: 22px; box-shadow: 0 12px 30px rgba(16, 35, 26, 0.08); text-align: center; }
+      .node .lbl { font-weight: 700; font-size: 30px; letter-spacing: -0.01em; line-height: 1.15; }
+      .node .sub { font-size: 26px; color: #4a5a51; line-height: 1.3; padding: 0 18px; }
+      .arrow { position: absolute; height: 6px; background: #6b8574; border-radius: 3px; }
+      .arrow::after { content: ""; position: absolute; right: -4px; top: -9px; border-left: 18px solid #6b8574; border-top: 12px solid transparent; border-bottom: 12px solid transparent; }
+      .chip { display: inline-block; font-weight: 600; font-size: 24px; border-radius: 999px; padding: 8px 18px; background: #eef3ee; color: #1f3a2b; }
+  </style>
+  <div data-hf-id="hf-zl7f" id="root" data-composition-id="scene-12" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-m7dd" class="bg"></div>
+    <div data-hf-id="hf-wmk5" id="scene-12-hdr" class="hdr">
+      <span data-hf-id="hf-ou65" class="num" data-layout-ignore>12</span>
+      <span data-hf-id="hf-nalf" class="ttl">Cash on hand: the owner's safe</span>
+      <span data-hf-id="hf-r1w9" class="role" style="color: #b45309; background: #fef3c7">Owner / Admin</span>
+    </div>
+    <div data-hf-id="hf-xc9c" id="scene-12-frame" class="chrome"><div data-hf-id="hf-ufsv" class="bar"><span data-hf-id="hf-9gry" class="dot"></span><span data-hf-id="hf-zcc2" class="dot"></span><span data-hf-id="hf-zqn3" class="dot"></span><span data-hf-id="hf-9qq2" class="url" data-layout-ignore>techiko-pos · Cash &amp; wallet</span></div></div>
+    <video data-hf-id="hf-dwop" id="scene-12-v0" class="clip shot" data-start="0" data-duration="37.47" data-track-index="2" src="assets/footage/scene-12.mp4" muted playsinline></video>
+    <div data-hf-id="hf-owjm" class="panel">
+    <div data-hf-id="hf-b7lx" id="scene-12-p0" class="card"><span data-hf-id="hf-n71o" class="bar2" style="background: #b45309"></span><div data-hf-id="hf-dzto" class="t1">In: Cash out at end of day</div><div data-hf-id="hf-p9zv" class="t2">Or collect an approved shift</div></div>
+    <div data-hf-id="hf-afy4" id="scene-12-p1" class="card"><span data-hf-id="hf-ughw" class="bar2" style="background: #b45309"></span><div data-hf-id="hf-nyp3" class="t1">Out: Move to a store</div><div data-hf-id="hf-dt8c" class="t2">Back to a drawer or channel</div></div>
+    <div data-hf-id="hf-j3tz" id="scene-12-p2" class="card"><span data-hf-id="hf-t9kt" class="bar2" style="background: #b45309"></span><div data-hf-id="hf-rej5" class="t1">Correction</div><div data-hf-id="hf-tjt6" class="t2">Fixes a mistake</div></div>
+    <div data-hf-id="hf-f5py" id="scene-12-p3" class="card"><span data-hf-id="hf-tnvu" class="bar2" style="background: #b45309"></span><div data-hf-id="hf-c5sm" class="t1">Owner used it</div><div data-hf-id="hf-il5c" class="t2">Spent outside the business</div></div>
+    <div data-hf-id="hf-q17l" id="scene-12-p4" class="card"><span data-hf-id="hf-vnez" class="bar2" style="background: #b45309"></span><div data-hf-id="hf-txh8" class="t1">Only “Owner used it” leaves the business</div></div>
+    </div>
+  </div>
+  <script>
+    (() => {
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo("#scene-12-hdr", { opacity: 0, y: -16 }, { opacity: 1, y: 0, duration: 0.45, ease: "power3.out" }, 0.05);
+      tl.fromTo("#scene-12-p0", { opacity: 0, x: 40 }, { opacity: 1, x: 0, duration: 0.5, ease: "power3.out" }, 2.45);
+      tl.fromTo("#scene-12-p1", { opacity: 0, x: 40 }, { opacity: 1, x: 0, duration: 0.5, ease: "power3.out" }, 12.25);
+      tl.fromTo("#scene-12-p2", { opacity: 0, x: 40 }, { opacity: 1, x: 0, duration: 0.5, ease: "power3.out" }, 18.05);
+      tl.fromTo("#scene-12-p3", { opacity: 0, x: 40 }, { opacity: 1, x: 0, duration: 0.5, ease: "power3.out" }, 20.39);
+      tl.fromTo("#scene-12-p4", { opacity: 0, x: 40 }, { opacity: 1, x: 0, duration: 0.5, ease: "power3.out" }, 33.41);
+      window.__timelines["scene-12"] = tl;
+    })();
+  </script>
+</template>

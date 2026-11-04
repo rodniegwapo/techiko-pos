@@ -6,6 +6,12 @@
     "dev": "npx --yes hyperframes@0.8.221 preview",
     "check": "npx --yes hyperframes@0.8.221 check",
     "render": "npx --yes hyperframes@0.8.221 render",
-    "publish": "npx --yes hyperframes@0.8.221 publish"
+    "publish": "npx --yes hyperframes@0.8.221 publish",
+    "voice": "node scripts/tts.mjs && node scripts/captions.mjs",
+    "voice:draft": "node scripts/tts.mjs --draft && node scripts/captions.mjs --draft",
+    "footage": "cd ../.. && cross-env E2E_VIDEO_W=1600 E2E_VIDEO_H=900 npx playwright test -c playwright.walkthrough.config.js wallet-video",
+    "clips": "node scripts/clips.mjs",
+    "build": "node scripts/clips.mjs && node scripts/build.mjs",
+    "finish": "node scripts/finish.mjs"
   }
 }

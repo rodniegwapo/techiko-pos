@@ -1,0 +1,61 @@
+<template>
+  <style>
+      #root { position: absolute; inset: 0; font-family: "Inter", sans-serif; color: #10231a; overflow: hidden; }
+      .bg { position: absolute; inset: 0; background: linear-gradient(180deg, #f6f8f5 0%, #edf2ec 100%); }
+      .hdr { position: absolute; left: 72px; top: 44px; right: 72px; height: 72px; display: flex; align-items: center; gap: 20px; }
+      .hdr .num { font-weight: 900; font-size: 26px; color: #ffffff; background: #1f7a3f; border-radius: 12px; padding: 10px 16px; letter-spacing: 0.02em; }
+      .hdr .ttl { font-weight: 700; font-size: 44px; letter-spacing: -0.02em; white-space: nowrap; }
+      .hdr .role { margin-left: auto; font-weight: 700; font-size: 28px; letter-spacing: 0.08em; text-transform: uppercase; border-radius: 999px; padding: 12px 26px; white-space: nowrap; }
+      .chrome { position: absolute; left: 72px; top: 150px; width: 1240px; height: 734px; background: #ffffff; border-radius: 16px; border: 1px solid #d3dbd2; box-shadow: 0 24px 60px rgba(16, 35, 26, 0.14); }
+      .chrome .bar { height: 36px; display: flex; align-items: center; gap: 8px; padding: 0 16px; border-bottom: 1px solid #e3e8e2; }
+      .chrome .dot { width: 11px; height: 11px; border-radius: 50%; background: #cfd8ce; }
+      .chrome .url { margin: 0 auto; font-size: 16px; color: #5b6b62; background: #f1f4f0; border-radius: 8px; padding: 4px 18px; }
+      .shot { position: absolute; left: 72px; top: 186px; width: 1240px; height: 698px; object-fit: cover; border-radius: 0 0 16px 16px; }
+      .panel { position: absolute; left: 1352px; top: 150px; width: 496px; height: 734px; display: flex; flex-direction: column; gap: 14px; }
+      .card { position: relative; width: 100%; background: #ffffff; border-radius: 16px; border: 1px solid #dbe3da; padding: 18px 22px 18px 26px; box-shadow: 0 10px 28px rgba(16, 35, 26, 0.08); }
+      .card .bar2 { position: absolute; left: 0; top: 16px; bottom: 16px; width: 6px; border-radius: 0 6px 6px 0; }
+      .card .t1 { font-weight: 700; font-size: 31px; line-height: 1.2; letter-spacing: -0.01em; }
+      .card .t2 { font-size: 28px; line-height: 1.3; color: #4a5a51; margin-top: 6px; }
+      .icon { display: inline-flex; width: 56px; height: 56px; }
+      .icon svg { width: 100%; height: 100%; }
+      .node { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: #ffffff; border: 2px solid #d3dbd2; border-radius: 22px; box-shadow: 0 12px 30px rgba(16, 35, 26, 0.08); text-align: center; }
+      .node .lbl { font-weight: 700; font-size: 30px; letter-spacing: -0.01em; line-height: 1.15; }
+      .node .sub { font-size: 26px; color: #4a5a51; line-height: 1.3; padding: 0 18px; }
+      .arrow { position: absolute; height: 6px; background: #6b8574; border-radius: 3px; }
+      .arrow::after { content: ""; position: absolute; right: -4px; top: -9px; border-left: 18px solid #6b8574; border-top: 12px solid transparent; border-bottom: 12px solid transparent; }
+      .chip { display: inline-block; font-weight: 600; font-size: 24px; border-radius: 999px; padding: 8px 18px; background: #eef3ee; color: #1f3a2b; }
+  </style>
+  <div data-hf-id="hf-by9e" id="root" data-composition-id="scene-2" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-m7dd" class="bg"></div>
+    <div data-hf-id="hf-e98c" id="scene-2-hdr" class="hdr">
+      <span data-hf-id="hf-pnqg" class="num" data-layout-ignore>02</span>
+      <span data-hf-id="hf-fnb4" class="ttl">Three places money lives</span>
+      
+    </div>
+    <div data-hf-id="hf-l3sf" id="scene-2-c0" class="node" style="left: 72px; top: 150px; width: 576px; height: 420px; justify-content: flex-start; padding-top: 34px; color: #1f7a3f"><span data-hf-id="hf-i0lu" class="icon"><svg data-hf-id="hf-e7ft" viewBox="0 0 48 48"><rect data-hf-id="hf-x4wq" x="6" y="12" width="36" height="26" rx="4" fill="none" stroke="currentColor" stroke-width="3.5"/><path data-hf-id="hf-rckp" d="M6 22h36M20 30h8" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/></svg></span><div data-hf-id="hf-sv0o" class="lbl" style="color: #10231a">Cash drawer</div><div data-hf-id="hf-lej6" class="sub">The physical cash in the store</div></div>
+    <div data-hf-id="hf-oye2" id="scene-2-c1" class="node" style="left: 672px; top: 150px; width: 576px; height: 420px; justify-content: flex-start; padding-top: 34px; color: #1d4ed8"><span data-hf-id="hf-9jva" class="icon"><svg data-hf-id="hf-7bj1" viewBox="0 0 48 48"><rect data-hf-id="hf-okh5" x="14" y="5" width="20" height="38" rx="4" fill="none" stroke="currentColor" stroke-width="3.5"/><path data-hf-id="hf-ctrw" d="M21 36h6" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/></svg></span><div data-hf-id="hf-foqm" class="lbl" style="color: #10231a">Payment channels</div><div data-hf-id="hf-ikom" class="sub">Where non-cash payments land</div></div>
+    <div data-hf-id="hf-883z" id="scene-2-c2" class="node" style="left: 1272px; top: 150px; width: 576px; height: 420px; justify-content: flex-start; padding-top: 34px; color: #b45309"><span data-hf-id="hf-9y6b" class="icon"><svg data-hf-id="hf-8ig4" viewBox="0 0 48 48"><rect data-hf-id="hf-obls" x="6" y="8" width="36" height="32" rx="4" fill="none" stroke="currentColor" stroke-width="3.5"/><circle data-hf-id="hf-4isw" cx="24" cy="24" r="7" fill="none" stroke="currentColor" stroke-width="3.5"/><path data-hf-id="hf-3b27" d="M24 17v3M24 28v3M10 40v4M38 40v4" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/></svg></span><div data-hf-id="hf-u3vt" class="lbl" style="color: #10231a">Cash on hand</div><div data-hf-id="hf-eund" class="sub">The business's cash the owner holds, outside every store</div></div>
+    <div data-hf-id="hf-9bbf" id="scene-2-trays" style="position: absolute; left: 96px; top: 452px; width: 528px; text-align: center"><span data-hf-id="hf-nvl8" class="chip">Tray · Cashier 1</span> <span data-hf-id="hf-moo5" class="chip">Tray · Cashier 2</span><div data-hf-id="hf-46fx" style="margin-top: 10px; font-weight: 700; font-size: 28px; color: #1f7a3f">= the store's drawer</div></div>
+    <div data-hf-id="hf-bfj7" id="scene-2-kinds" style="position: absolute; left: 696px; top: 470px; width: 528px; text-align: center"><span data-hf-id="hf-y5mn" class="chip">Card terminal</span> <span data-hf-id="hf-3xh7" class="chip">GCash</span> <span data-hf-id="hf-uqg5" class="chip">Bank</span></div>
+    <div data-hf-id="hf-se5a" id="scene-2-e0" class="node" style="left: 72px; top: 610px; width: 440px; height: 260px; color: #10231a"><div data-hf-id="hf-qinp" class="sub" style="font-weight: 700; font-size: 24px; letter-spacing: 0.08em; text-transform: uppercase">Expected</div><div data-hf-id="hf-5g9q" style="font-weight: 900; font-size: 64px; letter-spacing: -0.02em">₱700.00</div><div data-hf-id="hf-012a" class="sub">What should be there</div></div>
+    <div data-hf-id="hf-77b9" id="scene-2-e1" class="node" style="left: 542px; top: 610px; width: 440px; height: 260px; color: #10231a"><div data-hf-id="hf-00r5" class="sub" style="font-weight: 700; font-size: 24px; letter-spacing: 0.08em; text-transform: uppercase">Counted</div><div data-hf-id="hf-prdc" style="font-weight: 900; font-size: 64px; letter-spacing: -0.02em">₱690.00</div><div data-hf-id="hf-nn0n" class="sub">What you actually count</div></div>
+    <div data-hf-id="hf-uctr" id="scene-2-short" class="node" style="left: 1012px; top: 610px; width: 404px; height: 260px; border-color: #fca5a5; background: #fef2f2"><div data-hf-id="hf-xkye" class="sub" style="font-weight: 700; font-size: 24px; letter-spacing: 0.08em; text-transform: uppercase; color: #b91c1c">Counted less</div><div data-hf-id="hf-3f0e" style="font-weight: 900; font-size: 60px; color: #b91c1c">Short ₱10</div></div>
+    <div data-hf-id="hf-t57z" id="scene-2-over" class="node" style="left: 1440px; top: 610px; width: 408px; height: 260px; border-color: #fcd34d; background: #fffbeb"><div data-hf-id="hf-muye" class="sub" style="font-weight: 700; font-size: 24px; letter-spacing: 0.08em; text-transform: uppercase; color: #b45309">Counted more</div><div data-hf-id="hf-213c" style="font-weight: 900; font-size: 60px; color: #b45309">Over</div></div>
+  </div>
+  <script>
+    (() => {
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo("#scene-2-hdr", { opacity: 0, y: -16 }, { opacity: 1, y: 0, duration: 0.45, ease: "power3.out" }, 0.05);
+      tl.fromTo("#scene-2-c0", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 3.02);
+      tl.fromTo("#scene-2-c1", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 10.72);
+      tl.fromTo("#scene-2-c2", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 16.82);
+      tl.fromTo("#scene-2-trays", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 6.19);
+      tl.fromTo("#scene-2-kinds", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 11.92);
+      tl.fromTo("#scene-2-e0", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 24.00);
+      tl.fromTo("#scene-2-e1", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 27.15);
+      tl.fromTo("#scene-2-short", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 31.40);
+      tl.fromTo("#scene-2-over", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 32.84);
+      window.__timelines["scene-2"] = tl;
+    })();
+  </script>
+</template>

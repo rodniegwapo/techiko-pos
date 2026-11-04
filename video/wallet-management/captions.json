@@ -1,0 +1,1247 @@
+[
+  {
+    "start": 0,
+    "end": 1.356,
+    "text": "At the end of a busy"
+  },
+  {
+    "start": 1.381,
+    "end": 3.304,
+    "text": "day, every store owner asks the"
+  },
+  {
+    "start": 3.325,
+    "end": 4.149,
+    "text": "same question."
+  },
+  {
+    "start": 4.444,
+    "end": 6.376,
+    "text": "Where is my money right now?"
+  },
+  {
+    "start": 6.653,
+    "end": 8.841,
+    "text": "Cash and wallet answers that."
+  },
+  {
+    "start": 9.127,
+    "end": 11.204,
+    "text": "It follows every peso, from the"
+  },
+  {
+    "start": 11.226,
+    "end": 13.248,
+    "text": "moment a customer pays, to the"
+  },
+  {
+    "start": 13.27,
+    "end": 15.131,
+    "text": "drawer, to the bank, and to"
+  },
+  {
+    "start": 15.149,
+    "end": 15.832,
+    "text": "the owner."
+  },
+  {
+    "start": 16.117,
+    "end": 18.21,
+    "text": "It lives under five tabs."
+  },
+  {
+    "start": 18.498,
+    "end": 19.918,
+    "text": "Today's drawer."
+  },
+  {
+    "start": 20.227,
+    "end": 21.725,
+    "text": "Where money is."
+  },
+  {
+    "start": 22.007,
+    "end": 23.54,
+    "text": "Cash in and out."
+  },
+  {
+    "start": 23.826,
+    "end": 25.552,
+    "text": "Shifts and counts."
+  },
+  {
+    "start": 25.86,
+    "end": 27.536,
+    "text": "And Cash on hand."
+  },
+  {
+    "start": 27.83,
+    "end": 30.021,
+    "text": "Let's walk through them, one role"
+  },
+  {
+    "start": 30.048,
+    "end": 30.793,
+    "text": "at a time."
+  },
+  {
+    "start": 31.674,
+    "end": 34.016,
+    "text": "First, three words you will hear"
+  },
+  {
+    "start": 34.046,
+    "end": 34.564,
+    "text": "a lot."
+  },
+  {
+    "start": 34.843,
+    "end": 36.627,
+    "text": "The cash drawer is the physical"
+  },
+  {
+    "start": 36.666,
+    "end": 37.738,
+    "text": "cash in the store."
+  },
+  {
+    "start": 38.019,
+    "end": 39.865,
+    "text": "Each cashier has their own tray,"
+  },
+  {
+    "start": 39.892,
+    "end": 41.826,
+    "text": "and together they make the store's"
+  },
+  {
+    "start": 41.861,
+    "end": 42.258,
+    "text": "drawer."
+  },
+  {
+    "start": 42.543,
+    "end": 44.813,
+    "text": "Payment channels are where non cash"
+  },
+  {
+    "start": 44.839,
+    "end": 47.142,
+    "text": "payments land, like a card terminal,"
+  },
+  {
+    "start": 47.19,
+    "end": 48.362,
+    "text": "GCash, or a bank."
+  },
+  {
+    "start": 48.643,
+    "end": 50.124,
+    "text": "And Cash on hand is the"
+  },
+  {
+    "start": 50.144,
+    "end": 52.314,
+    "text": "business's cash that the owner holds,"
+  },
+  {
+    "start": 52.346,
+    "end": 53.715,
+    "text": "outside of every store."
+  },
+  {
+    "start": 53.997,
+    "end": 55.522,
+    "text": "One more idea."
+  },
+  {
+    "start": 55.821,
+    "end": 57.382,
+    "text": "Expected is what the app says"
+  },
+  {
+    "start": 57.403,
+    "end": 58.69,
+    "text": "should be in the drawer."
+  },
+  {
+    "start": 58.972,
+    "end": 61.344,
+    "text": "Counted is what you actually count."
+  },
+  {
+    "start": 61.631,
+    "end": 63.854,
+    "text": "If counted is less, you are"
+  },
+  {
+    "start": 63.881,
+    "end": 64.368,
+    "text": "short."
+  },
+  {
+    "start": 64.66,
+    "end": 66.514,
+    "text": "If it is more, you are"
+  },
+  {
+    "start": 66.54,
+    "end": 66.958,
+    "text": "over."
+  },
+  {
+    "start": 67.844,
+    "end": 69.8,
+    "text": "Four roles use this, and each"
+  },
+  {
+    "start": 69.826,
+    "end": 71.557,
+    "text": "one sees a different part."
+  },
+  {
+    "start": 71.838,
+    "end": 74.093,
+    "text": "A cashier handles only their own"
+  },
+  {
+    "start": 74.117,
+    "end": 74.547,
+    "text": "shift."
+  },
+  {
+    "start": 74.834,
+    "end": 77.092,
+    "text": "A supervisor watches the whole store"
+  },
+  {
+    "start": 77.122,
+    "end": 79.584,
+    "text": "drawer, and checks the cashiers' counts."
+  },
+  {
+    "start": 79.872,
+    "end": 81.659,
+    "text": "A manager does that too, and"
+  },
+  {
+    "start": 81.68,
+    "end": 83.571,
+    "text": "also ends the store's day, and"
+  },
+  {
+    "start": 83.592,
+    "end": 85.168,
+    "text": "records money in and out."
+  },
+  {
+    "start": 85.443,
+    "end": 87.383,
+    "text": "The owner, or an admin, sees"
+  },
+  {
+    "start": 87.41,
+    "end": 89.57,
+    "text": "every store, holds Cash on hand,"
+  },
+  {
+    "start": 89.602,
+    "end": 91.265,
+    "text": "and is the only one who"
+  },
+  {
+    "start": 91.288,
+    "end": 93.046,
+    "text": "moves money between stores."
+  },
+  {
+    "start": 93.936,
+    "end": 95.805,
+    "text": "Here is a cashier's day."
+  },
+  {
+    "start": 96.085,
+    "end": 98.46,
+    "text": "Open Today's drawer, and under My"
+  },
+  {
+    "start": 98.479,
+    "end": 100.536,
+    "text": "shift, choose Start my shift."
+  },
+  {
+    "start": 100.824,
+    "end": 103.387,
+    "text": "Enter your opening cash, here five"
+  },
+  {
+    "start": 103.418,
+    "end": 104.453,
+    "text": "hundred pesos."
+  },
+  {
+    "start": 104.743,
+    "end": 106.616,
+    "text": "You can also start from the"
+  },
+  {
+    "start": 106.639,
+    "end": 107.388,
+    "text": "Sales page."
+  },
+  {
+    "start": 107.669,
+    "end": 109.467,
+    "text": "Now sell as usual."
+  },
+  {
+    "start": 109.768,
+    "end": 111.66,
+    "text": "Every cash sale adds to your"
+  },
+  {
+    "start": 111.686,
+    "end": 112.679,
+    "text": "tray's Expected."
+  },
+  {
+    "start": 112.977,
+    "end": 114.858,
+    "text": "When you are done, choose End"
+  },
+  {
+    "start": 114.879,
+    "end": 116.703,
+    "text": "my shift, and count the cash"
+  },
+  {
+    "start": 116.728,
+    "end": 117.596,
+    "text": "in your tray."
+  },
+  {
+    "start": 117.876,
+    "end": 119.525,
+    "text": "You don't need a PIN."
+  },
+  {
+    "start": 119.805,
+    "end": 122.079,
+    "text": "If your count matches, you are"
+  },
+  {
+    "start": 122.104,
+    "end": 122.504,
+    "text": "done."
+  },
+  {
+    "start": 122.789,
+    "end": 124.327,
+    "text": "If it is short or over,"
+  },
+  {
+    "start": 124.356,
+    "end": 126.425,
+    "text": "the shift shows Needs review, and"
+  },
+  {
+    "start": 126.445,
+    "end": 127.887,
+    "text": "a supervisor checks it."
+  },
+  {
+    "start": 128.158,
+    "end": 130.188,
+    "text": "You can keep working meanwhile."
+  },
+  {
+    "start": 131.092,
+    "end": 133.512,
+    "text": "Every shift follows the same path."
+  },
+  {
+    "start": 133.796,
+    "end": 135.333,
+    "text": "It starts Open."
+  },
+  {
+    "start": 135.63,
+    "end": 138.197,
+    "text": "When the cashier counts, it becomes"
+  },
+  {
+    "start": 138.242,
+    "end": 138.699,
+    "text": "Ended."
+  },
+  {
+    "start": 138.989,
+    "end": 140.647,
+    "text": "If the count is off, it"
+  },
+  {
+    "start": 140.665,
+    "end": 142.078,
+    "text": "goes to Needs review."
+  },
+  {
+    "start": 142.368,
+    "end": 144.523,
+    "text": "A supervisor then approves it, or"
+  },
+  {
+    "start": 144.541,
+    "end": 146.399,
+    "text": "sends it back for a recount."
+  },
+  {
+    "start": 146.692,
+    "end": 148.305,
+    "text": "When it is sent back, the"
+  },
+  {
+    "start": 148.326,
+    "end": 150.442,
+    "text": "cashier counts again, and the shift"
+  },
+  {
+    "start": 150.47,
+    "end": 152.173,
+    "text": "goes through the same steps."
+  },
+  {
+    "start": 152.456,
+    "end": 154.168,
+    "text": "If a cashier forgets to end"
+  },
+  {
+    "start": 154.188,
+    "end": 156.385,
+    "text": "their shift, it shows under Forgotten"
+  },
+  {
+    "start": 156.43,
+    "end": 158.248,
+    "text": "shifts, so someone can end it"
+  },
+  {
+    "start": 158.265,
+    "end": 158.847,
+    "text": "for them."
+  },
+  {
+    "start": 159.126,
+    "end": 160.584,
+    "text": "And if a shift was ended"
+  },
+  {
+    "start": 160.611,
+    "end": 162.503,
+    "text": "on another device, the Sales page"
+  },
+  {
+    "start": 162.526,
+    "end": 164.423,
+    "text": "tells you, instead of letting you"
+  },
+  {
+    "start": 164.442,
+    "end": 165.8,
+    "text": "sell on a closed shift."
+  },
+  {
+    "start": 166.681,
+    "end": 168.951,
+    "text": "A supervisor opens Today's drawer and"
+  },
+  {
+    "start": 168.972,
+    "end": 170.292,
+    "text": "sees the whole store."
+  },
+  {
+    "start": 170.575,
+    "end": 172.557,
+    "text": "Cash in drawers is every tray"
+  },
+  {
+    "start": 172.584,
+    "end": 173.232,
+    "text": "added up."
+  },
+  {
+    "start": 173.504,
+    "end": 175.364,
+    "text": "Cash sales today is what went"
+  },
+  {
+    "start": 175.389,
+    "end": 176.446,
+    "text": "into the drawers."
+  },
+  {
+    "start": 176.738,
+    "end": 178.763,
+    "text": "Card, e-wallet and bank is money"
+  },
+  {
+    "start": 178.793,
+    "end": 180.964,
+    "text": "that went past the drawer, straight"
+  },
+  {
+    "start": 181.006,
+    "end": 181.965,
+    "text": "into a channel."
+  },
+  {
+    "start": 182.257,
+    "end": 184.227,
+    "text": "Counts off shows how many counts"
+  },
+  {
+    "start": 184.26,
+    "end": 185.148,
+    "text": "need a review."
+  },
+  {
+    "start": 185.435,
+    "end": 187.558,
+    "text": "A supervisor can set the opening"
+  },
+  {
+    "start": 187.598,
+    "end": 189.342,
+    "text": "cash, and do a spot check"
+  },
+  {
+    "start": 189.373,
+    "end": 190.008,
+    "text": "any time."
+  },
+  {
+    "start": 190.289,
+    "end": 192.038,
+    "text": "A spot check counts the drawer"
+  },
+  {
+    "start": 192.068,
+    "end": 193.373,
+    "text": "without ending anything."
+  },
+  {
+    "start": 193.665,
+    "end": 195.982,
+    "text": "Then, on Shifts and counts, open"
+  },
+  {
+    "start": 196.01,
+    "end": 197.892,
+    "text": "a count that needs review."
+  },
+  {
+    "start": 198.185,
+    "end": 200.429,
+    "text": "Look at Expected, Counted, and the"
+  },
+  {
+    "start": 200.451,
+    "end": 201.112,
+    "text": "Difference."
+  },
+  {
+    "start": 201.419,
+    "end": 203.148,
+    "text": "Approve it with a note, or"
+  },
+  {
+    "start": 203.165,
+    "end": 204.921,
+    "text": "send it back for a recount."
+  },
+  {
+    "start": 205.213,
+    "end": 207.532,
+    "text": "A supervisor only sees their own"
+  },
+  {
+    "start": 207.556,
+    "end": 207.943,
+    "text": "team."
+  },
+  {
+    "start": 208.828,
+    "end": 210.841,
+    "text": "When every cashier has ended their"
+  },
+  {
+    "start": 210.869,
+    "end": 212.924,
+    "text": "shift, the manager ends the store's"
+  },
+  {
+    "start": 212.959,
+    "end": 213.234,
+    "text": "day."
+  },
+  {
+    "start": 213.508,
+    "end": 215.538,
+    "text": "Choose End the store's day, and"
+  },
+  {
+    "start": 215.559,
+    "end": 216.982,
+    "text": "enter the final count."
+  },
+  {
+    "start": 217.267,
+    "end": 219.509,
+    "text": "Then decide where the cash goes."
+  },
+  {
+    "start": 219.792,
+    "end": 221.561,
+    "text": "Cash out sends it to Cash"
+  },
+  {
+    "start": 221.588,
+    "end": 223.18,
+    "text": "on hand, for the owner."
+  },
+  {
+    "start": 223.466,
+    "end": 225.673,
+    "text": "The drawer starts tomorrow empty."
+  },
+  {
+    "start": 225.96,
+    "end": 227.73,
+    "text": "Keep as opening leaves it in"
+  },
+  {
+    "start": 227.746,
+    "end": 230.064,
+    "text": "the drawer, as tomorrow's opening cash."
+  },
+  {
+    "start": 230.343,
+    "end": 232.336,
+    "text": "Once the day is closed, nothing"
+  },
+  {
+    "start": 232.375,
+    "end": 234.011,
+    "text": "more can be added to it."
+  },
+  {
+    "start": 234.282,
+    "end": 235.869,
+    "text": "If you made a mistake, a"
+  },
+  {
+    "start": 235.882,
+    "end": 237.822,
+    "text": "manager or admin can reopen the"
+  },
+  {
+    "start": 237.843,
+    "end": 239.044,
+    "text": "day, with a reason."
+  },
+  {
+    "start": 239.931,
+    "end": 242.334,
+    "text": "Not all money comes from sales."
+  },
+  {
+    "start": 242.625,
+    "end": 244.245,
+    "text": "On Cash in and out, a"
+  },
+  {
+    "start": 244.259,
+    "end": 245.976,
+    "text": "manager records the rest."
+  },
+  {
+    "start": 246.259,
+    "end": 248.584,
+    "text": "Cash in, for example Added float,"
+  },
+  {
+    "start": 248.621,
+    "end": 250.492,
+    "text": "when you put in change or"
+  },
+  {
+    "start": 250.511,
+    "end": 251.359,
+    "text": "small bills."
+  },
+  {
+    "start": 251.647,
+    "end": 254.276,
+    "text": "Cash out, for example Owner took"
+  },
+  {
+    "start": 254.309,
+    "end": 254.749,
+    "text": "cash."
+  },
+  {
+    "start": 255.037,
+    "end": 256.916,
+    "text": "Move, to send money between the"
+  },
+  {
+    "start": 256.936,
+    "end": 259.042,
+    "text": "drawer and the store's own channels,"
+  },
+  {
+    "start": 259.086,
+    "end": 261.157,
+    "text": "like depositing cash into the bank."
+  },
+  {
+    "start": 261.435,
+    "end": 263.386,
+    "text": "Before you save, the app shows"
+  },
+  {
+    "start": 263.416,
+    "end": 265.487,
+    "text": "the balance before and after, so"
+  },
+  {
+    "start": 265.504,
+    "end": 267.335,
+    "text": "you see exactly what changes."
+  },
+  {
+    "start": 267.628,
+    "end": 269.868,
+    "text": "Other pages add lines here too."
+  },
+  {
+    "start": 270.147,
+    "end": 272.293,
+    "text": "An expense, a supplier payment, or"
+  },
+  {
+    "start": 272.31,
+    "end": 274.083,
+    "text": "a loan payment all show up,"
+  },
+  {
+    "start": 274.104,
+    "end": 276.189,
+    "text": "because they also took money from"
+  },
+  {
+    "start": 276.214,
+    "end": 276.915,
+    "text": "the drawer."
+  },
+  {
+    "start": 277.803,
+    "end": 279.554,
+    "text": "Where money is puts it all"
+  },
+  {
+    "start": 279.575,
+    "end": 280.503,
+    "text": "on one screen."
+  },
+  {
+    "start": 280.792,
+    "end": 282.587,
+    "text": "For each store, you see the"
+  },
+  {
+    "start": 282.608,
+    "end": 284.981,
+    "text": "cash drawer, every e-wallet, and every"
+  },
+  {
+    "start": 285.011,
+    "end": 287.122,
+    "text": "bank and card terminal, each with"
+  },
+  {
+    "start": 287.148,
+    "end": 288.863,
+    "text": "its balance and a subtotal."
+  },
+  {
+    "start": 289.16,
+    "end": 291.398,
+    "text": "The owner sees every store side"
+  },
+  {
+    "start": 291.426,
+    "end": 293.421,
+    "text": "by side, plus Cash on hand."
+  },
+  {
+    "start": 293.704,
+    "end": 295.217,
+    "text": "This is the answer to the"
+  },
+  {
+    "start": 295.236,
+    "end": 296.646,
+    "text": "question we started with."
+  },
+  {
+    "start": 296.923,
+    "end": 298.855,
+    "text": "Where is my money right now?"
+  },
+  {
+    "start": 299.732,
+    "end": 301.487,
+    "text": "Now the owner's part."
+  },
+  {
+    "start": 301.776,
+    "end": 304.017,
+    "text": "Money only moves between stores that"
+  },
+  {
+    "start": 304.042,
+    "end": 304.654,
+    "text": "allow it."
+  },
+  {
+    "start": 304.925,
+    "end": 307.751,
+    "text": "Go to Inventory, then Locations."
+  },
+  {
+    "start": 308.074,
+    "end": 310.115,
+    "text": "Edit each store, and turn on"
+  },
+  {
+    "start": 310.134,
+    "end": 311.45,
+    "text": "Can transfer money."
+  },
+  {
+    "start": 311.738,
+    "end": 313.675,
+    "text": "Do this for both stores."
+  },
+  {
+    "start": 313.973,
+    "end": 315.406,
+    "text": "One more rule."
+  },
+  {
+    "start": 315.702,
+    "end": 317.212,
+    "text": "You can't move money into or"
+  },
+  {
+    "start": 317.226,
+    "end": 318.427,
+    "text": "out of a day that has"
+  },
+  {
+    "start": 318.445,
+    "end": 319.418,
+    "text": "already been ended."
+  },
+  {
+    "start": 320.296,
+    "end": 321.937,
+    "text": "There are three ways to move"
+  },
+  {
+    "start": 321.959,
+    "end": 323.26,
+    "text": "money to another store."
+  },
+  {
+    "start": 323.54,
+    "end": 325.495,
+    "text": "Only one of them passes through"
+  },
+  {
+    "start": 325.533,
+    "end": 326.395,
+    "text": "Cash on hand."
+  },
+  {
+    "start": 326.674,
+    "end": 327.695,
+    "text": "One."
+  },
+  {
+    "start": 328.034,
+    "end": 330.746,
+    "text": "Transfer, on Cash in and out."
+  },
+  {
+    "start": 331.033,
+    "end": 332.681,
+    "text": "Pick the other store and the"
+  },
+  {
+    "start": 332.7,
+    "end": 334.586,
+    "text": "place, drawer or channel, and the"
+  },
+  {
+    "start": 334.605,
+    "end": 336.051,
+    "text": "money goes straight there."
+  },
+  {
+    "start": 336.331,
+    "end": 337.246,
+    "text": "Two."
+  },
+  {
+    "start": 337.576,
+    "end": 339.633,
+    "text": "Owner took cash, and choose Into"
+  },
+  {
+    "start": 339.658,
+    "end": 341.222,
+    "text": "the other store's drawer."
+  },
+  {
+    "start": 341.51,
+    "end": 343.702,
+    "text": "The owner carries the cash over."
+  },
+  {
+    "start": 343.984,
+    "end": 345.882,
+    "text": "This only works from the cash"
+  },
+  {
+    "start": 345.907,
+    "end": 346.35,
+    "text": "drawer."
+  },
+  {
+    "start": 346.638,
+    "end": 347.649,
+    "text": "Three."
+  },
+  {
+    "start": 347.987,
+    "end": 349.724,
+    "text": "Through Cash on hand."
+  },
+  {
+    "start": 350.012,
+    "end": 351.686,
+    "text": "The cash comes in first, and"
+  },
+  {
+    "start": 351.706,
+    "end": 353.529,
+    "text": "later the owner chooses Move to"
+  },
+  {
+    "start": 353.545,
+    "end": 355.256,
+    "text": "a store, and picks its drawer"
+  },
+  {
+    "start": 355.287,
+    "end": 356.647,
+    "text": "or one of its channels."
+  },
+  {
+    "start": 357.54,
+    "end": 359.451,
+    "text": "Cash on hand is the owner's"
+  },
+  {
+    "start": 359.492,
+    "end": 359.862,
+    "text": "safe."
+  },
+  {
+    "start": 360.144,
+    "end": 362.104,
+    "text": "Money gets in two ways."
+  },
+  {
+    "start": 362.393,
+    "end": 364.104,
+    "text": "When a manager chooses Cash out"
+  },
+  {
+    "start": 364.122,
+    "end": 365.42,
+    "text": "at the end of the day."
+  },
+  {
+    "start": 365.692,
+    "end": 367.409,
+    "text": "Or when the owner collects an"
+  },
+  {
+    "start": 367.424,
+    "end": 369.648,
+    "text": "approved shift, from Waiting to collect."
+  },
+  {
+    "start": 369.936,
+    "end": 372.028,
+    "text": "Money goes out three ways."
+  },
+  {
+    "start": 372.315,
+    "end": 373.791,
+    "text": "Move to a store sends it"
+  },
+  {
+    "start": 373.807,
+    "end": 375.453,
+    "text": "back to a drawer or channel."
+  },
+  {
+    "start": 375.741,
+    "end": 377.778,
+    "text": "Correction fixes a mistake."
+  },
+  {
+    "start": 378.08,
+    "end": 379.659,
+    "text": "And Owner used it means the"
+  },
+  {
+    "start": 379.678,
+    "end": 381.658,
+    "text": "owner spent it outside the business."
+  },
+  {
+    "start": 381.949,
+    "end": 383.345,
+    "text": "Remember this."
+  },
+  {
+    "start": 383.643,
+    "end": 385.9,
+    "text": "Collecting cash, and moving it back"
+  },
+  {
+    "start": 385.927,
+    "end": 387.74,
+    "text": "to a store, does not change"
+  },
+  {
+    "start": 387.775,
+    "end": 388.447,
+    "text": "the books."
+  },
+  {
+    "start": 388.732,
+    "end": 390.812,
+    "text": "It is still the business's money."
+  },
+  {
+    "start": 391.096,
+    "end": 392.897,
+    "text": "Only Owner used it takes money"
+  },
+  {
+    "start": 392.925,
+    "end": 394.117,
+    "text": "out of the business."
+  },
+  {
+    "start": 395.01,
+    "end": 397.287,
+    "text": "Finally, the big picture."
+  },
+  {
+    "start": 397.599,
+    "end": 399.744,
+    "text": "Under Finance, Money in and out"
+  },
+  {
+    "start": 399.767,
+    "end": 401.218,
+    "text": "shows your cash flow."
+  },
+  {
+    "start": 401.5,
+    "end": 403.697,
+    "text": "Money in is sales, credit payments,"
+  },
+  {
+    "start": 403.744,
+    "end": 405.7,
+    "text": "loans, and money the owner put"
+  },
+  {
+    "start": 405.722,
+    "end": 405.968,
+    "text": "in."
+  },
+  {
+    "start": 406.239,
+    "end": 408.827,
+    "text": "Money out is expenses, suppliers, loan"
+  },
+  {
+    "start": 408.855,
+    "end": 411.317,
+    "text": "payments, equipment, and owner draws."
+  },
+  {
+    "start": 411.604,
+    "end": 413.626,
+    "text": "Moving money between your own drawers,"
+  },
+  {
+    "start": 413.663,
+    "end": 415.295,
+    "text": "channels, and Cash on hand is"
+  },
+  {
+    "start": 415.309,
+    "end": 416.896,
+    "text": "not on this list, because it"
+  },
+  {
+    "start": 416.91,
+    "end": 418.197,
+    "text": "never left the business."
+  },
+  {
+    "start": 418.487,
+    "end": 420.075,
+    "text": "And there is a section called"
+  },
+  {
+    "start": 420.104,
+    "end": 421.948,
+    "text": "Why profit and money are different."
+  },
+  {
+    "start": 422.241,
+    "end": 423.897,
+    "text": "You can make a profit, and"
+  },
+  {
+    "start": 423.918,
+    "end": 425.578,
+    "text": "still be short on cash, if"
+  },
+  {
+    "start": 425.594,
+    "end": 427.039,
+    "text": "it is tied up in stock"
+  },
+  {
+    "start": 427.067,
+    "end": 428.402,
+    "text": "or in customer credit."
+  },
+  {
+    "start": 429.29,
+    "end": 431.645,
+    "text": "So, which way to move money?"
+  },
+  {
+    "start": 431.939,
+    "end": 433.878,
+    "text": "If the other store needs it"
+  },
+  {
+    "start": 433.896,
+    "end": 435.112,
+    "text": "now, use Transfer."
+  },
+  {
+    "start": 435.413,
+    "end": 437.217,
+    "text": "If you are carrying cash from"
+  },
+  {
+    "start": 437.241,
+    "end": 439.193,
+    "text": "one drawer to another, use Owner"
+  },
+  {
+    "start": 439.222,
+    "end": 439.854,
+    "text": "took cash."
+  },
+  {
+    "start": 440.132,
+    "end": 442.246,
+    "text": "If you collect first and decide"
+  },
+  {
+    "start": 442.282,
+    "end": 443.948,
+    "text": "later, use Cash on hand."
+  },
+  {
+    "start": 444.23,
+    "end": 445.475,
+    "text": "To recap."
+  },
+  {
+    "start": 445.795,
+    "end": 448.416,
+    "text": "Cashiers start, sell, and count their"
+  },
+  {
+    "start": 448.45,
+    "end": 449.14,
+    "text": "own tray."
+  },
+  {
+    "start": 449.424,
+    "end": 451.776,
+    "text": "Supervisors check the drawer and the"
+  },
+  {
+    "start": 451.798,
+    "end": 452.255,
+    "text": "counts."
+  },
+  {
+    "start": 452.545,
+    "end": 454.427,
+    "text": "Managers end the store's day and"
+  },
+  {
+    "start": 454.446,
+    "end": 455.886,
+    "text": "record money in and out."
+  },
+  {
+    "start": 456.159,
+    "end": 458.209,
+    "text": "And the owner sees every store,"
+  },
+  {
+    "start": 458.244,
+    "end": 460.189,
+    "text": "keeps Cash on hand, and moves"
+  },
+  {
+    "start": 460.22,
+    "end": 461.552,
+    "text": "money between stores."
+  },
+  {
+    "start": 461.842,
+    "end": 463.674,
+    "text": "That's Cash and wallet."
+  }
+]

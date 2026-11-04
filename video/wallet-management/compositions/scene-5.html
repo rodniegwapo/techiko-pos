@@ -1,0 +1,77 @@
+<template>
+  <style>
+      #root { position: absolute; inset: 0; font-family: "Inter", sans-serif; color: #10231a; overflow: hidden; }
+      .bg { position: absolute; inset: 0; background: linear-gradient(180deg, #f6f8f5 0%, #edf2ec 100%); }
+      .hdr { position: absolute; left: 72px; top: 44px; right: 72px; height: 72px; display: flex; align-items: center; gap: 20px; }
+      .hdr .num { font-weight: 900; font-size: 26px; color: #ffffff; background: #1f7a3f; border-radius: 12px; padding: 10px 16px; letter-spacing: 0.02em; }
+      .hdr .ttl { font-weight: 700; font-size: 44px; letter-spacing: -0.02em; white-space: nowrap; }
+      .hdr .role { margin-left: auto; font-weight: 700; font-size: 28px; letter-spacing: 0.08em; text-transform: uppercase; border-radius: 999px; padding: 12px 26px; white-space: nowrap; }
+      .chrome { position: absolute; left: 72px; top: 150px; width: 1240px; height: 734px; background: #ffffff; border-radius: 16px; border: 1px solid #d3dbd2; box-shadow: 0 24px 60px rgba(16, 35, 26, 0.14); }
+      .chrome .bar { height: 36px; display: flex; align-items: center; gap: 8px; padding: 0 16px; border-bottom: 1px solid #e3e8e2; }
+      .chrome .dot { width: 11px; height: 11px; border-radius: 50%; background: #cfd8ce; }
+      .chrome .url { margin: 0 auto; font-size: 16px; color: #5b6b62; background: #f1f4f0; border-radius: 8px; padding: 4px 18px; }
+      .shot { position: absolute; left: 72px; top: 186px; width: 1240px; height: 698px; object-fit: cover; border-radius: 0 0 16px 16px; }
+      .panel { position: absolute; left: 1352px; top: 150px; width: 496px; height: 734px; display: flex; flex-direction: column; gap: 14px; }
+      .card { position: relative; width: 100%; background: #ffffff; border-radius: 16px; border: 1px solid #dbe3da; padding: 18px 22px 18px 26px; box-shadow: 0 10px 28px rgba(16, 35, 26, 0.08); }
+      .card .bar2 { position: absolute; left: 0; top: 16px; bottom: 16px; width: 6px; border-radius: 0 6px 6px 0; }
+      .card .t1 { font-weight: 700; font-size: 31px; line-height: 1.2; letter-spacing: -0.01em; }
+      .card .t2 { font-size: 28px; line-height: 1.3; color: #4a5a51; margin-top: 6px; }
+      .icon { display: inline-flex; width: 56px; height: 56px; }
+      .icon svg { width: 100%; height: 100%; }
+      .node { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: #ffffff; border: 2px solid #d3dbd2; border-radius: 22px; box-shadow: 0 12px 30px rgba(16, 35, 26, 0.08); text-align: center; }
+      .node .lbl { font-weight: 700; font-size: 30px; letter-spacing: -0.01em; line-height: 1.15; }
+      .node .sub { font-size: 26px; color: #4a5a51; line-height: 1.3; padding: 0 18px; }
+      .arrow { position: absolute; height: 6px; background: #6b8574; border-radius: 3px; }
+      .arrow::after { content: ""; position: absolute; right: -4px; top: -9px; border-left: 18px solid #6b8574; border-top: 12px solid transparent; border-bottom: 12px solid transparent; }
+      .chip { display: inline-block; font-weight: 600; font-size: 24px; border-radius: 999px; padding: 8px 18px; background: #eef3ee; color: #1f3a2b; }
+  </style>
+  <div data-hf-id="hf-rg9z" id="root" data-composition-id="scene-5" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-m7dd" class="bg"></div>
+    <div data-hf-id="hf-w4er" id="scene-5-hdr" class="hdr">
+      <span data-hf-id="hf-mvl9" class="num" data-layout-ignore>05</span>
+      <span data-hf-id="hf-4qtf" class="ttl">How a shift moves along</span>
+      
+    </div>
+    <div data-hf-id="hf-xckq" id="scene-5-dia" style="position: absolute; inset: 0">
+      <div data-hf-id="hf-pmze" id="scene-5-s0" class="node" style="left: 100px; top: 300px; width: 340px; height: 170px; border-color: #0f766e; background: #ccfbf1"><div data-hf-id="hf-xea1" class="lbl" style="color: #0f766e; font-size: 38px">Open</div></div>
+      <div data-hf-id="hf-ldae" id="scene-5-s1" class="node" style="left: 550px; top: 300px; width: 340px; height: 170px; border-color: #1d4ed8; background: #dbeafe"><div data-hf-id="hf-35yj" class="lbl" style="color: #1d4ed8; font-size: 38px">Ended</div></div>
+      <div data-hf-id="hf-q650" id="scene-5-sa1" class="arrow" style="left: 454px; top: 382px; width: 76px"></div>
+      <div data-hf-id="hf-m9kd" id="scene-5-s2" class="node" style="left: 1000px; top: 300px; width: 340px; height: 170px; border-color: #b91c1c; background: #fee2e2"><div data-hf-id="hf-ld3p" class="lbl" style="color: #b91c1c; font-size: 38px">Needs review</div></div>
+      <div data-hf-id="hf-qac3" id="scene-5-sa2" class="arrow" style="left: 904px; top: 382px; width: 76px"></div>
+      <div data-hf-id="hf-bpsc" id="scene-5-s3" class="node" style="left: 1450px; top: 300px; width: 340px; height: 170px; border-color: #15803d; background: #dcfce7"><div data-hf-id="hf-m0n1" class="lbl" style="color: #15803d; font-size: 38px">Approved</div></div>
+      <div data-hf-id="hf-o6zy" id="scene-5-sa3" class="arrow" style="left: 1354px; top: 382px; width: 76px"></div>
+      <svg data-hf-id="hf-37cf" id="scene-5-loop" style="position: absolute; left: 0; top: 0" width="1920" height="1080" viewBox="0 0 1920 1080"><path data-hf-id="hf-wchi" d="M 1120 476 C 1120 700, 270 700, 270 476" fill="none" stroke="#b45309" stroke-width="6" stroke-dasharray="14 12" stroke-linecap="round"/><path data-hf-id="hf-8q79" d="M 252 500 L 270 470 L 288 500" fill="none" stroke="#b45309" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div data-hf-id="hf-dvt3" id="scene-5-loopl" style="position: absolute; left: 0; right: 530px; top: 690px; text-align: center; font-weight: 700; font-size: 32px; color: #b45309">Sent back for a recount</div>
+    </div>
+    <div data-hf-id="hf-tqdm" id="scene-5-frame" class="chrome"><div data-hf-id="hf-ufsv" class="bar"><span data-hf-id="hf-9gry" class="dot"></span><span data-hf-id="hf-zcc2" class="dot"></span><span data-hf-id="hf-zqn3" class="dot"></span><span data-hf-id="hf-9qq2" class="url" data-layout-ignore>techiko-pos · Cash &amp; wallet</span></div></div>
+    <video data-hf-id="hf-imi8" id="scene-5-v0" class="clip shot" data-start="15.6" data-duration="19.989" data-track-index="2" src="assets/footage/scene-5.mp4" muted playsinline></video>
+    <div data-hf-id="hf-owjm" class="panel">
+    <div data-hf-id="hf-wxzf" id="scene-5-p0" class="card"><span data-hf-id="hf-ju1h" class="bar2" style="background: #1f7a3f"></span><div data-hf-id="hf-ufgo" class="t1">Sent back → Open again</div><div data-hf-id="hf-pw3g" class="t2">The cashier counts again</div></div>
+    <div data-hf-id="hf-szve" id="scene-5-p1" class="card"><span data-hf-id="hf-qgw9" class="bar2" style="background: #1f7a3f"></span><div data-hf-id="hf-vyq2" class="t1">Forgotten shifts</div><div data-hf-id="hf-tzpp" class="t2">Someone can end it for them</div></div>
+    <div data-hf-id="hf-p1rd" id="scene-5-p2" class="card"><span data-hf-id="hf-rntc" class="bar2" style="background: #1f7a3f"></span><div data-hf-id="hf-eq2z" class="t1">Ended on another device</div><div data-hf-id="hf-fcgx" class="t2">Sales tells you, so no one sells on a closed shift</div></div>
+    </div>
+  </div>
+  <script>
+    (() => {
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo("#scene-5-hdr", { opacity: 0, y: -16 }, { opacity: 1, y: 0, duration: 0.45, ease: "power3.out" }, 0.05);
+      tl.fromTo("#scene-5-s0", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 2.55);
+      tl.fromTo("#scene-5-s1", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 6.19);
+      tl.fromTo("#scene-5-sa1", { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.55, ease: "power3.out" }, 6.19);
+      tl.fromTo("#scene-5-s2", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 9.20);
+      tl.fromTo("#scene-5-sa2", { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.55, ease: "power3.out" }, 9.20);
+      tl.fromTo("#scene-5-s3", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 12.27);
+      tl.fromTo("#scene-5-sa3", { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.55, ease: "power3.out" }, 12.27);
+      tl.fromTo("#scene-5-loop", { opacity: 0 }, { opacity: 1, duration: 0.6 }, 13.08);
+      tl.fromTo("#scene-5-loopl", { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 13.08);
+      tl.to("#scene-5-dia", { opacity: 0, duration: 0.3 }, 15.30);
+      tl.set("#scene-5-frame", { opacity: 0 }, 0);
+      tl.fromTo("#scene-5-frame", { opacity: 0 }, { opacity: 1, duration: 0.3 }, 15.55);
+      tl.to("#scene-5-frame", { opacity: 0, duration: 0.25 }, 35.49);
+      tl.fromTo("#scene-5-p0", { opacity: 0, x: 40 }, { opacity: 1, x: 0, duration: 0.5, ease: "power3.out" }, 15.45);
+      tl.fromTo("#scene-5-p1", { opacity: 0, x: 40 }, { opacity: 1, x: 0, duration: 0.5, ease: "power3.out" }, 21.21);
+      tl.fromTo("#scene-5-p2", { opacity: 0, x: 40 }, { opacity: 1, x: 0, duration: 0.5, ease: "power3.out" }, 27.88);
+      window.__timelines["scene-5"] = tl;
+    })();
+  </script>
+</template>
