@@ -65,6 +65,9 @@ class RegisterShiftController extends Controller
             'counted_cash' => ['required', 'numeric', 'min:0', 'max:99999999.99'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'expenses' => ['nullable', 'array', 'max:20'],
+            // The form showed the expenses already on a reopened shift: the list replaces them.
+            'replace_recorded_expenses' => ['nullable', 'boolean'],
+            'expenses.*.id' => ['nullable', 'integer'],
             'expenses.*.expense_category_id' => ['required', 'integer', Rule::exists('expense_categories', 'id')->where('domain', $domain->name_slug)],
             'expenses.*.amount' => ['required', 'numeric', 'min:0.01', 'max:99999999.99'],
             'expenses.*.description' => ['required', 'string', 'max:255'],
@@ -139,6 +142,22 @@ class RegisterShiftController extends Controller
         $this->shifts->reopen($registerShift, $request->user(), $validated['reason']);
 
         return redirect()->back()->with('success', 'Shift reopened.');
+    }
+
+    /** A reviewer records a new count for an ended shift, any day, without reopening it. */
+    public function recount(Request $request, Domain $domain, RegisterShift $registerShift)
+    {
+        $this->ensureInDomain($request, $domain, $registerShift);
+        $validated = $request->validate([
+            'counted_cash' => ['required', 'numeric', 'min:0', 'max:99999999.99'],
+            'reason' => ['required', 'string', 'min:3', 'max:255'],
+        ], [
+            'reason.required' => 'Say why the shift is recounted.',
+        ]);
+
+        $this->shifts->recount($registerShift, $request->user(), (float) $validated['counted_cash'], $validated['reason']);
+
+        return redirect()->back()->with('success', 'Recount saved.');
     }
 
     public function approve(Request $request, Domain $domain, RegisterShift $registerShift)

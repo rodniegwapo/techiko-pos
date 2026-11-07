@@ -6,6 +6,8 @@ use App\Http\Middleware\RoleBasedAccessControl;
 use App\Http\Middleware\UserPermissionCheckMiddleware;
 use App\Models\Category;
 use App\Models\Domain;
+use App\Models\Expense;
+use App\Models\ExpenseCategory;
 use App\Models\InventoryLocation;
 use App\Models\PaymentCardType;
 use App\Models\Permission;
@@ -339,6 +341,100 @@ class RegisterShiftTest extends TestCase
         // Ana counts again; the new count replaces nothing, it's added.
         $this->end($ana, $shift, 100)->assertSessionHasNoErrors();
         $this->assertSame(2, WalletCashCountSubmission::query()->where('register_shift_id', $shift->id)->count());
+    }
+
+    public function test_a_reopened_shift_shows_its_expenses_apart_and_ending_it_again_does_not_add_them_twice(): void
+    {
+        $this->domain->update(['settings' => ['features' => ['finance' => true, 'expenses' => true]]]);
+        $ana = $this->user('cashier', 4);
+        $supplies = ExpenseCategory::query()->create(['domain' => $this->domain->name_slug, 'name' => 'Supplies', 'is_active' => true]);
+        $this->start($ana, 1000);
+        $shift = $this->shiftOf($ana);
+        $endShift = fn (array $body) => $this->actingAs($ana)->post($this->url('register-shifts.end', ['registerShift' => $shift->id]), $body);
+
+        $endShift([
+            'counted_cash' => 750,
+            'expenses' => [['expense_category_id' => $supplies->id, 'amount' => 250, 'description' => 'Ice']],
+        ])->assertSessionHasNoErrors();
+        $this->actingAs($ana)->post($this->url('register-shifts.reopen', ['registerShift' => $shift->id]), ['reason' => 'Forgot a sale'])
+            ->assertSessionHasNoErrors();
+
+        // The ₱250 is an expense, not cash taken out; Expected still has it taken out.
+        $figures = app(RegisterShiftService::class)->figures($shift->fresh());
+        $this->assertEquals(0, $figures['manual_out']);
+        $this->assertEquals(250, $figures['expenses']);
+        $this->assertEquals(750, $figures['expected_cash']);
+        $expense = app(RegisterShiftService::class)->recordedExpenses($shift)->sole();
+
+        // Ending again with the recorded list: the expense is changed in place, not added again.
+        $endShift([
+            'counted_cash' => 800,
+            'replace_recorded_expenses' => true,
+            'expenses' => [['id' => $expense->id, 'expense_category_id' => $supplies->id, 'amount' => 200, 'description' => 'Ice']],
+        ])->assertSessionHasNoErrors();
+        $this->assertSame(1, Expense::query()->count());
+        $this->assertEquals(200, Expense::query()->sole()->amount);
+        $shift->refresh();
+        $this->assertSame(RegisterShift::CLOSED, $shift->status);
+        $this->assertEquals(800, $shift->expected_cash);
+
+        // Reopened and ended with the expense removed from the list: it is gone, and so is its drawer line.
+        $this->actingAs($ana)->post($this->url('register-shifts.reopen', ['registerShift' => $shift->id]), ['reason' => 'Ice was refunded'])
+            ->assertSessionHasNoErrors();
+        $endShift(['counted_cash' => 1000, 'replace_recorded_expenses' => true, 'expenses' => []])->assertSessionHasNoErrors();
+        $this->assertSame(0, Expense::query()->count());
+        $this->assertEquals(1000, $shift->fresh()->expected_cash);
+    }
+
+    public function test_a_manager_recounts_an_earlier_days_shift_without_reopening_it(): void
+    {
+        $ana = $this->user('cashier', 4);
+        $boss = $this->user('manager', 3);
+        $this->start($ana, 100);
+        $this->end($ana, $this->shiftOf($ana), 90);
+        $shift = $this->shiftOf($ana);
+        // Reviewed the next day: it can't be reopened any more, but it can be recounted.
+        $shift->update(['business_date' => today()->subDay()->toDateString()]);
+        $this->assertSame(RegisterShift::NEEDS_REVIEW, $shift->fresh()->status);
+
+        $recount = fn (array $body) => $this->actingAs($boss)->post($this->url('register-shifts.recount', ['registerShift' => $shift->id]), $body);
+        $recount(['counted_cash' => 95])->assertSessionHasErrors('reason');
+
+        // Still short: stays waiting for review with the new figures.
+        $recount(['counted_cash' => 95, 'reason' => 'Found coins in the tray'])->assertSessionHasNoErrors();
+        $shift->refresh();
+        $this->assertSame(RegisterShift::NEEDS_REVIEW, $shift->status);
+        $this->assertEquals(95, $shift->counted_cash);
+        $this->assertEquals(-5, $shift->variance);
+        $this->assertNotNull($shift->closed_at);
+
+        // Balanced now: the review clears, and every count stays in the history.
+        $recount(['counted_cash' => 100, 'reason' => 'Bill stuck under the tray'])->assertSessionHasNoErrors();
+        $shift->refresh();
+        $this->assertSame(RegisterShift::CLOSED, $shift->status);
+        $this->assertEquals(0, $shift->variance);
+        $this->assertSame(3, WalletCashCountSubmission::query()->where('register_shift_id', $shift->id)->count());
+        $this->assertSame(0, WalletShiftReopenLog::query()->where('register_shift_id', $shift->id)->count());
+    }
+
+    public function test_a_recount_is_refused_on_an_open_or_approved_shift_or_by_another_supervisor(): void
+    {
+        $ana = $this->user('cashier', 4);
+        $boss = $this->user('manager', 3);
+        $sue = $this->user('supervisor', 4);
+        $this->start($ana, 100);
+        $shift = $this->shiftOf($ana);
+        $recount = fn (User $by) => $this->actingAs($by)->post($this->url('register-shifts.recount', ['registerShift' => $shift->id]), ['counted_cash' => 100, 'reason' => 'Recheck']);
+
+        $recount($boss)->assertSessionHasErrors('shift');
+
+        $this->end($ana, $shift, 90);
+        // Not Ana's supervisor.
+        $recount($sue)->assertSessionHasErrors('shift');
+
+        $this->actingAs($boss)->post($this->url('register-shifts.approve', ['registerShift' => $shift->id]), [])->assertSessionHasNoErrors();
+        $recount($boss)->assertSessionHasErrors('shift');
+        $this->assertEquals(90, $shift->fresh()->counted_cash);
     }
 
     public function test_a_manager_approves_counts_but_not_their_own(): void

@@ -20,7 +20,7 @@ class RegisterShiftPermissionSeeder extends Seeder
 
     public const TILL_ROUTES = ['register-shifts.start', 'register-shifts.end', 'register-shifts.reopen'];
 
-    public const REVIEW_ROUTES = ['register-shifts.index', 'register-shifts.approve', 'register-shifts.money-by-user'];
+    public const REVIEW_ROUTES = ['register-shifts.index', 'register-shifts.approve', 'register-shifts.recount', 'register-shifts.money-by-user'];
 
     public const TILL_ROLES = ['super admin', 'admin', 'manager', 'supervisor', 'cashier'];
 

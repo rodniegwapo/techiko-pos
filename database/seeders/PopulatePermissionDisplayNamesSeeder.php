@@ -165,6 +165,7 @@ class PopulatePermissionDisplayNamesSeeder extends Seeder
             'register-shifts.spot-check' => 'Spot check own drawer',
             'register-shifts.index' => 'View counted money',
             'register-shifts.approve' => 'Approve counted money',
+            'register-shifts.recount' => 'Recount an ended shift',
             'register-shifts.money-by-user' => 'View money per user',
 
             'vat-report.index' => 'View VAT Report',

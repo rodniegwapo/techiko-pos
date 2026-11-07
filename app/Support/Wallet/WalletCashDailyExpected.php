@@ -15,6 +15,7 @@ final class WalletCashDailyExpected
      *     paid_cash_sales: float,
      *     manual_in: float,
      *     manual_out: float,
+     *     expenses: float,
      *     expected_cash: float
      * }
      */
@@ -56,14 +57,18 @@ final class WalletCashDailyExpected
         // Cash sales, and the cash part of sales paid in parts.
         $paidCashSales = SalePayment::totalFor($salesQuery, 'cash');
         $manualIn = round((float) (clone $movementBase)->where('direction', 'in')->sum('amount'), 2);
-        $manualOut = round((float) (clone $movementBase)->where('direction', 'out')->sum('amount'), 2);
-        $expectedCash = round($openingCash + $paidCashSales + $manualIn - $manualOut, 2);
+        // Expenses paid from the drawer are their own line, apart from other cash taken out.
+        $outBase = (clone $movementBase)->where('direction', 'out');
+        $expenses = round((float) (clone $outBase)->where('kind', WalletCashMovement::KIND_EXPENSE)->sum('amount'), 2);
+        $manualOut = round((float) (clone $outBase)->where('kind', '!=', WalletCashMovement::KIND_EXPENSE)->sum('amount'), 2);
+        $expectedCash = round($openingCash + $paidCashSales + $manualIn - $manualOut - $expenses, 2);
 
         return [
             'opening_cash' => $openingCash,
             'paid_cash_sales' => $paidCashSales,
             'manual_in' => $manualIn,
             'manual_out' => $manualOut,
+            'expenses' => $expenses,
             'expected_cash' => $expectedCash,
         ];
     }

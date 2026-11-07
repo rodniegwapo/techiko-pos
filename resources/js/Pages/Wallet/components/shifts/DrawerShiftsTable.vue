@@ -39,6 +39,7 @@ const columns = computed(() => [
     { title: "Cash sales", key: "sales", align: "right" },
     { title: "Cash in", key: "in", align: "right" },
     { title: "Cash out", key: "out", align: "right" },
+    { title: "Expenses", key: "expenses", align: "right" },
     { title: "Expected", key: "expected", align: "right" },
     { title: "Counted", key: "counted", align: "right" },
     ...(props.canSeeCountResult ? [{ title: "Short / Over", key: "result", align: "right" }] : []),
@@ -69,6 +70,7 @@ const rows = computed(() => [
         paid_cash_sales: props.cashControl.paid_cash_sales,
         manual_in: props.cashControl.manual_in,
         manual_out: props.cashControl.manual_out,
+        expenses: props.cashControl.expenses,
         expected_cash: props.cashControl.expected_cash,
         in_tray: props.drawerByShift.total,
     }] : []),
@@ -79,7 +81,7 @@ const rowProps = (r) => ({
     class: r.kind === "total" ? "bg-gray-50 font-semibold" : "",
 });
 // The whole store's cells keep the ids the "What should be in the drawer" steps had.
-const totalId = { opening: "step-opening", sales: "step-sales", in: "step-in", out: "step-out" };
+const totalId = { opening: "step-opening", sales: "step-sales", in: "step-in", out: "step-out", expenses: "step-expenses" };
 </script>
 
 <template>
@@ -120,13 +122,13 @@ const totalId = { opening: "step-opening", sales: "step-sales", in: "step-in", o
                         <div v-if="record.reopen_count" class="text-xs text-gray-500">Reopened {{ record.reopen_count }}×</div>
                     </template>
                 </template>
-                <template v-else-if="['opening', 'sales', 'in', 'out'].includes(column.key)">
+                <template v-else-if="['opening', 'sales', 'in', 'out', 'expenses'].includes(column.key)">
                     <span
                         v-if="record.kind !== 'store'"
                         class="font-mono tabular-nums"
                         :data-testid="record.kind === 'total' ? totalId[column.key] : undefined"
                     >
-                        {{ column.key === "in" || column.key === "sales" ? "+ " : column.key === "out" ? "− " : "" }}{{ money({ opening: record.opening_cash, sales: record.paid_cash_sales, in: record.manual_in, out: record.manual_out }[column.key]) }}
+                        {{ column.key === "in" || column.key === "sales" ? "+ " : column.key === "out" || column.key === "expenses" ? "− " : "" }}{{ money({ opening: record.opening_cash, sales: record.paid_cash_sales, in: record.manual_in, out: record.manual_out, expenses: record.expenses ?? 0 }[column.key]) }}
                     </span>
                 </template>
                 <template v-else-if="column.key === 'expected'">

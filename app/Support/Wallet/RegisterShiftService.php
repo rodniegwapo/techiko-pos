@@ -3,6 +3,7 @@
 namespace App\Support\Wallet;
 
 use App\Models\Domain;
+use App\Models\Expense;
 use App\Models\InventoryLocation;
 use App\Models\RegisterShift;
 use App\Models\Sale;
@@ -36,7 +37,10 @@ class RegisterShiftService
      * What should be in this cashier's drawer: their opening, their cash sales, and the cash lines
      * added during their shift (book-only AUTO_CC_* lines aside, like the store's own Expected).
      *
-     * @return array{opening_cash: float, paid_cash_sales: float, manual_in: float, manual_out: float, expected_cash: float}
+     * Expenses paid from the drawer are their own line, not part of Cash out, so a reopened shift
+     * shows them as what they are.
+     *
+     * @return array{opening_cash: float, paid_cash_sales: float, manual_in: float, manual_out: float, expenses: float, expected_cash: float}
      */
     public function figures(RegisterShift $shift): array
     {
@@ -50,15 +54,35 @@ class RegisterShiftService
         $opening = round((float) $shift->opening_cash, 2);
         $cashSales = SalePayment::totalFor($sales, 'cash');
         $in = round((float) (clone $lines)->where('direction', 'in')->sum('amount'), 2);
-        $out = round((float) (clone $lines)->where('direction', 'out')->sum('amount'), 2);
+        $outLines = (clone $lines)->where('direction', 'out');
+        $expenses = round((float) (clone $outLines)->where('kind', WalletCashMovement::KIND_EXPENSE)->sum('amount'), 2);
+        $out = round((float) (clone $outLines)->where('kind', '!=', WalletCashMovement::KIND_EXPENSE)->sum('amount'), 2);
 
         return [
             'opening_cash' => $opening,
             'paid_cash_sales' => $cashSales,
             'manual_in' => $in,
             'manual_out' => $out,
-            'expected_cash' => round($opening + $cashSales + $in - $out, 2),
+            'expenses' => $expenses,
+            'expected_cash' => round($opening + $cashSales + $in - $out - $expenses, 2),
         ];
+    }
+
+    /**
+     * The expenses paid from this shift's drawer (recorded when it was ended, before a reopen), so
+     * ending it again shows them to edit instead of adding them twice.
+     *
+     * @return \Illuminate\Database\Eloquent\Collection<int, Expense>
+     */
+    public function recordedExpenses(RegisterShift $shift)
+    {
+        return Expense::query()
+            ->whereIn('wallet_cash_movement_id', WalletCashMovement::query()
+                ->where('register_shift_id', $shift->id)
+                ->where('kind', WalletCashMovement::KIND_EXPENSE)
+                ->select('id'))
+            ->orderBy('id')
+            ->get();
     }
 
     /**
@@ -149,7 +173,11 @@ class RegisterShiftService
      * Ends a shift with its count, and any cash expenses paid from the drawer during it. No PIN:
      * a count that is off goes to a manager to review.
      *
-     * @param  array{counted_cash: float|string, notes?: ?string, expenses?: list<array{expense_category_id: int, amount: float|string, description: string}>}  $data
+     * With replace_recorded_expenses (the form showed the expenses already on a reopened shift),
+     * the list is the shift's whole list: rows with an id change that expense, recorded ones left
+     * out are removed, the rest are new. Without it, every row is a new expense.
+     *
+     * @param  array{counted_cash: float|string, notes?: ?string, replace_recorded_expenses?: bool, expenses?: list<array{id?: ?int, expense_category_id: int, amount: float|string, description: string}>}  $data
      */
     public function end(RegisterShift $shift, User $actor, array $data): RegisterShift
     {
@@ -159,7 +187,31 @@ class RegisterShiftService
         }
 
         return DB::transaction(function () use ($shift, $actor, $data) {
-            foreach ($data['expenses'] ?? [] as $row) {
+            $rows = $data['expenses'] ?? [];
+            $recorded = $this->recordedExpenses($shift)->keyBy('id');
+            if (! empty($data['replace_recorded_expenses'])) {
+                $kept = collect($rows)->pluck('id')->filter()->map(fn ($id) => (int) $id)->all();
+                foreach ($recorded as $id => $expense) {
+                    if (! in_array((int) $id, $kept, true)) {
+                        $this->expenses->delete($expense);
+                    }
+                }
+            }
+
+            foreach ($rows as $row) {
+                if (! empty($row['id'])) {
+                    $expense = $recorded->get((int) $row['id']);
+                    if (! $expense) {
+                        throw ValidationException::withMessages(['expenses' => 'That expense isn\'t on this shift.']);
+                    }
+                    $this->expenses->update($expense, [
+                        'expense_category_id' => (int) $row['expense_category_id'],
+                        'amount' => $row['amount'],
+                        'description' => $row['description'],
+                    ]);
+
+                    continue;
+                }
                 $this->expenses->create([
                     'domain' => $shift->domain,
                     'location_id' => $shift->location_id,
@@ -260,6 +312,58 @@ class RegisterShiftService
                 'expected_cash' => null,
                 'variance' => null,
                 'closed_at' => null,
+            ]);
+
+            return $shift->refresh();
+        });
+    }
+
+    /**
+     * A reviewer records a new count for an ended shift without reopening it: any day, so a count
+     * reviewed after its day can still be corrected. The shift stays ended (no new sales join it);
+     * its count and short/over change, and the old count stays in the count history with the new
+     * one beside it. A count that now matches clears the review.
+     */
+    public function recount(RegisterShift $shift, User $actor, float $counted, string $reason): RegisterShift
+    {
+        if (! in_array($shift->status, [RegisterShift::CLOSED, RegisterShift::NEEDS_REVIEW], true)) {
+            throw ValidationException::withMessages(['shift' => $shift->isOpen()
+                ? 'The shift is still open.'
+                : 'A manager already approved this shift\'s count; record a correction in Cash in & out instead.']);
+        }
+        if ((int) $shift->user_id !== (int) $actor->id) {
+            $this->ensureCanReview($shift, $actor);
+        }
+
+        return DB::transaction(function () use ($shift, $actor, $counted, $reason) {
+            $expected = $this->figures($shift)['expected_cash'];
+            $counted = round($counted, 2);
+            $variance = round($counted - $expected, 2);
+            $reason = trim($reason);
+
+            WalletCashCountSubmission::query()->create([
+                'domain' => $shift->domain,
+                'location_id' => $shift->location_id,
+                'kind' => WalletCashCountSubmission::SHIFT,
+                'reconciliation_id' => WalletCashReconciliation::query()
+                    ->forWalletContext($shift->domain, (int) $shift->location_id)
+                    ->whereDate('business_date', $shift->business_date)
+                    ->value('id'),
+                'register_shift_id' => $shift->id,
+                'business_date' => $shift->business_date->toDateString(),
+                'counted_cash' => $counted,
+                'expected_cash_snapshot' => $expected,
+                'variance_snapshot' => $variance,
+                'notes' => 'Recount: '.$reason,
+                'counted_by' => $actor->id,
+                'counted_at' => now(),
+            ]);
+
+            $shift->update([
+                'counted_cash' => $counted,
+                'expected_cash' => $expected,
+                'variance' => $variance,
+                'status' => abs($variance) <= self::TOLERANCE ? RegisterShift::CLOSED : RegisterShift::NEEDS_REVIEW,
             ]);
 
             return $shift->refresh();

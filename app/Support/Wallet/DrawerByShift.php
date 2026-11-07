@@ -50,6 +50,7 @@ final class DrawerByShift
                 'paid_cash_sales' => $figures['paid_cash_sales'],
                 'manual_in' => $figures['manual_in'],
                 'manual_out' => $figures['manual_out'],
+                'expenses' => $figures['expenses'],
                 // Open: what should be there now. Ended: what it was counted against.
                 'expected_cash' => $shift->isOpen() ? $figures['expected_cash'] : (float) $shift->expected_cash,
                 'in_tray' => isset($trays[$shift->id]) ? $trays[$shift->id]['amount'] : null,
