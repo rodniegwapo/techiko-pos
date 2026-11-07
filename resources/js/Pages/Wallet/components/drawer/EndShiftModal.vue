@@ -11,7 +11,8 @@ import BillCounter from "./BillCounter.vue";
  * No manager's PIN: a count that is off goes to a manager on Shifts & counts. Ending the store's
  * day also says where the cash goes: taken out, or left in the drawer as the next opening.
  * In pesos the cash can be counted bill by bill (BillCounter); only the total is saved. A spot
- * check earlier in the day fills the count in.
+ * check earlier in the day fills the count in. A reopened shift's expenses (recordedExpenses) are
+ * already in the list: they can be changed or removed, and aren't added a second time.
  */
 const props = defineProps({
     open: { type: Boolean, default: false },
@@ -20,6 +21,8 @@ const props = defineProps({
     saving: { type: Boolean, default: false },
     /** Empty when the plan has no Expenses. */
     expenseCategories: { type: Array, default: () => [] },
+    /** Expenses already on this shift (it was ended and reopened): { id, expense_category_id, amount, description }. */
+    recordedExpenses: { type: Array, default: null },
     /** Managers see Expected next to the count. */
     showExpected: { type: Boolean, default: true },
     /** The cashier's own shift: no "where the cash goes" choice, that is the store's day. */
@@ -46,7 +49,7 @@ watch(
         Object.assign(form, {
             counted: c.counted_at != null ? Number(c.counted_cash) : null,
             notes: c.notes || "",
-            expenses: [],
+            expenses: (props.recordedExpenses ?? []).map((e) => ({ ...e })),
             action: "cashout_now",
         });
     },
@@ -55,6 +58,9 @@ watch(
 
 const countedAmount = computed(() => Number(form.counted || 0));
 const expenseTotal = computed(() => form.expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0));
+// Expected already has the recorded expenses taken out; the hint takes out the whole list below instead.
+const recordedTotal = computed(() => (props.recordedExpenses ?? []).reduce((sum, e) => sum + Number(e.amount || 0), 0));
+const expectedBeforeExpenses = computed(() => Number(props.cashControl.expected_cash || 0) + recordedTotal.value);
 const missingCount = computed(() => form.counted === null || form.counted === "" || !Number.isFinite(Number(form.counted)));
 
 // Taking out nothing makes no sense: with an empty drawer the shift just closes with it as the opening.
@@ -78,9 +84,10 @@ function submit() {
         counted_cash: Number(form.counted),
         notes: form.notes || null,
         ...(props.ownShift ? {} : { end_shift_action: form.action }),
+        ...(props.recordedExpenses ? { replace_recorded_expenses: true } : {}),
         expenses: form.expenses
             .filter((e) => Number(e.amount) > 0)
-            .map((e) => ({ expense_category_id: e.expense_category_id, amount: Number(e.amount), description: e.description })),
+            .map((e) => ({ ...(e.id ? { id: e.id } : {}), expense_category_id: e.expense_category_id, amount: Number(e.amount), description: e.description })),
         ...(offerClockOut.value && clockOut.value.enabled && clockOut.value.pin ? { clock_out_pin: clockOut.value.pin } : {}),
     });
 }
@@ -97,7 +104,7 @@ function submit() {
                 </p>
                 <BillCounter v-model="form.counted" testid="end-shift-counted" prefix="end-shift" />
                 <p v-if="showExpected" class="mb-0 mt-1 text-xs text-gray-500">
-                    Expected: {{ formattedTotal(Number(cashControl.expected_cash) || 0) }}<template v-if="expenseTotal">
+                    Expected: {{ formattedTotal(expectedBeforeExpenses) }}<template v-if="expenseTotal">
                         , less {{ formattedTotal(expenseTotal) }} in expenses below</template>.
                 </p>
                 <p v-if="ownShift" class="mb-0 mt-1 text-xs text-gray-500">
@@ -115,7 +122,10 @@ function submit() {
                 <p v-if="!form.expenses.length" class="m-0 text-xs text-gray-500">
                     Paid something from the drawer (ice, delivery, a small repair)? Add it so the drawer adds up.
                 </p>
-                <div v-for="(e, i) in form.expenses" :key="i" class="mb-2 grid grid-cols-12 gap-2" data-testid="end-shift-expense">
+                <p v-if="recordedExpenses?.length" class="mb-1 text-xs text-gray-500" data-testid="end-shift-recorded-expenses">
+                    Already recorded on this shift. Change or remove them here; don't add them again.
+                </p>
+                <div v-for="(e, i) in form.expenses" :key="e.id ?? `new-${i}`" class="mb-2 grid grid-cols-12 gap-2" data-testid="end-shift-expense">
                     <a-select
                         v-model:value="e.expense_category_id"
                         class="col-span-12 sm:col-span-4"

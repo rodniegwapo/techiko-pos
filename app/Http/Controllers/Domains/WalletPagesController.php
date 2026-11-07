@@ -137,6 +137,13 @@ class WalletPagesController extends Controller
             'myShift' => $mine ? [
                 ...$mine->load('reviewedBy:id,name')->toRow(),
                 'figures' => $mine->isOpen() ? $shifts->figures($mine) : null,
+                // Expenses already recorded on a reopened shift, to edit when it is ended again.
+                'expenses' => $mine->isOpen() ? $shifts->recordedExpenses($mine)->map(fn ($e) => [
+                    'id' => $e->id,
+                    'expense_category_id' => $e->expense_category_id,
+                    'amount' => (float) $e->amount,
+                    'description' => $e->description,
+                ])->values() : [],
                 'can_reopen' => ! $mine->isOpen() && $mine->status !== RegisterShift::APPROVED
                     && RoutePermission::allows($user, 'register-shifts.reopen'),
                 'last_spot_check' => RegisterShiftService::lastSpotCheck($mine),

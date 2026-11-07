@@ -370,6 +370,8 @@ Route::prefix('domains/{domain:name_slug}')
             // Count your own tray during your shift.
             Route::post('/{registerShift}/spot-check', [RegisterShiftController::class, 'spotCheck'])->whereNumber('registerShift')->name('spot-check');
             Route::post('/{registerShift}/approve', [RegisterShiftController::class, 'approve'])->whereNumber('registerShift')->name('approve');
+            // A reviewer's new count for an ended shift, any day, without reopening it.
+            Route::post('/{registerShift}/recount', [RegisterShiftController::class, 'recount'])->whereNumber('registerShift')->name('recount');
         });
 
         // Credit Management (Organization-specific)

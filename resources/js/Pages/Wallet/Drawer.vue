@@ -275,11 +275,12 @@ onBeforeUnmount(() => {
                     </a-button>
                 </div>
             </div>
-            <div v-if="myOpen && myFigures" class="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-5" data-testid="my-shift-figures">
+            <div v-if="myOpen && myFigures" class="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-6" data-testid="my-shift-figures">
                 <div><div class="text-xs text-gray-500">Opening</div><div class="font-mono tabular-nums">{{ money(myFigures.opening_cash) }}</div></div>
                 <div><div class="text-xs text-gray-500">Cash sales</div><div class="font-mono tabular-nums">+ {{ money(myFigures.paid_cash_sales) }}</div></div>
                 <div><div class="text-xs text-gray-500">Cash in</div><div class="font-mono tabular-nums">+ {{ money(myFigures.manual_in) }}</div></div>
                 <div><div class="text-xs text-gray-500">Cash out</div><div class="font-mono tabular-nums">− {{ money(myFigures.manual_out) }}</div></div>
+                <div><div class="text-xs text-gray-500">Expenses</div><div class="font-mono tabular-nums" data-testid="my-shift-expenses">− {{ money(myFigures.expenses) }}</div></div>
                 <div><div class="text-xs text-gray-500">Expected</div><div class="font-mono font-semibold tabular-nums" data-testid="my-shift-expected">{{ money(myFigures.expected_cash) }}</div></div>
             </div>
             <p v-else-if="myShift && !myOpen" class="mb-0 mt-2 text-sm text-gray-700">
@@ -547,6 +548,7 @@ onBeforeUnmount(() => {
             :cash-control="{ expected_cash: myFigures?.expected_cash ?? 0, counted_at: null }"
             :saving="actions.busy.value === 'my-end'"
             :expense-categories="expenseCategories"
+            :recorded-expenses="myShift?.expenses ?? []"
             :show-expected="canSeeCountResult"
             own-shift
             :clock="myClock"

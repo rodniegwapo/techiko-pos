@@ -118,6 +118,7 @@ const showSales = ref(false);
                         <div class="flex justify-between"><span class="text-gray-600">+ Cash sales</span><span class="font-mono tabular-nums text-green-700">+ {{ money(figures.paid_cash_sales) }}</span></div>
                         <div class="flex justify-between"><span class="text-gray-600">+ Cash in</span><span class="font-mono tabular-nums text-green-700">+ {{ money(figures.manual_in) }}</span></div>
                         <div class="flex justify-between"><span class="text-gray-600">− Cash out</span><span class="font-mono tabular-nums text-red-700">− {{ money(figures.manual_out) }}</span></div>
+                        <div class="flex justify-between"><span class="text-gray-600">− Expenses</span><span class="font-mono tabular-nums text-red-700">− {{ money(figures.expenses ?? 0) }}</span></div>
                         <div class="mt-1 flex justify-between border-t border-gray-100 pt-2 font-semibold">
                             <span>= Expected</span><span class="font-mono tabular-nums" data-testid="shift-sheet-expected">{{ money(expected) }}</span>
                         </div>

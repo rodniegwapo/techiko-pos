@@ -196,6 +196,7 @@ class CashControlSnapshot
             'paid_cash_sales' => $paidCashSales,
             'manual_in' => $manualIn,
             'manual_out' => $manualOut,
+            'expenses' => $dailyExpected['expenses'],
             'expected_cash' => $expectedCash,
             'counted_cash' => $countedCash,
             'variance' => $variance,

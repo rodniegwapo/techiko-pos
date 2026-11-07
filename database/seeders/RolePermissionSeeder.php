@@ -80,6 +80,7 @@ class RolePermissionSeeder extends Seeder
             'register-shifts.spot-check',
             'register-shifts.index',
             'register-shifts.approve',
+            'register-shifts.recount',
             'register-shifts.money-by-user',
             // Cash on hand: owners and admins only
             'cash-on-hand.index',
@@ -502,6 +503,7 @@ class RolePermissionSeeder extends Seeder
             'register-shifts.spot-check',
             'register-shifts.index',
             'register-shifts.approve',
+            'register-shifts.recount',
             'register-shifts.money-by-user',
             // Cash on hand: owners and admins only
             'cash-on-hand.index',
@@ -821,6 +823,7 @@ class RolePermissionSeeder extends Seeder
             'register-shifts.spot-check',
             'register-shifts.index',
             'register-shifts.approve',
+            'register-shifts.recount',
             'register-shifts.money-by-user',
             'vat-report.index',
             'vat-report.export',
@@ -1086,6 +1089,7 @@ class RolePermissionSeeder extends Seeder
             'register-shifts.spot-check',
             'register-shifts.index',
             'register-shifts.approve',
+            'register-shifts.recount',
             'register-shifts.money-by-user',
 
             // Dashboard

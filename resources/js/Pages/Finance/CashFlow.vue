@@ -30,6 +30,13 @@ const { filters, filtersConfig, activeFilters, handleClearSelectedFilter, clearA
 
 const change = (now, before) => ({ amount: now - before, pct: before ? Math.round(((now - before) / Math.abs(before)) * 1000) / 10 : null });
 
+// No money moved in the previous period (often: the business started recording this period).
+// Its column then shows "—" with a note, not a row of ₱0.00 that reads like real figures.
+const hasPrevious = computed(() =>
+    [props.previous.total_in, props.previous.total_out, props.previous.other_movements].some((v) => Math.abs(Number(v) || 0) >= 0.01),
+);
+const before = (v) => (hasPrevious.value ? formattedTotal(v) : "—");
+
 const sections = computed(() => [
     {
         title: "Money in",
@@ -93,7 +100,10 @@ const accounts = computed(() => props.current.account_balances ?? { accounts: []
                                 <tr>
                                     <th class="px-4 py-3 text-left font-medium"></th>
                                     <th class="px-4 py-3 text-right font-medium">This period</th>
-                                    <th class="px-4 py-3 text-right font-medium">Previous</th>
+                                    <th class="px-4 py-3 text-right font-medium">
+                                        Previous
+                                        <div class="text-[10px] font-normal normal-case tracking-normal text-gray-400">{{ previousLabel }}</div>
+                                    </th>
                                 </tr>
                             </thead>
                             <template v-for="section in sections" :key="section.title">
@@ -107,12 +117,12 @@ const accounts = computed(() => props.current.account_balances ?? { accounts: []
                                             <div v-if="row.note" class="text-xs text-gray-500">{{ row.note }}</div>
                                         </td>
                                         <td class="px-4 py-3 text-right text-gray-900">{{ formattedTotal(row.now) }}</td>
-                                        <td class="px-4 py-3 text-right text-gray-500">{{ formattedTotal(row.before) }}</td>
+                                        <td class="px-4 py-3 text-right text-gray-500">{{ before(row.before) }}</td>
                                     </tr>
                                     <tr class="border-t border-gray-100">
                                         <td class="px-4 py-3 font-semibold text-gray-900">{{ section.total.label }}</td>
                                         <td class="px-4 py-3 text-right font-semibold text-gray-900">{{ formattedTotal(section.total.now) }}</td>
-                                        <td class="px-4 py-3 text-right text-gray-500">{{ formattedTotal(section.total.before) }}</td>
+                                        <td class="px-4 py-3 text-right text-gray-500">{{ before(section.total.before) }}</td>
                                     </tr>
                                 </tbody>
                             </template>
@@ -123,14 +133,19 @@ const accounts = computed(() => props.current.account_balances ?? { accounts: []
                                         <div class="text-xs text-gray-500">Float added to the drawer and cash count differences</div>
                                     </td>
                                     <td class="px-4 py-3 text-right text-gray-900">{{ formattedTotal(current.other_movements) }}</td>
-                                    <td class="px-4 py-3 text-right text-gray-500">{{ formattedTotal(previous.other_movements) }}</td>
+                                    <td class="px-4 py-3 text-right text-gray-500">{{ before(previous.other_movements) }}</td>
                                 </tr>
                                 <tr class="border-t-2 border-gray-300 bg-gray-50/60">
                                     <td class="px-4 py-3 font-semibold text-gray-900">Net change in money</td>
                                     <td class="px-4 py-3 text-right font-semibold" :class="current.net_change < 0 ? 'text-red-600' : 'text-gray-900'">
                                         {{ formattedTotal(current.net_change) }}
                                     </td>
-                                    <td class="px-4 py-3 text-right text-gray-500">{{ formattedTotal(previous.net_change) }}</td>
+                                    <td class="px-4 py-3 text-right text-gray-500">{{ before(previous.net_change) }}</td>
+                                </tr>
+                                <tr v-if="!hasPrevious" class="border-t border-gray-100">
+                                    <td colspan="3" class="px-4 py-2 text-xs text-gray-500" data-testid="cash-flow-no-previous">
+                                        No money was recorded in the previous period ({{ previousLabel }}), so there is nothing to compare yet.
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
