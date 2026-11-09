@@ -128,12 +128,12 @@ function submit() {
                 <div v-for="(e, i) in form.expenses" :key="e.id ?? `new-${i}`" class="mb-2 grid grid-cols-12 gap-2" data-testid="end-shift-expense">
                     <a-select
                         v-model:value="e.expense_category_id"
-                        class="col-span-12 sm:col-span-4"
+                        class="col-span-12 md:col-span-4"
                         placeholder="For"
                         :options="expenseCategories.map((c) => ({ value: c.id, label: c.name }))"
                     />
-                    <a-input v-model:value="e.description" class="col-span-7 sm:col-span-4" placeholder="What" :maxlength="255" />
-                    <a-input-number v-model:value="e.amount" :min="0.01" :precision="2" class="col-span-4 sm:col-span-3 !w-full" placeholder="₱" />
+                    <a-input v-model:value="e.description" class="col-span-7 md:col-span-4" placeholder="What" :maxlength="255" />
+                    <a-input-number v-model:value="e.amount" :min="0.01" :precision="2" class="col-span-4 md:col-span-3 !w-full" placeholder="₱" />
                     <a-button type="text" danger class="col-span-1" aria-label="Remove expense" @click="form.expenses.splice(i, 1)">
                         <IconTrash :size="16" />
                     </a-button>
