@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref, watch } from "vue";
+import { useMediaQuery } from "@vueuse/core";
 import axios from "axios";
 import dayjs from "dayjs";
 import { notification } from "ant-design-vue";
@@ -86,6 +87,8 @@ const timeline = computed(() => {
     ];
     return events.filter((e) => e.at).sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
 });
+// Full screen on phones; a side panel from tablets up.
+const isMdUp = useMediaQuery("(min-width: 768px)");
 const DOT = { gray: "bg-gray-400", green: "bg-green-600", red: "bg-red-600", blue: "bg-blue-600", orange: "bg-amber-500" };
 const showSales = ref(false);
 </script>
@@ -93,7 +96,7 @@ const showSales = ref(false);
 <template>
     <a-drawer
         :visible="!!shift"
-        :width="520"
+        :width="isMdUp ? 520 : '100%'"
         :title="row.user ? `${row.user.name}'s shift` : 'Shift'"
         placement="right"
         destroy-on-close
@@ -145,8 +148,8 @@ const showSales = ref(false);
                         <li v-for="(e, i) in timeline" :key="i" class="relative flex gap-3 pb-3 text-sm">
                             <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full" :class="DOT[e.tone]" />
                             <div class="min-w-0 flex-1">
-                                <div class="flex justify-between gap-2">
-                                    <span class="text-gray-800">{{ e.title }}</span>
+                                <div class="flex flex-col md:flex-row md:justify-between md:gap-2">
+                                    <span class="break-words text-gray-800">{{ e.title }}</span>
                                     <span class="shrink-0 text-xs text-gray-500">{{ at(e.at) }}</span>
                                 </div>
                                 <div v-if="e.by || e.note" class="text-xs text-gray-500">
@@ -166,7 +169,7 @@ const showSales = ref(false);
                     </a-button>
                     <div v-if="showSales" class="mt-2 max-h-60 overflow-y-auto">
                         <p v-if="!detail.sales.length" class="m-0 text-xs text-gray-500">None.</p>
-                        <div v-for="s in detail.sales" :key="s.id" class="flex justify-between border-b border-gray-100 py-1 text-sm">
+                        <div v-for="s in detail.sales" :key="s.id" class="flex justify-between gap-2 border-b border-gray-100 py-1 text-sm">
                             <span>{{ s.at ? dayjs(s.at).format("h:mm A") : "" }} · {{ s.invoice_number }} · {{ s.channel || s.method }}<template v-if="s.status !== 'paid'"> · {{ s.status }}</template></span>
                             <span class="font-mono tabular-nums">{{ money(s.total) }}</span>
                         </div>

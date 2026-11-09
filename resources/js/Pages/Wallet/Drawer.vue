@@ -207,12 +207,13 @@ onBeforeUnmount(() => {
 <template>
     <WalletLayout title="Today's drawer" active="drawer" :active-location="activeLocation">
         <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div class="flex flex-wrap items-center gap-2">
+            <div class="flex w-full flex-wrap items-center gap-2 md:w-auto">
                 <a-date-picker
                     :value="businessDate"
                     value-format="YYYY-MM-DD"
                     :allow-clear="false"
                     :disabled-date="isFuture"
+                    class="w-full md:w-auto"
                     data-testid="drawer-date"
                     @change="changeDate"
                 />
@@ -250,7 +251,7 @@ onBeforeUnmount(() => {
             <template #message>
                 <div class="flex flex-wrap items-center justify-between gap-2">
                     <span>Your shift from {{ overdueDay(myShift) }} is still open. Count your drawer and end it before taking payments.</span>
-                    <a-button size="small" type="primary" data-testid="overdue-end-my-shift" @click="modal = 'my-end'">Close my drawer</a-button>
+                    <a-button size="small" type="primary" class="w-full md:w-auto" data-testid="overdue-end-my-shift" @click="modal = 'my-end'">Close my drawer</a-button>
                 </div>
             </template>
         </a-alert>
@@ -266,7 +267,7 @@ onBeforeUnmount(() => {
                     </span>
                     <span v-else-if="canStartShift" class="text-xs text-gray-500">Not started. Start it to take payments.</span>
                 </div>
-                <div class="flex flex-wrap gap-2">
+                <div class="grid w-full grid-cols-1 gap-2 md:flex md:w-auto md:flex-wrap">
                     <a-button v-if="myOpen && canSpotCheck" data-testid="spot-check-my-drawer" @click="modal = 'spot'">Spot check my drawer</a-button>
                     <a-button v-if="myOpen" type="primary" data-testid="open-end-my-shift" @click="modal = 'my-end'">Close my drawer</a-button>
                     <a-button v-if="myShift?.can_reopen" data-testid="reopen-my-shift" @click="modal = 'my-reopen'">Reopen</a-button>
@@ -275,13 +276,13 @@ onBeforeUnmount(() => {
                     </a-button>
                 </div>
             </div>
-            <div v-if="myOpen && myFigures" class="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-6" data-testid="my-shift-figures">
+            <div v-if="myOpen && myFigures" class="mt-3 grid grid-cols-2 gap-2 text-sm md:grid-cols-6" data-testid="my-shift-figures">
                 <div><div class="text-xs text-gray-500">Opening</div><div class="font-mono tabular-nums">{{ money(myFigures.opening_cash) }}</div></div>
                 <div><div class="text-xs text-gray-500">Cash sales</div><div class="font-mono tabular-nums">+ {{ money(myFigures.paid_cash_sales) }}</div></div>
                 <div><div class="text-xs text-gray-500">Cash in</div><div class="font-mono tabular-nums">+ {{ money(myFigures.manual_in) }}</div></div>
                 <div><div class="text-xs text-gray-500">Cash out</div><div class="font-mono tabular-nums">− {{ money(myFigures.manual_out) }}</div></div>
                 <div><div class="text-xs text-gray-500">Expenses</div><div class="font-mono tabular-nums" data-testid="my-shift-expenses">− {{ money(myFigures.expenses) }}</div></div>
-                <div><div class="text-xs text-gray-500">Expected</div><div class="font-mono font-semibold tabular-nums" data-testid="my-shift-expected">{{ money(myFigures.expected_cash) }}</div></div>
+                <div class="col-span-2 flex items-baseline justify-between border-t border-teal-200 pt-2 md:col-span-1 md:block md:border-0 md:pt-0"><div class="text-xs text-gray-500">Expected</div><div class="font-mono font-semibold tabular-nums" data-testid="my-shift-expected">{{ money(myFigures.expected_cash) }}</div></div>
             </div>
             <p v-else-if="myShift && !myOpen" class="mb-0 mt-2 text-sm text-gray-700">
                 Counted {{ money(myShift.counted_cash) }}<template v-if="canSeeCountResult && myResult">
@@ -289,7 +290,7 @@ onBeforeUnmount(() => {
                 <template v-if="myShift.status === 'needs_review'"> The count is off from Expected, so a manager will review it. You can start a new shift meanwhile.</template>
                 <template v-else-if="myShift.status === 'approved'"> Approved<template v-if="myShift.reviewed_by"> by {{ myShift.reviewed_by }}</template>.</template>
             </p>
-            <div v-if="myCards.length || cashOnHand" class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4" data-testid="my-takings">
+            <div v-if="myCards.length || cashOnHand" class="mt-3 grid grid-cols-1 gap-2 min-[480px]:grid-cols-2 md:grid-cols-4" data-testid="my-takings">
                 <div
                     v-for="card in myCards"
                     :key="card.key"
@@ -365,13 +366,13 @@ onBeforeUnmount(() => {
                             </span>
                         </template>
                     </div>
-                    <div v-if="canManage" class="flex flex-wrap gap-2">
+                    <div v-if="canManage" class="grid w-full grid-cols-1 gap-2 md:flex md:w-auto md:flex-wrap">
                         <template v-if="!isClosed">
                             <!-- The store's day is a manager's to end, after every cashier has ended their own shift. It takes the final count. -->
                             <a-button
                                 v-if="canSeeCountResult"
                                 type="primary"
-                                class="inline-flex items-center gap-1"
+                                class="inline-flex items-center justify-center gap-1"
                                 :disabled="openShiftsAtStore.length > 0"
                                 data-testid="open-end-shift"
                                 @click="modal = 'end'"
@@ -382,7 +383,7 @@ onBeforeUnmount(() => {
                         </template>
                         <a-button
                             v-else-if="cashControl.can_reopen"
-                            class="inline-flex items-center gap-1"
+                            class="inline-flex items-center justify-center gap-1"
                             data-testid="reopen-shift"
                             @click="modal = 'reopen'"
                         >

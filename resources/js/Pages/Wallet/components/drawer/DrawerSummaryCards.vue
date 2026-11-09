@@ -18,29 +18,29 @@ const money = (v) => formattedTotal(Number(v) || 0);
 
 <template>
     <div class="grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="drawer-summary">
-        <div class="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm" data-testid="summary-cash-in-drawers">
+        <div class="min-w-0 rounded-lg border border-gray-200 bg-white px-3 py-3 shadow-sm md:px-4" data-testid="summary-cash-in-drawers">
             <div class="text-xs font-medium uppercase text-gray-500">Cash in drawers</div>
-            <div class="mt-1 font-mono text-xl font-bold tabular-nums text-gray-900">{{ money(summary.cash_in_drawers) }}</div>
+            <div class="mt-1 break-words font-mono text-lg font-bold md:text-xl tabular-nums text-gray-900">{{ money(summary.cash_in_drawers) }}</div>
             <div class="text-xs text-gray-500">{{ onShift }} on shift now</div>
         </div>
-        <div class="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm" data-testid="summary-cash-sales">
+        <div class="min-w-0 rounded-lg border border-gray-200 bg-white px-3 py-3 shadow-sm md:px-4" data-testid="summary-cash-sales">
             <div class="text-xs font-medium uppercase text-gray-500">Cash sales today</div>
-            <div class="mt-1 font-mono text-xl font-bold tabular-nums text-gray-900">{{ money(summary.cash_sales) }}</div>
+            <div class="mt-1 break-words font-mono text-lg font-bold md:text-xl tabular-nums text-gray-900">{{ money(summary.cash_sales) }}</div>
             <div class="text-xs text-gray-500">Into the drawers</div>
         </div>
-        <div class="rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm" data-testid="summary-digital">
+        <div class="min-w-0 rounded-lg border border-gray-200 bg-white px-3 py-3 shadow-sm md:px-4" data-testid="summary-digital">
             <div class="text-xs font-medium uppercase text-gray-500">Card, e-wallet &amp; bank</div>
-            <div class="mt-1 font-mono text-xl font-bold tabular-nums text-gray-900">{{ money(summary.digital) }}</div>
+            <div class="mt-1 break-words font-mono text-lg font-bold md:text-xl tabular-nums text-gray-900">{{ money(summary.digital) }}</div>
             <div class="text-xs text-gray-500">Today, past the drawer</div>
         </div>
         <div
             v-if="summary.needs_review !== null"
-            class="rounded-lg border px-4 py-3 shadow-sm"
+            class="min-w-0 rounded-lg border px-3 py-3 shadow-sm md:px-4"
             :class="summary.needs_review ? 'border-red-200 bg-red-50' : 'border-gray-200 bg-white'"
             data-testid="summary-discrepancy"
         >
             <div class="text-xs font-medium uppercase" :class="summary.needs_review ? 'text-red-700' : 'text-gray-500'">Counts off</div>
-            <div class="mt-1 font-mono text-xl font-bold tabular-nums" :class="summary.discrepancy < 0 ? 'text-red-700' : summary.discrepancy > 0 ? 'text-amber-700' : 'text-gray-900'">
+            <div class="mt-1 break-words font-mono text-lg font-bold md:text-xl tabular-nums" :class="summary.discrepancy < 0 ? 'text-red-700' : summary.discrepancy > 0 ? 'text-amber-700' : 'text-gray-900'">
                 {{ summary.discrepancy < 0 ? "−" : summary.discrepancy > 0 ? "+" : "" }}{{ money(Math.abs(summary.discrepancy)) }}
             </div>
             <div class="text-xs" :class="summary.needs_review ? 'text-red-700' : 'text-gray-500'">
