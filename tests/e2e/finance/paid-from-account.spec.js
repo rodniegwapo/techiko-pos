@@ -25,8 +25,8 @@ async function pickOption(page, label) {
 const input = (scope, testId) => scope.getByTestId(testId).locator("input").or(scope.getByTestId(testId)).first();
 const modal = (page, title) => page.locator(".ant-modal:visible", { hasText: title });
 
-// Paid by bank transfer or e-wallet: which account the money left, shown in the lists and next to
-// the account's balance (which itself stays as entered).
+// Paid by bank transfer or e-wallet: which account the money left, shown in the lists and netted
+// out of that account's balance.
 test.describe("Paying from a bank account as admin", () => {
     test.use({ account: "admin" });
 
@@ -101,10 +101,10 @@ test.describe("Paying from a bank account as admin", () => {
         await expect(page.getByTestId("expenses-table")).toContainText(description);
         await expect(page.getByTestId("expenses-table").locator("tr", { hasText: description })).toContainText(`Bank transfer · ${account}`);
 
-        // The account's balance stays as entered; what was paid out since shows beside it.
+        // The account's balance nets out what was paid out since the last entry (10,000 − 1,200 − 300).
         await page.goto(url("/finance/assets-and-loans"));
         const accountRow = page.getByTestId("account-table").locator("tr", { hasText: account });
-        await expect(accountRow).toContainText("₱10,000.00");
+        await expect(accountRow).toContainText("₱8,500.00");
         await expect(accountRow.getByTestId("account-paid-out")).toContainText("₱1,500.00");
     });
 

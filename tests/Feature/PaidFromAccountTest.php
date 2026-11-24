@@ -24,7 +24,7 @@ use Tests\TestCase;
 
 /**
  * Expenses and supplier bills paid by bank transfer or e-wallet record which account the money
- * left. The account's entered balance is left alone.
+ * left, and are netted out of that account's entered balance.
  */
 class PaidFromAccountTest extends TestCase
 {
@@ -194,7 +194,7 @@ class PaidFromAccountTest extends TestCase
         $this->assertSame($this->bdo->id, Expense::query()->sole()->financial_account_id);
     }
 
-    public function test_accounts_show_what_was_paid_out_since_the_last_balance_without_changing_it(): void
+    public function test_accounts_balance_subtracts_what_was_paid_out_since_the_last_balance(): void
     {
         $this->bdo->balances()->create(['as_of_date' => today()->subDays(5)->toDateString(), 'balance' => 50000, 'user_id' => $this->admin->id]);
 
@@ -215,9 +215,16 @@ class PaidFromAccountTest extends TestCase
             ->get($this->route('finance.balance-items.index'))
             ->assertInertia(fn (Assert $page) => $page
                 ->where('accounts.0.name', 'BDO savings')
-                ->where('accounts.0.balance', 50000)
+                ->where('accounts.0.balance', 48000)
                 ->where('accounts.0.paid_out_since', 2000)
                 ->where('accounts.1.paid_out_since', 0)
+            );
+
+        $this->actingAs($this->admin)
+            ->get($this->route('finance.balance-sheet'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('balanceSheet.accounts.0.name', 'BDO savings')
+                ->where('balanceSheet.accounts.0.balance', 48000)
             );
     }
 }

@@ -50,15 +50,16 @@ class FinancialAccount extends Model
 
     /**
      * The account's balance at the end of a day: the last balance entered on or before it, plus
-     * sales received through the linked channel since then.
+     * sales received through the linked channel since then, minus expenses and supplier bills paid
+     * from this account since then.
      *
-     * @return array{balance: float|null, as_of: string|null, received: float}
+     * @return array{balance: float|null, as_of: string|null, received: float, paid_out: float}
      */
     public function positionOn(string $date): array
     {
         $entry = $this->balances()->where('as_of_date', '<=', $date)->first();
         if ($entry === null) {
-            return ['balance' => null, 'as_of' => null, 'received' => 0.0];
+            return ['balance' => null, 'as_of' => null, 'received' => 0.0, 'paid_out' => 0.0];
         }
 
         $received = 0.0;
@@ -72,16 +73,19 @@ class FinancialAccount extends Model
             $received = SalePayment::totalFor($sales, PaymentCardType::methodForKind($channel->kind), $channel->id);
         }
 
+        $paidOut = $this->paidOutSince($entry->as_of_date->toDateString(), $date);
+
         return [
-            'balance' => round((float) $entry->balance + $received, 2),
+            'balance' => round((float) $entry->balance + $received - $paidOut, 2),
             'as_of' => $entry->as_of_date->toDateString(),
             'received' => $received,
+            'paid_out' => $paidOut,
         ];
     }
 
     /**
-     * Expenses and supplier bills paid from this account after one day up to another. Shown next to
-     * the balance only; the entered balance already reflects them once the owner updates it.
+     * Expenses and supplier bills paid from this account after one day up to another. Netted
+     * into the balance `positionOn()` returns.
      */
     public function paidOutSince(string $afterDate, string $toDate): float
     {
